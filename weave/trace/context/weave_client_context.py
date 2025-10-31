@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import threading
+import contextvars
 from collections.abc import Generator
 from contextlib import contextmanager
 from typing import TYPE_CHECKING
@@ -8,23 +8,20 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from weave.trace.weave_client import WeaveClient
 
-_global_weave_client: WeaveClient | None = None
-lock = threading.Lock()
+# Thread-safe context variable for the weave client
+# Each execution context (thread, async task) gets its own value
+_weave_client: contextvars.ContextVar[WeaveClient | None] = contextvars.ContextVar(
+    "weave_client",
+    default=None,
+)
 
 
 def set_weave_client_global(client: WeaveClient | None) -> None:
-    global _global_weave_client
+    """Set the weave client for the current execution context.
 
-    # These outer guards are to avoid expensive lock acquisition
-    if client is not None and _global_weave_client is None:
-        with lock:
-            if _global_weave_client is None:
-                _global_weave_client = client
-
-    elif client is None and _global_weave_client is not None:
-        with lock:
-            if _global_weave_client is not None:
-                _global_weave_client = client
+    This is thread-safe - each thread/context gets its own client value.
+    """
+    _weave_client.set(client)
 
 
 # This is no longer a concept, but should be
@@ -33,9 +30,14 @@ def set_weave_client_global(client: WeaveClient | None) -> None:
 
 
 def get_weave_client() -> WeaveClient | None:
+    """Get the weave client for the current execution context.
+
+    Returns:
+        The WeaveClient for the current context, or None if not set.
+    """
     # if (context_client := context_state._graph_client.get()) is not None:
     #     return context_client
-    return _global_weave_client
+    return _weave_client.get()
 
 
 class WeaveInitError(Exception): ...

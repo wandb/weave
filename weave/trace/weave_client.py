@@ -670,7 +670,10 @@ class WeaveClient:
         ):
             return placeholder_call()
 
-        from weave.trace.api import _global_attributes, _global_postprocess_inputs
+        from weave.trace.api import (
+            get_global_attributes,
+            get_global_postprocess_inputs,
+        )
 
         if isinstance(op, str):
             if op not in self._anonymous_ops:
@@ -687,8 +690,9 @@ class WeaveClient:
         else:
             inputs_postprocessed = inputs_sensitive_keys_redacted
 
-        if _global_postprocess_inputs:
-            inputs_postprocessed = _global_postprocess_inputs(inputs_postprocessed)
+        global_postprocess_inputs = get_global_postprocess_inputs()
+        if global_postprocess_inputs:
+            inputs_postprocessed = global_postprocess_inputs(inputs_postprocessed)
 
         self._save_nested_objects(inputs_postprocessed)
         inputs_with_refs = map_to_refs(inputs_postprocessed)
@@ -708,7 +712,8 @@ class WeaveClient:
 
         # First create an AttributesDict with global attributes, then update with local attributes
         # Local attributes take precedence over global ones
-        attributes_dict = AttributesDict(**zip_dicts(_global_attributes, attributes))
+        global_attributes = get_global_attributes()
+        attributes_dict = AttributesDict(**zip_dicts(global_attributes, attributes))
 
         if should_capture_client_info():
             attributes_dict._set_weave_item("client_version", version.VERSION)
@@ -848,7 +853,7 @@ class WeaveClient:
         ):
             return None
 
-        from weave.trace.api import _global_postprocess_output
+        from weave.trace.api import get_global_postprocess_output
 
         ended_at = datetime.datetime.now(tz=datetime.timezone.utc)
         call.ended_at = ended_at
@@ -859,8 +864,9 @@ class WeaveClient:
         else:
             postprocessed_output = original_output
 
-        if _global_postprocess_output:
-            postprocessed_output = _global_postprocess_output(postprocessed_output)
+        global_postprocess_output = get_global_postprocess_output()
+        if global_postprocess_output:
+            postprocessed_output = global_postprocess_output(postprocessed_output)
 
         self._save_nested_objects(postprocessed_output)
         output_as_refs = map_to_refs(postprocessed_output)

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import contextlib
+import contextvars
 import logging
 from collections.abc import Iterator
 from typing import Any, cast
@@ -35,9 +36,45 @@ logger = logging.getLogger(__name__)
 # Sentinel object to distinguish between "not provided" (auto-generate) and explicit None (disable)
 _AUTO_GENERATE = object()
 
-_global_postprocess_inputs: PostprocessInputsFunc | None = None
-_global_postprocess_output: PostprocessOutputFunc | None = None
-_global_attributes: dict[str, Any] = {}
+# Thread-safe context variables for global postprocessing settings
+# Each execution context (thread, async task) gets its own value
+_postprocess_inputs: contextvars.ContextVar[PostprocessInputsFunc | None] = (
+    contextvars.ContextVar("postprocess_inputs", default=None)
+)
+_postprocess_output: contextvars.ContextVar[PostprocessOutputFunc | None] = (
+    contextvars.ContextVar("postprocess_output", default=None)
+)
+_attributes: contextvars.ContextVar[dict[str, Any]] = contextvars.ContextVar(
+    "attributes",
+    default={},  # noqa: B039
+)
+
+
+def get_global_postprocess_inputs() -> PostprocessInputsFunc | None:
+    """Get the global postprocess inputs function for the current execution context.
+
+    Returns:
+        The postprocess inputs function, or None if not set.
+    """
+    return _postprocess_inputs.get()
+
+
+def get_global_postprocess_output() -> PostprocessOutputFunc | None:
+    """Get the global postprocess output function for the current execution context.
+
+    Returns:
+        The postprocess output function, or None if not set.
+    """
+    return _postprocess_output.get()
+
+
+def get_global_attributes() -> dict[str, Any]:
+    """Get the global attributes dictionary for the current execution context.
+
+    Returns:
+        The attributes dictionary (empty dict if not set).
+    """
+    return _attributes.get()
 
 
 def init(
@@ -95,13 +132,10 @@ def init(
 
     parse_and_apply_settings(settings)
 
-    global _global_postprocess_inputs
-    global _global_postprocess_output
-    global _global_attributes
-
-    _global_postprocess_inputs = global_postprocess_inputs
-    _global_postprocess_output = global_postprocess_output
-    _global_attributes = global_attributes or {}
+    # Set thread-safe context variables for postprocessing settings
+    _postprocess_inputs.set(global_postprocess_inputs)
+    _postprocess_output.set(global_postprocess_output)
+    _attributes.set(global_attributes or {})
 
     if should_disable_weave():
         return weave_init.init_weave_disabled()
