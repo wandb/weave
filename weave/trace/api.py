@@ -7,7 +7,9 @@ import logging
 import sys
 import warnings
 from collections.abc import Iterator
-from typing import Any, Union, cast
+from typing import Any, Union, cast, overload
+
+from typing_extensions import TypedDict, Unpack
 
 # TODO: type_handlers is imported here to trigger registration of the image serializer.
 # There is probably a better place for this, but including here for now to get the fix in.
@@ -42,9 +44,38 @@ _global_postprocess_output: PostprocessOutputFunc | None = None
 _global_attributes: dict[str, Any] = {}
 
 
+class _InitKwargs(TypedDict, total=False):
+    """Common keyword arguments for weave.init()."""
+
+    settings: UserSettings | dict[str, Any] | None
+    autopatch_settings: AutopatchSettings | None
+    global_postprocess_inputs: PostprocessInputsFunc | None
+    global_postprocess_output: PostprocessOutputFunc | None
+    global_attributes: dict[str, Any] | None
+
+
+@overload
 def init(
     project_name: str,
+    /,
+    **kwargs: Unpack[_InitKwargs],
+) -> weave_client.WeaveClient: ...
+
+
+@overload
+def init(
     *,
+    entity: str,
+    project: str,
+    **kwargs: Unpack[_InitKwargs],
+) -> weave_client.WeaveClient: ...
+
+
+def init(
+    project_name: str | None = None,
+    *,
+    entity: str | None = None,
+    project: str | None = None,
     settings: UserSettings | dict[str, Any] | None = None,
     autopatch_settings: AutopatchSettings | None = None,
     global_postprocess_inputs: PostprocessInputsFunc | None = None,
@@ -63,6 +94,12 @@ def init(
         project_name: The name of the Weights & Biases team and project to log to. If you don't
             specify a team, your default entity is used.
             To find or update your default entity, refer to [User Settings](https://docs.wandb.ai/guides/models/app/settings-page/user-settings/#default-team) in the W&B Models documentation.
+            Can be either "<project_name>" or "<entity_name>/<project_name>".
+            Mutually exclusive with entity and project parameters.
+        entity: The Weights & Biases entity (team) name. Mutually exclusive with project_name.
+            Must be provided together with project parameter.
+        project: The Weights & Biases project name. Mutually exclusive with project_name.
+            Must be provided together with entity parameter.
         settings: Configuration for the Weave client generally.
         autopatch_settings: (Deprecated) Configuration for autopatch integrations. Use explicit patching instead.
         global_postprocess_inputs: A function that will be applied to all inputs of all ops.
@@ -76,9 +113,42 @@ def init(
 
     Returns:
         A Weave client.
+
+    Examples:
+        >>> import weave
+        >>> # Using project_name string format (backward compatible)
+        >>> weave.init("wandb/weave")
+        >>> # Using entity and project parameters (wandb.init style)
+        >>> weave.init(entity="wandb", project="weave")
     """
-    if not project_name or not project_name.strip():
-        raise ValueError("project_name must be non-empty")
+    # Validate that exactly one of the two parameter styles is provided
+    has_project_name = project_name is not None and project_name.strip()
+    has_entity_project = entity is not None or project is not None
+
+    if has_project_name and has_entity_project:
+        raise ValueError(
+            "Cannot specify both 'project_name' and 'entity'/'project' parameters. "
+            "Use either project_name='entity/project' or entity='entity', project='project'."
+        )
+
+    if not has_project_name and not has_entity_project:
+        raise ValueError(
+            "Must provide either 'project_name' or both 'entity' and 'project' parameters."
+        )
+
+    if has_entity_project:
+        if entity is None or project is None:
+            raise ValueError(
+                "Both 'entity' and 'project' must be provided when using entity/project style."
+            )
+        if not entity.strip() or not project.strip():
+            raise ValueError("entity and project must be non-empty strings")
+        # Construct project_name from entity and project
+        project_name = f"{entity}/{project}"
+
+    # At this point, project_name is guaranteed to be a non-empty string
+    # (either from the parameter or constructed from entity/project)
+    project_name = cast(str, project_name)
 
     configure_logger()
 
@@ -115,9 +185,7 @@ def init(
     if should_disable_weave():
         return weave_init.init_weave_disabled()
 
-    return weave_init.init_weave(
-        project_name,
-    )
+    return weave_init.init_weave(project_name)
 
 
 def get_client() -> weave_client.WeaveClient | None:
