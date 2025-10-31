@@ -104,8 +104,6 @@ USAGE_KEYS = {
 # ATTRIBUTE_KEYS: Maps common LLM call metadata attributes to the types of attributes expected in weave traces
 # Exception is wandb.attributes which populates its keys to the root level
 # This is used to populate the `attributes_dump` column in clickhouse
-# Legacy: Prior to dumping, the full span is dumped under another key not listed here called `otel_span`
-# Now: we inject the otel_span key into attributes at runtime, data is dumped to a special `otel_dump` column
 ATTRIBUTE_KEYS = {
     # System prompt/instructions
     "system": [
@@ -127,7 +125,6 @@ ATTRIBUTE_KEYS = {
     ],
     # Model generation parameters (temperature, max_tokens, etc.)
     "model_parameters": ["gen_ai.request", "llm.invocation_parameters"],
-    "wandb.attributes": ["wandb.attributes"],
 }
 
 # WB_KEYS: Wandb/Weave specific attributes for enhanced visualization and reporting
