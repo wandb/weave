@@ -21,7 +21,7 @@ from weave.trace.op_protocol import Op
 from weave.trace.refs import ObjectRef
 from weave.trace.serialization import serializer
 from weave.trace.serialization.mem_artifact import MemTraceFilesArtifact
-from weave.trace_server.trace_server_interface_util import str_digest
+from weave.trace_server.trace_server_interface_util import str_digest  # noqa: TID251
 from weave.utils.ipython import (
     ClassNotFoundError,
     get_class_source,

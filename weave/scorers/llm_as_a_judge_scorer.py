@@ -3,7 +3,7 @@ from typing import Any
 from weave.flow.scorer import Scorer
 from weave.trace.objectify import register_object
 from weave.trace.op import op
-from weave.trace_server.interface.builtin_object_classes.llm_structured_model import (
+from weave.trace_server.interface.builtin_object_classes.llm_structured_model import (  # noqa: TID251
     LLMStructuredCompletionModel,
 )
 

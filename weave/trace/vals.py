@@ -29,8 +29,10 @@ from weave.trace.refs import (
 )
 from weave.trace.serialization.serialize import from_json
 from weave.trace.table import Table
-from weave.trace_server.errors import ObjectDeletedError
-from weave.trace_server.trace_server_interface import (
+from weave.trace_server.errors import (  # noqa: TID251 (I think this might be a real problem)
+    ObjectDeletedError,
+)
+from weave.trace_server.trace_server_interface import (  # noqa: TID251
     ObjReadReq,
     TableQueryReq,
     TableQueryStatsReq,
