@@ -76,8 +76,10 @@ async def test_async_coro(client):
     res2 = await res
     assert isinstance(res2, Coroutine)
     assert await res2 == 1
-    res, call = await async_coro.call()
+    coro, call = async_coro.call()
     assert isinstance(call, Call)
+    assert isinstance(coro, Coroutine)
+    res, call = await coro
     assert isinstance(res, Coroutine)
     assert await res == 1
 
@@ -96,8 +98,10 @@ async def test_async_coro_method(client):
     res2 = await res
     assert isinstance(res2, Coroutine)
     assert await res2 == 1
-    res, call = await test_inst.async_coro.call(test_inst)
+    coro, call = test_inst.async_coro.call(test_inst)
     assert isinstance(call, Call)
+    assert isinstance(coro, Coroutine)
+    res, call = await coro
     assert isinstance(res, Coroutine)
     assert await res == 1
 
@@ -111,8 +115,9 @@ async def test_async_awaited_coro(client):
     res = async_awaited_coro()
     assert isinstance(res, Coroutine)
     assert await res == 1
-    res, call = await async_awaited_coro.call()
+    coro, call = async_awaited_coro.call()
     assert isinstance(call, Call)
+    res, call = await coro
     assert res == 1
 
 
@@ -127,8 +132,9 @@ async def test_async_awaited_coro_method(client):
     res = test_inst.async_awaited_coro()
     assert isinstance(res, Coroutine)
     assert await res == 1
-    res, call = await test_inst.async_awaited_coro.call(test_inst)
+    coro, call = test_inst.async_awaited_coro.call(test_inst)
     assert isinstance(call, Call)
+    res, call = await coro
     assert res == 1
 
 
@@ -141,8 +147,9 @@ async def test_async_val(client):
     res = async_val()
     assert isinstance(res, Coroutine)
     assert await res == 1
-    res, call = await async_val.call()
+    coro, call = async_val.call()
     assert isinstance(call, Call)
+    res, call = await coro
     assert res == 1
 
 
@@ -157,8 +164,9 @@ async def test_async_val_method(client):
     res = test_inst.async_val()
     assert isinstance(res, Coroutine)
     assert await res == 1
-    res, call = await test_inst.async_val.call(test_inst)
+    coro, call = test_inst.async_val.call(test_inst)
     assert isinstance(call, Call)
+    res, call = await coro
     assert res == 1
 
 
@@ -198,8 +206,9 @@ async def test_async_with_exception(client):
 
     with pytest.raises(ValueError, match="test"):
         await async_with_exception()
-    res, call = await async_with_exception.call()
+    coro, call = async_with_exception.call()
     assert isinstance(call, Call)
+    res, call = await coro
     assert call.exception is not None
     assert res is None
 
@@ -214,8 +223,9 @@ async def test_async_with_exception_method(client):
     test_inst = TestClass()
     with pytest.raises(ValueError, match="test"):
         await test_inst.async_with_exception()
-    res, call = await test_inst.async_with_exception.call(test_inst)
+    coro, call = test_inst.async_with_exception.call(test_inst)
     assert isinstance(call, Call)
+    res, call = await coro
     assert call.exception is not None
     assert res is None
 
