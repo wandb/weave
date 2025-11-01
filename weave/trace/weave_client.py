@@ -2241,6 +2241,17 @@ def redact_sensitive_keys(obj: Any) -> Any:
             tuple_res.append(redact_sensitive_keys(v))
         return tuple(tuple_res)
 
+    elif dataclasses.is_dataclass(obj):
+        # Redact dataclass fields whose names are in the redact set
+        redacted_fields = {}
+        for field in dataclasses.fields(obj):
+            field_value = getattr(obj, field.name)
+            if should_redact(field.name):
+                redacted_fields[field.name] = REDACTED_VALUE
+            else:
+                redacted_fields[field.name] = redact_sensitive_keys(field_value)
+        return dataclasses.replace(obj, **redacted_fields)
+
     return obj
 
 
