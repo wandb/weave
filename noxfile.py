@@ -120,7 +120,6 @@ def tests(session, shard):
         session.skip(f"Skipping {shard=} as it is not compatible with Python 3.10")
 
     session.install("-e", f".[{shard},test]")
-    session.chdir("tests")
 
     env = {
         k: session.env.get(k) or os.getenv(k)
@@ -153,19 +152,19 @@ def tests(session, shard):
     if shard == "openai_agents":
         env["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY", "MISSING")
 
-    default_test_dirs = [f"integrations/{shard}/"]
+    default_test_dirs = [f"tests/integrations/{shard}/"]
     test_dirs_dict = {
         "custom": [],
-        "flow": ["flow/"],
-        "trace_server": ["trace_server/"],
-        "trace_server_bindings": ["trace_server_bindings"],
-        "mistral": ["integrations/mistral/"],
-        "scorers": ["scorers/"],
-        "autogen_tests": ["integrations/autogen/"],
-        "verifiers_test": ["integrations/verifiers/"],
-        "trace": ["trace/"],
-        **{shard: ["trace/"] for shard in trace_server_shards},
-        "trace_no_server": ["trace/"],
+        "flow": ["tests/flow/"],
+        "trace_server": ["tests/trace_server/"],
+        "trace_server_bindings": ["tests/trace_server_bindings"],
+        "mistral": ["tests/integrations/mistral/"],
+        "scorers": ["tests/scorers/"],
+        "autogen_tests": ["tests/integrations/autogen/"],
+        "verifiers_test": ["tests/integrations/verifiers/"],
+        "trace": ["tests/trace/"],
+        **{shard: ["tests/trace/"] for shard in trace_server_shards},
+        "trace_no_server": ["tests/trace/"],
     }
 
     test_dirs = test_dirs_dict.get(shard, default_test_dirs)

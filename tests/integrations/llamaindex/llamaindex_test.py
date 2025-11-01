@@ -1,5 +1,6 @@
 import os
 from collections.abc import Generator
+from pathlib import Path
 
 import pytest
 from llama_index.core import (
@@ -849,19 +850,24 @@ async def test_llamaindex_workflow(client: WeaveClient) -> None:
 async def test_llamaindex_quick_start(client: WeaveClient) -> None:
     api_key = os.environ.get("OPENAI_API_KEY", "sk-DUMMY_KEY")
 
-    documents = SimpleDirectoryReader("integrations/llamaindex/test_data").load_data()
+    # Get paths relative to this test file
+    test_dir = Path(__file__).parent
+    test_data_dir = test_dir / "test_data"
+    vector_index_dir = test_dir / "vector_index"
+
+    documents = SimpleDirectoryReader(str(test_data_dir)).load_data()
     parser = SentenceSplitter()
     nodes = parser.get_nodes_from_documents(documents)
 
-    if os.path.exists("integrations/llamaindex/vector_index/"):
+    if os.path.exists(vector_index_dir):
         storage_context = StorageContext.from_defaults(
-            persist_dir="integrations/llamaindex/vector_index/"
+            persist_dir=str(vector_index_dir)
         )
         index = load_index_from_storage(storage_context)
     else:
-        os.makedirs("integrations/llamaindex/vector_index/", exist_ok=True)
+        os.makedirs(vector_index_dir, exist_ok=True)
         index = VectorStoreIndex(nodes)
-        index.storage_context.persist("integrations/llamaindex/vector_index/")
+        index.storage_context.persist(str(vector_index_dir))
 
     query_engine = index.as_query_engine()
 
