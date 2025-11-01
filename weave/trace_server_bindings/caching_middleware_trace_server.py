@@ -111,6 +111,22 @@ class CachingMiddlewareTraceServer(tsi.FullTraceServerInterface):
             return self._next_trace_server.get_call_processor()
         return None
 
+    def get_start_processor(self) -> AsyncBatchProcessor | None:
+        """Custom method not defined on the formal TraceServerInterface to expose
+        the underlying start processor. Should be formalized in a client-side interface.
+        """
+        if hasattr(self._next_trace_server, "get_start_processor"):
+            return self._next_trace_server.get_start_processor()
+        return None
+
+    def get_complete_processor(self) -> AsyncBatchProcessor | None:
+        """Custom method not defined on the formal TraceServerInterface to expose
+        the underlying complete processor. Should be formalized in a client-side interface.
+        """
+        if hasattr(self._next_trace_server, "get_complete_processor"):
+            return self._next_trace_server.get_complete_processor()
+        return None
+
     def get_feedback_processor(self) -> AsyncBatchProcessor | None:
         """Custom method not defined on the formal TraceServerInterface to expose
         the underlying feedback processor. Should be formalized in a client-side interface.
@@ -447,6 +463,16 @@ class CachingMiddlewareTraceServer(tsi.FullTraceServerInterface):
     def call_update(self, req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
         return self._next_trace_server.call_update(req)
 
+    def calls_start_batch_v2(
+        self, req: tsi.CallsStartBatchReq
+    ) -> tsi.CallsStartBatchRes:
+        return self._next_trace_server.calls_start_batch_v2(req)
+
+    def calls_complete_batch_v2(
+        self, req: tsi.CallsCompleteBatchReq
+    ) -> tsi.CallsCompleteBatchRes:
+        return self._next_trace_server.calls_complete_batch_v2(req)
+
     # OTEL API
     def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
         return self._next_trace_server.otel_export(req)
@@ -598,86 +624,6 @@ class CachingMiddlewareTraceServer(tsi.FullTraceServerInterface):
         self, req: tsi.EvaluationDeleteV2Req
     ) -> tsi.EvaluationDeleteV2Res:
         return self._next_trace_server.evaluation_delete_v2(req)
-
-    # Model V2 API
-
-    def model_create_v2(self, req: tsi.ModelCreateV2Req) -> tsi.ModelCreateV2Res:
-        return self._next_trace_server.model_create_v2(req)
-
-    def model_read_v2(self, req: tsi.ModelReadV2Req) -> tsi.ModelReadV2Res:
-        return self._next_trace_server.model_read_v2(req)
-
-    def model_list_v2(self, req: tsi.ModelListV2Req) -> Iterator[tsi.ModelReadV2Res]:
-        return self._next_trace_server.model_list_v2(req)
-
-    def model_delete_v2(self, req: tsi.ModelDeleteV2Req) -> tsi.ModelDeleteV2Res:
-        return self._next_trace_server.model_delete_v2(req)
-
-    def evaluation_run_create_v2(
-        self, req: tsi.EvaluationRunCreateV2Req
-    ) -> tsi.EvaluationRunCreateV2Res:
-        return self._next_trace_server.evaluation_run_create_v2(req)
-
-    def evaluation_run_read_v2(
-        self, req: tsi.EvaluationRunReadV2Req
-    ) -> tsi.EvaluationRunReadV2Res:
-        return self._next_trace_server.evaluation_run_read_v2(req)
-
-    def evaluation_run_list_v2(
-        self, req: tsi.EvaluationRunListV2Req
-    ) -> Iterator[tsi.EvaluationRunReadV2Res]:
-        return self._next_trace_server.evaluation_run_list_v2(req)
-
-    def evaluation_run_delete_v2(
-        self, req: tsi.EvaluationRunDeleteV2Req
-    ) -> tsi.EvaluationRunDeleteV2Res:
-        return self._next_trace_server.evaluation_run_delete_v2(req)
-
-    def evaluation_run_finish_v2(
-        self, req: tsi.EvaluationRunFinishV2Req
-    ) -> tsi.EvaluationRunFinishV2Res:
-        return self._next_trace_server.evaluation_run_finish_v2(req)
-
-    # Prediction V2 API
-
-    def prediction_create_v2(
-        self, req: tsi.PredictionCreateV2Req
-    ) -> tsi.PredictionCreateV2Res:
-        return self._next_trace_server.prediction_create_v2(req)
-
-    def prediction_read_v2(
-        self, req: tsi.PredictionReadV2Req
-    ) -> tsi.PredictionReadV2Res:
-        return self._next_trace_server.prediction_read_v2(req)
-
-    def prediction_list_v2(
-        self, req: tsi.PredictionListV2Req
-    ) -> Iterator[tsi.PredictionReadV2Res]:
-        return self._next_trace_server.prediction_list_v2(req)
-
-    def prediction_delete_v2(
-        self, req: tsi.PredictionDeleteV2Req
-    ) -> tsi.PredictionDeleteV2Res:
-        return self._next_trace_server.prediction_delete_v2(req)
-
-    def prediction_finish_v2(
-        self, req: tsi.PredictionFinishV2Req
-    ) -> tsi.PredictionFinishV2Res:
-        return self._next_trace_server.prediction_finish_v2(req)
-
-    # Score V2 API
-
-    def score_create_v2(self, req: tsi.ScoreCreateV2Req) -> tsi.ScoreCreateV2Res:
-        return self._next_trace_server.score_create_v2(req)
-
-    def score_read_v2(self, req: tsi.ScoreReadV2Req) -> tsi.ScoreReadV2Res:
-        return self._next_trace_server.score_read_v2(req)
-
-    def score_list_v2(self, req: tsi.ScoreListV2Req) -> Iterator[tsi.ScoreReadV2Res]:
-        return self._next_trace_server.score_list_v2(req)
-
-    def score_delete_v2(self, req: tsi.ScoreDeleteV2Req) -> tsi.ScoreDeleteV2Res:
-        return self._next_trace_server.score_delete_v2(req)
 
 
 def pydantic_bytes_safe_dump(obj: BaseModel) -> str:

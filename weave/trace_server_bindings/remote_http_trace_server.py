@@ -2,6 +2,7 @@ import datetime
 import io
 import logging
 from collections.abc import Iterator
+from threading import Lock
 from typing import Any, Optional, Union, cast
 from zoneinfo import ZoneInfo
 
@@ -15,16 +16,16 @@ from weave.trace_server.ids import generate_id
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
 from weave.trace_server_bindings.http_utils import (
     REMOTE_REQUEST_BYTES_LIMIT,
+    convert_complete_to_legacy_batch,
+    convert_start_to_legacy_batch,
     handle_response_error,
-    log_dropped_call_batch,
+    log_dropped_complete_batch,
     log_dropped_feedback_batch,
+    log_dropped_start_batch,
     process_batch_with_retry,
 )
 from weave.trace_server_bindings.models import (
-    Batch,
-    EndBatchItem,
     ServerInfoRes,
-    StartBatchItem,
 )
 from weave.utils import http_requests as requests
 from weave.utils.retry import get_current_retry_id, with_retry
@@ -54,11 +55,24 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
         super().__init__()
         self.trace_server_url = trace_server_url
         self.should_batch = should_batch
-        self.call_processor = None
+
+        # Separate processors for starts and completes
+        self.start_processor = None
+        self.complete_processor = None
         self.feedback_processor = None
+
+        # Thread-safe tracking of pending complete call IDs for deduplication
+        self._pending_complete_ids: set[str] = set()
+        self._pending_complete_ids_lock = Lock()
+
         if self.should_batch:
-            self.call_processor = AsyncBatchProcessor(
-                self._flush_calls,
+            self.start_processor = AsyncBatchProcessor(
+                self._flush_starts,
+                max_queue_size=max_calls_queue_size(),
+                enable_disk_fallback=should_enable_disk_fallback(),
+            )
+            self.complete_processor = AsyncBatchProcessor(
+                self._flush_completes,
                 max_queue_size=max_calls_queue_size(),
                 enable_disk_fallback=should_enable_disk_fallback(),
             )
@@ -129,62 +143,186 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
             **kwargs,
         )
 
-    @with_retry
-    def _send_batch_to_server(self, encoded_data: bytes) -> None:
-        """Send a batch of data to the server with retry logic.
+    def _send_start_batch_to_server(self, encoded_data: bytes) -> None:
+        """Send a batch of call starts to the server with retry logic.
 
-        This method is separated from _flush_calls to avoid recursive retries.
+        Falls back to /call/upsert_batch if the v1 endpoint is not available (404).
         """
-        r = self.post(
-            "/call/upsert_batch",
-            data=encoded_data,  # type: ignore
-        )
-        handle_response_error(r, "/call/upsert_batch")
+        try:
+            r = self.post(
+                "/v2/calls/start/batch",
+                data=encoded_data,  # type: ignore
+            )
+            handle_response_error(r, "/v2/calls/start/batch")
+        except requests.HTTPError as e:
+            # If v1 endpoint doesn't exist (404), fall back to legacy upsert_batch
+            if e.response.status_code == 404:
+                logger.debug(
+                    "V1 start batch endpoint not available, falling back to legacy upsert_batch"
+                )
 
-    def _flush_calls(
+                # Decode the v1 request and convert to legacy format
+                req = tsi.CallsStartBatchReq.model_validate_json(encoded_data)
+                legacy_req = convert_start_to_legacy_batch(req.items)
+                r = self.post(
+                    "/call/upsert_batch",
+                    data=legacy_req.model_dump_json().encode("utf-8"),  # type: ignore
+                )
+                handle_response_error(r, "/call/upsert_batch")
+            else:
+                # Re-raise server errors (5xx) as they're not client compatibility issues
+                raise
+
+    def _flush_starts(
         self,
-        batch: list[Union[StartBatchItem, EndBatchItem]],
+        batch: list[tsi.StartedCallSchemaForInsert],
         *,
         _should_update_batch_size: bool = True,
     ) -> None:
-        """Process a batch of calls, splitting if necessary and sending to the server.
+        """Process a batch of call starts, splitting if necessary and sending to the server.
 
-        This method handles the logic of splitting batches that are too large,
-        but delegates the actual server communication (with retries) to _send_batch_to_server.
+        This method handles batching of call start events, sending them to the
+        /v2/calls/start/batch endpoint. Filters out any starts that have pending
+        completes before sending.
         """
-        # Call processor must be defined for this method
-        assert self.call_processor is not None
+        assert self.start_processor is not None
         if len(batch) == 0:
             return
 
-        def get_item_id(item: Union[StartBatchItem, EndBatchItem]) -> str:
-            if isinstance(item, StartBatchItem):
-                return f"{item.req.start.id}-start"
-            elif isinstance(item, EndBatchItem):
-                return f"{item.req.end.id}-end"
-            return "unknown"
+        # Filter out starts that have pending completes, we don't need to send both if
+        # we already have the complete (start + end)
+        filtered_batch: list[tsi.StartedCallSchemaForInsert] = []
+        with self._pending_complete_ids_lock:
+            for item in batch:
+                if item.id not in self._pending_complete_ids:
+                    filtered_batch.append(item)
 
-        def encode_batch(batch: list[Union[StartBatchItem, EndBatchItem]]) -> bytes:
-            data = Batch(batch=batch).model_dump_json()
+        # If all starts were filtered out, nothing to send
+        if len(filtered_batch) == 0:
+            return
+
+        def get_item_id(item: tsi.StartedCallSchemaForInsert) -> str:
+            return f"{item.id}-start"
+
+        def encode_batch(batch: list[tsi.StartedCallSchemaForInsert]) -> bytes:
+            # Get project_id from first item (all items in a batch should have same project)
+            project_id = batch[0].project_id
+            req = tsi.CallsStartBatchReq(project_id=project_id, items=batch)
+            data = req.model_dump_json()
             return data.encode("utf-8")
 
         process_batch_with_retry(
-            batch_name="calls",
-            batch=batch,
+            batch_name="call_starts",
+            batch=filtered_batch,
             remote_request_bytes_limit=self.remote_request_bytes_limit,
-            send_batch_fn=self._send_batch_to_server,
-            processor_obj=self.call_processor,
+            send_batch_fn=self._send_start_batch_to_server,
+            processor_obj=self.start_processor,
             should_update_batch_size=_should_update_batch_size,
             get_item_id_fn=get_item_id,
-            log_dropped_fn=log_dropped_call_batch,
+            log_dropped_fn=log_dropped_start_batch,
+            encode_batch_fn=encode_batch,
+        )
+
+    def _send_complete_batch_to_server(
+        self, encoded_data: bytes, call_ids: list[str]
+    ) -> None:
+        """Send a batch of complete calls to the server with retry logic.
+
+        Falls back to /call/upsert_batch if the v1 endpoint is not available (404).
+        """
+        try:
+            try:
+                r = self.post(
+                    "/v2/calls/complete/batch",
+                    data=encoded_data,  # type: ignore
+                )
+                handle_response_error(r, "/v2/calls/complete/batch")
+            except requests.HTTPError as e:
+                # If v1 endpoint doesn't exist (new sdk, old server), fall back to legacy upsert_batch
+                # This should be very rare!
+                if e.response.status_code == 404:
+                    logger.debug(
+                        "V1 complete batch endpoint not available, falling back to legacy upsert_batch"
+                    )
+
+                    # Decode the v1 request and convert to legacy format
+                    req = tsi.CallsCompleteBatchReq.model_validate_json(encoded_data)
+                    legacy_req = convert_complete_to_legacy_batch(req.items)
+                    r = self.post(
+                        "/call/upsert_batch",
+                        data=legacy_req.model_dump_json().encode("utf-8"),  # type: ignore
+                    )
+                    handle_response_error(r, "/call/upsert_batch")
+                else:
+                    # Re-raise server errors (5xx) as they're not client compatibility issues
+                    raise
+        finally:
+            # After successful send, remove call IDs from pending set
+            # This runs even if an exception is raised to prevent call IDs from being stuck
+            with self._pending_complete_ids_lock:
+                for call_id in call_ids:
+                    self._pending_complete_ids.discard(call_id)
+
+    def _flush_completes(
+        self,
+        batch: list[tsi.CompleteCallSchemaForInsert],
+        *,
+        _should_update_batch_size: bool = True,
+    ) -> None:
+        """Process a batch of complete calls, splitting if necessary and sending to the server.
+
+        This method handles batching of complete call events (start + end combined),
+        sending them to the /v2/calls/complete/batch endpoint.
+        """
+        assert self.complete_processor is not None
+        if len(batch) == 0:
+            return
+
+        def get_item_id(item: tsi.CompleteCallSchemaForInsert) -> str:
+            return f"{item.id}-complete"
+
+        def encode_batch(batch: list[tsi.CompleteCallSchemaForInsert]) -> bytes:
+            # Get project_id from first item (all items in a batch should have same project)
+            project_id = batch[0].project_id
+            req = tsi.CallsCompleteBatchReq(project_id=project_id, items=batch)
+            data = req.model_dump_json()
+            return data.encode("utf-8")
+
+        # Extract call IDs for cleanup after successful send
+        # Complete calls should always have an ID, filter out any None values just in case
+        call_ids = [item.id for item in batch if item.id is not None]
+
+        def send_batch_fn(encoded_data: bytes) -> None:
+            self._send_complete_batch_to_server(encoded_data, call_ids)
+
+        process_batch_with_retry(
+            batch_name="call_completes",
+            batch=batch,
+            remote_request_bytes_limit=self.remote_request_bytes_limit,
+            send_batch_fn=send_batch_fn,
+            processor_obj=self.complete_processor,
+            should_update_batch_size=_should_update_batch_size,
+            get_item_id_fn=get_item_id,
+            log_dropped_fn=log_dropped_complete_batch,
             encode_batch_fn=encode_batch,
         )
 
     def get_call_processor(self) -> Union[AsyncBatchProcessor, None]:
         """Custom method not defined on the formal TraceServerInterface to expose
         the underlying call processor. Should be formalized in a client-side interface.
+
+        Deprecated: Use get_start_processor() or get_complete_processor() instead.
         """
-        return self.call_processor
+        # For backwards compatibility, return start_processor
+        return self.start_processor
+
+    def get_start_processor(self) -> Union[AsyncBatchProcessor, None]:
+        """Get the processor for call starts."""
+        return self.start_processor
+
+    def get_complete_processor(self) -> Union[AsyncBatchProcessor, None]:
+        """Get the processor for complete calls."""
+        return self.complete_processor
 
     def _send_feedback_batch_to_server(self, encoded_data: bytes) -> None:
         """Send a batch of feedback data to the server with retry logic.
@@ -373,47 +511,19 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
         # TODO: Add docs link (DOCS-1390)
         raise NotImplementedError("Sending otel traces directly is not yet supported.")
 
-    # Call API
+    # TODO(gst): Deprecate
     def call_start(
         self, req: Union[tsi.CallStartReq, dict[str, Any]]
     ) -> tsi.CallStartRes:
-        if self.should_batch:
-            assert self.call_processor is not None
+        raise NotImplementedError("Call start is not supported.")
 
-            req_as_obj: tsi.CallStartReq
-            if isinstance(req, dict):
-                req_as_obj = tsi.CallStartReq.model_validate(req)
-            else:
-                req_as_obj = req
-            if req_as_obj.start.id is None or req_as_obj.start.trace_id is None:
-                raise ValueError(
-                    "CallStartReq must have id and trace_id when batching."
-                )
-            self.call_processor.enqueue([StartBatchItem(req=req_as_obj)])
-            return tsi.CallStartRes(
-                id=req_as_obj.start.id, trace_id=req_as_obj.start.trace_id
-            )
-        return self._generic_request(
-            "/call/start", req, tsi.CallStartReq, tsi.CallStartRes
-        )
-
+    # TODO(gst): Deprecate
     def call_start_batch(self, req: tsi.CallCreateBatchReq) -> tsi.CallCreateBatchRes:
-        return self._generic_request(
-            "/call/upsert_batch", req, tsi.CallCreateBatchReq, tsi.CallCreateBatchRes
-        )
+        raise NotImplementedError("Call start batch is not supported.")
 
+    # TODO(gst): Deprecate
     def call_end(self, req: Union[tsi.CallEndReq, dict[str, Any]]) -> tsi.CallEndRes:
-        if self.should_batch:
-            assert self.call_processor is not None
-
-            req_as_obj: tsi.CallEndReq
-            if isinstance(req, dict):
-                req_as_obj = tsi.CallEndReq.model_validate(req)
-            else:
-                req_as_obj = req
-            self.call_processor.enqueue([EndBatchItem(req=req_as_obj)])
-            return tsi.CallEndRes()
-        return self._generic_request("/call/end", req, tsi.CallEndReq, tsi.CallEndRes)
+        raise NotImplementedError("Call end is not supported.")
 
     def call_read(self, req: Union[tsi.CallReadReq, dict[str, Any]]) -> tsi.CallReadRes:
         return self._generic_request(
@@ -999,333 +1109,105 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
         r = self._delete_request_executor(url, params)
         return tsi.EvaluationDeleteV2Res.model_validate(r.json())
 
-    # Model V2 API
+    def calls_start_batch_v2(
+        self, req: tsi.CallsStartBatchReq
+    ) -> tsi.CallsStartBatchRes:
+        """V2 batch call start endpoint for calls_complete table.
 
-    def model_create_v2(
-        self, req: Union[tsi.ModelCreateV2Req, dict[str, Any]]
-    ) -> tsi.ModelCreateV2Res:
-        if isinstance(req, dict):
-            req = tsi.ModelCreateV2Req.model_validate(req)
-        req = cast(tsi.ModelCreateV2Req, req)
-        entity, project = req.project_id.split("/", 1)
-        url = f"/v2/{entity}/{project}/models"
-        body = tsi.ModelCreateV2Body.model_validate(
-            req.model_dump(exclude={"project_id"})
-        )
-        return self._generic_request(
-            url,
-            body,
-            tsi.ModelCreateV2Body,
-            tsi.ModelCreateV2Res,
-            method="POST",
-        )
+        Starts are enqueued to the processor. Deduplication with pending completes
+        happens at flush time, not enqueue time.
+        """
+        if self.should_batch:
+            assert self.start_processor is not None
 
-    def model_read_v2(
-        self, req: Union[tsi.ModelReadV2Req, dict[str, Any]]
-    ) -> tsi.ModelReadV2Res:
-        if isinstance(req, dict):
-            req = tsi.ModelReadV2Req.model_validate(req)
-        req = cast(tsi.ModelReadV2Req, req)
-        entity, project = req.project_id.split("/", 1)
-        url = f"/v2/{entity}/{project}/models/{req.object_id}/versions/{req.digest}"
-        r = self._get_request_executor(url)
-        return tsi.ModelReadV2Res.model_validate(r.json())
+            # Enqueue all starts - filtering happens at flush time
+            self.start_processor.enqueue(req.items)
 
-    def model_list_v2(
-        self, req: Union[tsi.ModelListV2Req, dict[str, Any]]
-    ) -> Iterator[tsi.ModelReadV2Res]:
-        if isinstance(req, dict):
-            req = tsi.ModelListV2Req.model_validate(req)
-        req = cast(tsi.ModelListV2Req, req)
-        entity, project = req.project_id.split("/", 1)
-        url = f"/v2/{entity}/{project}/models"
-        # Build query params
-        params = {}
-        if req.limit is not None:
-            params["limit"] = req.limit
-        if req.offset is not None:
-            params["offset"] = req.offset
-        r = self._get_request_executor(url, params, stream=True)
-        for line in r.iter_lines():
-            if line:
-                yield tsi.ModelReadV2Res.model_validate_json(line)
+            # Return response with IDs and trace_ids for all items
+            return tsi.CallsStartBatchRes(
+                ids=[item.id or generate_id() for item in req.items],
+                trace_ids=[item.trace_id or generate_id() for item in req.items],
+            )
 
-    def model_delete_v2(
-        self, req: Union[tsi.ModelDeleteV2Req, dict[str, Any]]
-    ) -> tsi.ModelDeleteV2Res:
-        if isinstance(req, dict):
-            req = tsi.ModelDeleteV2Req.model_validate(req)
-        req = cast(tsi.ModelDeleteV2Req, req)
-        entity, project = req.project_id.split("/", 1)
-        url = f"/v2/{entity}/{project}/models/{req.object_id}"
-        # Build query params
-        params = {}
-        if req.digests:
-            params["digests"] = req.digests
-        r = self._delete_request_executor(url, params)
-        return tsi.ModelDeleteV2Res.model_validate(r.json())
+        # Try v2 endpoint first, fall back to legacy upsert_batch on 404
+        try:
+            return self._generic_request(
+                "/v2/calls/start/batch",
+                req,
+                tsi.CallsStartBatchReq,
+                tsi.CallsStartBatchRes,
+            )
+        except requests.HTTPError as e:
+            if e.response.status_code == 404:
+                logger.debug(
+                    "V2 start batch endpoint not available, falling back to legacy upsert_batch"
+                )
 
-    def evaluation_run_create_v2(
-        self, req: Union[tsi.EvaluationRunCreateV2Req, dict[str, Any]]
-    ) -> tsi.EvaluationRunCreateV2Res:
-        if isinstance(req, dict):
-            req = tsi.EvaluationRunCreateV2Req.model_validate(req)
-        req = cast(tsi.EvaluationRunCreateV2Req, req)
-        entity, project = req.project_id.split("/", 1)
-        url = f"/v2/{entity}/{project}/evaluation_runs"
-        # For create, we need to send the body without project_id (EvaluationRunCreateV2Body)
-        body_data = req.model_dump(exclude={"project_id"})
-        body = tsi.EvaluationRunCreateV2Body.model_validate(body_data)
-        return self._generic_request(
-            url,
-            body,
-            tsi.EvaluationRunCreateV2Body,
-            tsi.EvaluationRunCreateV2Res,
-        )
+                # Convert to legacy batch format and send
+                legacy_req = convert_start_to_legacy_batch(req.items)
+                self._generic_request(
+                    "/call/upsert_batch",
+                    legacy_req,
+                    tsi.CallCreateBatchReq,
+                    tsi.CallCreateBatchRes,
+                )
 
-    def evaluation_run_read_v2(
-        self, req: Union[tsi.EvaluationRunReadV2Req, dict[str, Any]]
-    ) -> tsi.EvaluationRunReadV2Res:
-        if isinstance(req, dict):
-            req = tsi.EvaluationRunReadV2Req.model_validate(req)
-        req = cast(tsi.EvaluationRunReadV2Req, req)
-        entity, project = req.project_id.split("/", 1)
-        url = f"/v2/{entity}/{project}/evaluation_runs/{req.evaluation_run_id}"
-        r = self._get_request_executor(url)
-        return tsi.EvaluationRunReadV2Res.model_validate(r.json())
+                # Convert legacy response to v2 response format
+                ids = [item.id or generate_id() for item in req.items]
+                trace_ids = [item.trace_id or generate_id() for item in req.items]
 
-    def evaluation_run_list_v2(
-        self, req: Union[tsi.EvaluationRunListV2Req, dict[str, Any]]
-    ) -> Iterator[tsi.EvaluationRunReadV2Res]:
-        if isinstance(req, dict):
-            req = tsi.EvaluationRunListV2Req.model_validate(req)
-        req = cast(tsi.EvaluationRunListV2Req, req)
-        entity, project = req.project_id.split("/", 1)
-        url = f"/v2/{entity}/{project}/evaluation_runs"
-        # Build query params
-        params: dict[str, Any] = {}
-        if req.limit is not None:
-            params["limit"] = req.limit
-        if req.offset is not None:
-            params["offset"] = req.offset
-        if req.filter:
-            if req.filter.evaluations:
-                params["evaluation_refs"] = ",".join(req.filter.evaluations)
-            if req.filter.models:
-                params["model_refs"] = ",".join(req.filter.models)
-            if req.filter.evaluation_run_ids:
-                params["evaluation_run_ids"] = ",".join(req.filter.evaluation_run_ids)
-        r = self._get_request_executor(url, params, stream=True)
-        for line in r.iter_lines():
-            if line:
-                yield tsi.EvaluationRunReadV2Res.model_validate_json(line)
+                return tsi.CallsStartBatchRes(ids=ids, trace_ids=trace_ids)
+            else:
+                raise
 
-    def evaluation_run_delete_v2(
-        self, req: Union[tsi.EvaluationRunDeleteV2Req, dict[str, Any]]
-    ) -> tsi.EvaluationRunDeleteV2Res:
-        if isinstance(req, dict):
-            req = tsi.EvaluationRunDeleteV2Req.model_validate(req)
-        req = cast(tsi.EvaluationRunDeleteV2Req, req)
-        entity, project = req.project_id.split("/", 1)
-        url = f"/v2/{entity}/{project}/evaluation_runs"
-        # Build query params - evaluation_run_ids are passed as a query param
-        params = {"evaluation_run_ids": req.evaluation_run_ids}
-        r = self._delete_request_executor(url, params)
-        return tsi.EvaluationRunDeleteV2Res.model_validate(r.json())
+    def calls_complete_batch_v2(
+        self, req: tsi.CallsCompleteBatchReq
+    ) -> tsi.CallsCompleteBatchRes:
+        """V2 batch call complete endpoint for calls_complete table.
 
-    def evaluation_run_finish_v2(
-        self, req: Union[tsi.EvaluationRunFinishV2Req, dict[str, Any]]
-    ) -> tsi.EvaluationRunFinishV2Res:
-        if isinstance(req, dict):
-            req = tsi.EvaluationRunFinishV2Req.model_validate(req)
-        req = cast(tsi.EvaluationRunFinishV2Req, req)
-        entity, project = req.project_id.split("/", 1)
-        url = f"/v2/{entity}/{project}/evaluation_runs/{req.evaluation_run_id}/finish"
-        return self._generic_request(
-            url,
-            req,
-            tsi.EvaluationRunFinishV2Req,
-            tsi.EvaluationRunFinishV2Res,
-            method="POST",
-        )
+        Complete calls contain both start and end data. When enqueueing, we track
+        the call IDs so that if a start arrives later, we can skip it.
+        """
+        if self.should_batch:
+            assert self.complete_processor is not None
 
-    # Prediction V2 API
+            # Track these call IDs as pending completes for deduplication
+            with self._pending_complete_ids_lock:
+                for item in req.items:
+                    if item.id is not None:
+                        self._pending_complete_ids.add(item.id)
 
-    def prediction_create_v2(
-        self, req: Union[tsi.PredictionCreateV2Req, dict[str, Any]]
-    ) -> tsi.PredictionCreateV2Res:
-        if isinstance(req, dict):
-            req = tsi.PredictionCreateV2Req.model_validate(req)
-        req = cast(tsi.PredictionCreateV2Req, req)
-        entity, project = req.project_id.split("/", 1)
-        url = f"/v2/{entity}/{project}/predictions"
-        body = tsi.PredictionCreateV2Body.model_validate(
-            req.model_dump(exclude={"project_id"})
-        )
-        return self._generic_request(
-            url,
-            body,
-            tsi.PredictionCreateV2Body,
-            tsi.PredictionCreateV2Res,
-            method="POST",
-        )
+            # Enqueue the complete calls directly
+            self.complete_processor.enqueue(req.items)
 
-    def prediction_read_v2(
-        self, req: Union[tsi.PredictionReadV2Req, dict[str, Any]]
-    ) -> tsi.PredictionReadV2Res:
-        if isinstance(req, dict):
-            req = tsi.PredictionReadV2Req.model_validate(req)
-        req = cast(tsi.PredictionReadV2Req, req)
-        entity, project = req.project_id.split("/", 1)
-        url = f"/v2/{entity}/{project}/predictions/{req.prediction_id}"
-        return self._generic_request(
-            url,
-            req,
-            tsi.PredictionReadV2Req,
-            tsi.PredictionReadV2Res,
-            method="GET",
-        )
+            return tsi.CallsCompleteBatchRes()
 
-    def prediction_list_v2(
-        self, req: Union[tsi.PredictionListV2Req, dict[str, Any]]
-    ) -> Iterator[tsi.PredictionReadV2Res]:
-        if isinstance(req, dict):
-            req = tsi.PredictionListV2Req.model_validate(req)
-        req = cast(tsi.PredictionListV2Req, req)
-        entity, project = req.project_id.split("/", 1)
-        url = f"/v2/{entity}/{project}/predictions"
-        # Build query params
-        params: dict[str, Any] = {}
-        if req.evaluation_run_id is not None:
-            params["evaluation_run_id"] = req.evaluation_run_id
-        if req.limit is not None:
-            params["limit"] = req.limit
-        if req.offset is not None:
-            params["offset"] = req.offset
-        return self._generic_stream_request(
-            url,
-            req,
-            tsi.PredictionListV2Req,
-            tsi.PredictionReadV2Res,
-            method="GET",
-            params=params,
-        )
+        # Try v2 endpoint first, fall back to legacy upsert_batch on 404
+        try:
+            return self._generic_request(
+                "/v2/calls/complete/batch",
+                req,
+                tsi.CallsCompleteBatchReq,
+                tsi.CallsCompleteBatchRes,
+            )
+        except requests.HTTPError as e:
+            if e.response.status_code == 404:
+                logger.debug(
+                    "V2 complete batch endpoint not available, falling back to legacy upsert_batch"
+                )
 
-    def prediction_delete_v2(
-        self, req: Union[tsi.PredictionDeleteV2Req, dict[str, Any]]
-    ) -> tsi.PredictionDeleteV2Res:
-        if isinstance(req, dict):
-            req = tsi.PredictionDeleteV2Req.model_validate(req)
-        req = cast(tsi.PredictionDeleteV2Req, req)
-        entity, project = req.project_id.split("/", 1)
-        url = f"/v2/{entity}/{project}/predictions"
-        # Build query params - prediction_ids are passed as a query param
-        params = {"prediction_ids": req.prediction_ids}
-        return self._generic_request(
-            url,
-            req,
-            tsi.PredictionDeleteV2Req,
-            tsi.PredictionDeleteV2Res,
-            method="DELETE",
-            params=params,
-        )
+                # Convert to legacy batch format
+                legacy_req = convert_complete_to_legacy_batch(req.items)
+                self._generic_request(
+                    "/call/upsert_batch",
+                    legacy_req,
+                    tsi.CallCreateBatchReq,
+                    tsi.CallCreateBatchRes,
+                )
 
-    def prediction_finish_v2(
-        self, req: Union[tsi.PredictionFinishV2Req, dict[str, Any]]
-    ) -> tsi.PredictionFinishV2Res:
-        if isinstance(req, dict):
-            req = tsi.PredictionFinishV2Req.model_validate(req)
-        req = cast(tsi.PredictionFinishV2Req, req)
-        entity, project = req.project_id.split("/", 1)
-        url = f"/v2/{entity}/{project}/predictions/{req.prediction_id}/finish"
-        return self._generic_request(
-            url,
-            req,
-            tsi.PredictionFinishV2Req,
-            tsi.PredictionFinishV2Res,
-            method="POST",
-        )
-
-    # Score V2 API
-
-    def score_create_v2(
-        self, req: Union[tsi.ScoreCreateV2Req, dict[str, Any]]
-    ) -> tsi.ScoreCreateV2Res:
-        if isinstance(req, dict):
-            req = tsi.ScoreCreateV2Req.model_validate(req)
-        req = cast(tsi.ScoreCreateV2Req, req)
-        entity, project = req.project_id.split("/", 1)
-        url = f"/v2/{entity}/{project}/scores"
-        body = tsi.ScoreCreateV2Body.model_validate(
-            req.model_dump(exclude={"project_id"})
-        )
-        return self._generic_request(
-            url,
-            body,
-            tsi.ScoreCreateV2Body,
-            tsi.ScoreCreateV2Res,
-            method="POST",
-        )
-
-    def score_read_v2(
-        self, req: Union[tsi.ScoreReadV2Req, dict[str, Any]]
-    ) -> tsi.ScoreReadV2Res:
-        if isinstance(req, dict):
-            req = tsi.ScoreReadV2Req.model_validate(req)
-        req = cast(tsi.ScoreReadV2Req, req)
-        entity, project = req.project_id.split("/", 1)
-        url = f"/v2/{entity}/{project}/scores/{req.score_id}"
-        return self._generic_request(
-            url,
-            req,
-            tsi.ScoreReadV2Req,
-            tsi.ScoreReadV2Res,
-            method="GET",
-        )
-
-    def score_list_v2(
-        self, req: Union[tsi.ScoreListV2Req, dict[str, Any]]
-    ) -> Iterator[tsi.ScoreReadV2Res]:
-        if isinstance(req, dict):
-            req = tsi.ScoreListV2Req.model_validate(req)
-        req = cast(tsi.ScoreListV2Req, req)
-        entity, project = req.project_id.split("/", 1)
-        url = f"/v2/{entity}/{project}/scores"
-        # Build query params
-        params: dict[str, Any] = {}
-        if req.evaluation_run_id is not None:
-            params["evaluation_run_id"] = req.evaluation_run_id
-        if req.limit is not None:
-            params["limit"] = req.limit
-        if req.offset is not None:
-            params["offset"] = req.offset
-        return self._generic_stream_request(
-            url,
-            req,
-            tsi.ScoreListV2Req,
-            tsi.ScoreReadV2Res,
-            method="GET",
-            params=params,
-        )
-
-    def score_delete_v2(
-        self, req: Union[tsi.ScoreDeleteV2Req, dict[str, Any]]
-    ) -> tsi.ScoreDeleteV2Res:
-        if isinstance(req, dict):
-            req = tsi.ScoreDeleteV2Req.model_validate(req)
-        req = cast(tsi.ScoreDeleteV2Req, req)
-        entity, project = req.project_id.split("/", 1)
-        url = f"/v2/{entity}/{project}/scores"
-        # Build query params - score_ids are passed as a query param
-        params = {"score_ids": req.score_ids}
-        return self._generic_request(
-            url,
-            req,
-            tsi.ScoreDeleteV2Req,
-            tsi.ScoreDeleteV2Res,
-            method="DELETE",
-            params=params,
-        )
+                return tsi.CallsCompleteBatchRes()
+            else:
+                raise
 
 
 __docspec__ = [
