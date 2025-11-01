@@ -10,7 +10,7 @@ import platform
 import re
 import sys
 import time
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
 from concurrent.futures import Future
 from functools import cached_property
 from typing import TYPE_CHECKING, Any, Callable, TypedDict, cast
@@ -1082,6 +1082,120 @@ class WeaveClient:
             )
         )
         return result.num_deleted
+
+    @trace_sentry.global_trace_sentry.watch()
+    def get_ops(
+        self,
+        *,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> Iterator[dict[str, Any]]:
+        """Get all ops for this project using the v2 API.
+
+        Args:
+            limit: Maximum number of ops to return.
+            offset: Number of ops to skip before returning results.
+
+        Yields:
+            Op dictionaries containing metadata and code for each op version.
+
+        Example:
+            ```python
+            for op in client.get_ops(limit=10):
+                print(f"Op: {op['object_id']} v{op['version_index']}")
+                print(f"Code: {op['code']}")
+            ```
+        """
+        from weave.trace_server.trace_server_interface import (
+            FullTraceServerInterface,
+            OpListV2Req,
+        )
+
+        # Cast to FullTraceServerInterface to access V2 methods
+        server = cast(FullTraceServerInterface, self.server)
+        ops_iterator = server.op_list_v2(
+            OpListV2Req(
+                project_id=self._project_id(),
+                limit=limit,
+                offset=offset,
+                wb_user_id=None,
+            )
+        )
+        for op in ops_iterator:
+            yield op.model_dump()
+
+    @trace_sentry.global_trace_sentry.watch()
+    def get_op(
+        self,
+        object_id: str,
+        digest: str | None = None,
+        *,
+        version: int | None = None,
+    ) -> dict[str, Any]:
+        """Get a specific op version using the v2 API.
+
+        Args:
+            object_id: The ID of the op object.
+            digest: The digest of the specific op version. If not provided, version must be specified.
+            version: The version index of the op. If provided and digest is not, will fetch the op with this version index.
+
+        Returns:
+            A dictionary containing the op metadata and code.
+
+        Examples:
+            ```python
+            # Get op by digest
+            op = client.get_op("my_op", "abc123...")
+            print(f"Op code: {op['code']}")
+            print(f"Created at: {op['created_at']}")
+
+            # Get op by version
+            op = client.get_op("my_op", version=2)
+            print(f"Op version {op['version_index']}")
+            ```
+        """
+        from weave.trace_server.trace_server_interface import (
+            FullTraceServerInterface,
+            OpListV2Req,
+            OpReadV2Req,
+        )
+
+        # Cast to FullTraceServerInterface to access V2 methods
+        server = cast(FullTraceServerInterface, self.server)
+
+        # If digest is not provided, use version to find it
+        if digest is None:
+            if version is None:
+                raise ValueError("Either digest or version must be provided")
+
+            # Use server-side filtering to efficiently find the op by version
+            ops_iterator = server.op_list_v2(
+                OpListV2Req(
+                    project_id=self._project_id(),
+                    object_id=object_id,
+                    version_index=version,
+                    wb_user_id=None,
+                )
+            )
+
+            # Get the first (and should be only) result
+            try:
+                op = next(iter(ops_iterator))
+                digest = op.digest
+            except StopIteration:
+                raise ValueError(
+                    f"Op {object_id} with version {version} not found"
+                ) from None
+
+        op = server.op_read_v2(
+            OpReadV2Req(
+                project_id=self._project_id(),
+                object_id=object_id,
+                digest=digest,
+                wb_user_id=None,
+            )
+        )
+        return op.model_dump()
 
     def get_feedback(
         self,

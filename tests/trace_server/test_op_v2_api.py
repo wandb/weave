@@ -438,3 +438,54 @@ def test_op_list_after_deletion(trace_server):
     op_names_returned = {op.object_id for op in ops}
     assert op_names_returned == {"op_keep_1", "op_keep_2"}
     assert "op_delete" not in op_names_returned
+
+
+def test_op_list_v2_filter_by_object_id(trace_server):
+    """Test filtering ops by object_id."""
+    project_id = f"{TEST_ENTITY}/test_op_list_filter_object_id"
+
+    # Create multiple ops
+    op_names = ["filter_op_a", "filter_op_b", "filter_op_c"]
+    for name in op_names:
+        create_req = tsi.OpCreateV2Req(
+            project_id=project_id,
+            name=name,
+            description=None,
+            source_code=f"def {name}():\n    pass",
+        )
+        trace_server.op_create_v2(create_req)
+
+    # Filter by specific object_id
+    list_req = tsi.OpListV2Req(project_id=project_id, object_id="filter_op_b")
+    ops = list(trace_server.op_list_v2(list_req))
+
+    assert len(ops) == 1
+    assert ops[0].object_id == "filter_op_b"
+
+
+def test_op_read_v2_by_version_index(trace_server):
+    """Test reading an op by version_index instead of digest."""
+    project_id = f"{TEST_ENTITY}/test_op_read_by_version"
+
+    # Create multiple versions of the same op
+    for i in range(3):
+        create_req = tsi.OpCreateV2Req(
+            project_id=project_id,
+            name="versioned_read_op",
+            description=None,
+            source_code=f"def versioned_read_op():\n    return {i}",
+        )
+        trace_server.op_create_v2(create_req)
+
+    # Read by version_index instead of digest
+    read_req = tsi.OpReadV2Req(
+        project_id=project_id,
+        object_id="versioned_read_op",
+        version_index=1,
+    )
+    op = trace_server.op_read_v2(read_req)
+
+    # Should return the op with version_index=1
+    assert op.object_id == "versioned_read_op"
+    assert op.version_index == 1
+    assert "return 1" in op.code
