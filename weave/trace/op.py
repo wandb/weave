@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import atexit
 import inspect
 import logging
@@ -89,6 +90,71 @@ CALL_CREATE_MSG = "Error creating call:\n{}"
 ASYNC_CALL_CREATE_MSG = "Error creating async call:\n{}"
 ON_OUTPUT_MSG = "Error capturing call output:\n{}"
 UNINITIALIZED_MSG = "Warning: Traces will not be logged. Call weave.init to log your traces to a project.\n"
+
+# Mapping from coroutine to Call object for coroutines that have started but not finished
+# Uses WeakKeyDictionary to avoid keeping coroutines alive after they finish
+if TYPE_CHECKING:
+    _coroutine_call_map: weakref.WeakKeyDictionary[Coroutine[Any, Any, Any], Call] = (
+        weakref.WeakKeyDictionary()
+    )
+else:
+    _coroutine_call_map: weakref.WeakKeyDictionary[Coroutine[Any, Any, Any], Any] = (
+        weakref.WeakKeyDictionary()
+    )
+
+
+def get_call_for_coroutine(coro: Coroutine[Any, Any, Any]) -> Call | None:
+    """Get the Call object for a coroutine that has started but not finished.
+
+    This function allows you to retrieve the Call object associated with a coroutine
+    that was created by calling `op.call()` on an async op, even before the coroutine
+    has finished executing.
+
+    Args:
+        coro: The coroutine for which to get the Call object. This should be a
+            coroutine returned by `op.call()` for an async op.
+
+    Returns:
+        The Call object associated with the coroutine, or None if the coroutine
+        has not started executing yet, has finished, or is not associated with
+        a traced op call.
+
+    Examples:
+        ```python
+        import asyncio
+        import weave
+
+        weave.init("my-project")
+
+        @weave.op
+        async def slow_op(x: int) -> int:
+            await asyncio.sleep(1)
+            return x * 2
+
+        # Option 1: Get coroutine and call immediately via call()
+        coro, call = slow_op.call(5)
+        print(f"Call ID: {call.id}")
+
+        # Wait for completion
+        result, call = await coro
+
+        # Option 2: Use get_call_for_coroutine (alternative approach)
+        # When calling the op directly, get_call_for_coroutine works after the coroutine starts
+        coro2 = slow_op(5)
+        task = asyncio.create_task(coro2)
+
+        # Wait a bit for the coroutine to start
+        await asyncio.sleep(0.01)
+
+        # Get the Call object while running
+        call2 = weave.get_call_for_coroutine(coro2)
+        if call2:
+            print(f"Call ID: {call2.id}")
+
+        result2 = await task
+        ```
+    """
+    return _coroutine_call_map.get(coro)
 
 
 class DisplayNameFuncError(ValueError): ...
@@ -542,10 +608,11 @@ async def _call_async_func(
     __weave: WeaveKwargs | None = None,
     __should_raise: bool = False,
     __require_explicit_finish: bool = False,
+    __call_obj: Call | None = None,
     **kwargs: Any,
 ) -> tuple[Any, Call]:
     func = op.resolve_fn
-    call = placeholder_call()
+    call = __call_obj if __call_obj is not None else placeholder_call()
 
     # Handle all of the possible cases where we would skip tracing.
     if is_tracing_setting_disabled() or should_skip_tracing_for_op(op):
@@ -559,23 +626,37 @@ async def _call_async_func(
             call.output = res
             return res, call
 
-    __weave = setup_dunder_weave_dict(__weave)
-    _set_python_function_type_on_weave_dict(__weave, "async_function")
+    # If call object was provided, we've already set up the weave dict and created the call
+    if __call_obj is None:
+        __weave = setup_dunder_weave_dict(__weave)
+        _set_python_function_type_on_weave_dict(__weave, "async_function")
 
-    # Proceed with tracing
-    try:
-        call = _create_call(op, *args, __weave=__weave, **kwargs)
-    except OpCallError as e:
-        raise e
-    except Exception as e:
-        if get_raise_on_captured_errors():
-            raise
-        log_once(
-            logger.error,
-            ASYNC_CALL_CREATE_MSG.format(traceback.format_exc()),
-        )
-        res = await func(*args, **kwargs)
-        return res, call
+        # Proceed with tracing
+        try:
+            call = _create_call(op, *args, __weave=__weave, **kwargs)
+        except OpCallError as e:
+            raise e
+        except Exception as e:
+            if get_raise_on_captured_errors():
+                raise
+            log_once(
+                logger.error,
+                ASYNC_CALL_CREATE_MSG.format(traceback.format_exc()),
+            )
+            res = await func(*args, **kwargs)
+            return res, call
+
+        # Store the mapping from the current coroutine to the Call object
+        # This allows users to get the Call object for a coroutine that has started but not finished
+        # Get the current task and its coroutine
+        # The coroutine being executed is the one the user has a reference to
+        current_task = asyncio.current_task()
+        if current_task is not None:
+            # Store the mapping from the coroutine to the Call object
+            # The coroutine is available via the task's get_coro() method
+            coro = current_task.get_coro()
+            if coro is not None:
+                _coroutine_call_map[coro] = call
 
     # Execute the op and process the result
     client = weave_client_context.require_weave_client()
@@ -1103,7 +1184,7 @@ def call(
     # included to support the imperative evaluation logging interface.
     __require_explicit_finish: bool = False,
     **kwargs: Any,
-) -> tuple[Any, Call] | Coroutine[Any, Any, tuple[Any, Call]]:
+) -> tuple[Any, Call] | tuple[Coroutine[Any, Any, tuple[Any, Call]], Call]:
     """Executes the op and returns both the result and a Call representing the execution.
 
     This function will never raise.  Any errors are captured in the Call object.
@@ -1118,16 +1199,95 @@ def call(
 
     result, call = add.call(1, 2)
     ```
+
+    For async ops, this returns a tuple of (coroutine, call) so you can access the
+    Call object immediately:
+
+    ```python
+    @weave.op
+    async def slow_op(x: int) -> int:
+        await asyncio.sleep(1)
+        return x * 2
+
+    coro, call = slow_op.call(5)
+    # call is available immediately
+    print(f"Call ID: {call.id}")
+
+    # Later, await the coroutine
+    result, call = await coro
+    ```
     """
     if inspect.iscoroutinefunction(op.resolve_fn):
-        return _call_async_func(
+        # For async functions, create the Call object immediately so it's available
+        # before the coroutine starts executing
+        __weave = setup_dunder_weave_dict(__weave)
+        _set_python_function_type_on_weave_dict(__weave, "async_function")
+
+        call = placeholder_call()
+
+        # Handle early exit cases
+        if is_tracing_setting_disabled() or should_skip_tracing_for_op(op):
+            coro = _call_async_func(
+                op,
+                *args,
+                __weave=__weave,
+                __should_raise=__should_raise,
+                __require_explicit_finish=__require_explicit_finish,
+                __call_obj=call,
+                **kwargs,
+            )
+            return coro, call
+
+        if _should_sample_traces(op):
+            coro = _call_async_func(
+                op,
+                *args,
+                __weave=__weave,
+                __should_raise=__should_raise,
+                __require_explicit_finish=__require_explicit_finish,
+                __call_obj=call,
+                **kwargs,
+            )
+            return coro, call
+
+        # Create the Call object synchronously
+        try:
+            call = _create_call(op, *args, __weave=__weave, **kwargs)
+        except OpCallError as e:
+            raise e
+        except Exception as e:
+            if get_raise_on_captured_errors():
+                raise
+            log_once(
+                logger.error,
+                ASYNC_CALL_CREATE_MSG.format(traceback.format_exc()),
+            )
+            coro = _call_async_func(
+                op,
+                *args,
+                __weave=__weave,
+                __should_raise=__should_raise,
+                __require_explicit_finish=__require_explicit_finish,
+                __call_obj=call,
+                **kwargs,
+            )
+            return coro, call
+
+        # Create the coroutine and store the mapping
+        coro = _call_async_func(
             op,
             *args,
             __weave=__weave,
             __should_raise=__should_raise,
             __require_explicit_finish=__require_explicit_finish,
+            __call_obj=call,
             **kwargs,
         )
+
+        # Store the mapping from coroutine to Call object immediately
+        _coroutine_call_map[coro] = call
+
+        return coro, call
     else:
         return _call_sync_func(
             op,
