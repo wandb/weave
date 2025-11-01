@@ -166,7 +166,8 @@ class Audio(Generic[T]):
                 f"Invalid file path {path}, file must end in one of: mp3 or wav"
             )
 
-        data = open(path, "rb").read()
+        with open(path, "rb") as f:
+            data = f.read()
         return cls(data=data, format=cast(SUPPORTED_FORMATS_TYPE, format_str))
 
     def export(self, path: str | bytes | Path | os.PathLike) -> None:
@@ -258,7 +259,12 @@ def load(
             if (
                 pytype is None and filename.endswith(".wav")
             ) or pytype == "wave.Wave_read":
-                return wave.open(path, "rb")
+                # Read the wave file and immediately close it to avoid file handle leaks
+                # on Windows. We create a new in-memory wave.Wave_read object from the data.
+                import io
+                with open(path, "rb") as f:
+                    wav_data = f.read()
+                return wave.open(io.BytesIO(wav_data), "rb")
             return Audio.from_path(path=path)
 
     raise ValueError("No audio found for artifact")

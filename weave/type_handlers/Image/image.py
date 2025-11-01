@@ -64,7 +64,13 @@ def load(artifact: MemTraceFilesArtifact, name: str, val: Any) -> Image.Image:
         raise ValueError(f"Expected filename to start with 'image.', got {filename}")
 
     path = artifact.path(filename)
-    return Image.open(path)
+    # Open, load, and close the image file immediately to avoid file handle leaks
+    # PIL's Image.open() keeps the file open for lazy loading, which causes issues
+    # on Windows when the temporary directory cleanup tries to delete the file
+    with Image.open(path) as img:
+        # Load the image data into memory and create a copy
+        # This ensures we don't keep a reference to the file
+        return img.copy()
 
 
 def register() -> None:
