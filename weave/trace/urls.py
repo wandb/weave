@@ -33,3 +33,10 @@ def leaderboard_path(entity_name: str, project_name: str, object_name: str) -> s
 
 def redirect_call(entity_name: str, project_name: str, call_id: str) -> str:
     return f"{remote_project_root_url(entity_name, project_name)}/r/call/{call_id}"
+
+
+def evaluation_call_url(entity_name: str, project_name: str, call_id: str) -> str:
+    """Generate a URL for an evaluation call that links to the evaluations page."""
+    project_id = f"{entity_name}/{project_name}"
+    peek_path = f"/{project_id}/calls/{call_id}?hideTraceTree%3D1"
+    return f"{project_weave_root_url(entity_name, project_name)}/evaluations?view=evaluations_default&peekPath={peek_path}"
