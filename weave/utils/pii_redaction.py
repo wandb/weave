@@ -1,3 +1,4 @@
+import dataclasses
 from typing import Any, Union
 
 from presidio_analyzer import AnalyzerEngine
@@ -53,6 +54,16 @@ def redact_pii(
             return result
         elif isinstance(value, list):
             return [redact_recursive(item) for item in value]
+        elif dataclasses.is_dataclass(value):
+            # Redact dataclass fields whose names are in the redact set
+            redacted_fields = {}
+            for field in dataclasses.fields(value):
+                field_value = getattr(value, field.name)
+                if should_redact(field.name):
+                    redacted_fields[field.name] = REDACTED_VALUE
+                else:
+                    redacted_fields[field.name] = redact_recursive(field_value)
+            return dataclasses.replace(value, **redacted_fields)
         else:
             return value
 
