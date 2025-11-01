@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pandas as pd
 
 import weave
@@ -5,8 +7,19 @@ from weave.evaluation.eval import EvaluationResults
 
 
 def get_model_evals(
-    file_path: str = "integrations/notdiamond/test_data/humaneval.csv",
+    file_path: str | None = None,
 ) -> dict[str, EvaluationResults]:
+    if file_path is None:
+        # Get path relative to this module file
+        module_dir = (
+            Path(__file__).parent.parent.parent.parent
+            / "tests"
+            / "integrations"
+            / "notdiamond"
+            / "test_data"
+        )
+        file_path = str(module_dir / "humaneval.csv")
+
     df = pd.read_csv(file_path)
     models = [
         "anthropic/claude-3-5-sonnet-20240620",
