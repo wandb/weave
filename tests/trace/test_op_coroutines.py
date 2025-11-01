@@ -218,3 +218,57 @@ async def test_async_with_exception_method(client):
     assert isinstance(call, Call)
     assert call.exception is not None
     assert res is None
+
+
+@pytest.mark.asyncio
+async def test_get_call_for_coroutine(client):
+    """Test getting Call object for a coroutine that has started but not finished."""
+    call_ids = []
+
+    @weave.op
+    async def slow_op(x: int) -> int:
+        # Store the call ID while the op is running
+        current_call = weave.get_current_call()
+        if current_call:
+            call_ids.append(current_call.id)
+        await asyncio.sleep(0.1)
+        return x * 2
+
+    # Test Option 1: Get coroutine and call immediately via call()
+    coro, call = slow_op.call(5)
+    assert call is not None
+    assert isinstance(call, Call)
+    assert call.id is not None
+
+    # Create a task to start execution
+    task = asyncio.create_task(coro)
+
+    # Wait a bit for the coroutine to start
+    await asyncio.sleep(0.01)
+
+    # The Call object should match what we got from call()
+    call_during_execution = weave.get_call_for_coroutine(coro)
+    assert call_during_execution is not None
+    assert call_during_execution.id == call.id
+    assert call_during_execution.id == call_ids[0]
+
+    # Wait for completion
+    result, call_after_completion = await task
+    assert result == 10
+    assert call_after_completion.id == call.id
+
+    # Test Option 2: Using get_call_for_coroutine with direct call
+    coro2 = slow_op(5)
+    task2 = asyncio.create_task(coro2)
+
+    # Wait a bit for the coroutine to start
+    await asyncio.sleep(0.01)
+
+    # Get the Call object while running
+    call2 = weave.get_call_for_coroutine(coro2)
+    assert call2 is not None
+    assert isinstance(call2, Call)
+
+    # Wait for completion
+    result2 = await task2
+    assert result2 == 10

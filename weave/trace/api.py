@@ -19,7 +19,7 @@ from weave.trace.context import call_context
 from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace.context.call_context import get_current_call, require_current_call
 from weave.trace.display.term import configure_logger
-from weave.trace.op import PostprocessInputsFunc, PostprocessOutputFunc, as_op, op
+from weave.trace.op import PostprocessInputsFunc, PostprocessOutputFunc, as_op, op, get_call_for_coroutine
 from weave.trace.refs import ObjectRef, Ref
 from weave.trace.settings import (
     UserSettings,
@@ -407,6 +407,7 @@ __all__ = [
     "attributes",
     "finish",
     "get",
+    "get_call_for_coroutine",
     "get_client",
     "get_current_call",
     "init",
