@@ -4,6 +4,8 @@ from unittest.mock import Mock, patch
 import pytest
 from pydantic import ValidationError
 
+from weave import publish
+from weave.prompt.prompt import MessagesPrompt
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.interface.builtin_object_classes.llm_structured_model import (
@@ -566,6 +568,17 @@ def test_parse_params_to_litellm_params():
     assert "temperature" not in result_none
     assert result_none["max_tokens"] == 100
 
+    # Test that messages_template and prompt_ref are excluded
+    params_with_prompt_ref = LLMStructuredCompletionModelDefaultParams(
+        temperature=0.5,
+        prompt_ref="weave:///entity/project/object/my_prompt:latest",
+        messages_template=[Message(role="system", content="Test")],
+    )
+    result_with_prompt_ref = parse_params_to_litellm_params(params_with_prompt_ref)
+    assert "prompt_ref" not in result_with_prompt_ref
+    assert "messages_template" not in result_with_prompt_ref
+    assert result_with_prompt_ref["temperature"] == 0.5
+
 
 def test_cast_to_message_list():
     """Test the cast_to_message_list function."""
@@ -629,6 +642,122 @@ def test_cast_to_message():
     # Test invalid type
     with pytest.raises(TypeError):
         cast_to_message(123)
+
+
+@patch(
+    "weave.trace_server.interface.builtin_object_classes.llm_structured_model.get_weave_client"
+)
+def test_llm_structured_completion_model_predict_with_prompt_ref(
+    mock_get_client, client: WeaveClient
+):
+    """Test the predict function with a prompt_ref that references a MessagesPrompt object."""
+    # Create and publish a MessagesPrompt
+    messages_prompt = MessagesPrompt(
+        messages=[
+            {"role": "system", "content": "You are {assistant_name}, a helpful AI."},
+            {"role": "user", "content": "Hello, my name is {user_name}"},
+        ]
+    )
+    prompt_ref = publish(messages_prompt, name="test_messages_prompt")
+
+    # Setup mock client
+    mock_client = Mock()
+    mock_client.entity = client.entity
+    mock_client.project = client.project
+
+    mock_response = tsi.CompletionsCreateRes(
+        response={
+            "choices": [
+                {
+                    "message": {
+                        "role": "assistant",
+                        "content": "Hello Alice! I'm Claude, nice to meet you.",
+                    }
+                }
+            ]
+        }
+    )
+    mock_client.server.completions_create.return_value = mock_response
+    mock_get_client.return_value = mock_client
+
+    # Create model with prompt_ref
+    model = LLMStructuredCompletionModel(
+        llm_model_id="claude-3",
+        default_params=LLMStructuredCompletionModelDefaultParams(
+            prompt_ref=prompt_ref.uri(),
+            response_format="text",
+        ),
+    )
+
+    # Test predict with template variables
+    result = model.predict(
+        user_input=[Message(role="user", content="What's your name?")],
+        assistant_name="Claude",
+        user_name="Alice",
+    )
+
+    # Verify result
+    assert result == "Hello Alice! I'm Claude, nice to meet you."
+
+    # Verify the messages were properly prepared with template substitution from the prompt
+    call_args = mock_client.server.completions_create.call_args[1]["req"]
+    expected_messages = [
+        {"role": "system", "content": "You are Claude, a helpful AI."},
+        {"role": "user", "content": "Hello, my name is Alice"},
+        {"role": "user", "content": "What's your name?"},
+    ]
+    assert call_args.inputs.messages == expected_messages
+
+
+@patch(
+    "weave.trace_server.interface.builtin_object_classes.llm_structured_model.get_weave_client"
+)
+def test_llm_structured_completion_model_prompt_ref_takes_precedence(
+    mock_get_client, client: WeaveClient
+):
+    """Test that prompt_ref takes precedence over messages_template when both are provided."""
+    # Create and publish a MessagesPrompt
+    messages_prompt = MessagesPrompt(
+        messages=[
+            {"role": "system", "content": "Message from prompt_ref: {var}"},
+        ]
+    )
+    prompt_ref = publish(messages_prompt, name="test_precedence_prompt")
+
+    # Setup mock client
+    mock_client = Mock()
+    mock_client.entity = client.entity
+    mock_client.project = client.project
+
+    mock_response = tsi.CompletionsCreateRes(
+        response={
+            "choices": [{"message": {"role": "assistant", "content": "Response"}}]
+        }
+    )
+    mock_client.server.completions_create.return_value = mock_response
+    mock_get_client.return_value = mock_client
+
+    # Create model with both prompt_ref and messages_template
+    model = LLMStructuredCompletionModel(
+        llm_model_id="gpt-4",
+        default_params=LLMStructuredCompletionModelDefaultParams(
+            prompt_ref=prompt_ref.uri(),
+            messages_template=[
+                Message(role="system", content="Message from template: {var}"),
+            ],
+            response_format="text",
+        ),
+    )
+
+    # Test predict
+    result = model.predict(var="test_value")
+
+    # Verify that prompt_ref was used (not messages_template)
+    call_args = mock_client.server.completions_create.call_args[1]["req"]
+    expected_messages = [
+        {"role": "system", "content": "Message from prompt_ref: test_value"},
+    ]
+    assert call_args.inputs.messages == expected_messages
 
 
 def test_llm_structured_completion_model_schema_validation(client: WeaveClient):
