@@ -103,6 +103,12 @@ class UserSettings(BaseModel):
     capture_system_info: bool = True
     """Toggles capture of system information (OS name and version) for ops."""
 
+    capture_git_state: bool = True
+    """Toggles capture of git state (branch, commit SHA, dirty state) for ops."""
+
+    capture_callsite: bool = True
+    """Toggles capture of callsite information (file, line number, function) for ops."""
+
     client_parallelism: Optional[int] = None
     """
     Sets the number of workers to use for background operations.
@@ -236,6 +242,14 @@ def should_capture_client_info() -> bool:
 
 def should_capture_system_info() -> bool:
     return _should("capture_system_info")
+
+
+def should_capture_git_state() -> bool:
+    return _should("capture_git_state")
+
+
+def should_capture_callsite() -> bool:
+    return _should("capture_callsite")
 
 
 def client_parallelism() -> Optional[int]:
