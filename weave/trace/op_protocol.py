@@ -7,7 +7,6 @@ from typing import (
     Callable,
     Optional,
     Protocol,
-    overload,
     runtime_checkable,
 )
 
@@ -63,10 +62,7 @@ class Op(Protocol[P, R]):
     _on_finish_post_processor: Callable[[Any], Any] | None
 
     # __call__: Callable[..., Any]
-    @overload
     def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R: ...
-    @overload
-    def __call__(self, *args: Any, **kwargs: Any) -> Any: ...  # pyright: ignore[reportOverlappingOverload]
 
     __self__: Any
 
