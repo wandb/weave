@@ -26,7 +26,7 @@ def test_redact_dataclass_fields() -> None:
     original_keys = sanitize.get_redact_keys()
 
     try:
-        sanitize.add_redact_key("api_key")
+        sanitize.add_redact_key("api_token")
 
         @dataclasses.dataclass
         class UserConfig:
@@ -42,10 +42,9 @@ def test_redact_dataclass_fields() -> None:
 
         redacted = redact_sensitive_keys(config)
 
-        # The api_key field should be redacted
+        # Both api_key (default) and api_token (added) should be redacted
         assert redacted.api_key == sanitize.REDACTED_VALUE
-        # api_token should not be redacted (not in redact set)
-        assert redacted.api_token == "token-456"
+        assert redacted.api_token == sanitize.REDACTED_VALUE
         # username should not be redacted
         assert redacted.username == "testuser"
 
@@ -110,6 +109,87 @@ def test_redact_dataclass_in_list() -> None:
         assert redacted[0].username == "user1"
         assert redacted[1].api_key == sanitize.REDACTED_VALUE
         assert redacted[1].username == "user2"
+
+    finally:
+        sanitize._REDACT_KEYS = original_keys
+
+
+def test_redact_dataclass_add_field_to_redact_list() -> None:
+    """Test that adding a field name to the redact list causes it to be redacted."""
+    original_keys = sanitize.get_redact_keys()
+
+    try:
+        # Create a dataclass with a field "foo" that is not in the redact list
+        @dataclasses.dataclass
+        class TestConfig:
+            foo: str
+            bar: str
+
+        config = TestConfig(foo="sensitive-value", bar="public-value")
+
+        # Initially, "foo" should not be redacted
+        assert "foo" not in sanitize.get_redact_keys()
+
+        # Before adding to redact list, foo should not be redacted
+        redacted_before = redact_sensitive_keys(config)
+        assert redacted_before.foo == "sensitive-value"
+        assert redacted_before.bar == "public-value"
+
+        # Add "foo" to the redact list
+        sanitize.add_redact_key("foo")
+
+        # Now "foo" should be redacted
+        assert "foo" in sanitize.get_redact_keys()
+        redacted_after = redact_sensitive_keys(config)
+
+        # After adding to redact list, foo should be redacted
+        assert redacted_after.foo == sanitize.REDACTED_VALUE
+        assert redacted_after.bar == "public-value"
+
+    finally:
+        sanitize._REDACT_KEYS = original_keys
+
+
+def test_redact_dataclass_nested_add_field_to_redact_list() -> None:
+    """Test that nested dataclasses redact fields after adding them to the redact list."""
+    original_keys = sanitize.get_redact_keys()
+
+    try:
+        # Create nested dataclasses with a field "foo" that is not in the redact list
+        @dataclasses.dataclass
+        class InnerConfig:
+            foo: str
+            public: str
+
+        @dataclasses.dataclass
+        class OuterConfig:
+            inner: InnerConfig
+            name: str
+
+        config = OuterConfig(
+            inner=InnerConfig(foo="sensitive-nested-value", public="visible"),
+            name="test",
+        )
+
+        # Initially, "foo" should not be redacted
+        assert "foo" not in sanitize.get_redact_keys()
+
+        # Before adding to redact list, foo should not be redacted
+        redacted_before = redact_sensitive_keys(config)
+        assert redacted_before.inner.foo == "sensitive-nested-value"
+        assert redacted_before.inner.public == "visible"
+        assert redacted_before.name == "test"
+
+        # Add "foo" to the redact list
+        sanitize.add_redact_key("foo")
+
+        # Now "foo" should be redacted in nested dataclass
+        redacted_after = redact_sensitive_keys(config)
+
+        # After adding to redact list, foo should be redacted
+        assert redacted_after.inner.foo == sanitize.REDACTED_VALUE
+        assert redacted_after.inner.public == "visible"
+        assert redacted_after.name == "test"
 
     finally:
         sanitize._REDACT_KEYS = original_keys
