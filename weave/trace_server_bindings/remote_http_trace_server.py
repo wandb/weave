@@ -763,7 +763,11 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
         body_data = req.model_dump(exclude={"project_id"})
         body = tsi.OpCreateV2Body.model_validate(body_data)
         return self._generic_request(
-            url, body, tsi.OpCreateV2Body, tsi.OpCreateV2Res, method="POST"
+            url,
+            body,
+            tsi.OpCreateV2Body,
+            tsi.OpCreateV2Res,
+            method="POST",
         )
 
     def op_read_v2(
@@ -774,8 +778,13 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
         req = cast(tsi.OpReadV2Req, req)
         entity, project = req.project_id.split("/", 1)
         url = f"/v2/{entity}/{project}/ops/{req.object_id}/versions/{req.digest}"
-        r = self._get_request_executor(url, {})
-        return tsi.OpReadV2Res.model_validate(r.json())
+        return self._generic_request(
+            url,
+            req,
+            tsi.OpReadV2Req,
+            tsi.OpReadV2Res,
+            method="GET",
+        )
 
     def op_list_v2(
         self, req: Union[tsi.OpListV2Req, dict[str, Any]]
@@ -793,10 +802,14 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
             params["offset"] = req.offset
         if req.eager:
             params["eager"] = "true"
-        r = self._get_request_executor(url, params, stream=True)
-        for line in r.iter_lines():
-            if line:
-                yield tsi.OpReadV2Res.model_validate_json(line)
+        return self._generic_stream_request(
+            url,
+            req,
+            tsi.OpListV2Req,
+            tsi.OpReadV2Res,
+            method="GET",
+            params=params,
+        )
 
     def op_delete_v2(
         self, req: Union[tsi.OpDeleteV2Req, dict[str, Any]]
@@ -810,8 +823,14 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
         params = {}
         if req.digests:
             params["digests"] = req.digests
-        r = self._delete_request_executor(url, params)
-        return tsi.OpDeleteV2Res.model_validate(r.json())
+        return self._generic_request(
+            url,
+            req,
+            tsi.OpDeleteV2Req,
+            tsi.OpDeleteV2Res,
+            method="DELETE",
+            params=params,
+        )
 
     def dataset_create_v2(
         self, req: Union[tsi.DatasetCreateV2Req, dict[str, Any]]
@@ -825,7 +844,11 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
         body_data = req.model_dump(exclude={"project_id"})
         body = tsi.DatasetCreateV2Body.model_validate(body_data)
         return self._generic_request(
-            url, body, tsi.DatasetCreateV2Body, tsi.DatasetCreateV2Res, method="POST"
+            url,
+            body,
+            tsi.DatasetCreateV2Body,
+            tsi.DatasetCreateV2Res,
+            method="POST",
         )
 
     def dataset_read_v2(
@@ -836,8 +859,13 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
         req = cast(tsi.DatasetReadV2Req, req)
         entity, project = req.project_id.split("/", 1)
         url = f"/v2/{entity}/{project}/datasets/{req.object_id}/versions/{req.digest}"
-        r = self._get_request_executor(url, {})
-        return tsi.DatasetReadV2Res.model_validate(r.json())
+        return self._generic_request(
+            url,
+            req,
+            tsi.DatasetReadV2Req,
+            tsi.DatasetReadV2Res,
+            method="GET",
+        )
 
     def dataset_list_v2(
         self, req: Union[tsi.DatasetListV2Req, dict[str, Any]]
@@ -853,10 +881,14 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
             params["limit"] = req.limit
         if req.offset is not None:
             params["offset"] = req.offset
-        r = self._get_request_executor(url, params, stream=True)
-        for line in r.iter_lines():
-            if line:
-                yield tsi.DatasetReadV2Res.model_validate_json(line)
+        return self._generic_stream_request(
+            url,
+            req,
+            tsi.DatasetListV2Req,
+            tsi.DatasetReadV2Res,
+            method="GET",
+            params=params,
+        )
 
     def dataset_delete_v2(
         self, req: Union[tsi.DatasetDeleteV2Req, dict[str, Any]]
@@ -870,8 +902,14 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
         params = {}
         if req.digests:
             params["digests"] = req.digests
-        r = self._delete_request_executor(url, params)
-        return tsi.DatasetDeleteV2Res.model_validate(r.json())
+        return self._generic_request(
+            url,
+            req,
+            tsi.DatasetDeleteV2Req,
+            tsi.DatasetDeleteV2Res,
+            method="DELETE",
+            params=params,
+        )
 
     def scorer_create_v2(
         self, req: Union[tsi.ScorerCreateV2Req, dict[str, Any]]
@@ -885,7 +923,11 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
         body_data = req.model_dump(exclude={"project_id"})
         body = tsi.ScorerCreateV2Body.model_validate(body_data)
         return self._generic_request(
-            url, body, tsi.ScorerCreateV2Body, tsi.ScorerCreateV2Res, method="POST"
+            url,
+            body,
+            tsi.ScorerCreateV2Body,
+            tsi.ScorerCreateV2Res,
+            method="POST",
         )
 
     def scorer_read_v2(
@@ -896,8 +938,13 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
         req = cast(tsi.ScorerReadV2Req, req)
         entity, project = req.project_id.split("/", 1)
         url = f"/v2/{entity}/{project}/scorers/{req.object_id}/versions/{req.digest}"
-        r = self._get_request_executor(url)
-        return tsi.ScorerReadV2Res.model_validate(r.json())
+        return self._generic_request(
+            url,
+            req,
+            tsi.ScorerReadV2Req,
+            tsi.ScorerReadV2Res,
+            method="GET",
+        )
 
     def scorer_list_v2(
         self, req: Union[tsi.ScorerListV2Req, dict[str, Any]]
@@ -913,10 +960,14 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
             params["limit"] = req.limit
         if req.offset is not None:
             params["offset"] = req.offset
-        r = self._get_request_executor(url, params, stream=True)
-        for line in r.iter_lines():
-            if line:
-                yield tsi.ScorerReadV2Res.model_validate_json(line)
+        return self._generic_stream_request(
+            url,
+            req,
+            tsi.ScorerListV2Req,
+            tsi.ScorerReadV2Res,
+            method="GET",
+            params=params,
+        )
 
     def scorer_delete_v2(
         self, req: Union[tsi.ScorerDeleteV2Req, dict[str, Any]]
@@ -930,8 +981,14 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
         params = {}
         if req.digests:
             params["digests"] = req.digests
-        r = self._delete_request_executor(url, params)
-        return tsi.ScorerDeleteV2Res.model_validate(r.json())
+        return self._generic_request(
+            url,
+            req,
+            tsi.ScorerDeleteV2Req,
+            tsi.ScorerDeleteV2Res,
+            method="DELETE",
+            params=params,
+        )
 
     def evaluation_create_v2(
         self, req: Union[tsi.EvaluationCreateV2Req, dict[str, Any]]
@@ -962,8 +1019,13 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
         url = (
             f"/v2/{entity}/{project}/evaluations/{req.object_id}/versions/{req.digest}"
         )
-        r = self._get_request_executor(url)
-        return tsi.EvaluationReadV2Res.model_validate(r.json())
+        return self._generic_request(
+            url,
+            req,
+            tsi.EvaluationReadV2Req,
+            tsi.EvaluationReadV2Res,
+            method="GET",
+        )
 
     def evaluation_list_v2(
         self, req: Union[tsi.EvaluationListV2Req, dict[str, Any]]
@@ -979,10 +1041,14 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
             params["limit"] = req.limit
         if req.offset is not None:
             params["offset"] = req.offset
-        r = self._get_request_executor(url, params, stream=True)
-        for line in r.iter_lines():
-            if line:
-                yield tsi.EvaluationReadV2Res.model_validate_json(line)
+        return self._generic_stream_request(
+            url,
+            req,
+            tsi.EvaluationListV2Req,
+            tsi.EvaluationReadV2Res,
+            method="GET",
+            params=params,
+        )
 
     def evaluation_delete_v2(
         self, req: Union[tsi.EvaluationDeleteV2Req, dict[str, Any]]
@@ -996,8 +1062,14 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
         params = {}
         if req.digests:
             params["digests"] = req.digests
-        r = self._delete_request_executor(url, params)
-        return tsi.EvaluationDeleteV2Res.model_validate(r.json())
+        return self._generic_request(
+            url,
+            req,
+            tsi.EvaluationDeleteV2Req,
+            tsi.EvaluationDeleteV2Res,
+            method="DELETE",
+            params=params,
+        )
 
     # Model V2 API
 
@@ -1028,8 +1100,13 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
         req = cast(tsi.ModelReadV2Req, req)
         entity, project = req.project_id.split("/", 1)
         url = f"/v2/{entity}/{project}/models/{req.object_id}/versions/{req.digest}"
-        r = self._get_request_executor(url)
-        return tsi.ModelReadV2Res.model_validate(r.json())
+        return self._generic_request(
+            url,
+            req,
+            tsi.ModelReadV2Req,
+            tsi.ModelReadV2Res,
+            method="GET",
+        )
 
     def model_list_v2(
         self, req: Union[tsi.ModelListV2Req, dict[str, Any]]
@@ -1045,10 +1122,14 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
             params["limit"] = req.limit
         if req.offset is not None:
             params["offset"] = req.offset
-        r = self._get_request_executor(url, params, stream=True)
-        for line in r.iter_lines():
-            if line:
-                yield tsi.ModelReadV2Res.model_validate_json(line)
+        return self._generic_stream_request(
+            url,
+            req,
+            tsi.ModelListV2Req,
+            tsi.ModelReadV2Res,
+            method="GET",
+            params=params,
+        )
 
     def model_delete_v2(
         self, req: Union[tsi.ModelDeleteV2Req, dict[str, Any]]
@@ -1062,8 +1143,14 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
         params = {}
         if req.digests:
             params["digests"] = req.digests
-        r = self._delete_request_executor(url, params)
-        return tsi.ModelDeleteV2Res.model_validate(r.json())
+        return self._generic_request(
+            url,
+            req,
+            tsi.ModelDeleteV2Req,
+            tsi.ModelDeleteV2Res,
+            method="DELETE",
+            params=params,
+        )
 
     def evaluation_run_create_v2(
         self, req: Union[tsi.EvaluationRunCreateV2Req, dict[str, Any]]
@@ -1091,8 +1178,13 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
         req = cast(tsi.EvaluationRunReadV2Req, req)
         entity, project = req.project_id.split("/", 1)
         url = f"/v2/{entity}/{project}/evaluation_runs/{req.evaluation_run_id}"
-        r = self._get_request_executor(url)
-        return tsi.EvaluationRunReadV2Res.model_validate(r.json())
+        return self._generic_request(
+            url,
+            req,
+            tsi.EvaluationRunReadV2Req,
+            tsi.EvaluationRunReadV2Res,
+            method="GET",
+        )
 
     def evaluation_run_list_v2(
         self, req: Union[tsi.EvaluationRunListV2Req, dict[str, Any]]
@@ -1115,10 +1207,14 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
                 params["model_refs"] = ",".join(req.filter.models)
             if req.filter.evaluation_run_ids:
                 params["evaluation_run_ids"] = ",".join(req.filter.evaluation_run_ids)
-        r = self._get_request_executor(url, params, stream=True)
-        for line in r.iter_lines():
-            if line:
-                yield tsi.EvaluationRunReadV2Res.model_validate_json(line)
+        return self._generic_stream_request(
+            url,
+            req,
+            tsi.EvaluationRunListV2Req,
+            tsi.EvaluationRunReadV2Res,
+            method="GET",
+            params=params,
+        )
 
     def evaluation_run_delete_v2(
         self, req: Union[tsi.EvaluationRunDeleteV2Req, dict[str, Any]]
@@ -1130,8 +1226,14 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
         url = f"/v2/{entity}/{project}/evaluation_runs"
         # Build query params - evaluation_run_ids are passed as a query param
         params = {"evaluation_run_ids": req.evaluation_run_ids}
-        r = self._delete_request_executor(url, params)
-        return tsi.EvaluationRunDeleteV2Res.model_validate(r.json())
+        return self._generic_request(
+            url,
+            req,
+            tsi.EvaluationRunDeleteV2Req,
+            tsi.EvaluationRunDeleteV2Res,
+            method="DELETE",
+            params=params,
+        )
 
     def evaluation_run_finish_v2(
         self, req: Union[tsi.EvaluationRunFinishV2Req, dict[str, Any]]
