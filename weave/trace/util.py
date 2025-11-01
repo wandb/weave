@@ -177,5 +177,3 @@ def deprecated(new_name: str) -> Callable[[Callable[..., Any]], Callable[..., An
 # rename for cleaner export
 ThreadPoolExecutor = ContextAwareThreadPoolExecutor
 Thread = ContextAwareThread
-
-__docspec__ = [ThreadPoolExecutor, Thread]

@@ -1,3 +1,1 @@
-from .content import Content
-
-__docspec__ = [Content]
+from .content import Content as Content

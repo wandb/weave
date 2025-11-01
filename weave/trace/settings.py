@@ -355,6 +355,3 @@ def _optional_float(name: str) -> Optional[float]:
     if env := os.getenv(f"{SETTINGS_PREFIX}{name.upper()}"):
         return float(env)
     return _context_vars[name].get()
-
-
-__doc_spec__ = [UserSettings]
