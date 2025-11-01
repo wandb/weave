@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import importlib
-from typing import Callable
+from typing import Callable, List, Optional, Union
 
 import weave
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
 
-_notdiamond_patcher: MultiPatcher | None = None
+_notdiamond_patcher: Optional[MultiPatcher] = None
 
 
 def not_diamond_wrapper(settings: OpSettings) -> Callable[[Callable], Callable]:
@@ -27,7 +27,7 @@ def passthrough_wrapper(settings: OpSettings) -> Callable:
     return wrapper
 
 
-def _patch_client_op(method_name: str) -> list[SymbolPatcher]:
+def _patch_client_op(method_name: str) -> List[SymbolPatcher]:
     return [
         SymbolPatcher(
             lambda: importlib.import_module("notdiamond"),
@@ -43,8 +43,8 @@ def _patch_client_op(method_name: str) -> list[SymbolPatcher]:
 
 
 def get_notdiamond_patcher(
-    settings: IntegrationSettings | None = None,
-) -> MultiPatcher | NoOpPatcher:
+    settings: Optional[IntegrationSettings] = None,
+) -> Union[MultiPatcher, NoOpPatcher]:
     if settings is None:
         settings = IntegrationSettings()
 

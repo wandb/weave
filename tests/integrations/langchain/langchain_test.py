@@ -1,6 +1,7 @@
 import os
 import sys
 from collections.abc import Generator
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -435,7 +436,8 @@ def test_simple_rag_chain(client: WeaveClient, fix_chroma_ci: None) -> None:
     from langchain_core.runnables import RunnablePassthrough
     from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 
-    loader = TextLoader("integrations/langchain/test_data/paul_graham_essay.txt")
+    test_data_path = Path(__file__).parent / "test_data" / "paul_graham_essay.txt"
+    loader = TextLoader(str(test_data_path))
     docs = loader.load()
 
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
