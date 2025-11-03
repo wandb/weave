@@ -228,18 +228,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
         assert_non_null_wb_user_id(req)
-        user_id = req.wb_user_id
 
         if not isinstance(req.traces, ExportTraceServiceRequest):
             raise TypeError(
                 "Expected traces as ExportTraceServiceRequest, got {type(req.traces)}"
             )
-        calls: list[Union[tsi.CallBatchStartMode, tsi.CallBatchEndMode]] = []
-        # Track unique op names seen in this batch so we can ensure
-        # an Op object exists for each OTEL-derived op.
-
+        calls: list[tuple[tsi.StartedCallSchemaForInsert, tsi.EndedCallSchemaForInsert]] = []
         rejected_spans = 0
         error_messages: list[str] = []
+
         for proto_resource_spans in req.traces.resource_spans:
             resource = Resource.from_proto(proto_resource_spans.resource)
             for proto_scope_spans in proto_resource_spans.scope_spans:
@@ -264,57 +261,74 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                         error_messages.append(f"Rejected span ({span_ident}): {e!s}")
                         continue
 
-                    start_call, end_call = span.to_call(
+                    calls.append(span.to_call(
                         req.project_id,
                         wb_user_id=req.wb_user_id,
                         wb_run_id=req.wb_run_id,
-                    )
+                    ))
 
-                    # Create a deterministic Op version based on the full otel_span
-                    try:
-                        # TODO: Validate behavior when op name is not safe
-                        op_object_id = object_creation_utils.make_safe_name(start_call.op_name)
-                        op_create_res = self.op_create_v2(
-                            tsi.OpCreateV2Req(
-                                project_id=req.project_id,
-                                name=op_object_id,
-                                wb_user_id=user_id,
-                                source_code=None,
-                            )
-                        )
-                        op_ref_uri = ri.InternalOpRef(
-                            project_id=req.project_id,
-                            name=op_object_id,
-                            version=op_create_res.digest,
-                        ).uri()
-                        start_call.op_name = op_ref_uri
+        # TODO: index by the obj_name and then set values to a list of indices
+        obj_id_idx_map = defaultdict(list)
+        for idx, (start_call, _) in enumerate(calls):
+            op_name = object_creation_utils.make_safe_name(start_call.op_name)
+            obj_id_idx_map[op_name].append(idx)
 
-                    except Exception as e:
-                        # Record and skip malformed spans so we can partially accept the batch
-                        rejected_spans += 1
-                        # Use data available on the proto span for context
-                        try:
-                            trace_id = proto_span.trace_id.hex()
-                            span_id = proto_span.span_id.hex()
-                            name = getattr(proto_span, "name", "")
-                        except Exception:
-                            trace_id = ""
-                            span_id = ""
-                            name = ""
-                        span_ident = (
-                            f"name='{name}' trace_id='{trace_id}' span_id='{span_id}'"
-                        )
-                        error_messages.append(f"Rejected span ({span_ident}): {e!s}")
-                        continue
+        seen_ids = set(obj_id_idx_map)
 
-                    calls.extend(
-                        [
-                            tsi.CallBatchStartMode(req=tsi.CallStartReq(start=start_call)),
-                            tsi.CallBatchEndMode(req=tsi.CallEndReq(end=end_call)),
-                        ]
-                    )
+        # Build a query to see if op already exists
+        limit = len(calls) # Only use latest so this is upper bound for possible results
+        obj_version_filter = tsi.ObjectVersionFilter(
+            object_ids=list(seen_ids),
+            latest_only=True,
+            is_op=True,
+        )
+        # maybe use this and then split calls into existing an non-existing
+        # Multiple start_calls can have same obj_name in the list
+        existing_objects = self.objs_query(
+            tsi.ObjQueryReq(
+                project_id=req.project_id,
+                filter=obj_version_filter,
+                metadata_only=True,
+                limit=limit
+            ),
+        ).objs
+
+        for obj in existing_objects:
+            op_ref_uri = ri.InternalOpRef(
+                project_id=req.project_id,
+                name=obj.object_id,
+                version=obj.digest,
+            ).uri()
+            # Modify each of the matched start calls in place
+            for idx in obj_id_idx_map[obj.object_id]:
+                calls[idx][0].op_name = op_ref_uri
+            # Remove this ID from the mapping so that once the for loop is done we are left with only new objects
+            obj_id_idx_map.pop(obj.object_id)
+
+        # Only new objects
+        for op_obj_id in obj_id_idx_map.keys():
+            op_create_res = self.op_create_v2(
+                tsi.OpCreateV2Req(
+                    project_id=req.project_id,
+                    name=op_obj_id,
+                    wb_user_id=req.wb_user_id,
+                    source_code=None,
+                )
+            )
+            op_ref_uri = ri.InternalOpRef(
+                project_id=req.project_id,
+                name=op_obj_id,
+                version=op_create_res.digest,
+            ).uri()
+            for idx in obj_id_idx_map[op_obj_id]:
+                calls[idx][0].op_name = op_ref_uri
+
+        batch = [item for start_call, end_call in calls for item in (
+            tsi.CallBatchStartMode(req=tsi.CallStartReq(start=start_call)),
+            tsi.CallBatchEndMode(req=tsi.CallEndReq(end=end_call)),
+        )]
         # TODO: Actually populate the error fields if call_start_batch fails
-        self.call_start_batch(tsi.CallCreateBatchReq(batch=calls))
+        self.call_start_batch(tsi.CallCreateBatchReq(batch=batch))
 
         if rejected_spans > 0:
             # Join the first 20 errors and return them delimited by ';'
