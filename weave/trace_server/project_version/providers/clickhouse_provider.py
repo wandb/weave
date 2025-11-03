@@ -1,4 +1,4 @@
-"""ClickHouse-based project version fallback provider."""
+"""ClickHouse-based project version provider."""
 
 import logging
 from typing import Any
@@ -7,13 +7,12 @@ import ddtrace
 
 from weave.trace_server.calls_query_builder.utils import param_slot
 from weave.trace_server.orm import ParamBuilder
-from weave.trace_server.project_version.base import ProjectVersionService
 from weave.trace_server.project_version.types import ProjectVersion
 
 logger = logging.getLogger(__name__)
 
 
-class ClickHouseProjectVersionProvider(ProjectVersionService):
+class ClickHouseProjectVersionProvider:
     """Determines project version by checking calls_complete and calls_merged tables.
 
     This provider implements the following logic:
@@ -28,7 +27,7 @@ class ClickHouseProjectVersionProvider(ProjectVersionService):
 
     Examples:
         >>> ch_provider = ClickHouseProjectVersionProvider(ch_client=clickhouse_client)
-        >>> version = await ch_provider.get_project_version("proj-123")
+        >>> version = ch_provider.get_project_version_sync("proj-123")
         >>> assert version in (ProjectVersion.CALLS_MERGED_VERSION, ProjectVersion.CALLS_COMPLETE_VERSION, ProjectVersion.EMPTY_PROJECT)
     """
 
@@ -36,7 +35,7 @@ class ClickHouseProjectVersionProvider(ProjectVersionService):
         self._ch = ch_client
 
     @ddtrace.tracer.wrap(name="clickhouse_project_version_provider.get_project_version")
-    async def get_project_version(
+    def get_project_version_sync(
         self, project_id: str, is_write: bool = False
     ) -> ProjectVersion:
         """Determine project version by checking both tables.

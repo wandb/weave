@@ -3,6 +3,7 @@
 import logging
 import os
 from enum import Enum, IntEnum
+from typing import Protocol
 
 logger = logging.getLogger(__name__)
 
@@ -60,3 +61,31 @@ class ProjectVersionMode(str, Enum):
                 f"Valid options: {', '.join([m.value for m in cls])}"
             )
             return cls.AUTO
+
+
+class Provider(Protocol):
+    """Protocol for project version providers.
+
+    Providers resolve project versions and always return a value (EMPTY_PROJECT if no data).
+    This is distinct from caches, which return Optional to indicate cache misses.
+
+    Examples:
+        >>> class MyProvider:
+        ...     def get_project_version_sync(self, project_id: str) -> ProjectVersion:
+        ...         # Implementation - always returns a value
+        ...         return ProjectVersion.CALLS_COMPLETE_VERSION
+    """
+
+    def get_project_version_sync(
+        self, project_id: str, is_write: bool = False
+    ) -> ProjectVersion:
+        """Get project version synchronously.
+
+        Args:
+            project_id: The project identifier.
+            is_write: Whether this is for a write operation.
+
+        Returns:
+            ProjectVersion - always returns a value (EMPTY_PROJECT if no data found).
+        """
+        ...

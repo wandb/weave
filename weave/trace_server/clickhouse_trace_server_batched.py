@@ -122,6 +122,7 @@ from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
 from weave.trace_server.opentelemetry.python_spans import Resource, Span
 from weave.trace_server.orm import ParamBuilder, Row
 from weave.trace_server.project_query_builder import make_project_stats_query
+from weave.trace_server.project_version.project_version import ProjectVersionResolver
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 from weave.trace_server.table_query_builder import (
     ROW_ORDER_COLUMN_NAME,
@@ -195,6 +196,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self._file_storage_client: Optional[FileStorageClient] = None
         self._kafka_producer: Optional[KafkaProducer] = None
         self._evaluate_model_dispatcher = evaluate_model_dispatcher
+        self._project_version_resolver: Optional[ProjectVersionResolver] = None
 
     @classmethod
     def from_env(
@@ -225,6 +227,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             return self._kafka_producer
         self._kafka_producer = KafkaProducer.from_env()
         return self._kafka_producer
+
+    @property
+    def project_version_resolver(self) -> ProjectVersionResolver:
+        if self._project_version_resolver is not None:
+            return self._project_version_resolver
+        self._project_version_resolver = ProjectVersionResolver(self.ch_client)
+        return self._project_version_resolver
 
     def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
         if not isinstance(req.traces, ExportTraceServiceRequest):
@@ -467,6 +476,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             cq.set_limit(req.limit)
         if req.offset is not None:
             cq.set_offset(req.offset)
+
+        # NOOP for testing latency impact
+        try:
+            self.project_version_resolver.get_project_version_sync(req.project_id)
+        except Exception as e:
+            logger.warning(f"Error getting project version: {e}")
 
         pb = ParamBuilder()
         raw_res = self._query_stream(cq.as_sql(pb), pb.get_params())
@@ -4438,6 +4453,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._flush_calls")
     def _flush_calls(self) -> None:
         try:
+            # NOOP for testing latency impact
+            try:
+                if len(self._call_batch) == 0:
+                    return
+                project_id = self._call_batch[0][0]
+                self.project_version_resolver.get_project_version_sync(project_id)
+            except Exception as e:
+                logger.warning(f"Error getting project version: {e}")
+
             self._insert_call_batch(self._call_batch)
         except InsertTooLarge:
             logger.info("Retrying with large objects stripped.")
