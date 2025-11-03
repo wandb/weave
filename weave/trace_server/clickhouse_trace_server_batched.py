@@ -864,18 +864,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             all_calls=all_calls,
         )
 
-        project_version = self.project_version_resolver.get_project_version_sync(
-            req.project_id
-        )
-        if project_version == ProjectVersion.CALLS_COMPLETE_VERSION:
-            return self._calls_delete_mutate(
-                req.project_id, req.call_ids, req.wb_user_id, "calls_complete"
-            )
-
         try:
-            return self._calls_delete_mutate(
-                req.project_id, req.call_ids, req.wb_user_id, "calls_merged"
-            )
+            return self._calls_delete_mutate(req.project_id, req.call_ids, req.wb_user_id)
         except Exception as e:
             logger.warning(f"Error deleting calls with mutate: {e}")
 
@@ -897,14 +887,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         return tsi.CallsDeleteRes(num_deleted=len(all_descendants))
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._calls_delete_mutate")
-    def _calls_delete_mutate(
-        self, project_id: str, call_ids: list[str], wb_user_id: str, table_name: str
-    ) -> tsi.CallsDeleteRes:
+    def _calls_delete_mutate(self, project_id: str, call_ids: list[str], wb_user_id: str) -> tsi.CallsDeleteRes:
         """Use the new fancy clickhouse UPDATE clause to delete the table directly."""
-        query = f"""UPDATE {table_name}
-            SET deleted_at = {{deleted_at:DateTime64(3)}}, wb_user_id = {{wb_user_id:String}}
-            WHERE project_id = {{project_id:String}}
-                AND id IN {{call_ids:String[]}}
+        query = """UPDATE calls_merged
+            SET deleted_at = {deleted_at:DateTime64(3)}, wb_user_id = {wb_user_id:String}
+            WHERE project_id = {project_id:String}
+                AND id IN ({call_ids:String[]})
         """
         self.ch_client.command(
             query,
@@ -932,27 +920,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         assert_non_null_wb_user_id(req)
         self._ensure_valid_update_field(req)
 
-        project_version = self.project_version_resolver.get_project_version_sync(
-            req.project_id
-        )
-        if project_version == ProjectVersion.CALLS_COMPLETE_VERSION:
-            return self._call_update_mutate(
-                req.display_name,
-                req.wb_user_id,
-                req.project_id,
-                req.call_id,
-                "calls_complete",
-            )
-
         # Try new update path, if fails fallback to insertion
         try:
-            return self._call_update_mutate(
-                req.display_name,
-                req.wb_user_id,
-                req.project_id,
-                req.call_id,
-                "calls_merged",
-            )
+            return self._call_update_mutate(req)
         except Exception as e:
             logger.warning(f"Error updating call with mutate: {e}")
 
