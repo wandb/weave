@@ -292,6 +292,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 limit=limit
             ),
         ).objs
+        if len(existing_objects) == 0:
+            # We don't know if any existing ops have been created
+            source_code = object_creation_utils.PLACEHOLDER_OP_SOURCE
+            source_file_req = tsi.FileCreateReq(
+                project_id=req.project_id,
+                name=object_creation_utils.OP_SOURCE_FILE_NAME,
+                content=source_code.encode("utf-8"),
+            )
+            self.file_create(source_file_req)
 
         for obj in existing_objects:
             op_ref_uri = ri.InternalOpRef(
@@ -313,7 +322,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     name=op_obj_id,
                     wb_user_id=req.wb_user_id,
                     source_code=None,
-                )
+                ),
+                create_file=False
             )
             op_ref_uri = ri.InternalOpRef(
                 project_id=req.project_id,
@@ -1336,7 +1346,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 p99_turn_duration_ms=p99_turn_duration_ms,
             )
 
-    def op_create_v2(self, req: tsi.OpCreateV2Req) -> tsi.OpCreateV2Res:
+    def op_create_v2(self, req: tsi.OpCreateV2Req, create_file=True) -> tsi.OpCreateV2Res:
         """Create an op object by delegating to obj_create.
 
         Args:
@@ -1346,17 +1356,23 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             OpCreateV2Res with digest, object_id, version_index, and op_ref
         """
         # Create the obj.py file that the SDK would have created
-        source_code = req.source_code or object_creation_utils.PLACEHOLDER_OP_SOURCE
-        source_file_req = tsi.FileCreateReq(
-            project_id=req.project_id,
-            name=object_creation_utils.OP_SOURCE_FILE_NAME,
-            content=source_code.encode("utf-8"),
-        )
-        source_file_res = self.file_create(source_file_req)
+        if create_file:
+            source_code = req.source_code or object_creation_utils.PLACEHOLDER_OP_SOURCE
+            source_file_req = tsi.FileCreateReq(
+                project_id=req.project_id,
+                name=object_creation_utils.OP_SOURCE_FILE_NAME,
+                content=source_code.encode("utf-8"),
+            )
+            source_file_res = self.file_create(source_file_req)
+            digest = source_file_res.digest
+        else:
+            digest = bytes_digest((
+                req.source_code or object_creation_utils.PLACEHOLDER_OP_SOURCE
+            ).encode("utf-8"))
 
         # Create the op "val" that the SDK would have created
         # Note: We store just the digest string, matching SDK's to_json output
-        op_val = object_creation_utils.build_op_val(source_file_res.digest)
+        op_val = object_creation_utils.build_op_val(digest)
         obj_req = tsi.ObjCreateReq(
             obj=tsi.ObjSchemaForInsert(
                 project_id=req.project_id,
