@@ -694,12 +694,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if req.offset is not None:
             cq.set_offset(req.offset)
 
-        # NOOP for testing latency impact
-        try:
-            self.project_version_resolver.get_project_version_sync(req.project_id)
-        except Exception as e:
-            logger.warning(f"Error getting project version: {e}")
-
         pb = ParamBuilder()
         raw_res = self._query_stream(cq.as_sql(pb), pb.get_params())
 

@@ -32,6 +32,8 @@ from typing import Callable, Literal, Optional, cast
 
 from pydantic import BaseModel, Field
 
+from weave.trace_server.project_version.types import ProjectVersion
+
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.calls_query_builder.cte import CTECollection
 from weave.trace_server.calls_query_builder.object_ref_query_builder import (
@@ -573,6 +575,7 @@ class CallsQuery(BaseModel):
     include_costs: bool = False
     include_storage_size: bool = False
     include_total_storage_size: bool = False
+    project_version: ProjectVersion = ProjectVersion.CALLS_MERGED_VERSION
 
     def add_field(self, field: str) -> "CallsQuery":
         name = get_field_by_name(field)
