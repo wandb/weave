@@ -232,7 +232,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def project_version_resolver(self) -> ProjectVersionResolver:
         if self._project_version_resolver is not None:
             return self._project_version_resolver
-        self._project_version_resolver = ProjectVersionResolver(self.ch_client)
+        # Pass a factory that returns the thread-local client
+        self._project_version_resolver = ProjectVersionResolver(
+            ch_client_factory=lambda: self.ch_client
+        )
         return self._project_version_resolver
 
     def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:

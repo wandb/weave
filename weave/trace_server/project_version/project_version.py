@@ -2,7 +2,7 @@
 
 import asyncio
 import logging
-from typing import Any
+from typing import Any, Callable
 
 import ddtrace
 
@@ -31,27 +31,28 @@ class ProjectVersionResolver:
         2. ClickHouse (queries both tables)
 
     Args:
-        ch_client: ClickHouse client.
+        ch_client_factory: Callable that returns a ClickHouse client.
+            This allows each thread to get its own thread-local client.
         cache_size: Size of the in-memory cache (defaults to 10,000).
 
     Examples:
         >>> # Sync usage (uses real sync methods)
-        >>> resolver = ProjectVersionResolver(ch_client=clickhouse_client)
+        >>> resolver = ProjectVersionResolver(ch_client_factory=lambda: get_ch_client())
         >>> version = resolver.get_project_version_sync("my-project")
 
         >>> # Async usage (wraps sync for now since no async ClickHouse client)
-        >>> resolver = ProjectVersionResolver(ch_client=clickhouse_client)
+        >>> resolver = ProjectVersionResolver(ch_client_factory=lambda: get_ch_client())
         >>> version = await resolver.get_project_version_async("my-project")
     """
 
     def __init__(
         self,
-        ch_client: Any,
+        ch_client_factory: Callable[[], Any],
         cache_size: int = PER_REPLICA_CACHE_SIZE,
     ):
         self._cache = InMemoryCacheProvider(maxsize=cache_size)
         self._clickhouse_provider = ClickHouseProjectVersionProvider(
-            ch_client=ch_client
+            ch_client_factory=ch_client_factory
         )
         self._mode = ProjectVersionMode.from_env()
 

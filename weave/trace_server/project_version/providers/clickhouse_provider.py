@@ -1,7 +1,7 @@
 """ClickHouse-based project version provider."""
 
 import logging
-from typing import Any
+from typing import Any, Callable
 
 import ddtrace
 
@@ -23,16 +23,17 @@ class ClickHouseProjectVersionProvider:
     5. If neither table has rows, return EMPTY_PROJECT (-1)
 
     Args:
-        ch_client: ClickHouse client for querying.
+        ch_client_factory: Callable that returns a ClickHouse client.
+            This allows each thread to get its own thread-local client.
 
     Examples:
-        >>> ch_provider = ClickHouseProjectVersionProvider(ch_client=clickhouse_client)
+        >>> ch_provider = ClickHouseProjectVersionProvider(ch_client_factory=lambda: get_ch_client())
         >>> version = ch_provider.get_project_version_sync("proj-123")
         >>> assert version in (ProjectVersion.CALLS_MERGED_VERSION, ProjectVersion.CALLS_COMPLETE_VERSION, ProjectVersion.EMPTY_PROJECT)
     """
 
-    def __init__(self, ch_client: Any):
-        self._ch = ch_client
+    def __init__(self, ch_client_factory: Callable[[], Any]):
+        self._get_ch_client = ch_client_factory
 
     @ddtrace.tracer.wrap(name="clickhouse_project_version_provider.get_project_version")
     def get_project_version_sync(
@@ -60,7 +61,9 @@ class ClickHouseProjectVersionProvider:
                 (SELECT 1 FROM calls_merged WHERE project_id = {project_slot} LIMIT 1) as has_merged
         """
 
-        result = self._ch.query(query, parameters=pb.get_params())
+        # Get a fresh thread-local client for this query
+        ch_client = self._get_ch_client()
+        result = ch_client.query(query, parameters=pb.get_params())
 
         if result.result_rows:
             row = result.result_rows[0]
