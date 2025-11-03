@@ -1,7 +1,6 @@
 ALTER TABLE calls_merged_stats DROP COLUMN otel_dump_size_bytes;
 ALTER TABLE calls_merged_stats ADD COLUMN otel_dump SimpleAggregateFunction(any, Nullable(String));
 
--- Update stats materialized view
 ALTER TABLE calls_merged_stats_view MODIFY QUERY
 SELECT
     call_parts.project_id,
