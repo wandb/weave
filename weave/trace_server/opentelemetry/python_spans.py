@@ -338,11 +338,15 @@ class Span:
         has_outputs = isinstance(outputs, int) or len(outputs) > 0
         has_usage = len(usage) > 0
 
-        # We failed to load any of the Weave attributes, dump all attributes
+        # Load user defined attributes - tagging system
+        if custom_attributes := wandb_attributes.get("attributes"):
+            attributes.update(custom_attributes)
+
+        # We failed to load any weave or user defined attributes, dump all attributes
         if not has_attributes and not has_inputs and not has_outputs and not has_usage:
             attributes = to_json_serializable(self.attributes)
 
-        attributes["otel_span"] = self.as_dict()
+        otel_span_data = self.as_dict()
         op_name = self.name
 
         display_name = wandb_attributes.get("display_name")
@@ -401,6 +405,7 @@ class Span:
             started_at=start_time,
             attributes=attributes,
             inputs=inputs,
+            otel_dump=otel_span_data,
             display_name=display_name,
             wb_user_id=wb_user_id,
             wb_run_id=wb_run_id,

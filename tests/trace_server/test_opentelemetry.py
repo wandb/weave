@@ -1373,3 +1373,184 @@ def test_otel_export_partial_success_on_attribute_conflict(
             {"role": "user", "content": "Tell me about quantum computing"},
         ]
     }
+
+
+def test_otel_span_wandb_attributes_and_data_routing(
+    client: weave_client.WeaveClient,
+):
+    """Comprehensive test for OTEL trace write and read path.
+
+    This test verifies that:
+    1. Custom attributes set via wandb.attributes appear in call.attributes
+    2. The full OTEL span data is stored separately and reconstructed in call.attributes.otel_span
+    3. Inputs (gen_ai.prompt) are routed to call.inputs
+    4. Outputs (gen_ai.completion) are routed to call.output
+    """
+    # Create a test export request
+    export_req = create_test_export_request()
+    project_id = client._project_id()
+    export_req.project_id = project_id
+
+    # Get the span to add custom attributes
+    span = export_req.traces.resource_spans[0].scope_spans[0].spans[0]
+
+    # Clear default test attributes
+    del span.attributes[:]
+
+    # 1. Add custom attributes via wandb.attributes (nested JSON object)
+    # These should appear at the root level of call.attributes
+    kv_custom_attrs = KeyValue()
+    kv_custom_attrs.key = "wandb.attributes"
+
+    # Create a nested JSON object for custom attributes
+    custom_attrs_value = AnyValue()
+
+    # Add a custom tag
+    tag_kv = KeyValue()
+    tag_kv.key = "custom_tag"
+    tag_kv.value.string_value = "production"
+    custom_attrs_value.kvlist_value.values.append(tag_kv)
+
+    # Add a custom environment
+    env_kv = KeyValue()
+    env_kv.key = "environment"
+    env_kv.value.string_value = "staging"
+    custom_attrs_value.kvlist_value.values.append(env_kv)
+
+    # Add a custom numeric metric
+    metric_kv = KeyValue()
+    metric_kv.key = "priority"
+    metric_kv.value.int_value = 42
+    custom_attrs_value.kvlist_value.values.append(metric_kv)
+
+    kv_custom_attrs.value.CopyFrom(custom_attrs_value)
+    span.attributes.append(kv_custom_attrs)
+
+    # 2. Add input data (gen_ai.prompt) - should go to call.inputs
+    kv_prompt_role = KeyValue()
+    kv_prompt_role.key = "gen_ai.prompt.0.role"
+    kv_prompt_role.value.string_value = "user"
+    span.attributes.append(kv_prompt_role)
+
+    kv_prompt_content = KeyValue()
+    kv_prompt_content.key = "gen_ai.prompt.0.content"
+    kv_prompt_content.value.string_value = "What is quantum computing?"
+    span.attributes.append(kv_prompt_content)
+
+    # 3. Add output data (gen_ai.completion) - should go to call.output
+    kv_completion_role = KeyValue()
+    kv_completion_role.key = "gen_ai.completion.0.role"
+    kv_completion_role.value.string_value = "assistant"
+    span.attributes.append(kv_completion_role)
+
+    kv_completion_content = KeyValue()
+    kv_completion_content.key = "gen_ai.completion.0.content"
+    kv_completion_content.value.string_value = (
+        "Quantum computing is a type of computing that uses quantum mechanics."
+    )
+    span.attributes.append(kv_completion_content)
+
+    # 4. Add some standard attributes that should also appear in call.attributes
+    kv_model = KeyValue()
+    kv_model.key = "gen_ai.response.model"
+    kv_model.value.string_value = "gpt-4"
+    span.attributes.append(kv_model)
+
+    kv_provider = KeyValue()
+    kv_provider.key = "llm.provider"
+    kv_provider.value.string_value = "openai"
+    span.attributes.append(kv_provider)
+
+    # Export the OTEL traces
+    response = client.server.otel_export(export_req)
+    assert isinstance(response, tsi.OtelExportRes)
+
+    # Query the calls
+    res = client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=project_id,
+        )
+    )
+    assert len(res.calls) == 1
+
+    call = res.calls[0]
+
+    # VERIFICATION 1: Custom attributes from wandb.attributes are in call.attributes
+    assert "custom_tag" in call.attributes
+    assert call.attributes["custom_tag"] == "production"
+
+    assert "environment" in call.attributes
+    assert call.attributes["environment"] == "staging"
+
+    assert "priority" in call.attributes
+    assert call.attributes["priority"] == 42
+
+    # VERIFICATION 2: Standard attributes are in call.attributes
+    assert "model" in call.attributes
+    assert call.attributes["model"] == "gpt-4"
+
+    assert "provider" in call.attributes
+    assert call.attributes["provider"] == "openai"
+
+    # VERIFICATION 3: Full OTEL span data exists in call.attributes.otel_span
+    assert "otel_span" in call.attributes
+    otel_span = call.attributes["otel_span"]
+
+    # Verify otel_span has the core span structure
+    assert "context" in otel_span
+    assert "trace_id" in otel_span["context"]
+    assert "span_id" in otel_span["context"]
+    assert "name" in otel_span
+    assert otel_span["name"] == "test_span"
+    assert "start_time" in otel_span
+    assert "end_time" in otel_span
+    assert "attributes" in otel_span
+    assert "status" in otel_span
+    assert otel_span["status"]["code"] == "OK"
+
+    # The otel_span should contain all the original attributes we set
+    otel_attributes = otel_span["attributes"]
+    # Attributes are nested under their standard namespaces
+    assert "wandb" in otel_attributes
+    assert "attributes" in otel_attributes["wandb"]
+    assert "gen_ai" in otel_attributes
+    assert "prompt" in otel_attributes["gen_ai"]
+    assert "completion" in otel_attributes["gen_ai"]
+    assert "response" in otel_attributes["gen_ai"]
+    assert "model" in otel_attributes["gen_ai"]["response"]
+    assert "llm" in otel_attributes
+    assert "provider" in otel_attributes["llm"]
+
+    # VERIFICATION 4: Inputs are routed to call.inputs (not in attributes)
+    assert "gen_ai.prompt" in call.inputs
+    prompts = call.inputs["gen_ai.prompt"]
+    assert isinstance(prompts, list)
+    assert len(prompts) == 1
+    assert prompts[0]["role"] == "user"
+    assert prompts[0]["content"] == "What is quantum computing?"
+
+    # Inputs should NOT be in attributes (they're routed to inputs field)
+    assert "gen_ai.prompt" not in call.attributes or isinstance(
+        call.attributes.get("gen_ai.prompt"), dict
+    )
+
+    # VERIFICATION 5: Outputs are routed to call.output (not in attributes)
+    assert call.output is not None
+    assert "gen_ai.completion" in call.output
+    completions = call.output["gen_ai.completion"]
+    assert isinstance(completions, list)
+    assert len(completions) == 1
+    assert completions[0]["role"] == "assistant"
+    assert completions[0]["content"] == (
+        "Quantum computing is a type of computing that uses quantum mechanics."
+    )
+
+    # Outputs should NOT be in attributes (they're routed to output field)
+    assert "gen_ai.completion" not in call.attributes or isinstance(
+        call.attributes.get("gen_ai.completion"), dict
+    )
+
+    # Clean up
+    client.server.calls_delete(
+        tsi.CallsDeleteReq(project_id=project_id, call_ids=[call.id], wb_user_id=None)
+    )
