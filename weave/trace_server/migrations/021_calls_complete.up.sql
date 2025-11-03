@@ -8,7 +8,7 @@ CREATE TABLE calls_complete (
     started_at      DateTime64(6),
     ended_at        Nullable(DateTime64(6)) DEFAULT NULL,
 
-    updated_at      DateTime64(3) DEFAULT now64(3),
+    updated_at      Nullable(DateTime64(3)) DEFAULT NULL,
     updated_by      Nullable(String) DEFAULT NULL,
 
     parent_id       Nullable(String),
