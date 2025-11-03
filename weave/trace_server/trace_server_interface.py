@@ -200,6 +200,53 @@ class EndedCallSchemaForInsert(BaseModel):
     # WB Metadata
     wb_run_step_end: Optional[int] = None
 
+
+class CompleteCallSchemaForInsert(BaseModel):
+    """Schema for a complete call with both start and end data (for V2 calls_complete table)."""
+
+    project_id: str
+    id: Optional[str] = None  # Will be generated if not provided
+
+    # Name of the calling function (op)
+    op_name: str
+    # Optional display name of the call
+    display_name: Optional[str] = None
+
+    # Trace ID
+    trace_id: Optional[str] = None  # Will be generated if not provided
+    # Parent ID is optional because the call may be a root
+    parent_id: Optional[str] = None
+    # Thread ID is optional
+    thread_id: Optional[str] = None
+    # Turn ID is optional
+    turn_id: Optional[str] = None
+
+    # Start time is required
+    started_at: datetime.datetime
+    # End time is required
+    ended_at: datetime.datetime
+
+    # Attributes: properties of the call
+    attributes: dict[str, Any]
+    # Inputs
+    inputs: dict[str, Any]
+
+    # Exception is present if the call failed
+    exception: Optional[str] = None
+    # Outputs
+    output: Optional[Any] = None
+    # Summary: a summary of the call
+    summary: SummaryInsertMap
+
+    # OTEL span data source of truth
+    otel_dump: Optional[dict[str, Any]] = None
+
+    # WB Metadata
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+    wb_run_id: Optional[str] = None
+    wb_run_step: Optional[int] = None
+    wb_run_step_end: Optional[int] = None
+
     @field_serializer("summary")
     def serialize_typed_dicts(self, v: dict[str, Any]) -> dict[str, Any]:
         return dict(v)
@@ -282,6 +329,34 @@ class CallEndReq(BaseModelStrict):
 
 
 class CallEndRes(BaseModel):
+    pass
+
+
+# V2 batch endpoints for call_starts and calls_complete tables (hidden from users)
+class CallsStartBatchReq(BaseModelStrict):
+    """Request for batch starting calls (writes to call_starts table)."""
+
+    project_id: str
+    items: list[StartedCallSchemaForInsert]
+
+
+class CallsStartBatchRes(BaseModel):
+    """Response for batch starting calls."""
+
+    ids: list[str]
+    trace_ids: list[str]
+
+
+class CallsCompleteBatchReq(BaseModelStrict):
+    """Request for batch completing calls (writes to calls_complete table)."""
+
+    project_id: str
+    items: list[CompleteCallSchemaForInsert]
+
+
+class CallsCompleteBatchRes(BaseModel):
+    """Response for batch completing calls."""
+
     pass
 
 
@@ -2004,6 +2079,12 @@ class TraceServerInterface(Protocol):
     def calls_query_stats(self, req: CallsQueryStatsReq) -> CallsQueryStatsRes: ...
     def call_update(self, req: CallUpdateReq) -> CallUpdateRes: ...
     def call_start_batch(self, req: CallCreateBatchReq) -> CallCreateBatchRes: ...
+
+    # V2 batch endpoints (hidden from users, for internal use only)
+    def calls_start_batch_v2(self, req: CallsStartBatchReq) -> CallsStartBatchRes: ...
+    def calls_complete_batch_v2(
+        self, req: CallsCompleteBatchReq
+    ) -> CallsCompleteBatchRes: ...
 
     # Op API
     def op_create(self, req: OpCreateReq) -> OpCreateRes: ...

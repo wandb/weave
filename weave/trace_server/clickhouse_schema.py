@@ -98,6 +98,83 @@ class CallUpdateCHInsertable(BaseModel):
     _output_refs_v = field_validator("output_refs")(validation.refs_list_validator)
 
 
+# V2 Insertables for call_starts and calls_complete tables
+class V2CallStartCHInsertable(BaseModel):
+    """Insertable for call_starts table (V2 projects)."""
+
+    project_id: str
+    id: str
+    trace_id: str
+    parent_id: Optional[str] = None
+    thread_id: Optional[str] = None
+    turn_id: Optional[str] = None
+    op_name: str
+    started_at: datetime.datetime
+    attributes_dump: str
+    inputs_dump: str
+    input_refs: list[str]
+    display_name: Optional[str] = None
+    otel_dump: Optional[str] = None
+
+    wb_user_id: Optional[str] = None
+    wb_run_id: Optional[str] = None
+    wb_run_step: Optional[int] = None
+
+    _project_id_v = field_validator("project_id")(validation.project_id_validator)
+    _id_v = field_validator("id")(validation.call_id_validator)
+    _trace_id_v = field_validator("trace_id")(validation.trace_id_validator)
+    _parent_id_v = field_validator("parent_id")(validation.parent_id_validator)
+    _op_name_v = field_validator("op_name")(validation.op_name_validator)
+    _input_refs_v = field_validator("input_refs")(validation.refs_list_validator)
+    _display_name_v = field_validator("display_name")(validation.display_name_validator)
+    _wb_user_id_v = field_validator("wb_user_id")(validation.wb_user_id_validator)
+    _wb_run_id_v = field_validator("wb_run_id")(validation.wb_run_id_validator)
+    _wb_run_step_v = field_validator("wb_run_step")(validation.wb_run_step_validator)
+
+
+class V2CallCompleteCHInsertable(BaseModel):
+    """Insertable for calls_complete table (V2 projects)."""
+
+    project_id: str
+    id: str
+    trace_id: str
+    parent_id: Optional[str] = None
+    thread_id: Optional[str] = None
+    turn_id: Optional[str] = None
+    op_name: str
+    started_at: datetime.datetime
+    ended_at: datetime.datetime
+    attributes_dump: str
+    inputs_dump: str
+    input_refs: list[str]
+    output_dump: str
+    output_refs: list[str]
+    summary_dump: str
+    exception: Optional[str] = None
+    display_name: Optional[str] = None
+    otel_dump: Optional[str] = None
+
+    wb_user_id: Optional[str] = None
+    wb_run_id: Optional[str] = None
+    wb_run_step: Optional[int] = None
+    wb_run_step_end: Optional[int] = None
+
+    _project_id_v = field_validator("project_id")(validation.project_id_validator)
+    _id_v = field_validator("id")(validation.call_id_validator)
+    _trace_id_v = field_validator("trace_id")(validation.trace_id_validator)
+    _parent_id_v = field_validator("parent_id")(validation.parent_id_validator)
+    _op_name_v = field_validator("op_name")(validation.op_name_validator)
+    _input_refs_v = field_validator("input_refs")(validation.refs_list_validator)
+    _output_refs_v = field_validator("output_refs")(validation.refs_list_validator)
+    _display_name_v = field_validator("display_name")(validation.display_name_validator)
+    _wb_user_id_v = field_validator("wb_user_id")(validation.wb_user_id_validator)
+    _wb_run_id_v = field_validator("wb_run_id")(validation.wb_run_id_validator)
+    _wb_run_step_v = field_validator("wb_run_step")(validation.wb_run_step_validator)
+    _wb_run_step_end_v = field_validator("wb_run_step_end")(
+        validation.wb_run_step_validator
+    )
+
+
 # Very critical that this matches the calls table schema! This should
 # essentially be the DB version of CallSchema with the addition of the
 # created_at and updated_at fields
@@ -196,6 +273,10 @@ ALL_CALL_INSERT_COLUMNS = sorted(
 ALL_CALL_SELECT_COLUMNS = list(SelectableCHCallSchema.model_fields.keys())
 ALL_CALL_JSON_COLUMNS = ("inputs", "output", "attributes", "summary")
 REQUIRED_CALL_COLUMNS = ["id", "project_id", "trace_id", "op_name", "started_at"]
+
+# V2 table column lists
+V2_CALL_STARTS_INSERT_COLUMNS = sorted(V2CallStartCHInsertable.model_fields.keys())
+V2_CALLS_COMPLETE_INSERT_COLUMNS = sorted(V2CallCompleteCHInsertable.model_fields.keys())
 
 # Columns in the calls_merged table with special aggregation functions:
 CALL_SELECT_RAW_COLUMNS = ["id", "project_id"]  # no aggregation
