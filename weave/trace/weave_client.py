@@ -79,6 +79,7 @@ from weave.trace.settings import (
     client_parallelism,
     should_capture_client_info,
     should_capture_system_info,
+    should_log_complete_only,
     should_print_call_link,
     should_redact_pii,
     should_use_parallel_table_upload,
@@ -828,7 +829,11 @@ class WeaveClient:
                     "Inputs may be dropped."
                 )
 
-            # Send the start immediately using the new V2 batch endpoint
+            # When log_complete_only is enabled, we skip sending the start event
+            # and instead only send it with the end event as a complete call
+            if should_log_complete_only():
+                return call_start_req
+
             self.server.calls_start_batch_v2(
                 CallsStartBatchReq(project_id=project_id, items=[call_start_req.start])
             )
