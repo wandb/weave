@@ -114,9 +114,9 @@ def test_clickhouse_batching():
             f"Expected exactly 2 ClickHouse insert call for 3 batched calls (and 3 base64 content objects, which are stored in files), "
             f"but got {insert_call_count} insert calls"
         )
-        assert mock_ch_client.insert.call_args_list[0][0][0] == "call_parts", (
-            f"Expected first insert call to be for call_parts, but got {mock_ch_client.insert.call_args_list[0][0][0]}"
-        )
-        assert mock_ch_client.insert.call_args_list[1][0][0] == "files", (
+        assert mock_ch_client.insert.call_args_list[0][0][0] == "files", (
             f"Expected second insert call to be for files, but got {mock_ch_client.insert.call_args_list[1][0][0]}"
+        )
+        assert mock_ch_client.insert.call_args_list[1][0][0] == "call_parts", (
+            f"Expected first insert call to be for call_parts, but got {mock_ch_client.insert.call_args_list[0][0][0]}"
         )
