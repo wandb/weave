@@ -268,7 +268,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                         wb_run_id=req.wb_run_id,
                     ))
 
-        # TODO: index by the obj_name and then set values to a list of indices
         obj_id_idx_map = defaultdict(list)
         for idx, (start_call, _) in enumerate(calls):
             op_name = object_creation_utils.make_safe_name(start_call.op_name)
@@ -295,13 +294,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         ).objs
 
         # FILE BYPASS START
-        # We know that OTEL will always user the placeholder source.
+        # We know that OTel will always user the placeholder source.
         # We also know how to calculate the digest of the placeholder source.
         # Therefore, instead of going through file create for each new op
         # We can instead just reuse the existing file if we know it is present
         # and create it just once if we are not sure.
         if len(existing_objects) == 0:
             # We don't know if any existing ops have been created
+            # None of the ops already exist, we create one shared source file
+            # for all spans since no code capture is available for OTel
             source_code = object_creation_utils.PLACEHOLDER_OP_SOURCE
             source_file_req = tsi.FileCreateReq(
                 project_id=req.project_id,
