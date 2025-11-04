@@ -1,6 +1,7 @@
 import base64
 import re
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.clickhouse_schema import SelectableCHCallSchema
@@ -16,6 +17,9 @@ from weave.trace_server.validation import (
     validate_purge_req_multiple,
     validate_purge_req_one,
 )
+
+if TYPE_CHECKING:
+    from weave.trace_server.calls_query_builder.cte import CTE
 
 DUMMY_LLM_ID = "weave_dummy_llm_id"
 DUMMY_LLM_USAGE = (
@@ -444,6 +448,59 @@ def final_call_select_with_cost(
 # We get the usage data and split the rows so that each usage object is a row
 # For each row we get matching price and rank them accordingly
 # Finally we join all rows with rank 1 together based on call id and construct cost object
+def build_cost_ctes(
+    pb: ParamBuilder,
+    call_table_alias: str,
+    project_id: str,
+) -> list["CTE"]:
+    """Build CTEs for cost calculations.
+
+    Returns a list of CTE objects for:
+    - llm_usage: Extracts usage data from calls
+    - ranked_prices: Ranks prices for each LLM by specificity and effective date
+
+    Args:
+        pb: Parameter builder for SQL parameters
+        call_table_alias: Alias of the table containing call data
+        project_id: Project ID for filtering prices
+
+    Returns:
+        List of CTE objects
+    """
+    from weave.trace_server.calls_query_builder.cte import CTE
+
+    return [
+        CTE(
+            name="llm_usage",
+            sql=f"""-- From the all_calls we get the usage data for LLMs
+                {get_llm_usage(pb, call_table_alias).sql}""",
+        ),
+        CTE(
+            name="ranked_prices",
+            sql=f"""-- based on the llm_ids in the usage data we get all the prices and rank them according to specificity and effective date
+                {get_ranked_prices(pb, 'llm_usage', project_id).sql}""",
+        ),
+    ]
+
+
+def get_cost_final_select(
+    pb: ParamBuilder,
+    select_fields: list[str],
+    order_fields: list[tsi.SortBy],
+) -> str:
+    """Get the final SELECT statement for cost queries.
+
+    Args:
+        pb: Parameter builder for SQL parameters
+        select_fields: Fields to select
+        order_fields: Fields to order by
+
+    Returns:
+        Final SELECT SQL statement
+    """
+    return f"-- Final Select, which just selects the correct fields, and adds a costs object\n{final_call_select_with_cost(pb, 'ranked_prices', select_fields, order_fields).sql}"
+
+
 def cost_query(
     pb: ParamBuilder,
     call_table_alias: str,
@@ -451,7 +508,9 @@ def cost_query(
     select_fields: list[str],
     order_fields: list[tsi.SortBy],
 ) -> str:
-    """This function takes something like the following:
+    """Build complete cost query with CTEs and final SELECT.
+
+    This function takes something like the following:
     1 call row
         [ id, summary_dump: {usage: { llm_1, llm_2}} ]
     splits it based on usage and extracts fields
@@ -473,17 +532,10 @@ def cost_query(
     1 row
         [ id, summary_dump: {usage: { llm_1, llm_2}, cost: { llm_1: { prompt_tokens_total_cost, completion_tokens_total_cost, ... }, llm_2: { prompt_tokens_total_cost, completion_tokens_total_cost, ... } } } ]
     """
-    raw_sql = f"""
-        -- From the all_calls we get the usage data for LLMs
-        llm_usage AS ({get_llm_usage(pb, call_table_alias).sql}),
-
-        -- based on the llm_ids in the usage data we get all the prices and rank them according to specificity and effective date
-        ranked_prices AS ({get_ranked_prices(pb, "llm_usage", project_id).sql})
-
-        -- Final Select, which just selects the correct fields, and adds a costs object
-        {final_call_select_with_cost(pb, "ranked_prices", select_fields, order_fields).sql}
-    """
-    return raw_sql
+    ctes = build_cost_ctes(pb, call_table_alias, project_id)
+    cte_sql = ",\n".join(f"{cte.name} AS ({cte.sql})" for cte in ctes)
+    final_select = get_cost_final_select(pb, select_fields, order_fields)
+    return f"{cte_sql}\n\n{final_select}"
 
 
 # This is a temporary workaround for the issue of clickhouse not allowing the use of parameters in row_number() over function
