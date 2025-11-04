@@ -1983,7 +1983,7 @@ def test_query_with_feedback_filter_and_datetime_and_string_filter() -> None:
         WITH filtered_calls AS
             (SELECT calls_merged.id AS id
             FROM calls_merged
-                            LEFT JOIN (SELECT * FROM feedback WHERE feedback.project_id = {pb_8:String}) AS feedback ON (feedback.weave_ref = concat('weave-trace-internal:///', {pb_8:String}, '/call/', calls_merged.id))
+                            LEFT JOIN (SELECT * FROM feedback WHERE feedback.project_id = {pb_8:String} ) AS feedback ON (feedback.weave_ref = concat('weave-trace-internal:///', {pb_8:String}, '/call/', calls_merged.id))
             WHERE calls_merged.project_id = {pb_8:String}
                 AND (calls_merged.sortable_datetime > {pb_7:String})
                 AND ((calls_merged.inputs_dump LIKE {pb_6:String}
@@ -2081,14 +2081,15 @@ def test_wb_run_id_filter_eq():
         SELECT
             calls_merged.id AS id
         FROM calls_merged
-        WHERE calls_merged.project_id = {pb_1:String}
-            AND (calls_merged.wb_run_id IN {pb_0:Array(String)}
+        WHERE calls_merged.project_id = {pb_2:String}
+            AND (calls_merged.wb_run_id IN {pb_1:Array(String)}
                 OR calls_merged.wb_run_id IS NULL)
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (((any(calls_merged.deleted_at) IS NULL))
-            AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+            AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+            AND (any(calls_merged.wb_run_id) IN {pb_0:Array(String)}))
         """,
-        {"pb_0": ["wb_run_123"], "pb_1": "project"},
+        {"pb_0": ["wb_run_123"], "pb_1": ["wb_run_123"], "pb_2": "project"},
     )
 
 
