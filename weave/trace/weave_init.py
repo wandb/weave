@@ -6,20 +6,15 @@ from json import JSONDecodeError
 
 from weave.compat import wandb
 from weave.telemetry import trace_sentry
-from weave.trace import (
-    env,
-    init_message,
-    weave_client,
-)
+from weave.trace import env, init_message, weave_client
 from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace.settings import should_redact_pii, use_server_cache
-from weave.trace_server.trace_server_interface import (
-    FullTraceServerInterface,
-)
-from weave.trace_server_bindings import remote_http_trace_server
+from weave.trace.weave_client import WeaveClient
+from weave.trace_server.trace_server_interface import FullTraceServerInterface
 from weave.trace_server_bindings.caching_middleware_trace_server import (
     CachingMiddlewareTraceServer,
 )
+from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
 
 logger = logging.getLogger(__name__)
 
@@ -76,7 +71,7 @@ Args:
 """
 
 
-def _weave_is_available(server: remote_http_trace_server.RemoteHTTPTraceServer) -> bool:
+def _weave_is_available(server: RemoteHTTPTraceServer) -> bool:
     try:
         server.server_info()
     except JSONDecodeError:
@@ -89,10 +84,7 @@ def _weave_is_available(server: remote_http_trace_server.RemoteHTTPTraceServer) 
     return True
 
 
-def init_weave(
-    project_name: str,
-    ensure_project_exists: bool = True,
-) -> weave_client.WeaveClient:
+def init_weave(project_name: str, ensure_project_exists: bool = True) -> WeaveClient:
     if not project_name or not project_name.strip():
         raise ValueError("project_name must be non-empty")
 
@@ -143,9 +135,7 @@ def init_weave(
     if use_server_cache():
         server = CachingMiddlewareTraceServer.from_env(server)
 
-    client = weave_client.WeaveClient(
-        entity_name, project_name, server, ensure_project_exists
-    )
+    client = WeaveClient(entity_name, project_name, server, ensure_project_exists)
 
     # If the project name was formatted by init, update the project name
     project_name = client.project
@@ -195,7 +185,7 @@ def init_weave(
     return client
 
 
-def init_weave_disabled() -> weave_client.WeaveClient:
+def init_weave_disabled() -> WeaveClient:
     """Initialize a dummy client that does nothing.
 
     This is used when the program is execuring with Weave disabled.
@@ -210,7 +200,7 @@ def init_weave_disabled() -> weave_client.WeaveClient:
     if current_client is not None:
         weave_client_context.set_weave_client_global(None)
 
-    client = weave_client.WeaveClient(
+    client = WeaveClient(
         "DISABLED",
         "DISABLED",
         init_weave_get_server("DISABLED", should_batch=False),
@@ -224,8 +214,8 @@ def init_weave_disabled() -> weave_client.WeaveClient:
 def init_weave_get_server(
     api_key: str | None = None,
     should_batch: bool = True,
-) -> remote_http_trace_server.RemoteHTTPTraceServer:
-    res = remote_http_trace_server.RemoteHTTPTraceServer.from_env(should_batch)
+) -> RemoteHTTPTraceServer:
+    res = RemoteHTTPTraceServer.from_env(should_batch)
     if api_key is not None:
         res.set_auth(("api", api_key))
     return res
