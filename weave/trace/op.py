@@ -32,7 +32,7 @@ from typing import (
     overload,
 )
 
-from typing_extensions import ParamSpec, TypeIs
+from typing_extensions import ParamSpec, TypeIs, Unpack
 
 from weave.trace import box, settings
 from weave.trace.context import call_context
@@ -194,6 +194,18 @@ class WeaveKwargs(TypedDict):
     display_name: str | None
     attributes: dict[str, Any]
     call_id: str | None
+
+
+class OpKwargs(TypedDict, total=False):
+    """TypedDict for op() keyword arguments."""
+
+    name: str | None
+    call_display_name: str | CallDisplayNameFunc | None
+    postprocess_inputs: PostprocessInputsFunc | None
+    postprocess_output: PostprocessOutputFunc | None
+    tracing_sample_rate: float
+    enable_code_capture: bool
+    accumulator: Callable[[Any | None, Any], Any] | None
 
 
 def setup_dunder_weave_dict(d: WeaveKwargs | None = None) -> WeaveKwargs:
@@ -1160,37 +1172,9 @@ def calls(op: Op) -> CallsIter:
 
 
 @overload
-def op(
-    func: Callable[P, R],
-    *,
-    name: str | None = None,
-    call_display_name: str | CallDisplayNameFunc | None = None,
-    postprocess_inputs: PostprocessInputsFunc | None = None,
-    postprocess_output: PostprocessOutputFunc | None = None,
-    accumulator: Callable[[Any | None, Any], Any] | None = None,
-) -> Op[P, R]: ...
-
-
+def op(func: Callable[P, R], **kwargs: Unpack[OpKwargs]) -> Op[P, R]: ...
 @overload
-def op(
-    *,
-    name: str | None = None,
-    call_display_name: str | CallDisplayNameFunc | None = None,
-    postprocess_inputs: PostprocessInputsFunc | None = None,
-    postprocess_output: PostprocessOutputFunc | None = None,
-    accumulator: Callable[[Any | None, Any], Any] | None = None,
-) -> Callable[[Callable[P, R]], Op[P, R]]: ...
-
-
-@overload
-def op(
-    *,
-    name: str | None = None,
-    enable_code_capture: bool = True,
-    accumulator: Callable[[Any | None, Any], Any] | None = None,
-) -> Callable[[Callable[P, R]], Op[P, R]]: ...
-
-
+def op(**kwargs: Unpack[OpKwargs]) -> Callable[[Callable[P, R]], Op[P, R]]: ...
 def op(
     func: Callable[P, R] | None = None,
     *,
@@ -1695,6 +1679,3 @@ def _add_accumulator(
     op._set_on_output_handler(on_output)
     op._on_finish_post_processor = on_finish_post_processor
     return op
-
-
-__docspec__ = [call, calls]

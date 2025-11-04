@@ -394,11 +394,6 @@ def finish() -> None:
         wc.finish()
 
 
-# As of this writing, most important symbols are
-# re-exported in __init__.py.
-# __docspec__ = []
-
-
 __all__ = [
     "ObjectRef",
     "Table",

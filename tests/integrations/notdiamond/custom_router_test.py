@@ -53,7 +53,7 @@ def model_datasets(model_evals: dict[str, EvaluationResults]):
 def preference_id():
     try:
         with open(
-            "integrations/notdiamond/cassettes/custom_router_test/test_custom_router_train_router.yaml",
+            "integrations/notdiamond/cassettes/custom_router_test/test_train_router.yaml",
         ) as file:
             cassette = yaml.safe_load(file)
 
