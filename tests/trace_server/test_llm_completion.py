@@ -578,7 +578,7 @@ class TestLLMCompletionStreaming(unittest.TestCase):
             req = tsi.CompletionsCreateReq(
                 project_id="dGVzdF9wcm9qZWN0",
                 inputs=tsi.CompletionsCreateRequestInputs(
-                    model="custom-provider/model",
+                    model="custom::custom-provider::model",
                     messages=[{"role": "user", "content": "Say hello"}],
                 ),
                 track_llm_call=False,
