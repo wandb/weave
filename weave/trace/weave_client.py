@@ -2254,6 +2254,3 @@ def sanitize_object_name(name: str) -> str:
     if len(res) > MAX_OBJECT_NAME_LENGTH:
         res = res[:MAX_OBJECT_NAME_LENGTH]
     return res
-
-
-__docspec__ = [WeaveClient, Call, CallsIter]

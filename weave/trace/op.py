@@ -1679,6 +1679,3 @@ def _add_accumulator(
     op._set_on_output_handler(on_output)
     op._on_finish_post_processor = on_finish_post_processor
     return op
-
-
-__docspec__ = [call, calls]

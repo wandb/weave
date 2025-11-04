@@ -1428,8 +1428,3 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
             method="DELETE",
             params=params,
         )
-
-
-__docspec__ = [
-    RemoteHTTPTraceServer,
-]
