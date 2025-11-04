@@ -67,6 +67,7 @@ from weave.trace_server.trace_server_common import assert_parameter_length_less_
 from weave.trace_server.trace_server_interface_util import (
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
 )
+from weave.trace_server.token_costs import build_cost_ctes, get_cost_final_select
 
 logger = logging.getLogger(__name__)
 
@@ -779,6 +780,9 @@ class CallsQuery(BaseModel):
         if not should_optimize and not self.include_costs and not object_ref_conditions:
             return self._as_sql_base_format(pb, table_alias)
 
+        # Build CTEs for the optimized query
+        ctes = CTECollection()
+
         # Build two queries, first filter query CTE, then select the columns
         filter_query = CallsQuery(project_id=self.project_id)
         select_query = CallsQuery(
@@ -1181,7 +1185,6 @@ class CallsQuery(BaseModel):
         """
 
         return safely_format_sql(raw_sql, logger)
-
 
 STORAGE_SIZE_TABLE_NAME = "storage_size_tbl"
 ROLLED_UP_CALL_MERGED_STATS_TABLE_NAME = "rolled_up_cms"
