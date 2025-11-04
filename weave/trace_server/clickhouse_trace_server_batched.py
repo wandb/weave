@@ -756,42 +756,45 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         obj_results = []
         ch_insert_batch = []
-        if req.batch:
-            for obj in req.batch:
-                processed_result = process_incoming_object_val(
-                    obj.val, obj.builtin_object_class
-                )
-                processed_val = processed_result["val"]
-                json_val = json.dumps(processed_val)
-                digest = str_digest(json_val)
-                ch_obj = ObjCHInsertable(
-                    project_id=obj.project_id,
-                    object_id=obj.object_id,
-                    wb_user_id=obj.wb_user_id,
-                    kind=get_kind(processed_val),
-                    base_object_class=processed_result["base_object_class"],
-                    leaf_object_class=processed_result["leaf_object_class"],
-                    refs=extract_refs_from_values(processed_val),
-                    val_dump=json_val,
-                    digest=digest,
-                )
-                insert_data = list(ch_obj.model_dump().values())
-                # Add the data to be inserted
-                ch_insert_batch.append(insert_data)
+        if not req or not req.batch: # Note: Mirrors check in obj_create. Would req ever be None here?
+            return tsi.ObjCreateBatchRes(results=[])
 
-                # Record the inserted data
-                obj_results.append(
-                    tsi.ObjCreateRes(
-                        digest=digest,
-                        object_id=obj.object_id,
-                    )
-                )
-
-            self._insert(
-                "object_versions",
-                data=ch_insert_batch,
-                column_names=ALL_OBJ_INSERT_COLUMNS,
+        for obj in req.batch:
+            processed_result = process_incoming_object_val(
+                obj.val, obj.builtin_object_class
             )
+            processed_val = processed_result["val"]
+            json_val = json.dumps(processed_val)
+            digest = str_digest(json_val)
+            ch_obj = ObjCHInsertable(
+                project_id=obj.project_id,
+                object_id=obj.object_id,
+                wb_user_id=obj.wb_user_id,
+                kind=get_kind(processed_val),
+                base_object_class=processed_result["base_object_class"],
+                leaf_object_class=processed_result["leaf_object_class"],
+                refs=extract_refs_from_values(processed_val),
+                val_dump=json_val,
+                digest=digest,
+            )
+            insert_data = list(ch_obj.model_dump().values())
+            # Add the data to be inserted
+            ch_insert_batch.append(insert_data)
+
+            # Record the inserted data
+            obj_results.append(
+                tsi.ObjCreateRes(
+                    digest=digest,
+                    object_id=obj.object_id,
+                )
+            )
+
+        self._insert(
+            "object_versions",
+            data=ch_insert_batch,
+            column_names=ALL_OBJ_INSERT_COLUMNS,
+        )
+
         return tsi.ObjCreateBatchRes(results=obj_results)
 
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
