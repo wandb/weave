@@ -557,11 +557,14 @@ class ObjCreateRes(BaseModel):
     digest: str
     object_id: str
 
+
 class ObjCreateBatchReq(BaseModelStrict):
     batch: list[ObjSchemaForInsert]
 
+
 class ObjCreateBatchRes(BaseModel):
     results: list[ObjCreateRes]
+
 
 class ObjReadReq(BaseModelStrict):
     project_id: str

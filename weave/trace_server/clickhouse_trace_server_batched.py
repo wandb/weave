@@ -53,8 +53,8 @@ from weave.trace_server.clickhouse_schema import (
     ALL_CALL_INSERT_COLUMNS,
     ALL_CALL_JSON_COLUMNS,
     ALL_CALL_SELECT_COLUMNS,
-    ALL_OBJ_INSERT_COLUMNS,
     ALL_FILE_CHUNK_INSERT_COLUMNS,
+    ALL_OBJ_INSERT_COLUMNS,
     REQUIRED_CALL_COLUMNS,
     CallCHInsertable,
     CallDeleteCHInsertable,
@@ -803,26 +803,25 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             )
         return tsi.ObjCreateBatchRes(results=obj_results)
 
-
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
-         object_query_builder = ObjectMetadataQueryBuilder(req.project_id)
-         object_query_builder.add_digests_conditions(req.digest)
-         object_query_builder.add_object_ids_condition([req.object_id])
-         object_query_builder.set_include_deleted(include_deleted=True)
-         metadata_only = req.metadata_only or False
+        object_query_builder = ObjectMetadataQueryBuilder(req.project_id)
+        object_query_builder.add_digests_conditions(req.digest)
+        object_query_builder.add_object_ids_condition([req.object_id])
+        object_query_builder.set_include_deleted(include_deleted=True)
+        metadata_only = req.metadata_only or False
 
-         objs = self._select_objs_query(object_query_builder, metadata_only)
-         if len(objs) == 0:
-             raise NotFoundError(f"Obj {req.object_id}:{req.digest} not found")
+        objs = self._select_objs_query(object_query_builder, metadata_only)
+        if len(objs) == 0:
+            raise NotFoundError(f"Obj {req.object_id}:{req.digest} not found")
 
-         obj = objs[0]
-         if obj.deleted_at is not None:
-             raise ObjectDeletedError(
-                 f"{req.object_id}:v{obj.version_index} was deleted at {obj.deleted_at}",
-                 deleted_at=obj.deleted_at,
-             )
+        obj = objs[0]
+        if obj.deleted_at is not None:
+            raise ObjectDeletedError(
+                f"{req.object_id}:v{obj.version_index} was deleted at {obj.deleted_at}",
+                deleted_at=obj.deleted_at,
+            )
 
-         return tsi.ObjReadRes(obj=_ch_obj_to_obj_schema(obj))
+        return tsi.ObjReadRes(obj=_ch_obj_to_obj_schema(obj))
 
     def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
         object_query_builder = ObjectMetadataQueryBuilder(req.project_id)

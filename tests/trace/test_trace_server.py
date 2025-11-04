@@ -82,15 +82,22 @@ def test_robust_to_url_sensitive_chars(client):
     )
     assert read_res.vals[0] == bad_val[bad_key]
 
+
 def test_save_object_batch(client):
     project_id = client._project_id()
     batch_req = tsi.ObjCreateBatchReq(
         batch=[
             tsi.ObjSchemaForInsert(
-                project_id=project_id, object_id="obj-a", val={"a": 1}, wb_user_id="abc123"
+                project_id=project_id,
+                object_id="obj-a",
+                val={"a": 1},
+                wb_user_id="abc123",
             ),
             tsi.ObjSchemaForInsert(
-                project_id=project_id, object_id="obj-b", val={"b": 2}, wb_user_id="abc123"
+                project_id=project_id,
+                object_id="obj-b",
+                val={"b": 2},
+                wb_user_id="abc123",
             ),
         ]
     )
@@ -135,7 +142,7 @@ def test_robust_to_url_sensitive_chars_batch(client):
                     project_id=project_id,
                     object_id="normal",
                     val={"x": 1},
-                    wb_user_id="abc123"
+                    wb_user_id="abc123",
                 ),
             ]
         )
