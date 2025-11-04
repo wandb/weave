@@ -817,7 +817,9 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
 
         with self.lock:
             if self._obj_exists(cursor, project_id, object_id, digest):
-                return tsi.ObjCreateRes(digest=digest)
+                return tsi.ObjCreateRes(
+                    digest=digest, object_id=object_id, project_id=project_id
+                )
 
             # Use IMMEDIATE transaction to acquire write lock immediately, preventing
             # race conditions where concurrent transactions read stale version_index values
@@ -868,7 +870,22 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 ),
             )
             conn.commit()
-        return tsi.ObjCreateRes(digest=digest)
+        return tsi.ObjCreateRes(
+            digest=digest, object_id=object_id, project_id=project_id
+        )
+
+    def obj_create_batch(self, batch: tsi.ObjCreateBatchReq) -> tsi.ObjCreateBatchRes:
+        """Create multiple objects in a batch.
+
+        SQLite does not benefit much from bulk inserts in this path due to
+        the per-object logic (versioning, latest flags). For correctness and
+        simplicity, reuse `obj_create` for each entry and aggregate results.
+        """
+        results: list[tsi.ObjCreateRes] = []
+        for obj in batch.batch:
+            res = self.obj_create(tsi.ObjCreateReq(obj=obj))
+            results.append(res)
+        return tsi.ObjCreateBatchRes(results=results)
 
     def _obj_exists(
         self, cursor: sqlite3.Cursor, project_id: str, object_id: str, digest: str
