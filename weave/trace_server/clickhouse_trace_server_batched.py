@@ -744,20 +744,20 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._create_obj_batch")
-    def obj_create_batch(self, batch: tsi.ObjCreateBatchReq) -> tsi.ObjCreateBatchRes:
+    def obj_create_batch(self, req: tsi.ObjCreateBatchReq) -> tsi.ObjCreateBatchRes:
         if root_span := ddtrace.tracer.current_span():
             root_span.set_tags(
                 {
                     "clickhouse_trace_server_batched._create_obj_batch.count": str(
-                        len(batch.batch)
+                        len(req.batch)
                     )
                 }
             )
 
         obj_results = []
         ch_insert_batch = []
-        if batch:
-            for obj in batch.batch:
+        if req.batch:
+            for obj in req.batch:
                 processed_result = process_incoming_object_val(
                     obj.val, obj.builtin_object_class
                 )
