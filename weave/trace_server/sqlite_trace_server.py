@@ -871,12 +871,6 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         return tsi.ObjCreateRes(digest=digest, object_id=object_id)
 
     def obj_create_batch(self, batch: tsi.ObjCreateBatchReq) -> tsi.ObjCreateBatchRes:
-        """Create multiple objects in a batch.
-
-        SQLite does not benefit much from bulk inserts in this path due to
-        the per-object logic (versioning, latest flags). For correctness and
-        simplicity, reuse `obj_create` for each entry and aggregate results.
-        """
         results: list[tsi.ObjCreateRes] = []
         for obj in batch.batch:
             res = self.obj_create(tsi.ObjCreateReq(obj=obj))
