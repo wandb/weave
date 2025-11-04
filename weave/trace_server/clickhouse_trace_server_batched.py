@@ -292,6 +292,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 limit=limit
             ),
         ).objs
+
+        # FILE BYPASS START
         if len(existing_objects) == 0:
             # We don't know if any existing ops have been created
             source_code = object_creation_utils.PLACEHOLDER_OP_SOURCE
@@ -300,7 +302,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 name=object_creation_utils.OP_SOURCE_FILE_NAME,
                 content=source_code.encode("utf-8"),
             )
-            self.file_create(source_file_req)
+            digest = self.file_create(source_file_req).digest
+        else:
+            digest = bytes_digest((
+                object_creation_utils.PLACEHOLDER_OP_SOURCE
+            ).encode("utf-8"))
+        # FILE BYPASS END
 
         for obj in existing_objects:
             op_ref_uri = ri.InternalOpRef(
@@ -308,29 +315,64 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 name=obj.object_id,
                 version=obj.digest,
             ).uri()
+
             # Modify each of the matched start calls in place
             for idx in obj_id_idx_map[obj.object_id]:
                 calls[idx][0].op_name = op_ref_uri
             # Remove this ID from the mapping so that once the for loop is done we are left with only new objects
             obj_id_idx_map.pop(obj.object_id)
 
+        # START OBJ BATCH CREATION
         # Only new objects
+        insert_batch: list[ObjCHInsertable] = []
+        obj_results = []
         for op_obj_id in obj_id_idx_map.keys():
-            op_create_res = self.op_create_v2(
-                tsi.OpCreateV2Req(
-                    project_id=req.project_id,
-                    name=op_obj_id,
-                    wb_user_id=req.wb_user_id,
-                    source_code=None,
-                ),
-                create_file=False
+            op_val = object_creation_utils.build_op_val(digest)
+            obj = tsi.ObjSchemaForInsert(
+                project_id=req.project_id,
+                object_id=op_obj_id,
+                val=op_val,
+                wb_user_id=None,
             )
+            processed_result = process_incoming_object_val(
+                obj.val, obj.builtin_object_class
+            )
+            processed_val = processed_result["val"]
+            json_val = json.dumps(processed_val)
+            digest = str_digest(json_val)
+            obj_results.append((op_obj_id, digest))
+            ch_obj = ObjCHInsertable(
+                project_id=obj.project_id,
+                object_id=obj.object_id,
+                wb_user_id=obj.wb_user_id,
+                kind=get_kind(processed_val),
+                base_object_class=processed_result["base_object_class"],
+                leaf_object_class=processed_result["leaf_object_class"],
+                refs=extract_refs_from_values(processed_val),
+                val_dump=json_val,
+                digest=digest,
+            )
+            insert_batch.append(ch_obj)
+
+        if len(insert_batch) > 0:
+            self._insert(
+                "object_versions",
+                data=[list(obj.model_dump().values()) for obj in insert_batch],
+                column_names=list(insert_batch[0].model_dump().keys()),
+                settings = {
+                    "wait_for_async_insert": 1,
+                    "async_insert": 1,
+                }
+            )
+        # END OBJ_BATCH_CREATION
+
+        for (object_id, digest) in obj_results:
             op_ref_uri = ri.InternalOpRef(
                 project_id=req.project_id,
-                name=op_obj_id,
-                version=op_create_res.digest,
+                name=object_id,
+                version=digest,
             ).uri()
-            for idx in obj_id_idx_map[op_obj_id]:
+            for idx in obj_id_idx_map[object_id]:
                 calls[idx][0].op_name = op_ref_uri
 
         batch = [item for start_call, end_call in calls for item in (
@@ -1356,23 +1398,17 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             OpCreateV2Res with digest, object_id, version_index, and op_ref
         """
         # Create the obj.py file that the SDK would have created
-        if create_file:
-            source_code = req.source_code or object_creation_utils.PLACEHOLDER_OP_SOURCE
-            source_file_req = tsi.FileCreateReq(
-                project_id=req.project_id,
-                name=object_creation_utils.OP_SOURCE_FILE_NAME,
-                content=source_code.encode("utf-8"),
-            )
-            source_file_res = self.file_create(source_file_req)
-            digest = source_file_res.digest
-        else:
-            digest = bytes_digest((
-                req.source_code or object_creation_utils.PLACEHOLDER_OP_SOURCE
-            ).encode("utf-8"))
+        source_code = req.source_code or object_creation_utils.PLACEHOLDER_OP_SOURCE
+        source_file_req = tsi.FileCreateReq(
+            project_id=req.project_id,
+            name=object_creation_utils.OP_SOURCE_FILE_NAME,
+            content=source_code.encode("utf-8"),
+        )
+        source_file_res = self.file_create(source_file_req)
 
         # Create the op "val" that the SDK would have created
         # Note: We store just the digest string, matching SDK's to_json output
-        op_val = object_creation_utils.build_op_val(digest)
+        op_val = object_creation_utils.build_op_val(source_file_res.digest)
         obj_req = tsi.ObjCreateReq(
             obj=tsi.ObjSchemaForInsert(
                 project_id=req.project_id,

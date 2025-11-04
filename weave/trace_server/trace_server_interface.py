@@ -549,6 +549,13 @@ class OpQueryRes(BaseModel):
     op_objs: list[ObjSchema]
 
 
+class ObjCreateBatchReq(BaseModelStrict):
+    objs: list[ObjSchemaForInsert]
+
+
+class ObjCreateBatchRes(BaseModel):
+    digests: list[tuple[str, str]] # object_id and digest
+
 class ObjCreateReq(BaseModelStrict):
     obj: ObjSchemaForInsert
 
