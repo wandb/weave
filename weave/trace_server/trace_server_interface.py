@@ -554,8 +554,15 @@ class ObjCreateReq(BaseModelStrict):
 
 
 class ObjCreateRes(BaseModel):
-    digest: str  #
+    digest: str
+    object_id: str
+    project_id: str
 
+class ObjCreateBatchReq(BaseModelStrict):
+    batch: list[ObjSchemaForInsert]
+
+class ObjCreateBatchRes(BaseModel):
+    results: list[ObjCreateRes]
 
 class ObjReadReq(BaseModelStrict):
     project_id: str
@@ -2016,6 +2023,7 @@ class TraceServerInterface(Protocol):
 
     # Obj API
     def obj_create(self, req: ObjCreateReq) -> ObjCreateRes: ...
+    def obj_create_batch(self, batch: ObjCreateBatchReq) -> ObjCreateBatchRes: ...
     def obj_read(self, req: ObjReadReq) -> ObjReadRes: ...
     def objs_query(self, req: ObjQueryReq) -> ObjQueryRes: ...
     def obj_delete(self, req: ObjDeleteReq) -> ObjDeleteRes: ...

@@ -53,6 +53,7 @@ from weave.trace_server.clickhouse_schema import (
     ALL_CALL_INSERT_COLUMNS,
     ALL_CALL_JSON_COLUMNS,
     ALL_CALL_SELECT_COLUMNS,
+    ALL_OBJ_INSERT_COLUMNS,
     ALL_FILE_CHUNK_INSERT_COLUMNS,
     REQUIRED_CALL_COLUMNS,
     CallCHInsertable,
@@ -736,27 +737,92 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             data=[list(ch_obj.model_dump().values())],
             column_names=list(ch_obj.model_fields.keys()),
         )
-        return tsi.ObjCreateRes(digest=digest)
 
-    def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
-        object_query_builder = ObjectMetadataQueryBuilder(req.project_id)
-        object_query_builder.add_digests_conditions(req.digest)
-        object_query_builder.add_object_ids_condition([req.object_id])
-        object_query_builder.set_include_deleted(include_deleted=True)
-        metadata_only = req.metadata_only or False
+        return tsi.ObjCreateRes(
+            digest=digest,
+            object_id=req.obj.object_id,
+            project_id=req.obj.project_id
+        )
 
-        objs = self._select_objs_query(object_query_builder, metadata_only)
-        if len(objs) == 0:
-            raise NotFoundError(f"Obj {req.object_id}:{req.digest} not found")
-
-        obj = objs[0]
-        if obj.deleted_at is not None:
-            raise ObjectDeletedError(
-                f"{req.object_id}:v{obj.version_index} was deleted at {obj.deleted_at}",
-                deleted_at=obj.deleted_at,
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._create_obj_batch")
+    def obj_create_batch(self, batch: tsi.ObjCreateBatchReq) -> tsi.ObjCreateBatchRes:
+        if root_span := ddtrace.tracer.current_span():
+            root_span.set_tags(
+                {
+                    "clickhouse_trace_server_batched._create_obj_batch.count": str(
+                        len(batch.batch)
+                    )
+                }
             )
 
-        return tsi.ObjReadRes(obj=_ch_obj_to_obj_schema(obj))
+        obj_results = []
+        ch_insert_batch = []
+        if batch:
+            settings = {}
+            if self._use_async_insert:
+                settings["async_insert"] = 1
+                # https://clickhouse.com/docs/en/optimize/asynchronous-inserts#enabling-asynchronous-inserts
+                # Setting wait_for_async_insert = 0 does not guarantee that insert errors
+                # are caught, reverting to default behavior.
+                settings["wait_for_async_insert"] = 1
+
+            for obj in batch.batch:
+                processed_result = process_incoming_object_val(
+                    obj.val, obj.builtin_object_class
+                )
+                processed_val = processed_result["val"]
+                json_val = json.dumps(processed_val)
+                digest = str_digest(json_val)
+                ch_obj = ObjCHInsertable(
+                    project_id=obj.project_id,
+                    object_id=obj.object_id,
+                    wb_user_id=obj.wb_user_id,
+                    kind=get_kind(processed_val),
+                    base_object_class=processed_result["base_object_class"],
+                    leaf_object_class=processed_result["leaf_object_class"],
+                    refs=extract_refs_from_values(processed_val),
+                    val_dump=json_val,
+                    digest=digest,
+                )
+                insert_data = list(ch_obj.model_dump().values())
+                # Add the data to be inserted
+                ch_insert_batch.append(insert_data)
+
+                # Record the inserted data
+                obj_results.append(tsi.ObjCreateRes(
+                    digest=digest,
+                    object_id=obj.object_id,
+                    project_id=obj.project_id
+                ))
+
+            self._insert(
+                "object_versions",
+                data=ch_insert_batch,
+                column_names=ALL_OBJ_INSERT_COLUMNS,
+                settings=settings,
+            )
+        return tsi.ObjCreateBatchRes(results=obj_results)
+
+
+    def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
+         object_query_builder = ObjectMetadataQueryBuilder(req.project_id)
+         object_query_builder.add_digests_conditions(req.digest)
+         object_query_builder.add_object_ids_condition([req.object_id])
+         object_query_builder.set_include_deleted(include_deleted=True)
+         metadata_only = req.metadata_only or False
+
+         objs = self._select_objs_query(object_query_builder, metadata_only)
+         if len(objs) == 0:
+             raise NotFoundError(f"Obj {req.object_id}:{req.digest} not found")
+
+         obj = objs[0]
+         if obj.deleted_at is not None:
+             raise ObjectDeletedError(
+                 f"{req.object_id}:v{obj.version_index} was deleted at {obj.deleted_at}",
+                 deleted_at=obj.deleted_at,
+             )
+
+         return tsi.ObjReadRes(obj=_ch_obj_to_obj_schema(obj))
 
     def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
         object_query_builder = ObjectMetadataQueryBuilder(req.project_id)
