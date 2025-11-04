@@ -4,7 +4,6 @@ import pytest
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.refs_internal import InvalidInternalRef
-from weave.trace_server.errors import ObjectDeletedError
 
 
 def test_save_object(client):
@@ -82,6 +81,3 @@ def test_robust_to_url_sensitive_chars(client):
         )
     )
     assert read_res.vals[0] == bad_val[bad_key]
-
-
-
