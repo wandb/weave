@@ -295,6 +295,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         ).objs
 
         # FILE BYPASS START
+        # We know that OTEL will always user the placeholder source.
+        # We also know how to calculate the digest of the placeholder source.
+        # Therefore, instead of going through file create for each new op
+        # We can instead just reuse the existing file if we know it is present
+        # and create it just once if we are not sure.
         if len(existing_objects) == 0:
             # We don't know if any existing ops have been created
             source_code = object_creation_utils.PLACEHOLDER_OP_SOURCE
