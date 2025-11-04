@@ -525,6 +525,18 @@ def network_proxy_client(client):
         )
         return client.server.obj_create(req)
 
+    @app.post("/obj/batch/create")
+    def obj_create_batch(
+        req: tsi.ObjCreateBatchReq,
+    ) -> tsi.ObjCreateBatchRes:
+        records.append(
+            (
+                "obj_create_batch",
+                req,
+            )
+        )
+        return client.server.obj_create_batch(req)
+
     @app.post("/obj/read")
     def obj_read(req: tsi.ObjReadReq) -> tsi.ObjReadRes:
         records.append(

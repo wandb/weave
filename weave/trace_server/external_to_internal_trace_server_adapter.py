@@ -250,6 +250,17 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
             req.obj.wb_user_id = self._idc.ext_to_int_user_id(req.obj.wb_user_id)
         return self._ref_apply(self._internal_trace_server.obj_create, req)
 
+    def obj_create_batch(
+        self, req: tsi.ObjCreateBatchReq
+    ) -> tsi.ObjCreateBatchRes:
+        # Convert project and user IDs for each object in the batch
+        for obj in req.batch:
+            obj.project_id = self._idc.ext_to_int_project_id(obj.project_id)
+            if obj.wb_user_id is not None:
+                obj.wb_user_id = self._idc.ext_to_int_user_id(obj.wb_user_id)
+        # Apply internal method and convert any refs in the response
+        return self._ref_apply(self._internal_trace_server.obj_create_batch, req)
+
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
         original_project_id = req.project_id
         req.project_id = self._idc.ext_to_int_project_id(original_project_id)

@@ -741,7 +741,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         return tsi.ObjCreateRes(
             digest=digest,
             object_id=req.obj.object_id,
-            project_id=req.obj.project_id
         )
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._create_obj_batch")
@@ -789,11 +788,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 ch_insert_batch.append(insert_data)
 
                 # Record the inserted data
-                obj_results.append(tsi.ObjCreateRes(
-                    digest=digest,
-                    object_id=obj.object_id,
-                    project_id=obj.project_id
-                ))
+                obj_results.append(
+                    tsi.ObjCreateRes(
+                        digest=digest,
+                        object_id=obj.object_id,
+                    )
+                )
 
             self._insert(
                 "object_versions",

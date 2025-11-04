@@ -556,7 +556,6 @@ class ObjCreateReq(BaseModelStrict):
 class ObjCreateRes(BaseModel):
     digest: str
     object_id: str
-    project_id: str
 
 class ObjCreateBatchReq(BaseModelStrict):
     batch: list[ObjSchemaForInsert]

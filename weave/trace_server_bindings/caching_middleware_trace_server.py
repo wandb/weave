@@ -288,6 +288,17 @@ class CachingMiddlewareTraceServer(tsi.FullTraceServerInterface):
             self._next_trace_server.obj_create, req, tsi.ObjCreateRes
         )
 
+    def obj_create_batch(
+        self, req: tsi.ObjCreateBatchReq
+    ) -> tsi.ObjCreateBatchRes:
+        """Pass-through batch create.
+
+        We currently do not add caching for the batch endpoint. Implementing
+        it as a passthrough ensures functional correctness while keeping
+        consistency with single `obj_create` behavior.
+        """
+        return self._next_trace_server.obj_create_batch(req)
+
     def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjDeleteRes:
         cache_key_partial = (
             f'{{"project_id": "{req.project_id}", "object_id": "{req.object_id}"'
