@@ -288,9 +288,6 @@ class CachingMiddlewareTraceServer(tsi.FullTraceServerInterface):
             self._next_trace_server.obj_create, req, tsi.ObjCreateRes
         )
 
-    def obj_create_batch(self, req: tsi.ObjCreateBatchReq) -> tsi.ObjCreateBatchRes:
-        return self._next_trace_server.obj_create_batch(req)
-
     def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjDeleteRes:
         cache_key_partial = (
             f'{{"project_id": "{req.project_id}", "object_id": "{req.object_id}"'

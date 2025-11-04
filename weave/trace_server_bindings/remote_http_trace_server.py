@@ -476,13 +476,6 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
             "/obj/create", req, tsi.ObjCreateReq, tsi.ObjCreateRes
         )
 
-    def obj_create_batch(
-        self, req: Union[tsi.ObjCreateBatchReq, dict[str, Any]]
-    ) -> tsi.ObjCreateBatchRes:
-        return self._generic_request(
-            "/obj/batch/create", req, tsi.ObjCreateBatchReq, tsi.ObjCreateBatchRes
-        )
-
     def obj_read(self, req: Union[tsi.ObjReadReq, dict[str, Any]]) -> tsi.ObjReadRes:
         return self._generic_request("/obj/read", req, tsi.ObjReadReq, tsi.ObjReadRes)
 
