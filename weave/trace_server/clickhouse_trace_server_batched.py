@@ -54,6 +54,7 @@ from weave.trace_server.clickhouse_schema import (
     ALL_CALL_JSON_COLUMNS,
     ALL_CALL_SELECT_COLUMNS,
     ALL_FILE_CHUNK_INSERT_COLUMNS,
+    ALL_OBJ_INSERT_COLUMNS,
     REQUIRED_CALL_COLUMNS,
     CallCHInsertable,
     CallDeleteCHInsertable,
@@ -324,55 +325,27 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         # START OBJ BATCH CREATION
         # Only new objects
-        insert_batch: list[ObjCHInsertable] = []
-        obj_results = []
+        obj_creation_batch = []
         for op_obj_id in obj_id_idx_map.keys():
             op_val = object_creation_utils.build_op_val(digest)
-            obj = tsi.ObjSchemaForInsert(
+            obj_creation_batch.append(tsi.ObjSchemaForInsert(
                 project_id=req.project_id,
                 object_id=op_obj_id,
                 val=op_val,
                 wb_user_id=None,
-            )
-            processed_result = process_incoming_object_val(
-                obj.val, obj.builtin_object_class
-            )
-            processed_val = processed_result["val"]
-            json_val = json.dumps(processed_val)
-            digest = str_digest(json_val)
-            obj_results.append((op_obj_id, digest))
-            ch_obj = ObjCHInsertable(
-                project_id=obj.project_id,
-                object_id=obj.object_id,
-                wb_user_id=obj.wb_user_id,
-                kind=get_kind(processed_val),
-                base_object_class=processed_result["base_object_class"],
-                leaf_object_class=processed_result["leaf_object_class"],
-                refs=extract_refs_from_values(processed_val),
-                val_dump=json_val,
-                digest=digest,
-            )
-            insert_batch.append(ch_obj)
+            ))
+        res = self.obj_create_batch(tsi.ObjCreateBatchReq(batch=obj_creation_batch))
 
-        if len(insert_batch) > 0:
-            self._insert(
-                "object_versions",
-                data=[list(obj.model_dump().values()) for obj in insert_batch],
-                column_names=list(insert_batch[0].model_dump().keys()),
-                settings = {
-                    "wait_for_async_insert": 1,
-                    "async_insert": 1,
-                }
-            )
         # END OBJ_BATCH_CREATION
 
-        for (object_id, digest) in obj_results:
+
+        for result in res.results:
             op_ref_uri = ri.InternalOpRef(
-                project_id=req.project_id,
-                name=object_id,
-                version=digest,
+                project_id=result.project_id,
+                name=result.object_id,
+                version=result.digest,
             ).uri()
-            for idx in obj_id_idx_map[object_id]:
+            for idx in obj_id_idx_map[result.object_id]:
                 calls[idx][0].op_name = op_ref_uri
 
         batch = [item for start_call, end_call in calls for item in (
@@ -845,7 +818,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             data=[list(ch_obj.model_dump().values())],
             column_names=list(ch_obj.model_fields.keys()),
         )
-        return tsi.ObjCreateRes(digest=digest)
+        return tsi.ObjCreateRes(
+            digest=digest,
+            object_id=req.obj.object_id,
+            project_id=req.obj.project_id,
+        )
 
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
         object_query_builder = ObjectMetadataQueryBuilder(req.project_id)
@@ -1388,7 +1365,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 p99_turn_duration_ms=p99_turn_duration_ms,
             )
 
-    def op_create_v2(self, req: tsi.OpCreateV2Req, create_file=True) -> tsi.OpCreateV2Res:
+    def op_create_v2(self, req: tsi.OpCreateV2Req) -> tsi.OpCreateV2Res:
         """Create an op object by delegating to obj_create.
 
         Args:
@@ -4328,6 +4305,66 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         finally:
             self._thread_local.ch_client = original_client
             client.close()
+
+
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._create_obj_batch")
+    def obj_create_batch(self, batch: tsi.ObjCreateBatchReq) -> tsi.ObjCreateBatchRes:
+        if root_span := ddtrace.tracer.current_span():
+            root_span.set_tags(
+                {
+                    "clickhouse_trace_server_batched._create_obj_batch.count": str(
+                        len(batch.batch)
+                    )
+                }
+            )
+
+        obj_results = []
+        ch_insert_batch = []
+        if batch:
+            settings = {}
+            if self._use_async_insert:
+                settings["async_insert"] = 1
+                # https://clickhouse.com/docs/en/optimize/asynchronous-inserts#enabling-asynchronous-inserts
+                # Setting wait_for_async_insert = 0 does not guarantee that insert errors
+                # are caught, reverting to default behavior.
+                settings["wait_for_async_insert"] = 1
+
+            for obj in batch.batch:
+                processed_result = process_incoming_object_val(
+                    obj.val, obj.builtin_object_class
+                )
+                processed_val = processed_result["val"]
+                json_val = json.dumps(processed_val)
+                digest = str_digest(json_val)
+                ch_obj = ObjCHInsertable(
+                    project_id=obj.project_id,
+                    object_id=obj.object_id,
+                    wb_user_id=obj.wb_user_id,
+                    kind=get_kind(processed_val),
+                    base_object_class=processed_result["base_object_class"],
+                    leaf_object_class=processed_result["leaf_object_class"],
+                    refs=extract_refs_from_values(processed_val),
+                    val_dump=json_val,
+                    digest=digest,
+                )
+                insert_data = list(ch_obj.model_dump().values())
+                # Add the data to be inserted
+                ch_insert_batch.append(insert_data)
+
+                # Record the inserted data
+                obj_results.append(tsi.ObjCreateRes(
+                    digest=digest,
+                    object_id=obj.object_id,
+                    project_id=obj.project_id
+                ))
+
+            self._insert(
+                "object_versions",
+                data=ch_insert_batch,
+                column_names=ALL_OBJ_INSERT_COLUMNS,
+                settings=settings,
+            )
+        return tsi.ObjCreateBatchRes(results=obj_results)
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert_call_batch")
     def _insert_call_batch(self, batch: list) -> None:
