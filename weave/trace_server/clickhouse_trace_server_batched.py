@@ -758,13 +758,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         ch_insert_batch = []
         if batch:
             settings = {}
-            if self._use_async_insert:
-                settings["async_insert"] = 1
-                # https://clickhouse.com/docs/en/optimize/asynchronous-inserts#enabling-asynchronous-inserts
-                # Setting wait_for_async_insert = 0 does not guarantee that insert errors
-                # are caught, reverting to default behavior.
-                settings["wait_for_async_insert"] = 1
-
             for obj in batch.batch:
                 processed_result = process_incoming_object_val(
                     obj.val, obj.builtin_object_class
