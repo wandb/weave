@@ -757,7 +757,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         obj_results = []
         ch_insert_batch = []
         if batch:
-            settings = {}
             for obj in batch.batch:
                 processed_result = process_incoming_object_val(
                     obj.val, obj.builtin_object_class
@@ -792,7 +791,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 "object_versions",
                 data=ch_insert_batch,
                 column_names=ALL_OBJ_INSERT_COLUMNS,
-                settings=settings,
             )
         return tsi.ObjCreateBatchRes(results=obj_results)
 
