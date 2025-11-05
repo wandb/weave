@@ -146,7 +146,7 @@ def test_otel_export_clickhouse(client: weave_client.WeaveClient):
     export_req = create_test_export_request()
     project_id = client._project_id()
     export_req.project_id = project_id
-    export_req.wb_user_id = 'abcd123'
+    export_req.wb_user_id = "abcd123"
 
     # Export the otel traces
     response = client.server.otel_export(export_req)
@@ -209,7 +209,7 @@ def test_otel_export_with_turn_and_thread(client: weave_client.WeaveClient):
     export_req = create_test_export_request()
     project_id = client._project_id()
     export_req.project_id = project_id
-    export_req.wb_user_id = 'abcd123'
+    export_req.wb_user_id = "abcd123"
 
     # Add turn and thread attributes to the span
     test_thread_id = str(uuid.uuid4())
@@ -259,7 +259,7 @@ def test_otel_export_with_turn_no_thread(client: weave_client.WeaveClient):
     export_req = create_test_export_request()
     project_id = client._project_id()
     export_req.project_id = project_id
-    export_req.wb_user_id = 'abcd123'
+    export_req.wb_user_id = "abcd123"
 
     # Add only is_turn attribute (no thread_id)
     span = export_req.traces.resource_spans[0].scope_spans[0].spans[0]
@@ -1313,7 +1313,7 @@ def test_otel_export_partial_success_on_attribute_conflict(
     export_req = create_test_export_request()
     project_id = client._project_id()
     export_req.project_id = project_id
-    export_req.wb_user_id = 'abcd123'
+    export_req.wb_user_id = "abcd123"
 
     # Good span (already present at index 0)
     good_span = export_req.traces.resource_spans[0].scope_spans[0].spans[0]
@@ -1391,7 +1391,7 @@ def test_otel_span_wandb_attributes_and_data_routing(
     export_req = create_test_export_request()
     project_id = client._project_id()
     export_req.project_id = project_id
-    export_req.wb_user_id = 'abcd123'
+    export_req.wb_user_id = "abcd123"
 
     # Get the span to add custom attributes
     span = export_req.traces.resource_spans[0].scope_spans[0].spans[0]

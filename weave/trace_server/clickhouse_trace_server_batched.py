@@ -234,7 +234,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             raise TypeError(
                 "Expected traces as ExportTraceServiceRequest, got {type(req.traces)}"
             )
-        calls: list[tuple[tsi.StartedCallSchemaForInsert, tsi.EndedCallSchemaForInsert]] = []
+        calls: list[
+            tuple[tsi.StartedCallSchemaForInsert, tsi.EndedCallSchemaForInsert]
+        ] = []
         rejected_spans = 0
         error_messages: list[str] = []
 
@@ -262,11 +264,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                         error_messages.append(f"Rejected span ({span_ident}): {e!s}")
                         continue
 
-                    calls.append(span.to_call(
-                        req.project_id,
-                        wb_user_id=req.wb_user_id,
-                        wb_run_id=req.wb_run_id,
-                    ))
+                    calls.append(
+                        span.to_call(
+                            req.project_id,
+                            wb_user_id=req.wb_user_id,
+                            wb_run_id=req.wb_run_id,
+                        )
+                    )
 
         obj_id_idx_map = defaultdict(list)
         for idx, (start_call, _) in enumerate(calls):
@@ -276,7 +280,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         seen_ids = set(obj_id_idx_map)
 
         # Build a query to see if op already exists
-        limit = len(calls) # Only use latest so this is upper bound for possible results
+        limit = len(
+            calls
+        )  # Only use latest so this is upper bound for possible results
         obj_version_filter = tsi.ObjectVersionFilter(
             object_ids=list(seen_ids),
             latest_only=True,
@@ -288,7 +294,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 project_id=req.project_id,
                 filter=obj_version_filter,
                 metadata_only=True,
-                limit=limit
+                limit=limit,
             ),
         ).objs
 
@@ -309,9 +315,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             )
             digest = self.file_create(source_file_req).digest
         else:
-            digest = bytes_digest((
-                object_creation_utils.PLACEHOLDER_OP_SOURCE
-            ).encode("utf-8"))
+            digest = bytes_digest(
+                (object_creation_utils.PLACEHOLDER_OP_SOURCE).encode("utf-8")
+            )
 
         for obj in existing_objects:
             op_ref_uri = ri.InternalOpRef(
@@ -329,14 +335,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         obj_creation_batch = []
         for op_obj_id in obj_id_idx_map.keys():
             op_val = object_creation_utils.build_op_val(digest)
-            obj_creation_batch.append(tsi.ObjSchemaForInsert(
-                project_id=req.project_id,
-                object_id=op_obj_id,
-                val=op_val,
-                wb_user_id=req.wb_user_id,
-            ))
+            obj_creation_batch.append(
+                tsi.ObjSchemaForInsert(
+                    project_id=req.project_id,
+                    object_id=op_obj_id,
+                    val=op_val,
+                    wb_user_id=req.wb_user_id,
+                )
+            )
         res = self.obj_create_batch(obj_creation_batch)
-
 
         for result in res:
             op_ref_uri = ri.InternalOpRef(
@@ -347,10 +354,14 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             for idx in obj_id_idx_map[result.object_id]:
                 calls[idx][0].op_name = op_ref_uri
 
-        batch = [item for start_call, end_call in calls for item in (
-            tsi.CallBatchStartMode(req=tsi.CallStartReq(start=start_call)),
-            tsi.CallBatchEndMode(req=tsi.CallEndReq(end=end_call)),
-        )]
+        batch = [
+            item
+            for start_call, end_call in calls
+            for item in (
+                tsi.CallBatchStartMode(req=tsi.CallStartReq(start=start_call)),
+                tsi.CallBatchEndMode(req=tsi.CallEndReq(end=end_call)),
+            )
+        ]
         # TODO: Actually populate the error fields if call_start_batch fails
         self.call_start_batch(tsi.CallCreateBatchReq(batch=batch))
 
@@ -4373,7 +4384,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         finally:
             self._thread_local.ch_client = original_client
             client.close()
-
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert_call_batch")
     def _insert_call_batch(self, batch: list) -> None:
