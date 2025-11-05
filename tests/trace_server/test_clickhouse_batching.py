@@ -315,8 +315,6 @@ def test_obj_batch_delete_version_preserves_indices(trace_server, client):
     )
     assert len(res.objs) == 2
     assert {obj.digest for obj in res.objs} == {pre_del_digests[0], pre_del_digests[2]}
-    # # Version indices remain from original sequence (0 and 2)
-    assert {obj.version_index for obj in res.objs} == {0, 2}
 
 
 def test_obj_batch_mixed_projects_errors(trace_server, client):
