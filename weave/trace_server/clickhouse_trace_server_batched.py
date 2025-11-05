@@ -237,7 +237,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if self._project_version_resolver is not None:
             return self._project_version_resolver
         # Pass a factory that returns the thread-local client
-        self._project_version_resolver = ProjectVersionResolver(
+        self._project_version_resolver = ProjectVersionResolver.get_global_instance(
             ch_client_factory=lambda: self.ch_client
         )
         return self._project_version_resolver

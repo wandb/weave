@@ -77,14 +77,15 @@ class ClickHouseProjectVersionProvider:
                 )
 
             if has_complete and has_merged:
-                raise ValueError(
-                    f"Project {project_id} has traces in both calls_complete and calls_merged!"
+                logger.warning(
+                    f"Project has traces in both calls_complete and calls_merged tables.",
+                    extra={"project_id": project_id},
                 )
 
-            if has_complete:
-                return ProjectVersion.CALLS_COMPLETE_VERSION
-            elif has_merged:
+            if has_merged:
                 return ProjectVersion.CALLS_MERGED_VERSION
+            elif has_complete:
+                return ProjectVersion.CALLS_COMPLETE_VERSION
 
         # No rows in either table - this is a new/empty project
         return ProjectVersion.EMPTY_PROJECT

@@ -8,6 +8,8 @@ from typing import Protocol
 logger = logging.getLogger(__name__)
 
 
+DEFAULT_PROJECT_VERSION_MODE = "auto"
+
 class ProjectVersion(IntEnum):
     """Represents the project version for table routing.
 
@@ -25,15 +27,14 @@ class ProjectVersion(IntEnum):
         >>> assert version == -1
     """
 
-    EMPTY_PROJECT = -1
     """No calls in either table - new project."""
+    EMPTY_PROJECT = -1
 
-    CALLS_MERGED_VERSION = 0
     """Legacy schema using calls_merged table."""
+    CALLS_MERGED_VERSION = 0
 
-    CALLS_COMPLETE_VERSION = 1
     """New schema using calls_complete table."""
-
+    CALLS_COMPLETE_VERSION = 1
 
 class ProjectVersionMode(str, Enum):
     """Modes for controlling project version resolution behavior.
@@ -52,7 +53,9 @@ class ProjectVersionMode(str, Enum):
     @classmethod
     def from_env(cls) -> "ProjectVersionMode":
         """Read project version mode from environment variable (defaults to AUTO)."""
-        mode_str = os.getenv("PROJECT_VERSION_MODE", "auto").lower()
+        mode_str = os.getenv(
+            "PROJECT_VERSION_MODE", DEFAULT_PROJECT_VERSION_MODE
+        ).lower()
         try:
             return cls(mode_str)
         except ValueError:

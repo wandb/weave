@@ -2,7 +2,8 @@
 
 import asyncio
 import logging
-from typing import Any, Callable
+import threading
+from typing import Any, Callable, Optional
 
 import ddtrace
 
@@ -16,6 +17,10 @@ from weave.trace_server.project_version.providers.memory_cache_provider import (
 from weave.trace_server.project_version.types import ProjectVersion, ProjectVersionMode
 
 logger = logging.getLogger(__name__)
+
+# Global singleton instance shared across all requests
+_global_resolver: Optional["ProjectVersionResolver"] = None
+_global_resolver_lock = threading.Lock()
 
 
 class ProjectVersionResolver:
@@ -56,6 +61,34 @@ class ProjectVersionResolver:
         )
         self._mode = ProjectVersionMode.from_env()
 
+    @classmethod
+    def get_global_instance(
+        cls,
+        ch_client_factory: Callable[[], Any],
+        cache_size: int = PER_REPLICA_CACHE_SIZE,
+    ) -> "ProjectVersionResolver":
+        """Get or create the global singleton resolver instance.
+
+        This ensures the cache is shared across all requests rather than being
+        per-request. The resolver is created once at application startup and
+        reused for all subsequent requests.
+
+        Args:
+            ch_client_factory: Callable that returns a ClickHouse client.
+            cache_size: Size of the in-memory cache (defaults to 10,000).
+
+        Returns:
+            The global singleton ProjectVersionResolver instance.
+        """
+        global _global_resolver
+        with _global_resolver_lock:
+            if _global_resolver is None:
+                _global_resolver = cls(
+                    ch_client_factory=ch_client_factory,
+                    cache_size=cache_size,
+                )
+        return _global_resolver
+
     def _apply_mode(
         self, resolved_version: ProjectVersion, is_write: bool
     ) -> ProjectVersion:
@@ -70,13 +103,21 @@ class ProjectVersionResolver:
 
     @ddtrace.tracer.wrap(name="project_version_resolver.resolve_version_sync")
     def _resolve_version_sync(self, project_id: str) -> ProjectVersion:
-        """Resolve version through provider chain synchronously."""
+        """Resolve version through provider chain synchronously.
+
+        TODO: Consider adding per-project locking to prevent thundering herd when
+        multiple concurrent requests for the same uncached project arrive. This would
+        ensure only the first request queries ClickHouse while others wait for the result.
+        """
         # Try cache first
         cached = self._cache.get(project_id)
         if cached is not None:
+            print(f":::ProjectVersion cache hit [{project_id}] >> {cached} <<")
             return cached
 
         version = self._clickhouse_provider.get_project_version_sync(project_id)
+
+        print(f":::ProjectVersion ch query [{project_id}] >> {version} <<")
 
         # Cache non-empty projects
         if version != ProjectVersion.EMPTY_PROJECT:
