@@ -67,7 +67,7 @@ stainless = [
   #    weave_server_sdk==0.0.1
 
   # TODO: Uncomment when ready to commit to the new bindings.
-  "weave_server_sdk @ git+https://github.com/wandb/weave-stainless.git@3e65c0a8e0adb642bbde81e64f03b333d9d57686",
+  "weave_server_sdk @ git+https://github.com/wandb/weave-stainless.git@2eccbc8564de85c88dbc4a3d98f821c01077714b",
 ]
 
 # `trace_server` is the dependency list of the trace server itself. We eventually will extract

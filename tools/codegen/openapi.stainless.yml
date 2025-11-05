@@ -169,6 +169,13 @@ resources:
     methods:
       stream_query: post /threads/stream_query
 
+  v2_ops:
+    methods:
+      create: post /{entity}/{project}/ops
+      list: get /{entity}/{project}/ops
+      read: get /{entity}/{project}/ops/{object_id}/versions/{digest}
+      delete: delete {entity}/{project}/ops/{object_id}
+
 settings:
   license: Apache-2.0
 
