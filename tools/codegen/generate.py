@@ -96,17 +96,37 @@ def get_openapi_spec(
         stderr=subprocess.PIPE,
     )
 
+    server_output_read = False
     try:
         if not _wait_for_server(f"http://localhost:{WEAVE_PORT}"):
             error("Server failed to start within timeout")
             server_out, server_err = server.communicate()
+            server_output_read = True
             error(f"Server output: {server_out.decode()}")
             error(f"Server error: {server_err.decode()}")
             sys.exit(1)
 
         info("Fetching OpenAPI spec...")
         response = httpx.get(f"http://localhost:{WEAVE_PORT}/openapi.json")
-        spec = response.json()
+
+        # Check if the request was successful
+        if not response.is_success:
+            error(
+                f"Failed to fetch OpenAPI spec: {response.status_code} {response.reason_phrase}"
+            )
+            error(f"Response body: {response.text}")
+            # Mark that we need to show server logs
+            server_output_read = False
+            sys.exit(1)
+
+        try:
+            spec = response.json()
+        except json.JSONDecodeError as e:
+            error(f"Failed to parse OpenAPI spec as JSON: {e}")
+            error(f"Response body: {response.text}")
+            # Mark that we need to show server logs
+            server_output_read = False
+            sys.exit(1)
 
         with open(output_file, "w") as f:
             json.dump(spec, f, indent=2)
@@ -116,13 +136,25 @@ def get_openapi_spec(
         # Try to cleanly shut down the server
         info("Shutting down server...")
         server.terminate()
-        server.wait(timeout=5)
-
-        # Force kill if server hasn't shut down
-        if server.poll() is None:
+        try:
+            server.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            # Force kill if server hasn't shut down
             warning("Force killing server...")
             server.kill()
             server.wait()
+
+        # If fetch failed and we haven't read server output yet, show logs for debugging
+        if not server_output_read and server.poll() is not None:
+            try:
+                server_out, server_err = server.communicate(timeout=1)
+                if server_out:
+                    error(f"Server stdout: {server_out.decode()}")
+                if server_err:
+                    error(f"Server stderr: {server_err.decode()}")
+            except (subprocess.TimeoutExpired, ValueError):
+                # Server logs already read or process still running
+                pass
 
 
 @app.command()
