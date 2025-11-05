@@ -12,7 +12,7 @@ from typing import Any
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.base64_content_conversion import AUTO_CONVERSION_MIN_SIZE
 from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
-from weave.trace_server.errors import ObjectDeletedError
+from weave.trace_server.errors import InvalidRequest, ObjectDeletedError
 from weave.trace_server.trace_server_interface_util import str_digest
 from weave.trace_server.errors import ObjectDeletedError
 import json
@@ -318,7 +318,7 @@ def test_obj_batch_delete_version_preserves_indices(trace_server):
             filter=tsi.ObjectVersionFilter(object_ids=[obj_id], latest_only=False),
         )
     )
-    pre_del_digests = [obj.digest for obj in res]
+    pre_del_digests = [obj.digest for obj in res.objs]
 
     # Delete the middle version
     del_digest = pre_del_digests[delete_idx]
@@ -340,11 +340,10 @@ def test_obj_batch_delete_version_preserves_indices(trace_server):
     )
     assert len(res.objs) == 2
     assert {obj.digest for obj in res.objs} == {pre_del_digests[0], pre_del_digests[2]}
-    # Version indices remain from original sequence (0 and 2)
+    # # Version indices remain from original sequence (0 and 2)
     assert {obj.version_index for obj in res.objs} == {0, 2}
 
 
-@pytest.mark.xfail(reason="Not yet enforced: mixed-project obj_create_batch should error")
 def test_obj_batch_mixed_projects_errors(trace_server):
     """Uploading objects to different projects in one batch should error."""
     server = trace_server._internal_trace_server
@@ -356,5 +355,5 @@ def test_obj_batch_mixed_projects_errors(trace_server):
         _mk_obj(pid2, "p2_obj", wb_user_id, {"b": 2}),
     ]
 
-    with pytest.raises(ValueError):
+    with pytest.raises(InvalidRequest):
         server.obj_create_batch(tsi.ObjCreateBatchReq(batch=batch))
