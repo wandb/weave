@@ -52,7 +52,7 @@ from typing import TYPE_CHECKING, Any, Optional, Union, get_args
 
 from pydantic import BaseModel
 
-from weave.trace_server.calls_query_builder.cte import CTE
+from weave.trace_server.calls_query_builder.cte import CTE, CTECollection
 from weave.trace_server.calls_query_builder.optimization_builder import (
     QueryOptimizationProcessor,
     apply_processor,
@@ -654,7 +654,7 @@ def build_object_ref_ctes(
     pb: "ParamBuilder",
     project_id: str,
     object_ref_conditions: list[ObjectRefCondition],
-) -> tuple[list[CTE], dict[str, str]]:
+) -> tuple[CTECollection, dict[str, str]]:
     """Build CTEs (Common Table Expressions) for object reference filtering and ordering.
 
     This function creates CTEs that check both object_versions and table_rows tables,
@@ -674,11 +674,11 @@ def build_object_ref_ctes(
         object_ref_conditions: List of object reference conditions to build CTEs for
 
     Returns:
-        - List of CTE objects
+        - CTECollection containing all object reference CTEs
         - Dictionary mapping field paths to CTE alias names
     """
     if not object_ref_conditions:
-        return [], {}
+        return CTECollection(), {}
 
     if len(object_ref_conditions) > MAX_CTES_PER_QUERY:
         raise ValueError(
@@ -687,7 +687,7 @@ def build_object_ref_ctes(
         )
 
     project_param = pb.add_param(project_id)
-    cte_list: list[CTE] = []
+    cte_collection = CTECollection()
     field_to_cte_alias_map: dict[str, str] = {}
     cte_counter = 0
 
@@ -744,7 +744,7 @@ def build_object_ref_ctes(
             val_dump_select,
             val_condition_sql,
         )
-        cte_list.append(CTE(name=leaf_cte_name, sql=leaf_cte_sql))
+        cte_collection.add_cte(leaf_cte_name, leaf_cte_sql)
         current_cte_name = leaf_cte_name
 
         intermediate_refs = condition.get_intermediate_object_refs()
@@ -763,15 +763,12 @@ def build_object_ref_ctes(
                 prop_json_path_param,
                 current_cte_name,
             )
-            cte_list.append(CTE(name=intermediate_cte_name, sql=intermediate_cte_sql))
+            cte_collection.add_cte(intermediate_cte_name, intermediate_cte_sql)
             current_cte_name = intermediate_cte_name
 
         field_to_cte_alias_map[condition.unique_key] = current_cte_name
 
-    if not cte_list:
-        return [], {}
-
-    return cte_list, field_to_cte_alias_map
+    return cte_collection, field_to_cte_alias_map
 
 
 def _build_leaf_cte_sql(

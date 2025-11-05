@@ -68,6 +68,9 @@ from weave.trace_server.trace_server_interface_util import (
 
 logger = logging.getLogger(__name__)
 
+CTE_FILTERED_CALLS = "filtered_calls"
+CTE_ALL_CALLS = "all_calls"
+
 
 class QueryBuilderField(BaseModel):
     field: str
@@ -786,17 +789,10 @@ class CallsQuery(BaseModel):
         for field in self.select_fields:
             select_query.select_fields.append(field)
 
-        # Build CTEs for object reference filtering and ordering
-        object_ref_cte_list, field_to_object_join_alias_map = build_object_ref_ctes(
+        ctes, field_to_object_join_alias_map = build_object_ref_ctes(
             pb, self.project_id, object_ref_conditions
         )
-        ctes = CTECollection()
 
-        # Add object reference CTEs to collection
-        for cte in object_ref_cte_list:
-            ctes.add_cte(cte.name, cte.sql)
-
-        # Query conditions and filter
         for condition in self.query_conditions:
             filter_query.query_conditions.append(condition)
 
@@ -809,25 +805,27 @@ class CallsQuery(BaseModel):
         # SUPER IMPORTANT: still need to re-sort the final query
         select_query.order_fields = self.order_fields
 
-        # Add filtered_calls CTE
         filtered_calls_sql = filter_query._as_sql_base_format(
             pb,
             table_alias,
             field_to_object_join_alias_map=field_to_object_join_alias_map,
             expand_columns=self.expand_columns,
         )
-        ctes.add_cte("filtered_calls", filtered_calls_sql)
+        ctes.add_cte(CTE_FILTERED_CALLS, filtered_calls_sql)
 
-        base_sql = self._build_base_select_sql(
-            select_query, pb, table_alias, field_to_object_join_alias_map
+        base_sql = select_query._as_sql_base_format(
+            pb,
+            table_alias,
+            id_subquery_name=CTE_FILTERED_CALLS,
+            field_to_object_join_alias_map=field_to_object_join_alias_map,
+            expand_columns=self.expand_columns,
         )
 
         if not self.include_costs:
             raw_sql = ctes.to_sql() + "\n" + base_sql
             return safely_format_sql(raw_sql, logger)
 
-        # Do cost CTE handling
-        ctes.add_cte("all_calls", base_sql)
+        ctes.add_cte(CTE_ALL_CALLS, base_sql)
         self._add_cost_ctes_to_builder(ctes, pb)
 
         order_by_fields = self._convert_to_orm_sort_fields()
@@ -837,23 +835,8 @@ class CallsQuery(BaseModel):
         raw_sql = ctes.to_sql() + "\n" + final_select
         return safely_format_sql(raw_sql, logger)
 
-    def _build_base_select_sql(
-        self,
-        select_query: "CallsQuery",
-        pb: ParamBuilder,
-        table_alias: str,
-        field_to_object_join_alias_map: dict[str, str],
-    ) -> str:
-        return select_query._as_sql_base_format(
-            pb,
-            table_alias,
-            id_subquery_name="filtered_calls",
-            field_to_object_join_alias_map=field_to_object_join_alias_map,
-            expand_columns=self.expand_columns,
-        )
-
     def _add_cost_ctes_to_builder(self, ctes: CTECollection, pb: ParamBuilder) -> None:
-        cost_cte_list = build_cost_ctes(pb, "all_calls", self.project_id)
+        cost_cte_list = build_cost_ctes(pb, CTE_ALL_CALLS, self.project_id)
         for cte in cost_cte_list:
             ctes.add_cte(cte.name, cte.sql)
 
@@ -927,22 +910,21 @@ class CallsQuery(BaseModel):
                         f.field for f in condition._consumed_fields
                     )
 
-        # Build optimization conditions (sortable_datetime, heavy_filter)
         optimization_conditions = process_query_to_optimization_sql(
             non_object_ref_conditions, pb, table_alias
         )
-
-        # Build object refs filter
+        sortable_datetime = optimization_conditions.sortable_datetime_filters_sql or ""
+        heavy_filter = optimization_conditions.heavy_filter_opt_sql or ""
+        
         object_refs = process_object_refs_filter_to_opt_sql(
             pb, table_alias, object_ref_fields_consumed
         )
 
-        # Build id_subquery filter
         id_subquery = ""
         if id_subquery_name is not None:
             id_subquery = f"AND (calls_merged.id IN {id_subquery_name})"
 
-        # Build id_mask - special optimization for call_ids filter
+        # special optimization for call_ids filter
         id_mask = ""
         if self.hardcoded_filter and self.hardcoded_filter.filter.call_ids:
             id_mask = f"AND (calls_merged.id IN {param_slot(pb.add_param(self.hardcoded_filter.filter.call_ids), 'Array(String)')})"
@@ -959,9 +941,8 @@ class CallsQuery(BaseModel):
             trace_roots_only=trace_roots_only,
             parent_ids=parent_ids,
             object_refs=object_refs,
-            sortable_datetime=optimization_conditions.sortable_datetime_filters_sql
-            or "",
-            heavy_filter=optimization_conditions.heavy_filter_opt_sql or "",
+            sortable_datetime=sortable_datetime,
+            heavy_filter=heavy_filter,
         )
 
     def _build_joins(
@@ -1158,32 +1139,21 @@ class CallsQuery(BaseModel):
         Returns:
             Complete SQL query string
         """
-        # Build SELECT fields
         select_fields_sql = ", ".join(
             field.as_select_sql(pb, table_alias) for field in self.select_fields
         )
-
-        # Build HAVING clause first to add its parameters in correct order
         having_filter_sql, needs_feedback_having = self._build_having_clause(
             pb, table_alias, expand_columns, field_to_object_join_alias_map
         )
-
-        # Build WHERE clause optimizations after HAVING
         where_filters = self._build_where_clause_optimizations(
             pb, table_alias, expand_columns, id_subquery_name
         )
-
-        # Build ORDER BY, LIMIT, OFFSET
         order_by_sql, limit_sql, offset_sql, needs_feedback_order = (
             self._build_order_limit_offset(
                 pb, table_alias, expand_columns, field_to_object_join_alias_map
             )
         )
-
-        # Set up project parameter after other parameters
         project_param = pb.add_param(self.project_id)
-
-        # Build all JOINs
         joins = self._build_joins(
             pb,
             table_alias,
@@ -1193,7 +1163,7 @@ class CallsQuery(BaseModel):
             field_to_object_join_alias_map=field_to_object_join_alias_map,
         )
 
-        # Assemble the final SQL query
+        # Assemble the actual SQL query
         raw_sql = f"""
         SELECT {select_fields_sql}
         FROM calls_merged
