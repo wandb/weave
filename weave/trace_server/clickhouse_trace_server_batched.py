@@ -4854,7 +4854,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             try:
                 if len(self._call_batch) == 0:
                     return
-                project_id = self._call_batch[0][0]
+                project_id_idx = ALL_CALL_INSERT_COLUMNS.index("project_id")
+                project_id = self._call_batch[0][project_id_idx]
                 self.project_version_resolver.get_project_version_sync(project_id)
             except Exception as e:
                 logger.warning(f"Error getting project version: {e}")
