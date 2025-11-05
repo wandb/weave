@@ -287,6 +287,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         calls: list[
             tuple[tsi.StartedCallSchemaForInsert, tsi.EndedCallSchemaForInsert]
         ] = []
+        complete_calls: list[tsi.CompleteCallSchemaForInsert] = []
         rejected_spans = 0
         error_messages: list[str] = []
 
@@ -321,6 +322,17 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                             wb_run_id=req.wb_run_id,
                         )
                     )
+
+                    # Also create complete call for shadow write
+                    try:
+                        complete_call = span.to_complete_call(
+                            req.project_id,
+                            wb_user_id=req.wb_user_id,
+                        )
+                        complete_calls.append(complete_call)
+                    except Exception:
+                        # If complete call conversion fails, skip it but don't fail the whole batch
+                        pass
 
         obj_id_idx_map = defaultdict(list)
         for idx, (start_call, _) in enumerate(calls):
@@ -390,6 +402,20 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # TODO: Actually populate the error fields if call_start_batch fails
         self.call_start_batch(tsi.CallCreateBatchReq(batch=batch))
 
+        # Shadow write to calls_complete table for OTEL exports
+        if complete_calls:
+            try:
+                # Convert to ClickHouse insertables
+                ch_complete_calls = [
+                    _complete_call_to_v2_ch_insertable(call) for call in complete_calls
+                ]
+                # Insert into calls_complete table
+                self._v2_insert_calls_complete_batch(req.project_id, ch_complete_calls)
+            except Exception:
+                # If shadow write fails, log but don't fail the request
+                # The primary write to call_parts has already succeeded
+                logger.exception("Error creating complete call for shadow write")
+    
         if rejected_spans > 0:
             # Join the first 20 errors and return them delimited by ';'
             joined_errors = "; ".join(error_messages[:20]) + (

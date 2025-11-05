@@ -281,12 +281,30 @@ class Span:
             }
         )
 
-    def to_call(
+    def _extract_call_data(
         self,
-        project_id: str,
-        wb_user_id: Optional[str] = None,
-        wb_run_id: Optional[str] = None,
-    ) -> tuple[tsi.StartedCallSchemaForInsert, tsi.EndedCallSchemaForInsert]:
+    ) -> tuple[
+        dict[str, Any],  # inputs
+        Any,  # outputs (can be dict, str, int, bytes)
+        dict[str, Any],  # attributes
+        str,  # op_name
+        Optional[str],  # display_name
+        datetime.datetime,  # start_time
+        datetime.datetime,  # end_time
+        tsi.SummaryMap,  # summary_map
+        Optional[str],  # exception_msg
+        Optional[str],  # turn_id
+        Optional[str],  # thread_id
+        dict[str, Any],  # otel_span_data
+    ]:
+        """Extract common data from span for call conversion.
+
+        This is a helper method to avoid duplication between to_call() and
+        to_complete_call() methods.
+
+        Returns:
+            Tuple containing all the processed data needed to create call schemas.
+        """
         events = [SpanEvent(e.as_dict()) for e in self.events]
         usage = get_weave_usage(self.attributes) or {}
 
@@ -359,20 +377,6 @@ class Span:
         else:
             turn_id = None
 
-        ### START HACK
-        # If wb_run_id is defined here - then it came in from the headers
-        # If it contains a '/' then it is a malformed conversion in adapting layer
-        # If it doesn't contain a ':' while this is defined from headers it is a malformed conversion in adapting layer
-        # If it does contain a ':' while this is not defined and the attribute field is defined, again we have a malformed value
-        if not wb_run_id:  # headers not defined
-            attr_wb_run_id = wandb_attributes.get("wb_run_id") or None
-            if attr_wb_run_id and not ("/" in attr_wb_run_id or ":" in attr_wb_run_id):
-                wb_run_id = f"{project_id}:{attr_wb_run_id}"
-        ### END HACK
-
-        wb_run_step = wandb_attributes.get("wb_run_step") or None
-        wb_run_step_end = wandb_attributes.get("wb_run_step_end") or None
-
         if display_name and len(display_name) >= MAX_DISPLAY_NAME_LENGTH:
             display_name = shorten_name(display_name, MAX_DISPLAY_NAME_LENGTH)
 
@@ -396,6 +400,63 @@ class Span:
         usage_key = model or "usage"
 
         summary_map = tsi.SummaryMap(weave=weave_summary, usage={usage_key: llm_usage})
+
+        exception_msg = (
+            self.status.message if self.status.code == StatusCode.ERROR else None
+        )
+
+        return (
+            inputs,
+            outputs,
+            attributes,
+            op_name,
+            display_name,
+            start_time,
+            end_time,
+            summary_map,
+            exception_msg,
+            turn_id,
+            thread_id,
+            otel_span_data,
+        )
+
+    def to_call(
+        self,
+        project_id: str,
+        wb_user_id: Optional[str] = None,
+        wb_run_id: Optional[str] = None,
+    ) -> tuple[tsi.StartedCallSchemaForInsert, tsi.EndedCallSchemaForInsert]:
+        (
+            inputs,
+            outputs,
+            attributes,
+            op_name,
+            display_name,
+            start_time,
+            end_time,
+            summary_map,
+            exception_msg,
+            turn_id,
+            thread_id,
+            otel_span_data,
+        ) = self._extract_call_data()
+
+        wandb_attributes = get_wandb_attributes(self.attributes) or {}
+
+        ### START HACK
+        # If wb_run_id is defined here - then it came in from the headers
+        # If it contains a '/' then it is a malformed conversion in adapting layer
+        # If it doesn't contain a ':' while this is defined from headers it is a malformed conversion in adapting layer
+        # If it does contain a ':' while this is not defined and the attribute field is defined, again we have a malformed value
+        if not wb_run_id:  # headers not defined
+            attr_wb_run_id = wandb_attributes.get("wb_run_id") or None
+            if attr_wb_run_id and not ("/" in attr_wb_run_id or ":" in attr_wb_run_id):
+                wb_run_id = f"{project_id}:{attr_wb_run_id}"
+        ### END HACK
+
+        wb_run_step = wandb_attributes.get("wb_run_step") or None
+        wb_run_step_end = wandb_attributes.get("wb_run_step_end") or None
+
         start_call = tsi.StartedCallSchemaForInsert(
             project_id=project_id,
             id=self.span_id,
@@ -414,10 +475,6 @@ class Span:
             thread_id=thread_id,
         )
 
-        exception_msg = (
-            self.status.message if self.status.code == StatusCode.ERROR else None
-        )
-
         end_call = tsi.EndedCallSchemaForInsert(
             project_id=project_id,
             id=self.span_id,
@@ -428,6 +485,62 @@ class Span:
             wb_run_step_end=wb_run_step_end,
         )
         return (start_call, end_call)
+
+    def to_complete_call(
+        self, project_id: str, wb_user_id: Optional[str] = None
+    ) -> tsi.CompleteCallSchemaForInsert:
+        """Convert the span to a CompleteCallSchemaForInsert.
+
+        This is a convenience method that creates a complete call object directly,
+        rather than separate start and end objects. It's primarily used for OTEL
+        span ingestion where we always have both start and end data.
+
+        Args:
+            project_id (str): The project ID for the call.
+            wb_user_id (Optional[str]): The W&B user ID.
+
+        Returns:
+            tsi.CompleteCallSchemaForInsert: A complete call schema ready for insertion.
+
+        Examples:
+            >>> span = Span.from_proto(proto_span, resource)
+            >>> complete_call = span.to_complete_call("project_123")
+        """
+        (
+            inputs,
+            outputs,
+            attributes,
+            op_name,
+            display_name,
+            start_time,
+            end_time,
+            summary_map,
+            exception_msg,
+            turn_id,
+            thread_id,
+            otel_span_data,
+        ) = self._extract_call_data()
+
+        return tsi.CompleteCallSchemaForInsert(
+            project_id=project_id,
+            id=self.span_id,
+            op_name=op_name,
+            trace_id=self.trace_id,
+            parent_id=self.parent_id,
+            started_at=start_time,
+            ended_at=end_time,
+            attributes=attributes,
+            inputs=inputs,
+            output=outputs,
+            exception=exception_msg,
+            summary=summary_map,
+            display_name=display_name,
+            wb_user_id=wb_user_id,
+            wb_run_id=None,
+            turn_id=turn_id,
+            thread_id=thread_id,
+            otel_dump=otel_span_data,
+        )
 
 
 @dataclass

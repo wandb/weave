@@ -42,14 +42,16 @@ class ProjectVersionMode(str, Enum):
     """Modes for controlling project version resolution behavior.
 
     AUTO: Default behavior - uses table to determine project version.
-    CALLS_MERGED: Forces all reads/writes to calls_merged table (queries DB for perf measurement).
+    CALLS_MERGED: Forces all reads/writes to calls_merged table.
     CALLS_MERGED_READ: Forces reads to calls_merged table, writes use determined version.
+    CALLS_COMPLETE_READ: Forces reads to calls_complete table, writes use determined version.
     OFF: Skips DB queries entirely, returns CALLS_MERGED_VERSION immediately.
     """
 
     AUTO = "auto"
     CALLS_MERGED = "calls_merged"
     CALLS_MERGED_READ = "calls_merged_read"
+    CALLS_COMPLETE_READ = "calls_complete_read"
     OFF = "off"
 
     @classmethod

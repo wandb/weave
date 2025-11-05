@@ -89,6 +89,14 @@ class ProjectVersionResolver:
                 )
         return _global_resolver
 
+    def do_OTEL_shadow_write(self) -> bool:
+        """Determine if OTEL shadow write should be performed.
+
+        Returns:
+            True if OTEL shadow write should be performed, False otherwise.
+        """
+        return self._mode != ProjectVersionMode.OFF
+
     def _apply_mode(
         self, resolved_version: ProjectVersion, is_write: bool
     ) -> ProjectVersion:
@@ -152,6 +160,9 @@ class ProjectVersionResolver:
         if self._mode == ProjectVersionMode.CALLS_MERGED_READ and not is_write:
             return ProjectVersion.CALLS_MERGED_VERSION
 
+        if self._mode == ProjectVersionMode.CALLS_COMPLETE_READ and not is_write:
+            return ProjectVersion.CALLS_COMPLETE_VERSION
+
         version = self._resolve_version_sync(project_id)
         return self._apply_mode(version, is_write)
 
@@ -179,6 +190,9 @@ class ProjectVersionResolver:
 
         if self._mode == ProjectVersionMode.CALLS_MERGED_READ and not is_write:
             return ProjectVersion.CALLS_MERGED_VERSION
+
+        if self._mode == ProjectVersionMode.CALLS_COMPLETE_READ and not is_write:
+            return ProjectVersion.CALLS_COMPLETE_VERSION
 
         # Since we don't have an async ClickHouse client, we need to run
         # the sync version in a thread to avoid blocking the event loop
