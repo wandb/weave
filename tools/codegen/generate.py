@@ -135,6 +135,10 @@ class Logger:
         """Log an error message."""
         self._log(LogLevel.ERROR, message, self.current_stage)
 
+    def exception(self, message: str) -> None:
+        """Log an exception message (same as error but semantically indicates exception handling)."""
+        self._log(LogLevel.ERROR, message, self.current_stage)
+
     def debug_log(self, message: str) -> None:
         """Log a debug message (only if debug mode is enabled)."""
         if self.debug:
@@ -327,8 +331,8 @@ def get_openapi_spec(
             spec = response.json()
             logger.debug_log(f"Successfully parsed JSON (size: {len(str(spec))} chars)")
         except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse OpenAPI spec as JSON: {e}")
-            logger.error(f"Response body: {response.text}")
+            logger.exception("Failed to parse OpenAPI spec as JSON")
+            logger.exception(f"Response body: {response.text}")
             monitor.log_output_on_error()
             sys.exit(1)
 
@@ -444,10 +448,12 @@ def generate_code(
         subprocess.run(cmd, check=True, timeout=SUBPROCESS_TIMEOUT)
         logger.info("Code generation completed successfully")
     except subprocess.CalledProcessError as e:
-        logger.error(f"Code generation failed with exit code {e.returncode}")
+        logger.exception(f"Code generation failed with exit code {e.returncode}")
         sys.exit(1)
     except subprocess.TimeoutExpired:
-        logger.error(f"Code generation timed out after {SUBPROCESS_TIMEOUT} seconds")
+        logger.exception(
+            f"Code generation timed out after {SUBPROCESS_TIMEOUT} seconds"
+        )
         sys.exit(1)
 
 
@@ -460,26 +466,39 @@ def update_pyproject(
     release: Annotated[
         bool, Option("--release", help="Update to the latest version")
     ] = False,
+    verbose: Annotated[
+        bool, Option("--verbose", "-v", help="Enable verbose output")
+    ] = False,
+    debug: Annotated[
+        bool, Option("--debug", "-d", help="Enable debug output (includes verbose)")
+    ] = False,
 ) -> None:
     """Update the pyproject.toml file with the latest version of the generated code.
 
     This command updates the dependency for the given package in pyproject.toml to either a specific version
     (if --release is specified) or a git SHA reference.
     """
-    header("Updating pyproject.toml")
+    logger = get_logger()
+    logger.verbose = verbose
+    logger.debug = debug or verbose
+
+    logger.set_stage(Stage.PYPROJECT_UPDATE)
+    logger.header("Updating pyproject.toml")
     if release:
-        version = _get_package_version(python_output)
+        version = _get_package_version(python_output, logger)
         _update_pyproject_toml(package_name, version, True)
-        info(f"Updated {package_name} in [stainless] extra to version: {version}")
+        logger.info(
+            f"Updated {package_name} in [stainless] extra to version: {version}"
+        )
     else:
-        repo_info = _get_repo_info(python_output)
+        repo_info = _get_repo_info(python_output, logger)
         remote_url = repo_info.remote_url
         sha = repo_info.sha
         if not sha:
-            error(f"Failed to get git SHA (got: {sha=})")
+            logger.error(f"Failed to get git SHA (got: {sha=})")
             sys.exit(1)
         _update_pyproject_toml(package_name, f"{remote_url}@{sha}", False)
-        info(f"Updated {package_name} in [stainless] extra to SHA: {sha}")
+        logger.info(f"Updated {package_name} in [stainless] extra to SHA: {sha}")
 
 
 @app.command()
@@ -490,6 +509,12 @@ def merge_generated_code(
     package_name: Annotated[
         str, typer.Argument(help="Name of the package to update in pyproject.toml")
     ],
+    verbose: Annotated[
+        bool, Option("--verbose", "-v", help="Enable verbose output")
+    ] = False,
+    debug: Annotated[
+        bool, Option("--debug", "-d", help="Enable debug output (includes verbose)")
+    ] = False,
 ) -> None:
     """Create a branch from main with the generated code and update pyproject.toml.
 
@@ -503,7 +528,12 @@ def merge_generated_code(
 
     Note: This does NOT merge to main directly - it creates a feature branch.
     """
-    header("Creating branch with generated code")
+    logger = get_logger()
+    logger.verbose = verbose
+    logger.debug = debug or verbose
+
+    logger.set_stage(Stage.GIT_OPERATIONS)
+    logger.header("Creating branch with generated code")
 
     # Get current branch name in weave repo
     try:
@@ -514,31 +544,33 @@ def merge_generated_code(
             timeout=SUBPROCESS_TIMEOUT,
             check=True,
         ).stdout.strip()
-        info(f"Current weave branch: {current_branch}")
+        logger.info(f"Current weave branch: {current_branch}")
     except subprocess.CalledProcessError as e:
-        error(f"Failed to get current branch: {e}")
+        logger.exception("Failed to get current branch")
         sys.exit(1)
     except subprocess.TimeoutExpired:
-        error("Timeout while getting current branch")
+        logger.exception("Timeout while getting current branch")
         sys.exit(1)
 
     # Navigate to weave-stainless repo
     if not python_output.exists():
-        print(f"python_output: {python_output}")
+        logger.debug_log(f"python_output: {python_output}")
         # List contents of python_output directory for debugging
-        info(f"Listing contents of parent directory: {python_output.parent}")
+        logger.info(f"Listing contents of parent directory: {python_output.parent}")
         try:
             for item in python_output.parent.iterdir():
-                info(f"  {item.name} ({'dir' if item.is_dir() else 'file'})")
+                logger.debug_log(
+                    f"  {item.name} ({'dir' if item.is_dir() else 'file'})"
+                )
         except Exception as e:
-            warning(f"Could not list parent directory: {e}")
-        error(f"Python output directory does not exist: {python_output}")
+            logger.warning("Could not list parent directory")
+        logger.error(f"Python output directory does not exist: {python_output}")
         sys.exit(1)
 
     try:
         # The generated code is on the local main branch after stainless generation
         # We need to create a branch from this main that has the generated code
-        info("Checking current branch in weave-stainless...")
+        logger.info("Checking current branch in weave-stainless...")
         current_stainless_branch = subprocess.run(
             ["git", "rev-parse", "--abbrev-ref", "HEAD"],
             cwd=python_output,
@@ -547,11 +579,11 @@ def merge_generated_code(
             timeout=SUBPROCESS_TIMEOUT,
             check=True,
         ).stdout.strip()
-        info(f"Currently on branch: {current_stainless_branch}")
+        logger.info(f"Currently on branch: {current_stainless_branch}")
 
         # Ensure we're on main which should have the generated code
         if current_stainless_branch != "main":
-            info("Switching to main branch (which has generated code)...")
+            logger.info("Switching to main branch (which has generated code)...")
             subprocess.run(
                 ["git", "checkout", "main"],
                 cwd=python_output,
@@ -565,7 +597,7 @@ def merge_generated_code(
 
         # Create branch from main (with generated code) matching weave branch
         mirror_branch = f"weave/{current_branch}"
-        info(f"Creating branch from main (with generated code): {mirror_branch}")
+        logger.info(f"Creating branch from main (with generated code): {mirror_branch}")
 
         # Check if branch exists
         branch_exists = (
@@ -580,7 +612,7 @@ def merge_generated_code(
 
         if branch_exists:
             # Delete the existing branch first so we can recreate it from origin/main
-            info(
+            logger.info(
                 f"Deleting existing branch {mirror_branch} to recreate with new generated code..."
             )
             subprocess.run(
@@ -592,7 +624,9 @@ def merge_generated_code(
             )
 
         # Create new branch from ORIGIN/main (clean remote state)
-        info(f"Creating new branch {mirror_branch} from origin/main (clean base)...")
+        logger.info(
+            f"Creating new branch {mirror_branch} from origin/main (clean base)..."
+        )
         subprocess.run(
             ["git", "checkout", "-b", mirror_branch, "origin/main"],
             cwd=python_output,
@@ -602,7 +636,7 @@ def merge_generated_code(
         )
 
         # Now checkout the generated code from LOCAL main into this branch
-        info("Applying generated code from local main branch...")
+        logger.info("Applying generated code from local main branch...")
         subprocess.run(
             ["git", "checkout", "main", "--", "."],
             cwd=python_output,
@@ -623,7 +657,7 @@ def merge_generated_code(
 
         if status_result.stdout.strip():
             # Stage all changes
-            info("Staging changes...")
+            logger.info("Staging changes...")
             subprocess.run(
                 ["git", "add", "."],
                 cwd=python_output,
@@ -636,7 +670,7 @@ def merge_generated_code(
             commit_message = (
                 f"Update generated code from weave branch: {current_branch}"
             )
-            info(f"Committing: {commit_message}")
+            logger.info(f"Committing: {commit_message}")
             subprocess.run(
                 ["git", "commit", "-m", commit_message],
                 cwd=python_output,
@@ -646,7 +680,7 @@ def merge_generated_code(
             )
 
             # Push the branch
-            info(f"Pushing branch {mirror_branch}...")
+            logger.info(f"Pushing branch {mirror_branch}...")
             subprocess.run(
                 ["git", "push", "origin", mirror_branch],
                 cwd=python_output,
@@ -655,27 +689,31 @@ def merge_generated_code(
                 check=True,
             )
         else:
-            info("No changes to commit (generated code may already be on origin/main)")
+            logger.info(
+                "No changes to commit (generated code may already be on origin/main)"
+            )
 
         # Always update pyproject.toml with the current SHA, whether we committed or not
         # Get the current SHA of the branch
-        repo_info = _get_repo_info(python_output)
+        repo_info = _get_repo_info(python_output, logger)
         sha = repo_info.sha
         remote_url = repo_info.remote_url
 
         # Update pyproject.toml with the SHA
-        info(f"Updating pyproject.toml [stainless] extra with SHA: {sha}")
+        logger.info(f"Updating pyproject.toml [stainless] extra with SHA: {sha}")
         _update_pyproject_toml(package_name, f"{remote_url}@{sha}", False)
 
-        info(f"Successfully updated {package_name} in [stainless] extra to SHA: {sha}")
+        logger.info(
+            f"Successfully updated {package_name} in [stainless] extra to SHA: {sha}"
+        )
 
     except subprocess.CalledProcessError as e:
-        error(f"Git operation failed: {e}")
+        logger.exception("Git operation failed")
         if e.stderr:
-            error(f"Error output: {e.stderr}")
+            logger.exception(f"Error output: {e.stderr}")
         sys.exit(1)
     except subprocess.TimeoutExpired:
-        error("Git operation timed out")
+        logger.exception("Git operation timed out")
         sys.exit(1)
 
 
@@ -907,10 +945,10 @@ def _kill_port(port: int, logger: Logger | None = None) -> bool:
             check=False,
         )
     except subprocess.TimeoutExpired:
-        logger.error(f"Timeout while finding processes on port {port}")
+        logger.exception(f"Timeout while finding processes on port {port}")
         return False
     except Exception as e:
-        logger.error(f"Unexpected error finding processes on port {port}: {e}")
+        logger.exception(f"Unexpected error finding processes on port {port}")
         return False
 
     if result.returncode != 0 or not result.stdout.strip():
@@ -938,9 +976,9 @@ def _kill_port(port: int, logger: Logger | None = None) -> bool:
         except subprocess.TimeoutExpired:
             logger.warning(f"Timeout while killing process {pid}")
         except subprocess.CalledProcessError as e:
-            logger.warning(f"Failed to kill process {pid}: {e}")
+            logger.warning(f"Failed to kill process {pid}")
         except Exception as e:
-            logger.warning(f"Unexpected error killing process {pid}: {e}")
+            logger.warning(f"Unexpected error killing process {pid}")
 
     return killed_any
 
@@ -989,12 +1027,15 @@ class RepoInfo:
     remote_url: str
 
 
-def _get_repo_info(python_output: Path) -> RepoInfo:
+def _get_repo_info(python_output: Path, logger: Logger | None = None) -> RepoInfo:
     """Retrieve the latest git commit SHA and remote URL for the repository.
 
     Executes git commands in the specified repository path to obtain repository metadata.
     """
-    info(f"Getting SHA for {python_output}")
+    if logger is None:
+        logger = get_logger()
+
+    logger.debug_log(f"Getting SHA for {python_output}")
     try:
         sha = subprocess.run(
             ["git", "rev-parse", "HEAD"],
@@ -1011,18 +1052,25 @@ def _get_repo_info(python_output: Path) -> RepoInfo:
             text=True,
             timeout=SUBPROCESS_TIMEOUT,
         ).stdout.strip()
+        logger.debug_log(f"Got SHA: {sha[:8]}... from {remote_url}")
     except subprocess.TimeoutExpired:
-        error("Timeout while getting git repository information")
+        logger.exception("Timeout while getting git repository information")
         sys.exit(1)
     else:
         return RepoInfo(sha=sha, remote_url=remote_url)
 
 
-def _get_package_version(python_output: Path) -> str:
+def _get_package_version(python_output: Path, logger: Logger | None = None) -> str:
     """Extract the package version from the pyproject.toml file located in the repository."""
+    if logger is None:
+        logger = get_logger()
+
+    logger.debug_log(f"Reading package version from {python_output / 'pyproject.toml'}")
     with open(python_output / "pyproject.toml") as f:
         doc = tomlkit.parse(f.read())
-    return doc["project"]["version"]
+    version = doc["project"]["version"]
+    logger.debug_log(f"Found version: {version}")
+    return version
 
 
 def _update_pyproject_toml(
@@ -1073,12 +1121,22 @@ def _update_pyproject_toml(
         dependencies = doc["project"]["dependencies"]
 
     # Update the package dependency
+    found = False
     for i, dep in enumerate(dependencies):
         if dep.startswith(package):
             if is_version:
                 dependencies[i] = f"{package}=={value}"
             else:
                 dependencies[i] = f"{package} @ git+{value}"
+            found = True
+            break
+
+    # If package wasn't found, add it
+    if not found:
+        if is_version:
+            dependencies.append(f"{package}=={value}")
+        else:
+            dependencies.append(f"{package} @ git+{value}")
 
     # Handle [tool.hatch.metadata] section
     if is_version:
@@ -1172,10 +1230,10 @@ def _load_config(
         logger.info(f"Loaded config from {config_path}")
         logger.debug_log(f"Config contents: {cfg}")
     except yaml.YAMLError as e:
-        logger.error(f"Failed to parse config file: {e}")
+        logger.exception("Failed to parse config file")
         sys.exit(1)
     except OSError as e:
-        logger.error(f"Failed to read config file: {e}")
+        logger.exception("Failed to read config file")
         sys.exit(1)
     else:
         return cfg
