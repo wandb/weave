@@ -554,7 +554,8 @@ class ObjCreateReq(BaseModelStrict):
 
 
 class ObjCreateRes(BaseModel):
-    digest: str  #
+    digest: str
+    object_id: str
 
 
 class ObjReadReq(BaseModelStrict):
