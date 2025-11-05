@@ -22,6 +22,9 @@ from weave.trace_server.trace_server_interface import (
 )
 from weave.type_wrappers.Content.content import Content
 
+# Test data size larger than AUTO_CONVERSION_MIN_SIZE to trigger conversion
+LARGE_TEST_DATA_SIZE = AUTO_CONVERSION_MIN_SIZE + 10
+
 
 class TestBase64AndDataURIDetection:
     """Test detection heuristics for data URIs only (raw base64 no longer auto-encoded)."""
@@ -106,8 +109,7 @@ class TestBase64Replacement:
             ]
         )
 
-        # Use data larger than AUTO_CONVERSION_MIN_SIZE to trigger conversion
-        test_data = b"a" * (AUTO_CONVERSION_MIN_SIZE + 10)
+        test_data = b"a" * LARGE_TEST_DATA_SIZE
         b64_data = base64.b64encode(test_data).decode("ascii")
 
         input_data = {
@@ -147,8 +149,7 @@ class TestBase64Replacement:
             ]
         )
 
-        # Use data larger than AUTO_CONVERSION_MIN_SIZE to trigger conversion
-        test_data = b"a" * (AUTO_CONVERSION_MIN_SIZE + 10)
+        test_data = b"a" * LARGE_TEST_DATA_SIZE
         b64_data = base64.b64encode(test_data).decode("ascii")
 
         input_data = [
@@ -183,8 +184,7 @@ class TestBase64Replacement:
             ]
         )
 
-        # Use data larger than AUTO_CONVERSION_MIN_SIZE to trigger conversion
-        test_data = b"x" * (AUTO_CONVERSION_MIN_SIZE + 10)
+        test_data = b"x" * LARGE_TEST_DATA_SIZE
         b64_data = base64.b64encode(test_data).decode("ascii")
 
         # Start request with data URI in inputs
@@ -206,8 +206,7 @@ class TestBase64Replacement:
         assert isinstance(processed_start.start.inputs["image"], dict)
         assert processed_start.start.inputs["image"]["_type"] == "CustomWeaveType"
 
-        # End request with standalone base64 in output should NOT be replaced
-        long_bytes = b"y" * (AUTO_CONVERSION_MIN_SIZE + 10)
+        long_bytes = b"y" * LARGE_TEST_DATA_SIZE
         long_b64 = base64.b64encode(long_bytes).decode("ascii")
         end_req = CallEndReq(
             end=EndedCallSchemaForInsert(
