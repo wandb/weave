@@ -276,7 +276,9 @@ REQUIRED_CALL_COLUMNS = ["id", "project_id", "trace_id", "op_name", "started_at"
 
 # V2 table column lists
 V2_CALL_STARTS_INSERT_COLUMNS = sorted(V2CallStartCHInsertable.model_fields.keys())
-V2_CALLS_COMPLETE_INSERT_COLUMNS = sorted(V2CallCompleteCHInsertable.model_fields.keys())
+V2_CALLS_COMPLETE_INSERT_COLUMNS = sorted(
+    V2CallCompleteCHInsertable.model_fields.keys()
+)
 
 # Columns in the calls_merged table with special aggregation functions:
 CALL_SELECT_RAW_COLUMNS = ["id", "project_id"]  # no aggregation

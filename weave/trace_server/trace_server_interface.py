@@ -333,31 +333,23 @@ class CallEndRes(BaseModel):
 
 
 # V2 batch endpoints for call_starts and calls_complete tables (hidden from users)
-class CallsStartBatchReq(BaseModelStrict):
-    """Request for batch starting calls (writes to call_starts table)."""
+class CallsUpsertBatchV2Req(BaseModelStrict):
+    """Request for batch upserting calls (writes to call_starts or calls_complete tables).
+
+    The system detects whether items are starts or completes based on presence of ended_at.
+    - If ended_at is present: complete call -> writes to calls_complete table
+    - If ended_at is None: started call -> writes to call_starts table
+    """
 
     project_id: str
-    items: list[StartedCallSchemaForInsert]
+    items: list[Union[StartedCallSchemaForInsert, CompleteCallSchemaForInsert]]
 
 
-class CallsStartBatchRes(BaseModel):
-    """Response for batch starting calls."""
+class CallsUpsertBatchV2Res(BaseModel):
+    """Response for batch upserting calls."""
 
     ids: list[str]
     trace_ids: list[str]
-
-
-class CallsCompleteBatchReq(BaseModelStrict):
-    """Request for batch completing calls (writes to calls_complete table)."""
-
-    project_id: str
-    items: list[CompleteCallSchemaForInsert]
-
-
-class CallsCompleteBatchRes(BaseModel):
-    """Response for batch completing calls."""
-
-    pass
 
 
 class CallBatchStartMode(BaseModel):
@@ -2080,11 +2072,10 @@ class TraceServerInterface(Protocol):
     def call_update(self, req: CallUpdateReq) -> CallUpdateRes: ...
     def call_start_batch(self, req: CallCreateBatchReq) -> CallCreateBatchRes: ...
 
-    # V2 batch endpoints (hidden from users, for internal use only)
-    def calls_start_batch_v2(self, req: CallsStartBatchReq) -> CallsStartBatchRes: ...
-    def calls_complete_batch_v2(
-        self, req: CallsCompleteBatchReq
-    ) -> CallsCompleteBatchRes: ...
+    # V2 batch endpoint (hidden from users, for internal use only)
+    def calls_upsert_batch_v2(
+        self, req: CallsUpsertBatchV2Req
+    ) -> CallsUpsertBatchV2Res: ...
 
     # Op API
     def op_create(self, req: OpCreateReq) -> OpCreateRes: ...

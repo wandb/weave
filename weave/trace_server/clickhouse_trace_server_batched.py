@@ -111,6 +111,7 @@ from weave.trace_server.llm_completion import (
     lite_llm_completion,
     lite_llm_completion_stream,
 )
+from weave.trace_server.project_version.types import ProjectVersion
 from weave.trace_server.methods.evaluation_status import evaluation_status
 from weave.trace_server.model_providers.model_providers import (
     LLMModelProviderInfo,
@@ -4521,25 +4522,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             client.close()
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert_call_batch")
-    def _insert_call_batch(
-        self,
-        batch: list,
-        table_name: str = "call_parts",
-        column_names: Optional[list[str]] = None,
-    ) -> None:
-        """Generic batch insert for call tables.
-
-        Can handle both raw batch data (list of lists) or insertable objects.
-
-        Args:
-            batch: Either list of raw row data OR list of insertable objects.
-            table_name: Name of the table to insert into. Defaults to "call_parts".
-            column_names: List of column names. Defaults to ALL_CALL_INSERT_COLUMNS.
-                         Required if batch contains insertable objects.
-        """
-        if not batch:
-            return
-
+    def _insert_call_batch(self, batch: list) -> None:
         if root_span := ddtrace.tracer.current_span():
             root_span.set_tags(
                 {
@@ -4548,30 +4531,61 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     )
                 }
             )
+        if batch:
+            settings = {}
+            if self._use_async_insert:
+                settings["async_insert"] = 1
+                # https://clickhouse.com/docs/en/optimize/asynchronous-inserts#enabling-asynchronous-inserts
+                # Setting wait_for_async_insert = 0 does not guarantee that insert errors
+                # are caught, reverting to default behavior.
+                settings["wait_for_async_insert"] = 1
+            self._insert(
+                "call_parts",
+                data=batch,
+                column_names=ALL_CALL_INSERT_COLUMNS,
+                settings=settings,
+            )
 
-        # Default column names for backward compatibility
-        if column_names is None:
-            column_names = ALL_CALL_INSERT_COLUMNS
+    # V2 Write Methods
 
-        # Check if batch contains insertable objects (has model_dump method)
-        # vs raw data (list of lists)
-        if batch and hasattr(batch[0], "model_dump"):
-            # Convert insertable objects to row data
-            batch_data = []
-            for ch_call in batch:
-                call_dict = ch_call.model_dump()
-                values = [call_dict.get(col) for col in column_names]
-                batch_data.append(values)
-        else:
-            # Already raw data
-            batch_data = batch
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._v2_insert_call_batch")
+    def _v2_insert_call_batch(
+        self,
+        table_name: str,
+        ch_calls: list,
+        column_names: list[str],
+    ) -> None:
+        """Generic batch insert for V2 call tables.
+
+        Converts insertable objects to rows and delegates to _insert.
+
+        Args:
+            table_name: Name of the table to insert into (e.g., "call_starts", "calls_complete").
+            ch_calls: List of call insertables to insert.
+            column_names: List of column names for the insert.
+        """
+        if not ch_calls:
+            return
+
+        if root_span := ddtrace.tracer.current_span():
+            root_span.set_tags(
+                {
+                    "clickhouse_trace_server_batched._v2_insert_call_batch.count": str(
+                        len(ch_calls)
+                    ),
+                    "clickhouse_trace_server_batched._v2_insert_call_batch.table": table_name,
+                }
+            )
+
+        batch_data = []
+        for ch_call in ch_calls:
+            call_dict = ch_call.model_dump()
+            values = [call_dict.get(col) for col in column_names]
+            batch_data.append(values)
 
         settings = {}
         if self._use_async_insert:
             settings["async_insert"] = 1
-            # https://clickhouse.com/docs/en/optimize/asynchronous-inserts#enabling-asynchronous-inserts
-            # Setting wait_for_async_insert = 0 does not guarantee that insert errors
-            # are caught, reverting to default behavior.
             settings["wait_for_async_insert"] = 1
 
         self._insert(
@@ -4581,16 +4595,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             settings=settings,
         )
 
-    # V2 Write Methods
-
     def _v2_insert_call_starts_batch(
         self, ch_calls: list[V2CallStartCHInsertable]
     ) -> None:
         """Batch insert calls into call_starts table (V2 projects)."""
-        self._insert_call_batch(
-            ch_calls,
-            table_name="call_starts",
-            column_names=V2_CALL_STARTS_INSERT_COLUMNS,
+        self._v2_insert_call_batch(
+            "call_starts", ch_calls, V2_CALL_STARTS_INSERT_COLUMNS
         )
 
     def _v2_insert_calls_complete_batch(
@@ -4601,10 +4611,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         Note: For calls_complete, we also need to delete any matching entries
         from call_starts table since the call is now complete.
         """
-        self._insert_call_batch(
-            ch_calls,
-            table_name="calls_complete",
-            column_names=V2_CALLS_COMPLETE_INSERT_COLUMNS,
+        self._v2_insert_call_batch(
+            "calls_complete", ch_calls, V2_CALLS_COMPLETE_INSERT_COLUMNS
         )
         # Now we need to delete the inserted ids from the call_starts if they exist
         call_ids = [ch_call.id for ch_call in ch_calls]
