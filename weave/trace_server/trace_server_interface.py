@@ -245,13 +245,20 @@ class TableSchemaForInsert(BaseModel):
     rows: list[dict[str, Any]]
 
 
-class OtelExportReq(BaseModel):
+class MetadataReq(BaseModelStrict):
+    project_id: str = Field(
+        description="The ID of the project", examples=["my_entity/my_project"]
+    )
+
+    # wb_user_id is automatically populated by the server
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class OtelExportReq(MetadataReq):
     model_config = ConfigDict(arbitrary_types_allowed=True)
-    project_id: str
     # traces must be ExportTraceServiceRequest payload but allowing Any removes the proto package as a requirement.
     traces: Any
     wb_run_id: Optional[str] = None
-    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
 class ExportTracePartialSuccess(BaseModel):
@@ -303,8 +310,7 @@ class CallCreateBatchRes(BaseModel):
     res: list[Union[CallStartRes, CallEndRes]]
 
 
-class CallReadReq(BaseModelStrict):
-    project_id: str
+class CallReadReq(MetadataReq):
     id: str
     include_costs: Optional[bool] = False
     include_storage_size: Optional[bool] = False
@@ -315,12 +321,8 @@ class CallReadRes(BaseModel):
     call: Optional[CallSchema]
 
 
-class CallsDeleteReq(BaseModelStrict):
-    project_id: str
+class CallsDeleteReq(MetadataReq):
     call_ids: list[str]
-
-    # wb_user_id is automatically populated by the server
-    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
 class CallsDeleteRes(BaseModel):
@@ -358,10 +360,8 @@ class CompletionsCreateRequestInputs(BaseModel):
     api_version: Optional[str] = None
 
 
-class CompletionsCreateReq(BaseModelStrict):
-    project_id: str
+class CompletionsCreateReq(MetadataReq):
     inputs: CompletionsCreateRequestInputs
-    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
     track_llm_call: Optional[bool] = Field(
         True, description="Whether to track this LLM call in the trace server"
     )
@@ -378,10 +378,8 @@ class ImageGenerationRequestInputs(BaseModel):
     n: Optional[int] = None
 
 
-class ImageGenerationCreateReq(BaseModel):
-    project_id: str
+class ImageGenerationCreateReq(MetadataReq):
     inputs: ImageGenerationRequestInputs
-    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
     track_llm_call: Optional[bool] = Field(
         True,
         description="Whether to track this image generation call in the trace server",
@@ -416,8 +414,7 @@ class SortBy(BaseModelStrict):
     direction: Literal["asc", "desc"]
 
 
-class CallsQueryReq(BaseModelStrict):
-    project_id: str
+class CallsQueryReq(MetadataReq):
     filter: Optional[CallsFilter] = None
     limit: Optional[int] = None
     offset: Optional[int] = None
@@ -480,8 +477,7 @@ class CallsQueryRes(BaseModel):
     calls: list[CallSchema]
 
 
-class CallsQueryStatsReq(BaseModelStrict):
-    project_id: str
+class CallsQueryStatsReq(MetadataReq):
     filter: Optional[CallsFilter] = None
     query: Optional[Query] = None
     limit: Optional[int] = None
@@ -501,16 +497,11 @@ class CallsQueryStatsRes(BaseModel):
     total_storage_size_bytes: Optional[int] = None
 
 
-class CallUpdateReq(BaseModelStrict):
-    # required for all updates
-    project_id: str
+class CallUpdateReq(MetadataReq):
     call_id: str
 
     # optional update fields
     display_name: Optional[str] = None
-
-    # wb_user_id is automatically populated by the server
-    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
 class CallUpdateRes(BaseModel):
@@ -557,8 +548,7 @@ class ObjCreateRes(BaseModel):
     digest: str  #
 
 
-class ObjReadReq(BaseModelStrict):
-    project_id: str
+class ObjReadReq(MetadataReq):
     object_id: str
     digest: str
 
@@ -606,10 +596,7 @@ class ObjectVersionFilter(BaseModelStrict):
     )
 
 
-class ObjQueryReq(BaseModelStrict):
-    project_id: str = Field(
-        description="The ID of the project to query", examples=["user/project"]
-    )
+class ObjQueryReq(MetadataReq):
     filter: Optional[ObjectVersionFilter] = Field(
         default=None,
         description="Filter criteria for the query. See `ObjectVersionFilter`",
@@ -641,8 +628,7 @@ class ObjQueryReq(BaseModelStrict):
     )
 
 
-class ObjDeleteReq(BaseModelStrict):
-    project_id: str
+class ObjDeleteReq(MetadataReq):
     object_id: str
     digests: Optional[list[str]] = Field(
         default=None,
@@ -662,8 +648,7 @@ class TableCreateReq(BaseModelStrict):
     table: TableSchemaForInsert
 
 
-class TableCreateFromDigestsReq(BaseModelStrict):
-    project_id: str
+class TableCreateFromDigestsReq(MetadataReq):
     row_digests: list[str]
 
 
@@ -750,8 +735,7 @@ class TableInsertSpec(BaseModel):
 TableUpdateSpec = Union[TableAppendSpec, TablePopSpec, TableInsertSpec]
 
 
-class TableUpdateReq(BaseModelStrict):
-    project_id: str
+class TableUpdateReq(MetadataReq):
     base_digest: str
     updates: list[TableUpdateSpec]
 
@@ -807,10 +791,7 @@ class TableRowFilter(BaseModelStrict):
     )
 
 
-class TableQueryReq(BaseModelStrict):
-    project_id: str = Field(
-        description="The ID of the project", examples=["my_entity/my_project"]
-    )
+class TableQueryReq(MetadataReq):
     digest: str = Field(
         description="The digest of the table to query",
         examples=["aonareimsvtl13apimtalpa4435rpmgnaemrpgmarltarstaorsnte134avrims"],
@@ -846,20 +827,13 @@ class TableQueryRes(BaseModel):
     rows: list[TableRowSchema]
 
 
-class TableQueryStatsReq(BaseModelStrict):
-    project_id: str = Field(
-        description="The ID of the project", examples=["my_entity/my_project"]
-    )
+class TableQueryStatsReq(MetadataReq):
     digest: str = Field(
         description="The digest of the table to query",
     )
 
 
-class TableQueryStatsBatchReq(BaseModelStrict):
-    project_id: str = Field(
-        description="The ID of the project", examples=["my_entity/my_project"]
-    )
-
+class TableQueryStatsBatchReq(MetadataReq):
     digests: Optional[list[str]] = Field(
         description="The digests of the tables to query",
         examples=[
@@ -896,13 +870,12 @@ class RefsReadBatchRes(BaseModel):
     vals: list[Any]
 
 
-class FeedbackCreateReq(BaseModelStrict):
+class FeedbackCreateReq(MetadataReq):
     id: Optional[str] = Field(
         default=None,
         description="If provided by the client, this ID will be used for the feedback row instead of a server-generated one.",
         examples=["018f1f2a-9c2b-7d3e-b5a1-8c9d2e4f6a7b"],
     )
-    project_id: str = Field(examples=["entity/project"])
     weave_ref: str = Field(examples=["weave:///entity/project/object/name:digest"])
     creator: Optional[str] = Field(default=None, examples=["Jane Smith"])
     feedback_type: str = Field(examples=["custom"])
@@ -928,9 +901,6 @@ class FeedbackCreateReq(BaseModelStrict):
         default=None, examples=["weave:///entity/project/object/name:digest"]
     )
 
-    # wb_user_id is automatically populated by the server
-    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
-
 
 # The response provides the additional fields needed to convert a request
 # into a complete Feedback.
@@ -947,8 +917,7 @@ class Feedback(FeedbackCreateReq):
     created_at: datetime.datetime
 
 
-class FeedbackQueryReq(BaseModelStrict):
-    project_id: str = Field(examples=["entity/project"])
+class FeedbackQueryReq(MetadataReq):
     fields: Optional[list[str]] = Field(
         default=None, examples=[["id", "feedback_type", "payload.note"]]
     )
@@ -965,8 +934,7 @@ class FeedbackQueryRes(BaseModel):
     result: list[dict[str, Any]]
 
 
-class FeedbackPurgeReq(BaseModelStrict):
-    project_id: str = Field(examples=["entity/project"])
+class FeedbackPurgeReq(MetadataReq):
     query: Query
 
 
@@ -1000,13 +968,12 @@ class FileCreateRes(BaseModel):
     digest: str
 
 
-class FileContentReadReq(BaseModelStrict):
-    project_id: str
+class FileContentReadReq(MetadataReq):
     digest: str
 
 
-class FilesStatsReq(BaseModelStrict):
-    project_id: str
+class FilesStatsReq(MetadataReq):
+    pass
 
 
 class FileContentReadRes(BaseModel):
@@ -1040,8 +1007,7 @@ class CostCreateInput(BaseModelStrict):
     )
 
 
-class CostCreateReq(BaseModelStrict):
-    project_id: str = Field(examples=["entity/project"])
+class CostCreateReq(MetadataReq):
     costs: dict[str, CostCreateInput]
     wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
@@ -1051,8 +1017,7 @@ class CostCreateRes(BaseModel):
     ids: list[tuple[str, str]]
 
 
-class CostQueryReq(BaseModelStrict):
-    project_id: str = Field(examples=["entity/project"])
+class CostQueryReq(MetadataReq):
     fields: Optional[list[str]] = Field(
         default=None,
         examples=[
@@ -1094,8 +1059,7 @@ class CostQueryRes(BaseModel):
     results: list[CostQueryOutput]
 
 
-class CostPurgeReq(BaseModelStrict):
-    project_id: str = Field(examples=["entity/project"])
+class CostPurgeReq(MetadataReq):
     query: Query
 
 
@@ -1103,19 +1067,16 @@ class CostPurgeRes(BaseModel):
     pass
 
 
-class ActionsExecuteBatchReq(BaseModelStrict):
-    project_id: str
+class ActionsExecuteBatchReq(MetadataReq):
     action_ref: str
     call_ids: list[str]
-    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
 class ActionsExecuteBatchRes(BaseModel):
     pass
 
 
-class ProjectStatsReq(BaseModelStrict):
-    project_id: str
+class ProjectStatsReq(MetadataReq):
     include_trace_storage_size: Optional[bool] = True
     include_object_storage_size: Optional[bool] = True
     include_table_storage_size: Optional[bool] = True
@@ -1173,7 +1134,7 @@ class ThreadsQueryFilter(BaseModelStrict):
     )
 
 
-class ThreadsQueryReq(BaseModelStrict):
+class ThreadsQueryReq(MetadataReq):
     """Query threads with aggregated statistics based on turn calls only.
 
     Turn calls are the immediate children of thread contexts (where call.id == turn_id).
@@ -1181,9 +1142,6 @@ class ThreadsQueryReq(BaseModelStrict):
     nested implementation details.
     """
 
-    project_id: str = Field(
-        description="The ID of the project", examples=["my_entity/my_project"]
-    )
     filter: Optional[ThreadsQueryFilter] = Field(
         default=None,
         description="Filter criteria for the threads query",
@@ -1199,11 +1157,9 @@ class ThreadsQueryReq(BaseModelStrict):
     )
 
 
-class EvaluateModelReq(BaseModelStrict):
-    project_id: str
+class EvaluateModelReq(MetadataReq):
     evaluation_ref: str
     model_ref: str
-    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
     # Fixes the following warning:
     # UserWarning: Field "model_ref" has conflict with protected namespace "model_".
     model_config = ConfigDict(protected_namespaces=())
@@ -1213,8 +1169,7 @@ class EvaluateModelRes(BaseModel):
     call_id: str
 
 
-class EvaluationStatusReq(BaseModelStrict):
-    project_id: str
+class EvaluationStatusReq(MetadataReq):
     call_id: str
 
 
