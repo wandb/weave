@@ -10,6 +10,7 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_PROJECT_VERSION_MODE = "auto"
 
+
 class ProjectVersion(IntEnum):
     """Represents the project version for table routing.
 
@@ -35,6 +36,7 @@ class ProjectVersion(IntEnum):
 
     """New schema using calls_complete table."""
     CALLS_COMPLETE_VERSION = 1
+
 
 class ProjectVersionMode(str, Enum):
     """Modes for controlling project version resolution behavior.

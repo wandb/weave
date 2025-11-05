@@ -78,7 +78,7 @@ class ClickHouseProjectVersionProvider:
 
             if has_complete and has_merged:
                 logger.warning(
-                    f"Project has traces in both calls_complete and calls_merged tables.",
+                    "Project has traces in both calls_complete and calls_merged tables.",
                     extra={"project_id": project_id},
                 )
 
