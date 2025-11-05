@@ -5,16 +5,13 @@ ClickHouse insert operation for performance optimization.
 """
 
 import base64
-import urllib
 import pytest
 import datetime
 from unittest.mock import MagicMock, patch
-
-from tests.trace_server.conftest import TEST_ENTITY
+from typing import Any
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.base64_content_conversion import AUTO_CONVERSION_MIN_SIZE
 from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
-from weave.trace_server.refs_internal import InvalidInternalRef
 from weave.trace_server.errors import ObjectDeletedError
 from weave.trace_server.trace_server_interface_util import str_digest
 from weave.trace_server.errors import ObjectDeletedError
@@ -134,14 +131,22 @@ def test_clickhouse_batching():
             f"but got inserts to: {insert_tables}"
         )
 
-def _mk_obj(project_id: str, object_id: str, val: dict[str, object]):
-    return tsi.ObjSchemaForInsert(project_id=project_id, object_id=object_id, val=val)
+def _mk_obj(project_id: str, object_id: str, wb_user_id: str, val: dict[str, Any]):
+    return tsi.ObjSchemaForInsert(
+        project_id=project_id,
+        object_id=object_id,
+        wb_user_id=wb_user_id,
+        val=val,
+    )
 
 
 def _internal_pid() -> str:
     # Any base64 string is valid for internal project id validation
     # Reuse the same value as other tests in this module
-    return "dGVzdF9wcm9qZWN0"
+    return str(base64.b64encode("test_project".encode()))
+
+def _internal_wb_user_id() -> str:
+    return str(base64.b64encode("test_user".encode()))
 
 
 def test_obj_create_batch_internal_clickhouse_insert_once():
@@ -155,10 +160,11 @@ def test_obj_create_batch_internal_clickhouse_insert_once():
     with patch.object(ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client):
         server = ClickHouseTraceServer(host="test_host")
         pid = _internal_pid()
+        wb_user_id = _internal_wb_user_id()
         batch = [
-            _mk_obj(pid, "obj_a", {"v": 1}),
-            _mk_obj(pid, "obj_b", {"v": 2}),
-            _mk_obj(pid, "obj_c", {"v": 3}),
+            _mk_obj(pid, "obj_a", wb_user_id, {"v": 1}),
+            _mk_obj(pid, "obj_b", wb_user_id, {"v": 2}),
+            _mk_obj(pid, "obj_c", wb_user_id, {"v": 3}),
         ]
         res = server.obj_create_batch(tsi.ObjCreateBatchReq(batch=batch))
 
@@ -175,6 +181,7 @@ def test_obj_batch_same_object_id_different_hash(trace_server):
     """Two versions for same object_id with different digests."""
     server = trace_server._internal_trace_server
     pid = _internal_pid()
+    wb_user_id = _internal_wb_user_id()
     obj_id = "my_obj"
     v1 = {"k": 1}
     v2 = {"k": 2}
@@ -182,8 +189,8 @@ def test_obj_batch_same_object_id_different_hash(trace_server):
     server.obj_create_batch(
         tsi.ObjCreateBatchReq(
             batch=[
-                _mk_obj(pid, obj_id, v1),
-                _mk_obj(pid, obj_id, v2),
+                _mk_obj(pid, obj_id, wb_user_id, v1),
+                _mk_obj(pid, obj_id, wb_user_id, v2),
             ]
         )
     )
@@ -205,12 +212,13 @@ def test_obj_batch_same_hash_different_object_ids(trace_server):
     """Same digest payload uploaded under different object_ids yields distinct objects."""
     server = trace_server._internal_trace_server
     pid = _internal_pid()
+    wb_user_id = _internal_wb_user_id()
     val = {"shared": True}
     server.obj_create_batch(
         tsi.ObjCreateBatchReq(
             batch=[
-                _mk_obj(pid, "obj_1", val),
-                _mk_obj(pid, "obj_2", val),
+                _mk_obj(pid, "obj_1", wb_user_id, val),
+                _mk_obj(pid, "obj_2", wb_user_id, val),
             ]
         )
     )
@@ -228,13 +236,14 @@ def test_obj_batch_identical_same_id_same_hash_deduplicates(trace_server):
     """Duplicate rows (same object_id and digest) are represented once in metadata view."""
     server = trace_server._internal_trace_server
     pid = _internal_pid()
+    wb_user_id = _internal_wb_user_id()
     obj_id = "dup_obj"
     val = {"x": 1}
     server.obj_create_batch(
         tsi.ObjCreateBatchReq(
             batch=[
-                _mk_obj(pid, obj_id, val),
-                _mk_obj(pid, obj_id, val),
+                _mk_obj(pid, obj_id, wb_user_id, val),
+                _mk_obj(pid, obj_id, wb_user_id, val),
             ]
         )
     )
@@ -252,12 +261,13 @@ def test_obj_batch_four_versions_and_read_path(trace_server):
     """Batch upload 4 versions and verify reads over all and latest work."""
     server = trace_server._internal_trace_server
     pid = _internal_pid()
+    wb_user_id = _internal_wb_user_id()
     obj_id = "multi_v"
     vals = [{"i": i} for i in range(4)]
     digests = [str_digest(json.dumps(v)) for v in vals]
     server.obj_create_batch(
         tsi.ObjCreateBatchReq(
-            batch=[_mk_obj(pid, obj_id, v) for v in vals]
+            batch=[_mk_obj(pid, obj_id, wb_user_id, v) for v in vals]
         )
     )
 
@@ -291,18 +301,28 @@ def test_obj_batch_delete_version_preserves_indices(trace_server):
     """Delete one version and ensure indices remain intact and deletion is reflected."""
     server = trace_server._internal_trace_server
     pid = _internal_pid()
+    wb_user_id = _internal_wb_user_id()
     obj_id = "del_v"
     vals = [{"i": i} for i in range(3)]
-    digests = [str_digest(json.dumps(v)) for v in vals]
+    delete_idx = 1
 
     server.obj_create_batch(
         tsi.ObjCreateBatchReq(
-            batch=[_mk_obj(pid, obj_id, v) for v in vals]
+            batch=[_mk_obj(pid, obj_id, wb_user_id, v) for v in vals]
         )
     )
+    # Remaining versions are intact; indices are not renumbered in metadata
+    res = server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=pid,
+            filter=tsi.ObjectVersionFilter(object_ids=[obj_id], latest_only=False),
+        )
+    )
+    pre_del_digests = [obj.digest for obj in res]
 
     # Delete the middle version
-    del_digest = digests[1]
+    del_digest = pre_del_digests[delete_idx]
+
     server.obj_delete(
         tsi.ObjDeleteReq(project_id=pid, object_id=obj_id, digests=[del_digest])
     )
@@ -319,9 +339,9 @@ def test_obj_batch_delete_version_preserves_indices(trace_server):
         )
     )
     assert len(res.objs) == 2
-    assert {o.digest for o in res.objs} == {digests[0], digests[2]}
+    assert {obj.digest for obj in res.objs} == {pre_del_digests[0], pre_del_digests[2]}
     # Version indices remain from original sequence (0 and 2)
-    assert {o.version_index for o in res.objs} == {0, 2}
+    assert {obj.version_index for obj in res.objs} == {0, 2}
 
 
 @pytest.mark.xfail(reason="Not yet enforced: mixed-project obj_create_batch should error")
@@ -329,10 +349,11 @@ def test_obj_batch_mixed_projects_errors(trace_server):
     """Uploading objects to different projects in one batch should error."""
     server = trace_server._internal_trace_server
     pid1 = _internal_pid()
+    wb_user_id = _internal_wb_user_id()
     pid2 = "cHJvamVjdF8y"  # base64("project_2")
     batch = [
-        _mk_obj(pid1, "p1_obj", {"a": 1}),
-        _mk_obj(pid2, "p2_obj", {"b": 2}),
+        _mk_obj(pid1, "p1_obj", wb_user_id, {"a": 1}),
+        _mk_obj(pid2, "p2_obj", wb_user_id, {"b": 2}),
     ]
 
     with pytest.raises(ValueError):
