@@ -744,7 +744,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.create_obj_batch")
-    def obj_create_batch(self, batch: list[tsi.ObjSchemaForInsert]) -> list[tsi.ObjCreateRes]:
+    def obj_create_batch(
+        self, batch: list[tsi.ObjSchemaForInsert]
+    ) -> list[tsi.ObjCreateRes]:
         if root_span := ddtrace.tracer.current_span():
             root_span.set_tags(
                 {

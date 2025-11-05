@@ -235,9 +235,7 @@ def test_obj_batch_four_versions_and_read_path(trace_server):
     obj_id = "multi_v"
     vals = [{"i": i} for i in range(4)]
     digests = [str_digest(json.dumps(v)) for v in vals]
-    server.obj_create_batch(
-        batch=[_mk_obj(pid, obj_id, wb_user_id, v) for v in vals]
-    )
+    server.obj_create_batch(batch=[_mk_obj(pid, obj_id, wb_user_id, v) for v in vals])
 
     # All versions are queryable
     res = server.objs_query(
@@ -274,9 +272,7 @@ def test_obj_batch_delete_version_preserves_indices(trace_server):
     vals = [{"i": i} for i in range(3)]
     delete_idx = 1
 
-    server.obj_create_batch(
-        batch=[_mk_obj(pid, obj_id, wb_user_id, v) for v in vals]
-    )
+    server.obj_create_batch(batch=[_mk_obj(pid, obj_id, wb_user_id, v) for v in vals])
     # Remaining versions are intact; indices are not renumbered in metadata
     res = server.objs_query(
         tsi.ObjQueryReq(
@@ -323,5 +319,8 @@ def test_obj_batch_mixed_projects_errors(trace_server):
         _mk_obj(pid2, "p2_obj", wb_user_id, {"b": 2}),
     ]
 
-    with pytest.raises(InvalidRequest, match="obj_create_batch only supports updating a single project."):
+    with pytest.raises(
+        InvalidRequest,
+        match="obj_create_batch only supports updating a single project.",
+    ):
         server.obj_create_batch(batch=batch)
