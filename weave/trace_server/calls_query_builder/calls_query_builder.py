@@ -915,7 +915,7 @@ class CallsQuery(BaseModel):
         )
         sortable_datetime = optimization_conditions.sortable_datetime_filters_sql or ""
         heavy_filter = optimization_conditions.heavy_filter_opt_sql or ""
-        
+
         object_refs = process_object_refs_filter_to_opt_sql(
             pb, table_alias, object_ref_fields_consumed
         )

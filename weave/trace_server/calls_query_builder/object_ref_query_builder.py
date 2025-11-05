@@ -52,7 +52,7 @@ from typing import TYPE_CHECKING, Any, Optional, Union, get_args
 
 from pydantic import BaseModel
 
-from weave.trace_server.calls_query_builder.cte import CTE, CTECollection
+from weave.trace_server.calls_query_builder.cte import CTECollection
 from weave.trace_server.calls_query_builder.optimization_builder import (
     QueryOptimizationProcessor,
     apply_processor,
