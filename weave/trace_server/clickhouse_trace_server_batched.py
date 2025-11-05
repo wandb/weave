@@ -744,32 +744,29 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.create_obj_batch")
-    def obj_create_batch(self, req: tsi.ObjCreateBatchReq) -> tsi.ObjCreateBatchRes:
+    def obj_create_batch(self, batch: list[tsi.ObjSchemaForInsert]) -> list[tsi.ObjCreateRes]:
         if root_span := ddtrace.tracer.current_span():
             root_span.set_tags(
                 {
                     "clickhouse_trace_server_batched.create_obj_batch.count": str(
-                        len(req.batch)
+                        len(batch)
                     )
                 }
             )
 
         obj_results = []
         ch_insert_batch = []
-        if (
-            not req or not req.batch
-        ):  # Note: Mirrors check in obj_create. Would req ever be None here?
-            return tsi.ObjCreateBatchRes(results=[])
+        if not batch:
+            # Note: Mirrors check in obj_create. Would req ever be None here?
+            return []
 
-        unique_projects = {obj.project_id for obj in req.batch}
+        unique_projects = {obj.project_id for obj in batch}
         if len(unique_projects) > 1:
-            # Note(zach): Is this really necessary?
-            # Cross project updates should be fine if external validation is correct
             raise InvalidRequest(
                 f"obj_create_batch only supports updating a single project. Supplied projects: {unique_projects}"
             )
 
-        for obj in req.batch:
+        for obj in batch:
             processed_result = process_incoming_object_val(
                 obj.val, obj.builtin_object_class
             )
@@ -805,7 +802,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             column_names=ALL_OBJ_INSERT_COLUMNS,
         )
 
-        return tsi.ObjCreateBatchRes(results=obj_results)
+        return obj_results
 
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
         object_query_builder = ObjectMetadataQueryBuilder(req.project_id)

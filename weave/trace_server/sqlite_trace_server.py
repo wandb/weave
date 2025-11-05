@@ -870,12 +870,12 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             conn.commit()
         return tsi.ObjCreateRes(digest=digest, object_id=object_id)
 
-    def obj_create_batch(self, req: tsi.ObjCreateBatchReq) -> tsi.ObjCreateBatchRes:
+    def obj_create_batch(self, batch: list[tsi.ObjSchemaForInsert]) -> list[tsi.ObjCreateRes]:
         results: list[tsi.ObjCreateRes] = []
-        for obj in req.batch:
+        for obj in batch:
             res = self.obj_create(tsi.ObjCreateReq(obj=obj))
             results.append(res)
-        return tsi.ObjCreateBatchRes(results=results)
+        return results
 
     def _obj_exists(
         self, cursor: sqlite3.Cursor, project_id: str, object_id: str, digest: str

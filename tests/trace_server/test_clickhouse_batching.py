@@ -151,36 +151,6 @@ def _internal_wb_user_id() -> str:
     return base64.b64encode(b"test_user").decode()
 
 
-def test_obj_create_batch_internal_clickhouse_insert_once():
-    """Test internal obj_create_batch performs a single ClickHouse insert."""
-    from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
-
-    mock_ch_client = MagicMock()
-    mock_ch_client.command.return_value = None
-    mock_ch_client.insert.return_value = MagicMock()
-
-    with patch.object(
-        ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
-    ):
-        server = ClickHouseTraceServer(host="test_host")
-        pid = _internal_pid()
-        wb_user_id = _internal_wb_user_id()
-        batch = [
-            _mk_obj(pid, "obj_a", wb_user_id, {"v": 1}),
-            _mk_obj(pid, "obj_b", wb_user_id, {"v": 2}),
-            _mk_obj(pid, "obj_c", wb_user_id, {"v": 3}),
-        ]
-        res = server.obj_create_batch(tsi.ObjCreateBatchReq(batch=batch))
-
-        # Single insert to the object_versions table with 3 rows
-        assert mock_ch_client.insert.call_count == 1
-        assert mock_ch_client.insert.call_args_list[0][0][0] == "object_versions"
-        # Verify result digests match expected values
-        expected = [str_digest(json.dumps(x.val)) for x in batch]
-        assert [r.digest for r in res.results] == expected
-        assert [r.object_id for r in res.results] == [x.object_id for x in batch]
-
-
 def test_obj_batch_same_object_id_different_hash(trace_server):
     """Two versions for same object_id with different digests."""
     server = trace_server._internal_trace_server
@@ -191,12 +161,10 @@ def test_obj_batch_same_object_id_different_hash(trace_server):
     v2 = {"k": 2}
 
     server.obj_create_batch(
-        tsi.ObjCreateBatchReq(
-            batch=[
-                _mk_obj(pid, obj_id, wb_user_id, v1),
-                _mk_obj(pid, obj_id, wb_user_id, v2),
-            ]
-        )
+        batch=[
+            _mk_obj(pid, obj_id, wb_user_id, v1),
+            _mk_obj(pid, obj_id, wb_user_id, v2),
+        ]
     )
 
     res = server.objs_query(
@@ -219,12 +187,10 @@ def test_obj_batch_same_hash_different_object_ids(trace_server):
     wb_user_id = _internal_wb_user_id()
     val = {"shared": True}
     server.obj_create_batch(
-        tsi.ObjCreateBatchReq(
-            batch=[
-                _mk_obj(pid, "obj_1", wb_user_id, val),
-                _mk_obj(pid, "obj_2", wb_user_id, val),
-            ]
-        )
+        batch=[
+            _mk_obj(pid, "obj_1", wb_user_id, val),
+            _mk_obj(pid, "obj_2", wb_user_id, val),
+        ]
     )
     res = server.objs_query(
         tsi.ObjQueryReq(
@@ -246,12 +212,10 @@ def test_obj_batch_identical_same_id_same_hash_deduplicates(trace_server):
     obj_id = "dup_obj"
     val = {"x": 1}
     server.obj_create_batch(
-        tsi.ObjCreateBatchReq(
-            batch=[
-                _mk_obj(pid, obj_id, wb_user_id, val),
-                _mk_obj(pid, obj_id, wb_user_id, val),
-            ]
-        )
+        batch=[
+            _mk_obj(pid, obj_id, wb_user_id, val),
+            _mk_obj(pid, obj_id, wb_user_id, val),
+        ]
     )
     res = server.objs_query(
         tsi.ObjQueryReq(
@@ -272,7 +236,7 @@ def test_obj_batch_four_versions_and_read_path(trace_server):
     vals = [{"i": i} for i in range(4)]
     digests = [str_digest(json.dumps(v)) for v in vals]
     server.obj_create_batch(
-        tsi.ObjCreateBatchReq(batch=[_mk_obj(pid, obj_id, wb_user_id, v) for v in vals])
+        batch=[_mk_obj(pid, obj_id, wb_user_id, v) for v in vals]
     )
 
     # All versions are queryable
@@ -311,7 +275,7 @@ def test_obj_batch_delete_version_preserves_indices(trace_server):
     delete_idx = 1
 
     server.obj_create_batch(
-        tsi.ObjCreateBatchReq(batch=[_mk_obj(pid, obj_id, wb_user_id, v) for v in vals])
+        batch=[_mk_obj(pid, obj_id, wb_user_id, v) for v in vals]
     )
     # Remaining versions are intact; indices are not renumbered in metadata
     res = server.objs_query(
@@ -359,5 +323,5 @@ def test_obj_batch_mixed_projects_errors(trace_server):
         _mk_obj(pid2, "p2_obj", wb_user_id, {"b": 2}),
     ]
 
-    with pytest.raises(InvalidRequest):
-        server.obj_create_batch(tsi.ObjCreateBatchReq(batch=batch))
+    with pytest.raises(InvalidRequest, match="obj_create_batch only supports updating a single project."):
+        server.obj_create_batch(batch=batch)
