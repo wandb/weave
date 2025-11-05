@@ -1,4 +1,4 @@
-from tests.trace_server.test_calls_query_builder import assert_sql
+from tests.trace_server.query_builder.test_calls_query_builder import assert_sql
 from weave.trace_server.calls_query_builder.calls_query_builder import (
     CallsQuery,
     HardCodedFilter,

@@ -368,8 +368,8 @@ def test_query_light_column_with_costs() -> None:
                 WHERE calls_merged.project_id = {pb_1:String}
                     AND (calls_merged.id IN filtered_calls)
                 GROUP BY (calls_merged.project_id, calls_merged.id)),
-            -- From the all_calls we get the usage data for LLMs
             llm_usage AS (
+                -- From the all_calls we get the usage data for LLMs
                 SELECT
                     *,
                     ifNull(JSONExtractRaw(summary_dump, 'usage'), '{}') AS usage_raw,
@@ -386,9 +386,9 @@ def test_query_light_column_with_costs() -> None:
                     if(JSONHas(kv.2, 'completion_tokens'), JSONExtractInt(kv.2, 'completion_tokens'), JSONExtractInt(kv.2, 'output_tokens')) AS completion_tokens,
                     JSONExtractInt(kv.2, 'total_tokens') AS total_tokens
                 FROM all_calls),
-            -- based on the llm_ids in the usage data we get all the prices and rank them according to specificity and effective date
-            ranked_prices AS
-                (SELECT
+            ranked_prices AS (
+                -- based on the llm_ids in the usage data we get all the prices and rank them according to specificity and effective date
+                SELECT
                     *,
                     llm_token_prices.id,
                     llm_token_prices.pricing_level,
