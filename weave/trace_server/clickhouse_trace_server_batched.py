@@ -54,6 +54,7 @@ from weave.trace_server.clickhouse_schema import (
     ALL_CALL_JSON_COLUMNS,
     ALL_CALL_SELECT_COLUMNS,
     ALL_FILE_CHUNK_INSERT_COLUMNS,
+    ALL_OBJ_INSERT_COLUMNS,
     REQUIRED_CALL_COLUMNS,
     CallCHInsertable,
     CallDeleteCHInsertable,
@@ -736,7 +737,80 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             data=[list(ch_obj.model_dump().values())],
             column_names=list(ch_obj.model_fields.keys()),
         )
-        return tsi.ObjCreateRes(digest=digest)
+
+        return tsi.ObjCreateRes(
+            digest=digest,
+            object_id=req.obj.object_id,
+        )
+
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.create_obj_batch")
+    def obj_create_batch(
+        self, batch: list[tsi.ObjSchemaForInsert]
+    ) -> list[tsi.ObjCreateRes]:
+        """This method is for the special case where all objects are known to use a placeholder.
+        We lose any knowledge of what version the created object is in return for an enormous
+        performance increase for operations like OTel ingest.
+
+        This should **ONLY** be used when we know an object will never have more than one version.
+        """
+        if root_span := ddtrace.tracer.current_span():
+            root_span.set_tags(
+                {
+                    "clickhouse_trace_server_batched.create_obj_batch.count": str(
+                        len(batch)
+                    )
+                }
+            )
+
+        if not batch:
+            return []
+
+        obj_results = []
+        ch_insert_batch = []
+
+        unique_projects = {obj.project_id for obj in batch}
+        if len(unique_projects) > 1:
+            raise InvalidRequest(
+                f"obj_create_batch only supports updating a single project. Supplied projects: {unique_projects}"
+            )
+
+        for obj in batch:
+            processed_result = process_incoming_object_val(
+                obj.val, obj.builtin_object_class
+            )
+            processed_val = processed_result["val"]
+            json_val = json.dumps(processed_val)
+            digest = str_digest(json_val)
+            ch_obj = ObjCHInsertable(
+                project_id=obj.project_id,
+                object_id=obj.object_id,
+                wb_user_id=obj.wb_user_id,
+                kind=get_kind(processed_val),
+                base_object_class=processed_result["base_object_class"],
+                leaf_object_class=processed_result["leaf_object_class"],
+                refs=extract_refs_from_values(processed_val),
+                val_dump=json_val,
+                digest=digest,
+            )
+            insert_data = list(ch_obj.model_dump().values())
+            # Add the data to be inserted
+            ch_insert_batch.append(insert_data)
+
+            # Record the inserted data
+            obj_results.append(
+                tsi.ObjCreateRes(
+                    digest=digest,
+                    object_id=obj.object_id,
+                )
+            )
+
+        self._insert(
+            "object_versions",
+            data=ch_insert_batch,
+            column_names=ALL_OBJ_INSERT_COLUMNS,
+        )
+
+        return obj_results
 
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
         object_query_builder = ObjectMetadataQueryBuilder(req.project_id)
