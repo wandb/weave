@@ -143,10 +143,10 @@ def _mk_obj(project_id: str, object_id: str, wb_user_id: str, val: dict[str, Any
 def _internal_pid() -> str:
     # Any base64 string is valid for internal project id validation
     # Reuse the same value as other tests in this module
-    return str(base64.b64encode("test_project".encode()))
+    return base64.b64encode("test_project".encode()).decode()
 
 def _internal_wb_user_id() -> str:
-    return str(base64.b64encode("test_user".encode()))
+    return base64.b64encode("test_user".encode()).decode()
 
 
 def test_obj_create_batch_internal_clickhouse_insert_once():

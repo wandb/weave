@@ -4,10 +4,6 @@ from unittest.mock import MagicMock, Mock, patch
 from weave.trace_server import clickhouse_trace_server_batched as chts
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
-from weave.trace_server.trace_server_interface_util import str_digest
-from weave.trace_server.errors import ObjectDeletedError
-import json
-import pytest
 
 
 class MockObjectReadError(Exception):
