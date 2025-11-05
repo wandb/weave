@@ -50,9 +50,16 @@ def pytest_addoption(parser):
 
 
 def pytest_collection_modifyitems(config, items):
-    # Add the trace_server marker to all tests that have a client fixture
+    # Add the trace_server marker to:
+    # 1. All tests in the trace_server directory (regardless of fixture usage)
+    # 2. All tests that use the trace_server fixture (for tests outside this directory)
     for item in items:
-        if "trace_server" in item.fixturenames:
+        # Check if the test is in the trace_server directory
+        test_file_path = str(item.fspath)
+        if "tests/trace_server" in test_file_path or "/trace_server/" in test_file_path:
+            item.add_marker(pytest.mark.trace_server)
+        # Also mark tests that use the trace_server fixture (for tests outside this dir)
+        elif "trace_server" in item.fixturenames:
             item.add_marker(pytest.mark.trace_server)
 
 
