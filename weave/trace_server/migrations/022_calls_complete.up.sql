@@ -14,11 +14,11 @@ CREATE TABLE calls_complete (
     parent_id       Nullable(String),
     display_name    Nullable(String) DEFAULT NULL,
     
-    attributes_dump Nullable(String),
-    inputs_dump     Nullable(String),
+    attributes_dump String,
+    inputs_dump     String,
     input_refs      Array(String),
-    output_dump     Nullable(String),
-    summary_dump    Nullable(String),
+    output_dump     String,
+    summary_dump    String,
     otel_dump       Nullable(String),
     exception       Nullable(String),
     output_refs     Array(String),
@@ -36,8 +36,8 @@ CREATE TABLE calls_complete (
     INDEX idx_trace_id trace_id TYPE bloom_filter GRANULARITY 1,
     -- Much more conservative bloom filter with explicit small tokenization for 
     -- larger JSON dump fields. ~250 MiB index size per 1B rows
-    INDEX idx_inputs_dump  inputs_dump  TYPE tokenbf_v1(1024, 2, 0) GRANULARITY 1,
-    INDEX idx_output_dump  output_dump  TYPE tokenbf_v1(1024, 2, 0) GRANULARITY 1,
+    INDEX idx_inputs_dump inputs_dump TYPE tokenbf_v1(1024, 2, 0) GRANULARITY 1,
+    INDEX idx_output_dump output_dump TYPE tokenbf_v1(1024, 2, 0) GRANULARITY 1,
     -- Set for equality searches with low cardinality ids, high granularity for
     -- smaller index memory size
     INDEX idx_wb_run_id wb_run_id TYPE set(100) GRANULARITY 4,
@@ -62,8 +62,8 @@ CREATE TABLE call_starts (
     parent_id       Nullable(String),
     display_name    Nullable(String) DEFAULT NULL,
     
-    attributes_dump Nullable(String),
-    inputs_dump     Nullable(String),
+    attributes_dump String,
+    inputs_dump     String,
     input_refs      Array(String),
 
     wb_user_id      Nullable(String),
