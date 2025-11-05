@@ -13,7 +13,7 @@ CREATE TABLE calls_complete (
 
     parent_id       Nullable(String),
     display_name    Nullable(String) DEFAULT NULL,
-    
+
     attributes_dump String,
     inputs_dump     String,
     input_refs      Array(String),
@@ -61,7 +61,7 @@ CREATE TABLE call_starts (
 
     parent_id       Nullable(String),
     display_name    Nullable(String) DEFAULT NULL,
-    
+
     attributes_dump String,
     inputs_dump     String,
     input_refs      Array(String),
