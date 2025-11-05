@@ -7,6 +7,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from weave.trace_server.base64_content_conversion import (
+    AUTO_CONVERSION_MIN_SIZE,
     is_data_uri,
     process_call_req_to_content,
     replace_base64_with_content_objects,
@@ -105,7 +106,8 @@ class TestBase64Replacement:
             ]
         )
 
-        test_data = b"a" * 100
+        # Use data larger than AUTO_CONVERSION_MIN_SIZE to trigger conversion
+        test_data = b"a" * (AUTO_CONVERSION_MIN_SIZE + 10)
         b64_data = base64.b64encode(test_data).decode("ascii")
 
         input_data = {
@@ -145,7 +147,8 @@ class TestBase64Replacement:
             ]
         )
 
-        test_data = b"a" * 100
+        # Use data larger than AUTO_CONVERSION_MIN_SIZE to trigger conversion
+        test_data = b"a" * (AUTO_CONVERSION_MIN_SIZE + 10)
         b64_data = base64.b64encode(test_data).decode("ascii")
 
         input_data = [
@@ -180,7 +183,8 @@ class TestBase64Replacement:
             ]
         )
 
-        test_data = b"Test image data"
+        # Use data larger than AUTO_CONVERSION_MIN_SIZE to trigger conversion
+        test_data = b"x" * (AUTO_CONVERSION_MIN_SIZE + 10)
         b64_data = base64.b64encode(test_data).decode("ascii")
 
         # Start request with data URI in inputs
@@ -203,7 +207,7 @@ class TestBase64Replacement:
         assert processed_start.start.inputs["image"]["_type"] == "CustomWeaveType"
 
         # End request with standalone base64 in output should NOT be replaced
-        long_bytes = b"b" * 100
+        long_bytes = b"y" * (AUTO_CONVERSION_MIN_SIZE + 10)
         long_b64 = base64.b64encode(long_bytes).decode("ascii")
         end_req = CallEndReq(
             end=EndedCallSchemaForInsert(
