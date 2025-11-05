@@ -319,7 +319,6 @@ def test_obj_batch_delete_version_preserves_indices(trace_server, client):
     assert {obj.version_index for obj in res.objs} == {0, 2}
 
 
-@pytest.mark.skip_
 def test_obj_batch_mixed_projects_errors(trace_server, client):
     """Uploading objects to different projects in one batch should error."""
     if client_is_sqlite(client):
