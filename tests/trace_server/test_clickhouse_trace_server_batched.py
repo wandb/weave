@@ -230,7 +230,7 @@ def test_completions_create_stream_custom_provider():
             req = tsi.CompletionsCreateReq(
                 project_id="test_project",
                 inputs=tsi.CompletionsCreateRequestInputs(
-                    model="custom-provider/model",
+                    model="custom::custom-provider::model",
                     messages=[{"role": "user", "content": "Say hello"}],
                 ),
                 track_llm_call=False,
@@ -365,7 +365,7 @@ def test_completions_create_stream_custom_provider_with_tracking():
             req = tsi.CompletionsCreateReq(
                 project_id="dGVzdF9wcm9qZWN0",
                 inputs=tsi.CompletionsCreateRequestInputs(
-                    model="custom-provider/model",
+                    model="custom::custom-provider::model",
                     messages=[{"role": "user", "content": "Say hello"}],
                 ),
                 track_llm_call=True,

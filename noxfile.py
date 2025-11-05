@@ -22,6 +22,7 @@ PY39_INCOMPATIBLE_SHARDS = [
     "autogen_tests",
     "langchain",
     "verifiers_test",
+    "notdiamond",
 ]
 PY310_INCOMPATIBLE_SHARDS = [
     "verifiers_test",

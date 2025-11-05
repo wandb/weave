@@ -53,13 +53,12 @@ def model_datasets(model_evals: dict[str, EvaluationResults]):
 @pytest.fixture
 def preference_id():
     try:
-        # Get path relative to this test file
         test_dir = Path(__file__).parent
         cassette_path = (
             test_dir
             / "cassettes"
             / "custom_router_test"
-            / "test_custom_router_train_router.yaml"
+            / "test_train_router.yaml"
         )
         with open(cassette_path) as file:
             cassette = yaml.safe_load(file)

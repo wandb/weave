@@ -5,18 +5,16 @@ interactions:
       Check if in given list of numbers, are any two numbers closer to each other
       than\n    given threshold.\n    >>> has_close_elements([1.0, 2.0, 3.0], 0.5)\n    False\n    >>>
       has_close_elements([1.0, 2.8, 3.0, 4.0, 5.0, 2.0], 0.3)\n    True\n    \"\"\"\n"}],
-      "llm_providers": [{"provider": "anthropic", "model": "claude-3-5-sonnet-20240620",
-      "is_custom": false, "context_length": null, "input_price": null, "output_price":
-      null, "latency": null}, {"provider": "openai", "model": "gpt-4o-2024-05-13",
-      "is_custom": false, "context_length": null, "input_price": null, "output_price":
-      null, "latency": null}, {"provider": "google", "model": "gemini-1.5-pro-latest",
-      "is_custom": false, "context_length": null, "input_price": null, "output_price":
-      null, "latency": null}, {"provider": "openai", "model": "gpt-4-turbo-2024-04-09",
-      "is_custom": false, "context_length": null, "input_price": null, "output_price":
-      null, "latency": null}, {"provider": "anthropic", "model": "claude-3-opus-20240229",
-      "is_custom": false, "context_length": null, "input_price": null, "output_price":
-      null, "latency": null}], "metric": "accuracy", "max_model_depth": 5, "hash_content":
-      false}'
+      "llm_providers": [{"provider": "openai", "model": "gpt-4o-2024-05-13", "is_custom":
+      false, "context_length": null, "input_price": null, "output_price": null, "latency":
+      null}, {"provider": "google", "model": "gemini-1.5-pro-latest", "is_custom":
+      false, "context_length": null, "input_price": null, "output_price": null, "latency":
+      null}, {"provider": "openai", "model": "gpt-4-turbo-2024-04-09", "is_custom":
+      false, "context_length": null, "input_price": null, "output_price": null, "latency":
+      null}, {"provider": "anthropic", "model": "claude-sonnet-4-5", "is_custom":
+      false, "context_length": null, "input_price": null, "output_price": null, "latency":
+      null}], "metric": "accuracy", "max_model_depth": 4, "hash_content": false, "preference_id":
+      "0af17140-4a56-4c63-8690-907d8fa1c3bf"}'
     headers:
       Accept:
       - '*/*'
@@ -25,21 +23,19 @@ interactions:
       Connection:
       - keep-alive
       Content-Length:
-      - '1317'
+      - '1199'
       User-Agent:
-      - Python-SDK/0.3.21
+      - Python-SDK/0.4.9
       content-type:
       - application/json
     method: POST
     uri: https://api.notdiamond.ai/v2/modelRouter/modelSelect
   response:
     body:
-      string: '{"providers":[{"provider":"openai","model":"gpt-4o-2024-05-13"}],"session_id":"0edef89c-fe12-4c27-b35f-177fbf653779"}'
+      string: '{"providers":[{"provider":"anthropic","model":"claude-sonnet-4-5"}],"session_id":"6ac843e7-c68e-4bed-a641-02a2ae63a474"}'
     headers:
-      CF-Cache-Status:
-      - DYNAMIC
-      CF-Ray:
-      - 8d06ed9f2cd6ade7-ATL
+      CF-RAY:
+      - 998f0afd7ebdd8a7-SJC
       Connection:
       - keep-alive
       Content-Encoding:
@@ -47,19 +43,23 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Thu, 10 Oct 2024 13:24:01 GMT
+      - Mon, 03 Nov 2025 21:42:45 GMT
       Server:
       - cloudflare
       Transfer-Encoding:
       - chunked
-      Vary:
-      - Accept-Encoding
       alt-svc:
       - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
       rndr-id:
-      - e7d313b1-59b0-4280
+      - 47cd3685-dfdb-4000
+      vary:
+      - Accept-Encoding
       x-render-origin-server:
       - uvicorn
+      x-request-id:
+      - 47cd3685-dfdb-4000
     status:
       code: 200
       message: OK
@@ -71,18 +71,16 @@ interactions:
       list of those.\n    Separate groups are balanced (each open brace is properly
       closed) and not nested within each other\n    Ignore any spaces in the input
       string.\n    >>> separate_paren_groups(''( ) (( )) (( )( ))'')\n    [''()'',
-      ''(())'', ''(()())'']\n    \"\"\"\n"}], "llm_providers": [{"provider": "anthropic",
-      "model": "claude-3-5-sonnet-20240620", "is_custom": false, "context_length":
-      null, "input_price": null, "output_price": null, "latency": null}, {"provider":
-      "openai", "model": "gpt-4o-2024-05-13", "is_custom": false, "context_length":
-      null, "input_price": null, "output_price": null, "latency": null}, {"provider":
-      "google", "model": "gemini-1.5-pro-latest", "is_custom": false, "context_length":
-      null, "input_price": null, "output_price": null, "latency": null}, {"provider":
-      "openai", "model": "gpt-4-turbo-2024-04-09", "is_custom": false, "context_length":
-      null, "input_price": null, "output_price": null, "latency": null}, {"provider":
-      "anthropic", "model": "claude-3-opus-20240229", "is_custom": false, "context_length":
-      null, "input_price": null, "output_price": null, "latency": null}], "metric":
-      "accuracy", "max_model_depth": 5, "hash_content": false}'
+      ''(())'', ''(()())'']\n    \"\"\"\n"}], "llm_providers": [{"provider": "openai",
+      "model": "gpt-4o-2024-05-13", "is_custom": false, "context_length": null, "input_price":
+      null, "output_price": null, "latency": null}, {"provider": "google", "model":
+      "gemini-1.5-pro-latest", "is_custom": false, "context_length": null, "input_price":
+      null, "output_price": null, "latency": null}, {"provider": "openai", "model":
+      "gpt-4-turbo-2024-04-09", "is_custom": false, "context_length": null, "input_price":
+      null, "output_price": null, "latency": null}, {"provider": "anthropic", "model":
+      "claude-sonnet-4-5", "is_custom": false, "context_length": null, "input_price":
+      null, "output_price": null, "latency": null}], "metric": "accuracy", "max_model_depth":
+      4, "hash_content": false, "preference_id": "0af17140-4a56-4c63-8690-907d8fa1c3bf"}'
     headers:
       Accept:
       - '*/*'
@@ -91,21 +89,19 @@ interactions:
       Connection:
       - keep-alive
       Content-Length:
-      - '1475'
+      - '1357'
       User-Agent:
-      - Python-SDK/0.3.21
+      - Python-SDK/0.4.9
       content-type:
       - application/json
     method: POST
     uri: https://api.notdiamond.ai/v2/modelRouter/modelSelect
   response:
     body:
-      string: '{"providers":[{"provider":"openai","model":"gpt-4-turbo-2024-04-09"}],"session_id":"839d937f-a736-456a-bd1b-7f5cc6c9e5ce"}'
+      string: '{"providers":[{"provider":"anthropic","model":"claude-sonnet-4-5"}],"session_id":"c2c579f3-5993-4fd2-b1d4-e4da7c08d42d"}'
     headers:
-      CF-Cache-Status:
-      - DYNAMIC
-      CF-Ray:
-      - 8d06eda74c34bd3f-ATL
+      CF-RAY:
+      - 998f0b1aef81ac07-SJC
       Connection:
       - keep-alive
       Content-Encoding:
@@ -113,19 +109,23 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Thu, 10 Oct 2024 13:24:02 GMT
+      - Mon, 03 Nov 2025 21:42:48 GMT
       Server:
       - cloudflare
       Transfer-Encoding:
       - chunked
-      Vary:
-      - Accept-Encoding
       alt-svc:
       - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
       rndr-id:
-      - fc55ad81-c616-4864
+      - 1975070c-06f2-427a
+      vary:
+      - Accept-Encoding
       x-render-origin-server:
       - uvicorn
+      x-request-id:
+      - 1975070c-06f2-427a
     status:
       code: 200
       message: OK
@@ -135,18 +135,16 @@ interactions:
       be decomposed into\n    and integer part (largest integer smaller than given
       number) and decimals\n    (leftover part always smaller than 1).\n\n    Return
       the decimal part of the number.\n    >>> truncate_number(3.5)\n    0.5\n    \"\"\"\n"}],
-      "llm_providers": [{"provider": "anthropic", "model": "claude-3-5-sonnet-20240620",
-      "is_custom": false, "context_length": null, "input_price": null, "output_price":
-      null, "latency": null}, {"provider": "openai", "model": "gpt-4o-2024-05-13",
-      "is_custom": false, "context_length": null, "input_price": null, "output_price":
-      null, "latency": null}, {"provider": "google", "model": "gemini-1.5-pro-latest",
-      "is_custom": false, "context_length": null, "input_price": null, "output_price":
-      null, "latency": null}, {"provider": "openai", "model": "gpt-4-turbo-2024-04-09",
-      "is_custom": false, "context_length": null, "input_price": null, "output_price":
-      null, "latency": null}, {"provider": "anthropic", "model": "claude-3-opus-20240229",
-      "is_custom": false, "context_length": null, "input_price": null, "output_price":
-      null, "latency": null}], "metric": "accuracy", "max_model_depth": 5, "hash_content":
-      false}'
+      "llm_providers": [{"provider": "openai", "model": "gpt-4o-2024-05-13", "is_custom":
+      false, "context_length": null, "input_price": null, "output_price": null, "latency":
+      null}, {"provider": "google", "model": "gemini-1.5-pro-latest", "is_custom":
+      false, "context_length": null, "input_price": null, "output_price": null, "latency":
+      null}, {"provider": "openai", "model": "gpt-4-turbo-2024-04-09", "is_custom":
+      false, "context_length": null, "input_price": null, "output_price": null, "latency":
+      null}, {"provider": "anthropic", "model": "claude-sonnet-4-5", "is_custom":
+      false, "context_length": null, "input_price": null, "output_price": null, "latency":
+      null}], "metric": "accuracy", "max_model_depth": 4, "hash_content": false, "preference_id":
+      "0af17140-4a56-4c63-8690-907d8fa1c3bf"}'
     headers:
       Accept:
       - '*/*'
@@ -155,21 +153,19 @@ interactions:
       Connection:
       - keep-alive
       Content-Length:
-      - '1300'
+      - '1182'
       User-Agent:
-      - Python-SDK/0.3.21
+      - Python-SDK/0.4.9
       content-type:
       - application/json
     method: POST
     uri: https://api.notdiamond.ai/v2/modelRouter/modelSelect
   response:
     body:
-      string: '{"providers":[{"provider":"anthropic","model":"claude-3-5-sonnet-20240620"}],"session_id":"59e75912-1bd8-4183-bf2a-d8eca95f22f5"}'
+      string: '{"providers":[{"provider":"anthropic","model":"claude-sonnet-4-5"}],"session_id":"34bfd903-8102-45ce-9238-915c5d930566"}'
     headers:
-      CF-Cache-Status:
-      - DYNAMIC
-      CF-Ray:
-      - 8d06edad5dd069ed-ATL
+      CF-RAY:
+      - 998f0b27dca1f967-SJC
       Connection:
       - keep-alive
       Content-Encoding:
@@ -177,19 +173,23 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Thu, 10 Oct 2024 13:24:03 GMT
+      - Mon, 03 Nov 2025 21:42:49 GMT
       Server:
       - cloudflare
       Transfer-Encoding:
       - chunked
-      Vary:
-      - Accept-Encoding
       alt-svc:
       - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
       rndr-id:
-      - 0db6f733-4692-4673
+      - 5349ada3-aae3-4a3b
+      vary:
+      - Accept-Encoding
       x-render-origin-server:
       - uvicorn
+      x-request-id:
+      - 5349ada3-aae3-4a3b
     status:
       code: 200
       message: OK
@@ -200,18 +200,16 @@ interactions:
       balance. Your task is to detect if at any point the balance of account fallls
       below zero, and\n    at that point function should return True. Otherwise it
       should return False.\n    >>> below_zero([1, 2, 3])\n    False\n    >>> below_zero([1,
-      2, -4, 5])\n    True\n    \"\"\"\n"}], "llm_providers": [{"provider": "anthropic",
-      "model": "claude-3-5-sonnet-20240620", "is_custom": false, "context_length":
-      null, "input_price": null, "output_price": null, "latency": null}, {"provider":
-      "openai", "model": "gpt-4o-2024-05-13", "is_custom": false, "context_length":
-      null, "input_price": null, "output_price": null, "latency": null}, {"provider":
-      "google", "model": "gemini-1.5-pro-latest", "is_custom": false, "context_length":
-      null, "input_price": null, "output_price": null, "latency": null}, {"provider":
-      "openai", "model": "gpt-4-turbo-2024-04-09", "is_custom": false, "context_length":
-      null, "input_price": null, "output_price": null, "latency": null}, {"provider":
-      "anthropic", "model": "claude-3-opus-20240229", "is_custom": false, "context_length":
-      null, "input_price": null, "output_price": null, "latency": null}], "metric":
-      "accuracy", "max_model_depth": 5, "hash_content": false}'
+      2, -4, 5])\n    True\n    \"\"\"\n"}], "llm_providers": [{"provider": "openai",
+      "model": "gpt-4o-2024-05-13", "is_custom": false, "context_length": null, "input_price":
+      null, "output_price": null, "latency": null}, {"provider": "google", "model":
+      "gemini-1.5-pro-latest", "is_custom": false, "context_length": null, "input_price":
+      null, "output_price": null, "latency": null}, {"provider": "openai", "model":
+      "gpt-4-turbo-2024-04-09", "is_custom": false, "context_length": null, "input_price":
+      null, "output_price": null, "latency": null}, {"provider": "anthropic", "model":
+      "claude-sonnet-4-5", "is_custom": false, "context_length": null, "input_price":
+      null, "output_price": null, "latency": null}], "metric": "accuracy", "max_model_depth":
+      4, "hash_content": false, "preference_id": "0af17140-4a56-4c63-8690-907d8fa1c3bf"}'
     headers:
       Accept:
       - '*/*'
@@ -220,21 +218,19 @@ interactions:
       Connection:
       - keep-alive
       Content-Length:
-      - '1418'
+      - '1300'
       User-Agent:
-      - Python-SDK/0.3.21
+      - Python-SDK/0.4.9
       content-type:
       - application/json
     method: POST
     uri: https://api.notdiamond.ai/v2/modelRouter/modelSelect
   response:
     body:
-      string: '{"providers":[{"provider":"openai","model":"gpt-4o-2024-05-13"}],"session_id":"70b6bff3-da48-451a-9330-2f1a2e6941e3"}'
+      string: '{"providers":[{"provider":"anthropic","model":"claude-sonnet-4-5"}],"session_id":"58a49842-d235-4e8b-94ee-83e62ee32115"}'
     headers:
-      CF-Cache-Status:
-      - DYNAMIC
-      CF-Ray:
-      - 8d06edb53bf97bde-ATL
+      CF-RAY:
+      - 998f0b329b62cf55-SJC
       Connection:
       - keep-alive
       Content-Encoding:
@@ -242,19 +238,23 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Thu, 10 Oct 2024 13:24:04 GMT
+      - Mon, 03 Nov 2025 21:42:53 GMT
       Server:
       - cloudflare
       Transfer-Encoding:
       - chunked
-      Vary:
-      - Accept-Encoding
       alt-svc:
       - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
       rndr-id:
-      - f1c69680-eed1-4519
+      - cb1a92b2-19df-421b
+      vary:
+      - Accept-Encoding
       x-render-origin-server:
       - uvicorn
+      x-request-id:
+      - cb1a92b2-19df-421b
     status:
       code: 200
       message: OK
@@ -265,18 +265,16 @@ interactions:
       of this dataset.\n    Mean Absolute Deviation is the average absolute difference
       between each\n    element and a centerpoint (mean in this case):\n    MAD =
       average | x - x_mean |\n    >>> mean_absolute_deviation([1.0, 2.0, 3.0, 4.0])\n    1.0\n    \"\"\"\n"}],
-      "llm_providers": [{"provider": "anthropic", "model": "claude-3-5-sonnet-20240620",
-      "is_custom": false, "context_length": null, "input_price": null, "output_price":
-      null, "latency": null}, {"provider": "openai", "model": "gpt-4o-2024-05-13",
-      "is_custom": false, "context_length": null, "input_price": null, "output_price":
-      null, "latency": null}, {"provider": "google", "model": "gemini-1.5-pro-latest",
-      "is_custom": false, "context_length": null, "input_price": null, "output_price":
-      null, "latency": null}, {"provider": "openai", "model": "gpt-4-turbo-2024-04-09",
-      "is_custom": false, "context_length": null, "input_price": null, "output_price":
-      null, "latency": null}, {"provider": "anthropic", "model": "claude-3-opus-20240229",
-      "is_custom": false, "context_length": null, "input_price": null, "output_price":
-      null, "latency": null}], "metric": "accuracy", "max_model_depth": 5, "hash_content":
-      false}'
+      "llm_providers": [{"provider": "openai", "model": "gpt-4o-2024-05-13", "is_custom":
+      false, "context_length": null, "input_price": null, "output_price": null, "latency":
+      null}, {"provider": "google", "model": "gemini-1.5-pro-latest", "is_custom":
+      false, "context_length": null, "input_price": null, "output_price": null, "latency":
+      null}, {"provider": "openai", "model": "gpt-4-turbo-2024-04-09", "is_custom":
+      false, "context_length": null, "input_price": null, "output_price": null, "latency":
+      null}, {"provider": "anthropic", "model": "claude-sonnet-4-5", "is_custom":
+      false, "context_length": null, "input_price": null, "output_price": null, "latency":
+      null}], "metric": "accuracy", "max_model_depth": 4, "hash_content": false, "preference_id":
+      "0af17140-4a56-4c63-8690-907d8fa1c3bf"}'
     headers:
       Accept:
       - '*/*'
@@ -285,21 +283,19 @@ interactions:
       Connection:
       - keep-alive
       Content-Length:
-      - '1400'
+      - '1282'
       User-Agent:
-      - Python-SDK/0.3.21
+      - Python-SDK/0.4.9
       content-type:
       - application/json
     method: POST
     uri: https://api.notdiamond.ai/v2/modelRouter/modelSelect
   response:
     body:
-      string: '{"providers":[{"provider":"anthropic","model":"claude-3-5-sonnet-20240620"}],"session_id":"0e52a652-43ee-451b-88cd-8176331b01d6"}'
+      string: '{"providers":[{"provider":"anthropic","model":"claude-sonnet-4-5"}],"session_id":"0c374945-d66b-41fe-a74f-6eb5eeba4fce"}'
     headers:
-      CF-Cache-Status:
-      - DYNAMIC
-      CF-Ray:
-      - 8d06edbe9aea53da-ATL
+      CF-RAY:
+      - 998f0b49ba8c67c7-SJC
       Connection:
       - keep-alive
       Content-Encoding:
@@ -307,19 +303,23 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Thu, 10 Oct 2024 13:24:06 GMT
+      - Mon, 03 Nov 2025 21:42:55 GMT
       Server:
       - cloudflare
       Transfer-Encoding:
       - chunked
-      Vary:
-      - Accept-Encoding
       alt-svc:
       - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
       rndr-id:
-      - b2fff2a7-b702-48b3
+      - 311a662f-6a48-49c1
+      vary:
+      - Accept-Encoding
       x-render-origin-server:
       - uvicorn
+      x-request-id:
+      - 311a662f-6a48-49c1
     status:
       code: 200
       message: OK
@@ -328,18 +328,16 @@ interactions:
       intersperse(numbers: List[int], delimeter: int) -> List[int]:\n    \"\"\" Insert
       a number ''delimeter'' between every two consecutive elements of input list
       `numbers''\n    >>> intersperse([], 4)\n    []\n    >>> intersperse([1, 2, 3],
-      4)\n    [1, 4, 2, 4, 3]\n    \"\"\"\n"}], "llm_providers": [{"provider": "anthropic",
-      "model": "claude-3-5-sonnet-20240620", "is_custom": false, "context_length":
-      null, "input_price": null, "output_price": null, "latency": null}, {"provider":
-      "openai", "model": "gpt-4o-2024-05-13", "is_custom": false, "context_length":
-      null, "input_price": null, "output_price": null, "latency": null}, {"provider":
-      "google", "model": "gemini-1.5-pro-latest", "is_custom": false, "context_length":
-      null, "input_price": null, "output_price": null, "latency": null}, {"provider":
-      "openai", "model": "gpt-4-turbo-2024-04-09", "is_custom": false, "context_length":
-      null, "input_price": null, "output_price": null, "latency": null}, {"provider":
-      "anthropic", "model": "claude-3-opus-20240229", "is_custom": false, "context_length":
-      null, "input_price": null, "output_price": null, "latency": null}], "metric":
-      "accuracy", "max_model_depth": 5, "hash_content": false}'
+      4)\n    [1, 4, 2, 4, 3]\n    \"\"\"\n"}], "llm_providers": [{"provider": "openai",
+      "model": "gpt-4o-2024-05-13", "is_custom": false, "context_length": null, "input_price":
+      null, "output_price": null, "latency": null}, {"provider": "google", "model":
+      "gemini-1.5-pro-latest", "is_custom": false, "context_length": null, "input_price":
+      null, "output_price": null, "latency": null}, {"provider": "openai", "model":
+      "gpt-4-turbo-2024-04-09", "is_custom": false, "context_length": null, "input_price":
+      null, "output_price": null, "latency": null}, {"provider": "anthropic", "model":
+      "claude-sonnet-4-5", "is_custom": false, "context_length": null, "input_price":
+      null, "output_price": null, "latency": null}], "metric": "accuracy", "max_model_depth":
+      4, "hash_content": false, "preference_id": "0af17140-4a56-4c63-8690-907d8fa1c3bf"}'
     headers:
       Accept:
       - '*/*'
@@ -348,21 +346,19 @@ interactions:
       Connection:
       - keep-alive
       Content-Length:
-      - '1255'
+      - '1137'
       User-Agent:
-      - Python-SDK/0.3.21
+      - Python-SDK/0.4.9
       content-type:
       - application/json
     method: POST
     uri: https://api.notdiamond.ai/v2/modelRouter/modelSelect
   response:
     body:
-      string: '{"providers":[{"provider":"openai","model":"gpt-4o-2024-05-13"}],"session_id":"843aaf6f-b7c9-4bd4-bfdb-fbd1fa948dab"}'
+      string: '{"providers":[{"provider":"anthropic","model":"claude-sonnet-4-5"}],"session_id":"fadccbf8-64ff-4751-bec7-498fc739cd1c"}'
     headers:
-      CF-Cache-Status:
-      - DYNAMIC
-      CF-Ray:
-      - 8d06edc50861bcfc-ATL
+      CF-RAY:
+      - 998f0b55dbc4d041-SJC
       Connection:
       - keep-alive
       Content-Encoding:
@@ -370,19 +366,23 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Thu, 10 Oct 2024 13:24:07 GMT
+      - Mon, 03 Nov 2025 21:42:57 GMT
       Server:
       - cloudflare
       Transfer-Encoding:
       - chunked
-      Vary:
-      - Accept-Encoding
       alt-svc:
       - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
       rndr-id:
-      - 9bb0f771-7da6-4505
+      - 7ce8706b-7356-4ec4
+      vary:
+      - Accept-Encoding
       x-render-origin-server:
       - uvicorn
+      x-request-id:
+      - 7ce8706b-7356-4ec4
     status:
       code: 200
       message: OK
@@ -393,18 +393,16 @@ interactions:
       by spaces.\n    For each of the group, output the deepest level of nesting of
       parentheses.\n    E.g. (()()) has maximum two levels of nesting while ((()))
       has three.\n\n    >>> parse_nested_parens(''(()()) ((())) () ((())()())'')\n    [2,
-      3, 1, 3]\n    \"\"\"\n"}], "llm_providers": [{"provider": "anthropic", "model":
-      "claude-3-5-sonnet-20240620", "is_custom": false, "context_length": null, "input_price":
-      null, "output_price": null, "latency": null}, {"provider": "openai", "model":
+      3, 1, 3]\n    \"\"\"\n"}], "llm_providers": [{"provider": "openai", "model":
       "gpt-4o-2024-05-13", "is_custom": false, "context_length": null, "input_price":
       null, "output_price": null, "latency": null}, {"provider": "google", "model":
       "gemini-1.5-pro-latest", "is_custom": false, "context_length": null, "input_price":
       null, "output_price": null, "latency": null}, {"provider": "openai", "model":
       "gpt-4-turbo-2024-04-09", "is_custom": false, "context_length": null, "input_price":
       null, "output_price": null, "latency": null}, {"provider": "anthropic", "model":
-      "claude-3-opus-20240229", "is_custom": false, "context_length": null, "input_price":
+      "claude-sonnet-4-5", "is_custom": false, "context_length": null, "input_price":
       null, "output_price": null, "latency": null}], "metric": "accuracy", "max_model_depth":
-      5, "hash_content": false}'
+      4, "hash_content": false, "preference_id": "0af17140-4a56-4c63-8690-907d8fa1c3bf"}'
     headers:
       Accept:
       - '*/*'
@@ -413,21 +411,19 @@ interactions:
       Connection:
       - keep-alive
       Content-Length:
-      - '1405'
+      - '1287'
       User-Agent:
-      - Python-SDK/0.3.21
+      - Python-SDK/0.4.9
       content-type:
       - application/json
     method: POST
     uri: https://api.notdiamond.ai/v2/modelRouter/modelSelect
   response:
     body:
-      string: '{"providers":[{"provider":"anthropic","model":"claude-3-5-sonnet-20240620"}],"session_id":"a3effa5b-d276-4968-a3f7-34e94ee099dc"}'
+      string: '{"providers":[{"provider":"anthropic","model":"claude-sonnet-4-5"}],"session_id":"fa2a88b8-cc55-4702-926e-072df99871e2"}'
     headers:
-      CF-Cache-Status:
-      - DYNAMIC
-      CF-Ray:
-      - 8d06edccab784533-ATL
+      CF-RAY:
+      - 998f0b623a7e15e5-SJC
       Connection:
       - keep-alive
       Content-Encoding:
@@ -435,19 +431,23 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Thu, 10 Oct 2024 13:24:08 GMT
+      - Mon, 03 Nov 2025 21:42:59 GMT
       Server:
       - cloudflare
       Transfer-Encoding:
       - chunked
-      Vary:
-      - Accept-Encoding
       alt-svc:
       - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
       rndr-id:
-      - 05cb9579-9d87-42f0
+      - 6c872611-3f7b-4199
+      vary:
+      - Accept-Encoding
       x-render-origin-server:
       - uvicorn
+      x-request-id:
+      - 6c872611-3f7b-4199
     status:
       code: 200
       message: OK
@@ -457,18 +457,16 @@ interactions:
       Filter an input list of strings only for ones that contain given substring\n    >>>
       filter_by_substring([], ''a'')\n    []\n    >>> filter_by_substring([''abc'',
       ''bacd'', ''cde'', ''array''], ''a'')\n    [''abc'', ''bacd'', ''array'']\n    \"\"\"\n"}],
-      "llm_providers": [{"provider": "anthropic", "model": "claude-3-5-sonnet-20240620",
-      "is_custom": false, "context_length": null, "input_price": null, "output_price":
-      null, "latency": null}, {"provider": "openai", "model": "gpt-4o-2024-05-13",
-      "is_custom": false, "context_length": null, "input_price": null, "output_price":
-      null, "latency": null}, {"provider": "google", "model": "gemini-1.5-pro-latest",
-      "is_custom": false, "context_length": null, "input_price": null, "output_price":
-      null, "latency": null}, {"provider": "openai", "model": "gpt-4-turbo-2024-04-09",
-      "is_custom": false, "context_length": null, "input_price": null, "output_price":
-      null, "latency": null}, {"provider": "anthropic", "model": "claude-3-opus-20240229",
-      "is_custom": false, "context_length": null, "input_price": null, "output_price":
-      null, "latency": null}], "metric": "accuracy", "max_model_depth": 5, "hash_content":
-      false}'
+      "llm_providers": [{"provider": "openai", "model": "gpt-4o-2024-05-13", "is_custom":
+      false, "context_length": null, "input_price": null, "output_price": null, "latency":
+      null}, {"provider": "google", "model": "gemini-1.5-pro-latest", "is_custom":
+      false, "context_length": null, "input_price": null, "output_price": null, "latency":
+      null}, {"provider": "openai", "model": "gpt-4-turbo-2024-04-09", "is_custom":
+      false, "context_length": null, "input_price": null, "output_price": null, "latency":
+      null}, {"provider": "anthropic", "model": "claude-sonnet-4-5", "is_custom":
+      false, "context_length": null, "input_price": null, "output_price": null, "latency":
+      null}], "metric": "accuracy", "max_model_depth": 4, "hash_content": false, "preference_id":
+      "0af17140-4a56-4c63-8690-907d8fa1c3bf"}'
     headers:
       Accept:
       - '*/*'
@@ -477,21 +475,19 @@ interactions:
       Connection:
       - keep-alive
       Content-Length:
-      - '1298'
+      - '1180'
       User-Agent:
-      - Python-SDK/0.3.21
+      - Python-SDK/0.4.9
       content-type:
       - application/json
     method: POST
     uri: https://api.notdiamond.ai/v2/modelRouter/modelSelect
   response:
     body:
-      string: '{"providers":[{"provider":"openai","model":"gpt-4o-2024-05-13"}],"session_id":"d051bcca-2ee1-4cd6-b0b7-a07f88542453"}'
+      string: '{"providers":[{"provider":"anthropic","model":"claude-sonnet-4-5"}],"session_id":"e2b71c9f-66dd-4da9-be56-d8aeb994f283"}'
     headers:
-      CF-Cache-Status:
-      - DYNAMIC
-      CF-Ray:
-      - 8d06edd31e0d53cd-ATL
+      CF-RAY:
+      - 998f0b6ecf08cef5-SJC
       Connection:
       - keep-alive
       Content-Encoding:
@@ -499,19 +495,23 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Thu, 10 Oct 2024 13:24:09 GMT
+      - Mon, 03 Nov 2025 21:43:01 GMT
       Server:
       - cloudflare
       Transfer-Encoding:
       - chunked
-      Vary:
-      - Accept-Encoding
       alt-svc:
       - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
       rndr-id:
-      - c461fc4a-fd6d-4973
+      - a32b2e10-77f9-4363
+      vary:
+      - Accept-Encoding
       x-render-origin-server:
       - uvicorn
+      x-request-id:
+      - a32b2e10-77f9-4363
     status:
       code: 200
       message: OK
@@ -521,18 +521,16 @@ interactions:
       list of integers, return a tuple consisting of a sum and a product of all the
       integers in a list.\n    Empty sum should be equal to 0 and empty product should
       be equal to 1.\n    >>> sum_product([])\n    (0, 1)\n    >>> sum_product([1,
-      2, 3, 4])\n    (10, 24)\n    \"\"\"\n"}], "llm_providers": [{"provider": "anthropic",
-      "model": "claude-3-5-sonnet-20240620", "is_custom": false, "context_length":
-      null, "input_price": null, "output_price": null, "latency": null}, {"provider":
-      "openai", "model": "gpt-4o-2024-05-13", "is_custom": false, "context_length":
-      null, "input_price": null, "output_price": null, "latency": null}, {"provider":
-      "google", "model": "gemini-1.5-pro-latest", "is_custom": false, "context_length":
-      null, "input_price": null, "output_price": null, "latency": null}, {"provider":
-      "openai", "model": "gpt-4-turbo-2024-04-09", "is_custom": false, "context_length":
-      null, "input_price": null, "output_price": null, "latency": null}, {"provider":
-      "anthropic", "model": "claude-3-opus-20240229", "is_custom": false, "context_length":
-      null, "input_price": null, "output_price": null, "latency": null}], "metric":
-      "accuracy", "max_model_depth": 5, "hash_content": false}'
+      2, 3, 4])\n    (10, 24)\n    \"\"\"\n"}], "llm_providers": [{"provider": "openai",
+      "model": "gpt-4o-2024-05-13", "is_custom": false, "context_length": null, "input_price":
+      null, "output_price": null, "latency": null}, {"provider": "google", "model":
+      "gemini-1.5-pro-latest", "is_custom": false, "context_length": null, "input_price":
+      null, "output_price": null, "latency": null}, {"provider": "openai", "model":
+      "gpt-4-turbo-2024-04-09", "is_custom": false, "context_length": null, "input_price":
+      null, "output_price": null, "latency": null}, {"provider": "anthropic", "model":
+      "claude-sonnet-4-5", "is_custom": false, "context_length": null, "input_price":
+      null, "output_price": null, "latency": null}], "metric": "accuracy", "max_model_depth":
+      4, "hash_content": false, "preference_id": "0af17140-4a56-4c63-8690-907d8fa1c3bf"}'
     headers:
       Accept:
       - '*/*'
@@ -541,21 +539,19 @@ interactions:
       Connection:
       - keep-alive
       Content-Length:
-      - '1341'
+      - '1223'
       User-Agent:
-      - Python-SDK/0.3.21
+      - Python-SDK/0.4.9
       content-type:
       - application/json
     method: POST
     uri: https://api.notdiamond.ai/v2/modelRouter/modelSelect
   response:
     body:
-      string: '{"providers":[{"provider":"openai","model":"gpt-4o-2024-05-13"}],"session_id":"0a7a4332-4f01-4e03-88d2-4d4824039b3e"}'
+      string: '{"providers":[{"provider":"anthropic","model":"claude-sonnet-4-5"}],"session_id":"9be435f7-90b2-4ed5-974d-bea1ef97c6ed"}'
     headers:
-      CF-Cache-Status:
-      - DYNAMIC
-      CF-Ray:
-      - 8d06edd98945bf6e-ATL
+      CF-RAY:
+      - 998f0b799ed5a230-SJC
       Connection:
       - keep-alive
       Content-Encoding:
@@ -563,19 +559,23 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Thu, 10 Oct 2024 13:24:10 GMT
+      - Mon, 03 Nov 2025 21:43:03 GMT
       Server:
       - cloudflare
       Transfer-Encoding:
       - chunked
-      Vary:
-      - Accept-Encoding
       alt-svc:
       - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
       rndr-id:
-      - 04ef84c4-5df4-4690
+      - 9ab5badf-7588-4220
+      vary:
+      - Accept-Encoding
       x-render-origin-server:
       - uvicorn
+      x-request-id:
+      - 9ab5badf-7588-4220
     status:
       code: 200
       message: OK
@@ -584,18 +584,16 @@ interactions:
       rolling_max(numbers: List[int]) -> List[int]:\n    \"\"\" From a given list
       of integers, generate a list of rolling maximum element found until given moment\n    in
       the sequence.\n    >>> rolling_max([1, 2, 3, 2, 3, 4, 2])\n    [1, 2, 3, 3,
-      3, 4, 4]\n    \"\"\"\n"}], "llm_providers": [{"provider": "anthropic", "model":
-      "claude-3-5-sonnet-20240620", "is_custom": false, "context_length": null, "input_price":
-      null, "output_price": null, "latency": null}, {"provider": "openai", "model":
+      3, 4, 4]\n    \"\"\"\n"}], "llm_providers": [{"provider": "openai", "model":
       "gpt-4o-2024-05-13", "is_custom": false, "context_length": null, "input_price":
       null, "output_price": null, "latency": null}, {"provider": "google", "model":
       "gemini-1.5-pro-latest", "is_custom": false, "context_length": null, "input_price":
       null, "output_price": null, "latency": null}, {"provider": "openai", "model":
       "gpt-4-turbo-2024-04-09", "is_custom": false, "context_length": null, "input_price":
       null, "output_price": null, "latency": null}, {"provider": "anthropic", "model":
-      "claude-3-opus-20240229", "is_custom": false, "context_length": null, "input_price":
+      "claude-sonnet-4-5", "is_custom": false, "context_length": null, "input_price":
       null, "output_price": null, "latency": null}], "metric": "accuracy", "max_model_depth":
-      5, "hash_content": false}'
+      4, "hash_content": false, "preference_id": "0af17140-4a56-4c63-8690-907d8fa1c3bf"}'
     headers:
       Accept:
       - '*/*'
@@ -604,21 +602,19 @@ interactions:
       Connection:
       - keep-alive
       Content-Length:
-      - '1255'
+      - '1137'
       User-Agent:
-      - Python-SDK/0.3.21
+      - Python-SDK/0.4.9
       content-type:
       - application/json
     method: POST
     uri: https://api.notdiamond.ai/v2/modelRouter/modelSelect
   response:
     body:
-      string: '{"providers":[{"provider":"anthropic","model":"claude-3-5-sonnet-20240620"}],"session_id":"e8106862-22b9-4c48-812f-3c9e222fcc37"}'
+      string: '{"providers":[{"provider":"anthropic","model":"claude-sonnet-4-5"}],"session_id":"3ce683dc-2476-47d4-9435-54cc10bb68c2"}'
     headers:
-      CF-Cache-Status:
-      - DYNAMIC
-      CF-Ray:
-      - 8d06eddf9f9f69ec-ATL
+      CF-RAY:
+      - 998f0b848c7915b4-SJC
       Connection:
       - keep-alive
       Content-Encoding:
@@ -626,19 +622,23 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Thu, 10 Oct 2024 13:24:11 GMT
+      - Mon, 03 Nov 2025 21:43:04 GMT
       Server:
       - cloudflare
       Transfer-Encoding:
       - chunked
-      Vary:
-      - Accept-Encoding
       alt-svc:
       - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
       rndr-id:
-      - 64aeaa4d-7ea8-409e
+      - 571d08f5-56bb-4964
+      vary:
+      - Accept-Encoding
       x-render-origin-server:
       - uvicorn
+      x-request-id:
+      - 571d08f5-56bb-4964
     status:
       code: 200
       message: OK
@@ -651,18 +651,16 @@ interactions:
       palindrome.\n    - Append to the end of the string reverse of a string prefix
       that comes before the palindromic suffix.\n    >>> make_palindrome('''')\n    ''''\n    >>>
       make_palindrome(''cat'')\n    ''catac''\n    >>> make_palindrome(''cata'')\n    ''catac''\n    \"\"\"\n"}],
-      "llm_providers": [{"provider": "anthropic", "model": "claude-3-5-sonnet-20240620",
-      "is_custom": false, "context_length": null, "input_price": null, "output_price":
-      null, "latency": null}, {"provider": "openai", "model": "gpt-4o-2024-05-13",
-      "is_custom": false, "context_length": null, "input_price": null, "output_price":
-      null, "latency": null}, {"provider": "google", "model": "gemini-1.5-pro-latest",
-      "is_custom": false, "context_length": null, "input_price": null, "output_price":
-      null, "latency": null}, {"provider": "openai", "model": "gpt-4-turbo-2024-04-09",
-      "is_custom": false, "context_length": null, "input_price": null, "output_price":
-      null, "latency": null}, {"provider": "anthropic", "model": "claude-3-opus-20240229",
-      "is_custom": false, "context_length": null, "input_price": null, "output_price":
-      null, "latency": null}], "metric": "accuracy", "max_model_depth": 5, "hash_content":
-      false}'
+      "llm_providers": [{"provider": "openai", "model": "gpt-4o-2024-05-13", "is_custom":
+      false, "context_length": null, "input_price": null, "output_price": null, "latency":
+      null}, {"provider": "google", "model": "gemini-1.5-pro-latest", "is_custom":
+      false, "context_length": null, "input_price": null, "output_price": null, "latency":
+      null}, {"provider": "openai", "model": "gpt-4-turbo-2024-04-09", "is_custom":
+      false, "context_length": null, "input_price": null, "output_price": null, "latency":
+      null}, {"provider": "anthropic", "model": "claude-sonnet-4-5", "is_custom":
+      false, "context_length": null, "input_price": null, "output_price": null, "latency":
+      null}], "metric": "accuracy", "max_model_depth": 4, "hash_content": false, "preference_id":
+      "0af17140-4a56-4c63-8690-907d8fa1c3bf"}'
     headers:
       Accept:
       - '*/*'
@@ -671,21 +669,19 @@ interactions:
       Connection:
       - keep-alive
       Content-Length:
-      - '1563'
+      - '1445'
       User-Agent:
-      - Python-SDK/0.3.21
+      - Python-SDK/0.4.9
       content-type:
       - application/json
     method: POST
     uri: https://api.notdiamond.ai/v2/modelRouter/modelSelect
   response:
     body:
-      string: '{"providers":[{"provider":"openai","model":"gpt-4o-2024-05-13"}],"session_id":"05b979d4-2716-4c54-bc53-de391b220bf9"}'
+      string: '{"providers":[{"provider":"anthropic","model":"claude-sonnet-4-5"}],"session_id":"aef2fae8-9edd-4414-8336-b286df50068c"}'
     headers:
-      CF-Cache-Status:
-      - DYNAMIC
-      CF-Ray:
-      - 8d06ede6892cb057-ATL
+      CF-RAY:
+      - 998f0b8f3da9cce4-SJC
       Connection:
       - keep-alive
       Content-Encoding:
@@ -693,19 +689,23 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Thu, 10 Oct 2024 13:24:12 GMT
+      - Mon, 03 Nov 2025 21:43:06 GMT
       Server:
       - cloudflare
       Transfer-Encoding:
       - chunked
-      Vary:
-      - Accept-Encoding
       alt-svc:
       - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
       rndr-id:
-      - 93758d85-838f-44b8
+      - 49c452c0-cb23-4934
+      vary:
+      - Accept-Encoding
       x-render-origin-server:
       - uvicorn
+      x-request-id:
+      - 49c452c0-cb23-4934
     status:
       code: 200
       message: OK
@@ -714,18 +714,16 @@ interactions:
       string_xor(a: str, b: str) -> str:\n    \"\"\" Input are two strings a and b
       consisting only of 1s and 0s.\n    Perform binary XOR on these inputs and return
       result also as a string.\n    >>> string_xor(''010'', ''110'')\n    ''100''\n    \"\"\"\n"}],
-      "llm_providers": [{"provider": "anthropic", "model": "claude-3-5-sonnet-20240620",
-      "is_custom": false, "context_length": null, "input_price": null, "output_price":
-      null, "latency": null}, {"provider": "openai", "model": "gpt-4o-2024-05-13",
-      "is_custom": false, "context_length": null, "input_price": null, "output_price":
-      null, "latency": null}, {"provider": "google", "model": "gemini-1.5-pro-latest",
-      "is_custom": false, "context_length": null, "input_price": null, "output_price":
-      null, "latency": null}, {"provider": "openai", "model": "gpt-4-turbo-2024-04-09",
-      "is_custom": false, "context_length": null, "input_price": null, "output_price":
-      null, "latency": null}, {"provider": "anthropic", "model": "claude-3-opus-20240229",
-      "is_custom": false, "context_length": null, "input_price": null, "output_price":
-      null, "latency": null}], "metric": "accuracy", "max_model_depth": 5, "hash_content":
-      false}'
+      "llm_providers": [{"provider": "openai", "model": "gpt-4o-2024-05-13", "is_custom":
+      false, "context_length": null, "input_price": null, "output_price": null, "latency":
+      null}, {"provider": "google", "model": "gemini-1.5-pro-latest", "is_custom":
+      false, "context_length": null, "input_price": null, "output_price": null, "latency":
+      null}, {"provider": "openai", "model": "gpt-4-turbo-2024-04-09", "is_custom":
+      false, "context_length": null, "input_price": null, "output_price": null, "latency":
+      null}, {"provider": "anthropic", "model": "claude-sonnet-4-5", "is_custom":
+      false, "context_length": null, "input_price": null, "output_price": null, "latency":
+      null}], "metric": "accuracy", "max_model_depth": 4, "hash_content": false, "preference_id":
+      "0af17140-4a56-4c63-8690-907d8fa1c3bf"}'
     headers:
       Accept:
       - '*/*'
@@ -734,21 +732,19 @@ interactions:
       Connection:
       - keep-alive
       Content-Length:
-      - '1226'
+      - '1108'
       User-Agent:
-      - Python-SDK/0.3.21
+      - Python-SDK/0.4.9
       content-type:
       - application/json
     method: POST
     uri: https://api.notdiamond.ai/v2/modelRouter/modelSelect
   response:
     body:
-      string: '{"providers":[{"provider":"openai","model":"gpt-4o-2024-05-13"}],"session_id":"85771f10-73a3-466e-ac7a-052d2e8dd8f1"}'
+      string: '{"providers":[{"provider":"anthropic","model":"claude-sonnet-4-5"}],"session_id":"65790a29-b53f-4360-b6b5-7e6ac61a1eef"}'
     headers:
-      CF-Cache-Status:
-      - DYNAMIC
-      CF-Ray:
-      - 8d06eded9974b053-ATL
+      CF-RAY:
+      - 998f0b994a08f9ed-SJC
       Connection:
       - keep-alive
       Content-Encoding:
@@ -756,19 +752,23 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Thu, 10 Oct 2024 13:24:13 GMT
+      - Mon, 03 Nov 2025 21:43:08 GMT
       Server:
       - cloudflare
       Transfer-Encoding:
       - chunked
-      Vary:
-      - Accept-Encoding
       alt-svc:
       - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
       rndr-id:
-      - d45e80c7-e666-43b9
+      - ae635964-3edc-4c43
+      vary:
+      - Accept-Encoding
       x-render-origin-server:
       - uvicorn
+      x-request-id:
+      - ae635964-3edc-4c43
     status:
       code: 200
       message: OK
@@ -778,18 +778,16 @@ interactions:
       return the longest one. Return the first one in case of multiple\n    strings
       of the same length. Return None in case the input list is empty.\n    >>> longest([])\n\n    >>>
       longest([''a'', ''b'', ''c''])\n    ''a''\n    >>> longest([''a'', ''bb'', ''ccc''])\n    ''ccc''\n    \"\"\"\n"}],
-      "llm_providers": [{"provider": "anthropic", "model": "claude-3-5-sonnet-20240620",
-      "is_custom": false, "context_length": null, "input_price": null, "output_price":
-      null, "latency": null}, {"provider": "openai", "model": "gpt-4o-2024-05-13",
-      "is_custom": false, "context_length": null, "input_price": null, "output_price":
-      null, "latency": null}, {"provider": "google", "model": "gemini-1.5-pro-latest",
-      "is_custom": false, "context_length": null, "input_price": null, "output_price":
-      null, "latency": null}, {"provider": "openai", "model": "gpt-4-turbo-2024-04-09",
-      "is_custom": false, "context_length": null, "input_price": null, "output_price":
-      null, "latency": null}, {"provider": "anthropic", "model": "claude-3-opus-20240229",
-      "is_custom": false, "context_length": null, "input_price": null, "output_price":
-      null, "latency": null}], "metric": "accuracy", "max_model_depth": 5, "hash_content":
-      false}'
+      "llm_providers": [{"provider": "openai", "model": "gpt-4o-2024-05-13", "is_custom":
+      false, "context_length": null, "input_price": null, "output_price": null, "latency":
+      null}, {"provider": "google", "model": "gemini-1.5-pro-latest", "is_custom":
+      false, "context_length": null, "input_price": null, "output_price": null, "latency":
+      null}, {"provider": "openai", "model": "gpt-4-turbo-2024-04-09", "is_custom":
+      false, "context_length": null, "input_price": null, "output_price": null, "latency":
+      null}, {"provider": "anthropic", "model": "claude-sonnet-4-5", "is_custom":
+      false, "context_length": null, "input_price": null, "output_price": null, "latency":
+      null}], "metric": "accuracy", "max_model_depth": 4, "hash_content": false, "preference_id":
+      "0af17140-4a56-4c63-8690-907d8fa1c3bf"}'
     headers:
       Accept:
       - '*/*'
@@ -798,21 +796,19 @@ interactions:
       Connection:
       - keep-alive
       Content-Length:
-      - '1347'
+      - '1229'
       User-Agent:
-      - Python-SDK/0.3.21
+      - Python-SDK/0.4.9
       content-type:
       - application/json
     method: POST
     uri: https://api.notdiamond.ai/v2/modelRouter/modelSelect
   response:
     body:
-      string: '{"providers":[{"provider":"openai","model":"gpt-4o-2024-05-13"}],"session_id":"1c85a72d-36a7-4154-a471-22347158ea74"}'
+      string: '{"providers":[{"provider":"anthropic","model":"claude-sonnet-4-5"}],"session_id":"c8b9fc8d-78be-4481-a730-5752252278d6"}'
     headers:
-      CF-Cache-Status:
-      - DYNAMIC
-      CF-Ray:
-      - 8d06edf3fe6a6767-ATL
+      CF-RAY:
+      - 998f0ba39f19cfd5-SJC
       Connection:
       - keep-alive
       Content-Encoding:
@@ -820,19 +816,23 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Thu, 10 Oct 2024 13:24:14 GMT
+      - Mon, 03 Nov 2025 21:43:09 GMT
       Server:
       - cloudflare
       Transfer-Encoding:
       - chunked
-      Vary:
-      - Accept-Encoding
       alt-svc:
       - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
       rndr-id:
-      - 6dbb39f8-b83c-4518
+      - 6d125977-7698-45fc
+      vary:
+      - Accept-Encoding
       x-render-origin-server:
       - uvicorn
+      x-request-id:
+      - 6d125977-7698-45fc
     status:
       code: 200
       message: OK
@@ -840,18 +840,16 @@ interactions:
     body: '{"messages": [{"role": "user", "content": "\n\ndef greatest_common_divisor(a:
       int, b: int) -> int:\n    \"\"\" Return a greatest common divisor of two integers
       a and b\n    >>> greatest_common_divisor(3, 5)\n    1\n    >>> greatest_common_divisor(25,
-      15)\n    5\n    \"\"\"\n"}], "llm_providers": [{"provider": "anthropic", "model":
-      "claude-3-5-sonnet-20240620", "is_custom": false, "context_length": null, "input_price":
-      null, "output_price": null, "latency": null}, {"provider": "openai", "model":
+      15)\n    5\n    \"\"\"\n"}], "llm_providers": [{"provider": "openai", "model":
       "gpt-4o-2024-05-13", "is_custom": false, "context_length": null, "input_price":
       null, "output_price": null, "latency": null}, {"provider": "google", "model":
       "gemini-1.5-pro-latest", "is_custom": false, "context_length": null, "input_price":
       null, "output_price": null, "latency": null}, {"provider": "openai", "model":
       "gpt-4-turbo-2024-04-09", "is_custom": false, "context_length": null, "input_price":
       null, "output_price": null, "latency": null}, {"provider": "anthropic", "model":
-      "claude-3-opus-20240229", "is_custom": false, "context_length": null, "input_price":
+      "claude-sonnet-4-5", "is_custom": false, "context_length": null, "input_price":
       null, "output_price": null, "latency": null}], "metric": "accuracy", "max_model_depth":
-      5, "hash_content": false}'
+      4, "hash_content": false, "preference_id": "0af17140-4a56-4c63-8690-907d8fa1c3bf"}'
     headers:
       Accept:
       - '*/*'
@@ -860,21 +858,19 @@ interactions:
       Connection:
       - keep-alive
       Content-Length:
-      - '1184'
+      - '1066'
       User-Agent:
-      - Python-SDK/0.3.21
+      - Python-SDK/0.4.9
       content-type:
       - application/json
     method: POST
     uri: https://api.notdiamond.ai/v2/modelRouter/modelSelect
   response:
     body:
-      string: '{"providers":[{"provider":"openai","model":"gpt-4o-2024-05-13"}],"session_id":"41b3265c-3eb6-4f8b-be73-ec463d583a3e"}'
+      string: '{"providers":[{"provider":"anthropic","model":"claude-sonnet-4-5"}],"session_id":"7a97e0d7-6602-4903-8aba-ec400292c2ac"}'
     headers:
-      CF-Cache-Status:
-      - DYNAMIC
-      CF-Ray:
-      - 8d06edfa3db778c6-ATL
+      CF-RAY:
+      - 998f0bae98dcf9ed-SJC
       Connection:
       - keep-alive
       Content-Encoding:
@@ -882,19 +878,23 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Thu, 10 Oct 2024 13:24:15 GMT
+      - Mon, 03 Nov 2025 21:43:11 GMT
       Server:
       - cloudflare
       Transfer-Encoding:
       - chunked
-      Vary:
-      - Accept-Encoding
       alt-svc:
       - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
       rndr-id:
-      - d20741ad-70af-46fe
+      - 4f14177c-1707-4d81
+      vary:
+      - Accept-Encoding
       x-render-origin-server:
       - uvicorn
+      x-request-id:
+      - 4f14177c-1707-4d81
     status:
       code: 200
       message: OK
@@ -902,18 +902,16 @@ interactions:
     body: '{"messages": [{"role": "user", "content": "from typing import List\n\n\ndef
       all_prefixes(string: str) -> List[str]:\n    \"\"\" Return list of all prefixes
       from shortest to longest of the input string\n    >>> all_prefixes(''abc'')\n    [''a'',
-      ''ab'', ''abc'']\n    \"\"\"\n"}], "llm_providers": [{"provider": "anthropic",
-      "model": "claude-3-5-sonnet-20240620", "is_custom": false, "context_length":
-      null, "input_price": null, "output_price": null, "latency": null}, {"provider":
-      "openai", "model": "gpt-4o-2024-05-13", "is_custom": false, "context_length":
-      null, "input_price": null, "output_price": null, "latency": null}, {"provider":
-      "google", "model": "gemini-1.5-pro-latest", "is_custom": false, "context_length":
-      null, "input_price": null, "output_price": null, "latency": null}, {"provider":
-      "openai", "model": "gpt-4-turbo-2024-04-09", "is_custom": false, "context_length":
-      null, "input_price": null, "output_price": null, "latency": null}, {"provider":
-      "anthropic", "model": "claude-3-opus-20240229", "is_custom": false, "context_length":
-      null, "input_price": null, "output_price": null, "latency": null}], "metric":
-      "accuracy", "max_model_depth": 5, "hash_content": false}'
+      ''ab'', ''abc'']\n    \"\"\"\n"}], "llm_providers": [{"provider": "openai",
+      "model": "gpt-4o-2024-05-13", "is_custom": false, "context_length": null, "input_price":
+      null, "output_price": null, "latency": null}, {"provider": "google", "model":
+      "gemini-1.5-pro-latest", "is_custom": false, "context_length": null, "input_price":
+      null, "output_price": null, "latency": null}, {"provider": "openai", "model":
+      "gpt-4-turbo-2024-04-09", "is_custom": false, "context_length": null, "input_price":
+      null, "output_price": null, "latency": null}, {"provider": "anthropic", "model":
+      "claude-sonnet-4-5", "is_custom": false, "context_length": null, "input_price":
+      null, "output_price": null, "latency": null}], "metric": "accuracy", "max_model_depth":
+      4, "hash_content": false, "preference_id": "0af17140-4a56-4c63-8690-907d8fa1c3bf"}'
     headers:
       Accept:
       - '*/*'
@@ -922,21 +920,19 @@ interactions:
       Connection:
       - keep-alive
       Content-Length:
-      - '1176'
+      - '1058'
       User-Agent:
-      - Python-SDK/0.3.21
+      - Python-SDK/0.4.9
       content-type:
       - application/json
     method: POST
     uri: https://api.notdiamond.ai/v2/modelRouter/modelSelect
   response:
     body:
-      string: '{"providers":[{"provider":"anthropic","model":"claude-3-5-sonnet-20240620"}],"session_id":"014f4434-488e-43b1-bdbe-31d6dcb02c40"}'
+      string: '{"providers":[{"provider":"anthropic","model":"claude-sonnet-4-5"}],"session_id":"80c7b582-b11f-4a44-99f7-f482f97dd218"}'
     headers:
-      CF-Cache-Status:
-      - DYNAMIC
-      CF-Ray:
-      - 8d06ee001bbbbaea-ATL
+      CF-RAY:
+      - 998f0bb7ec141722-SJC
       Connection:
       - keep-alive
       Content-Encoding:
@@ -944,19 +940,23 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Thu, 10 Oct 2024 13:24:16 GMT
+      - Mon, 03 Nov 2025 21:43:12 GMT
       Server:
       - cloudflare
       Transfer-Encoding:
       - chunked
-      Vary:
-      - Accept-Encoding
       alt-svc:
       - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
       rndr-id:
-      - 477da270-028a-4871
+      - b1aef206-3f63-41a5
+      vary:
+      - Accept-Encoding
       x-render-origin-server:
       - uvicorn
+      x-request-id:
+      - b1aef206-3f63-41a5
     status:
       code: 200
       message: OK
