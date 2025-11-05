@@ -22,6 +22,7 @@ from opentelemetry.proto.trace.v1.trace_pb2 import (
 )
 from opentelemetry.semconv_ai import SpanAttributes as OTSpanAttr
 
+import pytest
 from weave.trace import weave_client
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.constants import MAX_OP_NAME_LENGTH
