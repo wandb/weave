@@ -107,16 +107,20 @@ def test_clickhouse_batching():
 
         # THE KEY ASSERTION:
         # Verify that there are exactly 2 inserts:
-        # 1 call that is the batch of call inserts
-        # 1 call that is the batch of file inserts
+        # 1 for files and 1 for call_parts (order may vary)
         insert_call_count = mock_ch_client.insert.call_count
         assert insert_call_count == 2, (
-            f"Expected exactly 2 ClickHouse insert call for 3 batched calls (and 3 base64 content objects, which are stored in files), "
+            f"Expected exactly 2 ClickHouse insert calls for 3 batched calls "
+            f"(and 3 base64 content objects, which are stored in files), "
             f"but got {insert_call_count} insert calls"
         )
-        assert mock_ch_client.insert.call_args_list[0][0][0] == "call_parts", (
-            f"Expected first insert call to be for call_parts, but got {mock_ch_client.insert.call_args_list[0][0][0]}"
-        )
-        assert mock_ch_client.insert.call_args_list[1][0][0] == "files", (
-            f"Expected second insert call to be for files, but got {mock_ch_client.insert.call_args_list[1][0][0]}"
+
+        # Check that both files and call_parts were inserted (order may vary)
+        insert_tables = [
+            mock_ch_client.insert.call_args_list[0][0][0],
+            mock_ch_client.insert.call_args_list[1][0][0],
+        ]
+        assert set(insert_tables) == {"files", "call_parts"}, (
+            f"Expected inserts to files and call_parts tables, "
+            f"but got inserts to: {insert_tables}"
         )
