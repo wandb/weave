@@ -747,8 +747,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def obj_create_batch(
         self, batch: list[tsi.ObjSchemaForInsert]
     ) -> list[tsi.ObjCreateRes]:
-        """
-        This method is for the special case where all objects are known to use a placeholder.
+        """This method is for the special case where all objects are known to use a placeholder.
         We lose any knowledge of what version the created object is in return for an enormous
         performance increase for operations like OTel ingest.
 
