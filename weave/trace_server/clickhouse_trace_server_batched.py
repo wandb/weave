@@ -756,14 +756,18 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         obj_results = []
         ch_insert_batch = []
-        if not req or not req.batch: # Note: Mirrors check in obj_create. Would req ever be None here?
+        if (
+            not req or not req.batch
+        ):  # Note: Mirrors check in obj_create. Would req ever be None here?
             return tsi.ObjCreateBatchRes(results=[])
 
-        unique_projects = set([obj.project_id for obj in req.batch])
+        unique_projects = {obj.project_id for obj in req.batch}
         if len(unique_projects) > 1:
             # Note(zach): Is this really necessary?
             # Cross project updates should be fine if external validation is correct
-            raise InvalidRequest(f"obj_create_batch only supports updating a single project. Supplied projects: {unique_projects}")
+            raise InvalidRequest(
+                f"obj_create_batch only supports updating a single project. Supplied projects: {unique_projects}"
+            )
 
         for obj in req.batch:
             processed_result = process_incoming_object_val(

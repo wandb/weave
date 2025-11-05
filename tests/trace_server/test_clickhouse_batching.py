@@ -5,18 +5,18 @@ ClickHouse insert operation for performance optimization.
 """
 
 import base64
-import pytest
 import datetime
-from unittest.mock import MagicMock, patch
+import json
 from typing import Any
+from unittest.mock import MagicMock, patch
+
+import pytest
+
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.base64_content_conversion import AUTO_CONVERSION_MIN_SIZE
 from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
 from weave.trace_server.errors import InvalidRequest, ObjectDeletedError
 from weave.trace_server.trace_server_interface_util import str_digest
-from weave.trace_server.errors import ObjectDeletedError
-import json
-import pytest
 
 
 def make_base_64_content(content: str) -> str:
@@ -131,6 +131,7 @@ def test_clickhouse_batching():
             f"but got inserts to: {insert_tables}"
         )
 
+
 def _mk_obj(project_id: str, object_id: str, wb_user_id: str, val: dict[str, Any]):
     return tsi.ObjSchemaForInsert(
         project_id=project_id,
@@ -143,10 +144,11 @@ def _mk_obj(project_id: str, object_id: str, wb_user_id: str, val: dict[str, Any
 def _internal_pid() -> str:
     # Any base64 string is valid for internal project id validation
     # Reuse the same value as other tests in this module
-    return base64.b64encode("test_project".encode()).decode()
+    return base64.b64encode(b"test_project").decode()
+
 
 def _internal_wb_user_id() -> str:
-    return base64.b64encode("test_user".encode()).decode()
+    return base64.b64encode(b"test_user").decode()
 
 
 def test_obj_create_batch_internal_clickhouse_insert_once():
@@ -157,7 +159,9 @@ def test_obj_create_batch_internal_clickhouse_insert_once():
     mock_ch_client.command.return_value = None
     mock_ch_client.insert.return_value = MagicMock()
 
-    with patch.object(ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client):
+    with patch.object(
+        ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
+    ):
         server = ClickHouseTraceServer(host="test_host")
         pid = _internal_pid()
         wb_user_id = _internal_wb_user_id()
@@ -225,7 +229,9 @@ def test_obj_batch_same_hash_different_object_ids(trace_server):
     res = server.objs_query(
         tsi.ObjQueryReq(
             project_id=pid,
-            filter=tsi.ObjectVersionFilter(object_ids=["obj_1", "obj_2"], latest_only=False),
+            filter=tsi.ObjectVersionFilter(
+                object_ids=["obj_1", "obj_2"], latest_only=False
+            ),
         )
     )
     assert len(res.objs) == 2
@@ -266,9 +272,7 @@ def test_obj_batch_four_versions_and_read_path(trace_server):
     vals = [{"i": i} for i in range(4)]
     digests = [str_digest(json.dumps(v)) for v in vals]
     server.obj_create_batch(
-        tsi.ObjCreateBatchReq(
-            batch=[_mk_obj(pid, obj_id, wb_user_id, v) for v in vals]
-        )
+        tsi.ObjCreateBatchReq(batch=[_mk_obj(pid, obj_id, wb_user_id, v) for v in vals])
     )
 
     # All versions are queryable
@@ -307,9 +311,7 @@ def test_obj_batch_delete_version_preserves_indices(trace_server):
     delete_idx = 1
 
     server.obj_create_batch(
-        tsi.ObjCreateBatchReq(
-            batch=[_mk_obj(pid, obj_id, wb_user_id, v) for v in vals]
-        )
+        tsi.ObjCreateBatchReq(batch=[_mk_obj(pid, obj_id, wb_user_id, v) for v in vals])
     )
     # Remaining versions are intact; indices are not renumbered in metadata
     res = server.objs_query(
@@ -329,7 +331,9 @@ def test_obj_batch_delete_version_preserves_indices(trace_server):
 
     # Reading deleted digest raises ObjectDeletedError
     with pytest.raises(ObjectDeletedError):
-        server.obj_read(tsi.ObjReadReq(project_id=pid, object_id=obj_id, digest=del_digest))
+        server.obj_read(
+            tsi.ObjReadReq(project_id=pid, object_id=obj_id, digest=del_digest)
+        )
 
     # Remaining versions are intact; indices are not renumbered in metadata
     res = server.objs_query(
