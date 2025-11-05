@@ -111,7 +111,6 @@ from weave.trace_server.llm_completion import (
     lite_llm_completion,
     lite_llm_completion_stream,
 )
-from weave.trace_server.project_version.types import ProjectVersion
 from weave.trace_server.methods.evaluation_status import evaluation_status
 from weave.trace_server.model_providers.model_providers import (
     LLMModelProviderInfo,
@@ -866,6 +865,14 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             all_calls=all_calls,
         )
 
+        project_version = self.project_version_resolver.get_project_version_sync(
+            req.project_id
+        )
+        if project_version == ProjectVersion.CALLS_COMPLETE_VERSION:
+            return self._calls_delete_mutate(
+                req.project_id, req.call_ids, req.wb_user_id, "calls_complete"
+            )
+
         try:
             return self._calls_delete_mutate(
                 req.project_id, req.call_ids, req.wb_user_id, "calls_merged"
@@ -925,6 +932,18 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def call_update(self, req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
         assert_non_null_wb_user_id(req)
         self._ensure_valid_update_field(req)
+
+        project_version = self.project_version_resolver.get_project_version_sync(
+            req.project_id
+        )
+        if project_version == ProjectVersion.CALLS_COMPLETE_VERSION:
+            return self._call_update_mutate(
+                req.display_name,
+                req.wb_user_id,
+                req.project_id,
+                req.call_id,
+                "calls_complete",
+            )
 
         # Try new update path, if fails fallback to insertion
         try:
