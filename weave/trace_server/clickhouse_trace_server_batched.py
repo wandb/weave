@@ -756,11 +756,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 }
             )
 
+        if not batch:
+            return []
+
         obj_results = []
         ch_insert_batch = []
-        if not batch:
-            # Note: Mirrors check in obj_create. Would req ever be None here?
-            return []
 
         unique_projects = {obj.project_id for obj in batch}
         if len(unique_projects) > 1:
