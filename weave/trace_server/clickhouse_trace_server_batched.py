@@ -227,6 +227,36 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self._kafka_producer = KafkaProducer.from_env()
         return self._kafka_producer
 
+    def _get_existing_ops_from_spans(self, seen_ids: set[str], project_id: str, limit=None):
+        obj_version_filter = tsi.ObjectVersionFilter(
+            object_ids=list(seen_ids),
+            latest_only=True,
+            is_op=True,
+        )
+
+        return self.objs_query(
+            tsi.ObjQueryReq(
+                project_id=project_id,
+                filter=obj_version_filter,
+                metadata_only=True,
+                limit=limit,
+            ),
+        ).objs
+
+    def _create_or_get_placeholder_ops_digest(self, project_id: str, create: bool):
+        if not create:
+            return bytes_digest(
+                (object_creation_utils.PLACEHOLDER_OP_SOURCE).encode("utf-8")
+            )
+
+        source_code = object_creation_utils.PLACEHOLDER_OP_SOURCE
+        source_file_req = tsi.FileCreateReq(
+            project_id=project_id,
+            name=object_creation_utils.OP_SOURCE_FILE_NAME,
+            content=source_code.encode("utf-8"),
+        )
+        return self.file_create(source_file_req).digest
+
     def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
         assert_non_null_wb_user_id(req)
 
@@ -277,47 +307,18 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             op_name = object_creation_utils.make_safe_name(start_call.op_name)
             obj_id_idx_map[op_name].append(idx)
 
-        seen_ids = set(obj_id_idx_map)
-
-        # Build a query to see if op already exists
-        limit = len(
-            calls
-        )  # Only use latest so this is upper bound for possible results
-        obj_version_filter = tsi.ObjectVersionFilter(
-            object_ids=list(seen_ids),
-            latest_only=True,
-            is_op=True,
+        existing_objects = self._get_existing_ops_from_spans(
+            seen_ids=set(obj_id_idx_map.keys()),
+            project_id=req.project_id,
+            limit=len(calls)
         )
-
-        existing_objects = self.objs_query(
-            tsi.ObjQueryReq(
-                project_id=req.project_id,
-                filter=obj_version_filter,
-                metadata_only=True,
-                limit=limit,
-            ),
-        ).objs
-
-        # We know that OTel will always user the placeholder source.
-        # We also know how to calculate the digest of the placeholder source.
-        # Therefore, instead of going through file create for each new op
+        # We know that OTel will always use the placeholder source.
         # We can instead just reuse the existing file if we know it is present
         # and create it just once if we are not sure.
         if len(existing_objects) == 0:
-            # We don't know if any existing ops have been created
-            # None of the ops already exist, we create one shared source file
-            # for all spans since no code capture is available for OTel
-            source_code = object_creation_utils.PLACEHOLDER_OP_SOURCE
-            source_file_req = tsi.FileCreateReq(
-                project_id=req.project_id,
-                name=object_creation_utils.OP_SOURCE_FILE_NAME,
-                content=source_code.encode("utf-8"),
-            )
-            digest = self.file_create(source_file_req).digest
+            digest = self._create_or_get_placeholder_ops_digest(project_id=req.project_id, create=True)
         else:
-            digest = bytes_digest(
-                (object_creation_utils.PLACEHOLDER_OP_SOURCE).encode("utf-8")
-            )
+            digest = self._create_or_get_placeholder_ops_digest(project_id=req.project_id, create=False)
 
         for obj in existing_objects:
             op_ref_uri = ri.InternalOpRef(
