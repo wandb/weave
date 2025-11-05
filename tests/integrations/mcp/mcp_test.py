@@ -1,6 +1,8 @@
 import asyncio
+import os
 import sys
 from collections.abc import Generator
+from pathlib import Path
 
 import pytest
 from mcp import ClientSession, StdioServerParameters
@@ -52,14 +54,22 @@ def mcp_server():
 
 async def run_client():
     """Run the client and connect to the MCP server."""
-    # Configure the server parameters
+    # Get the repository root directory (4 levels up from this test file)
+    # The subprocess needs this in PYTHONPATH to import the tests module
+    repo_root = Path(__file__).resolve().parent.parent.parent.parent
+    # Configure the server parameters with PYTHONPATH so the subprocess can find the tests module
+    env = os.environ.copy()
+    existing_pythonpath = env.get("PYTHONPATH", "")
+    env["PYTHONPATH"] = str(repo_root) + (
+        os.pathsep + existing_pythonpath if existing_pythonpath else ""
+    )
     server_params = StdioServerParameters(
         command="python",
         args=[
             "-c",
-            "from integrations.mcp.mcp_test import mcp_server; mcp_server().run()",
+            "from tests.integrations.mcp.mcp_test import mcp_server; mcp_server().run()",
         ],
-        env=None,
+        env=env,
     )
 
     # Connect to the server using stdio
