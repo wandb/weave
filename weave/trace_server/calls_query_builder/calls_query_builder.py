@@ -773,9 +773,6 @@ class CallsQuery(BaseModel):
         if not should_optimize and not self.include_costs and not object_ref_conditions:
             return self._as_sql_base_format(pb, table_alias)
 
-        # Build CTEs for the optimized query
-        ctes = CTECollection()
-
         # Build two queries, first filter query CTE, then select the columns
         filter_query = CallsQuery(project_id=self.project_id)
         select_query = CallsQuery(
@@ -793,6 +790,7 @@ class CallsQuery(BaseModel):
         object_ref_cte_list, field_to_object_join_alias_map = build_object_ref_ctes(
             pb, self.project_id, object_ref_conditions
         )
+        ctes = CTECollection()
 
         # Add object reference CTEs to collection
         for cte in object_ref_cte_list:
@@ -820,46 +818,53 @@ class CallsQuery(BaseModel):
         )
         ctes.add_cte("filtered_calls", filtered_calls_sql)
 
-        # Build final query
-        if self.include_costs:
-            # Add all_calls CTE
-            all_calls_sql = select_query._as_sql_base_format(
-                pb,
-                table_alias,
-                id_subquery_name="filtered_calls",
-                field_to_object_join_alias_map=field_to_object_join_alias_map,
-                expand_columns=self.expand_columns,
-            )
-            ctes.add_cte("all_calls", all_calls_sql)
-            cost_cte_list = build_cost_ctes(pb, "all_calls", self.project_id)
-            for cte in cost_cte_list:
-                ctes.add_cte(cte.name, cte.sql)
+        base_sql = self._build_base_select_sql(
+            select_query, pb, table_alias, field_to_object_join_alias_map
+        )
 
-            # TODO: We should unify the calls query order by fields to be orm sort by fields
-            order_by_fields = [
-                tsi.SortBy(
-                    field=sort_by.field.field,
-                    direction=cast(Literal["asc", "desc"], sort_by.direction.lower()),
-                )
-                for sort_by in self.order_fields
-            ]
-            select_fields = [field.field for field in self.select_fields]
-
-            # Get final SELECT statement
-            final_select = get_cost_final_select(pb, select_fields, order_by_fields)
-            raw_sql = ctes.to_sql() + "\n" + final_select
-        else:
-            # No costs, just return the select query
-            base_sql = select_query._as_sql_base_format(
-                pb,
-                table_alias,
-                id_subquery_name="filtered_calls",
-                field_to_object_join_alias_map=field_to_object_join_alias_map,
-                expand_columns=self.expand_columns,
-            )
+        if not self.include_costs:
             raw_sql = ctes.to_sql() + "\n" + base_sql
+            return safely_format_sql(raw_sql, logger)
 
+        # Do cost CTE handling
+        ctes.add_cte("all_calls", base_sql)
+        self._add_cost_ctes_to_builder(ctes, pb)
+
+        order_by_fields = self._convert_to_orm_sort_fields()
+        select_fields = [field.field for field in self.select_fields]
+        final_select = get_cost_final_select(pb, select_fields, order_by_fields)
+
+        raw_sql = ctes.to_sql() + "\n" + final_select
         return safely_format_sql(raw_sql, logger)
+
+    def _build_base_select_sql(
+        self,
+        select_query: "CallsQuery",
+        pb: ParamBuilder,
+        table_alias: str,
+        field_to_object_join_alias_map: dict[str, str],
+    ) -> str:
+        return select_query._as_sql_base_format(
+            pb,
+            table_alias,
+            id_subquery_name="filtered_calls",
+            field_to_object_join_alias_map=field_to_object_join_alias_map,
+            expand_columns=self.expand_columns,
+        )
+
+    def _add_cost_ctes_to_builder(self, ctes: CTECollection, pb: ParamBuilder) -> None:
+        cost_cte_list = build_cost_ctes(pb, "all_calls", self.project_id)
+        for cte in cost_cte_list:
+            ctes.add_cte(cte.name, cte.sql)
+
+    def _convert_to_orm_sort_fields(self) -> list[tsi.SortBy]:
+        return [
+            tsi.SortBy(
+                field=sort_by.field.field,
+                direction=cast(Literal["asc", "desc"], sort_by.direction.lower()),
+            )
+            for sort_by in self.order_fields
+        ]
 
     def _build_where_clause_optimizations(
         self,
