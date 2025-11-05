@@ -33,7 +33,7 @@ from typing import Callable, Literal, Optional, cast
 from pydantic import BaseModel, Field
 
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.calls_query_builder.cte import CTE, CTECollection
+from weave.trace_server.calls_query_builder.cte import CTECollection
 from weave.trace_server.calls_query_builder.object_ref_query_builder import (
     ObjectRefCondition,
     ObjectRefOrderCondition,
@@ -60,11 +60,11 @@ from weave.trace_server.orm import (
     combine_conditions,
     python_value_to_ch_type,
 )
+from weave.trace_server.token_costs import build_cost_ctes, get_cost_final_select
 from weave.trace_server.trace_server_common import assert_parameter_length_less_than_max
 from weave.trace_server.trace_server_interface_util import (
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
 )
-from weave.trace_server.token_costs import build_cost_ctes, get_cost_final_select
 
 logger = logging.getLogger(__name__)
 

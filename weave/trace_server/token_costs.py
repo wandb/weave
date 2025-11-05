@@ -478,7 +478,7 @@ def build_cost_ctes(
         CTE(
             name="ranked_prices",
             sql=f"""-- based on the llm_ids in the usage data we get all the prices and rank them according to specificity and effective date
-                {get_ranked_prices(pb, 'llm_usage', project_id).sql}""",
+                {get_ranked_prices(pb, "llm_usage", project_id).sql}""",
         ),
     ]
 
