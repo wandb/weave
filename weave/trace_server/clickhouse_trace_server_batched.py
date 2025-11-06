@@ -1056,7 +1056,80 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             data=[list(ch_obj.model_dump().values())],
             column_names=list(ch_obj.model_fields.keys()),
         )
-        return tsi.ObjCreateRes(digest=digest)
+
+        return tsi.ObjCreateRes(
+            digest=digest,
+            object_id=req.obj.object_id,
+        )
+
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.create_obj_batch")
+    def obj_create_batch(
+        self, batch: list[tsi.ObjSchemaForInsert]
+    ) -> list[tsi.ObjCreateRes]:
+        """This method is for the special case where all objects are known to use a placeholder.
+        We lose any knowledge of what version the created object is in return for an enormous
+        performance increase for operations like OTel ingest.
+
+        This should **ONLY** be used when we know an object will never have more than one version.
+        """
+        if root_span := ddtrace.tracer.current_span():
+            root_span.set_tags(
+                {
+                    "clickhouse_trace_server_batched.create_obj_batch.count": str(
+                        len(batch)
+                    )
+                }
+            )
+
+        if not batch:
+            return []
+
+        obj_results = []
+        ch_insert_batch = []
+
+        unique_projects = {obj.project_id for obj in batch}
+        if len(unique_projects) > 1:
+            raise InvalidRequest(
+                f"obj_create_batch only supports updating a single project. Supplied projects: {unique_projects}"
+            )
+
+        for obj in batch:
+            processed_result = process_incoming_object_val(
+                obj.val, obj.builtin_object_class
+            )
+            processed_val = processed_result["val"]
+            json_val = json.dumps(processed_val)
+            digest = str_digest(json_val)
+            ch_obj = ObjCHInsertable(
+                project_id=obj.project_id,
+                object_id=obj.object_id,
+                wb_user_id=obj.wb_user_id,
+                kind=get_kind(processed_val),
+                base_object_class=processed_result["base_object_class"],
+                leaf_object_class=processed_result["leaf_object_class"],
+                refs=extract_refs_from_values(processed_val),
+                val_dump=json_val,
+                digest=digest,
+            )
+            insert_data = list(ch_obj.model_dump().values())
+            # Add the data to be inserted
+            ch_insert_batch.append(insert_data)
+
+            # Record the inserted data
+            obj_results.append(
+                tsi.ObjCreateRes(
+                    digest=digest,
+                    object_id=obj.object_id,
+                )
+            )
+
+        self._insert(
+            "object_versions",
+            data=ch_insert_batch,
+            column_names=ALL_OBJ_INSERT_COLUMNS,
+        )
+
+        return obj_results
 
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
         object_query_builder = ObjectMetadataQueryBuilder(req.project_id)
@@ -4564,99 +4637,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 column_names=ALL_CALL_INSERT_COLUMNS,
                 settings=settings,
             )
-
-    # V2 Write Methods
-
-    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._v2_insert_call_batch")
-    def _v2_insert_call_batch(
-        self,
-        table_name: str,
-        ch_calls: list,
-        column_names: list[str],
-    ) -> None:
-        """Generic batch insert for V2 call tables.
-
-        Converts insertable objects to rows and delegates to _insert.
-
-        Args:
-            table_name: Name of the table to insert into (e.g., "call_starts", "calls_complete").
-            ch_calls: List of call insertables to insert.
-            column_names: List of column names for the insert.
-        """
-        if not ch_calls:
-            return
-
-        if root_span := ddtrace.tracer.current_span():
-            root_span.set_tags(
-                {
-                    "clickhouse_trace_server_batched._v2_insert_call_batch.count": str(
-                        len(ch_calls)
-                    ),
-                    "clickhouse_trace_server_batched._v2_insert_call_batch.table": table_name,
-                }
-            )
-
-        batch_data = []
-        for ch_call in ch_calls:
-            call_dict = ch_call.model_dump()
-            values = [call_dict.get(col) for col in column_names]
-            batch_data.append(values)
-
-        settings = {}
-        if self._use_async_insert:
-            settings["async_insert"] = 1
-            settings["wait_for_async_insert"] = 1
-
-        self._insert(
-            table_name,
-            data=batch_data,
-            column_names=column_names,
-            settings=settings,
-        )
-
-    def _v2_insert_call_starts_batch(
-        self, ch_calls: list[V2CallStartCHInsertable]
-    ) -> None:
-        """Batch insert calls into call_starts table (V2 projects)."""
-        self._v2_insert_call_batch(
-            "call_starts", ch_calls, V2_CALL_STARTS_INSERT_COLUMNS
-        )
-
-    def _v2_insert_calls_complete_batch(
-        self, project_id: str, ch_calls: list[V2CallCompleteCHInsertable]
-    ) -> None:
-        """Batch insert calls into calls_complete table (V2 projects).
-
-        Note: For calls_complete, we also need to delete any matching entries
-        from call_starts table since the call is now complete.
-        """
-        self._v2_insert_call_batch(
-            "calls_complete", ch_calls, V2_CALLS_COMPLETE_INSERT_COLUMNS
-        )
-        # Now we need to delete the inserted ids from the call_starts if they exist
-        call_ids = [ch_call.id for ch_call in ch_calls]
-        self._delete_call_starts(project_id, call_ids)
-
-    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._delete_call_starts")
-    def _delete_call_starts(self, project_id: str, call_ids: list[str]) -> None:
-        """Delete calls from call_starts table (used when calls are completed).
-
-        Args:
-            project_id: The project identifier.
-            call_ids: List of call IDs to delete.
-        """
-        delete_sql = """
-            DELETE FROM call_starts
-            WHERE project_id = {project_id:String}
-                AND id IN {call_ids:Array(String)}
-        """
-        try:
-            self.ch_client.command(
-                delete_sql,
-                parameters={"project_id": project_id, "call_ids": call_ids},
-            )
-        except Exception as e:
-            logger.warning(f"Error deleting calls from call_starts: {e}")
 
     # V2 Write Methods
 
