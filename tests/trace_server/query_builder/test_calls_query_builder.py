@@ -1,6 +1,6 @@
 import pytest
-import sqlparse
 
+from tests.trace_server.query_builder.utils import assert_sql
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.calls_query_builder.calls_query_builder import (
     AggregatedDataSizeField,
@@ -318,18 +318,6 @@ def test_query_heavy_column_simple_filter_with_order_and_limit_and_mixed_query_c
             "pb_9": "project",
         },
     )
-
-
-def assert_sql(cq: CallsQuery, exp_query, exp_params):
-    pb = ParamBuilder("pb")
-    query = cq.as_sql(pb)
-    params = pb.get_params()
-
-    exp_formatted = sqlparse.format(exp_query, reindent=True)
-    found_formatted = sqlparse.format(query, reindent=True)
-
-    assert exp_formatted == found_formatted
-    assert exp_params == params
 
 
 def test_query_light_column_with_costs() -> None:

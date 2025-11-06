@@ -1,8 +1,11 @@
 import datetime
 
 import pytest
-import sqlparse
 
+from tests.trace_server.query_builder.utils import (
+    assert_clickhouse_sql,
+    assert_sqlite_sql,
+)
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.threads_query_builder import (
@@ -10,39 +13,6 @@ from weave.trace_server.threads_query_builder import (
     make_threads_query,
     make_threads_query_sqlite,
 )
-
-
-def assert_clickhouse_sql(expected_query: str, expected_params: dict, **kwargs):
-    """Helper to test ClickHouse query generation."""
-    pb = ParamBuilder("pb")
-    query = make_threads_query(pb=pb, **kwargs)
-    params = pb.get_params()
-
-    expected_formatted = sqlparse.format(expected_query, reindent=True)
-    found_formatted = sqlparse.format(query, reindent=True)
-
-    assert expected_formatted == found_formatted, (
-        f"Query mismatch:\nExpected:\n{expected_formatted}\n\nFound:\n{found_formatted}"
-    )
-    assert expected_params == params, (
-        f"Params mismatch:\nExpected: {expected_params}\nFound: {params}"
-    )
-
-
-def assert_sqlite_sql(expected_query: str, expected_params: list, **kwargs):
-    """Helper to test SQLite query generation."""
-    query, params = make_threads_query_sqlite(**kwargs)
-
-    expected_formatted = sqlparse.format(expected_query, reindent=True)
-    found_formatted = sqlparse.format(query, reindent=True)
-
-    assert expected_formatted == found_formatted, (
-        f"Query mismatch:\nExpected:\n{expected_formatted}\n\nFound:\n{found_formatted}"
-    )
-    assert expected_params == params, (
-        f"Params mismatch:\nExpected: {expected_params}\nFound: {params}"
-    )
-
 
 # Basic Functionality Tests
 
