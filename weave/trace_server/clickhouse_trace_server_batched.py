@@ -493,6 +493,28 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # Returns the id of the newly created call
         return tsi.CallEndRes()
 
+    def upsert_calls_batch_v2(
+        self, req: tsi.CallsUpsertBatchV2Req
+    ) -> tsi.CallsUpsertBatchV2Res:
+        # First organize the batch into starts, ends and completes.
+        # Starts and completes get inserted directly into the `calls_complete` table
+        # Ends hit a special UPDATE path
+        pass
+
+    def _calls_complete_update_end(
+        self, end_call: tsi.EndedCallSchemaForInsert
+    ) -> None:
+        command = """UPDATE calls_complete 
+            SET ended_at = {ended_at:datetime}
+            WHERE project_id = {project_id:string} AND id = {id:string}
+        """
+        params = {
+            "ended_at": end_call.ended_at,
+            "project_id": end_call.project_id,
+            "id": end_call.id,
+        }
+        self._command(command, params)
+
     def call_read(self, req: tsi.CallReadReq) -> tsi.CallReadRes:
         res = self.calls_query_stream(
             tsi.CallsQueryReq(
@@ -4632,6 +4654,20 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             },
         )
         return res
+
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._command")
+    def _command(self, command: str, parameters: dict[str, Any]) -> None:
+        try:
+            return self.ch_client.command(command, parameters=parameters)
+        except Exception as e:
+            logger.exception(
+                "clickhouse_command_error",
+                extra={
+                    "error_str": str(e),
+                    "command": command,
+                    "parameters": parameters,
+                },
+            )
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert")
     def _insert(
