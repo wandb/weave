@@ -49,6 +49,27 @@ from weave.trace_server.opentelemetry.helpers import (
 )
 
 
+@dataclass
+class ProcessedSpanData:
+    """Holds processed span data used to construct call schemas."""
+
+    inputs: dict[str, Any]
+    outputs: Any
+    attributes: dict[str, Any]
+    start_time: datetime.datetime
+    end_time: datetime.datetime
+    op_name: str
+    display_name: str | None = None
+    thread_id: str | None = None
+    turn_id: str | None = None
+    wb_run_id: str | None = None
+    wb_run_step: int | None = None
+    wb_run_step_end: int | None = None
+    otel_span_data: dict[str, Any] = field(default_factory=dict)
+    summary_map: tsi.SummaryMap = field(default_factory=tsi.SummaryMap)
+    exception_msg: str | None = None
+
+
 class SpanKind(Enum):
     """Enum representing the span's kind."""
 
@@ -280,12 +301,14 @@ class Span:
             }
         )
 
-    def to_call(
-        self,
-        project_id: str,
-        wb_user_id: str | None = None,
-        wb_run_id: str | None = None,
-    ) -> tuple[tsi.StartedCallSchemaForInsert, tsi.EndedCallSchemaForInsert]:
+    def _process_span_data(
+        self, project_id: str, wb_run_id: str | None = None
+    ) -> ProcessedSpanData:
+        """Process span data into a normalized format for call schemas.
+
+        This helper method extracts and processes all common data needed by both
+        to_call and to_complete methods.
+        """
         events = [SpanEvent(e.as_dict()) for e in self.events]
         usage = get_weave_usage(self.attributes) or {}
 
@@ -395,38 +418,113 @@ class Span:
         usage_key = model or "usage"
 
         summary_map = tsi.SummaryMap(weave=weave_summary, usage={usage_key: llm_usage})
-        start_call = tsi.StartedCallSchemaForInsert(
-            project_id=project_id,
-            id=self.span_id,
-            op_name=op_name,
-            trace_id=self.trace_id,
-            parent_id=self.parent_id,
-            started_at=start_time,
-            attributes=attributes,
-            inputs=inputs,
-            otel_dump=otel_span_data,
-            display_name=display_name,
-            wb_user_id=wb_user_id,
-            wb_run_id=wb_run_id,
-            wb_run_step=wb_run_step,
-            turn_id=turn_id,
-            thread_id=thread_id,
-        )
 
         exception_msg = (
             self.status.message if self.status.code == StatusCode.ERROR else None
         )
 
+        return ProcessedSpanData(
+            inputs=inputs,
+            outputs=outputs,
+            attributes=attributes,
+            start_time=start_time,
+            end_time=end_time,
+            op_name=op_name,
+            display_name=display_name,
+            thread_id=thread_id,
+            turn_id=turn_id,
+            wb_run_id=wb_run_id,
+            wb_run_step=wb_run_step,
+            wb_run_step_end=wb_run_step_end,
+            otel_span_data=otel_span_data,
+            summary_map=summary_map,
+            exception_msg=exception_msg,
+        )
+
+    def to_call(
+        self,
+        project_id: str,
+        wb_user_id: str | None = None,
+        wb_run_id: str | None = None,
+    ) -> tuple[tsi.StartedCallSchemaForInsert, tsi.EndedCallSchemaForInsert]:
+        data = self._process_span_data(project_id, wb_run_id)
+
+        start_call = tsi.StartedCallSchemaForInsert(
+            project_id=project_id,
+            id=self.span_id,
+            op_name=data.op_name,
+            trace_id=self.trace_id,
+            parent_id=self.parent_id,
+            started_at=data.start_time,
+            attributes=data.attributes,
+            inputs=data.inputs,
+            otel_dump=data.otel_span_data,
+            display_name=data.display_name,
+            wb_user_id=wb_user_id,
+            wb_run_id=data.wb_run_id,
+            wb_run_step=data.wb_run_step,
+            turn_id=data.turn_id,
+            thread_id=data.thread_id,
+        )
+
         end_call = tsi.EndedCallSchemaForInsert(
             project_id=project_id,
             id=self.span_id,
-            ended_at=end_time,
-            exception=exception_msg,
-            output=outputs,
-            summary=summary_map,
-            wb_run_step_end=wb_run_step_end,
+            ended_at=data.end_time,
+            exception=data.exception_msg,
+            output=data.outputs,
+            summary=data.summary_map,
+            wb_run_step_end=data.wb_run_step_end,
         )
         return (start_call, end_call)
+
+    def to_complete(
+        self,
+        project_id: str,
+        wb_user_id: str | None = None,
+        wb_run_id: str | None = None,
+    ) -> tsi.CompletedCallSchemaForInsert:
+        """Convert this span to a CompletedCallSchemaForInsert for direct insertion into calls_complete.
+
+        This method combines both start and end call information into a single complete call schema.
+
+        Args:
+            project_id (str): The project ID for the call.
+            wb_user_id (Optional[str]): Optional W&B user ID.
+            wb_run_id (Optional[str]): Optional W&B run ID.
+
+        Returns:
+            tsi.CompletedCallSchemaForInsert: A complete call schema ready for insertion.
+
+        Examples:
+            >>> span = Span(...)
+            >>> complete_call = span.to_complete("project123")
+        """
+        data = self._process_span_data(project_id, wb_run_id)
+
+        complete_call = tsi.CompletedCallSchemaForInsert(
+            project_id=project_id,
+            id=self.span_id,
+            trace_id=self.trace_id,
+            op_name=data.op_name,
+            started_at=data.start_time,
+            ended_at=data.end_time,
+            display_name=data.display_name,
+            parent_id=self.parent_id,
+            thread_id=data.thread_id,
+            turn_id=data.turn_id,
+            attributes=data.attributes,
+            inputs=data.inputs,
+            output=data.outputs,
+            summary=data.summary_map,
+            otel_dump=data.otel_span_data,
+            exception=data.exception_msg,
+            wb_user_id=wb_user_id,
+            wb_run_id=data.wb_run_id,
+            wb_run_step=data.wb_run_step,
+            wb_run_step_end=data.wb_run_step_end,
+        )
+        return complete_call
 
 
 @dataclass
