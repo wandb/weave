@@ -228,7 +228,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         return self._kafka_producer
 
     def _get_existing_ops_from_spans(
-        self, seen_ids: set[str], project_id: str, limit=None
+        self, seen_ids: set[str], project_id: str, limit: Optional[int] = None
     ) -> list[tsi.ObjSchema]:
         obj_version_filter = tsi.ObjectVersionFilter(
             object_ids=list(seen_ids),
@@ -245,7 +245,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             ),
         ).objs
 
-    def _create_or_get_placeholder_ops_digest(self, project_id: str, create: bool) -> str:
+    def _create_or_get_placeholder_ops_digest(
+        self, project_id: str, create: bool
+    ) -> str:
         if not create:
             return bytes_digest(
                 (object_creation_utils.PLACEHOLDER_OP_SOURCE).encode("utf-8")
