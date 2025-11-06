@@ -1,5 +1,4 @@
 import pytest
-import sqlparse
 
 from tests.trace_server.query_builder.utils import assert_sql
 from weave.trace_server import trace_server_interface as tsi

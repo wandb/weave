@@ -1,7 +1,6 @@
 import datetime
 
 import pytest
-import sqlparse
 
 from tests.trace_server.query_builder.utils import (
     assert_clickhouse_sql,
@@ -14,7 +13,6 @@ from weave.trace_server.threads_query_builder import (
     make_threads_query,
     make_threads_query_sqlite,
 )
-
 
 # Basic Functionality Tests
 
