@@ -25,10 +25,12 @@ Outstanding Optimizations/Work:
 
 """
 
+import datetime
+import json
 import logging
 import re
 from collections.abc import Callable, KeysView
-from typing import Literal, cast
+from typing import Any, Literal, cast
 
 from pydantic import BaseModel, Field
 from typing_extensions import Self
@@ -66,6 +68,7 @@ from weave.trace_server.token_costs import build_cost_ctes, get_cost_final_selec
 from weave.trace_server.trace_server_common import assert_parameter_length_less_than_max
 from weave.trace_server.trace_server_interface_util import (
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
+    extract_refs_from_values,
 )
 
 logger = logging.getLogger(__name__)
@@ -1961,4 +1964,234 @@ def _is_minimal_filter(filter: tsi.CallsFilter | None) -> bool:
         and filter.trace_roots_only is None
         and filter.input_refs is None
         and filter.output_refs is None
+    )
+
+
+######### BATCH UPDATE QUERY HANDLING ##########
+
+
+def build_calls_complete_batch_update_query(
+    end_calls: list["tsi.EndedCallSchemaForInsert"],
+    pb: ParamBuilder,
+) -> str:
+    """Build a parameterized batch UPDATE query for calls_complete table.
+
+    This uses ClickHouse's lightweight UPDATE with CASE expressions to update
+    multiple calls in a single query, creating only one patch part instead of N.
+
+    Args:
+        end_calls: List of ended call schemas to update
+        pb: Parameter builder for query parameterization
+
+    Returns:
+        Formatted SQL UPDATE command string
+    """
+    if not end_calls:
+        return ""
+
+    # All calls should be from the same project
+    project_id = end_calls[0].project_id
+
+    # Build parameterized CASE statements for each field
+    call_ids = []
+    ended_at_cases = []
+    output_dump_cases = []
+    output_refs_cases = []
+    summary_dump_cases = []
+    exception_cases = []
+    wb_run_step_end_cases = []
+
+    for call in end_calls:
+        call_id = call.id
+        call_ids.append(call_id)
+
+        # Create unique parameter names for each call's values
+        id_param = pb.add_param(call_id)
+        ended_at_param = pb.add_param(call.ended_at)
+        output_dump_param = pb.add_param(json.dumps(call.output))
+        summary_dump_param = pb.add_param(json.dumps(dict(call.summary)))
+
+        # Build CASE condition for ended_at
+        ended_at_cases.append(
+            f"WHEN id = {param_slot(id_param, 'String')} THEN {param_slot(ended_at_param, 'DateTime64(6)')}"
+        )
+
+        # Build CASE condition for output_dump
+        output_dump_cases.append(
+            f"WHEN id = {param_slot(id_param, 'String')} THEN {param_slot(output_dump_param, 'String')}"
+        )
+
+        # Build CASE condition for output_refs
+        output_refs = extract_refs_from_values(call.output)
+        if output_refs:
+            # Store each ref as a parameter
+            refs_params = []
+            for ref in output_refs:
+                ref_param = pb.add_param(ref)
+                refs_params.append(param_slot(ref_param, "String"))
+            refs_list = ", ".join(refs_params)
+            output_refs_cases.append(
+                f"WHEN id = {param_slot(id_param, 'String')} THEN [{refs_list}]"
+            )
+        else:
+            # Cast empty array to Array(String) for type compatibility
+            output_refs_cases.append(
+                f"WHEN id = {param_slot(id_param, 'String')} THEN CAST([], 'Array(String)')"
+            )
+
+        # Build CASE condition for summary_dump
+        summary_dump_cases.append(
+            f"WHEN id = {param_slot(id_param, 'String')} THEN {param_slot(summary_dump_param, 'String')}"
+        )
+
+        # Build CASE condition for exception (nullable)
+        if call.exception is not None:
+            exception_param = pb.add_param(call.exception)
+            exception_cases.append(
+                f"WHEN id = {param_slot(id_param, 'String')} THEN {param_slot(exception_param, 'String')}"
+            )
+        else:
+            exception_cases.append(
+                f"WHEN id = {param_slot(id_param, 'String')} THEN NULL"
+            )
+
+        # Build CASE condition for wb_run_step_end (nullable)
+        if call.wb_run_step_end is not None:
+            wb_run_step_end_param = pb.add_param(call.wb_run_step_end)
+            wb_run_step_end_cases.append(
+                f"WHEN id = {param_slot(id_param, 'String')} THEN {param_slot(wb_run_step_end_param, 'UInt64')}"
+            )
+        else:
+            wb_run_step_end_cases.append(
+                f"WHEN id = {param_slot(id_param, 'String')} THEN NULL"
+            )
+
+    # Format each CASE expression with proper indentation
+    def format_case_expression(cases: list[str]) -> str:
+        """Format a list of CASE conditions into a multi-line string."""
+        return "\n                ".join(cases)
+
+    ended_at_case_expr = format_case_expression(ended_at_cases)
+    output_dump_case_expr = format_case_expression(output_dump_cases)
+    output_refs_case_expr = format_case_expression(output_refs_cases)
+    summary_dump_case_expr = format_case_expression(summary_dump_cases)
+    exception_case_expr = format_case_expression(exception_cases)
+    wb_run_step_end_case_expr = format_case_expression(wb_run_step_end_cases)
+
+    # Build WHERE clause with parameterized IN clause
+    where_id_params = []
+    for call_id in call_ids:
+        where_param = pb.add_param(call_id)
+        where_id_params.append(param_slot(where_param, "String"))
+
+    ids_in_clause = ", ".join(where_id_params)
+    project_id_param = pb.add_param(project_id)
+
+    # Construct the final UPDATE command
+    raw_sql = f"""
+    UPDATE calls_complete
+    SET
+        ended_at = CASE {ended_at_case_expr} ELSE ended_at END,
+        output_dump = CASE {output_dump_case_expr} ELSE output_dump END,
+        output_refs = CASE {output_refs_case_expr} ELSE output_refs END,
+        summary_dump = CASE {summary_dump_case_expr} ELSE summary_dump END,
+        exception = CASE {exception_case_expr} ELSE exception END,
+        wb_run_step_end = CASE {wb_run_step_end_case_expr} ELSE wb_run_step_end END,
+        updated_at = now64(3)
+    WHERE project_id = {param_slot(project_id_param, "String")}
+      AND id IN ({ids_in_clause})
+    """
+
+    return safely_format_sql(raw_sql, logger)
+
+
+def _build_calls_complete_update_query(
+    project_id: str,
+    call_ids: list[str],
+    update_fields: dict[str, tuple[Any, str]],
+    wb_user_id: str,
+    updated_at: datetime.datetime,
+    pb: ParamBuilder,
+) -> str | None:
+    """Build a parameterized UPDATE query for calls_complete table.
+
+    Args:
+        project_id: The project ID to filter by
+        call_ids: List of call IDs to update
+        update_fields: Dictionary mapping field names to (value, clickhouse_type) tuples
+        wb_user_id: User ID performing the update
+        updated_at: Timestamp of the update
+        pb: ParamBuilder for parameterized queries
+
+    Returns:
+        Formatted SQL query string or None if no call_ids provided
+    """
+    # Handle empty list case
+    if not call_ids:
+        return None
+
+    # Build parameters
+    project_id_param = pb.add_param(project_id)
+    call_ids_param = pb.add_param(call_ids)
+    updated_at_param = pb.add_param(updated_at)
+    wb_user_id_param = pb.add_param(wb_user_id)
+
+    # Build SET clause with custom fields + standard audit fields
+    set_clauses = []
+    for field_name, (value, clickhouse_type) in update_fields.items():
+        param = pb.add_param(value)
+        set_clauses.append(f"{field_name} = {param_slot(param, clickhouse_type)}")
+
+    # Add standard audit fields
+    set_clauses.append(f"updated_at = {param_slot(updated_at_param, 'DateTime64(3)')}")
+    set_clauses.append(f"wb_user_id = {param_slot(wb_user_id_param, 'String')}")
+    set_sql = ", ".join(set_clauses)
+
+    raw_sql = f"""
+        UPDATE calls_complete
+        SET
+            {set_sql}
+        WHERE project_id = {param_slot(project_id_param, "String")}
+            AND id IN {param_slot(call_ids_param, "Array(String)")}
+    """
+    return safely_format_sql(raw_sql, logger)
+
+
+def build_calls_complete_update_display_name_query(
+    project_id: str,
+    call_id: str,
+    display_name: str,
+    wb_user_id: str,
+    updated_at: datetime.datetime,
+    pb: ParamBuilder,
+) -> str | None:
+    """Build a parameterized UPDATE query for calls_complete table to update the display_name field."""
+    return _build_calls_complete_update_query(
+        project_id=project_id,
+        call_ids=[call_id],
+        update_fields={"display_name": (display_name, "String")},
+        wb_user_id=wb_user_id,
+        updated_at=updated_at,
+        pb=pb,
+    )
+
+
+def build_calls_complete_batch_delete_query(
+    project_id: str,
+    call_ids: list[str],
+    deleted_at: datetime.datetime,
+    wb_user_id: str,
+    updated_at: datetime.datetime,
+    pb: ParamBuilder,
+) -> str | None:
+    """Build a parameterized DELETE query for calls_complete table.
+    This uses ClickHouse's lightweight DELETE with parameterized IN clause.
+    """
+    return _build_calls_complete_update_query(
+        project_id=project_id,
+        call_ids=call_ids,
+        update_fields={"deleted_at": (deleted_at, "DateTime64(3)")},
+        wb_user_id=wb_user_id,
+        updated_at=updated_at,
+        pb=pb,
     )
