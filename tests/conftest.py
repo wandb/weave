@@ -13,7 +13,7 @@ from fastapi.responses import StreamingResponse
 from fastapi.testclient import TestClient
 
 import weave
-from tests.trace.util import DummyTestException
+from tests.trace.util import DummyTestException, client_is_sqlite
 from tests.trace_server.conftest import *
 from tests.trace_server.conftest import TEST_ENTITY, get_trace_server_flag
 from weave.trace import weave_client, weave_init
@@ -676,3 +676,14 @@ def mock_wandb_context():
             "get": mock_get_context,
             "set": mock_set_context,
         }
+
+
+@pytest.fixture
+def clickhouse_client(client):
+    """Get direct ClickHouse client for table queries.
+
+    Returns None for SQLite clients, otherwise returns the underlying ClickHouse client.
+    """
+    if client_is_sqlite(client):
+        return None
+    return client.server._next_trace_server.ch_client

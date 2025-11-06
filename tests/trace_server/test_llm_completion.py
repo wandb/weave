@@ -12,6 +12,7 @@ from weave.trace_server.errors import (
     NotFoundError,
 )
 from weave.trace_server.llm_completion import get_custom_provider_info
+from weave.trace_server.project_version.types import WriteTarget
 from weave.trace_server.secret_fetcher_context import (
     _secret_fetcher_context,
 )
@@ -449,6 +450,13 @@ class TestLLMCompletionStreaming(unittest.TestCase):
             patch.object(
                 chts.ClickHouseTraceServer, "_insert_call"
             ) as mock_insert_call,
+            patch.object(
+                chts.ClickHouseTraceServer, "_mint_client"
+            ) as mock_mint_client,
+            patch(
+                "weave.trace_server.project_version.project_version.TableRoutingResolver.resolve_write_target",
+                return_value=WriteTarget.CALLS_MERGED,
+            ),
         ):
             # Mock the litellm completion stream
             mock_stream = MagicMock()

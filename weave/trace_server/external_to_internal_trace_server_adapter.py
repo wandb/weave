@@ -640,3 +640,46 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         if req.wb_user_id is not None:
             req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
         return self._ref_apply(self._internal_trace_server.score_delete, req)
+
+    def calls_start_batch(self, req: tsi.CallsStartBatchReq) -> tsi.CallsStartBatchRes:
+        """Batch start/complete calls, converting project_id and user_ids."""
+        # Convert project_id and user_ids in all batch items
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        for item in req.batch:
+            if item.mode == "start":
+                item.req.start.project_id = self._idc.ext_to_int_project_id(
+                    item.req.start.project_id
+                )
+                if item.req.start.wb_user_id is not None:
+                    item.req.start.wb_user_id = self._idc.ext_to_int_user_id(
+                        item.req.start.wb_user_id
+                    )
+                if item.req.start.wb_run_id is not None:
+                    item.req.start.wb_run_id = self._idc.ext_to_int_run_id(
+                        item.req.start.wb_run_id
+                    )
+            elif item.mode == "complete":
+                item.req.complete.project_id = self._idc.ext_to_int_project_id(
+                    item.req.complete.project_id
+                )
+                if item.req.complete.wb_user_id is not None:
+                    item.req.complete.wb_user_id = self._idc.ext_to_int_user_id(
+                        item.req.complete.wb_user_id
+                    )
+                if item.req.complete.wb_run_id is not None:
+                    item.req.complete.wb_run_id = self._idc.ext_to_int_run_id(
+                        item.req.complete.wb_run_id
+                    )
+
+        return self._ref_apply(self._internal_trace_server.calls_start_batch, req)
+
+    def calls_end_batch(self, req: tsi.CallsEndBatchReq) -> tsi.CallsEndBatchRes:
+        """Batch end calls, converting project_id."""
+        # Convert project_id in all batch items
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        for item in req.batch:
+            item.req.end.project_id = self._idc.ext_to_int_project_id(
+                item.req.end.project_id
+            )
+
+        return self._ref_apply(self._internal_trace_server.calls_end_batch, req)
