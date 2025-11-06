@@ -119,6 +119,22 @@ class CachingMiddlewareTraceServer(tsi.FullTraceServerInterface):
             return self._next_trace_server.get_feedback_processor()
         return None
 
+    def get_start_processor(self) -> AsyncBatchProcessor | None:
+        """Custom method not defined on the formal TraceServerInterface to expose
+        the underlying start processor. Should be formalized in a client-side interface.
+        """
+        if hasattr(self._next_trace_server, "get_start_processor"):
+            return self._next_trace_server.get_start_processor()
+        return None
+
+    def get_complete_processor(self) -> AsyncBatchProcessor | None:
+        """Custom method not defined on the formal TraceServerInterface to expose
+        the underlying complete processor. Should be formalized in a client-side interface.
+        """
+        if hasattr(self._next_trace_server, "get_complete_processor"):
+            return self._next_trace_server.get_complete_processor()
+        return None
+
     @classmethod
     def from_env(cls, next_trace_server: tsi.FullTraceServerInterface) -> Self:
         cache_dir = server_cache_dir()
@@ -678,6 +694,18 @@ class CachingMiddlewareTraceServer(tsi.FullTraceServerInterface):
 
     def score_delete_v2(self, req: tsi.ScoreDeleteV2Req) -> tsi.ScoreDeleteV2Res:
         return self._next_trace_server.score_delete_v2(req)
+
+    # Call insert V2 API
+
+    def calls_start_batch_v2(
+        self, req: tsi.CallsStartBatchReq
+    ) -> tsi.CallsStartBatchRes:
+        return self._next_trace_server.calls_start_batch_v2(req)
+
+    def calls_complete_batch_v2(
+        self, req: tsi.CallsCompleteBatchReq
+    ) -> tsi.CallsCompleteBatchRes:
+        return self._next_trace_server.calls_complete_batch_v2(req)
 
 
 def pydantic_bytes_safe_dump(obj: BaseModel) -> str:

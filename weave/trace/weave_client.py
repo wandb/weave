@@ -16,12 +16,14 @@ from functools import cached_property
 from typing import TYPE_CHECKING, Any, Callable, TypedDict, cast
 
 import pydantic
+from cachetools import LRUCache
 from requests import HTTPError
 
 from weave import version
 from weave.chat.chat import Chat
 from weave.chat.inference_models import InferenceModels
 from weave.telemetry import trace_sentry
+from weave.telemetry.trace_sentry import SENTRY_AVAILABLE, sentry_sdk
 from weave.trace import settings
 from weave.trace.call import (
     DEFAULT_CALLS_PAGE_SIZE,
@@ -77,6 +79,7 @@ from weave.trace.settings import (
     client_parallelism,
     should_capture_client_info,
     should_capture_system_info,
+    should_log_complete_only,
     should_print_call_link,
     should_redact_pii,
     should_use_parallel_table_upload,
@@ -94,11 +97,14 @@ from weave.trace_server.interface.feedback_types import (
 )
 from weave.trace_server.trace_server_interface import (
     CallEndReq,
+    CallsCompleteBatchReq,
     CallsDeleteReq,
     CallsFilter,
     CallsQueryReq,
+    CallsStartBatchReq,
     CallStartReq,
     CallUpdateReq,
+    CompleteCallSchemaForInsert,
     CostCreateInput,
     CostCreateReq,
     CostCreateRes,
@@ -331,6 +337,8 @@ class WeaveClient:
             self.project = resp.project_name
 
         self._server_call_processor = None
+        self._server_start_processor = None
+        self._server_complete_processor = None
         self._server_feedback_processor = None
         # This is a short-term hack to get around the fact that we are reaching into
         # the underlying implementation of the specific server to get the call processor.
@@ -341,9 +349,19 @@ class WeaveClient:
         # to define no-ops.
         if hasattr(self.server, "get_call_processor"):
             self._server_call_processor = self.server.get_call_processor()
+        if hasattr(self.server, "get_start_processor"):
+            self._server_start_processor = self.server.get_start_processor()
+        if hasattr(self.server, "get_complete_processor"):
+            self._server_complete_processor = self.server.get_complete_processor()
         if hasattr(self.server, "get_feedback_processor"):
             self._server_feedback_processor = self.server.get_feedback_processor()
         self.send_file_cache = WeaveClientSendFileCache()
+
+        # Track futures for call start requests - used to ensure call ends
+        # are sent after call starts are built, and to send them together
+        self._call_start_futures: LRUCache[str, Future[CallStartReq]] = LRUCache(
+            maxsize=10_000
+        )
 
     ################ High Level Convenience Methods ################
 
@@ -524,6 +542,7 @@ class WeaveClient:
         query: QueryLike | None = None,
         include_costs: bool = False,
         include_feedback: bool = False,
+        include_running: bool = True,
         columns: list[str] | None = None,
         expand_columns: list[str] | None = None,
         return_expanded_column_values: bool = True,
@@ -546,6 +565,7 @@ class WeaveClient:
             `query`: A mongo-like expression for advanced filtering. Not all Mongo operators are supported.
             `include_costs`: If True, includes token/cost info in `summary.weave`.
             `include_feedback`: If True, includes feedback in `summary.weave.feedback`.
+            `include_running`: If True and the table is calls_complete, includes running calls from call_starts in the query results.
             `columns`: List of fields to return per call. Reducing this can significantly improve performance.
                     (Some fields like `id`, `trace_id`, `op_name`, and `started_at` are always included.)
             `scored_by`: Filter by one or more scorers (name or ref URI). Multiple scorers are AND-ed.
@@ -580,6 +600,7 @@ class WeaveClient:
             query=query,
             include_costs=include_costs,
             include_feedback=include_feedback,
+            include_running=include_running,
             columns=columns,
             expand_columns=expand_columns,
             return_expanded_column_values=return_expanded_column_values,
@@ -755,7 +776,8 @@ class WeaveClient:
         should_print_call_link_ = should_print_call_link()
         current_call = call_context.get_current_call()
 
-        def send_start_call() -> bool:
+        def send_start_call() -> CallStartReq:
+            """Build and send the CallStartReq immediately, return it for caching."""
             maybe_redacted_inputs_with_refs = inputs_with_refs
             if should_redact_pii():
                 from weave.utils.pii_redaction import redact_pii
@@ -790,19 +812,32 @@ class WeaveClient:
                     "Inputs may be dropped."
                 )
 
-            self.server.call_start(call_start_req)
-            return True
+            # When log_complete_only is enabled, we skip sending the start event
+            # and instead only send it with the end event as a complete call
+            if should_log_complete_only():
+                return call_start_req
 
-        def on_complete(f: Future) -> None:
+            self.server.calls_start_batch_v2(
+                CallsStartBatchReq(project_id=project_id, items=[call_start_req.start])
+            )
+
+            # Return the request for caching
+            return call_start_req
+
+        def on_start_sent(f: Future) -> None:
+            """Print call link for root calls after start is sent."""
             try:
-                root_call_did_not_error = f.result() and not current_call
-                if root_call_did_not_error and should_print_call_link_:
+                f.result()
+                if not current_call and should_print_call_link_:
                     print_call_link(call)
             except Exception:
                 pass
 
-        fut = self.future_executor.defer(send_start_call)
-        fut.add_done_callback(on_complete)
+        # Send the start request asynchronously and cache the future
+        # The cached request will be used to send the complete call when it finishes
+        start_fut = self.future_executor.defer(send_start_call)
+        self._call_start_futures[call_id] = start_fut
+        start_fut.add_done_callback(on_start_sent)
 
         if use_stack:
             call_context.push_call(call)
@@ -917,7 +952,8 @@ class WeaveClient:
         if op is not None and op._on_finish_handler:
             op._on_finish_handler(call, original_output, exception)
 
-        def send_end_call() -> None:
+        def send_complete_call() -> None:
+            """Send the complete call (start + end) together using the batch endpoint."""
             maybe_redacted_output_as_refs = output_as_refs
             if should_redact_pii():
                 from weave.utils.pii_redaction import redact_pii
@@ -931,13 +967,14 @@ class WeaveClient:
             # Capture wb_run_step_end at call end time
             current_wb_run_step_end = safe_current_wb_run_step()
 
+            assert call.id is not None, "Call ID must be set at this point"
             call_end_req = CallEndReq(
                 end=EndedCallSchemaForInsert(
                     project_id=project_id,
                     id=call.id,
                     ended_at=ended_at,
                     output=output_json,
-                    summary=merged_summary,
+                    summary=merged_summary,  # type: ignore[arg-type]
                     exception=exception_str,
                     wb_run_step_end=current_wb_run_step_end,
                 )
@@ -948,9 +985,55 @@ class WeaveClient:
                     f"Trace output size ({bytes_size} bytes) exceeds the maximum allowed size of {MAX_TRACE_PAYLOAD_SIZE} bytes. "
                     "Output may be dropped."
                 )
-            self.server.call_end(call_end_req)
 
-        self.future_executor.defer(send_end_call)
+            # Get the cached start request
+            start_future = self._call_start_futures.get(call.id)
+            if not start_future:
+                if SENTRY_AVAILABLE:
+                    error_message = (
+                        f"No start request found for call {call.id} when uploading completed call,"
+                        "this can be caused by exceptionally high write volume or very long lived calls."
+                    )
+                    sentry_sdk.capture_message(error_message, level="error")
+                raise ValueError(error_message)
+
+            # Wait for the start to be cached
+            call_start_req = start_future.result()
+
+            # Combine start and end into a complete call
+            complete_call = CompleteCallSchemaForInsert(
+                project_id=call_start_req.start.project_id,
+                id=call_start_req.start.id,
+                op_name=call_start_req.start.op_name,
+                display_name=call_start_req.start.display_name,
+                trace_id=call_start_req.start.trace_id,
+                parent_id=call_start_req.start.parent_id,
+                thread_id=call_start_req.start.thread_id,
+                turn_id=call_start_req.start.turn_id,
+                started_at=call_start_req.start.started_at,
+                attributes=call_start_req.start.attributes,
+                inputs=call_start_req.start.inputs,
+                ended_at=call_end_req.end.ended_at,
+                exception=call_end_req.end.exception,
+                output=call_end_req.end.output,
+                summary=call_end_req.end.summary,
+                wb_user_id=call_start_req.start.wb_user_id,
+                wb_run_id=call_start_req.start.wb_run_id,
+                wb_run_step=call_start_req.start.wb_run_step,
+                wb_run_step_end=call_end_req.end.wb_run_step_end,
+            )
+
+            # Send the complete call using the new V2 batch endpoint
+            self.server.calls_complete_batch_v2(
+                CallsCompleteBatchReq(project_id=project_id, items=[complete_call])
+            )
+
+            # Clean up the future tracking
+            self._call_start_futures.pop(call.id, None)
+
+        # The send_complete_call() function will block on start_future.result(),
+        # ensuring the start is enqueued before the complete. Ensures ordering: start -> complete.
+        self.future_executor.defer(send_complete_call)
 
         # If a turn call is finishing, reset turn context for next sibling
         if call.turn_id == call.id and call.thread_id:
@@ -1886,6 +1969,10 @@ class WeaveClient:
         # Add call batch uploads if available
         if self._server_call_processor:
             total += self._server_call_processor.num_outstanding_jobs
+        if self._server_start_processor:
+            total += self._server_start_processor.num_outstanding_jobs
+        if self._server_complete_processor:
+            total += self._server_complete_processor.num_outstanding_jobs
         # Add feedback batch uploads if available
         if self._server_feedback_processor:
             total += self._server_feedback_processor.num_outstanding_jobs
@@ -2008,6 +2095,8 @@ class WeaveClient:
                 main_jobs=0,
                 fastlane_jobs=0,
                 call_processor_jobs=0,
+                start_processor_jobs=0,
+                complete_processor_jobs=0,
                 feedback_processor_jobs=0,
                 total_jobs=0,
             ),
@@ -2028,6 +2117,14 @@ class WeaveClient:
             self._server_call_processor.stop_accepting_new_work_and_flush_queue()
             # Restart call processor processing thread after flushing
             self._server_call_processor.accept_new_work()
+        if self._server_start_processor:
+            self._server_start_processor.stop_accepting_new_work_and_flush_queue()
+            # Restart start processor processing thread after flushing
+            self._server_start_processor.accept_new_work()
+        if self._server_complete_processor:
+            self._server_complete_processor.stop_accepting_new_work_and_flush_queue()
+            # Restart complete processor processing thread after flushing
+            self._server_complete_processor.accept_new_work()
         if self._server_feedback_processor:
             self._server_feedback_processor.stop_accepting_new_work_and_flush_queue()
             # Restart feedback processor processing thread after flushing
@@ -2040,7 +2137,9 @@ class WeaveClient:
             PendingJobCounts:
                 - main_jobs: Number of pending jobs in the main executor
                 - fastlane_jobs: Number of pending jobs in the fastlane executor
-                - call_processor_jobs: Number of pending jobs in the call processor
+                - call_processor_jobs: Number of pending jobs in the legacy call processor
+                - start_processor_jobs: Number of pending jobs in the v1 start processor
+                - complete_processor_jobs: Number of pending jobs in the v1 complete processor
                 - feedback_processor_jobs: Number of pending jobs in the feedback processor
                 - total_jobs: Total number of pending jobs
         """
@@ -2051,6 +2150,14 @@ class WeaveClient:
         call_processor_jobs = 0
         if self._server_call_processor:
             call_processor_jobs = self._server_call_processor.num_outstanding_jobs
+        start_processor_jobs = 0
+        if self._server_start_processor:
+            start_processor_jobs = self._server_start_processor.num_outstanding_jobs
+        complete_processor_jobs = 0
+        if self._server_complete_processor:
+            complete_processor_jobs = (
+                self._server_complete_processor.num_outstanding_jobs
+            )
         feedback_processor_jobs = 0
         if self._server_feedback_processor:
             feedback_processor_jobs = (
@@ -2061,10 +2168,14 @@ class WeaveClient:
             main_jobs=main_jobs,
             fastlane_jobs=fastlane_jobs,
             call_processor_jobs=call_processor_jobs,
+            start_processor_jobs=start_processor_jobs,
+            complete_processor_jobs=complete_processor_jobs,
             feedback_processor_jobs=feedback_processor_jobs,
             total_jobs=main_jobs
             + fastlane_jobs
             + call_processor_jobs
+            + start_processor_jobs
+            + complete_processor_jobs
             + feedback_processor_jobs,
         )
 
@@ -2083,6 +2194,8 @@ class PendingJobCounts(TypedDict):
     main_jobs: int
     fastlane_jobs: int
     call_processor_jobs: int
+    start_processor_jobs: int
+    complete_processor_jobs: int
     feedback_processor_jobs: int
     total_jobs: int
 

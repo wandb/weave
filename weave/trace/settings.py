@@ -187,6 +187,16 @@ class UserSettings(BaseModel):
     Can be overridden with the environment variable `WEAVE_USE_PARALLEL_TABLE_UPLOAD`
     """
 
+    log_complete_only: bool = False
+    """
+    Optimization to skip sending start events, only sending complete events.
+
+    If True, call start events are cached but not sent to the server. Instead, they're
+    sent together with the call end event as a complete call. This reduces network
+    requests by half but means calls won't appear in the UI until they complete.
+    Can be overridden with the environment variable `WEAVE_LOG_COMPLETE_ONLY`
+    """
+
     model_config = ConfigDict(extra="forbid")
     _is_first_apply: bool = PrivateAttr(True)
 
@@ -302,6 +312,11 @@ def should_use_parallel_table_upload() -> bool:
 def should_implicitly_patch_integrations() -> bool:
     """Returns whether implicit patching of integrations is enabled."""
     return _should("implicitly_patch_integrations")
+
+
+def should_log_complete_only() -> bool:
+    """Returns whether to skip sending start events and only send complete events."""
+    return _should("log_complete_only")
 
 
 def parse_and_apply_settings(

@@ -5926,3 +5926,77 @@ def test_calls_query_filter_contains_in_message_array(client):
     #     )
     # )
     # assert len(calls) == 1
+
+
+def test_log_complete_only_setting(client):
+    """Test that log_complete_only setting skips sending start events."""
+    from unittest.mock import patch
+    from weave.trace import settings as weave_settings
+
+    # Define a simple op
+    @weave.op
+    def my_op(x: int) -> int:
+        return x * 2
+
+    # Test 1: Default behavior (log_complete_only=False) - start event should be sent
+    with patch.object(
+        client.server, "calls_start_batch_v2", wraps=client.server.calls_start_batch_v2
+    ) as mock_start, patch.object(
+        client.server,
+        "calls_complete_batch_v2",
+        wraps=client.server.calls_complete_batch_v2,
+    ) as mock_complete:
+        result = my_op(5)
+        assert result == 10
+
+        # Wait for async operations to complete
+        client.flush()
+
+        # Verify start was called
+        assert mock_start.call_count == 1
+        # Verify complete was called
+        assert mock_complete.call_count == 1
+
+    # Test 2: With log_complete_only=True - start event should NOT be sent
+    with patch.object(
+        client.server, "calls_start_batch_v2", wraps=client.server.calls_start_batch_v2
+    ) as mock_start, patch.object(
+        client.server,
+        "calls_complete_batch_v2",
+        wraps=client.server.calls_complete_batch_v2,
+    ) as mock_complete, patch.object(
+        weave_settings,
+        "should_log_complete_only",
+        return_value=True,
+    ):
+        result = my_op(10)
+        assert result == 20
+
+        # Wait for async operations to complete
+        client.flush()
+
+        # Verify start was NOT called (because log_complete_only is enabled)
+        assert mock_start.call_count == 0
+        # Verify complete was called
+        assert mock_complete.call_count == 1
+
+        # Verify the complete call contains both start and end data
+        complete_call_args = mock_complete.call_args
+        assert complete_call_args is not None
+        complete_req = complete_call_args[0][0]
+        assert len(complete_req.items) == 1
+        complete_item = complete_req.items[0]
+        # Verify it has start data (inputs, started_at)
+        assert complete_item.inputs is not None
+        assert complete_item.started_at is not None
+        # Verify it has end data (output, ended_at)
+        assert complete_item.output is not None
+        assert complete_item.ended_at is not None
+
+    # Verify both calls are in the database
+    calls = list(client.get_calls())
+    assert len(calls) == 2
+    # Both calls should have inputs and outputs
+    for call in calls:
+        assert call.inputs is not None
+        assert call.output is not None
