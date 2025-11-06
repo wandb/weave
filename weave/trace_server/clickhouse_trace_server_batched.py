@@ -4650,7 +4650,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 ended_call_ids.add(call_id)
 
         unmatched_starts = started_call_ids - ended_call_ids
-        print(f"Number of call starts without ends in batch: {len(unmatched_starts)}")
 
         if root_span := ddtrace.tracer.current_span():
             root_span.set_tag(
