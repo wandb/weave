@@ -511,6 +511,11 @@ class CallsQueryReq(BaseModelStrict):
         description="Beta, subject to change. If true, the response will"
         " include the total storage size for a trace.",
     )
+    include_running: Optional[bool] = Field(
+        default=True,
+        description="Includes calls that are still running in the query results. "
+        "Set to false for a performance gain.",
+    )
 
     # TODO: type this with call schema columns, following the same rules as
     # SortBy and thus GetFieldOperator.get_field_ (without direction)

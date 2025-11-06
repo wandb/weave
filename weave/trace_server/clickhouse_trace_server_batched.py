@@ -626,7 +626,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
         """Returns a stream of calls that match the given query."""
-        project_version = self.project_version_resolver.get_project_version_sync(req.project_id)
+        project_version = self.project_version_resolver.get_project_version_sync(
+            req.project_id
+        )
         cq = CallsQuery(
             project_id=req.project_id,
             include_costs=req.include_costs or False,
