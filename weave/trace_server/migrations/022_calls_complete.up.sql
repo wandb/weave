@@ -48,7 +48,12 @@ CREATE TABLE calls_complete (
     INDEX idx_ended_at ended_at TYPE minmax GRANULARITY 1
 ) ENGINE = MergeTree
 ORDER BY (project_id, started_at DESC, id)
-SETTINGS allow_experimental_reverse_key=1;
+SETTINGS
+    -- Enable reverse key for faster range searches
+    allow_experimental_reverse_key=1,
+    -- Required for lightweight updates
+    enable_block_number_column=1,
+    enable_block_offset_column=1;
 
 CREATE TABLE call_starts (
     id              String,
