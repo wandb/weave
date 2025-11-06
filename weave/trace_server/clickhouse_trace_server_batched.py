@@ -4624,7 +4624,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         self._call_batch = []
 
-    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._analyze_call_batch_breakdown")
+    @ddtrace.tracer.wrap(
+        name="clickhouse_trace_server_batched._analyze_call_batch_breakdown"
+    )
     def _analyze_call_batch_breakdown(self) -> None:
         """Analyze the batch to count calls with starts but no ends"""
         if not self._call_batch:
@@ -4648,9 +4650,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 ended_call_ids.add(call_id)
 
         unmatched_starts = started_call_ids - ended_call_ids
-        print(
-            f"Number of call starts without ends in batch: {len(unmatched_starts)}"
-        )
+        print(f"Number of call starts without ends in batch: {len(unmatched_starts)}")
 
         if root_span := ddtrace.tracer.current_span():
             root_span.set_tag(
