@@ -227,7 +227,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self._kafka_producer = KafkaProducer.from_env()
         return self._kafka_producer
 
-    def _get_existing_ops_from_spans(self, seen_ids: set[str], project_id: str, limit=None):
+    def _get_existing_ops_from_spans(
+        self, seen_ids: set[str], project_id: str, limit=None
+    ) -> list[tsi.ObjSchema]:
         obj_version_filter = tsi.ObjectVersionFilter(
             object_ids=list(seen_ids),
             latest_only=True,
@@ -243,7 +245,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             ),
         ).objs
 
-    def _create_or_get_placeholder_ops_digest(self, project_id: str, create: bool):
+    def _create_or_get_placeholder_ops_digest(self, project_id: str, create: bool) -> str:
         if not create:
             return bytes_digest(
                 (object_creation_utils.PLACEHOLDER_OP_SOURCE).encode("utf-8")
@@ -310,15 +312,19 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         existing_objects = self._get_existing_ops_from_spans(
             seen_ids=set(obj_id_idx_map.keys()),
             project_id=req.project_id,
-            limit=len(calls)
+            limit=len(calls),
         )
         # We know that OTel will always use the placeholder source.
         # We can instead just reuse the existing file if we know it is present
         # and create it just once if we are not sure.
         if len(existing_objects) == 0:
-            digest = self._create_or_get_placeholder_ops_digest(project_id=req.project_id, create=True)
+            digest = self._create_or_get_placeholder_ops_digest(
+                project_id=req.project_id, create=True
+            )
         else:
-            digest = self._create_or_get_placeholder_ops_digest(project_id=req.project_id, create=False)
+            digest = self._create_or_get_placeholder_ops_digest(
+                project_id=req.project_id, create=False
+            )
 
         for obj in existing_objects:
             op_ref_uri = ri.InternalOpRef(
