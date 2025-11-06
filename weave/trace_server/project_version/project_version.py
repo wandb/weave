@@ -5,6 +5,7 @@ import ddtrace
 from cachetools import LRUCache
 from clickhouse_connect.driver.client import Client as CHClient
 
+from weave.trace_server.datadog import set_current_span_dd_tags, set_root_span_dd_tags
 from weave.trace_server.project_version.clickhouse_project_version import (
     get_project_data_residence,
 )
@@ -50,9 +51,7 @@ class TableRoutingResolver:
             with _project_residence_cache_lock:
                 _project_residence_cache[project_id] = residence
 
-        # TODO: remove me, this is temporary to guage cache size impact
-        if root_span := ddtrace.tracer.current_root_span():
-            root_span.set_tag("cache_size", len(_project_residence_cache))
+        set_current_span_dd_tags({"cache_size": len(_project_residence_cache)})
 
         return residence
 
@@ -63,6 +62,14 @@ class TableRoutingResolver:
             return ReadTable.CALLS_MERGED
 
         residence = self._get_residence(project_id, ch_client)
+
+        set_current_span_dd_tags({"residence": residence.value})
+        set_root_span_dd_tags(
+            {
+                "table_routing.resolve_read_table.residence": residence.value,
+                "table_routing.resolve_read_table.mode": self._mode.value,
+            }
+        )
 
         if self._mode == CallsStorageServerMode.FORCE_LEGACY:
             return ReadTable.CALLS_MERGED
