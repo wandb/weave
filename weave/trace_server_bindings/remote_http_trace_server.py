@@ -56,25 +56,16 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
         self.trace_server_url = trace_server_url
         self.should_batch = should_batch
 
-        # Separate processors for starts and completes
-        self.start_processor = None
-        self.complete_processor = None
+        # Processors
+        self.call_processor_v2 = None
         self.feedback_processor = None
 
-        # Thread-safe tracking of pending complete call IDs for deduplication
-        self._pending_complete_ids: set[str] = set()
-        self._pending_complete_ids_lock = Lock()
-
         if self.should_batch:
-            self.start_processor = AsyncBatchProcessor(
-                self._flush_starts,
+            self.call_processor_v2 = AsyncBatchProcessor(
+                self._flush_calls_v2,
                 max_queue_size=max_calls_queue_size(),
                 enable_disk_fallback=should_enable_disk_fallback(),
-            )
-            self.complete_processor = AsyncBatchProcessor(
-                self._flush_completes,
-                max_queue_size=max_calls_queue_size(),
-                enable_disk_fallback=should_enable_disk_fallback(),
+                min_batch_interval=2.0,  # slightly slower/larger batches
             )
             self.feedback_processor = AsyncBatchProcessor(
                 self._flush_feedback,
@@ -84,6 +75,23 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
         self._auth: Optional[tuple[str, str]] = auth
         self._extra_headers: Optional[dict[str, str]] = extra_headers
         self.remote_request_bytes_limit = remote_request_bytes_limit
+
+        # Track endpoints that are not available (returned 404)
+        # so we can skip trying them and use fallback directly
+        self._unavailable_endpoints: set[str] = set()
+        self._unavailable_endpoints_lock = Lock()
+
+    def _is_endpoint_available(self, endpoint: str) -> bool:
+        """Check if an endpoint is available (hasn't returned 404)."""
+        with self._unavailable_endpoints_lock:
+            return endpoint not in self._unavailable_endpoints
+
+    def _mark_endpoint_unavailable(self, endpoint: str) -> None:
+        """Mark an endpoint as unavailable after receiving 404."""
+        with self._unavailable_endpoints_lock:
+            if endpoint not in self._unavailable_endpoints:
+                logger.debug(f"Marking endpoint as unavailable: {endpoint}")
+                self._unavailable_endpoints.add(endpoint)
 
     def ensure_project_exists(
         self, entity: str, project: str
@@ -143,186 +151,455 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
             **kwargs,
         )
 
-    def _send_start_batch_to_server(self, encoded_data: bytes) -> None:
-        """Send a batch of call starts to the server with retry logic.
+    def _send_legacy_upsert_batch(self, req: tsi.CallsUpsertBatchV2Req) -> None:
+        """Send a request using the legacy /call/upsert_batch endpoint.
 
-        Falls back to /call/upsert_batch if the v1 endpoint is not available (404).
+        Converts V2 format (starts/ends/completes) to legacy format.
         """
+        # Convert to legacy format: send starts and ends separately
+        starts = [
+            item
+            for item in req.items
+            if isinstance(item, tsi.StartedCallSchemaForInsert)
+        ]
+        completes = [
+            item
+            for item in req.items
+            if isinstance(item, tsi.CompleteCallSchemaForInsert)
+        ]
+        ends = [
+            item for item in req.items if isinstance(item, tsi.EndedCallSchemaForInsert)
+        ]
+
+        # Build legacy batch with starts and ends
+        legacy_items: list[Union[tsi.CallBatchStartMode, tsi.CallBatchEndMode]] = []
+
+        # Add starts to legacy batch
+        for start in starts:
+            legacy_items.append(
+                tsi.CallBatchStartMode(req=tsi.CallStartReq(start=start))
+            )
+
+        # Add ends to legacy batch
+        for end in ends:
+            legacy_items.append(tsi.CallBatchEndMode(req=tsi.CallEndReq(end=end)))
+
+        # For completes, send as both start and end
+        for complete in completes:
+            # Create start from complete
+            assert complete.id is not None
+            start_from_complete = tsi.StartedCallSchemaForInsert(
+                project_id=complete.project_id,
+                id=complete.id,
+                op_name=complete.op_name,
+                display_name=complete.display_name,
+                trace_id=complete.trace_id,
+                parent_id=complete.parent_id,
+                thread_id=complete.thread_id,
+                turn_id=complete.turn_id,
+                started_at=complete.started_at,
+                attributes=complete.attributes,
+                inputs=complete.inputs,
+                otel_dump=complete.otel_dump,
+                wb_user_id=complete.wb_user_id,
+                wb_run_id=complete.wb_run_id,
+                wb_run_step=complete.wb_run_step,
+            )
+            legacy_items.append(
+                tsi.CallBatchStartMode(req=tsi.CallStartReq(start=start_from_complete))
+            )
+
+            # Create end from complete
+            end_from_complete = tsi.EndedCallSchemaForInsert(
+                project_id=complete.project_id,
+                id=complete.id,
+                ended_at=complete.ended_at,
+                exception=complete.exception,
+                output=complete.output,
+                summary=complete.summary,
+                wb_run_step_end=complete.wb_run_step_end,
+            )
+            legacy_items.append(
+                tsi.CallBatchEndMode(req=tsi.CallEndReq(end=end_from_complete))
+            )
+
+        # Send to legacy endpoint
+        if legacy_items:
+            legacy_req = tsi.CallCreateBatchReq(batch=legacy_items)
+            legacy_data = legacy_req.model_dump_json().encode("utf-8")
+            r = self.post(
+                "/call/upsert_batch",
+                data=legacy_data,  # type: ignore
+            )
+            handle_response_error(r, "/call/upsert_batch")
+
+    def _send_upsert_batch_v2_to_server(self, encoded_data: bytes) -> None:
+        """Send a batch of upserts (starts/ends/completes) to the server with retry logic.
+
+        Falls back to legacy /call/upsert_batch if unified endpoint is not available (404).
+        """
+        # Decode the request to extract entity/project
+        req = tsi.CallsUpsertBatchV2Req.model_validate_json(encoded_data)
+
+        # Extract entity and project from the first item's project_id
+        if not req.items:
+            return
+
+        first_project_id = req.items[0].project_id
+        entity, project = first_project_id.split("/", 1)
+        url = f"/v2/{entity}/{project}/calls/upsert/batch"
+
+        # Check if we already know this endpoint is unavailable
+        if not self._is_endpoint_available(url):
+            logger.debug(
+                "Unified upsert endpoint known to be unavailable, using legacy /call/upsert_batch"
+            )
+            self._send_legacy_upsert_batch(req)
+            return
+
         try:
             r = self.post(
-                "/v2/calls/start/batch",
+                url,
                 data=encoded_data,  # type: ignore
             )
-            handle_response_error(r, "/v2/calls/start/batch")
+            handle_response_error(r, url)
         except requests.HTTPError as e:
-            # If v1 endpoint doesn't exist (404), fall back to legacy upsert_batch
             if e.response.status_code == 404:
+                # Mark endpoint as unavailable for future requests
+                self._mark_endpoint_unavailable(url)
                 logger.debug(
-                    "V1 start batch endpoint not available, falling back to legacy upsert_batch"
+                    "Unified upsert endpoint not available, falling back to legacy /call/upsert_batch"
                 )
 
-                # Decode the v1 request and convert to legacy format
-                req = tsi.CallsStartBatchReq.model_validate_json(encoded_data)
-                legacy_req = convert_start_to_legacy_batch(req.items)
-                r = self.post(
-                    "/call/upsert_batch",
-                    data=legacy_req.model_dump_json().encode("utf-8"),  # type: ignore
-                )
-                handle_response_error(r, "/call/upsert_batch")
+                # Already decoded req above
+                self._send_legacy_upsert_batch(req)
             else:
-                # Re-raise server errors (5xx) as they're not client compatibility issues
                 raise
 
-    def _flush_starts(
+    def _flush_calls_v2(
         self,
-        batch: list[tsi.StartedCallSchemaForInsert],
+        batch: list[
+            Union[
+                tsi.StartedCallSchemaForInsert,
+                tsi.EndedCallSchemaForInsert,
+                tsi.CompleteCallSchemaForInsert,
+            ]
+        ],
         *,
         _should_update_batch_size: bool = True,
     ) -> None:
-        """Process a batch of call starts, splitting if necessary and sending to the server.
+        """Process a batch of call events intelligently, combining starts and ends.
 
-        This method handles batching of call start events, sending them to the
-        /v2/calls/start/batch endpoint. Filters out any starts that have pending
-        completes before sending.
+        This method implements smart batching:
+        - Combines starts and ends with the same ID into complete calls
+        - Sends naked starts (no corresponding end in batch)
+        - Sends naked ends (no corresponding start in batch)
+        - Never sends both start and end with same ID separately
+        - Never sends an end before its start
         """
-        assert self.start_processor is not None
+        assert self.call_processor_v2 is not None
         if len(batch) == 0:
             return
 
-        # Filter out starts that have pending completes, we don't need to send both if
-        # we already have the complete (start + end)
-        filtered_batch: list[tsi.StartedCallSchemaForInsert] = []
-        with self._pending_complete_ids_lock:
-            for item in batch:
-                if item.id not in self._pending_complete_ids:
-                    filtered_batch.append(item)
+        # Separate items by type and track by ID
+        starts_by_id: dict[str, tsi.StartedCallSchemaForInsert] = {}
+        ends_by_id: dict[str, tsi.EndedCallSchemaForInsert] = {}
+        completes: list[tsi.CompleteCallSchemaForInsert] = []
 
-        # If all starts were filtered out, nothing to send
-        if len(filtered_batch) == 0:
-            return
+        for item in batch:
+            assert item.id is not None
+            if isinstance(item, tsi.StartedCallSchemaForInsert):
+                starts_by_id[item.id] = item
+            elif isinstance(item, tsi.EndedCallSchemaForInsert):
+                ends_by_id[item.id] = item
+            elif isinstance(item, tsi.CompleteCallSchemaForInsert):
+                completes.append(item)
 
-        def get_item_id(item: tsi.StartedCallSchemaForInsert) -> str:
-            return f"{item.id}-start"
+        # Combine matching starts and ends into complete calls
+        combined_complete_ids = set()
+        for call_id in list(starts_by_id.keys()):
+            if call_id in ends_by_id:
+                start = starts_by_id[call_id]
+                end = ends_by_id[call_id]
 
-        def encode_batch(batch: list[tsi.StartedCallSchemaForInsert]) -> bytes:
-            # Get project_id from first item (all items in a batch should have same project)
-            project_id = batch[0].project_id
-            req = tsi.CallsStartBatchReq(project_id=project_id, items=batch)
-            data = req.model_dump_json()
-            return data.encode("utf-8")
-
-        process_batch_with_retry(
-            batch_name="call_starts",
-            batch=filtered_batch,
-            remote_request_bytes_limit=self.remote_request_bytes_limit,
-            send_batch_fn=self._send_start_batch_to_server,
-            processor_obj=self.start_processor,
-            should_update_batch_size=_should_update_batch_size,
-            get_item_id_fn=get_item_id,
-            log_dropped_fn=log_dropped_start_batch,
-            encode_batch_fn=encode_batch,
-        )
-
-    def _send_complete_batch_to_server(
-        self, encoded_data: bytes, call_ids: list[str]
-    ) -> None:
-        """Send a batch of complete calls to the server with retry logic.
-
-        Falls back to /call/upsert_batch if the v1 endpoint is not available (404).
-        """
-        try:
-            try:
-                r = self.post(
-                    "/v2/calls/complete/batch",
-                    data=encoded_data,  # type: ignore
+                # Combine into a complete call
+                complete = tsi.CompleteCallSchemaForInsert(
+                    project_id=start.project_id,
+                    id=start.id,
+                    op_name=start.op_name,
+                    display_name=start.display_name,
+                    trace_id=start.trace_id,
+                    parent_id=start.parent_id,
+                    thread_id=start.thread_id,
+                    turn_id=start.turn_id,
+                    started_at=start.started_at,
+                    attributes=start.attributes,
+                    inputs=start.inputs,
+                    ended_at=end.ended_at,
+                    exception=end.exception,
+                    output=end.output,
+                    summary=end.summary,
+                    wb_user_id=start.wb_user_id,
+                    wb_run_id=start.wb_run_id,
+                    wb_run_step=start.wb_run_step,
+                    wb_run_step_end=end.wb_run_step_end,
+                    otel_dump=start.otel_dump,
                 )
-                handle_response_error(r, "/v2/calls/complete/batch")
-            except requests.HTTPError as e:
-                # If v1 endpoint doesn't exist (new sdk, old server), fall back to legacy upsert_batch
-                # This should be very rare!
-                if e.response.status_code == 404:
-                    logger.debug(
-                        "V1 complete batch endpoint not available, falling back to legacy upsert_batch"
-                    )
+                completes.append(complete)
+                combined_complete_ids.add(call_id)
 
-                    # Decode the v1 request and convert to legacy format
-                    req = tsi.CallsCompleteBatchReq.model_validate_json(encoded_data)
-                    legacy_req = convert_complete_to_legacy_batch(req.items)
-                    r = self.post(
-                        "/call/upsert_batch",
-                        data=legacy_req.model_dump_json().encode("utf-8"),  # type: ignore
-                    )
-                    handle_response_error(r, "/call/upsert_batch")
-                else:
-                    # Re-raise server errors (5xx) as they're not client compatibility issues
-                    raise
-        finally:
-            # After successful send, remove call IDs from pending set
-            # This runs even if an exception is raised to prevent call IDs from being stuck
-            with self._pending_complete_ids_lock:
-                for call_id in call_ids:
-                    self._pending_complete_ids.discard(call_id)
+        # Remove combined starts and ends from the dictionaries
+        for call_id in combined_complete_ids:
+            starts_by_id.pop(call_id, None)
+            ends_by_id.pop(call_id, None)
 
-    def _flush_completes(
-        self,
-        batch: list[tsi.CompleteCallSchemaForInsert],
-        *,
-        _should_update_batch_size: bool = True,
-    ) -> None:
-        """Process a batch of complete calls, splitting if necessary and sending to the server.
+        # Build final batch: completes + naked starts + naked ends
+        # Order: completes first, then starts, then ends
+        # This ensures we never send an end before a start
+        final_batch: list[
+            Union[
+                tsi.CompleteCallSchemaForInsert,
+                tsi.StartedCallSchemaForInsert,
+                tsi.EndedCallSchemaForInsert,
+            ]
+        ] = []
+        final_batch.extend(completes)
+        final_batch.extend(starts_by_id.values())
+        final_batch.extend(ends_by_id.values())
 
-        This method handles batching of complete call events (start + end combined),
-        sending them to the /v2/calls/complete/batch endpoint.
-        """
-        assert self.complete_processor is not None
-        if len(batch) == 0:
+        if len(final_batch) == 0:
             return
 
-        def get_item_id(item: tsi.CompleteCallSchemaForInsert) -> str:
-            return f"{item.id}-complete"
+        def get_item_id(
+            item: Union[
+                tsi.StartedCallSchemaForInsert,
+                tsi.EndedCallSchemaForInsert,
+                tsi.CompleteCallSchemaForInsert,
+            ],
+        ) -> str:
+            if isinstance(item, tsi.StartedCallSchemaForInsert):
+                return f"{item.id}-start"
+            elif isinstance(item, tsi.EndedCallSchemaForInsert):
+                return f"{item.id}-end"
+            else:
+                return f"{item.id}-complete"
 
-        def encode_batch(batch: list[tsi.CompleteCallSchemaForInsert]) -> bytes:
+        def encode_batch(
+            batch: list[
+                Union[
+                    tsi.StartedCallSchemaForInsert,
+                    tsi.EndedCallSchemaForInsert,
+                    tsi.CompleteCallSchemaForInsert,
+                ]
+            ],
+        ) -> bytes:
             # Get project_id from first item (all items in a batch should have same project)
             project_id = batch[0].project_id
-            req = tsi.CallsCompleteBatchReq(project_id=project_id, items=batch)
+            req = tsi.CallsUpsertBatchV2Req(project_id=project_id, items=batch)
             data = req.model_dump_json()
             return data.encode("utf-8")
 
-        # Extract call IDs for cleanup after successful send
-        # Complete calls should always have an ID, filter out any None values just in case
-        call_ids = [item.id for item in batch if item.id is not None]
-
-        def send_batch_fn(encoded_data: bytes) -> None:
-            self._send_complete_batch_to_server(encoded_data, call_ids)
+        def log_dropped_upsert_batch(
+            batch: list[
+                Union[
+                    tsi.StartedCallSchemaForInsert,
+                    tsi.EndedCallSchemaForInsert,
+                    tsi.CompleteCallSchemaForInsert,
+                ]
+            ],
+            e: Exception,
+        ) -> None:
+            logger.warning(f"Dropped {len(batch)} call upsert(s) due to error: {e}")
 
         process_batch_with_retry(
-            batch_name="call_completes",
-            batch=batch,
+            batch_name="call_upserts_v2",
+            batch=final_batch,
             remote_request_bytes_limit=self.remote_request_bytes_limit,
-            send_batch_fn=send_batch_fn,
-            processor_obj=self.complete_processor,
+            send_batch_fn=self._send_upsert_batch_v2_to_server,
+            processor_obj=self.call_processor_v2,
             should_update_batch_size=_should_update_batch_size,
             get_item_id_fn=get_item_id,
-            log_dropped_fn=log_dropped_complete_batch,
+            log_dropped_fn=log_dropped_upsert_batch,
             encode_batch_fn=encode_batch,
         )
 
-    def get_call_processor(self) -> Union[AsyncBatchProcessor, None]:
-        """Custom method not defined on the formal TraceServerInterface to expose
-        the underlying call processor. Should be formalized in a client-side interface.
+    def _calls_upsert_batch_v2_legacy(
+        self, req: tsi.CallsUpsertBatchV2Req
+    ) -> tsi.CallsUpsertBatchV2Res:
+        """Handle V2 upsert batch request using legacy /call/upsert_batch endpoint.
 
-        Deprecated: Use get_start_processor() or get_complete_processor() instead.
+        Converts V2 format to legacy format and returns V2 response.
         """
-        # For backwards compatibility, return start_processor
-        return self.start_processor
+        # Convert to legacy format: send starts and ends separately
+        starts = [
+            item
+            for item in req.items
+            if isinstance(item, tsi.StartedCallSchemaForInsert)
+        ]
+        completes = [
+            item
+            for item in req.items
+            if isinstance(item, tsi.CompleteCallSchemaForInsert)
+        ]
+        ends = [
+            item for item in req.items if isinstance(item, tsi.EndedCallSchemaForInsert)
+        ]
 
-    def get_start_processor(self) -> Union[AsyncBatchProcessor, None]:
-        """Get the processor for call starts."""
-        return self.start_processor
+        # Build legacy batch with starts and ends
+        legacy_items: list[Union[tsi.CallBatchStartMode, tsi.CallBatchEndMode]] = []
 
-    def get_complete_processor(self) -> Union[AsyncBatchProcessor, None]:
-        """Get the processor for complete calls."""
-        return self.complete_processor
+        # Add starts to legacy batch
+        for start in starts:
+            legacy_items.append(
+                tsi.CallBatchStartMode(req=tsi.CallStartReq(start=start))
+            )
+
+        # Add ends to legacy batch
+        for end in ends:
+            legacy_items.append(tsi.CallBatchEndMode(req=tsi.CallEndReq(end=end)))
+
+        # For completes, send as both start and end
+        for complete in completes:
+            # Create start from complete
+            assert complete.id is not None
+            start_from_complete = tsi.StartedCallSchemaForInsert(
+                project_id=complete.project_id,
+                id=complete.id,
+                op_name=complete.op_name,
+                display_name=complete.display_name,
+                trace_id=complete.trace_id,
+                parent_id=complete.parent_id,
+                thread_id=complete.thread_id,
+                turn_id=complete.turn_id,
+                started_at=complete.started_at,
+                attributes=complete.attributes,
+                inputs=complete.inputs,
+                otel_dump=complete.otel_dump,
+                wb_user_id=complete.wb_user_id,
+                wb_run_id=complete.wb_run_id,
+                wb_run_step=complete.wb_run_step,
+            )
+            legacy_items.append(
+                tsi.CallBatchStartMode(req=tsi.CallStartReq(start=start_from_complete))
+            )
+
+            # Create end from complete
+            end_from_complete = tsi.EndedCallSchemaForInsert(
+                project_id=complete.project_id,
+                id=complete.id,
+                ended_at=complete.ended_at,
+                exception=complete.exception,
+                output=complete.output,
+                summary=complete.summary,
+                wb_run_step_end=complete.wb_run_step_end,
+            )
+            legacy_items.append(
+                tsi.CallBatchEndMode(req=tsi.CallEndReq(end=end_from_complete))
+            )
+
+        # Send to legacy endpoint
+        ids: list[str] = []
+        trace_ids: list[str] = []
+
+        if legacy_items:
+            legacy_req = tsi.CallCreateBatchReq(batch=legacy_items)
+            self._generic_request(
+                "/call/upsert_batch",
+                legacy_req,
+                tsi.CallCreateBatchReq,
+                tsi.CallCreateBatchRes,
+            )
+
+        # Build response with IDs
+        for item in req.items:
+            if isinstance(item, tsi.StartedCallSchemaForInsert):
+                assert item.id is not None
+                ids.append(item.id)
+                trace_ids.append(item.trace_id or "")
+            elif isinstance(item, tsi.EndedCallSchemaForInsert):
+                assert item.id is not None
+                ids.append(item.id)
+                trace_ids.append("")
+            elif isinstance(item, tsi.CompleteCallSchemaForInsert):
+                assert item.id is not None
+                ids.append(item.id)
+                trace_ids.append(item.trace_id or "")
+
+        return tsi.CallsUpsertBatchV2Res(ids=ids, trace_ids=trace_ids)
+
+    def calls_upsert_batch_v2(
+        self, req: tsi.CallsUpsertBatchV2Req
+    ) -> tsi.CallsUpsertBatchV2Res:
+        """V2 batch upsert endpoint that handles starts, ends, and completes.
+
+        This is the new unified endpoint that intelligently handles all call types:
+        - Starts (naked starts without end)
+        - Ends (naked ends without start)
+        - Completes (start + end combined)
+
+        Falls back to separate endpoints if unified endpoint is not available.
+        """
+        if self.should_batch:
+            assert self.call_processor_v2 is not None
+
+            # Enqueue all items - smart batching happens at flush time
+            self.call_processor_v2.enqueue(req.items)
+
+            # Return response with IDs and trace_ids for all items
+            ids: list[str] = []
+            trace_ids = []
+            for item in req.items:
+                assert item.id is not None
+                if isinstance(item, tsi.StartedCallSchemaForInsert):
+                    ids.append(item.id)
+                    trace_ids.append(item.trace_id or "")
+                elif isinstance(item, tsi.EndedCallSchemaForInsert):
+                    ids.append(item.id)
+                    trace_ids.append("")  # Ends don't have trace_id
+                elif isinstance(item, tsi.CompleteCallSchemaForInsert):
+                    ids.append(item.id or "")
+                    trace_ids.append(item.trace_id or "")
+
+            return tsi.CallsUpsertBatchV2Res(ids=ids, trace_ids=trace_ids)
+
+        # Non-batching path - try unified endpoint, fall back to legacy endpoint
+        # Extract entity and project from the first item's project_id
+        if not req.items:
+            return tsi.CallsUpsertBatchV2Res(ids=[], trace_ids=[])
+
+        first_project_id = req.items[0].project_id
+        entity, project = first_project_id.split("/", 1)
+        url = f"/v2/{entity}/{project}/calls/upsert/batch"
+
+        # Check if we already know this endpoint is unavailable
+        if not self._is_endpoint_available(url):
+            logger.debug(
+                "Unified upsert endpoint known to be unavailable, using legacy /call/upsert_batch"
+            )
+            return self._calls_upsert_batch_v2_legacy(req)
+
+        try:
+            return self._generic_request(
+                url,
+                req,
+                tsi.CallsUpsertBatchV2Req,
+                tsi.CallsUpsertBatchV2Res,
+            )
+        except requests.HTTPError as e:
+            if e.response.status_code == 404:
+                # Mark endpoint as unavailable for future requests
+                self._mark_endpoint_unavailable(url)
+                logger.debug(
+                    "Unified upsert endpoint not available, falling back to legacy /call/upsert_batch"
+                )
+
+                return self._calls_upsert_batch_v2_legacy(req)
+            else:
+                raise
+
+    def get_call_processor_v2(self) -> Union[AsyncBatchProcessor, None]:
+        """Get the V2 processor that handles all call types (starts, ends, completes)."""
+        return self.call_processor_v2
 
     def _send_feedback_batch_to_server(self, encoded_data: bytes) -> None:
         """Send a batch of feedback data to the server with retry logic.
@@ -334,6 +611,28 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
             data=encoded_data,  # type: ignore
         )
         handle_response_error(r, "/feedback/batch/create")
+
+    def _send_feedback_individually(self, batch: list[tsi.FeedbackCreateReq]) -> None:
+        """Send feedback items individually when batch endpoint is unavailable.
+
+        Strips id and created_at fields as they're not supported by the individual endpoint.
+        """
+        # Fall back to individual feedback creation calls
+        for item in batch:
+            # Feedback endpoint doesn't support id, created_at, so we need to strip them
+            item_dict = item.model_dump(exclude={"id", "created_at"})
+            feedback_req = tsi.FeedbackCreateReq.model_validate(item_dict)
+            try:
+                self._generic_request(
+                    "/feedback/create",
+                    feedback_req,
+                    tsi.FeedbackCreateReq,
+                    tsi.FeedbackCreateRes,
+                )
+            except Exception as individual_error:
+                logger.warning(
+                    f"Failed to create individual feedback: {individual_error}"
+                )
 
     def _flush_feedback(
         self,
@@ -358,36 +657,27 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
             return data.encode("utf-8")
 
         def send_feedback_batch(encoded_data: bytes) -> None:
+            # Check if we already know this endpoint is unavailable
+            if not self._is_endpoint_available("/feedback/batch/create"):
+                logger.debug(
+                    "Feedback batch endpoint known to be unavailable, using individual feedback creation"
+                )
+                # Fallback to individual calls
+                self._send_feedback_individually(batch)
+                return
+
             try:
                 self._send_feedback_batch_to_server(encoded_data)
             except requests.HTTPError as e:
                 # If batching endpoint doesn't exist (404) fall back to individual calls
                 if e.response.status_code == 404:
+                    # Mark endpoint as unavailable for future requests
+                    self._mark_endpoint_unavailable("/feedback/batch/create")
                     logger.debug(
                         f"Batching endpoint not available, falling back to individual feedback creation: {e}"
                     )
-
-                    # Feedback endpoint doesn't support id, created_at, so we need to strip them
-                    class FeedbackCreateReqStripped(tsi.FeedbackCreateReq):
-                        id: SkipJsonSchema[str] = Field(exclude=True)
-                        created_at: SkipJsonSchema[Optional[datetime.datetime]] = Field(
-                            exclude=True, default=None
-                        )
-
-                    # Fall back to individual feedback creation calls
-                    for item in batch:
-                        item_copy = FeedbackCreateReqStripped(**item.model_dump())
-                        try:
-                            self._generic_request(
-                                "/feedback/create",
-                                item_copy,
-                                FeedbackCreateReqStripped,
-                                tsi.FeedbackCreateRes,
-                            )
-                        except Exception as individual_error:
-                            logger.warning(
-                                f"Failed to create individual feedback: {individual_error}"
-                            )
+                    # Fallback to individual calls
+                    self._send_feedback_individually(batch)
                 else:
                     # Re-raise server errors (5xx) as they're not client compatibility issues
                     raise
@@ -1538,107 +1828,6 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
             method="DELETE",
             params=params,
         )
-
-    def calls_start_batch_v2(
-        self, req: tsi.CallsStartBatchReq
-    ) -> tsi.CallsStartBatchRes:
-        """V2 batch call start endpoint for calls_complete table.
-
-        Starts are enqueued to the processor. Deduplication with pending completes
-        happens at flush time, not enqueue time.
-        """
-        if self.should_batch:
-            assert self.start_processor is not None
-
-            # Enqueue all starts - filtering happens at flush time
-            self.start_processor.enqueue(req.items)
-
-            # Return response with IDs and trace_ids for all items
-            return tsi.CallsStartBatchRes(
-                ids=[item.id or generate_id() for item in req.items],
-                trace_ids=[item.trace_id or generate_id() for item in req.items],
-            )
-
-        # Try v2 endpoint first, fall back to legacy upsert_batch on 404
-        try:
-            return self._generic_request(
-                "/v2/calls/start/batch",
-                req,
-                tsi.CallsStartBatchReq,
-                tsi.CallsStartBatchRes,
-            )
-        except requests.HTTPError as e:
-            if e.response.status_code == 404:
-                logger.debug(
-                    "V2 start batch endpoint not available, falling back to legacy upsert_batch"
-                )
-
-                # Convert to legacy batch format and send
-                legacy_req = convert_start_to_legacy_batch(req.items)
-                self._generic_request(
-                    "/call/upsert_batch",
-                    legacy_req,
-                    tsi.CallCreateBatchReq,
-                    tsi.CallCreateBatchRes,
-                )
-
-                # Convert legacy response to v2 response format
-                ids = [item.id or generate_id() for item in req.items]
-                trace_ids = [item.trace_id or generate_id() for item in req.items]
-
-                return tsi.CallsStartBatchRes(ids=ids, trace_ids=trace_ids)
-            else:
-                raise
-
-    def calls_complete_batch_v2(
-        self, req: tsi.CallsCompleteBatchReq
-    ) -> tsi.CallsCompleteBatchRes:
-        """V2 batch call complete endpoint for calls_complete table.
-
-        Complete calls contain both start and end data. When enqueueing, we track
-        the call IDs so that if a start arrives later, we can skip it.
-        """
-        if self.should_batch:
-            assert self.complete_processor is not None
-
-            # Track these call IDs as pending completes for deduplication
-            with self._pending_complete_ids_lock:
-                for item in req.items:
-                    if item.id is not None:
-                        self._pending_complete_ids.add(item.id)
-
-            # Enqueue the complete calls directly
-            self.complete_processor.enqueue(req.items)
-
-            return tsi.CallsCompleteBatchRes()
-
-        # Try v2 endpoint first, fall back to legacy upsert_batch on 404
-        try:
-            return self._generic_request(
-                "/v2/calls/complete/batch",
-                req,
-                tsi.CallsCompleteBatchReq,
-                tsi.CallsCompleteBatchRes,
-            )
-        except requests.HTTPError as e:
-            if e.response.status_code == 404:
-                logger.debug(
-                    "V2 complete batch endpoint not available, falling back to legacy upsert_batch"
-                )
-
-                # Convert to legacy batch format
-                legacy_req = convert_complete_to_legacy_batch(req.items)
-                self._generic_request(
-                    "/call/upsert_batch",
-                    legacy_req,
-                    tsi.CallCreateBatchReq,
-                    tsi.CallCreateBatchRes,
-                )
-
-                return tsi.CallsCompleteBatchRes()
-            else:
-                raise
-
 
 __docspec__ = [
     RemoteHTTPTraceServer,

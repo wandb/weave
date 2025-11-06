@@ -103,12 +103,12 @@ class CachingMiddlewareTraceServer(tsi.FullTraceServerInterface):
         except Exception:
             logger.exception("Error closing cache")
 
-    def get_call_processor(self) -> AsyncBatchProcessor | None:
+    def get_call_processor_v2(self) -> AsyncBatchProcessor | None:
         """Custom method not defined on the formal TraceServerInterface to expose
         the underlying call processor. Should be formalized in a client-side interface.
         """
-        if hasattr(self._next_trace_server, "get_call_processor"):
-            return self._next_trace_server.get_call_processor()
+        if hasattr(self._next_trace_server, "get_call_processor_v2"):
+            return self._next_trace_server.get_call_processor_v2()
         return None
 
     def get_feedback_processor(self) -> AsyncBatchProcessor | None:
@@ -117,22 +117,6 @@ class CachingMiddlewareTraceServer(tsi.FullTraceServerInterface):
         """
         if hasattr(self._next_trace_server, "get_feedback_processor"):
             return self._next_trace_server.get_feedback_processor()
-        return None
-
-    def get_start_processor(self) -> AsyncBatchProcessor | None:
-        """Custom method not defined on the formal TraceServerInterface to expose
-        the underlying start processor. Should be formalized in a client-side interface.
-        """
-        if hasattr(self._next_trace_server, "get_start_processor"):
-            return self._next_trace_server.get_start_processor()
-        return None
-
-    def get_complete_processor(self) -> AsyncBatchProcessor | None:
-        """Custom method not defined on the formal TraceServerInterface to expose
-        the underlying complete processor. Should be formalized in a client-side interface.
-        """
-        if hasattr(self._next_trace_server, "get_complete_processor"):
-            return self._next_trace_server.get_complete_processor()
         return None
 
     @classmethod
@@ -695,17 +679,10 @@ class CachingMiddlewareTraceServer(tsi.FullTraceServerInterface):
     def score_delete_v2(self, req: tsi.ScoreDeleteV2Req) -> tsi.ScoreDeleteV2Res:
         return self._next_trace_server.score_delete_v2(req)
 
-    # Call insert V2 API
-
-    def calls_start_batch_v2(
-        self, req: tsi.CallsStartBatchReq
-    ) -> tsi.CallsStartBatchRes:
-        return self._next_trace_server.calls_start_batch_v2(req)
-
-    def calls_complete_batch_v2(
-        self, req: tsi.CallsCompleteBatchReq
-    ) -> tsi.CallsCompleteBatchRes:
-        return self._next_trace_server.calls_complete_batch_v2(req)
+    def calls_upsert_batch_v2(
+        self, req: tsi.CallsUpsertBatchV2Req
+    ) -> tsi.CallsUpsertBatchV2Res:
+        return self._next_trace_server.calls_upsert_batch_v2(req)
 
 
 def pydantic_bytes_safe_dump(obj: BaseModel) -> str:

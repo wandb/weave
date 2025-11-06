@@ -158,6 +158,12 @@ class TestOnlyUserInjectingExternalTraceServer(
         req.wb_user_id = self._user_id
         return super().score_delete_v2(req)
 
+    def calls_upsert_batch_v2(
+        self, req: tsi.CallsUpsertBatchV2Req
+    ) -> tsi.CallsUpsertBatchV2Res:
+        req.wb_user_id = self._user_id
+        return super().calls_upsert_batch_v2(req)
+
 
 def externalize_trace_server(
     trace_server: tsi.TraceServerInterface,

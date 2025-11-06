@@ -344,7 +344,11 @@ class CallsUpsertBatchV2Req(BaseModelStrict):
 
     project_id: str
     items: list[
-        Union[StartedCallSchemaForInsert, EndedCallSchemaForInsert, CompleteCallSchemaForInsert]
+        Union[
+            StartedCallSchemaForInsert,
+            EndedCallSchemaForInsert,
+            CompleteCallSchemaForInsert,
+        ]
     ]
 
 

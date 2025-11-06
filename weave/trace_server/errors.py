@@ -256,7 +256,6 @@ class ErrorRegistry:
 
         self.register(TransportQueryError, 403, lambda exc: {"reason": "Forbidden"})
 
-
 def _get_error_registry() -> ErrorRegistry:
     """Get the global error registry, initializing it if needed."""
     global _error_registry

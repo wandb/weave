@@ -97,14 +97,11 @@ from weave.trace_server.interface.feedback_types import (
 )
 from weave.trace_server.trace_server_interface import (
     CallEndReq,
-    CallsCompleteBatchReq,
     CallsDeleteReq,
     CallsFilter,
     CallsQueryReq,
-    CallsStartBatchReq,
     CallStartReq,
     CallUpdateReq,
-    CompleteCallSchemaForInsert,
     CostCreateInput,
     CostCreateReq,
     CostCreateRes,
@@ -336,9 +333,7 @@ class WeaveClient:
             # Set Client project name with updated project name
             self.project = resp.project_name
 
-        self._server_call_processor = None
-        self._server_start_processor = None
-        self._server_complete_processor = None
+        self._server_call_processor_v2 = None
         self._server_feedback_processor = None
         # This is a short-term hack to get around the fact that we are reaching into
         # the underlying implementation of the specific server to get the call processor.
@@ -347,12 +342,8 @@ class WeaveClient:
         # we don't really want the server-side implementations to need to define no-ops as that is
         # even uglier. So we are using this "hasattr" check to avoid forcing the server-side implementations
         # to define no-ops.
-        if hasattr(self.server, "get_call_processor"):
-            self._server_call_processor = self.server.get_call_processor()
-        if hasattr(self.server, "get_start_processor"):
-            self._server_start_processor = self.server.get_start_processor()
-        if hasattr(self.server, "get_complete_processor"):
-            self._server_complete_processor = self.server.get_complete_processor()
+        if hasattr(self.server, "get_call_processor_v2"):
+            self._server_call_processor_v2 = self.server.get_call_processor_v2()
         if hasattr(self.server, "get_feedback_processor"):
             self._server_feedback_processor = self.server.get_feedback_processor()
         self.send_file_cache = WeaveClientSendFileCache()
@@ -817,9 +808,8 @@ class WeaveClient:
             if should_log_complete_only():
                 return call_start_req
 
-            self.server.calls_start_batch_v2(
-                CallsStartBatchReq(project_id=project_id, items=[call_start_req.start])
-            )
+            assert self._server_call_processor_v2 is not None
+            self._server_call_processor_v2.enqueue([call_start_req.start])
 
             # Return the request for caching
             return call_start_req
@@ -998,35 +988,9 @@ class WeaveClient:
                 raise ValueError(error_message)
 
             # Wait for the start to be cached
-            call_start_req = start_future.result()
-
-            # Combine start and end into a complete call
-            complete_call = CompleteCallSchemaForInsert(
-                project_id=call_start_req.start.project_id,
-                id=call_start_req.start.id,
-                op_name=call_start_req.start.op_name,
-                display_name=call_start_req.start.display_name,
-                trace_id=call_start_req.start.trace_id,
-                parent_id=call_start_req.start.parent_id,
-                thread_id=call_start_req.start.thread_id,
-                turn_id=call_start_req.start.turn_id,
-                started_at=call_start_req.start.started_at,
-                attributes=call_start_req.start.attributes,
-                inputs=call_start_req.start.inputs,
-                ended_at=call_end_req.end.ended_at,
-                exception=call_end_req.end.exception,
-                output=call_end_req.end.output,
-                summary=call_end_req.end.summary,
-                wb_user_id=call_start_req.start.wb_user_id,
-                wb_run_id=call_start_req.start.wb_run_id,
-                wb_run_step=call_start_req.start.wb_run_step,
-                wb_run_step_end=call_end_req.end.wb_run_step_end,
-            )
-
-            # Send the complete call using the new V2 batch endpoint
-            self.server.calls_complete_batch_v2(
-                CallsCompleteBatchReq(project_id=project_id, items=[complete_call])
-            )
+            start_future.result()
+            assert self._server_call_processor_v2 is not None
+            self._server_call_processor_v2.enqueue([call_end_req.end])
 
             # Clean up the future tracking
             self._call_start_futures.pop(call.id, None)
@@ -1967,12 +1931,8 @@ class WeaveClient:
             total += self.future_executor_fastlane.num_outstanding_futures
 
         # Add call batch uploads if available
-        if self._server_call_processor:
-            total += self._server_call_processor.num_outstanding_jobs
-        if self._server_start_processor:
-            total += self._server_start_processor.num_outstanding_jobs
-        if self._server_complete_processor:
-            total += self._server_complete_processor.num_outstanding_jobs
+        if self._server_call_processor_v2:
+            total += self._server_call_processor_v2.num_outstanding_jobs
         # Add feedback batch uploads if available
         if self._server_feedback_processor:
             total += self._server_feedback_processor.num_outstanding_jobs
@@ -2052,8 +2012,8 @@ class WeaveClient:
             )
             call_processor_completed = max(
                 0,
-                prev_job_counts["call_processor_jobs"]
-                - current_job_counts["call_processor_jobs"],
+                prev_job_counts["call_processor_v2_jobs"]
+                - current_job_counts["call_processor_v2_jobs"],
             )
             feedback_processor_completed = max(
                 0,
@@ -2094,9 +2054,7 @@ class WeaveClient:
             job_counts=PendingJobCounts(
                 main_jobs=0,
                 fastlane_jobs=0,
-                call_processor_jobs=0,
-                start_processor_jobs=0,
-                complete_processor_jobs=0,
+                call_processor_v2_jobs=0,
                 feedback_processor_jobs=0,
                 total_jobs=0,
             ),
@@ -2113,18 +2071,10 @@ class WeaveClient:
             self.future_executor.flush()
         if self.future_executor_fastlane:
             self.future_executor_fastlane.flush()
-        if self._server_call_processor:
-            self._server_call_processor.stop_accepting_new_work_and_flush_queue()
-            # Restart call processor processing thread after flushing
-            self._server_call_processor.accept_new_work()
-        if self._server_start_processor:
-            self._server_start_processor.stop_accepting_new_work_and_flush_queue()
-            # Restart start processor processing thread after flushing
-            self._server_start_processor.accept_new_work()
-        if self._server_complete_processor:
-            self._server_complete_processor.stop_accepting_new_work_and_flush_queue()
-            # Restart complete processor processing thread after flushing
-            self._server_complete_processor.accept_new_work()
+        if self._server_call_processor_v2:
+            self._server_call_processor_v2.stop_accepting_new_work_and_flush_queue()
+            # Restart v2 call processor processing thread after flushing
+            self._server_call_processor_v2.accept_new_work()
         if self._server_feedback_processor:
             self._server_feedback_processor.stop_accepting_new_work_and_flush_queue()
             # Restart feedback processor processing thread after flushing
@@ -2137,9 +2087,7 @@ class WeaveClient:
             PendingJobCounts:
                 - main_jobs: Number of pending jobs in the main executor
                 - fastlane_jobs: Number of pending jobs in the fastlane executor
-                - call_processor_jobs: Number of pending jobs in the legacy call processor
-                - start_processor_jobs: Number of pending jobs in the v1 start processor
-                - complete_processor_jobs: Number of pending jobs in the v1 complete processor
+                - call_processor_v2_jobs: Number of pending jobs in the v2 call processor
                 - feedback_processor_jobs: Number of pending jobs in the feedback processor
                 - total_jobs: Total number of pending jobs
         """
@@ -2147,17 +2095,9 @@ class WeaveClient:
         fastlane_jobs = 0
         if self.future_executor_fastlane:
             fastlane_jobs = self.future_executor_fastlane.num_outstanding_futures
-        call_processor_jobs = 0
-        if self._server_call_processor:
-            call_processor_jobs = self._server_call_processor.num_outstanding_jobs
-        start_processor_jobs = 0
-        if self._server_start_processor:
-            start_processor_jobs = self._server_start_processor.num_outstanding_jobs
-        complete_processor_jobs = 0
-        if self._server_complete_processor:
-            complete_processor_jobs = (
-                self._server_complete_processor.num_outstanding_jobs
-            )
+        call_processor_v2_jobs = 0
+        if self._server_call_processor_v2:
+            call_processor_v2_jobs = self._server_call_processor_v2.num_outstanding_jobs
         feedback_processor_jobs = 0
         if self._server_feedback_processor:
             feedback_processor_jobs = (
@@ -2167,15 +2107,11 @@ class WeaveClient:
         return PendingJobCounts(
             main_jobs=main_jobs,
             fastlane_jobs=fastlane_jobs,
-            call_processor_jobs=call_processor_jobs,
-            start_processor_jobs=start_processor_jobs,
-            complete_processor_jobs=complete_processor_jobs,
+            call_processor_v2_jobs=call_processor_v2_jobs,
             feedback_processor_jobs=feedback_processor_jobs,
             total_jobs=main_jobs
             + fastlane_jobs
-            + call_processor_jobs
-            + start_processor_jobs
-            + complete_processor_jobs
+            + call_processor_v2_jobs
             + feedback_processor_jobs,
         )
 
@@ -2193,9 +2129,7 @@ class PendingJobCounts(TypedDict):
 
     main_jobs: int
     fastlane_jobs: int
-    call_processor_jobs: int
-    start_processor_jobs: int
-    complete_processor_jobs: int
+    call_processor_v2_jobs: int
     feedback_processor_jobs: int
     total_jobs: int
 

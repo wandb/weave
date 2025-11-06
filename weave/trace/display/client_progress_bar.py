@@ -86,8 +86,8 @@ def create_progress_bar_callback() -> Callable[[FlushStatus], None]:
             job_details.append(f"{counts['main_jobs']} main")
         if counts["fastlane_jobs"] > 0:
             job_details.append(f"{counts['fastlane_jobs']} file-upload")
-        if counts["call_processor_jobs"] > 0:
-            job_details.append(f"{counts['call_processor_jobs']} call-batch")
+        if counts["call_processor_v2_jobs"] > 0:
+            job_details.append(f"{counts['call_processor_v2_jobs']} call-batch")
         if counts["feedback_processor_jobs"] > 0:
             job_details.append(f"{counts['feedback_processor_jobs']} feedback-batch")
 

@@ -5931,6 +5931,7 @@ def test_calls_query_filter_contains_in_message_array(client):
 def test_log_complete_only_setting(client):
     """Test that log_complete_only setting skips sending start events."""
     from unittest.mock import patch
+
     from weave.trace import settings as weave_settings
 
     # Define a simple op
@@ -5939,13 +5940,18 @@ def test_log_complete_only_setting(client):
         return x * 2
 
     # Test 1: Default behavior (log_complete_only=False) - start event should be sent
-    with patch.object(
-        client.server, "calls_start_batch_v2", wraps=client.server.calls_start_batch_v2
-    ) as mock_start, patch.object(
-        client.server,
-        "calls_complete_batch_v2",
-        wraps=client.server.calls_complete_batch_v2,
-    ) as mock_complete:
+    with (
+        patch.object(
+            client.server,
+            "calls_start_batch_v2",
+            wraps=client.server.calls_start_batch_v2,
+        ) as mock_start,
+        patch.object(
+            client.server,
+            "calls_complete_batch_v2",
+            wraps=client.server.calls_complete_batch_v2,
+        ) as mock_complete,
+    ):
         result = my_op(5)
         assert result == 10
 
@@ -5958,16 +5964,22 @@ def test_log_complete_only_setting(client):
         assert mock_complete.call_count == 1
 
     # Test 2: With log_complete_only=True - start event should NOT be sent
-    with patch.object(
-        client.server, "calls_start_batch_v2", wraps=client.server.calls_start_batch_v2
-    ) as mock_start, patch.object(
-        client.server,
-        "calls_complete_batch_v2",
-        wraps=client.server.calls_complete_batch_v2,
-    ) as mock_complete, patch.object(
-        weave_settings,
-        "should_log_complete_only",
-        return_value=True,
+    with (
+        patch.object(
+            client.server,
+            "calls_start_batch_v2",
+            wraps=client.server.calls_start_batch_v2,
+        ) as mock_start,
+        patch.object(
+            client.server,
+            "calls_complete_batch_v2",
+            wraps=client.server.calls_complete_batch_v2,
+        ) as mock_complete,
+        patch.object(
+            weave_settings,
+            "should_log_complete_only",
+            return_value=True,
+        ),
     ):
         result = my_op(10)
         assert result == 20

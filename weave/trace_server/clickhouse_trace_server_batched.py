@@ -54,6 +54,7 @@ from weave.trace_server.clickhouse_schema import (
     ALL_CALL_JSON_COLUMNS,
     ALL_CALL_SELECT_COLUMNS,
     ALL_FILE_CHUNK_INSERT_COLUMNS,
+    ALL_OBJ_INSERT_COLUMNS,
     REQUIRED_CALL_COLUMNS,
     V2_CALL_STARTS_INSERT_COLUMNS,
     V2_CALLS_COMPLETE_INSERT_COLUMNS,
@@ -645,7 +646,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
         """Returns a stream of calls that match the given query."""
-        project_version = self.project_version_resolver.get_project_version_sync(req.project_id)
+        project_version = self.project_version_resolver.get_project_version_sync(
+            req.project_id
+        )
         cq = CallsQuery(
             project_id=req.project_id,
             include_costs=req.include_costs or False,
@@ -4747,6 +4750,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         output = end_call.output
         output_refs = extract_refs_from_values(output)
 
+        print(f">>>>>>>>>>>> DOING UPDATE: {end_call.id}")
+
+        # TODO: add updated_by
         query = """UPDATE calls_complete
             SET 
                 ended_at = {ended_at:Nullable(DateTime64(3))},
@@ -4754,8 +4760,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 output_refs = {output_refs:Array(String)},
                 summary_dump = {summary_dump:String},
                 exception = {exception:Nullable(String)},
-                wb_run_step_end = {wb_run_step_end:Nullable(Int64)}
+                wb_run_step_end = {wb_run_step_end:Nullable(UInt64)},
+                updated_at = {updated_at:Nullable(DateTime64(3))}
             WHERE project_id = {project_id:String}
+                -- could add 48 hour started at check here   
                 AND id = {id:String}
         """
         parameters = {
@@ -4767,11 +4775,24 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             "summary_dump": _dict_value_to_dump(dict(end_call.summary)),
             "exception": end_call.exception,
             "wb_run_step_end": end_call.wb_run_step_end,
+            "updated_at": datetime.datetime.now(),
         }
 
         parameters = _process_parameters(parameters)
 
-        self.ch_client.command(query, parameters=parameters)
+        try:
+            start = datetime.datetime.now()
+            self.ch_client.command(query, parameters=parameters)
+            logger.info(
+                "call_update_done",
+                extra={
+                    "call_id": end_call.id,
+                    "duration": (datetime.datetime.now() - start).total_seconds(),
+                },
+            )
+        except Exception as e:
+            print(f">>>>>>>>>>>> ERROR UPDATING: {end_call.id} {e} \n{query}\n{parameters}")
+            raise e
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._delete_call_starts")
     def _delete_call_starts(self, project_id: str, call_ids: list[str]) -> None:

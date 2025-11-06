@@ -677,3 +677,16 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         if req.wb_user_id is not None:
             req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
         return self._ref_apply(self._internal_trace_server.score_delete_v2, req)
+
+    def calls_upsert_batch_v2(
+        self, req: tsi.CallsUpsertBatchV2Req
+    ) -> tsi.CallsUpsertBatchV2Res:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        for item in req.items:
+            item.project_id = self._idc.ext_to_int_project_id(item.project_id)
+            if isinstance(
+                item, tsi.StartedCallSchemaForInsert | tsi.CompleteCallSchemaForInsert
+            ):
+                if item.wb_user_id is not None:
+                    item.wb_user_id = self._idc.ext_to_int_user_id(item.wb_user_id)
+        return self._ref_apply(self._internal_trace_server.calls_upsert_batch_v2, req)
