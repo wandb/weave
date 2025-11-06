@@ -37,17 +37,17 @@ client_settings:
   opts:
     username:
       type: string
-      description: Username for HTTP Basic authentication
+      description: Weights & Biases username
       nullable: false
-      read_env: USERNAME
+      read_env: WANDB_USERNAME
       auth:
         security_scheme: HTTPBasic
         role: username
     password:
       type: string
-      description: Password for HTTP Basic authentication
+      description: Weights & Biases API key
       nullable: false
-      read_env: PASSWORD
+      read_env: WANDB_API_KEY
       auth:
         security_scheme: HTTPBasic
         role: password
@@ -208,9 +208,9 @@ resources:
     methods:
       create: post /v2/{entity}/{project}/evaluation_runs
       list: get /v2/{entity}/{project}/evaluation_runs
-      read: get /v2/{entity}/{project}/evaluation_runs/{object_id}/versions/{digest}
-      delete: delete /v2/{entity}/{project}/evaluation_runs/{object_id}
-      finish: post /v2/{entity}/{project}/evaluation_runs/{object_id}/finish
+      read: get /v2/{entity}/{project}/evaluation_runs/{evaluation_run_id}/versions/{digest}
+      delete: delete /v2/{entity}/{project}/evaluation_runs/{evaluation_run_id}
+      finish: post /v2/{entity}/{project}/evaluation_runs/{evaluation_run_id}/finish
 
   v2_predictions:
     methods:
