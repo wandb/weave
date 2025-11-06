@@ -23,10 +23,10 @@ interactions:
     uri: https://api.notdiamond.ai/v2/modelRouter/modelSelect
   response:
     body:
-      string: '{"providers":[{"provider":"openai","model":"gpt-4o-mini"}],"session_id":"c0ecc24f-41c3-404d-8154-d4282808abf3"}'
+      string: '{"providers":[{"provider":"openai","model":"gpt-4o-mini"}],"session_id":"b6e30613-2c5b-415e-be1a-d820d3f013c8"}'
     headers:
       CF-RAY:
-      - 998f0bc35beb230c-SJC
+      - 99a79b0ceca767a2-SJC
       Connection:
       - keep-alive
       Content-Encoding:
@@ -34,7 +34,7 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Mon, 03 Nov 2025 21:43:14 GMT
+      - Thu, 06 Nov 2025 21:15:21 GMT
       Server:
       - cloudflare
       Transfer-Encoding:
@@ -44,13 +44,13 @@ interactions:
       cf-cache-status:
       - DYNAMIC
       rndr-id:
-      - bb70e8bf-1789-422e
+      - 5bbec791-c29f-42ac
       vary:
       - Accept-Encoding
       x-render-origin-server:
       - uvicorn
       x-request-id:
-      - bb70e8bf-1789-422e
+      - 5bbec791-c29f-42ac
     status:
       code: 200
       message: OK

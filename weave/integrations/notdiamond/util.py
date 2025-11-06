@@ -23,9 +23,9 @@ def get_model_evals(
 
     df = pd.read_csv(file_path)
     models = [
-        "openai/gpt-4o-2024-05-13",
-        "google/gemini-1.5-pro-latest",
-        "openai/gpt-4-turbo-2024-04-09",
+        "openai/gpt-4o",
+        "google/gemini-2.5-flash",
+        "openai/gpt-4-turbo",
         "anthropic/claude-sonnet-4-5",
     ]
 
