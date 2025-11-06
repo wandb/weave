@@ -253,8 +253,13 @@ def test_project_version_mode_from_env():
         test_cases = [
             ("off", CallsStorageServerMode.OFF),
             ("force_legacy", CallsStorageServerMode.FORCE_LEGACY),
+            ("dual_write_read_merged", CallsStorageServerMode.DUAL_WRITE_READ_MERGED),
+            (
+                "dual_write_read_complete",
+                CallsStorageServerMode.DUAL_WRITE_READ_COMPLETE,
+            ),
             ("auto", CallsStorageServerMode.AUTO),
-            ("invalid_mode", CallsStorageServerMode.FORCE_LEGACY),
+            ("invalid_mode", CallsStorageServerMode.DUAL_WRITE_READ_MERGED),
         ]
 
         for env_val, expected_mode in test_cases:
@@ -264,8 +269,10 @@ def test_project_version_mode_from_env():
 
         if "PROJECT_VERSION_MODE" in os.environ:
             del os.environ["PROJECT_VERSION_MODE"]
+
+        # default
         mode = CallsStorageServerMode.from_env()
-        assert mode == CallsStorageServerMode.FORCE_LEGACY
+        assert mode == CallsStorageServerMode.DUAL_WRITE_READ_MERGED
 
     finally:
         if original_value is not None:

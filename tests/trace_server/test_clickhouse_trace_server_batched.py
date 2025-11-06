@@ -6,6 +6,7 @@ import pytest
 
 from weave.trace_server import clickhouse_trace_server_batched as chts
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.project_version.types import CallsStorageServerMode, WriteTarget
 from weave.trace_server.secret_fetcher_context import secret_fetcher_context
 
 
@@ -283,6 +284,7 @@ def test_completions_create_stream_custom_provider():
         )
 
         server = chts.ClickHouseTraceServer(host="test_host")
+        server.table_routing_resolver._mode = CallsStorageServerMode.OFF
         stream = server.completions_create_stream(req)
         chunks = list(stream)
 
@@ -349,6 +351,11 @@ def test_completions_create_stream_custom_provider_with_tracking():
         ) as mock_litellm,
         patch.object(chts.ClickHouseTraceServer, "obj_read") as mock_obj_read,
         patch.object(chts.ClickHouseTraceServer, "_insert_call") as mock_insert_call,
+        patch.object(chts.ClickHouseTraceServer, "_mint_client") as mock_mint_client,
+        patch(
+            "weave.trace_server.project_version.project_version.TableRoutingResolver.resolve_write_target",
+            return_value=WriteTarget.CALLS_MERGED,
+        ),
     ):
         # Mock the litellm completion stream
         mock_stream = MagicMock()
@@ -415,6 +422,7 @@ def test_completions_create_stream_custom_provider_with_tracking():
         )
 
         server = chts.ClickHouseTraceServer(host="test_host")
+        server.table_routing_resolver._mode = CallsStorageServerMode.OFF
         stream = server.completions_create_stream(req)
         chunks = list(stream)
 
@@ -516,6 +524,11 @@ def test_completions_create_stream_multiple_choices():
             "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
         ) as mock_litellm,
         patch.object(chts.ClickHouseTraceServer, "_insert_call") as mock_insert_call,
+        patch.object(chts.ClickHouseTraceServer, "_mint_client") as mock_mint_client,
+        patch(
+            "weave.trace_server.project_version.project_version.TableRoutingResolver.resolve_write_target",
+            return_value=WriteTarget.CALLS_MERGED,
+        ),
     ):
         # Mock the litellm completion stream
         mock_stream = MagicMock()
@@ -645,6 +658,11 @@ def test_completions_create_stream_single_choice_unified_wrapper():
             "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
         ) as mock_litellm,
         patch.object(chts.ClickHouseTraceServer, "_insert_call") as mock_insert_call,
+        patch.object(chts.ClickHouseTraceServer, "_mint_client") as mock_mint_client,
+        patch(
+            "weave.trace_server.project_version.project_version.TableRoutingResolver.resolve_write_target",
+            return_value=WriteTarget.CALLS_MERGED,
+        ),
     ):
         # Mock the litellm completion stream
         mock_stream = MagicMock()

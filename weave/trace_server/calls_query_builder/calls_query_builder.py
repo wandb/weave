@@ -25,10 +25,13 @@ Outstanding Optimizations/Work:
 
 """
 
+import datetime
+import json
 import logging
 import re
+from collections import defaultdict
 from collections.abc import Callable, KeysView
-from typing import Literal, cast
+from typing import Any, Literal, cast
 
 from pydantic import BaseModel, Field
 from typing_extensions import Self
@@ -66,6 +69,7 @@ from weave.trace_server.token_costs import build_cost_ctes, get_cost_final_selec
 from weave.trace_server.trace_server_common import assert_parameter_length_less_than_max
 from weave.trace_server.trace_server_interface_util import (
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
+    extract_refs_from_values,
 )
 
 logger = logging.getLogger(__name__)
@@ -1961,4 +1965,321 @@ def _is_minimal_filter(filter: tsi.CallsFilter | None) -> bool:
         and filter.trace_roots_only is None
         and filter.input_refs is None
         and filter.output_refs is None
+    )
+
+
+######### BATCH UPDATE QUERY HANDLING ##########
+
+
+def _build_grouped_case_statements(
+    call_values: list[tuple[str, Any]],
+    clickhouse_type: str,
+    pb: ParamBuilder,
+    is_nullable: bool = False,
+    is_array: bool = False,
+    array_element_type: str | None = None,
+) -> list[str]:
+    """Build optimized CASE WHEN clauses by grouping calls with identical values.
+
+    This reduces query size and parameter count when multiple calls share the same value.
+
+    Args:
+        call_values: List of (call_id, value) tuples
+        clickhouse_type: ClickHouse type string (e.g., 'String', 'DateTime64(6)')
+        pb: Parameter builder for query parameterization
+        is_nullable: Whether NULL is allowed for this field
+        is_array: Whether this is an array field
+        array_element_type: ClickHouse type for array elements (required if is_array=True)
+
+    Returns:
+        List of CASE WHEN clause strings, optimized by grouping identical values
+
+    Examples:
+        >>> pb = ParamBuilder()
+        >>> # Three calls, two with same exception
+        >>> calls = [("id1", "Error"), ("id2", "Error"), ("id3", None)]
+        >>> _build_grouped_case_statements(calls, "String", pb, is_nullable=True)
+        ['WHEN id IN ({id1:String}, {id2:String}) THEN {val:String}',
+         'WHEN id = {id3:String} THEN NULL']
+    """
+    if not call_values:
+        return []
+
+    # Group calls by their value
+    value_to_ids = _group_calls_by_value(call_values, is_array)
+
+    # Build CASE clauses for each unique value
+    cases = []
+    for group_key, call_ids in value_to_ids.items():
+        value = _convert_group_key_to_value(group_key, is_array)
+        id_clause = _build_id_clause(call_ids, pb)
+        value_clause = _build_value_clause(
+            value, clickhouse_type, array_element_type, is_nullable, is_array, pb
+        )
+        cases.append(f"WHEN {id_clause} THEN {value_clause}")
+
+    return cases
+
+
+def _group_calls_by_value(
+    call_values: list[tuple[str, Any]], is_array: bool
+) -> dict[Any, list[str]]:
+    """Group call IDs by their field value.
+
+    For arrays, converts to tuples for hashability.
+    """
+    value_to_ids: dict[Any, list[str]] = defaultdict(list)
+    for call_id, value in call_values:
+        group_key = (
+            tuple(value) if is_array and value else (value if not is_array else ())
+        )
+        value_to_ids[group_key].append(call_id)
+    return value_to_ids
+
+
+def _convert_group_key_to_value(group_key: Any, is_array: bool) -> Any:
+    """Convert a group key back to its original value type."""
+    if is_array and group_key:
+        return list(group_key)
+    elif is_array:
+        return []
+    else:
+        return group_key
+
+
+def _build_id_clause(call_ids: list[str], pb: ParamBuilder) -> str:
+    """Build the ID matching clause (= for single, IN for multiple)."""
+    if len(call_ids) == 1:
+        id_param = pb.add_param(call_ids[0])
+        return f"id = {param_slot(id_param, 'String')}"
+    else:
+        id_params = [param_slot(pb.add_param(cid), "String") for cid in call_ids]
+        return f"id IN ({', '.join(id_params)})"
+
+
+def _build_value_clause(
+    value: Any,
+    clickhouse_type: str,
+    array_element_type: str | None,
+    is_nullable: bool,
+    is_array: bool,
+    pb: ParamBuilder,
+) -> str:
+    """Build the value clause for a CASE WHEN statement."""
+    if is_nullable and value is None:
+        return "NULL"
+
+    if is_array:
+        if array_element_type is None:
+            raise ValueError("array_element_type must be provided for array fields")
+        return _build_array_value_clause(value, array_element_type, pb)
+
+    value_param = pb.add_param(value)
+    return param_slot(value_param, clickhouse_type)
+
+
+def _build_array_value_clause(
+    value: list, array_element_type: str, pb: ParamBuilder
+) -> str:
+    """Build the value clause for an array field."""
+    if value:
+        params = [param_slot(pb.add_param(val), array_element_type) for val in value]
+        return f"[{', '.join(params)}]"
+    else:
+        return f"CAST([], 'Array({array_element_type})')"
+
+
+def build_calls_complete_batch_update_query(
+    end_calls: list["tsi.EndedCallSchemaForInsert"],
+    pb: ParamBuilder,
+) -> str:
+    """Build a parameterized batch UPDATE query for calls_complete table.
+
+    This uses ClickHouse's lightweight UPDATE with CASE expressions to update
+    multiple calls in a single query, creating only one patch part instead of N.
+
+    Optimizes by grouping calls with identical values to reduce query size.
+
+    Args:
+        end_calls: List of ended call schemas to update
+        pb: Parameter builder for query parameterization
+
+    Returns:
+        Formatted SQL UPDATE command string
+
+    Examples:
+        >>> pb = ParamBuilder()
+        >>> end_calls = [ended_call1, ended_call2]
+        >>> query = build_calls_complete_batch_update_query(end_calls, pb)
+    """
+    if not end_calls:
+        return ""
+
+    # All calls should be from the same project
+    project_id = end_calls[0].project_id
+    call_ids = []
+
+    # Collect values for each field across all calls
+    field_values: dict[str, list[Any]] = {
+        "ended_at": [],
+        "output_dump": [],
+        "output_refs": [],
+        "summary_dump": [],
+        "exception": [],
+        "wb_run_step_end": [],
+    }
+
+    for call in end_calls:
+        call_ids.append(call.id)
+        field_values["ended_at"].append((call.id, call.ended_at))
+        field_values["output_dump"].append((call.id, json.dumps(call.output)))
+        field_values["output_refs"].append(
+            (call.id, extract_refs_from_values(call.output))
+        )
+        field_values["summary_dump"].append((call.id, json.dumps(dict(call.summary))))
+        field_values["exception"].append((call.id, call.exception))
+        field_values["wb_run_step_end"].append((call.id, call.wb_run_step_end))
+
+    # Build optimized CASE statements (groups calls with identical values)
+    field_cases = {
+        "ended_at": _build_grouped_case_statements(
+            field_values["ended_at"], "DateTime64(6)", pb
+        ),
+        "output_dump": _build_grouped_case_statements(
+            field_values["output_dump"], "String", pb
+        ),
+        "output_refs": _build_grouped_case_statements(
+            field_values["output_refs"],
+            "Array(String)",
+            pb,
+            is_array=True,
+            array_element_type="String",
+        ),
+        "summary_dump": _build_grouped_case_statements(
+            field_values["summary_dump"], "String", pb
+        ),
+        "exception": _build_grouped_case_statements(
+            field_values["exception"], "String", pb, is_nullable=True
+        ),
+        "wb_run_step_end": _build_grouped_case_statements(
+            field_values["wb_run_step_end"], "UInt64", pb, is_nullable=True
+        ),
+    }
+
+    # Format CASE expressions with proper indentation
+    def format_cases(cases: list[str]) -> str:
+        """Format a list of CASE conditions into a multi-line string."""
+        return "\n".join(cases)
+
+    # Build WHERE clause with parameterized IN clause
+    where_params = [param_slot(pb.add_param(cid), "String") for cid in call_ids]
+    project_id_param = param_slot(pb.add_param(project_id), "String")
+
+    # Construct the final UPDATE command
+    raw_sql = f"""
+    UPDATE calls_complete
+    SET
+        ended_at = CASE {format_cases(field_cases["ended_at"])} ELSE ended_at END,
+        output_dump = CASE {format_cases(field_cases["output_dump"])} ELSE output_dump END,
+        output_refs = CASE {format_cases(field_cases["output_refs"])} ELSE output_refs END,
+        summary_dump = CASE {format_cases(field_cases["summary_dump"])} ELSE summary_dump END,
+        exception = CASE {format_cases(field_cases["exception"])} ELSE exception END,
+        wb_run_step_end = CASE {format_cases(field_cases["wb_run_step_end"])} ELSE wb_run_step_end END,
+        updated_at = now64(3)
+    WHERE project_id = {project_id_param}
+      AND id IN ({", ".join(where_params)})
+    """
+
+    return safely_format_sql(raw_sql, logger)
+
+
+def _build_calls_complete_update_query(
+    project_id: str,
+    call_ids: list[str],
+    update_fields: dict[str, tuple[Any, str]],
+    wb_user_id: str,
+    updated_at: datetime.datetime,
+    pb: ParamBuilder,
+) -> str | None:
+    """Build a parameterized UPDATE query for calls_complete table.
+
+    Args:
+        project_id: The project ID to filter by
+        call_ids: List of call IDs to update
+        update_fields: Dictionary mapping field names to (value, clickhouse_type) tuples
+        wb_user_id: User ID performing the update
+        updated_at: Timestamp of the update
+        pb: ParamBuilder for parameterized queries
+
+    Returns:
+        Formatted SQL query string or None if no call_ids provided
+    """
+    # Handle empty list case
+    if not call_ids:
+        return None
+
+    # Build parameters
+    project_id_param = pb.add_param(project_id)
+    call_ids_param = pb.add_param(call_ids)
+    updated_at_param = pb.add_param(updated_at)
+    wb_user_id_param = pb.add_param(wb_user_id)
+
+    # Build SET clause with custom fields + standard audit fields
+    set_clauses = []
+    for field_name, (value, clickhouse_type) in update_fields.items():
+        param = pb.add_param(value)
+        set_clauses.append(f"{field_name} = {param_slot(param, clickhouse_type)}")
+
+    # Add standard audit fields
+    set_clauses.append(f"updated_at = {param_slot(updated_at_param, 'DateTime64(3)')}")
+    set_clauses.append(f"wb_user_id = {param_slot(wb_user_id_param, 'String')}")
+    set_sql = ", ".join(set_clauses)
+
+    raw_sql = f"""
+        UPDATE calls_complete
+        SET
+            {set_sql}
+        WHERE project_id = {param_slot(project_id_param, "String")}
+            AND id IN {param_slot(call_ids_param, "Array(String)")}
+    """
+    return safely_format_sql(raw_sql, logger)
+
+
+def build_calls_complete_update_display_name_query(
+    project_id: str,
+    call_id: str,
+    display_name: str,
+    wb_user_id: str,
+    updated_at: datetime.datetime,
+    pb: ParamBuilder,
+) -> str | None:
+    """Build a parameterized UPDATE query for calls_complete table to update the display_name field."""
+    return _build_calls_complete_update_query(
+        project_id=project_id,
+        call_ids=[call_id],
+        update_fields={"display_name": (display_name, "String")},
+        wb_user_id=wb_user_id,
+        updated_at=updated_at,
+        pb=pb,
+    )
+
+
+def build_calls_complete_batch_delete_query(
+    project_id: str,
+    call_ids: list[str],
+    deleted_at: datetime.datetime,
+    wb_user_id: str,
+    updated_at: datetime.datetime,
+    pb: ParamBuilder,
+) -> str | None:
+    """Build a parameterized DELETE query for calls_complete table.
+    This uses ClickHouse's lightweight DELETE with parameterized IN clause.
+    """
+    return _build_calls_complete_update_query(
+        project_id=project_id,
+        call_ids=call_ids,
+        update_fields={"deleted_at": (deleted_at, "DateTime64(3)")},
+        wb_user_id=wb_user_id,
+        updated_at=updated_at,
+        pb=pb,
     )

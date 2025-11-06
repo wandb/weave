@@ -269,7 +269,9 @@ def lite_llm_completion(
                 # Handle different return types if needed in the future
                 pass
 
-            return tsi.CompletionsCreateRes(response=res.model_dump())
+            return tsi.CompletionsCreateRes(
+                response=res.model_dump(mode="python", exclude_none=False)
+            )
         except Exception as e:
             error_message = str(e)
             error_message = error_message.replace("litellm.", "")
@@ -293,7 +295,9 @@ def lite_llm_completion(
             api_base=azure_api_base,
             api_version=azure_api_version,
         )
-        return tsi.CompletionsCreateRes(response=res.model_dump())
+        return tsi.CompletionsCreateRes(
+            response=res.model_dump(mode="python", exclude_none=False)
+        )
     except Exception as e:
         error_message = str(e)
         error_message = error_message.replace("litellm.", "")
