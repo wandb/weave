@@ -121,6 +121,7 @@ def generate_routes_v2(
     @router.post(
         "/{entity}/{project}/ops",
         tags=[V2_OPS_TAG_NAME],
+        operation_id="op_create_v2",
     )
     def op_create_v2(
         entity: str,
@@ -136,6 +137,7 @@ def generate_routes_v2(
     @router.get(
         "/{entity}/{project}/ops/{object_id}/versions/{digest}",
         tags=[V2_OPS_TAG_NAME],
+        operation_id="op_read_v2",
     )
     def op_read_v2(
         entity: str,
@@ -152,6 +154,7 @@ def generate_routes_v2(
     @router.get(
         "/{entity}/{project}/ops",
         tags=[V2_OPS_TAG_NAME],
+        operation_id="op_list_v2",
         response_class=StreamingResponse,
         responses={
             200: {
@@ -160,7 +163,7 @@ def generate_routes_v2(
                     "application/jsonl": {
                         "schema": {
                             "type": "array",
-                            "items": {"$ref": "#/components/schemas/Schema"},
+                            "items": {"$ref": "#/components/schemas/OpReadV2Res"},
                         }
                     }
                 },
@@ -185,6 +188,7 @@ def generate_routes_v2(
     @router.delete(
         "/{entity}/{project}/ops/{object_id}",
         tags=[V2_OPS_TAG_NAME],
+        operation_id="op_delete_v2",
     )
     def op_delete_v2(
         entity: str,
@@ -203,6 +207,7 @@ def generate_routes_v2(
     @router.post(
         "/{entity}/{project}/datasets",
         tags=[V2_DATASETS_TAG_NAME],
+        operation_id="dataset_create_v2",
     )
     def dataset_create_v2(
         entity: str,
@@ -218,6 +223,7 @@ def generate_routes_v2(
     @router.get(
         "/{entity}/{project}/datasets/{object_id}/versions/{digest}",
         tags=[V2_DATASETS_TAG_NAME],
+        operation_id="dataset_read_v2",
     )
     def dataset_read_v2(
         entity: str,
@@ -236,6 +242,7 @@ def generate_routes_v2(
     @router.get(
         "/{entity}/{project}/datasets",
         tags=[V2_DATASETS_TAG_NAME],
+        operation_id="dataset_list_v2",
         response_class=StreamingResponse,
         responses={
             200: {
@@ -244,7 +251,7 @@ def generate_routes_v2(
                     "application/jsonl": {
                         "schema": {
                             "type": "array",
-                            "items": {"$ref": "#/components/schemas/Schema"},
+                            "items": {"$ref": "#/components/schemas/DatasetReadV2Res"},
                         }
                     }
                 },
@@ -269,6 +276,7 @@ def generate_routes_v2(
     @router.delete(
         "/{entity}/{project}/datasets/{object_id}",
         tags=[V2_DATASETS_TAG_NAME],
+        operation_id="dataset_delete_v2",
     )
     def dataset_delete_v2(
         entity: str,
@@ -287,6 +295,7 @@ def generate_routes_v2(
     @router.post(
         "/{entity}/{project}/scorers",
         tags=[V2_SCORERS_TAG_NAME],
+        operation_id="scorer_create_v2",
     )
     def scorer_create_v2(
         entity: str,
@@ -302,6 +311,7 @@ def generate_routes_v2(
     @router.get(
         "/{entity}/{project}/scorers/{object_id}/versions/{digest}",
         tags=[V2_SCORERS_TAG_NAME],
+        operation_id="scorer_read_v2",
     )
     def scorer_read_v2(
         entity: str,
@@ -320,6 +330,7 @@ def generate_routes_v2(
     @router.get(
         "/{entity}/{project}/scorers",
         tags=[V2_SCORERS_TAG_NAME],
+        operation_id="scorer_list_v2",
         response_class=StreamingResponse,
         responses={
             200: {
@@ -328,7 +339,7 @@ def generate_routes_v2(
                     "application/jsonl": {
                         "schema": {
                             "type": "array",
-                            "items": {"$ref": "#/components/schemas/Schema"},
+                            "items": {"$ref": "#/components/schemas/ScorerReadV2Res"},
                         }
                     }
                 },
@@ -353,6 +364,7 @@ def generate_routes_v2(
     @router.delete(
         "/{entity}/{project}/scorers/{object_id}",
         tags=[V2_SCORERS_TAG_NAME],
+        operation_id="scorer_delete_v2",
     )
     def scorer_delete_v2(
         entity: str,
@@ -371,6 +383,7 @@ def generate_routes_v2(
     @router.post(
         "/{entity}/{project}/evaluations",
         tags=[V2_EVALUATIONS_TAG_NAME],
+        operation_id="evaluation_create_v2",
     )
     def evaluation_create_v2(
         req: tsi.EvaluationCreateV2Req,
@@ -382,6 +395,7 @@ def generate_routes_v2(
     @router.get(
         "/{entity}/{project}/evaluations/{object_id}/versions/{digest}",
         tags=[V2_EVALUATIONS_TAG_NAME],
+        operation_id="evaluation_read_v2",
     )
     def evaluation_read_v2(
         entity: str,
@@ -400,6 +414,7 @@ def generate_routes_v2(
     @router.get(
         "/{entity}/{project}/evaluations",
         tags=[V2_EVALUATIONS_TAG_NAME],
+        operation_id="evaluation_list_v2",
         response_class=StreamingResponse,
         responses={
             200: {
@@ -408,7 +423,9 @@ def generate_routes_v2(
                     "application/jsonl": {
                         "schema": {
                             "type": "array",
-                            "items": {"$ref": "#/components/schemas/Schema"},
+                            "items": {
+                                "$ref": "#/components/schemas/EvaluationReadV2Res"
+                            },
                         }
                     }
                 },
@@ -431,7 +448,9 @@ def generate_routes_v2(
         )
 
     @router.delete(
-        "/{entity}/{project}/evaluations/{object_id}", tags=[V2_EVALUATIONS_TAG_NAME]
+        "/{entity}/{project}/evaluations/{object_id}",
+        tags=[V2_EVALUATIONS_TAG_NAME],
+        operation_id="evaluation_delete_v2",
     )
     def evaluation_delete_v2(
         entity: str,
@@ -450,6 +469,7 @@ def generate_routes_v2(
     @router.post(
         "/{entity}/{project}/evaluation_runs",
         tags=[V2_EVALUATION_RUNS_TAG_NAME],
+        operation_id="evaluation_run_create_v2",
     )
     def evaluation_run_create_v2(
         entity: str,
@@ -465,6 +485,7 @@ def generate_routes_v2(
     @router.get(
         "/{entity}/{project}/evaluation_runs/{evaluation_run_id}",
         tags=[V2_EVALUATION_RUNS_TAG_NAME],
+        operation_id="evaluation_run_read_v2",
     )
     def evaluation_run_read_v2(
         entity: str,
@@ -482,6 +503,7 @@ def generate_routes_v2(
     @router.get(
         "/{entity}/{project}/evaluation_runs",
         tags=[V2_EVALUATION_RUNS_TAG_NAME],
+        operation_id="evaluation_run_list_v2",
         response_class=StreamingResponse,
         responses={
             200: {
@@ -490,7 +512,9 @@ def generate_routes_v2(
                     "application/jsonl": {
                         "schema": {
                             "type": "array",
-                            "items": {"$ref": "#/components/schemas/Schema"},
+                            "items": {
+                                "$ref": "#/components/schemas/EvaluationRunReadV2Res"
+                            },
                         }
                     }
                 },
@@ -517,6 +541,7 @@ def generate_routes_v2(
     @router.delete(
         "/{entity}/{project}/evaluation_runs",
         tags=[V2_EVALUATION_RUNS_TAG_NAME],
+        operation_id="evaluation_run_delete_v2",
     )
     def evaluation_run_delete_v2(
         entity: str,
@@ -534,6 +559,7 @@ def generate_routes_v2(
     @router.post(
         "/{entity}/{project}/evaluation_runs/{evaluation_run_id}/finish",
         tags=[V2_EVALUATION_RUNS_TAG_NAME],
+        operation_id="evaluation_run_finish_v2",
     )
     def evaluation_run_finish_v2(
         entity: str,
@@ -554,6 +580,7 @@ def generate_routes_v2(
     @router.post(
         "/{entity}/{project}/models",
         tags=[V2_MODELS_TAG_NAME],
+        operation_id="model_create_v2",
     )
     def model_create_v2(
         entity: str,
@@ -569,6 +596,7 @@ def generate_routes_v2(
     @router.get(
         "/{entity}/{project}/models/{object_id}/versions/{digest}",
         tags=[V2_MODELS_TAG_NAME],
+        operation_id="model_read_v2",
     )
     def model_read_v2(
         entity: str,
@@ -587,6 +615,7 @@ def generate_routes_v2(
     @router.get(
         "/{entity}/{project}/models",
         tags=[V2_MODELS_TAG_NAME],
+        operation_id="model_list_v2",
         response_class=StreamingResponse,
         responses={
             200: {
@@ -595,7 +624,7 @@ def generate_routes_v2(
                     "application/jsonl": {
                         "schema": {
                             "type": "array",
-                            "items": {"$ref": "#/components/schemas/Schema"},
+                            "items": {"$ref": "#/components/schemas/ModelReadV2Res"},
                         }
                     }
                 },
@@ -620,6 +649,7 @@ def generate_routes_v2(
     @router.delete(
         "/{entity}/{project}/models/{object_id}",
         tags=[V2_MODELS_TAG_NAME],
+        operation_id="model_delete_v2",
     )
     def model_delete_v2(
         entity: str,
@@ -640,6 +670,7 @@ def generate_routes_v2(
     @router.post(
         "/{entity}/{project}/predictions",
         tags=[V2_PREDICTIONS_TAG_NAME],
+        operation_id="prediction_create_v2",
     )
     def prediction_create_v2(
         entity: str,
@@ -655,6 +686,7 @@ def generate_routes_v2(
     @router.get(
         "/{entity}/{project}/predictions/{prediction_id}",
         tags=[V2_PREDICTIONS_TAG_NAME],
+        operation_id="prediction_read_v2",
     )
     def prediction_read_v2(
         entity: str,
@@ -672,6 +704,7 @@ def generate_routes_v2(
     @router.get(
         "/{entity}/{project}/predictions",
         tags=[V2_PREDICTIONS_TAG_NAME],
+        operation_id="prediction_list_v2",
         response_class=StreamingResponse,
         responses={
             200: {
@@ -680,7 +713,9 @@ def generate_routes_v2(
                     "application/jsonl": {
                         "schema": {
                             "type": "array",
-                            "items": {"$ref": "#/components/schemas/Schema"},
+                            "items": {
+                                "$ref": "#/components/schemas/PredictionReadV2Res"
+                            },
                         }
                     }
                 },
@@ -711,6 +746,7 @@ def generate_routes_v2(
     @router.delete(
         "/{entity}/{project}/predictions",
         tags=[V2_PREDICTIONS_TAG_NAME],
+        operation_id="prediction_delete_v2",
     )
     def prediction_delete_v2(
         entity: str,
@@ -728,6 +764,7 @@ def generate_routes_v2(
     @router.post(
         "/{entity}/{project}/predictions/{prediction_id}/finish",
         tags=[V2_PREDICTIONS_TAG_NAME],
+        operation_id="prediction_finish_v2",
     )
     def prediction_finish_v2(
         entity: str,
@@ -753,6 +790,7 @@ def generate_routes_v2(
     @router.post(
         "/{entity}/{project}/scores",
         tags=[V2_SCORES_TAG_NAME],
+        operation_id="score_create_v2",
     )
     def score_create_v2(
         entity: str,
@@ -768,6 +806,7 @@ def generate_routes_v2(
     @router.get(
         "/{entity}/{project}/scores/{score_id}",
         tags=[V2_SCORES_TAG_NAME],
+        operation_id="score_read_v2",
     )
     def score_read_v2(
         entity: str,
@@ -783,6 +822,7 @@ def generate_routes_v2(
     @router.get(
         "/{entity}/{project}/scores",
         tags=[V2_SCORES_TAG_NAME],
+        operation_id="score_list_v2",
         response_class=StreamingResponse,
         responses={
             200: {
@@ -791,7 +831,7 @@ def generate_routes_v2(
                     "application/jsonl": {
                         "schema": {
                             "type": "array",
-                            "items": {"$ref": "#/components/schemas/Schema"},
+                            "items": {"$ref": "#/components/schemas/ScoreReadV2Res"},
                         }
                     }
                 },
@@ -822,6 +862,7 @@ def generate_routes_v2(
     @router.delete(
         "/{entity}/{project}/scores",
         tags=[V2_SCORES_TAG_NAME],
+        operation_id="score_delete_v2",
     )
     def score_delete_v2(
         entity: str,
@@ -937,7 +978,7 @@ def generate_routes(
                     "application/jsonl": {
                         "schema": {
                             "type": "array",
-                            "items": {"$ref": "#/components/schemas/Schema"},
+                            "items": {"$ref": "#/components/schemas/CallSchema"},
                         }
                     }
                 },
@@ -1019,7 +1060,10 @@ def generate_routes(
                     "application/jsonl": {
                         "schema": {
                             "type": "array",
-                            "items": {"$ref": "#/components/schemas/Schema"},
+                            "items": {
+                                "type": "object",
+                                "additionalProperties": True,
+                            },
                         }
                     }
                 },
@@ -1184,7 +1228,10 @@ def generate_routes(
                     "application/jsonl": {
                         "schema": {
                             "type": "array",
-                            "items": {"$ref": "#/components/schemas/Schema"},
+                            "items": {
+                                "type": "object",
+                                "additionalProperties": True,
+                            },
                         }
                     }
                 },
@@ -1219,7 +1266,10 @@ def generate_routes(
                     "application/jsonl": {
                         "schema": {
                             "type": "array",
-                            "items": {"$ref": "#/components/schemas/Schema"},
+                            "items": {
+                                "type": "object",
+                                "additionalProperties": True,
+                            },
                         }
                     }
                 },

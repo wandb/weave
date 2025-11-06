@@ -491,7 +491,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/Schema"
+                    "$ref": "#/components/schemas/CallSchema"
                   }
                 }
               }
@@ -871,7 +871,8 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/Schema"
+                    "type": "object",
+                    "additionalProperties": true
                   }
                 }
               }
@@ -1465,7 +1466,8 @@
               "application/jsonl": {
                 "schema": {
                   "items": {
-                    "$ref": "#/components/schemas/Schema"
+                    "additionalProperties": true,
+                    "type": "object"
                   },
                   "type": "array"
                 }
@@ -1514,7 +1516,8 @@
               "application/jsonl": {
                 "schema": {
                   "items": {
-                    "$ref": "#/components/schemas/Schema"
+                    "additionalProperties": true,
+                    "type": "object"
                   },
                   "type": "array"
                 }
@@ -1539,14 +1542,14 @@
         ]
       }
     },
-    "/v2{entity}/{project}/ops": {
+    "/v2/{entity}/{project}/ops": {
       "post": {
         "tags": [
           "V2 -- Ops"
         ],
         "summary": "Op Create V2",
         "description": "Create an op object.",
-        "operationId": "op_create_v2_v2_entity___project__ops_post",
+        "operationId": "op_create_v2",
         "security": [
           {
             "HTTPBasic": []
@@ -1611,7 +1614,7 @@
         ],
         "summary": "Op List V2",
         "description": "List op objects.",
-        "operationId": "op_list_v2_v2_entity___project__ops_get",
+        "operationId": "op_list_v2",
         "security": [
           {
             "HTTPBasic": []
@@ -1677,7 +1680,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/Schema"
+                    "$ref": "#/components/schemas/OpReadV2Res"
                   }
                 }
               }
@@ -1696,14 +1699,14 @@
         }
       }
     },
-    "/v2{entity}/{project}/ops/{object_id}/versions/{digest}": {
+    "/v2/{entity}/{project}/ops/{object_id}/versions/{digest}": {
       "get": {
         "tags": [
           "V2 -- Ops"
         ],
         "summary": "Op Read V2",
         "description": "Get an op object.",
-        "operationId": "op_read_v2_v2_entity___project__ops__object_id__versions__digest__get",
+        "operationId": "op_read_v2",
         "security": [
           {
             "HTTPBasic": []
@@ -1771,14 +1774,14 @@
         }
       }
     },
-    "/v2{entity}/{project}/ops/{object_id}": {
+    "/v2/{entity}/{project}/ops/{object_id}": {
       "delete": {
         "tags": [
           "V2 -- Ops"
         ],
         "summary": "Op Delete V2",
         "description": "Delete an op object. If digests are provided, only those versions are deleted. Otherwise, all versions are deleted.",
-        "operationId": "op_delete_v2_v2_entity___project__ops__object_id__delete",
+        "operationId": "op_delete_v2",
         "security": [
           {
             "HTTPBasic": []
@@ -1857,14 +1860,14 @@
         }
       }
     },
-    "/v2{entity}/{project}/datasets": {
+    "/v2/{entity}/{project}/datasets": {
       "post": {
         "tags": [
           "V2 -- Datasets"
         ],
         "summary": "Dataset Create V2",
         "description": "Create a dataset object.",
-        "operationId": "dataset_create_v2_v2_entity___project__datasets_post",
+        "operationId": "dataset_create_v2",
         "security": [
           {
             "HTTPBasic": []
@@ -1929,7 +1932,7 @@
         ],
         "summary": "Dataset List V2",
         "description": "List dataset objects.",
-        "operationId": "dataset_list_v2_v2_entity___project__datasets_get",
+        "operationId": "dataset_list_v2",
         "security": [
           {
             "HTTPBasic": []
@@ -1995,7 +1998,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/Schema"
+                    "$ref": "#/components/schemas/DatasetReadV2Res"
                   }
                 }
               }
@@ -2014,14 +2017,14 @@
         }
       }
     },
-    "/v2{entity}/{project}/datasets/{object_id}/versions/{digest}": {
+    "/v2/{entity}/{project}/datasets/{object_id}/versions/{digest}": {
       "get": {
         "tags": [
           "V2 -- Datasets"
         ],
         "summary": "Dataset Read V2",
         "description": "Get a dataset object.",
-        "operationId": "dataset_read_v2_v2_entity___project__datasets__object_id__versions__digest__get",
+        "operationId": "dataset_read_v2",
         "security": [
           {
             "HTTPBasic": []
@@ -2089,14 +2092,14 @@
         }
       }
     },
-    "/v2{entity}/{project}/datasets/{object_id}": {
+    "/v2/{entity}/{project}/datasets/{object_id}": {
       "delete": {
         "tags": [
           "V2 -- Datasets"
         ],
         "summary": "Dataset Delete V2",
         "description": "Delete a dataset object.",
-        "operationId": "dataset_delete_v2_v2_entity___project__datasets__object_id__delete",
+        "operationId": "dataset_delete_v2",
         "security": [
           {
             "HTTPBasic": []
@@ -2175,14 +2178,14 @@
         }
       }
     },
-    "/v2{entity}/{project}/scorers": {
+    "/v2/{entity}/{project}/scorers": {
       "post": {
         "tags": [
           "V2 -- Scorers"
         ],
         "summary": "Scorer Create V2",
         "description": "Create a scorer object.",
-        "operationId": "scorer_create_v2_v2_entity___project__scorers_post",
+        "operationId": "scorer_create_v2",
         "security": [
           {
             "HTTPBasic": []
@@ -2247,7 +2250,7 @@
         ],
         "summary": "Scorer List V2",
         "description": "List scorer objects.",
-        "operationId": "scorer_list_v2_v2_entity___project__scorers_get",
+        "operationId": "scorer_list_v2",
         "security": [
           {
             "HTTPBasic": []
@@ -2313,7 +2316,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/Schema"
+                    "$ref": "#/components/schemas/ScorerReadV2Res"
                   }
                 }
               }
@@ -2332,14 +2335,14 @@
         }
       }
     },
-    "/v2{entity}/{project}/scorers/{object_id}/versions/{digest}": {
+    "/v2/{entity}/{project}/scorers/{object_id}/versions/{digest}": {
       "get": {
         "tags": [
           "V2 -- Scorers"
         ],
         "summary": "Scorer Read V2",
         "description": "Get a scorer object.",
-        "operationId": "scorer_read_v2_v2_entity___project__scorers__object_id__versions__digest__get",
+        "operationId": "scorer_read_v2",
         "security": [
           {
             "HTTPBasic": []
@@ -2407,14 +2410,14 @@
         }
       }
     },
-    "/v2{entity}/{project}/scorers/{object_id}": {
+    "/v2/{entity}/{project}/scorers/{object_id}": {
       "delete": {
         "tags": [
           "V2 -- Scorers"
         ],
         "summary": "Scorer Delete V2",
         "description": "Delete a scorer object.",
-        "operationId": "scorer_delete_v2_v2_entity___project__scorers__object_id__delete",
+        "operationId": "scorer_delete_v2",
         "security": [
           {
             "HTTPBasic": []
@@ -2493,14 +2496,14 @@
         }
       }
     },
-    "/v2{entity}/{project}/evaluations": {
+    "/v2/{entity}/{project}/evaluations": {
       "post": {
         "tags": [
           "V2 -- Evaluations"
         ],
         "summary": "Evaluation Create V2",
         "description": "Create an evaluation object.",
-        "operationId": "evaluation_create_v2_v2_entity___project__evaluations_post",
+        "operationId": "evaluation_create_v2",
         "security": [
           {
             "HTTPBasic": []
@@ -2545,7 +2548,7 @@
         ],
         "summary": "Evaluation List V2",
         "description": "List evaluation objects.",
-        "operationId": "evaluation_list_v2_v2_entity___project__evaluations_get",
+        "operationId": "evaluation_list_v2",
         "security": [
           {
             "HTTPBasic": []
@@ -2611,7 +2614,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/Schema"
+                    "$ref": "#/components/schemas/EvaluationReadV2Res"
                   }
                 }
               }
@@ -2630,14 +2633,14 @@
         }
       }
     },
-    "/v2{entity}/{project}/evaluations/{object_id}/versions/{digest}": {
+    "/v2/{entity}/{project}/evaluations/{object_id}/versions/{digest}": {
       "get": {
         "tags": [
           "V2 -- Evaluations"
         ],
         "summary": "Evaluation Read V2",
         "description": "Get an evaluation object.",
-        "operationId": "evaluation_read_v2_v2_entity___project__evaluations__object_id__versions__digest__get",
+        "operationId": "evaluation_read_v2",
         "security": [
           {
             "HTTPBasic": []
@@ -2705,14 +2708,14 @@
         }
       }
     },
-    "/v2{entity}/{project}/evaluations/{object_id}": {
+    "/v2/{entity}/{project}/evaluations/{object_id}": {
       "delete": {
         "tags": [
           "V2 -- Evaluations"
         ],
         "summary": "Evaluation Delete V2",
         "description": "Delete an evaluation object.",
-        "operationId": "evaluation_delete_v2_v2_entity___project__evaluations__object_id__delete",
+        "operationId": "evaluation_delete_v2",
         "security": [
           {
             "HTTPBasic": []
@@ -2791,14 +2794,14 @@
         }
       }
     },
-    "/v2{entity}/{project}/evaluation_runs": {
+    "/v2/{entity}/{project}/evaluation_runs": {
       "post": {
         "tags": [
           "V2 -- Evaluation Runs"
         ],
         "summary": "Evaluation Run Create V2",
         "description": "Create an evaluation run.",
-        "operationId": "evaluation_run_create_v2_v2_entity___project__evaluation_runs_post",
+        "operationId": "evaluation_run_create_v2",
         "security": [
           {
             "HTTPBasic": []
@@ -2863,7 +2866,7 @@
         ],
         "summary": "Evaluation Run List V2",
         "description": "List evaluation runs.",
-        "operationId": "evaluation_run_list_v2_v2_entity___project__evaluation_runs_get",
+        "operationId": "evaluation_run_list_v2",
         "security": [
           {
             "HTTPBasic": []
@@ -2929,7 +2932,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/Schema"
+                    "$ref": "#/components/schemas/EvaluationRunReadV2Res"
                   }
                 }
               }
@@ -2953,7 +2956,7 @@
         ],
         "summary": "Evaluation Run Delete V2",
         "description": "Delete evaluation runs.",
-        "operationId": "evaluation_run_delete_v2_v2_entity___project__evaluation_runs_delete",
+        "operationId": "evaluation_run_delete_v2",
         "security": [
           {
             "HTTPBasic": []
@@ -3017,14 +3020,14 @@
         }
       }
     },
-    "/v2{entity}/{project}/evaluation_runs/{evaluation_run_id}": {
+    "/v2/{entity}/{project}/evaluation_runs/{evaluation_run_id}": {
       "get": {
         "tags": [
           "V2 -- Evaluation Runs"
         ],
         "summary": "Evaluation Run Read V2",
         "description": "Get an evaluation run.",
-        "operationId": "evaluation_run_read_v2_v2_entity___project__evaluation_runs__evaluation_run_id__get",
+        "operationId": "evaluation_run_read_v2",
         "security": [
           {
             "HTTPBasic": []
@@ -3083,14 +3086,14 @@
         }
       }
     },
-    "/v2{entity}/{project}/evaluation_runs/{evaluation_run_id}/finish": {
+    "/v2/{entity}/{project}/evaluation_runs/{evaluation_run_id}/finish": {
       "post": {
         "tags": [
           "V2 -- Evaluation Runs"
         ],
         "summary": "Evaluation Run Finish V2",
         "description": "Finish an evaluation run.",
-        "operationId": "evaluation_run_finish_v2_v2_entity___project__evaluation_runs__evaluation_run_id__finish_post",
+        "operationId": "evaluation_run_finish_v2",
         "security": [
           {
             "HTTPBasic": []
@@ -3159,14 +3162,14 @@
         }
       }
     },
-    "/v2{entity}/{project}/models": {
+    "/v2/{entity}/{project}/models": {
       "post": {
         "tags": [
           "V2 -- Models"
         ],
         "summary": "Model Create V2",
         "description": "Create a model object.",
-        "operationId": "model_create_v2_v2_entity___project__models_post",
+        "operationId": "model_create_v2",
         "security": [
           {
             "HTTPBasic": []
@@ -3231,7 +3234,7 @@
         ],
         "summary": "Model List V2",
         "description": "List model objects.",
-        "operationId": "model_list_v2_v2_entity___project__models_get",
+        "operationId": "model_list_v2",
         "security": [
           {
             "HTTPBasic": []
@@ -3297,7 +3300,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/Schema"
+                    "$ref": "#/components/schemas/ModelReadV2Res"
                   }
                 }
               }
@@ -3316,14 +3319,14 @@
         }
       }
     },
-    "/v2{entity}/{project}/models/{object_id}/versions/{digest}": {
+    "/v2/{entity}/{project}/models/{object_id}/versions/{digest}": {
       "get": {
         "tags": [
           "V2 -- Models"
         ],
         "summary": "Model Read V2",
         "description": "Get a model object.",
-        "operationId": "model_read_v2_v2_entity___project__models__object_id__versions__digest__get",
+        "operationId": "model_read_v2",
         "security": [
           {
             "HTTPBasic": []
@@ -3391,14 +3394,14 @@
         }
       }
     },
-    "/v2{entity}/{project}/models/{object_id}": {
+    "/v2/{entity}/{project}/models/{object_id}": {
       "delete": {
         "tags": [
           "V2 -- Models"
         ],
         "summary": "Model Delete V2",
         "description": "Delete a model object. If digests are provided, only those versions are deleted. Otherwise, all versions are deleted.",
-        "operationId": "model_delete_v2_v2_entity___project__models__object_id__delete",
+        "operationId": "model_delete_v2",
         "security": [
           {
             "HTTPBasic": []
@@ -3477,14 +3480,14 @@
         }
       }
     },
-    "/v2{entity}/{project}/predictions": {
+    "/v2/{entity}/{project}/predictions": {
       "post": {
         "tags": [
           "V2 -- Predictions"
         ],
         "summary": "Prediction Create V2",
         "description": "Create a prediction.",
-        "operationId": "prediction_create_v2_v2_entity___project__predictions_post",
+        "operationId": "prediction_create_v2",
         "security": [
           {
             "HTTPBasic": []
@@ -3549,7 +3552,7 @@
         ],
         "summary": "Prediction List V2",
         "description": "List predictions.",
-        "operationId": "prediction_list_v2_v2_entity___project__predictions_get",
+        "operationId": "prediction_list_v2",
         "security": [
           {
             "HTTPBasic": []
@@ -3631,7 +3634,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/Schema"
+                    "$ref": "#/components/schemas/PredictionReadV2Res"
                   }
                 }
               }
@@ -3655,7 +3658,7 @@
         ],
         "summary": "Prediction Delete V2",
         "description": "Delete predictions.",
-        "operationId": "prediction_delete_v2_v2_entity___project__predictions_delete",
+        "operationId": "prediction_delete_v2",
         "security": [
           {
             "HTTPBasic": []
@@ -3719,14 +3722,14 @@
         }
       }
     },
-    "/v2{entity}/{project}/predictions/{prediction_id}": {
+    "/v2/{entity}/{project}/predictions/{prediction_id}": {
       "get": {
         "tags": [
           "V2 -- Predictions"
         ],
         "summary": "Prediction Read V2",
         "description": "Get a prediction.",
-        "operationId": "prediction_read_v2_v2_entity___project__predictions__prediction_id__get",
+        "operationId": "prediction_read_v2",
         "security": [
           {
             "HTTPBasic": []
@@ -3785,14 +3788,14 @@
         }
       }
     },
-    "/v2{entity}/{project}/predictions/{prediction_id}/finish": {
+    "/v2/{entity}/{project}/predictions/{prediction_id}/finish": {
       "post": {
         "tags": [
           "V2 -- Predictions"
         ],
         "summary": "Prediction Finish V2",
         "description": "Finish a prediction.",
-        "operationId": "prediction_finish_v2_v2_entity___project__predictions__prediction_id__finish_post",
+        "operationId": "prediction_finish_v2",
         "security": [
           {
             "HTTPBasic": []
@@ -3851,14 +3854,14 @@
         }
       }
     },
-    "/v2{entity}/{project}/scores": {
+    "/v2/{entity}/{project}/scores": {
       "post": {
         "tags": [
           "V2 -- Scores"
         ],
         "summary": "Score Create V2",
         "description": "Create a score.",
-        "operationId": "score_create_v2_v2_entity___project__scores_post",
+        "operationId": "score_create_v2",
         "security": [
           {
             "HTTPBasic": []
@@ -3923,7 +3926,7 @@
         ],
         "summary": "Score List V2",
         "description": "List scores.",
-        "operationId": "score_list_v2_v2_entity___project__scores_get",
+        "operationId": "score_list_v2",
         "security": [
           {
             "HTTPBasic": []
@@ -4005,7 +4008,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/Schema"
+                    "$ref": "#/components/schemas/ScoreReadV2Res"
                   }
                 }
               }
@@ -4029,7 +4032,7 @@
         ],
         "summary": "Score Delete V2",
         "description": "Delete scores.",
-        "operationId": "score_delete_v2_v2_entity___project__scores_delete",
+        "operationId": "score_delete_v2",
         "security": [
           {
             "HTTPBasic": []
@@ -4093,14 +4096,14 @@
         }
       }
     },
-    "/v2{entity}/{project}/scores/{score_id}": {
+    "/v2/{entity}/{project}/scores/{score_id}": {
       "get": {
         "tags": [
           "V2 -- Scores"
         ],
         "summary": "Score Read V2",
         "description": "Get a score.",
-        "operationId": "score_read_v2_v2_entity___project__scores__score_id__get",
+        "operationId": "score_read_v2",
         "security": [
           {
             "HTTPBasic": []
