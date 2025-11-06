@@ -127,7 +127,10 @@ TODO: need to fill this out
 
 ### Pre-commit Checklist
 
-1. Run lint
+1. **Run linting**: `unset NO_COLOR FORCE_COLOR && nox --no-install -e lint`
+   - Uses `ruff` for linting and formatting
+   - The lint command will modify files to fix formatting issues automatically
+   - **Important**: Do NOT stage files with `git add` - the human maintains staging as a workflow separation tool
 2. Ensure all tests pass
 3. Update documentation if needed
 4. Check for any breaking changes
