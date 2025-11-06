@@ -11,6 +11,10 @@ from weave.trace import (
     init_message,
     weave_client,
 )
+from weave.trace.wandb_run_context import (
+    check_wandb_run_matches,
+    get_global_wb_run_id,
+)
 from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace.settings import should_redact_pii, use_server_cache
 from weave.trace_server.trace_server_interface import (
@@ -127,8 +131,8 @@ def init_weave(
 
     # Resolve entity name after authentication is ensured
     entity_name, project_name = get_entity_project_from_project_name(project_name)
-    wandb_run_id = weave_client.safe_current_wb_run_id()
-    weave_client.check_wandb_run_matches(wandb_run_id, entity_name, project_name)
+    wandb_run_id = get_global_wb_run_id()
+    check_wandb_run_matches(wandb_run_id, entity_name, project_name)
 
     api_key = None
     if wandb_context is not None and wandb_context.api_key is not None:

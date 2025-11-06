@@ -84,6 +84,12 @@ from weave.trace.settings import (
 from weave.trace.table import Table
 from weave.trace.table_upload_chunking import ChunkingConfig, TableChunkManager
 from weave.trace.vals import WeaveObject, WeaveTable, make_trace_obj
+from weave.trace.wandb_run_context import (
+    WandbRunContext,
+    check_wandb_run_matches,
+    get_global_wb_run_id,
+    get_global_wb_run_step,
+)
 from weave.trace.weave_client_send_file_cache import WeaveClientSendFileCache
 from weave.trace_server.constants import MAX_OBJECT_NAME_LENGTH
 from weave.trace_server.ids import generate_id
@@ -320,6 +326,7 @@ class WeaveClient:
         self.project = project
         self.server = server
         self._anonymous_ops: dict[str, Op] = {}
+        self._wandb_run_context: WandbRunContext | None = None
         parallelism_main, parallelism_upload = get_parallelism_settings()
         self.future_executor = FutureExecutor(max_workers=parallelism_main)
         self.future_executor_fastlane = FutureExecutor(max_workers=parallelism_upload)
@@ -745,8 +752,8 @@ class WeaveClient:
         if parent is not None:
             parent._children.append(call)
 
-        current_wb_run_id = safe_current_wb_run_id()
-        current_wb_run_step = safe_current_wb_run_step()
+        current_wb_run_id = self._get_current_wb_run_id()
+        current_wb_run_step = self._get_current_wb_run_step()
         check_wandb_run_matches(current_wb_run_id, self.entity, self.project)
 
         started_at = datetime.datetime.now(tz=datetime.timezone.utc)
@@ -929,7 +936,7 @@ class WeaveClient:
             )
 
             # Capture wb_run_step_end at call end time
-            current_wb_run_step_end = safe_current_wb_run_step()
+            current_wb_run_step_end = self._get_current_wb_run_step()
 
             call_end_req = CallEndReq(
                 end=EndedCallSchemaForInsert(
@@ -962,6 +969,69 @@ class WeaveClient:
     def fail_call(self, call: Call, exception: BaseException) -> None:
         """Fail a call with an exception. This is a convenience method for finish_call."""
         return self.finish_call(call, exception=exception)
+
+    def set_wandb_run_context(self, run_id: str, step: int) -> None:
+        """Override wandb run_id and step for calls created by this client.
+
+        This allows you to associate Weave calls with a specific WandB run
+        that is not bound to the global wandb.run symbol.
+
+        Args:
+            run_id: The run ID (not including entity/project prefix).
+                    The client will automatically add the entity/project prefix.
+            step: The step number to use for calls.
+
+        Examples:
+            ```python
+            client = weave.init("my-project")
+            client.set_wandb_run_context(run_id="my-run-id", step=5)
+            # Now all calls will be associated with entity/project/my-run-id at step 5
+            ```
+        """
+        self._wandb_run_context = WandbRunContext(run_id=run_id, step=step)
+
+    def clear_wandb_run_context(self) -> None:
+        """Clear wandb run context override.
+
+        After calling this, calls will fall back to using the global wandb.run
+        (if available) for run_id and step information.
+
+        Examples:
+            ```python
+            client = weave.init("my-project")
+            client.set_wandb_run_context(run_id="my-run-id", step=5)
+            # ... make some calls ...
+            client.clear_wandb_run_context()
+            # Now calls will use global wandb.run again
+            ```
+        """
+        self._wandb_run_context = None
+
+    def _get_current_wb_run_id(self) -> str | None:
+        """Get the current WandB run ID, checking override first then global state.
+
+        Returns:
+            The run ID in format "entity/project/run_id", or None if no run is active.
+        """
+        # Check override first
+        if self._wandb_run_context is not None:
+            return f"{self.entity}/{self.project}/{self._wandb_run_context.run_id}"
+
+        # Fall back to global wandb.run
+        return get_global_wb_run_id()
+
+    def _get_current_wb_run_step(self) -> int | None:
+        """Get the current WandB run step, checking override first then global state.
+
+        Returns:
+            The current step number, or None if no step is available.
+        """
+        # Check override first
+        if self._wandb_run_context is not None:
+            return self._wandb_run_context.step
+
+        # Fall back to global wandb.run
+        return get_global_wb_run_step()
 
     @trace_sentry.global_trace_sentry.watch()
     def delete_call(self, call: Call) -> None:
@@ -2121,44 +2191,6 @@ def get_parallelism_settings() -> tuple[int | None, int | None]:
     parallelism_fastlane = total_parallelism - parallelism_main
 
     return parallelism_main, parallelism_fastlane
-
-
-def _safe_get_wandb_run() -> wandb.sdk.wandb_run.Run | None:
-    if WANDB_AVAILABLE:
-        import wandb
-
-        return wandb.run
-    return None
-
-
-def safe_current_wb_run_id() -> str | None:
-    wandb_run = _safe_get_wandb_run()
-    if wandb_run is None:
-        return None
-
-    return f"{wandb_run.entity}/{wandb_run.project}/{wandb_run.id}"
-
-
-def safe_current_wb_run_step() -> int | None:
-    wandb_run = _safe_get_wandb_run()
-    if wandb_run is None:
-        return None
-    try:
-        return int(wandb_run.step)
-    except Exception:
-        return None
-
-
-def check_wandb_run_matches(
-    wandb_run_id: str | None, weave_entity: str, weave_project: str
-) -> None:
-    if wandb_run_id:
-        # ex: "entity/project/run_id"
-        wandb_entity, wandb_project, _ = wandb_run_id.split("/")
-        if wandb_entity != weave_entity or wandb_project != weave_project:
-            raise ValueError(
-                f'Project Mismatch: weave and wandb must be initialized using the same project. Found wandb.init targeting project "{wandb_entity}/{wandb_project}" and weave.init targeting project "{weave_entity}/{weave_project}". To fix, please use the same project for both library initializations.'
-            )
 
 
 def _build_anonymous_op(name: str, config: dict[str, Any] | None = None) -> Op:

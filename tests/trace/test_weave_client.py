@@ -3928,10 +3928,10 @@ def test_table_create_from_digests(network_proxy_client):
 def test_calls_query_with_wb_run_id_not_null(client, monkeypatch):
     """Test optimized stats query for wb_run_id not null."""
     # Mock wandb to simulate a run
-    import weave.trace.weave_client as wc
+    from weave.trace import weave_client
 
     mock_run_id = f"{client._project_id()}/test_run_123"
-    monkeypatch.setattr(wc, "safe_current_wb_run_id", lambda: mock_run_id)
+    monkeypatch.setattr(weave_client, "get_global_wb_run_id", lambda: mock_run_id)
 
     @weave.op
     def test_op(x: int) -> int:
