@@ -55,7 +55,7 @@ Focus on these primary test shards:
 
 1. Run all tests in a specific shard: `nox --no-install -e "tests-3.12(shard='trace')"`
 2. Run a specific test by appending `-- [test]` like so: `nox --no-install -e "tests-3.12(shard='trace')" -- tests/trace/test_client_trace.py::test_simple_op`
-3. Run linting: `nox --no-install -e lint` (Note: This will modify files)
+3. Run linting: `nox --no-install -e lint -- --all-files` (Note: This will modify files to fix formatting issues)
 
 _Important:_ Since you don't have internet access, you must run `nox` with `--no-install`. We have pre-installed the requirements on the above shards.
 
@@ -127,7 +127,7 @@ TODO: need to fill this out
 
 ### Pre-commit Checklist
 
-1. **Run linting**: `unset NO_COLOR FORCE_COLOR && nox --no-install -e lint`
+1. **Run linting**: `unset NO_COLOR FORCE_COLOR && nox --no-install -e lint -- --all-files`
    - Uses `ruff` for linting and formatting
    - The lint command will modify files to fix formatting issues automatically
    - **Important**: Do NOT stage files with `git add` - the human maintains staging as a workflow separation tool
