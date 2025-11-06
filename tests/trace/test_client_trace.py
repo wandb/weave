@@ -545,17 +545,16 @@ def test_trace_call_query_filter_input_object_version_refs(client):
 
 
 def test_trace_call_wb_run_step_query(client):
-    full_wb_run_id = f"{client.entity}/{client.project}/test-run"
     from weave.trace import weave_client
+    from weave.trace.wandb_run_context import WandbRunContext
 
     step_counter = iter(range(100))
-    with (
-        mock.patch.object(
-            weave_client, "get_global_wb_run_id", return_value=full_wb_run_id
-        ),
-        mock.patch.object(  # noqa: PT008
-            weave_client, "get_global_wb_run_step", lambda: next(step_counter)
-        ),
+
+    def mock_context():
+        return WandbRunContext(run_id="test-run", step=next(step_counter))
+
+    with mock.patch.object(
+        weave_client, "get_global_wb_run_context", side_effect=mock_context
     ):
         call_spec = simple_line_call_bootstrap()
 
@@ -884,16 +883,19 @@ def test_trace_call_query_filter_trace_roots_only(client):
 
 
 def test_trace_call_query_filter_wb_run_ids(client):
-    full_wb_run_id_1 = f"{client.entity}/{client.project}/test-run-1"
-    full_wb_run_id_2 = f"{client.entity}/{client.project}/test-run-2"
     from weave.trace import weave_client
+    from weave.trace.wandb_run_context import WandbRunContext
 
     with mock.patch.object(
-        weave_client, "get_global_wb_run_id", return_value=full_wb_run_id_1
+        weave_client,
+        "get_global_wb_run_context",
+        return_value=WandbRunContext(run_id="test-run-1", step=0),
     ):
         call_spec_1 = simple_line_call_bootstrap()
     with mock.patch.object(
-        weave_client, "get_global_wb_run_id", return_value=full_wb_run_id_2
+        weave_client,
+        "get_global_wb_run_context",
+        return_value=WandbRunContext(run_id="test-run-2", step=0),
     ):
         call_spec_2 = simple_line_call_bootstrap()
     call_spec_3 = simple_line_call_bootstrap()

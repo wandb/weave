@@ -87,8 +87,7 @@ from weave.trace.vals import WeaveObject, WeaveTable, make_trace_obj
 from weave.trace.wandb_run_context import (
     WandbRunContext,
     check_wandb_run_matches,
-    get_global_wb_run_id,
-    get_global_wb_run_step,
+    get_global_wb_run_context,
 )
 from weave.trace.weave_client_send_file_cache import WeaveClientSendFileCache
 from weave.trace_server.constants import MAX_OBJECT_NAME_LENGTH
@@ -752,9 +751,14 @@ class WeaveClient:
         if parent is not None:
             parent._children.append(call)
 
-        current_wb_run_id = self._get_current_wb_run_id()
-        current_wb_run_step = self._get_current_wb_run_step()
-        check_wandb_run_matches(current_wb_run_id, self.entity, self.project)
+        wb_run_context = self._get_current_wb_run_context()
+        if wb_run_context:
+            current_wb_run_id = f"{self.entity}/{self.project}/{wb_run_context.run_id}"
+            current_wb_run_step = wb_run_context.step
+            check_wandb_run_matches(current_wb_run_id, self.entity, self.project)
+        else:
+            current_wb_run_id = None
+            current_wb_run_step = None
 
         started_at = datetime.datetime.now(tz=datetime.timezone.utc)
         project_id = self._project_id()
@@ -936,7 +940,8 @@ class WeaveClient:
             )
 
             # Capture wb_run_step_end at call end time
-            current_wb_run_step_end = self._get_current_wb_run_step()
+            wb_run_context_end = self._get_current_wb_run_context()
+            current_wb_run_step_end = wb_run_context_end.step if wb_run_context_end else None
 
             call_end_req = CallEndReq(
                 end=EndedCallSchemaForInsert(
@@ -1007,31 +1012,19 @@ class WeaveClient:
         """
         self._wandb_run_context = None
 
-    def _get_current_wb_run_id(self) -> str | None:
-        """Get the current WandB run ID, checking override first then global state.
+    def _get_current_wb_run_context(self) -> WandbRunContext | None:
+        """Get the current WandB run context, checking override first then global state.
 
         Returns:
-            The run ID in format "entity/project/run_id", or None if no run is active.
+            WandbRunContext if a run is active (either from override or global wandb.run),
+            or None if no run is active.
         """
         # Check override first
         if self._wandb_run_context is not None:
-            return f"{self.entity}/{self.project}/{self._wandb_run_context.run_id}"
+            return self._wandb_run_context
 
         # Fall back to global wandb.run
-        return get_global_wb_run_id()
-
-    def _get_current_wb_run_step(self) -> int | None:
-        """Get the current WandB run step, checking override first then global state.
-
-        Returns:
-            The current step number, or None if no step is available.
-        """
-        # Check override first
-        if self._wandb_run_context is not None:
-            return self._wandb_run_context.step
-
-        # Fall back to global wandb.run
-        return get_global_wb_run_step()
+        return get_global_wb_run_context()
 
     @trace_sentry.global_trace_sentry.watch()
     def delete_call(self, call: Call) -> None:

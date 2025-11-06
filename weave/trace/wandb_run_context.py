@@ -21,11 +21,11 @@ class WandbRunContext:
 
     Attributes:
         run_id: The run ID (not including entity/project prefix)
-        step: The step number
+        step: The step number, or None if not available
     """
 
     run_id: str
-    step: int
+    step: int | None
 
 
 def _get_global_wandb_run() -> wandb.sdk.wandb_run.Run | None:
@@ -41,32 +41,23 @@ def _get_global_wandb_run() -> wandb.sdk.wandb_run.Run | None:
     return None
 
 
-def get_global_wb_run_id() -> str | None:
-    """Get the current WandB run ID from global wandb.run.
+def get_global_wb_run_context() -> WandbRunContext | None:
+    """Get the current WandB run context from global wandb.run.
 
     Returns:
-        The run ID in format "entity/project/run_id", or None if no run is active.
+        WandbRunContext with run_id (without entity/project prefix) and step, 
+        or None if no run is active. Step may be None if it cannot be determined.
     """
     wandb_run = _get_global_wandb_run()
     if wandb_run is None:
         return None
 
-    return f"{wandb_run.entity}/{wandb_run.project}/{wandb_run.id}"
-
-
-def get_global_wb_run_step() -> int | None:
-    """Get the current WandB run step from global wandb.run.
-
-    Returns:
-        The current step number, or None if no step is available.
-    """
-    wandb_run = _get_global_wandb_run()
-    if wandb_run is None:
-        return None
     try:
-        return int(wandb_run.step)
+        step = int(wandb_run.step)
     except Exception:
-        return None
+        step = None
+
+    return WandbRunContext(run_id=wandb_run.id, step=step)
 
 
 def check_wandb_run_matches(
