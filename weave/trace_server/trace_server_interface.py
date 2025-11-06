@@ -205,6 +205,83 @@ class EndedCallSchemaForInsert(BaseModel):
         return dict(v)
 
 
+class CompletedCallSchemaForInsert(BaseModel):
+    """Schema for inserting a completed call directly into the calls_complete table.
+
+    This represents a call that is already finished at insertion time, with both
+    start and end information provided together.
+    """
+
+    # Required fields
+    project_id: str
+    id: str
+    trace_id: str
+    op_name: str
+    started_at: datetime.datetime
+
+    updated_at: datetime.datetime | None = None
+    ended_at: datetime.datetime | None = None
+    deleted_at: datetime.datetime | None = None
+
+    display_name: str | None = None
+    parent_id: str | None = None
+    thread_id: str | None = None
+    turn_id: str | None = None
+
+    # Dump fields
+    attributes: dict[str, Any]
+    inputs: dict[str, Any]
+    output: Any | None = None
+    summary: SummaryInsertMap
+    # OTEL span data
+    otel_dump: dict[str, Any] | None = None
+
+    exception: str | None = None
+
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
+    wb_run_id: str | None = None
+    wb_run_step: int | None = None
+    wb_run_step_end: int | None = None
+
+    @field_serializer("attributes", "summary", when_used="unless-none")
+    def serialize_typed_dicts(self, v: dict[str, Any]) -> dict[str, Any]:
+        return dict(v)
+
+    def split_to_start_and_end(
+        self,
+    ) -> tuple["StartedCallSchemaForInsert", "EndedCallSchemaForInsert"]:
+        """Split into separate start and end schemas for two-row table format."""
+        start = StartedCallSchemaForInsert(
+            project_id=self.project_id,
+            id=self.id,
+            op_name=self.op_name,
+            display_name=self.display_name,
+            trace_id=self.trace_id,
+            parent_id=self.parent_id,
+            thread_id=self.thread_id,
+            turn_id=self.turn_id,
+            started_at=self.started_at,
+            attributes=self.attributes,
+            inputs=self.inputs,
+            otel_dump=self.otel_dump,
+            wb_user_id=self.wb_user_id,
+            wb_run_id=self.wb_run_id,
+            wb_run_step=self.wb_run_step,
+        )
+
+        end = EndedCallSchemaForInsert(
+            project_id=self.project_id,
+            id=self.id,
+            ended_at=self.ended_at,
+            exception=self.exception,
+            output=self.output,
+            summary=self.summary,
+            wb_run_step_end=self.wb_run_step_end,
+        )
+
+        return start, end
+
+
 class ObjSchema(BaseModel):
     project_id: str
     object_id: str
@@ -285,6 +362,15 @@ class CallEndRes(BaseModel):
     pass
 
 
+class CallCompleteReq(BaseModelStrict):
+    complete: CompletedCallSchemaForInsert
+
+
+class CallUpsertRes(BaseModel):
+    id: str
+    trace_id: str
+
+
 class CallBatchStartMode(BaseModel):
     mode: str = "start"
     req: CallStartReq
@@ -293,6 +379,11 @@ class CallBatchStartMode(BaseModel):
 class CallBatchEndMode(BaseModel):
     mode: str = "end"
     req: CallEndReq
+
+
+class CallBatchCompleteMode(BaseModel):
+    mode: str = "complete"
+    req: CallCompleteReq
 
 
 class CallCreateBatchReq(BaseModelStrict):
@@ -1958,6 +2049,36 @@ class ScoreDeleteRes(BaseModel):
     num_deleted: int = Field(..., description="Number of scores deleted")
 
 
+class CallsStartBatchReq(BaseModel):
+    """Request for batch starting/completing calls. Accepts start or complete call types."""
+
+    project_id: str = Field(
+        ..., description="The `entity/project` where these calls are saved"
+    )
+    batch: list[CallBatchStartMode | CallBatchCompleteMode]
+
+
+class CallsStartBatchRes(BaseModel):
+    """Response for batch starting/completing calls."""
+
+    res: list[CallUpsertRes]
+
+
+class CallsEndBatchReq(BaseModel):
+    """Request for batch ending calls. Accepts only end call types."""
+
+    project_id: str = Field(
+        ..., description="The `entity/project` where these calls are saved"
+    )
+    batch: list[CallBatchEndMode]
+
+
+class CallsEndBatchRes(BaseModel):
+    """Response for batch ending calls. Returns empty list since ends don't return IDs."""
+
+    res: list[CallUpsertRes] = []
+
+
 class TraceServerInterface(Protocol):
     def ensure_project_exists(
         self, entity: str, project: str
@@ -2124,6 +2245,11 @@ class ObjectInterface(Protocol):
     def score_read(self, req: ScoreReadReq) -> ScoreReadRes: ...
     def score_list(self, req: ScoreListReq) -> Iterator[ScoreReadRes]: ...
     def score_delete(self, req: ScoreDeleteReq) -> ScoreDeleteRes: ...
+
+    # Calls V2 - Batch Endpoints
+    # TODO: this is start AND complete endpoint, we should name it something better
+    def calls_start_batch(self, req: CallsStartBatchReq) -> CallsStartBatchRes: ...
+    def calls_end_batch(self, req: CallsEndBatchReq) -> CallsEndBatchRes: ...
 
 
 class FullTraceServerInterface(TraceServerInterface, ObjectInterface, Protocol):

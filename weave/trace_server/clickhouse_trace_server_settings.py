@@ -13,6 +13,7 @@ FILE_CHUNK_SIZE = 100000
 MAX_DELETE_CALLS_COUNT = 1000
 INITIAL_CALLS_STREAM_BATCH_SIZE = 50
 MAX_CALLS_STREAM_BATCH_SIZE = 500
+BATCH_UPDATE_CHUNK_SIZE = 100  # Split large UPDATE queries to avoid SQL limits
 
 
 # ClickHouse size limits and error handling

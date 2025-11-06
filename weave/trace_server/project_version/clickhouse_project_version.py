@@ -6,6 +6,7 @@ import ddtrace
 from clickhouse_connect.driver.client import Client as CHClient
 
 from weave.trace_server.calls_query_builder.utils import param_slot
+from weave.trace_server.datadog import set_current_span_dd_tags
 from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.project_version.types import ProjectDataResidence
 
@@ -43,9 +44,9 @@ def get_project_data_residence(
         has_complete = row[0]
         has_merged = row[1]
 
-        root_span = ddtrace.tracer.current_root_span()
-        if root_span:
-            root_span.set_tags({"has_complete": has_complete, "has_merged": has_merged})
+        set_current_span_dd_tags(
+            {"has_complete": has_complete, "has_merged": has_merged}
+        )
 
         if has_complete and has_merged:
             return ProjectDataResidence.BOTH
