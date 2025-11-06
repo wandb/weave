@@ -5,8 +5,7 @@ from openai import OpenAI
 
 import weave
 
-PROMPT = """Emulate the Pokedex from early Pokémon episodes. State the name of the Pokemon and then describe it.
-        Your tone is informative yet sassy, blending factual details with a touch of dry humor. Be concise, no more than 3 sentences."""
+PROMPT = "Emulate the Pokedex from early Pokémon episodes. State the name of the Pokemon and then describe it. Your tone is informative yet sassy, blending factual details with a touch of dry humor. Be concise, no more than 3 sentences."
 POKEMON = [
     "pikachu",
     "charmander",
