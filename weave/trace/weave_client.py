@@ -974,7 +974,7 @@ class WeaveClient:
         """Fail a call with an exception. This is a convenience method for finish_call."""
         return self.finish_call(call, exception=exception)
 
-    def set_wandb_run_context(self, run_id: str, step: int) -> None:
+    def set_wandb_run_context(self, run_id: str, step: int | None = None) -> None:
         """Override wandb run_id and step for calls created by this client.
 
         This allows you to associate Weave calls with a specific WandB run
@@ -983,13 +983,17 @@ class WeaveClient:
         Args:
             run_id: The run ID (not including entity/project prefix).
                     The client will automatically add the entity/project prefix.
-            step: The step number to use for calls.
+            step: The step number to use for calls. If None, step will not be set.
 
         Examples:
             ```python
             client = weave.init("my-project")
             client.set_wandb_run_context(run_id="my-run-id", step=5)
             # Now all calls will be associated with entity/project/my-run-id at step 5
+
+            # Or without a step
+            client.set_wandb_run_context(run_id="my-run-id")
+            # Calls will be associated with entity/project/my-run-id with no step
             ```
         """
         self._wandb_run_context = WandbRunContext(run_id=run_id, step=step)
