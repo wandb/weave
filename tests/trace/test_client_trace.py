@@ -883,6 +883,8 @@ def test_trace_call_query_filter_trace_roots_only(client):
 
 
 def test_trace_call_query_filter_wb_run_ids(client):
+    full_wb_run_id_1 = f"{client.entity}/{client.project}/test-run-1"
+    full_wb_run_id_2 = f"{client.entity}/{client.project}/test-run-2"
     from weave.trace import weave_client
     from weave.trace.wandb_run_context import WandbRunContext
 

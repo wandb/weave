@@ -36,7 +36,6 @@ from weave.trace.concurrent.futures import FutureExecutor
 from weave.trace.constants import TRACE_CALL_EMOJI
 from weave.trace.context import call_context
 from weave.trace.feedback import FeedbackQuery
-from weave.trace.init_message import WANDB_AVAILABLE
 from weave.trace.interface_query_builder import (
     exists_expr,
     get_field_expr,
@@ -146,8 +145,6 @@ from weave.utils.exception import exception_to_json_str
 from weave.utils.sanitize import REDACTED_VALUE, should_redact
 
 if TYPE_CHECKING:
-    import wandb
-
     from weave.evaluation.eval import Evaluation
 
 # Controls if objects can have refs to projects not the WeaveClient project.
@@ -941,7 +938,9 @@ class WeaveClient:
 
             # Capture wb_run_step_end at call end time
             wb_run_context_end = self._get_current_wb_run_context()
-            current_wb_run_step_end = wb_run_context_end.step if wb_run_context_end else None
+            current_wb_run_step_end = (
+                wb_run_context_end.step if wb_run_context_end else None
+            )
 
             call_end_req = CallEndReq(
                 end=EndedCallSchemaForInsert(

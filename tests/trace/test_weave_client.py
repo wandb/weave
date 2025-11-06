@@ -3931,6 +3931,7 @@ def test_calls_query_with_wb_run_id_not_null(client, monkeypatch):
     from weave.trace import weave_client
     from weave.trace.wandb_run_context import WandbRunContext
 
+    mock_run_id = f"{client._project_id()}/test_run_123"
     monkeypatch.setattr(
         weave_client,
         "get_global_wb_run_context",

@@ -11,12 +11,12 @@ from weave.trace import (
     init_message,
     weave_client,
 )
+from weave.trace.context import weave_client_context as weave_client_context
+from weave.trace.settings import should_redact_pii, use_server_cache
 from weave.trace.wandb_run_context import (
     check_wandb_run_matches,
     get_global_wb_run_context,
 )
-from weave.trace.context import weave_client_context as weave_client_context
-from weave.trace.settings import should_redact_pii, use_server_cache
 from weave.trace_server.trace_server_interface import (
     FullTraceServerInterface,
 )
