@@ -143,7 +143,7 @@ class V2CallCompleteCHInsertable(BaseModel):
     turn_id: Optional[str] = None
     op_name: str
     started_at: datetime.datetime
-    ended_at: datetime.datetime
+    ended_at: Optional[datetime.datetime] = None
     attributes_dump: str
     inputs_dump: str
     input_refs: list[str]

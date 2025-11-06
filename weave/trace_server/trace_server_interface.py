@@ -336,13 +336,16 @@ class CallEndRes(BaseModel):
 class CallsUpsertBatchV2Req(BaseModelStrict):
     """Request for batch upserting calls (writes to call_starts or calls_complete tables).
 
-    The system detects whether items are starts or completes based on presence of ended_at.
-    - If ended_at is present: complete call -> writes to calls_complete table
-    - If ended_at is None: started call -> writes to call_starts table
+    The system detects whether items are starts, ends, or completes:
+    - StartedCallSchemaForInsert: naked start -> writes to calls_complete table with defaults
+    - CompleteCallSchemaForInsert: complete call -> writes to calls_complete table
+    - EndedCallSchemaForInsert: naked end -> updates existing record in calls_complete table
     """
 
     project_id: str
-    items: list[Union[StartedCallSchemaForInsert, CompleteCallSchemaForInsert]]
+    items: list[
+        Union[StartedCallSchemaForInsert, EndedCallSchemaForInsert, CompleteCallSchemaForInsert]
+    ]
 
 
 class CallsUpsertBatchV2Res(BaseModel):

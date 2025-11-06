@@ -485,7 +485,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         This method enforces that the project is V2 or empty before writing.
         Detects whether calls are starts or completes based on presence of ended_at field:
         - If ended_at is present: complete call -> writes to calls_complete table
-        - If ended_at is None: started call -> writes to call_starts table
+        - If ended_at is None: started call -> writes to calls_complete table
+        - If ended_at is present but op_name is not: naked end -> updates calls_complete table
 
         Args:
             req: CallsUpsertBatchV2Req with project_id and list of calls (starts or completes).
@@ -507,17 +508,26 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         ids = []
         trace_ids = []
 
-        # Separate starts and completes
+        # Separate starts, ends, and completes
         starts: list[tsi.StartedCallSchemaForInsert] = []
+        ends: list[tsi.EndedCallSchemaForInsert] = []
         completes: list[tsi.CompleteCallSchemaForInsert] = []
 
         # TODO(gst): clean this typing up
         for item in req.items:
-            # Detect if it's a complete call by checking for ended_at
-            if hasattr(item, "ended_at") and item.ended_at is not None:
-                completes.append(item)  # type: ignore
-            else:
-                starts.append(item)  # type: ignore
+            # Detect the type of call:
+            # - EndedCallSchemaForInsert: has 'ended_at' but NOT 'op_name'
+            # - CompleteCallSchemaForInsert: has both 'op_name' and 'ended_at'
+            # - StartedCallSchemaForInsert: has 'op_name' but NOT 'ended_at'
+            if hasattr(item, "op_name"):
+                # Has op_name, so it's either a start or complete
+                if hasattr(item, "ended_at") and item.ended_at is not None:
+                    completes.append(item)  # type: ignore
+                else:
+                    starts.append(item)  # type: ignore
+            elif hasattr(item, "ended_at"):
+                # Has ended_at but no op_name, so it's a naked end
+                ends.append(item)  # type: ignore
 
         if project_version == ProjectVersion.CALLS_MERGED_VERSION:
             # New sdk writing to old project - write to call_parts table
@@ -558,18 +568,18 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
             return tsi.CallsUpsertBatchV2Res(ids=ids, trace_ids=trace_ids)
 
-        # V2 project - write to separate tables
+        # V2 project - write everything to calls_complete table
 
-        # Process starts -> call_starts table
+        # Process starts -> calls_complete table (with defaults for missing fields)
         if starts:
-            ch_start_calls: list[V2CallStartCHInsertable] = []
+            ch_start_calls: list[V2CallCompleteCHInsertable] = []
             for item in starts:
-                ch_call = _start_call_to_v2_ch_insertable(item)
-                ch_start_calls.append(ch_call)
-                ids.append(ch_call.id)
-                trace_ids.append(ch_call.trace_id)
+                ch_call_complete = _start_call_to_v2_complete_ch_insertable(item)
+                ch_start_calls.append(ch_call_complete)
+                ids.append(ch_call_complete.id)
+                trace_ids.append(ch_call_complete.trace_id)
 
-            self._v2_insert_call_starts_batch(ch_start_calls)
+            self._v2_insert_calls_complete_batch(req.project_id, ch_start_calls)
 
         # Process completes -> calls_complete table
         if completes:
@@ -581,6 +591,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 trace_ids.append(ch_call.trace_id)
 
             self._v2_insert_calls_complete_batch(req.project_id, ch_complete_calls)
+
+        # Process naked ends -> UPDATE calls_complete table
+        if ends:
+            for item in ends:
+                self._v2_update_calls_complete_with_end(req.project_id, item)
+                # For ends, we use the existing id and don't have trace_id
+                ids.append(item.id)
+                # Note: We can't get trace_id from ends, so we skip it
+                # The client should handle this appropriately
 
         return tsi.CallsUpsertBatchV2Res(ids=ids, trace_ids=trace_ids)
 
@@ -632,7 +651,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             include_costs=req.include_costs or False,
             include_storage_size=req.include_storage_size or False,
             include_total_storage_size=req.include_total_storage_size or False,
-            project_version=project_version,
         )
         columns = ALL_CALL_SELECT_COLUMNS
         if req.columns:
@@ -4700,15 +4718,60 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     ) -> None:
         """Batch insert calls into calls_complete table (V2 projects).
 
-        Note: For calls_complete, we also need to delete any matching entries
-        from call_starts table since the call is now complete.
+        This handles both:
+        - Complete calls with all fields populated
+        - Naked starts with default values for end-related fields (ended_at, output, summary)
+
+        Note: We also delete any matching entries from call_starts table in case there
+        are existing entries (for backward compatibility during the transition).
         """
         self._v2_insert_call_batch(
             "calls_complete", ch_calls, V2_CALLS_COMPLETE_INSERT_COLUMNS
         )
-        # Now we need to delete the inserted ids from the call_starts if they exist
+        # Delete from call_starts if they exist (for backward compatibility)
         call_ids = [ch_call.id for ch_call in ch_calls]
         self._delete_call_starts(project_id, call_ids)
+
+    @ddtrace.tracer.wrap(
+        name="clickhouse_trace_server_batched._v2_update_calls_complete_with_end"
+    )
+    def _v2_update_calls_complete_with_end(
+        self, project_id: str, end_call: tsi.EndedCallSchemaForInsert
+    ) -> None:
+        """Update an existing call in calls_complete with end data (naked end).
+
+        Args:
+            project_id: The project identifier.
+            end_call: The end data to update the call with.
+        """
+        output = end_call.output
+        output_refs = extract_refs_from_values(output)
+
+        query = """UPDATE calls_complete
+            SET 
+                ended_at = {ended_at:Nullable(DateTime64(3))},
+                output_dump = {output_dump:String},
+                output_refs = {output_refs:Array(String)},
+                summary_dump = {summary_dump:String},
+                exception = {exception:Nullable(String)},
+                wb_run_step_end = {wb_run_step_end:Nullable(Int64)}
+            WHERE project_id = {project_id:String}
+                AND id = {id:String}
+        """
+        parameters = {
+            "project_id": project_id,
+            "id": end_call.id,
+            "ended_at": end_call.ended_at,
+            "output_dump": _any_value_to_dump(output),
+            "output_refs": output_refs,
+            "summary_dump": _dict_value_to_dump(dict(end_call.summary)),
+            "exception": end_call.exception,
+            "wb_run_step_end": end_call.wb_run_step_end,
+        }
+
+        parameters = _process_parameters(parameters)
+
+        self.ch_client.command(query, parameters=parameters)
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._delete_call_starts")
     def _delete_call_starts(self, project_id: str, call_ids: list[str]) -> None:
@@ -5253,6 +5316,60 @@ def _start_call_to_v2_ch_insertable(
         wb_user_id=start_call.wb_user_id,
         wb_run_id=start_call.wb_run_id,
         wb_run_step=start_call.wb_run_step,
+    )
+
+
+def _start_call_to_v2_complete_ch_insertable(
+    start_call: tsi.StartedCallSchemaForInsert,
+) -> V2CallCompleteCHInsertable:
+    """Convert StartedCallSchemaForInsert to V2CallCompleteCHInsertable for calls_complete table.
+
+    This is used when inserting a naked start into calls_complete. Missing fields
+    (like ended_at, output, summary) are filled with defaults.
+
+    Args:
+        start_call: API schema for call start.
+
+    Returns:
+        V2CallCompleteCHInsertable ready for insertion with defaults for missing fields.
+
+    Examples:
+        >>> call = StartedCallSchemaForInsert(...)
+        >>> insertable = _start_call_to_v2_complete_ch_insertable(call)
+    """
+    call_id = start_call.id or generate_id()
+    trace_id = start_call.trace_id or generate_id()
+
+    inputs = start_call.inputs
+    input_refs = extract_refs_from_values(inputs)
+
+    otel_dump_str = None
+    if start_call.otel_dump is not None:
+        otel_dump_str = _dict_value_to_dump(start_call.otel_dump)
+
+    return V2CallCompleteCHInsertable(
+        project_id=start_call.project_id,
+        id=call_id,
+        trace_id=trace_id,
+        op_name=start_call.op_name,
+        started_at=start_call.started_at,
+        ended_at=None,  # NULL for incomplete calls
+        parent_id=start_call.parent_id,
+        display_name=start_call.display_name,
+        thread_id=start_call.thread_id,
+        turn_id=start_call.turn_id,
+        attributes_dump=_dict_value_to_dump(start_call.attributes),
+        inputs_dump=_dict_value_to_dump(inputs),
+        input_refs=input_refs,
+        output_dump="",  # Default empty output
+        output_refs=[],  # Default empty refs
+        summary_dump="{}",  # Default empty summary
+        exception=None,
+        otel_dump=otel_dump_str,
+        wb_user_id=start_call.wb_user_id,
+        wb_run_id=start_call.wb_run_id,
+        wb_run_step=start_call.wb_run_step,
+        wb_run_step_end=None,
     )
 
 
