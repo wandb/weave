@@ -216,16 +216,16 @@ resources:
     methods:
       create: post /v2/{entity}/{project}/predictions
       list: get /v2/{entity}/{project}/predictions
-      read: get /v2/{entity}/{project}/predictions/{object_id}/versions/{digest}
-      delete: delete /v2/{entity}/{project}/predictions/{object_id}
-      finish: post /v2/{entity}/{project}/predictions/{object_id}/finish
+      read: get /v2/{entity}/{project}/predictions/{prediction_id}/versions/{digest}
+      delete: delete /v2/{entity}/{project}/predictions/{prediction_id}
+      finish: post /v2/{entity}/{project}/predictions/{prediction_id}/finish
 
   v2_scores:
     methods:
       create: post /v2/{entity}/{project}/scores
       list: get /v2/{entity}/{project}/scores
-      read: get /v2/{entity}/{project}/scores/{object_id}/versions/{digest}
-      delete: delete /v2/{entity}/{project}/scores/{object_id}
+      read: get /v2/{entity}/{project}/scores/{score_id}/versions/{digest}
+      delete: delete /v2/{entity}/{project}/scores/{score_id}
 
 settings:
   license: Apache-2.0
