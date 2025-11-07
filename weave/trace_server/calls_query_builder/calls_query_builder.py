@@ -643,6 +643,47 @@ class CallsQuery(BaseModel):
         self.expand_columns = expand_columns
         return self
 
+    def _should_optimize(self) -> bool:
+        """Determines if query optimization should be performed.
+
+        Returns True if the query has heavy fields and predicate pushdown is possible.
+        Heavy fields are expensive to load into memory (inputs, output, attributes, summary).
+        Predicate pushdown is possible when there are light filters, light query conditions,
+        or light order filters that can be pushed down into a subquery.
+        """
+        # First, check if the query has any heavy fields
+        has_heavy_select = any(field.is_heavy() for field in self.select_fields)
+        has_heavy_filter = any(
+            condition.is_heavy() for condition in self.query_conditions
+        )
+        has_heavy_order = any(
+            order_field.field.is_heavy() for order_field in self.order_fields
+        )
+
+        # If no heavy fields, no need to optimize
+        if not (has_heavy_select or has_heavy_filter or has_heavy_order):
+            return False
+
+        # If filtering by actual data, do predicate pushdown, should optimize
+        if self.hardcoded_filter and self.hardcoded_filter.is_useful():
+            return True
+
+        # If any light conditions exist, use them to filter rows before loading heavy fields
+        if any(not condition.is_heavy() for condition in self.query_conditions):
+            return True
+
+        # Check for light order filter
+        if (
+            self.order_fields
+            and self.limit
+            and not has_heavy_filter
+            and not has_heavy_order
+        ):
+            return True
+
+        # No predicate pushdown possible
+        return False
+
     def as_sql(self, pb: ParamBuilder, table_alias: str = "calls_merged") -> str:
         """This is the main entry point for building the query. This method will
         determine the optimal query to build based on the fields and conditions
@@ -717,37 +758,8 @@ class CallsQuery(BaseModel):
         if not self.select_fields:
             raise ValueError("Missing select columns")
 
-        # Determine if the query `has_heavy_fields` by checking
-        has_heavy_select = any(field.is_heavy() for field in self.select_fields)
-        has_heavy_filter = any(
-            condition.is_heavy() for condition in self.query_conditions
-        )
-        has_heavy_order = any(
-            order_field.field.is_heavy() for order_field in self.order_fields
-        )
-        has_heavy_fields = has_heavy_select or has_heavy_filter or has_heavy_order
-
-        # Determine if `predicate_pushdown_possible` which is
-        # if it `has_light_filter or has_light_query or has_light_order_filter`
-        has_light_filter = self.hardcoded_filter and self.hardcoded_filter.is_useful()
-
-        has_light_query = any(
-            not condition.is_heavy() for condition in self.query_conditions
-        )
-
-        has_light_order_filter = (
-            self.order_fields
-            and self.limit
-            and not has_heavy_filter
-            and not has_heavy_order
-        )
-
-        predicate_pushdown_possible = (
-            has_light_filter or has_light_query or has_light_order_filter
-        )
-
         # Determine if we should optimize!
-        should_optimize = has_heavy_fields and predicate_pushdown_possible
+        should_optimize = self._should_optimize()
 
         # Important: Always inject deleted_at into the query.
         # Note: it might be better to make this configurable.
