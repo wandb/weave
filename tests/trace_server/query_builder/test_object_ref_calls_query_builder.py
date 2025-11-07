@@ -60,7 +60,8 @@ def test_object_ref_filter_simple() -> None:
                    AND ((any(calls_merged.deleted_at) IS NULL))
                    AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
            ORDER BY any(calls_merged.started_at) DESC)
-        SELECT calls_merged.id AS id
+        SELECT calls_merged.id AS id,
+               any(calls_merged.started_at) AS started_at
         FROM calls_merged
         WHERE calls_merged.project_id = {pb_0:String}
           AND (calls_merged.id IN filtered_calls)

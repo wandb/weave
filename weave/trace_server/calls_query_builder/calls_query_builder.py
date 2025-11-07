@@ -819,26 +819,16 @@ class CallsQuery(BaseModel):
 
         # When using the CTE pattern, ensure all fields used in ordering
         # are selected in select_query so they're available in the final query's ORDER BY.
-        for order_field in self.order_fields:
-            field_obj = order_field.field
-            # Skip fields that can't be selected:
-            if isinstance(field_obj, CallsMergedFeedbackPayloadField):
-                continue
-
-            if isinstance(
-                field_obj, (CallsMergedDynamicField, QueryBuilderDynamicField)
-            ):
-                # we need to add the base field, not the dynamic one
-                base_field = get_field_by_name(field_obj.field)
-                if base_field not in select_query.select_fields:
-                    select_query.select_fields.append(base_field)
-                continue
-
-            if (
-                isinstance(field_obj, CallsMergedField)
-                and field_obj not in select_query.select_fields
-            ):
-                select_query.select_fields.append(field_obj)
+        if self.include_costs:
+            for order_field in self.order_fields:
+                field_obj = order_field.field
+                if isinstance(
+                    field_obj, (CallsMergedDynamicField, QueryBuilderDynamicField)
+                ):
+                    # we need to add the base field, not the dynamic one
+                    base_field = get_field_by_name(field_obj.field)
+                    if base_field not in select_query.select_fields:
+                        select_query.select_fields.append(base_field)
 
         filtered_calls_sql = filter_query._as_sql_base_format(
             pb,
