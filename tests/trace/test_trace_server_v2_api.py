@@ -178,7 +178,8 @@ class TestDatasetsV2API:
         res = client.server.dataset_create_v2(req)
 
         # Verify response
-        assert res.object_id.startswith("dataset_")
+        # When name is provided, object_id should be the sanitized name
+        assert res.object_id == "test_dataset"
         assert res.digest is not None
         assert res.version_index == 0
 
@@ -281,7 +282,8 @@ class TestScorersV2API:
         res = client.server.scorer_create_v2(req)
 
         # Verify response
-        assert res.object_id.startswith("scorer_")
+        # When name is provided, object_id should be the sanitized name
+        assert res.object_id == "test_scorer"
         assert res.digest is not None
         assert res.version_index == 0
 
