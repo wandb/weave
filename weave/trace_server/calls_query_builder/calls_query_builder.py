@@ -824,6 +824,16 @@ class CallsQuery(BaseModel):
             # Skip fields that can't be selected:
             if isinstance(field_obj, CallsMergedFeedbackPayloadField):
                 continue
+
+            if isinstance(
+                field_obj, CallsMergedDynamicField | QueryBuilderDynamicField
+            ):
+                # we need to add the base field, not the dynamic one
+                base_field = get_field_by_name(field_obj.field)
+                if base_field not in select_query.select_fields:
+                    select_query.select_fields.append(base_field)
+                continue
+
             if (
                 isinstance(field_obj, CallsMergedField)
                 and field_obj not in select_query.select_fields
