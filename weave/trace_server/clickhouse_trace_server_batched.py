@@ -28,7 +28,6 @@ from tenacity import (
     stop_after_attempt,
     wait_exponential,
 )
-
 from weave.trace_server import clickhouse_trace_server_migrator as wf_migrator
 from weave.trace_server import clickhouse_trace_server_settings as ch_settings
 from weave.trace_server import constants, object_creation_utils
@@ -48,6 +47,7 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     QueryBuilderField,
     build_calls_stats_query,
     combine_conditions,
+    build_calls_complete_batch_update_query,
 )
 from weave.trace_server.clickhouse_schema import (
     ALL_CALL_INSERT_COLUMNS,
@@ -493,27 +493,59 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # Returns the id of the newly created call
         return tsi.CallEndRes()
 
+    def _split_call_batch_v2(self, batch: tsi.CallsUpsertBatchV2Req) -> tuple[
+        list[tsi.StartedCallSchemaForInsert],
+        list[tsi.EndedCallSchemaForInsert],
+        list[tsi.CompletedCallSchemaForInsert],
+    ]:
+        starts = []
+        ends = []
+        completes = []
+        for item in batch:
+            if item.mode == "start":
+                starts.append(item.req.start)
+            elif item.mode == "end":
+                ends.append(item.req.end)
+            elif item.mode == "complete":
+                completes.append(item.req.complete)
+        return starts, ends, completes
+
     def upsert_calls_batch_v2(
         self, req: tsi.CallsUpsertBatchV2Req
     ) -> tsi.CallsUpsertBatchV2Res:
         # First organize the batch into starts, ends and completes.
         # Starts and completes get inserted directly into the `calls_complete` table
         # Ends hit a special UPDATE path
-        pass
+        starts, ends, completes = self._split_call_batch_v2(req.batch)
 
-    def _calls_complete_update_end(
-        self, end_call: tsi.EndedCallSchemaForInsert
+        # Insert starts and completes immediately
+        self._insert_call_batch(starts + completes)
+
+        # Update ends using a batch update
+        self._calls_complete_update_end_batch(ends)
+
+        return tsi.CallsUpsertBatchV2Res()
+
+    def _calls_complete_update_end_batch(
+        self, end_calls: list[tsi.EndedCallSchemaForInsert]
     ) -> None:
-        command = """UPDATE calls_complete 
-            SET ended_at = {ended_at:datetime}
-            WHERE project_id = {project_id:string} AND id = {id:string}
+        """Batch update multiple call ends using ClickHouse lightweight UPDATE.
+
+        This uses a single UPDATE statement with CASE expressions to update different
+        values for different call IDs.
+        - Creates 1 patch part instead of N (reduces read overhead)
+        - 1 network round trip instead of N
+
+        Args:
+            end_calls: List of ended call schemas to update
         """
-        params = {
-            "ended_at": end_call.ended_at,
-            "project_id": end_call.project_id,
-            "id": end_call.id,
-        }
-        self._command(command, params)
+        if not end_calls:
+            return
+
+        pb = ParamBuilder()
+        command = build_calls_complete_batch_update_query(end_calls, pb)
+
+        self._command(command, pb.get_params())
 
     def call_read(self, req: tsi.CallReadReq) -> tsi.CallReadRes:
         res = self.calls_query_stream(

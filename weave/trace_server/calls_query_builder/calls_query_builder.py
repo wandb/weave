@@ -1962,3 +1962,150 @@ def _is_minimal_filter(filter: tsi.CallsFilter | None) -> bool:
         and filter.input_refs is None
         and filter.output_refs is None
     )
+
+
+######### BATCH UPDATE QUERY HANDLING ##########
+
+
+def build_calls_complete_batch_update_query(
+    end_calls: list["tsi.EndedCallSchemaForInsert"],
+    pb: ParamBuilder,
+) -> str:
+    """Build a parameterized batch UPDATE query for calls_complete table.
+
+    This uses ClickHouse's lightweight UPDATE with CASE expressions to update
+    multiple calls in a single query, creating only one patch part instead of N.
+
+    Args:
+        end_calls: List of ended call schemas to update
+        pb: Parameter builder for query parameterization
+
+    Returns:
+        Formatted SQL UPDATE command string
+    """
+    from weave.trace_server.trace_server_interface_util import (
+        extract_refs_from_values,
+    )
+
+    if not end_calls:
+        return ""
+
+    # Import here to avoid circular dependency
+    from weave.trace_server.clickhouse_trace_server_batched import (
+        _any_value_to_dump,
+        _dict_value_to_dump,
+    )
+
+    # All calls should be from the same project (validated assumption)
+    project_id = end_calls[0].project_id
+
+    # Build parameterized CASE statements for each field
+    call_ids = []
+    ended_at_cases = []
+    output_dump_cases = []
+    output_refs_cases = []
+    summary_dump_cases = []
+    exception_cases = []
+    wb_run_step_end_cases = []
+
+    for call in end_calls:
+        call_id = call.id
+        call_ids.append(call_id)
+
+        # Create unique parameter names for each call's values
+        id_param = pb.add_param(call_id)
+        ended_at_param = pb.add_param(call.ended_at)
+        output_dump_param = pb.add_param(_any_value_to_dump(call.output))
+        summary_dump_param = pb.add_param(_dict_value_to_dump(dict(call.summary)))
+
+        # Build CASE condition for ended_at
+        ended_at_cases.append(
+            f"WHEN id = {param_slot(id_param, 'String')} THEN {param_slot(ended_at_param, 'DateTime64(6)')}"
+        )
+
+        # Build CASE condition for output_dump
+        output_dump_cases.append(
+            f"WHEN id = {param_slot(id_param, 'String')} THEN {param_slot(output_dump_param, 'String')}"
+        )
+
+        # Build CASE condition for output_refs
+        output_refs = extract_refs_from_values(call.output)
+        if output_refs:
+            # Store each ref as a parameter
+            refs_params = []
+            for ref in output_refs:
+                ref_param = pb.add_param(ref)
+                refs_params.append(param_slot(ref_param, "String"))
+            refs_list = ", ".join(refs_params)
+            output_refs_cases.append(
+                f"WHEN id = {param_slot(id_param, 'String')} THEN [{refs_list}]"
+            )
+        else:
+            output_refs_cases.append(
+                f"WHEN id = {param_slot(id_param, 'String')} THEN []"
+            )
+
+        # Build CASE condition for summary_dump
+        summary_dump_cases.append(
+            f"WHEN id = {param_slot(id_param, 'String')} THEN {param_slot(summary_dump_param, 'String')}"
+        )
+
+        # Build CASE condition for exception (nullable)
+        if call.exception is not None:
+            exception_param = pb.add_param(call.exception)
+            exception_cases.append(
+                f"WHEN id = {param_slot(id_param, 'String')} THEN {param_slot(exception_param, 'String')}"
+            )
+        else:
+            exception_cases.append(
+                f"WHEN id = {param_slot(id_param, 'String')} THEN NULL"
+            )
+
+        # Build CASE condition for wb_run_step_end (nullable)
+        if call.wb_run_step_end is not None:
+            wb_run_step_end_param = pb.add_param(call.wb_run_step_end)
+            wb_run_step_end_cases.append(
+                f"WHEN id = {param_slot(id_param, 'String')} THEN {param_slot(wb_run_step_end_param, 'UInt64')}"
+            )
+        else:
+            wb_run_step_end_cases.append(
+                f"WHEN id = {param_slot(id_param, 'String')} THEN NULL"
+            )
+
+    # Format each CASE expression with proper indentation
+    def format_case_expression(cases: list[str]) -> str:
+        """Format a list of CASE conditions into a multi-line string."""
+        return "\n                ".join(cases)
+
+    ended_at_case_expr = format_case_expression(ended_at_cases)
+    output_dump_case_expr = format_case_expression(output_dump_cases)
+    output_refs_case_expr = format_case_expression(output_refs_cases)
+    summary_dump_case_expr = format_case_expression(summary_dump_cases)
+    exception_case_expr = format_case_expression(exception_cases)
+    wb_run_step_end_case_expr = format_case_expression(wb_run_step_end_cases)
+
+    # Build WHERE clause with parameterized IN clause
+    where_id_params = []
+    for call_id in call_ids:
+        where_param = pb.add_param(call_id)
+        where_id_params.append(param_slot(where_param, "String"))
+
+    ids_in_clause = ", ".join(where_id_params)
+    project_id_param = pb.add_param(project_id)
+
+    # Construct the final UPDATE command
+    raw_sql = f"""
+    UPDATE calls_complete
+    SET
+        ended_at = CASE {ended_at_case_expr} END,
+        output_dump = CASE {output_dump_case_expr} END,
+        output_refs = CASE {output_refs_case_expr} END,
+        summary_dump = CASE {summary_dump_case_expr} END,
+        exception = CASE {exception_case_expr} END,
+        wb_run_step_end = CASE {wb_run_step_end_case_expr} END,
+        updated_at = now64(3)
+    WHERE project_id = {param_slot(project_id_param, 'String')}
+      AND id IN ({ids_in_clause})
+    """
+
+    return safely_format_sql(raw_sql, logger)
