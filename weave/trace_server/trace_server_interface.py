@@ -220,13 +220,13 @@ class CompletedCallSchemaForInsert(BaseModel):
     started_at: datetime.datetime
 
     updated_at: datetime.datetime | None = None
+    ended_at: datetime.datetime | None = None
+    deleted_at: datetime.datetime | None = None
 
     display_name: str | None = None
     parent_id: str | None = None
     thread_id: str | None = None
     turn_id: str | None = None
-
-    ended_at: datetime.datetime | None = None
 
     # Dump fields
     attributes: dict[str, Any]

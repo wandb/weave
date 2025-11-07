@@ -925,7 +925,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     project_id=req.project_id,
                     filter=tsi.CallsFilter(trace_ids=parent_trace_ids),
                     columns=["id", "parent_id"],
-                    limit=10_000,
+                    limit=delete_call_limit,
                 )
             )
         )
