@@ -840,9 +840,8 @@ class CallsQuery(BaseModel):
         ctes.add_cte(CTE_ALL_CALLS, base_sql)
         self._add_cost_ctes_to_builder(ctes, pb)
 
-        order_by_fields = self._convert_to_orm_sort_fields()
         select_fields = [field.field for field in self.select_fields]
-        final_select = get_cost_final_select(pb, select_fields, order_by_fields)
+        final_select = get_cost_final_select(pb, select_fields, self.order_fields)
 
         raw_sql = ctes.to_sql() + "\n" + final_select
         return safely_format_sql(raw_sql, logger)

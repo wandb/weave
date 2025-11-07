@@ -230,6 +230,7 @@ class Select:
     _raw_sql_fields: typing.Optional[list[str]]
     _query: typing.Optional[tsi.Query]
     _order_by: typing.Optional[list[tsi.SortBy]]
+    _raw_sql_order_by: typing.Optional[str]
     _limit: typing.Optional[int]
     _offset: typing.Optional[int]
     _group_by: typing.Optional[list[str]]
@@ -245,6 +246,7 @@ class Select:
         self._raw_sql_fields = []
         self._query = None
         self._order_by = None
+        self._raw_sql_order_by = None
         self._limit = None
         self._offset = None
         self._group_by = None
@@ -290,6 +292,18 @@ class Select:
                     "desc",
                 ), f"Invalid order_by direction: {o.direction}"
         self._order_by = order_by
+        return self
+
+    def raw_sql_order_by(self, order_by_sql: typing.Optional[str]) -> "Select":
+        """Add raw SQL ORDER BY clause without field validation.
+
+        Use this when ordering by fields that aren't in the table schema,
+        such as feedback fields, dynamic JSON paths, or computed expressions.
+
+        Returns:
+            Self for method chaining
+        """
+        self._raw_sql_order_by = order_by_sql
         return self
 
     def limit(self, limit: typing.Optional[int]) -> "Select":
@@ -377,7 +391,10 @@ class Select:
             joined_fields = ", ".join(internal_fields)
             sql += f"\nGROUP BY {joined_fields}"
 
-        if self._order_by is not None:
+        if self._raw_sql_order_by is not None:
+            # Use raw SQL ORDER BY without validation
+            sql += f"\nORDER BY {self._raw_sql_order_by}"
+        elif self._order_by is not None:
             order_parts = []
             for clause in self._order_by:
                 field = clause.field

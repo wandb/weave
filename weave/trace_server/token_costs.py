@@ -19,6 +19,7 @@ from weave.trace_server.validation import (
 )
 
 if TYPE_CHECKING:
+    from weave.trace_server.calls_query_builder.calls_query_builder import OrderField
     from weave.trace_server.calls_query_builder.cte import CTE
 
 DUMMY_LLM_ID = "weave_dummy_llm_id"
@@ -335,7 +336,7 @@ def final_call_select_with_cost(
     param_builder: ParamBuilder,
     price_table_alias: str,
     select_fields: list[str],
-    order_fields: list[tsi.SortBy],
+    order_fields: list["OrderField"],
 ) -> PreparedSelect:
     # We filter out summary_dump, because we add costs to summary dump in the select statement
     final_select_fields = [field for field in select_fields if field != "summary_dump"]
@@ -427,6 +428,22 @@ def final_call_select_with_cost(
         ],
     )
 
+    # Build ORDER BY SQL manually to support all field types
+    order_by_sql = None
+    if order_fields:
+        order_parts = []
+        for order_field in order_fields:
+            # This handles feedback, dynamic fields, summary fields, everything!
+            order_sql = order_field.as_sql(
+                param_builder,
+                table_alias=price_table_alias,
+                expand_columns=None,
+                field_to_object_join_alias_map=None,
+            )
+            order_parts.append(order_sql)
+        order_by_sql = ", ".join(order_parts)
+
+    # Build final query
     final_query = (
         ranked_price_table.select()
         .fields(final_select_fields)
@@ -435,8 +452,11 @@ def final_call_select_with_cost(
             tsi.Query(**{"$expr": {"$eq": [{"$getField": "rank"}, {"$literal": 1}]}})
         )
         .group_by(final_select_fields)
-        .order_by(order_fields)
     )
+
+    # Use raw_sql_order_by instead of order_by to bypass validation
+    if order_by_sql:
+        final_query = final_query.raw_sql_order_by(order_by_sql)
 
     final_prepared_query = final_query.prepare(
         database_type="clickhouse", param_builder=param_builder
@@ -486,14 +506,14 @@ def build_cost_ctes(
 def get_cost_final_select(
     pb: ParamBuilder,
     select_fields: list[str],
-    order_fields: list[tsi.SortBy],
+    order_fields: list["OrderField"],
 ) -> str:
     """Get the final SELECT statement for cost queries.
 
     Args:
         pb: Parameter builder for SQL parameters
         select_fields: Fields to select
-        order_fields: Fields to order by
+        order_fields: OrderField objects to order by
 
     Returns:
         Final SELECT SQL statement
@@ -506,7 +526,7 @@ def cost_query(
     call_table_alias: str,
     project_id: str,
     select_fields: list[str],
-    order_fields: list[tsi.SortBy],
+    order_fields: list["OrderField"],
 ) -> str:
     """Build complete cost query with CTEs and final SELECT.
 
