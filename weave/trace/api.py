@@ -23,6 +23,7 @@ from weave.trace.op import PostprocessInputsFunc, PostprocessOutputFunc, as_op, 
 from weave.trace.refs import ObjectRef, Ref
 from weave.trace.settings import (
     UserSettings,
+    log_level,
     parse_and_apply_settings,
     should_disable_weave,
 )
@@ -103,6 +104,11 @@ def init(
         )
 
     parse_and_apply_settings(settings)
+
+    # Update logger level after settings are applied
+    from weave.trace.display.term import logger as weave_logger
+
+    weave_logger.setLevel(getattr(logging, log_level()))
 
     global _global_postprocess_inputs
     global _global_postprocess_output
