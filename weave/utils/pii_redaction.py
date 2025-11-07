@@ -1,3 +1,4 @@
+import dataclasses
 from typing import Any, Union
 
 from presidio_analyzer import AnalyzerEngine
@@ -5,7 +6,7 @@ from presidio_anonymizer import AnonymizerEngine
 
 from weave.telemetry import trace_sentry
 from weave.trace.settings import redact_pii_fields
-from weave.utils.sanitize import REDACTED_VALUE, should_redact
+from weave.utils.sanitize import REDACTED_VALUE, redact_dataclass_fields, should_redact
 
 DEFAULT_REDACTED_FIELDS = [
     "CREDIT_CARD",
@@ -53,6 +54,8 @@ def redact_pii(
             return result
         elif isinstance(value, list):
             return [redact_recursive(item) for item in value]
+        elif dataclasses.is_dataclass(value):
+            return redact_dataclass_fields(value, redact_recursive)
         else:
             return value
 

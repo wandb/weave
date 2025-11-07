@@ -138,7 +138,7 @@ from weave.trace_server_bindings.http_utils import (
 from weave.utils.attributes_dict import AttributesDict
 from weave.utils.dict_utils import sum_dict_leaves, zip_dicts
 from weave.utils.exception import exception_to_json_str
-from weave.utils.sanitize import REDACTED_VALUE, should_redact
+from weave.utils.sanitize import REDACTED_VALUE, redact_dataclass_fields, should_redact
 
 if TYPE_CHECKING:
     import wandb
@@ -2210,6 +2210,9 @@ def redact_sensitive_keys(obj: Any) -> Any:
         for v in obj:
             tuple_res.append(redact_sensitive_keys(v))
         return tuple(tuple_res)
+
+    elif dataclasses.is_dataclass(obj):
+        return redact_dataclass_fields(obj, redact_sensitive_keys)
 
     return obj
 
