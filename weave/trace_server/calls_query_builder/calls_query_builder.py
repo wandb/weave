@@ -817,6 +817,19 @@ class CallsQuery(BaseModel):
         # SUPER IMPORTANT: still need to re-sort the final query
         select_query.order_fields = self.order_fields
 
+        # When using the CTE pattern, ensure all fields used in ordering
+        # are selected in select_query so they're available in the final query's ORDER BY.
+        for order_field in self.order_fields:
+            field_obj = order_field.field
+            # Skip fields that can't be selected:
+            if isinstance(field_obj, CallsMergedFeedbackPayloadField):
+                continue
+            if (
+                isinstance(field_obj, CallsMergedField)
+                and field_obj not in select_query.select_fields
+            ):
+                select_query.select_fields.append(field_obj)
+
         filtered_calls_sql = filter_query._as_sql_base_format(
             pb,
             table_alias,
