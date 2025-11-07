@@ -35,6 +35,7 @@ def lint(session):
     session.install("pre-commit", "jupyter")
     dry_run = session.posargs and "dry-run" in session.posargs
     all_files = session.posargs and "--all-files" in session.posargs
+    modified = session.posargs and "--modified" in session.posargs
     ruff_only = session.posargs and "--ruff-only" in session.posargs
 
     if ruff_only:
@@ -57,6 +58,28 @@ def lint(session):
     elif all_files:
         # Allow running on all files if explicitly requested
         session.run("pre-commit", "run", "--hook-stage=pre-push", "--all-files")
+    elif modified:
+        # Run on staged and dirty (modified but unstaged) files
+        import subprocess
+
+        result = subprocess.run(
+            ["git", "diff", "--name-only", "HEAD", "--diff-filter=ACMR"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        files = result.stdout.strip().split("\n")
+        files = [f for f in files if f]  # Filter empty strings
+        if files:
+            session.run(
+                "pre-commit",
+                "run",
+                "--hook-stage=pre-push",
+                "--files",
+                *files,
+            )
+        else:
+            session.log("No modified files to lint")
     else:
         # Default: run only on staged files for faster execution
         session.run("pre-commit", "run", "--hook-stage=pre-push")
