@@ -817,6 +817,19 @@ class CallsQuery(BaseModel):
         # SUPER IMPORTANT: still need to re-sort the final query
         select_query.order_fields = self.order_fields
 
+        # When using the CTE pattern, ensure all fields used in ordering
+        # are selected in select_query so they're available in the final query's ORDER BY.
+        if self.include_costs:
+            for order_field in self.order_fields:
+                field_obj = order_field.field
+                if isinstance(
+                    field_obj, (CallsMergedDynamicField, QueryBuilderDynamicField)
+                ):
+                    # we need to add the base field, not the dynamic one
+                    base_field = get_field_by_name(field_obj.field)
+                    if base_field not in select_query.select_fields:
+                        select_query.select_fields.append(base_field)
+
         filtered_calls_sql = filter_query._as_sql_base_format(
             pb,
             table_alias,

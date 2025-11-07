@@ -340,6 +340,13 @@ def final_call_select_with_cost(
     # We filter out summary_dump, because we add costs to summary dump in the select statement
     final_select_fields = [field for field in select_fields if field != "summary_dump"]
 
+    # Add any fields from order_fields that aren't already in final_select_fields
+    # This ensures that fields used in ORDER BY are available in the query scope
+    for order_field in order_fields:
+        field_name = order_field.field
+        if field_name not in final_select_fields and field_name != "summary_dump":
+            final_select_fields.append(field_name)
+
     # These two objects are used to construct the costs object
     # We add two more fields in addition to this
     # prompt_tokens_total_cost and completion_tokens_total_cost
