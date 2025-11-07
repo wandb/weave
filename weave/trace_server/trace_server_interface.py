@@ -555,7 +555,7 @@ class ObjCreateReq(BaseModelStrict):
 
 class ObjCreateRes(BaseModel):
     digest: str
-    object_id: str
+    object_id: Optional[str] = None
 
 
 class ObjReadReq(BaseModelStrict):
