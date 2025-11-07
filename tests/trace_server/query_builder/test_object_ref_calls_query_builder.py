@@ -1,4 +1,4 @@
-from tests.trace_server.test_calls_query_builder import assert_sql
+from tests.trace_server.query_builder.utils import assert_sql
 from weave.trace_server.calls_query_builder.calls_query_builder import (
     CallsQuery,
     HardCodedFilter,
@@ -51,10 +51,10 @@ def test_object_ref_filter_simple() -> None:
                   OR calls_merged.ended_at IS NULL)
            GROUP BY (calls_merged.project_id,
                      calls_merged.id)
-           HAVING (((JSON_VALUE(any(calls_merged.output_dump), {pb_3:String}) IN
+           HAVING (((coalesce(nullIf(JSON_VALUE(any(calls_merged.output_dump), {pb_3:String}), 'null'), '') IN
                       (SELECT ref
                        FROM obj_filter_0)
-                   OR regexpExtract(JSON_VALUE(any(calls_merged.output_dump), {pb_3:String}), '/([^/]+)$', 1) IN
+                   OR regexpExtract(coalesce(nullIf(JSON_VALUE(any(calls_merged.output_dump), {pb_3:String}), 'null'), ''), '/([^/]+)$', 1) IN
                       (SELECT ref
                        FROM obj_filter_0)))
                    AND ((any(calls_merged.deleted_at) IS NULL))
@@ -148,10 +148,10 @@ def test_object_ref_filter_nested() -> None:
                   OR calls_merged.started_at IS NULL)
            GROUP BY (calls_merged.project_id,
                      calls_merged.id)
-           HAVING (((JSON_VALUE(any(calls_merged.inputs_dump), {pb_5:String}) IN
+           HAVING (((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_5:String}), 'null'), '') IN
                       (SELECT ref
                        FROM obj_filter_2)
-                   OR regexpExtract(JSON_VALUE(any(calls_merged.inputs_dump), {pb_5:String}), '/([^/]+)$', 1) IN
+                   OR regexpExtract(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_5:String}), 'null'), ''), '/([^/]+)$', 1) IN
                       (SELECT ref
                        FROM obj_filter_2)))
                    AND ((any(calls_merged.deleted_at) IS NULL))
@@ -265,16 +265,16 @@ def test_multiple_object_ref_filters() -> None:
                   OR calls_merged.started_at IS NULL)
            GROUP BY (calls_merged.project_id,
                      calls_merged.id)
-           HAVING (((JSON_VALUE(any(calls_merged.inputs_dump), {pb_4:String}) IN
+           HAVING (((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_4:String}), 'null'), '') IN
                       (SELECT ref
                        FROM obj_filter_0)
-                   OR regexpExtract(JSON_VALUE(any(calls_merged.inputs_dump), {pb_4:String}), '/([^/]+)$', 1) IN
+                   OR regexpExtract(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_4:String}), 'null'), ''), '/([^/]+)$', 1) IN
                       (SELECT ref
                        FROM obj_filter_0)))
-                   AND ((NOT ((JSON_VALUE(any(calls_merged.inputs_dump), {pb_4:String}) IN
+                   AND ((NOT ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_4:String}), 'null'), '') IN
                                (SELECT ref
                                 FROM obj_filter_1)
-                             OR regexpExtract(JSON_VALUE(any(calls_merged.inputs_dump), {pb_4:String}), '/([^/]+)$', 1) IN
+                             OR regexpExtract(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_4:String}), 'null'), ''), '/([^/]+)$', 1) IN
                                (SELECT ref
                                 FROM obj_filter_1)))))
                    AND ((any(calls_merged.deleted_at) IS NULL))
@@ -445,37 +445,37 @@ def test_object_ref_filter_duplicates_and_similar() -> None:
                   OR calls_merged.started_at IS NULL)
            GROUP BY (calls_merged.project_id,
                      calls_merged.id)
-           HAVING (((JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}) IN
+           HAVING (((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}), 'null'), '') IN
               (SELECT ref
                FROM obj_filter_0)
-             OR regexpExtract(JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}), '/([^/]+)$', 1) IN
+             OR regexpExtract(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}), 'null'), ''), '/([^/]+)$', 1) IN
               (SELECT ref
                FROM obj_filter_0)))
-           AND ((JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}) IN
+           AND ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}), 'null'), '') IN
                (SELECT ref
                 FROM obj_filter_0)
-             OR regexpExtract(JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}), '/([^/]+)$', 1) IN
+             OR regexpExtract(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}), 'null'), ''), '/([^/]+)$', 1) IN
                (SELECT ref
                 FROM obj_filter_0)))
-           AND ((JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}) IN
+           AND ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}), 'null'), '') IN
                (SELECT ref
                 FROM obj_filter_1)
-             OR regexpExtract(JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}), '/([^/]+)$', 1) IN
+             OR regexpExtract(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}), 'null'), ''), '/([^/]+)$', 1) IN
                (SELECT ref
                 FROM obj_filter_1)))
-           AND ((JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}) IN
+           AND ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}), 'null'), '') IN
                  (SELECT ref
                   FROM obj_filter_2)
-               OR regexpExtract(JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}), '/([^/]+)$', 1) IN
+               OR regexpExtract(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}), 'null'), ''), '/([^/]+)$', 1) IN
                  (SELECT ref
                   FROM obj_filter_2)))
-           AND ((JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}) IN
+           AND ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}), 'null'), '') IN
                (SELECT ref
                 FROM obj_filter_3)
-             OR regexpExtract(JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}), '/([^/]+)$', 1) IN
+             OR regexpExtract(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}), 'null'), ''), '/([^/]+)$', 1) IN
                (SELECT ref
                 FROM obj_filter_3)))
-           AND (positionCaseInsensitive(JSON_VALUE(any(calls_merged.inputs_dump), {pb_8:String}), {pb_9:String}) > 0)
+           AND (positionCaseInsensitive(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_8:String}), 'null'), ''), {pb_9:String}) > 0)
            AND ((any(calls_merged.deleted_at) IS NULL))
            AND ((NOT ((any(calls_merged.started_at) IS NULL))))))
         SELECT calls_merged.id AS id
@@ -624,23 +624,23 @@ def test_object_ref_filter_complex_mixed_conditions() -> None:
                OR calls_merged.started_at IS NULL)
         GROUP BY (calls_merged.project_id,
                   calls_merged.id)
-        HAVING (((((((JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}) IN
+        HAVING (((((((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}), 'null'), '') IN
                        (SELECT ref
                         FROM obj_filter_0)
-                     OR regexpExtract(JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}), '/([^/]+)$', 1) IN
+                     OR regexpExtract(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}), 'null'), ''), '/([^/]+)$', 1) IN
                        (SELECT ref
                         FROM obj_filter_0)))
-                    AND ((JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}) IN
+                    AND ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}), 'null'), '') IN
                            (SELECT ref
                             FROM obj_filter_1)
-                         OR regexpExtract(JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}), '/([^/]+)$', 1) IN
+                         OR regexpExtract(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}), 'null'), ''), '/([^/]+)$', 1) IN
                            (SELECT ref
                             FROM obj_filter_1)))))
-                  OR ((JSON_VALUE(any(calls_merged.inputs_dump), {pb_8:String}) = {pb_9:String}))
-                  OR ((NOT ((JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}) IN
+                  OR ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_8:String}), 'null'), '') = {pb_9:String}))
+                  OR ((NOT ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}), 'null'), '') IN
                              (SELECT ref
                               FROM obj_filter_2)
-                           OR regexpExtract(JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}), '/([^/]+)$', 1) IN
+                           OR regexpExtract(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}), 'null'), ''), '/([^/]+)$', 1) IN
                              (SELECT ref
                               FROM obj_filter_2)))))))
                 AND ((any(calls_merged.deleted_at) IS NULL))
@@ -682,7 +682,7 @@ def test_object_ref_order_by_simple() -> None:
         """
         WITH obj_filter_0 AS
           (SELECT digest,
-                  nullIf(JSON_VALUE(any(val_dump), {pb_1:String}), '') AS object_val_dump,
+                  nullIf(coalesce(nullIf(JSON_VALUE(any(val_dump), {pb_1:String}), 'null'), ''), '') AS object_val_dump,
                   concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS ref
            FROM object_versions
            WHERE project_id = {pb_0:String}
@@ -693,7 +693,7 @@ def test_object_ref_order_by_simple() -> None:
            UNION ALL
 
            SELECT digest,
-                  nullIf(JSON_VALUE(any(val_dump), {pb_1:String}), '') AS object_val_dump,
+                  nullIf(coalesce(nullIf(JSON_VALUE(any(val_dump), {pb_1:String}), 'null'), ''), '') AS object_val_dump,
                   digest as ref
            FROM table_rows
            WHERE project_id = {pb_0:String}
@@ -702,8 +702,8 @@ def test_object_ref_order_by_simple() -> None:
              filtered_calls AS
           (SELECT calls_merged.id AS id
            FROM calls_merged
-           LEFT JOIN obj_filter_0 ON (JSON_VALUE(calls_merged.inputs_dump, {pb_2:String}) = obj_filter_0.ref
-                                      OR regexpExtract(JSON_VALUE(calls_merged.inputs_dump, {pb_2:String}), '/([^/]+)$', 1) = obj_filter_0.ref)
+           LEFT JOIN obj_filter_0 ON (coalesce(nullIf(JSON_VALUE(calls_merged.inputs_dump, {pb_2:String}), 'null'), '') = obj_filter_0.ref
+                                      OR regexpExtract(coalesce(nullIf(JSON_VALUE(calls_merged.inputs_dump, {pb_2:String}), 'null'), ''), '/([^/]+)$', 1) = obj_filter_0.ref)
            WHERE calls_merged.project_id = {pb_0:String}
            GROUP BY (calls_merged.project_id,
                      calls_merged.id)
@@ -713,8 +713,8 @@ def test_object_ref_order_by_simple() -> None:
                           OR JSONType(any(obj_filter_0.object_val_dump)) IS NULL)) desc, toFloat64OrNull(any(obj_filter_0.object_val_dump)) DESC, toString(any(obj_filter_0.object_val_dump)) DESC)
         SELECT calls_merged.id AS id
         FROM calls_merged
-        LEFT JOIN obj_filter_0 ON (JSON_VALUE(calls_merged.inputs_dump, {pb_2:String}) = obj_filter_0.ref
-                                   OR regexpExtract(JSON_VALUE(calls_merged.inputs_dump, {pb_2:String}), '/([^/]+)$', 1) = obj_filter_0.ref)
+        LEFT JOIN obj_filter_0 ON (coalesce(nullIf(JSON_VALUE(calls_merged.inputs_dump, {pb_2:String}), 'null'), '') = obj_filter_0.ref
+                                   OR regexpExtract(coalesce(nullIf(JSON_VALUE(calls_merged.inputs_dump, {pb_2:String}), 'null'), ''), '/([^/]+)$', 1) = obj_filter_0.ref)
         WHERE calls_merged.project_id = {pb_0:String}
           AND (calls_merged.id IN filtered_calls)
         GROUP BY (calls_merged.project_id,
@@ -785,10 +785,10 @@ def test_object_ref_filter_heavily_nested_keys() -> None:
                   OR calls_merged.started_at IS NULL)
            GROUP BY (calls_merged.project_id,
                      calls_merged.id)
-           HAVING (((JSON_VALUE(any(calls_merged.inputs_dump), {pb_4:String}) IN
+           HAVING (((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_4:String}), 'null'), '') IN
                       (SELECT ref
                        FROM obj_filter_1)
-                   OR regexpExtract(JSON_VALUE(any(calls_merged.inputs_dump), {pb_4:String}), '/([^/]+)$', 1) IN
+                   OR regexpExtract(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_4:String}), 'null'), ''), '/([^/]+)$', 1) IN
                       (SELECT ref
                        FROM obj_filter_1)))
                    AND ((any(calls_merged.deleted_at) IS NULL))
@@ -870,10 +870,10 @@ def test_object_ref_filter_complex_nested_path() -> None:
                   OR calls_merged.started_at IS NULL)
            GROUP BY (calls_merged.project_id,
                      calls_merged.id)
-           HAVING (((JSON_VALUE(any(calls_merged.inputs_dump), {pb_4:String}) IN
+           HAVING (((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_4:String}), 'null'), '') IN
                       (SELECT ref
                        FROM obj_filter_1)
-                   OR regexpExtract(JSON_VALUE(any(calls_merged.inputs_dump), {pb_4:String}), '/([^/]+)$', 1) IN
+                   OR regexpExtract(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_4:String}), 'null'), ''), '/([^/]+)$', 1) IN
                       (SELECT ref
                        FROM obj_filter_1)))
                    AND ((any(calls_merged.deleted_at) IS NULL))

@@ -54,6 +54,7 @@ from weave.trace_server.clickhouse_schema import (
     ALL_CALL_JSON_COLUMNS,
     ALL_CALL_SELECT_COLUMNS,
     ALL_FILE_CHUNK_INSERT_COLUMNS,
+    ALL_OBJ_INSERT_COLUMNS,
     REQUIRED_CALL_COLUMNS,
     CallCHInsertable,
     CallDeleteCHInsertable,
@@ -226,14 +227,53 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self._kafka_producer = KafkaProducer.from_env()
         return self._kafka_producer
 
+    def _get_existing_ops_from_spans(
+        self, seen_ids: set[str], project_id: str, limit: Optional[int] = None
+    ) -> list[tsi.ObjSchema]:
+        obj_version_filter = tsi.ObjectVersionFilter(
+            object_ids=list(seen_ids),
+            latest_only=True,
+            is_op=True,
+        )
+
+        return self.objs_query(
+            tsi.ObjQueryReq(
+                project_id=project_id,
+                filter=obj_version_filter,
+                metadata_only=True,
+                limit=limit,
+            ),
+        ).objs
+
+    def _create_or_get_placeholder_ops_digest(
+        self, project_id: str, create: bool
+    ) -> str:
+        if not create:
+            return bytes_digest(
+                (object_creation_utils.PLACEHOLDER_OP_SOURCE).encode("utf-8")
+            )
+
+        source_code = object_creation_utils.PLACEHOLDER_OP_SOURCE
+        source_file_req = tsi.FileCreateReq(
+            project_id=project_id,
+            name=object_creation_utils.OP_SOURCE_FILE_NAME,
+            content=source_code.encode("utf-8"),
+        )
+        return self.file_create(source_file_req).digest
+
     def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
+        assert_non_null_wb_user_id(req)
+
         if not isinstance(req.traces, ExportTraceServiceRequest):
             raise TypeError(
                 "Expected traces as ExportTraceServiceRequest, got {type(req.traces)}"
             )
-        calls: list[Union[tsi.CallBatchStartMode, tsi.CallBatchEndMode]] = []
+        calls: list[
+            tuple[tsi.StartedCallSchemaForInsert, tsi.EndedCallSchemaForInsert]
+        ] = []
         rejected_spans = 0
         error_messages: list[str] = []
+
         for proto_resource_spans in req.traces.resource_spans:
             resource = Resource.from_proto(proto_resource_spans.resource)
             for proto_scope_spans in proto_resource_spans.scope_spans:
@@ -258,21 +298,82 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                         error_messages.append(f"Rejected span ({span_ident}): {e!s}")
                         continue
 
-                    start_call, end_call = span.to_call(
-                        req.project_id,
-                        wb_user_id=req.wb_user_id,
-                        wb_run_id=req.wb_run_id,
+                    calls.append(
+                        span.to_call(
+                            req.project_id,
+                            wb_user_id=req.wb_user_id,
+                            wb_run_id=req.wb_run_id,
+                        )
                     )
-                    calls.extend(
-                        [
-                            tsi.CallBatchStartMode(
-                                req=tsi.CallStartReq(start=start_call)
-                            ),
-                            tsi.CallBatchEndMode(req=tsi.CallEndReq(end=end_call)),
-                        ]
-                    )
+
+        obj_id_idx_map = defaultdict(list)
+        for idx, (start_call, _) in enumerate(calls):
+            op_name = object_creation_utils.make_safe_name(start_call.op_name)
+            obj_id_idx_map[op_name].append(idx)
+
+        existing_objects = self._get_existing_ops_from_spans(
+            seen_ids=set(obj_id_idx_map.keys()),
+            project_id=req.project_id,
+            limit=len(calls),
+        )
+        # We know that OTel will always use the placeholder source.
+        # We can instead just reuse the existing file if we know it is present
+        # and create it just once if we are not sure.
+        if len(existing_objects) == 0:
+            digest = self._create_or_get_placeholder_ops_digest(
+                project_id=req.project_id, create=True
+            )
+        else:
+            digest = self._create_or_get_placeholder_ops_digest(
+                project_id=req.project_id, create=False
+            )
+
+        for obj in existing_objects:
+            op_ref_uri = ri.InternalOpRef(
+                project_id=req.project_id,
+                name=obj.object_id,
+                version=obj.digest,
+            ).uri()
+
+            # Modify each of the matched start calls in place
+            for idx in obj_id_idx_map[obj.object_id]:
+                calls[idx][0].op_name = op_ref_uri
+            # Remove this ID from the mapping so that once the for loop is done we are left with only new objects
+            obj_id_idx_map.pop(obj.object_id)
+
+        obj_creation_batch = []
+        for op_obj_id in obj_id_idx_map.keys():
+            op_val = object_creation_utils.build_op_val(digest)
+            obj_creation_batch.append(
+                tsi.ObjSchemaForInsert(
+                    project_id=req.project_id,
+                    object_id=op_obj_id,
+                    val=op_val,
+                    wb_user_id=req.wb_user_id,
+                )
+            )
+        res = self.obj_create_batch(obj_creation_batch)
+
+        for result in res:
+            op_ref_uri = ri.InternalOpRef(
+                project_id=req.project_id,
+                name=result.object_id,
+                version=result.digest,
+            ).uri()
+            for idx in obj_id_idx_map[result.object_id]:
+                calls[idx][0].op_name = op_ref_uri
+
+        batch = [
+            item
+            for start_call, end_call in calls
+            for item in (
+                tsi.CallBatchStartMode(req=tsi.CallStartReq(start=start_call)),
+                tsi.CallBatchEndMode(req=tsi.CallEndReq(end=end_call)),
+            )
+        ]
         # TODO: Actually populate the error fields if call_start_batch fails
-        self.call_start_batch(tsi.CallCreateBatchReq(batch=calls))
+        self.call_start_batch(tsi.CallCreateBatchReq(batch=batch))
+
         if rejected_spans > 0:
             # Join the first 20 errors and return them delimited by ';'
             joined_errors = "; ".join(error_messages[:20]) + (
@@ -736,7 +837,80 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             data=[list(ch_obj.model_dump().values())],
             column_names=list(ch_obj.model_fields.keys()),
         )
-        return tsi.ObjCreateRes(digest=digest)
+
+        return tsi.ObjCreateRes(
+            digest=digest,
+            object_id=req.obj.object_id,
+        )
+
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.create_obj_batch")
+    def obj_create_batch(
+        self, batch: list[tsi.ObjSchemaForInsert]
+    ) -> list[tsi.ObjCreateRes]:
+        """This method is for the special case where all objects are known to use a placeholder.
+        We lose any knowledge of what version the created object is in return for an enormous
+        performance increase for operations like OTel ingest.
+
+        This should **ONLY** be used when we know an object will never have more than one version.
+        """
+        if root_span := ddtrace.tracer.current_span():
+            root_span.set_tags(
+                {
+                    "clickhouse_trace_server_batched.create_obj_batch.count": str(
+                        len(batch)
+                    )
+                }
+            )
+
+        if not batch:
+            return []
+
+        obj_results = []
+        ch_insert_batch = []
+
+        unique_projects = {obj.project_id for obj in batch}
+        if len(unique_projects) > 1:
+            raise InvalidRequest(
+                f"obj_create_batch only supports updating a single project. Supplied projects: {unique_projects}"
+            )
+
+        for obj in batch:
+            processed_result = process_incoming_object_val(
+                obj.val, obj.builtin_object_class
+            )
+            processed_val = processed_result["val"]
+            json_val = json.dumps(processed_val)
+            digest = str_digest(json_val)
+            ch_obj = ObjCHInsertable(
+                project_id=obj.project_id,
+                object_id=obj.object_id,
+                wb_user_id=obj.wb_user_id,
+                kind=get_kind(processed_val),
+                base_object_class=processed_result["base_object_class"],
+                leaf_object_class=processed_result["leaf_object_class"],
+                refs=extract_refs_from_values(processed_val),
+                val_dump=json_val,
+                digest=digest,
+            )
+            insert_data = list(ch_obj.model_dump().values())
+            # Add the data to be inserted
+            ch_insert_batch.append(insert_data)
+
+            # Record the inserted data
+            obj_results.append(
+                tsi.ObjCreateRes(
+                    digest=digest,
+                    object_id=obj.object_id,
+                )
+            )
+
+        self._insert(
+            "object_versions",
+            data=ch_insert_batch,
+            column_names=ALL_OBJ_INSERT_COLUMNS,
+        )
+
+        return obj_results
 
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
         object_query_builder = ObjectMetadataQueryBuilder(req.project_id)

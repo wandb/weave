@@ -83,7 +83,6 @@ from weave.trace.settings import (
 )
 from weave.trace.table import Table
 from weave.trace.table_upload_chunking import ChunkingConfig, TableChunkManager
-from weave.trace.util import deprecated
 from weave.trace.vals import WeaveObject, WeaveTable, make_trace_obj
 from weave.trace.weave_client_send_file_cache import WeaveClientSendFileCache
 from weave.trace_server.constants import MAX_OBJECT_NAME_LENGTH
@@ -587,14 +586,6 @@ class WeaveClient:
             page_size=page_size,
         )
 
-    @deprecated(new_name="get_calls")
-    def calls(
-        self,
-        filter: CallsFilter | None = None,
-        include_costs: bool = False,
-    ) -> CallsIter:
-        return self.get_calls(filter=filter, include_costs=include_costs)
-
     @trace_sentry.global_trace_sentry.watch()
     def get_call(
         self,
@@ -631,14 +622,6 @@ class WeaveClient:
             raise ValueError(f"Call not found: {call_id}")
         response_call = calls[0]
         return make_client_call(self.entity, self.project, response_call, self.server)
-
-    @deprecated(new_name="get_call")
-    def call(
-        self,
-        call_id: str,
-        include_costs: bool = False,
-    ) -> WeaveObject:
-        return self.get_call(call_id=call_id, include_costs=include_costs)
 
     @trace_sentry.global_trace_sentry.watch()
     def create_call(
@@ -1172,19 +1155,6 @@ class WeaveClient:
             offset=offset,
             limit=limit,
             show_refs=True,
-        )
-
-    @deprecated(new_name="get_feedback")
-    def feedback(
-        self,
-        query: Query | str | None = None,
-        *,
-        reaction: str | None = None,
-        offset: int = 0,
-        limit: int = 100,
-    ) -> FeedbackQuery:
-        return self.get_feedback(
-            query=query, reaction=reaction, offset=offset, limit=limit
         )
 
     def add_cost(
@@ -2257,6 +2227,3 @@ def sanitize_object_name(name: str) -> str:
     if len(res) > MAX_OBJECT_NAME_LENGTH:
         res = res[:MAX_OBJECT_NAME_LENGTH]
     return res
-
-
-__docspec__ = [WeaveClient, Call, CallsIter]

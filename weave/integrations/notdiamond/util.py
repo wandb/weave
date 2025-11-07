@@ -1,3 +1,6 @@
+from pathlib import Path
+from typing import Optional
+
 import pandas as pd
 
 import weave
@@ -5,15 +8,25 @@ from weave.evaluation.eval import EvaluationResults
 
 
 def get_model_evals(
-    file_path: str = "integrations/notdiamond/test_data/humaneval.csv",
+    file_path: Optional[str] = None,
 ) -> dict[str, EvaluationResults]:
+    if file_path is None:
+        # Get path relative to this module file
+        module_dir = (
+            Path(__file__).parent.parent.parent.parent
+            / "tests"
+            / "integrations"
+            / "notdiamond"
+            / "test_data"
+        )
+        file_path = str(module_dir / "humaneval.csv")
+
     df = pd.read_csv(file_path)
     models = [
-        "anthropic/claude-3-5-sonnet-20240620",
-        "openai/gpt-4o-2024-05-13",
-        "google/gemini-1.5-pro-latest",
-        "openai/gpt-4-turbo-2024-04-09",
-        "anthropic/claude-3-opus-20240229",
+        "openai/gpt-4o",
+        "google/gemini-2.5-flash",
+        "openai/gpt-4-turbo",
+        "anthropic/claude-sonnet-4-5",
     ]
 
     model_evals = {}

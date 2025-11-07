@@ -1,6 +1,6 @@
 import pytest
-import sqlparse
 
+from tests.trace_server.query_builder.utils import assert_sql
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.calls_query_builder.calls_query_builder import (
     AggregatedDataSizeField,
@@ -320,18 +320,6 @@ def test_query_heavy_column_simple_filter_with_order_and_limit_and_mixed_query_c
     )
 
 
-def assert_sql(cq: CallsQuery, exp_query, exp_params):
-    pb = ParamBuilder("pb")
-    query = cq.as_sql(pb)
-    params = pb.get_params()
-
-    exp_formatted = sqlparse.format(exp_query, reindent=True)
-    found_formatted = sqlparse.format(query, reindent=True)
-
-    assert exp_formatted == found_formatted
-    assert exp_params == params
-
-
 def test_query_light_column_with_costs() -> None:
     cq = CallsQuery(
         project_id="UHJvamVjdEludGVybmFsSWQ6Mzk1NDg2Mjc=", include_costs=True
@@ -368,8 +356,8 @@ def test_query_light_column_with_costs() -> None:
                 WHERE calls_merged.project_id = {pb_1:String}
                     AND (calls_merged.id IN filtered_calls)
                 GROUP BY (calls_merged.project_id, calls_merged.id)),
-            -- From the all_calls we get the usage data for LLMs
             llm_usage AS (
+                -- From the all_calls we get the usage data for LLMs
                 SELECT
                     *,
                     ifNull(JSONExtractRaw(summary_dump, 'usage'), '{}') AS usage_raw,
@@ -386,9 +374,9 @@ def test_query_light_column_with_costs() -> None:
                     if(JSONHas(kv.2, 'completion_tokens'), JSONExtractInt(kv.2, 'completion_tokens'), JSONExtractInt(kv.2, 'output_tokens')) AS completion_tokens,
                     JSONExtractInt(kv.2, 'total_tokens') AS total_tokens
                 FROM all_calls),
-            -- based on the llm_ids in the usage data we get all the prices and rank them according to specificity and effective date
-            ranked_prices AS
-                (SELECT
+            ranked_prices AS (
+                -- based on the llm_ids in the usage data we get all the prices and rank them according to specificity and effective date
+                SELECT
                     *,
                     llm_token_prices.id,
                     llm_token_prices.pricing_level,
@@ -1983,7 +1971,7 @@ def test_query_with_feedback_filter_and_datetime_and_string_filter() -> None:
         WITH filtered_calls AS
             (SELECT calls_merged.id AS id
             FROM calls_merged
-                            LEFT JOIN (SELECT * FROM feedback WHERE feedback.project_id = {pb_8:String}) AS feedback ON (feedback.weave_ref = concat('weave-trace-internal:///', {pb_8:String}, '/call/', calls_merged.id))
+                            LEFT JOIN (SELECT * FROM feedback WHERE feedback.project_id = {pb_8:String} ) AS feedback ON (feedback.weave_ref = concat('weave-trace-internal:///', {pb_8:String}, '/call/', calls_merged.id))
             WHERE calls_merged.project_id = {pb_8:String}
                 AND (calls_merged.sortable_datetime > {pb_7:String})
                 AND ((calls_merged.inputs_dump LIKE {pb_6:String}
@@ -2081,14 +2069,15 @@ def test_wb_run_id_filter_eq():
         SELECT
             calls_merged.id AS id
         FROM calls_merged
-        WHERE calls_merged.project_id = {pb_1:String}
-            AND (calls_merged.wb_run_id IN {pb_0:Array(String)}
+        WHERE calls_merged.project_id = {pb_2:String}
+            AND (calls_merged.wb_run_id IN {pb_1:Array(String)}
                 OR calls_merged.wb_run_id IS NULL)
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (((any(calls_merged.deleted_at) IS NULL))
-            AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+            AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+            AND (any(calls_merged.wb_run_id) IN {pb_0:Array(String)}))
         """,
-        {"pb_0": ["wb_run_123"], "pb_1": "project"},
+        {"pb_0": ["wb_run_123"], "pb_1": ["wb_run_123"], "pb_2": "project"},
     )
 
 

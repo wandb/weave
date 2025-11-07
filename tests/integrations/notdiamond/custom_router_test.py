@@ -2,6 +2,7 @@ import json
 import os
 import sys
 from collections.abc import Generator
+from pathlib import Path
 from typing import Optional
 
 import pytest
@@ -52,9 +53,11 @@ def model_datasets(model_evals: dict[str, EvaluationResults]):
 @pytest.fixture
 def preference_id():
     try:
-        with open(
-            "integrations/notdiamond/cassettes/custom_router_test/test_custom_router_train_router.yaml",
-        ) as file:
+        test_dir = Path(__file__).parent
+        cassette_path = (
+            test_dir / "cassettes" / "custom_router_test" / "test_train_router.yaml"
+        )
+        with open(cassette_path) as file:
             cassette = yaml.safe_load(file)
 
         response_body = cassette["interactions"][0]["response"]["body"]
