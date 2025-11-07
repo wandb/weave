@@ -826,7 +826,7 @@ class CallsQuery(BaseModel):
                 continue
 
             if isinstance(
-                field_obj, CallsMergedDynamicField | QueryBuilderDynamicField
+                field_obj, (CallsMergedDynamicField, QueryBuilderDynamicField)
             ):
                 # we need to add the base field, not the dynamic one
                 base_field = get_field_by_name(field_obj.field)
