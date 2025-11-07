@@ -204,16 +204,6 @@ class UserSettings(BaseModel):
             context_var = _context_vars[name]
             context_var.set(getattr(self, name))
 
-        # Update logger level to reflect current settings
-        # Use lazy import to avoid circular import
-        try:
-            from weave.trace.display.term import update_logger_level
-
-            update_logger_level()
-        except ImportError:
-            # Logger module not yet imported, that's okay
-            pass
-
 
 def should_disable_weave() -> bool:
     return _should("disabled")
