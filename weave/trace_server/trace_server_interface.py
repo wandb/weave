@@ -205,6 +205,50 @@ class EndedCallSchemaForInsert(BaseModel):
         return dict(v)
 
 
+class CompletedCallSchemaForInsert(BaseModel):
+    """
+    Schema for inserting a completed call directly into the calls_complete table.
+
+    This represents a call that is already finished at insertion time, with both
+    start and end information provided together.
+    """
+
+    # Required fields
+    project_id: str
+    id: str
+    trace_id: str
+    op_name: str
+    started_at: datetime.datetime
+
+    updated_at: Optional[datetime.datetime] = None
+
+    display_name: Optional[str] = None
+    parent_id: Optional[str] = None
+    thread_id: Optional[str] = None
+    turn_id: Optional[str] = None
+
+    ended_at: Optional[datetime.datetime] = None
+
+    # Dump fields
+    attributes: dict[str, Any]
+    inputs: dict[str, Any]
+    output: Optional[Any] = None
+    summary: SummaryInsertMap
+    # OTEL span data
+    otel_dump: Optional[dict[str, Any]] = None
+
+    exception: Optional[str] = None
+
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+    wb_run_id: Optional[str] = None
+    wb_run_step: Optional[int] = None
+    wb_run_step_end: Optional[int] = None
+
+    @field_serializer("attributes", "summary", when_used="unless-none")
+    def serialize_typed_dicts(self, v: dict[str, Any]) -> dict[str, Any]:
+        return dict(v)
+
+
 class ObjSchema(BaseModel):
     project_id: str
     object_id: str
@@ -285,6 +329,15 @@ class CallEndRes(BaseModel):
     pass
 
 
+class CallCompleteReq(BaseModelStrict):
+    complete: CompletedCallSchemaForInsert
+
+
+class CallCompleteRes(BaseModel):
+    id: str
+    trace_id: str
+
+
 class CallBatchStartMode(BaseModel):
     mode: str = "start"
     req: CallStartReq
@@ -293,6 +346,11 @@ class CallBatchStartMode(BaseModel):
 class CallBatchEndMode(BaseModel):
     mode: str = "end"
     req: CallEndReq
+
+
+class CallBatchCompleteMode(BaseModel):
+    mode: str = "complete"
+    req: CallCompleteReq
 
 
 class CallCreateBatchReq(BaseModelStrict):
@@ -1956,6 +2014,14 @@ class ScoreDeleteReq(BaseModel):
 
 class ScoreDeleteRes(BaseModel):
     num_deleted: int = Field(..., description="Number of scores deleted")
+
+
+class CallsUpsertBatchV2Req(BaseModel):
+    batch: list[CallBatchStartMode | CallBatchEndMode | CallBatchCompleteMode]
+
+
+class CallsUpsertBatchV2Res(BaseModel):
+    res: list[Union[CallStartRes, CallEndRes, CallCompleteRes]]
 
 
 class TraceServerInterface(Protocol):
