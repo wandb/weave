@@ -22,6 +22,7 @@ PY39_INCOMPATIBLE_SHARDS = [
     "autogen_tests",
     "langchain",
     "verifiers_test",
+    "notdiamond",
 ]
 PY310_INCOMPATIBLE_SHARDS = [
     "verifiers_test",
@@ -82,7 +83,6 @@ trace_server_shards = [f"trace{i}" for i in range(1, NUM_TRACE_SERVER_SHARDS + 1
         "cohere",
         "crewai",
         "dspy",
-        "google_ai_studio",
         "google_genai",
         "groq",
         "instructor",
@@ -121,7 +121,6 @@ def tests(session, shard):
         session.skip(f"Skipping {shard=} as it is not compatible with Python 3.10")
 
     session.install("-e", f".[{shard},test]")
-    session.chdir("tests")
 
     env = {
         k: session.env.get(k) or os.getenv(k)
@@ -135,10 +134,7 @@ def tests(session, shard):
         ]
     }
     # Add the GOOGLE_API_KEY environment variable for the "google" shard
-    if shard in ["google_ai_studio", "google_genai"]:
-        env["GOOGLE_API_KEY"] = session.env.get("GOOGLE_API_KEY")
-
-    if shard == "google_ai_studio":
+    if shard == "google_genai":
         env["GOOGLE_API_KEY"] = os.getenv("GOOGLE_API_KEY", "MISSING")
 
     # Add the NVIDIA_API_KEY environment variable for the "langchain_nvidia_ai_endpoints" shard
@@ -157,19 +153,19 @@ def tests(session, shard):
     if shard == "openai_agents":
         env["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY", "MISSING")
 
-    default_test_dirs = [f"integrations/{shard}/"]
+    default_test_dirs = [f"tests/integrations/{shard}/"]
     test_dirs_dict = {
         "custom": [],
-        "flow": ["flow/"],
-        "trace_server": ["trace_server/"],
-        "trace_server_bindings": ["trace_server_bindings"],
-        "mistral": ["integrations/mistral/"],
-        "scorers": ["scorers/"],
-        "autogen_tests": ["integrations/autogen/"],
-        "verifiers_test": ["integrations/verifiers/"],
-        "trace": ["trace/"],
-        **{shard: ["trace/"] for shard in trace_server_shards},
-        "trace_no_server": ["trace/"],
+        "flow": ["tests/flow/"],
+        "trace_server": ["tests/trace_server/"],
+        "trace_server_bindings": ["tests/trace_server_bindings"],
+        "mistral": ["tests/integrations/mistral/"],
+        "scorers": ["tests/scorers/"],
+        "autogen_tests": ["tests/integrations/autogen/"],
+        "verifiers_test": ["tests/integrations/verifiers/"],
+        "trace": ["tests/trace/"],
+        **{shard: ["tests/trace/"] for shard in trace_server_shards},
+        "trace_no_server": ["tests/trace/"],
     }
 
     test_dirs = test_dirs_dict.get(shard, default_test_dirs)

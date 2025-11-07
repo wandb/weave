@@ -97,7 +97,7 @@ def _wandb_api_key_via_netrc_file(filepath: str) -> str | None:
 
 def weave_wandb_api_key() -> str | None:
     env_api_key = _wandb_api_key_via_env()
-    if env_api_key is not None:
+    if env_api_key is not None and env_api_key != "":
         return env_api_key
 
     return _wandb_api_key_via_netrc()

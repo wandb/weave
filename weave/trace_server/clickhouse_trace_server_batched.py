@@ -31,9 +31,10 @@ from tenacity import (
 
 from weave.trace_server import clickhouse_trace_server_migrator as wf_migrator
 from weave.trace_server import clickhouse_trace_server_settings as ch_settings
+from weave.trace_server import constants, object_creation_utils
 from weave.trace_server import environment as wf_env
-from weave.trace_server import object_creation_utils
 from weave.trace_server import refs_internal as ri
+from weave.trace_server import trace_server_common as tsc
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.actions_worker.dispatcher import execute_batch
 from weave.trace_server.base64_content_conversion import (
@@ -53,6 +54,7 @@ from weave.trace_server.clickhouse_schema import (
     ALL_CALL_JSON_COLUMNS,
     ALL_CALL_SELECT_COLUMNS,
     ALL_FILE_CHUNK_INSERT_COLUMNS,
+    ALL_OBJ_INSERT_COLUMNS,
     REQUIRED_CALL_COLUMNS,
     CallCHInsertable,
     CallDeleteCHInsertable,
@@ -98,6 +100,8 @@ from weave.trace_server.file_storage import (
 from weave.trace_server.file_storage_uris import FileStorageURI
 from weave.trace_server.ids import generate_id
 from weave.trace_server.image_completion import lite_llm_image_generation
+from weave.trace_server.interface import query as tsi_query
+from weave.trace_server.interface.feedback_types import RUNNABLE_FEEDBACK_TYPE_PREFIX
 from weave.trace_server.kafka import KafkaProducer
 from weave.trace_server.llm_completion import (
     get_custom_provider_info,
@@ -136,6 +140,7 @@ from weave.trace_server.token_costs import (
 from weave.trace_server.trace_server_common import (
     DynamicBatchProcessor,
     LRUCache,
+    determine_call_status,
     empty_str_to_none,
     get_nested_key,
     hydrate_calls_with_feedback,
@@ -222,14 +227,53 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self._kafka_producer = KafkaProducer.from_env()
         return self._kafka_producer
 
+    def _get_existing_ops_from_spans(
+        self, seen_ids: set[str], project_id: str, limit: Optional[int] = None
+    ) -> list[tsi.ObjSchema]:
+        obj_version_filter = tsi.ObjectVersionFilter(
+            object_ids=list(seen_ids),
+            latest_only=True,
+            is_op=True,
+        )
+
+        return self.objs_query(
+            tsi.ObjQueryReq(
+                project_id=project_id,
+                filter=obj_version_filter,
+                metadata_only=True,
+                limit=limit,
+            ),
+        ).objs
+
+    def _create_or_get_placeholder_ops_digest(
+        self, project_id: str, create: bool
+    ) -> str:
+        if not create:
+            return bytes_digest(
+                (object_creation_utils.PLACEHOLDER_OP_SOURCE).encode("utf-8")
+            )
+
+        source_code = object_creation_utils.PLACEHOLDER_OP_SOURCE
+        source_file_req = tsi.FileCreateReq(
+            project_id=project_id,
+            name=object_creation_utils.OP_SOURCE_FILE_NAME,
+            content=source_code.encode("utf-8"),
+        )
+        return self.file_create(source_file_req).digest
+
     def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
+        assert_non_null_wb_user_id(req)
+
         if not isinstance(req.traces, ExportTraceServiceRequest):
             raise TypeError(
                 "Expected traces as ExportTraceServiceRequest, got {type(req.traces)}"
             )
-        calls: list[dict[str, object]] = []
+        calls: list[
+            tuple[tsi.StartedCallSchemaForInsert, tsi.EndedCallSchemaForInsert]
+        ] = []
         rejected_spans = 0
         error_messages: list[str] = []
+
         for proto_resource_spans in req.traces.resource_spans:
             resource = Resource.from_proto(proto_resource_spans.resource)
             for proto_scope_spans in proto_resource_spans.scope_spans:
@@ -254,18 +298,82 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                         error_messages.append(f"Rejected span ({span_ident}): {e!s}")
                         continue
 
-                    start_call, end_call = span.to_call(req.project_id)
-                    calls.extend(
-                        [
-                            {
-                                "mode": "start",
-                                "req": tsi.CallStartReq(start=start_call),
-                            },
-                            {"mode": "end", "req": tsi.CallEndReq(end=end_call)},
-                        ]
+                    calls.append(
+                        span.to_call(
+                            req.project_id,
+                            wb_user_id=req.wb_user_id,
+                            wb_run_id=req.wb_run_id,
+                        )
                     )
+
+        obj_id_idx_map = defaultdict(list)
+        for idx, (start_call, _) in enumerate(calls):
+            op_name = object_creation_utils.make_safe_name(start_call.op_name)
+            obj_id_idx_map[op_name].append(idx)
+
+        existing_objects = self._get_existing_ops_from_spans(
+            seen_ids=set(obj_id_idx_map.keys()),
+            project_id=req.project_id,
+            limit=len(calls),
+        )
+        # We know that OTel will always use the placeholder source.
+        # We can instead just reuse the existing file if we know it is present
+        # and create it just once if we are not sure.
+        if len(existing_objects) == 0:
+            digest = self._create_or_get_placeholder_ops_digest(
+                project_id=req.project_id, create=True
+            )
+        else:
+            digest = self._create_or_get_placeholder_ops_digest(
+                project_id=req.project_id, create=False
+            )
+
+        for obj in existing_objects:
+            op_ref_uri = ri.InternalOpRef(
+                project_id=req.project_id,
+                name=obj.object_id,
+                version=obj.digest,
+            ).uri()
+
+            # Modify each of the matched start calls in place
+            for idx in obj_id_idx_map[obj.object_id]:
+                calls[idx][0].op_name = op_ref_uri
+            # Remove this ID from the mapping so that once the for loop is done we are left with only new objects
+            obj_id_idx_map.pop(obj.object_id)
+
+        obj_creation_batch = []
+        for op_obj_id in obj_id_idx_map.keys():
+            op_val = object_creation_utils.build_op_val(digest)
+            obj_creation_batch.append(
+                tsi.ObjSchemaForInsert(
+                    project_id=req.project_id,
+                    object_id=op_obj_id,
+                    val=op_val,
+                    wb_user_id=req.wb_user_id,
+                )
+            )
+        res = self.obj_create_batch(obj_creation_batch)
+
+        for result in res:
+            op_ref_uri = ri.InternalOpRef(
+                project_id=req.project_id,
+                name=result.object_id,
+                version=result.digest,
+            ).uri()
+            for idx in obj_id_idx_map[result.object_id]:
+                calls[idx][0].op_name = op_ref_uri
+
+        batch = [
+            item
+            for start_call, end_call in calls
+            for item in (
+                tsi.CallBatchStartMode(req=tsi.CallStartReq(start=start_call)),
+                tsi.CallBatchEndMode(req=tsi.CallEndReq(end=end_call)),
+            )
+        ]
         # TODO: Actually populate the error fields if call_start_batch fails
-        self.call_start_batch(tsi.CallCreateBatchReq(batch=calls))
+        self.call_start_batch(tsi.CallCreateBatchReq(batch=batch))
+
         if rejected_spans > 0:
             # Join the first 20 errors and return them delimited by ';'
             joined_errors = "; ".join(error_messages[:20]) + (
@@ -641,7 +749,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             for insertable in insertables:
                 self._insert_call(insertable)
 
-        return tsi.CallsDeleteRes()
+        return tsi.CallsDeleteRes(num_deleted=len(all_descendants))
 
     def _ensure_valid_update_field(self, req: tsi.CallUpdateReq) -> None:
         valid_update_fields = ["display_name"]
@@ -729,7 +837,80 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             data=[list(ch_obj.model_dump().values())],
             column_names=list(ch_obj.model_fields.keys()),
         )
-        return tsi.ObjCreateRes(digest=digest)
+
+        return tsi.ObjCreateRes(
+            digest=digest,
+            object_id=req.obj.object_id,
+        )
+
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.create_obj_batch")
+    def obj_create_batch(
+        self, batch: list[tsi.ObjSchemaForInsert]
+    ) -> list[tsi.ObjCreateRes]:
+        """This method is for the special case where all objects are known to use a placeholder.
+        We lose any knowledge of what version the created object is in return for an enormous
+        performance increase for operations like OTel ingest.
+
+        This should **ONLY** be used when we know an object will never have more than one version.
+        """
+        if root_span := ddtrace.tracer.current_span():
+            root_span.set_tags(
+                {
+                    "clickhouse_trace_server_batched.create_obj_batch.count": str(
+                        len(batch)
+                    )
+                }
+            )
+
+        if not batch:
+            return []
+
+        obj_results = []
+        ch_insert_batch = []
+
+        unique_projects = {obj.project_id for obj in batch}
+        if len(unique_projects) > 1:
+            raise InvalidRequest(
+                f"obj_create_batch only supports updating a single project. Supplied projects: {unique_projects}"
+            )
+
+        for obj in batch:
+            processed_result = process_incoming_object_val(
+                obj.val, obj.builtin_object_class
+            )
+            processed_val = processed_result["val"]
+            json_val = json.dumps(processed_val)
+            digest = str_digest(json_val)
+            ch_obj = ObjCHInsertable(
+                project_id=obj.project_id,
+                object_id=obj.object_id,
+                wb_user_id=obj.wb_user_id,
+                kind=get_kind(processed_val),
+                base_object_class=processed_result["base_object_class"],
+                leaf_object_class=processed_result["leaf_object_class"],
+                refs=extract_refs_from_values(processed_val),
+                val_dump=json_val,
+                digest=digest,
+            )
+            insert_data = list(ch_obj.model_dump().values())
+            # Add the data to be inserted
+            ch_insert_batch.append(insert_data)
+
+            # Record the inserted data
+            obj_results.append(
+                tsi.ObjCreateRes(
+                    digest=digest,
+                    object_id=obj.object_id,
+                )
+            )
+
+        self._insert(
+            "object_versions",
+            data=ch_insert_batch,
+            column_names=ALL_OBJ_INSERT_COLUMNS,
+        )
+
+        return obj_results
 
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
         object_query_builder = ObjectMetadataQueryBuilder(req.project_id)
@@ -1934,6 +2115,1224 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
         result = self.obj_delete(obj_delete_req)
         return tsi.EvaluationDeleteV2Res(num_deleted=result.num_deleted)
+
+    # Model V2 API
+
+    def model_create_v2(self, req: tsi.ModelCreateV2Req) -> tsi.ModelCreateV2Res:
+        """Create a model object.
+
+        Args:
+            req: ModelCreateV2Req containing project_id, name, description, source_code, and attributes
+
+        Returns:
+            ModelCreateV2Res with digest, object_id, version_index, and model_ref
+        """
+        # Store source code as a file
+        source_file_req = tsi.FileCreateReq(
+            project_id=req.project_id,
+            name=object_creation_utils.OP_SOURCE_FILE_NAME,
+            content=req.source_code.encode("utf-8"),
+        )
+        source_file_res = self.file_create(source_file_req)
+
+        # Build the model object value structure
+        model_val = object_creation_utils.build_model_val(
+            name=req.name,
+            description=req.description,
+            source_file_digest=source_file_res.digest,
+            attributes=req.attributes,
+        )
+
+        # Generate object_id based on name
+        safe_name = object_creation_utils.make_safe_name(req.name)
+        object_id = f"model_{safe_name}"
+
+        # Create the object
+        obj_req = tsi.ObjCreateReq(
+            obj=tsi.ObjSchemaForInsert(
+                project_id=req.project_id,
+                object_id=object_id,
+                val=model_val,
+            )
+        )
+        obj_result = self.obj_create(obj_req)
+
+        # Query back to get version_index with retry
+        obj_read_req = tsi.ObjReadReq(
+            project_id=req.project_id,
+            object_id=object_id,
+            digest=obj_result.digest,
+        )
+        obj_read_res = self._obj_read_with_retry(obj_read_req)
+
+        # Build model reference - external adapter will convert to external format
+        model_ref = ri.InternalObjectRef(
+            project_id=req.project_id,
+            name=object_id,
+            version=obj_result.digest,
+        ).uri()
+
+        return tsi.ModelCreateV2Res(
+            digest=obj_result.digest,
+            object_id=object_id,
+            version_index=obj_read_res.obj.version_index,
+            model_ref=model_ref,
+        )
+
+    def model_read_v2(self, req: tsi.ModelReadV2Req) -> tsi.ModelReadV2Res:
+        """Read a model object.
+
+        Args:
+            req: ModelReadV2Req containing project_id, object_id, and digest
+
+        Returns:
+            ModelReadV2Res with all model details
+        """
+        # Read the object
+        obj_read_req = tsi.ObjReadReq(
+            project_id=req.project_id,
+            object_id=req.object_id,
+            digest=req.digest,
+        )
+        obj_read_res = self.obj_read(obj_read_req)
+
+        # Extract model properties from the val dict
+        val = obj_read_res.obj.val
+        name = val.get("name", req.object_id)
+        description = val.get("description")
+
+        # Get source code from file
+        files = val.get("files", {})
+        source_file_digest = files.get(object_creation_utils.OP_SOURCE_FILE_NAME)
+        if not source_file_digest:
+            raise ValueError(f"Model {req.object_id} has no source file")
+
+        file_content_req = tsi.FileContentReadReq(
+            project_id=req.project_id,
+            digest=source_file_digest,
+        )
+        file_content_res = self.file_content_read(file_content_req)
+        source_code = file_content_res.content.decode("utf-8")
+
+        # Extract additional attributes (exclude system fields)
+        excluded_fields = {
+            "_type",
+            "_class_name",
+            "_bases",
+            "name",
+            "description",
+            "files",
+        }
+        attributes = {k: v for k, v in val.items() if k not in excluded_fields}
+
+        return tsi.ModelReadV2Res(
+            object_id=req.object_id,
+            digest=req.digest,
+            version_index=obj_read_res.obj.version_index,
+            created_at=obj_read_res.obj.created_at,
+            name=name,
+            description=description,
+            source_code=source_code,
+            attributes=attributes if attributes else None,
+        )
+
+    def model_list_v2(self, req: tsi.ModelListV2Req) -> Iterator[tsi.ModelReadV2Res]:
+        """List model objects by delegating to objs_query with Model filtering."""
+        obj_query_req = tsi.ObjQueryReq(
+            project_id=req.project_id,
+            filter=tsi.ObjectVersionFilter(base_object_classes=["Model"]),
+            limit=req.limit,
+            offset=req.offset,
+        )
+        obj_query_res = self.objs_query(obj_query_req)
+
+        for obj in obj_query_res.objs:
+            # Build ModelReadV2Res from each object
+            val = obj.val
+            name = val.get("name", obj.object_id)
+            description = val.get("description")
+
+            # Get source code from file
+            files = val.get("files", {})
+            source_file_digest = files.get(object_creation_utils.OP_SOURCE_FILE_NAME)
+            if source_file_digest:
+                file_content_req = tsi.FileContentReadReq(
+                    project_id=req.project_id,
+                    digest=source_file_digest,
+                )
+                file_content_res = self.file_content_read(file_content_req)
+                source_code = file_content_res.content.decode("utf-8")
+            else:
+                source_code = ""
+
+            # Extract additional attributes
+            excluded_fields = {
+                "_type",
+                "_class_name",
+                "_bases",
+                "name",
+                "description",
+                "files",
+            }
+            attributes = {k: v for k, v in val.items() if k not in excluded_fields}
+
+            yield tsi.ModelReadV2Res(
+                object_id=obj.object_id,
+                digest=obj.digest,
+                version_index=obj.version_index,
+                created_at=obj.created_at,
+                name=name,
+                description=description,
+                source_code=source_code,
+                attributes=attributes if attributes else None,
+            )
+
+    def model_delete_v2(self, req: tsi.ModelDeleteV2Req) -> tsi.ModelDeleteV2Res:
+        """Delete model objects by delegating to obj_delete.
+
+        Args:
+            req: ModelDeleteV2Req containing project_id, object_id, and optional digests
+
+        Returns:
+            ModelDeleteV2Res with the number of deleted versions
+        """
+        obj_delete_req = tsi.ObjDeleteReq(
+            project_id=req.project_id,
+            object_id=req.object_id,
+            digests=req.digests,
+        )
+        result = self.obj_delete(obj_delete_req)
+        return tsi.ModelDeleteV2Res(num_deleted=result.num_deleted)
+
+    def evaluation_run_create_v2(
+        self, req: tsi.EvaluationRunCreateV2Req
+    ) -> tsi.EvaluationRunCreateV2Res:
+        """Create an evaluation run as a call with special attributes."""
+        evaluation_run_id = generate_id()
+
+        # Create the evaluation run op
+        op_create_req = tsi.OpCreateV2Req(
+            project_id=req.project_id,
+            name=constants.EVALUATION_RUN_OP_NAME,
+            source_code=object_creation_utils.PLACEHOLDER_EVALUATION_EVALUATE_OP_SOURCE,
+        )
+        op_create_res = self.op_create_v2(op_create_req)
+
+        # Build the op ref
+        op_ref = ri.InternalOpRef(
+            project_id=req.project_id,
+            name=constants.EVALUATION_RUN_OP_NAME,
+            version=op_create_res.digest,
+        )
+
+        # Start a call to represent the evaluation run
+        call_start_req = tsi.CallStartReq(
+            start=tsi.StartedCallSchemaForInsert(
+                project_id=req.project_id,
+                id=evaluation_run_id,
+                trace_id=evaluation_run_id,
+                op_name=op_ref.uri(),
+                started_at=datetime.datetime.now(datetime.timezone.utc),
+                attributes={
+                    constants.WEAVE_ATTRIBUTES_NAMESPACE: {
+                        constants.EVALUATION_RUN_ATTR_KEY: "true",
+                        constants.EVALUATION_RUN_EVALUATION_ATTR_KEY: req.evaluation,
+                        constants.EVALUATION_RUN_MODEL_ATTR_KEY: req.model,
+                    }
+                },
+                inputs={
+                    "self": req.evaluation,
+                    "model": req.model,
+                },
+            )
+        )
+        self.call_start(call_start_req)
+
+        return tsi.EvaluationRunCreateV2Res(evaluation_run_id=evaluation_run_id)
+
+    def evaluation_run_read_v2(
+        self, req: tsi.EvaluationRunReadV2Req
+    ) -> tsi.EvaluationRunReadV2Res:
+        """Read an evaluation run by reading the underlying call."""
+        call_read_req = tsi.CallReadReq(
+            project_id=req.project_id,
+            id=req.evaluation_run_id,
+        )
+        call_res = self.call_read(call_read_req)
+        if (call := call_res.call) is None:
+            raise NotFoundError(f"Evaluation run {req.evaluation_run_id} not found")
+
+        attributes = call.attributes.get(constants.WEAVE_ATTRIBUTES_NAMESPACE, {})
+        status = determine_call_status(call)
+
+        return tsi.EvaluationRunReadV2Res(
+            evaluation_run_id=call.id,
+            evaluation=attributes.get(constants.EVALUATION_RUN_EVALUATION_ATTR_KEY, ""),
+            model=attributes.get(constants.EVALUATION_RUN_MODEL_ATTR_KEY, ""),
+            status=status,
+            started_at=call.started_at,
+            finished_at=call.ended_at,
+            summary=call.summary,
+        )
+
+    def evaluation_run_list_v2(
+        self, req: tsi.EvaluationRunListV2Req
+    ) -> Iterator[tsi.EvaluationRunReadV2Res]:
+        """List evaluation runs by querying calls with evaluation_run attribute."""
+        # Build query conditions to filter at database level
+        conditions: list[tsi_query.Operand] = []
+
+        # Filter for calls with evaluation_run attribute set to true
+        conditions.append(
+            tsi_query.EqOperation(
+                eq_=[
+                    tsi_query.GetFieldOperator(
+                        get_field_=f"attributes.{constants.WEAVE_ATTRIBUTES_NAMESPACE}.{constants.EVALUATION_RUN_ATTR_KEY}"
+                    ),
+                    tsi_query.LiteralOperation(literal_="true"),
+                ]
+            )
+        )
+
+        # Apply additional filters if specified
+        if req.filter:
+            if req.filter.evaluations:
+                conditions.append(
+                    tsi_query.InOperation(
+                        in_=[
+                            tsi_query.GetFieldOperator(
+                                get_field_=f"attributes.{constants.WEAVE_ATTRIBUTES_NAMESPACE}.{constants.EVALUATION_RUN_EVALUATION_ATTR_KEY}"
+                            ),
+                            [
+                                tsi_query.LiteralOperation(literal_=eval_ref)
+                                for eval_ref in req.filter.evaluations
+                            ],
+                        ]
+                    )
+                )
+            if req.filter.models:
+                conditions.append(
+                    tsi_query.InOperation(
+                        in_=[
+                            tsi_query.GetFieldOperator(
+                                get_field_=f"attributes.{constants.WEAVE_ATTRIBUTES_NAMESPACE}.{constants.EVALUATION_RUN_MODEL_ATTR_KEY}"
+                            ),
+                            [
+                                tsi_query.LiteralOperation(literal_=model_ref)
+                                for model_ref in req.filter.models
+                            ],
+                        ]
+                    )
+                )
+            if req.filter.evaluation_run_ids:
+                conditions.append(
+                    tsi_query.InOperation(
+                        in_=[
+                            tsi_query.GetFieldOperator(get_field_="id"),
+                            [
+                                tsi_query.LiteralOperation(literal_=run_id)
+                                for run_id in req.filter.evaluation_run_ids
+                            ],
+                        ]
+                    )
+                )
+
+        # Combine all conditions with AND
+        query = tsi.Query(expr_=tsi_query.AndOperation(and_=conditions))
+
+        # Query for calls that have the evaluation_run attribute
+        calls_query_req = tsi.CallsQueryReq(
+            project_id=req.project_id,
+            query=query,
+            limit=req.limit,
+            offset=req.offset,
+        )
+
+        # Use calls_query_stream to avoid loading all calls into memory
+        for call in self.calls_query_stream(calls_query_req):
+            attributes = call.attributes.get(constants.WEAVE_ATTRIBUTES_NAMESPACE, {})
+            status = determine_call_status(call)
+
+            yield tsi.EvaluationRunReadV2Res(
+                evaluation_run_id=call.id,
+                evaluation=attributes.get(
+                    constants.EVALUATION_RUN_EVALUATION_ATTR_KEY, ""
+                ),
+                model=attributes.get(constants.EVALUATION_RUN_MODEL_ATTR_KEY, ""),
+                status=status,
+                started_at=call.started_at,
+                finished_at=call.ended_at,
+                summary=call.summary,
+            )
+
+    def evaluation_run_delete_v2(
+        self, req: tsi.EvaluationRunDeleteV2Req
+    ) -> tsi.EvaluationRunDeleteV2Res:
+        """Delete evaluation runs by deleting the underlying calls."""
+        calls_delete_req = tsi.CallsDeleteReq(
+            project_id=req.project_id,
+            call_ids=req.evaluation_run_ids,
+            wb_user_id=req.wb_user_id,
+        )
+        res = self.calls_delete(calls_delete_req)
+        return tsi.EvaluationRunDeleteV2Res(num_deleted=res.num_deleted)
+
+    def evaluation_run_finish_v2(
+        self, req: tsi.EvaluationRunFinishV2Req
+    ) -> tsi.EvaluationRunFinishV2Res:
+        """Finish an evaluation run by ending the underlying call.
+
+        This creates a summarize call as a child of the evaluation run,
+        then ends both the summarize call and the evaluation run.
+
+        Args:
+            req: EvaluationRunFinishV2Req containing project_id, evaluation_run_id, and optional summary
+
+        Returns:
+            EvaluationRunFinishV2Res with success status
+        """
+        summary = req.summary or {}
+
+        # Read the evaluation run call to get the evaluation reference
+        evaluation_run_read_req = tsi.CallReadReq(
+            project_id=req.project_id,
+            id=req.evaluation_run_id,
+        )
+        evaluation_run_call = self.call_read(evaluation_run_read_req).call
+        evaluation_ref = None
+        if evaluation_run_call and evaluation_run_call.inputs:
+            evaluation_ref = evaluation_run_call.inputs.get("self")
+
+        # Query all predict_and_score children to compute means
+        # (Do this first so we can use the same data for both summarize and evaluation_run)
+        calls_query_req = tsi.CallsQueryReq(
+            project_id=req.project_id,
+            filter=tsi.CallsFilter(
+                parent_ids=[req.evaluation_run_id],
+            ),
+            columns=["output", "op_name"],
+        )
+
+        # Collect outputs and scores from all predict_and_score calls
+        model_outputs = []
+        scorer_outputs_by_name: dict[str, list[float]] = {}
+
+        for call in self.calls_query_stream(calls_query_req):
+            # Check if this is a predict_and_score call
+            if not tsc.op_name_matches(
+                call.op_name, constants.EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME
+            ):
+                continue
+
+            if call.output is None or not isinstance(call.output, dict):
+                continue
+
+            # Extract model output
+            if (model_output := call.output.get("output")) is not None:
+                model_outputs.append(model_output)
+
+            # Extract scores
+            scores = call.output.get("scores", {})
+            if not isinstance(scores, dict):
+                continue
+
+            for scorer_name, score_value in scores.items():
+                if scorer_name not in scorer_outputs_by_name:
+                    scorer_outputs_by_name[scorer_name] = []
+                # Only add numeric scores for mean calculation
+                if isinstance(score_value, float):
+                    scorer_outputs_by_name[scorer_name].append(float(score_value))
+
+        # Build the evaluation run output with means
+        eval_output = {}
+
+        # Add scorer outputs
+        for scorer_name, scores in scorer_outputs_by_name.items():
+            if scores:
+                eval_output[scorer_name] = {"mean": sum(scores) / len(scores)}
+
+        # Add model outputs
+        if model_outputs:
+            try:
+                numeric_outputs = [
+                    float(o) for o in model_outputs if isinstance(o, (int, float))
+                ]
+                if numeric_outputs:
+                    eval_output["output"] = {
+                        "mean": sum(numeric_outputs) / len(numeric_outputs)
+                    }
+            except (ValueError, TypeError):
+                pass
+
+        # Create a summarize call as a child of the evaluation run
+        summarize_id = generate_id()
+        summarize_start_req = tsi.CallStartReq(
+            start=tsi.StartedCallSchemaForInsert(
+                project_id=req.project_id,
+                id=summarize_id,
+                trace_id=req.evaluation_run_id,
+                parent_id=req.evaluation_run_id,
+                op_name=constants.EVALUATION_SUMMARIZE_OP_NAME,
+                started_at=datetime.datetime.now(datetime.timezone.utc),
+                attributes={},
+                inputs={
+                    "self": evaluation_ref,
+                },
+                wb_user_id=req.wb_user_id,
+            )
+        )
+        self.call_start(summarize_start_req)
+
+        # End the summarize call with the same output as evaluation_run
+        summarize_end_req = tsi.CallEndReq(
+            end=tsi.EndedCallSchemaForInsert(
+                project_id=req.project_id,
+                id=summarize_id,
+                ended_at=datetime.datetime.now(datetime.timezone.utc),
+                output=eval_output,
+                summary={},
+            )
+        )
+        self.call_end(summarize_end_req)
+
+        # End the evaluation run call
+        call_end_req = tsi.CallEndReq(
+            end=tsi.EndedCallSchemaForInsert(
+                project_id=req.project_id,
+                id=req.evaluation_run_id,
+                ended_at=datetime.datetime.now(datetime.timezone.utc),
+                output=eval_output,
+                summary=summary,
+            )
+        )
+        self.call_end(call_end_req)
+        return tsi.EvaluationRunFinishV2Res(success=True)
+
+    # Prediction V2 API
+
+    def prediction_create_v2(
+        self, req: tsi.PredictionCreateV2Req
+    ) -> tsi.PredictionCreateV2Res:
+        """Create a prediction as a call with special attributes.
+
+        Args:
+            req: PredictionCreateV2Req containing project_id, model, inputs, and output
+
+        Returns:
+            PredictionCreateV2Res with the prediction_id
+        """
+        prediction_id = generate_id()
+
+        # Determine trace_id and parent_id based on evaluation_run_id
+        if req.evaluation_run_id:
+            # If evaluation_run_id is provided, create a predict_and_score parent call
+            trace_id = req.evaluation_run_id
+            predict_and_score_id = generate_id()
+
+            # Read the evaluation run call to get the evaluation reference
+            evaluation_run_read_req = tsi.CallReadReq(
+                project_id=req.project_id,
+                id=req.evaluation_run_id,
+            )
+            eval_run_read_res = self.call_read(evaluation_run_read_req)
+
+            call = eval_run_read_res.call
+            if call is None:
+                raise NotFoundError(f"Evaluation run {req.evaluation_run_id} not found")
+            evaluation_ref = call.inputs.get("self")
+
+            # Create the predict_and_score op
+            predict_and_score_op_req = tsi.OpCreateV2Req(
+                project_id=req.project_id,
+                name=constants.EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME,
+                source_code=object_creation_utils.PLACEHOLDER_EVALUATION_PREDICT_AND_SCORE_OP_SOURCE,
+            )
+            predict_and_score_op_res = self.op_create_v2(predict_and_score_op_req)
+
+            # Build the predict_and_score op ref
+            predict_and_score_op_ref = ri.InternalOpRef(
+                project_id=req.project_id,
+                name=constants.EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME,
+                version=predict_and_score_op_res.digest,
+            )
+
+            # Create the predict_and_score call as a child of the evaluation run
+            predict_and_score_start_req = tsi.CallStartReq(
+                start=tsi.StartedCallSchemaForInsert(
+                    project_id=req.project_id,
+                    id=predict_and_score_id,
+                    trace_id=trace_id,
+                    parent_id=req.evaluation_run_id,
+                    op_name=predict_and_score_op_ref.uri(),
+                    started_at=datetime.datetime.now(datetime.timezone.utc),
+                    attributes={
+                        constants.WEAVE_ATTRIBUTES_NAMESPACE: {
+                            constants.EVALUATION_RUN_PREDICT_CALL_ID_ATTR_KEY: prediction_id,
+                        }
+                    },
+                    inputs={
+                        "self": evaluation_ref,
+                        "model": req.model,
+                        "example": req.inputs,
+                    },
+                    wb_user_id=req.wb_user_id,
+                )
+            )
+            self.call_start(predict_and_score_start_req)
+
+            # The prediction will be a child of predict_and_score
+            parent_id = predict_and_score_id
+        else:
+            # Standalone prediction (not part of an evaluation)
+            trace_id = prediction_id
+            parent_id = None
+
+        # Parse the model ref to get the model name
+        try:
+            model_ref = ri.parse_internal_uri(req.model)
+            if isinstance(model_ref, (ri.InternalObjectRef, ri.InternalOpRef)):
+                model_name = model_ref.name
+            else:
+                # Fallback to default if not an object/op ref
+                model_name = "Model"
+        except ri.InvalidInternalRef:
+            # Fallback to default if parsing fails
+            model_name = "Model"
+
+        # Create the predict op with the model-specific name
+        predict_op_name = f"{model_name}.predict"
+        predict_op_req = tsi.OpCreateV2Req(
+            project_id=req.project_id,
+            name=predict_op_name,
+            source_code=object_creation_utils.PLACEHOLDER_MODEL_PREDICT_OP_SOURCE,
+        )
+        predict_op_res = self.op_create_v2(predict_op_req)
+
+        # Build the predict op ref
+        predict_op_ref = ri.InternalOpRef(
+            project_id=req.project_id,
+            name=predict_op_name,
+            version=predict_op_res.digest,
+        )
+
+        # Start a call to represent the prediction
+        prediction_attributes = {
+            constants.WEAVE_ATTRIBUTES_NAMESPACE: {
+                constants.PREDICTION_ATTR_KEY: "true",
+                constants.PREDICTION_MODEL_ATTR_KEY: req.model,
+            }
+        }
+        # Store evaluation_run_id as attribute if provided
+        if req.evaluation_run_id:
+            prediction_attributes[constants.WEAVE_ATTRIBUTES_NAMESPACE][
+                constants.PREDICTION_EVALUATION_RUN_ID_ATTR_KEY
+            ] = req.evaluation_run_id
+
+        call_start_req = tsi.CallStartReq(
+            start=tsi.StartedCallSchemaForInsert(
+                project_id=req.project_id,
+                id=prediction_id,
+                trace_id=trace_id,
+                parent_id=parent_id,
+                op_name=predict_op_ref.uri(),
+                started_at=datetime.datetime.now(datetime.timezone.utc),
+                attributes=prediction_attributes,
+                inputs={
+                    "self": req.model,
+                    "inputs": req.inputs,
+                },
+                wb_user_id=req.wb_user_id,
+            )
+        )
+        self.call_start(call_start_req)
+
+        # End the call immediately with the output
+        call_end_req = tsi.CallEndReq(
+            end=tsi.EndedCallSchemaForInsert(
+                project_id=req.project_id,
+                id=prediction_id,
+                ended_at=datetime.datetime.now(datetime.timezone.utc),
+                output=req.output,
+                summary={},
+            )
+        )
+        self.call_end(call_end_req)
+
+        return tsi.PredictionCreateV2Res(prediction_id=prediction_id)
+
+    def prediction_read_v2(
+        self, req: tsi.PredictionReadV2Req
+    ) -> tsi.PredictionReadV2Res:
+        """Read a prediction by reading the underlying call.
+
+        Args:
+            req: PredictionReadV2Req containing project_id and prediction_id
+
+        Returns:
+            PredictionReadV2Res with all prediction details
+
+        Raises:
+            NotFoundError: If the prediction is not found
+        """
+        call_read_req = tsi.CallReadReq(
+            project_id=req.project_id,
+            id=req.prediction_id,
+        )
+        call_res = self.call_read(call_read_req)
+
+        call = call_res.call
+        if call is None:
+            raise NotFoundError(f"Prediction {req.prediction_id} not found")
+
+        attributes = call.attributes.get(constants.WEAVE_ATTRIBUTES_NAMESPACE, {})
+
+        # Get evaluation_run_id from attributes (preferred), fallback to parent traversal for backwards compatibility
+        evaluation_run_id = attributes.get(
+            constants.PREDICTION_EVALUATION_RUN_ID_ATTR_KEY
+        )
+        if evaluation_run_id is None and call.parent_id:
+            # Fallback: If the parent is a predict_and_score call, get the evaluation_run_id from its parent
+            parent_read_req = tsi.CallReadReq(
+                project_id=req.project_id,
+                id=call.parent_id,
+            )
+            parent_res = self.call_read(parent_read_req)
+            if parent_res.call and tsc.op_name_matches(
+                parent_res.call.op_name,
+                constants.EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME,
+            ):
+                evaluation_run_id = parent_res.call.parent_id
+
+        return tsi.PredictionReadV2Res(
+            prediction_id=call.id,
+            model=attributes.get(constants.PREDICTION_MODEL_ATTR_KEY, ""),
+            inputs=call.inputs.get("inputs") if call.inputs else {},
+            output=call.output,
+            evaluation_run_id=evaluation_run_id,
+            wb_user_id=call.wb_user_id,
+        )
+
+    def prediction_list_v2(
+        self, req: tsi.PredictionListV2Req
+    ) -> Iterator[tsi.PredictionReadV2Res]:
+        """List predictions by querying calls with prediction attribute.
+
+        Args:
+            req: PredictionListV2Req containing project_id, limit, and offset
+
+        Yields:
+            PredictionReadV2Res for each prediction found
+        """
+        # Build query conditions to filter at database level
+        conditions: list[tsi_query.Operand] = []
+
+        # Filter for calls with prediction attribute set to true
+        conditions.append(
+            tsi_query.EqOperation(
+                eq_=[
+                    tsi_query.GetFieldOperator(
+                        get_field_=f"attributes.{constants.WEAVE_ATTRIBUTES_NAMESPACE}.{constants.PREDICTION_ATTR_KEY}"
+                    ),
+                    tsi_query.LiteralOperation(literal_="true"),
+                ]
+            )
+        )
+
+        # Filter by evaluation_run_id if provided
+        if req.evaluation_run_id:
+            conditions.append(
+                tsi_query.EqOperation(
+                    eq_=[
+                        tsi_query.GetFieldOperator(
+                            get_field_=f"attributes.{constants.WEAVE_ATTRIBUTES_NAMESPACE}.{constants.PREDICTION_EVALUATION_RUN_ID_ATTR_KEY}"
+                        ),
+                        tsi_query.LiteralOperation(literal_=req.evaluation_run_id),
+                    ]
+                )
+            )
+
+        # Combine all conditions with AND (or use single condition if only one)
+        if len(conditions) == 1:
+            query = tsi.Query(expr_=conditions[0])
+        else:
+            query = tsi.Query(expr_=tsi_query.AndOperation(and_=conditions))
+
+        # Query for calls that have the prediction attribute
+        calls_query_req = tsi.CallsQueryReq(
+            project_id=req.project_id,
+            query=query,
+            limit=req.limit,
+            offset=req.offset,
+        )
+
+        # Yield predictions
+        for call in self.calls_query_stream(calls_query_req):
+            attributes = call.attributes.get(constants.WEAVE_ATTRIBUTES_NAMESPACE, {})
+
+            # Get evaluation_run_id from attributes (preferred), fallback to parent traversal for backwards compatibility
+            evaluation_run_id = attributes.get(
+                constants.PREDICTION_EVALUATION_RUN_ID_ATTR_KEY
+            )
+            if evaluation_run_id is None and call.parent_id:
+                # Fallback: If the parent is a predict_and_score call, get the evaluation_run_id from its parent
+                parent_read_req = tsi.CallReadReq(
+                    project_id=req.project_id,
+                    id=call.parent_id,
+                )
+                parent_res = self.call_read(parent_read_req)
+                if parent_res.call and tsc.op_name_matches(
+                    parent_res.call.op_name,
+                    constants.EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME,
+                ):
+                    evaluation_run_id = parent_res.call.parent_id
+
+            yield tsi.PredictionReadV2Res(
+                prediction_id=call.id,
+                model=attributes.get(constants.PREDICTION_MODEL_ATTR_KEY, ""),
+                inputs=call.inputs.get("inputs") if call.inputs else {},
+                output=call.output,
+                evaluation_run_id=evaluation_run_id,
+                wb_user_id=call.wb_user_id,
+            )
+
+    def prediction_delete_v2(
+        self, req: tsi.PredictionDeleteV2Req
+    ) -> tsi.PredictionDeleteV2Res:
+        """Delete predictions by deleting the underlying calls.
+
+        Args:
+            req: PredictionDeleteV2Req containing project_id and prediction_ids
+
+        Returns:
+            PredictionDeleteV2Res with the number of deleted predictions
+        """
+        calls_delete_req = tsi.CallsDeleteReq(
+            project_id=req.project_id,
+            call_ids=req.prediction_ids,
+            wb_user_id=req.wb_user_id,
+        )
+        res = self.calls_delete(calls_delete_req)
+        return tsi.PredictionDeleteV2Res(num_deleted=res.num_deleted)
+
+    def prediction_finish_v2(
+        self, req: tsi.PredictionFinishV2Req
+    ) -> tsi.PredictionFinishV2Res:
+        """Finish a prediction by ending the underlying call.
+
+        If the prediction is part of an evaluation (has a predict_and_score parent),
+        this will also finish the predict_and_score parent call.
+
+        Args:
+            req: PredictionFinishV2Req containing project_id and prediction_id
+
+        Returns:
+            PredictionFinishV2Res with success status
+        """
+        # Read the prediction to check if it has a parent (predict_and_score call)
+        prediction_read_req = tsi.CallReadReq(
+            project_id=req.project_id,
+            id=req.prediction_id,
+        )
+        prediction_res = self.call_read(prediction_read_req)
+
+        # Finish the prediction call
+        call_end_req = tsi.CallEndReq(
+            end=tsi.EndedCallSchemaForInsert(
+                project_id=req.project_id,
+                id=req.prediction_id,
+                ended_at=datetime.datetime.now(datetime.timezone.utc),
+                output=None,
+                summary={},
+            )
+        )
+        self.call_end(call_end_req)
+
+        # If this prediction has a parent (predict_and_score call), finish that too
+        prediction_call = prediction_res.call
+
+        # If there is no parent, or the parent is not a predict_and_score call,
+        # this is a regular prediction and we can return success
+        if not prediction_call or not prediction_call.parent_id:
+            return tsi.PredictionFinishV2Res(success=True)
+
+        parent_id = prediction_call.parent_id
+
+        parent_read_req = tsi.CallReadReq(
+            project_id=req.project_id,
+            id=parent_id,
+        )
+        parent_res = self.call_read(parent_read_req)
+        parent_call = parent_res.call
+        if not parent_call or not tsc.op_name_matches(
+            parent_call.op_name,
+            constants.EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME,
+        ):
+            return tsi.PredictionFinishV2Res(success=True)
+
+        # == After here, we assume the parent is a predict_and_score call ==
+
+        # Build the scores dict by querying all score children of predict_and_score
+        scores_dict = {}
+
+        # Build query to filter for score calls at database level
+        score_query = tsi.Query(
+            expr_=tsi_query.EqOperation(
+                eq_=[
+                    tsi_query.GetFieldOperator(
+                        get_field_=f"attributes.{constants.WEAVE_ATTRIBUTES_NAMESPACE}.{constants.SCORE_ATTR_KEY}"
+                    ),
+                    tsi_query.LiteralOperation(literal_="true"),
+                ]
+            )
+        )
+
+        calls_query_req = tsi.CallsQueryReq(
+            project_id=req.project_id,
+            filter=tsi.CallsFilter(
+                parent_ids=[parent_id],
+            ),
+            query=score_query,
+            columns=["output", "attributes"],
+        )
+
+        for score_call in self.calls_query_stream(calls_query_req):
+            if score_call.output is None:
+                continue
+
+            # Get scorer name from the scorer ref in attributes
+            weave_attrs = score_call.attributes.get(
+                constants.WEAVE_ATTRIBUTES_NAMESPACE, {}
+            )
+            scorer_ref = weave_attrs.get(constants.SCORE_SCORER_ATTR_KEY)
+
+            # Extract scorer name from ref (e.g., "weave:///entity/project/Scorer:digest" -> "Scorer")
+            scorer_name = "unknown"
+            if scorer_ref and isinstance(scorer_ref, str):
+                # Parse the weave:// URI to get the object name
+                parts = scorer_ref.split("/")
+                if parts:
+                    # Get the last part which should be like "Scorer:digest"
+                    name_and_digest = parts[-1]
+                    if ":" in name_and_digest:
+                        scorer_name = name_and_digest.split(":")[0]
+
+            scores_dict[scorer_name] = score_call.output
+
+        # Calculate model latency from the prediction call's timestamps
+        model_latency = None
+        if prediction_call.started_at and prediction_call.ended_at:
+            latency_seconds = (
+                prediction_call.ended_at - prediction_call.started_at
+            ).total_seconds()
+            model_latency = {"mean": latency_seconds}
+
+        # Finish the predict_and_score parent call with proper output
+        parent_end_req = tsi.CallEndReq(
+            end=tsi.EndedCallSchemaForInsert(
+                project_id=req.project_id,
+                id=parent_id,
+                ended_at=datetime.datetime.now(datetime.timezone.utc),
+                output={
+                    "output": prediction_call.output,
+                    "scores": scores_dict,
+                    "model_latency": model_latency,
+                },
+                summary={},
+            )
+        )
+        self.call_end(parent_end_req)
+
+        return tsi.PredictionFinishV2Res(success=True)
+
+    # Score V2 API
+
+    def score_create_v2(self, req: tsi.ScoreCreateV2Req) -> tsi.ScoreCreateV2Res:
+        """Create a score as a call with special attributes.
+
+        Args:
+            req: ScoreCreateV2Req containing project_id, prediction_id, scorer, and value
+
+        Returns:
+            ScoreCreateV2Res with the score_id
+        """
+        score_id = generate_id()
+
+        # Read the prediction to get its inputs and output
+        prediction_read_req = tsi.CallReadReq(
+            project_id=req.project_id,
+            id=req.prediction_id,
+        )
+        prediction_res = self.call_read(prediction_read_req)
+
+        # Extract inputs and output from the prediction call
+        prediction_inputs = {}
+        prediction_output = None
+        prediction_call = prediction_res.call
+        if prediction_call:
+            # The prediction call has inputs structured as {"self": model_ref, "inputs": actual_inputs}
+            # We want just the actual_inputs part
+            if isinstance(prediction_call.inputs, dict):
+                prediction_inputs = prediction_call.inputs.get("inputs", {})
+            prediction_output = prediction_call.output
+
+        # Determine trace_id and parent_id based on evaluation_run_id
+        if req.evaluation_run_id:
+            # If evaluation_run_id is provided, find the prediction's parent (predict_and_score call)
+            # and make this score a sibling of the prediction
+            trace_id = req.evaluation_run_id
+
+            if prediction_call and prediction_call.parent_id:
+                # Use the prediction's parent as this score's parent
+                parent_id = prediction_call.parent_id
+            else:
+                # Fallback: make it a direct child of the evaluation_run
+                parent_id = req.evaluation_run_id
+        else:
+            # Standalone score (not part of an evaluation)
+            trace_id = score_id
+            parent_id = None
+
+        # Parse the scorer ref to get the scorer name
+        scorer_ref = ri.parse_internal_uri(req.scorer)
+        if not isinstance(scorer_ref, ri.InternalObjectRef):
+            raise TypeError(f"Invalid scorer ref: {req.scorer}")
+        scorer_name = scorer_ref.name
+
+        # Create the score op with scorer-specific name
+        score_op_name = f"{scorer_name}.score"
+        score_op_req = tsi.OpCreateV2Req(
+            project_id=req.project_id,
+            name=score_op_name,
+            source_code=object_creation_utils.PLACEHOLDER_SCORER_SCORE_OP_SOURCE,
+        )
+        score_op_res = self.op_create_v2(score_op_req)
+
+        # Build the score op ref
+        score_op_ref = ri.InternalOpRef(
+            project_id=req.project_id,
+            name=score_op_name,
+            version=score_op_res.digest,
+        )
+
+        # Start a call to represent the score
+        score_attributes = {
+            constants.WEAVE_ATTRIBUTES_NAMESPACE: {
+                constants.SCORE_ATTR_KEY: "true",
+                constants.SCORE_PREDICTION_ID_ATTR_KEY: req.prediction_id,
+                constants.SCORE_SCORER_ATTR_KEY: req.scorer,
+            }
+        }
+        # Store evaluation_run_id as attribute if provided
+        if req.evaluation_run_id:
+            score_attributes[constants.WEAVE_ATTRIBUTES_NAMESPACE][
+                constants.SCORE_EVALUATION_RUN_ID_ATTR_KEY
+            ] = req.evaluation_run_id
+
+        call_start_req = tsi.CallStartReq(
+            start=tsi.StartedCallSchemaForInsert(
+                project_id=req.project_id,
+                id=score_id,
+                trace_id=trace_id,
+                parent_id=parent_id,
+                op_name=score_op_ref.uri(),
+                started_at=datetime.datetime.now(datetime.timezone.utc),
+                attributes=score_attributes,
+                inputs={
+                    "self": req.scorer,
+                    "inputs": prediction_inputs,
+                    "output": prediction_output,
+                },
+                wb_user_id=req.wb_user_id,
+            )
+        )
+        self.call_start(call_start_req)
+
+        # End the call immediately with the score value
+        call_end_req = tsi.CallEndReq(
+            end=tsi.EndedCallSchemaForInsert(
+                project_id=req.project_id,
+                id=score_id,
+                ended_at=datetime.datetime.now(datetime.timezone.utc),
+                output=req.value,
+                summary={},
+            )
+        )
+        self.call_end(call_end_req)
+
+        # Also create feedback on the prediction (Model.predict) call
+        # This makes the score visible in the UI attached to the prediction
+        prediction_call_ref = ri.InternalCallRef(
+            project_id=req.project_id,
+            id=req.prediction_id,
+        )
+
+        # Get wb_user_id from request or fall back to prediction's wb_user_id or default
+        wb_user_id = (
+            req.wb_user_id
+            or (prediction_call.wb_user_id if prediction_call else None)
+            or "unknown"
+        )
+
+        feedback_req = tsi.FeedbackCreateReq(
+            project_id=req.project_id,
+            weave_ref=prediction_call_ref.uri(),
+            feedback_type=f"{RUNNABLE_FEEDBACK_TYPE_PREFIX}.{scorer_name}",
+            payload={"output": req.value},
+            runnable_ref=req.scorer,
+            wb_user_id=wb_user_id,
+        )
+        self.feedback_create(feedback_req)
+
+        return tsi.ScoreCreateV2Res(score_id=score_id)
+
+    def score_read_v2(self, req: tsi.ScoreReadV2Req) -> tsi.ScoreReadV2Res:
+        """Read a score by reading the underlying call.
+
+        Args:
+            req: ScoreReadV2Req containing project_id and score_id
+
+        Returns:
+            ScoreReadV2Res with all score details
+
+        Raises:
+            NotFoundError: If the score is not found
+        """
+        call_read_req = tsi.CallReadReq(
+            project_id=req.project_id,
+            id=req.score_id,
+        )
+        call_res = self.call_read(call_read_req)
+
+        if call_res.call is None:
+            raise NotFoundError(f"Score {req.score_id} not found")
+
+        call = call_res.call
+        attributes = call.attributes.get(constants.WEAVE_ATTRIBUTES_NAMESPACE, {})
+
+        # Extract score value from output
+        # The output is stored directly as the numeric value
+        value = call.output if call.output is not None else 0.0
+
+        # Get evaluation_run_id from attributes (preferred), fallback to parent traversal for backwards compatibility
+        evaluation_run_id = attributes.get(constants.SCORE_EVALUATION_RUN_ID_ATTR_KEY)
+        if evaluation_run_id is None and call.parent_id:
+            # Fallback: If the parent is a predict_and_score call, get the evaluation_run_id from its parent
+            parent_read_req = tsi.CallReadReq(
+                project_id=req.project_id,
+                id=call.parent_id,
+            )
+            parent_res = self.call_read(parent_read_req)
+            if parent_res.call and tsc.op_name_matches(
+                parent_res.call.op_name,
+                constants.EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME,
+            ):
+                evaluation_run_id = parent_res.call.parent_id
+
+        return tsi.ScoreReadV2Res(
+            score_id=call.id,
+            scorer=attributes.get(constants.SCORE_SCORER_ATTR_KEY, ""),
+            value=value,
+            evaluation_run_id=evaluation_run_id,
+            wb_user_id=call.wb_user_id,
+        )
+
+    def score_list_v2(self, req: tsi.ScoreListV2Req) -> Iterator[tsi.ScoreReadV2Res]:
+        """List scores by querying calls with score attribute.
+
+        Args:
+            req: ScoreListV2Req containing project_id, limit, and offset
+
+        Yields:
+            ScoreReadV2Res for each score found
+        """
+        # Build query conditions to filter at database level
+        conditions: list[tsi_query.Operand] = []
+
+        # Filter for calls with score attribute set to true
+        conditions.append(
+            tsi_query.EqOperation(
+                eq_=[
+                    tsi_query.GetFieldOperator(
+                        get_field_=f"attributes.{constants.WEAVE_ATTRIBUTES_NAMESPACE}.{constants.SCORE_ATTR_KEY}"
+                    ),
+                    tsi_query.LiteralOperation(literal_="true"),
+                ]
+            )
+        )
+
+        # Filter by evaluation_run_id if provided
+        if req.evaluation_run_id:
+            conditions.append(
+                tsi_query.EqOperation(
+                    eq_=[
+                        tsi_query.GetFieldOperator(
+                            get_field_=f"attributes.{constants.WEAVE_ATTRIBUTES_NAMESPACE}.{constants.SCORE_EVALUATION_RUN_ID_ATTR_KEY}"
+                        ),
+                        tsi_query.LiteralOperation(literal_=req.evaluation_run_id),
+                    ]
+                )
+            )
+
+        # Combine all conditions with AND (or use single condition if only one)
+        if len(conditions) == 1:
+            query = tsi.Query(expr_=conditions[0])
+        else:
+            query = tsi.Query(expr_=tsi_query.AndOperation(and_=conditions))
+
+        # Query for calls that have the score attribute
+        calls_query_req = tsi.CallsQueryReq(
+            project_id=req.project_id,
+            query=query,
+            limit=req.limit,
+            offset=req.offset,
+        )
+
+        # Yield scores
+        for call in self.calls_query_stream(calls_query_req):
+            attributes = call.attributes.get(constants.WEAVE_ATTRIBUTES_NAMESPACE, {})
+            value = call.output if call.output is not None else 0.0
+
+            # Get evaluation_run_id from attributes (preferred), fallback to parent traversal for backwards compatibility
+            evaluation_run_id = attributes.get(
+                constants.SCORE_EVALUATION_RUN_ID_ATTR_KEY
+            )
+            if evaluation_run_id is None and call.parent_id:
+                # Fallback: If the parent is a predict_and_score call, get the evaluation_run_id from its parent
+                parent_read_req = tsi.CallReadReq(
+                    project_id=req.project_id,
+                    id=call.parent_id,
+                )
+                parent_res = self.call_read(parent_read_req)
+                if parent_res.call and tsc.op_name_matches(
+                    parent_res.call.op_name,
+                    constants.EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME,
+                ):
+                    evaluation_run_id = parent_res.call.parent_id
+
+            yield tsi.ScoreReadV2Res(
+                score_id=call.id,
+                scorer=attributes.get(constants.SCORE_SCORER_ATTR_KEY, ""),
+                value=value,
+                evaluation_run_id=evaluation_run_id,
+                wb_user_id=call.wb_user_id,
+            )
+
+    def score_delete_v2(self, req: tsi.ScoreDeleteV2Req) -> tsi.ScoreDeleteV2Res:
+        """Delete scores by deleting the underlying calls.
+
+        Args:
+            req: ScoreDeleteV2Req containing project_id and score_ids
+
+        Returns:
+            ScoreDeleteV2Res with the number of deleted scores
+        """
+        calls_delete_req = tsi.CallsDeleteReq(
+            project_id=req.project_id,
+            call_ids=req.score_ids,
+            wb_user_id=req.wb_user_id,
+        )
+        res = self.calls_delete(calls_delete_req)
+        return tsi.ScoreDeleteV2Res(num_deleted=res.num_deleted)
 
     def _obj_read_with_retry(
         self, req: tsi.ObjReadReq, max_retries: int = 10, initial_delay: float = 0.05
@@ -3212,6 +4611,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._flush_calls")
     def _flush_calls(self) -> None:
+        self._analyze_call_batch_breakdown()
+
         try:
             self._insert_call_batch(self._call_batch)
         except InsertTooLarge:
@@ -3222,6 +4623,43 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 self._insert_call_batch([row])
 
         self._call_batch = []
+
+    @ddtrace.tracer.wrap(
+        name="clickhouse_trace_server_batched._analyze_call_batch_breakdown"
+    )
+    def _analyze_call_batch_breakdown(self) -> None:
+        """Analyze the batch to count calls with starts but no ends"""
+        if not self._call_batch:
+            return
+
+        try:
+            id_idx = ALL_CALL_INSERT_COLUMNS.index("id")
+            started_at_idx = ALL_CALL_INSERT_COLUMNS.index("started_at")
+            ended_at_idx = ALL_CALL_INSERT_COLUMNS.index("ended_at")
+
+            started_call_ids: set[str] = set()
+            ended_call_ids: set[str] = set()
+
+            for row in self._call_batch:
+                call_id = row[id_idx]
+                started_at = row[started_at_idx]
+                ended_at = row[ended_at_idx]
+
+                if started_at is not None:
+                    started_call_ids.add(call_id)
+                if ended_at is not None:
+                    ended_call_ids.add(call_id)
+
+            unmatched_starts = started_call_ids - ended_call_ids
+
+            if root_span := ddtrace.tracer.current_span():
+                root_span.set_tag(
+                    "weave_trace_server._flush_calls.unmatched_starts",
+                    len(unmatched_starts),
+                )
+        except Exception as e:
+            # Under no circumstances should we block ingest with an error
+            pass
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._strip_large_values")
     def _strip_large_values(self, batch: list[list[Any]]) -> list[list[Any]]:
@@ -3355,6 +4793,16 @@ def _ch_call_dict_to_call_schema_dict(ch_call_dict: dict) -> dict:
     started_at = _ensure_datetimes_have_tz(ch_call_dict.get("started_at"))
     ended_at = _ensure_datetimes_have_tz(ch_call_dict.get("ended_at"))
     display_name = empty_str_to_none(ch_call_dict.get("display_name"))
+
+    # Load attributes from attributes_dump
+    attributes = _dict_dump_to_dict(ch_call_dict.get("attributes_dump", "{}"))
+
+    # For backwards/future compatibility: inject otel_dump into attributes if present
+    # Legacy trace servers stored all otel info in attributes, clients expect it
+    # TODO(gst): consider returning the raw otel column and reconstructing client side
+    if otel_dump := ch_call_dict.get("otel_dump"):
+        attributes["otel_span"] = _dict_dump_to_dict(otel_dump)
+
     return {
         "project_id": ch_call_dict.get("project_id"),
         "id": ch_call_dict.get("id"),
@@ -3365,7 +4813,7 @@ def _ch_call_dict_to_call_schema_dict(ch_call_dict: dict) -> dict:
         "op_name": ch_call_dict.get("op_name"),
         "started_at": started_at,
         "ended_at": ended_at,
-        "attributes": _dict_dump_to_dict(ch_call_dict.get("attributes_dump", "{}")),
+        "attributes": attributes,
         "inputs": _dict_dump_to_dict(ch_call_dict.get("inputs_dump", "{}")),
         "output": _nullable_any_dump_to_any(ch_call_dict.get("output_dump")),
         "summary": make_derived_summary_fields(
@@ -3431,6 +4879,10 @@ def _start_call_for_insert_to_ch_insertable_start_call(
     inputs = start_call.inputs
     input_refs = extract_refs_from_values(inputs)
 
+    otel_dump_str = None
+    if start_call.otel_dump is not None:
+        otel_dump_str = _dict_value_to_dump(start_call.otel_dump)
+
     return CallStartCHInsertable(
         project_id=start_call.project_id,
         id=call_id,
@@ -3443,6 +4895,7 @@ def _start_call_for_insert_to_ch_insertable_start_call(
         attributes_dump=_dict_value_to_dump(start_call.attributes),
         inputs_dump=_dict_value_to_dump(inputs),
         input_refs=input_refs,
+        otel_dump=otel_dump_str,
         wb_run_id=start_call.wb_run_id,
         wb_run_step=start_call.wb_run_step,
         wb_user_id=start_call.wb_user_id,

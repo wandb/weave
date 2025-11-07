@@ -52,6 +52,7 @@ from typing import TYPE_CHECKING, Any, Optional, Union, get_args
 
 from pydantic import BaseModel
 
+from weave.trace_server.calls_query_builder.cte import CTECollection
 from weave.trace_server.calls_query_builder.optimization_builder import (
     QueryOptimizationProcessor,
     apply_processor,
@@ -653,7 +654,7 @@ def build_object_ref_ctes(
     pb: "ParamBuilder",
     project_id: str,
     object_ref_conditions: list[ObjectRefCondition],
-) -> tuple[str, dict[str, str]]:
+) -> tuple[CTECollection, dict[str, str]]:
     """Build CTEs (Common Table Expressions) for object reference filtering and ordering.
 
     This function creates CTEs that check both object_versions and table_rows tables,
@@ -673,11 +674,11 @@ def build_object_ref_ctes(
         object_ref_conditions: List of object reference conditions to build CTEs for
 
     Returns:
-        - CTE SQL string
+        - CTECollection containing all object reference CTEs
         - Dictionary mapping field paths to CTE alias names
     """
     if not object_ref_conditions:
-        return "", {}
+        return CTECollection(), {}
 
     if len(object_ref_conditions) > MAX_CTES_PER_QUERY:
         raise ValueError(
@@ -686,7 +687,7 @@ def build_object_ref_ctes(
         )
 
     project_param = pb.add_param(project_id)
-    cte_parts = []
+    cte_collection = CTECollection()
     field_to_cte_alias_map: dict[str, str] = {}
     cte_counter = 0
 
@@ -736,14 +737,14 @@ def build_object_ref_ctes(
                 val_condition = handler.handle_in_operation(condition)
         val_condition_sql = f"AND {val_condition}" if val_condition else ""
 
-        leaf_cte = _build_leaf_cte_sql(
+        leaf_cte_sql = _build_leaf_cte_sql(
             project_param,
             condition,
             leaf_cte_name,
             val_dump_select,
             val_condition_sql,
         )
-        cte_parts.append(leaf_cte)
+        cte_collection.add_cte(leaf_cte_name, leaf_cte_sql)
         current_cte_name = leaf_cte_name
 
         intermediate_refs = condition.get_intermediate_object_refs()
@@ -755,24 +756,19 @@ def build_object_ref_ctes(
         for ref_property in reversed(intermediate_refs):
             intermediate_cte_name, cte_counter = _get_cte_name(cte_counter)
             prop_json_path_param = pb.add_param(quote_json_path(ref_property))
-            intermediate_cte = _build_intermediate_cte_sql(
+            intermediate_cte_sql = _build_intermediate_cte_sql(
                 project_param,
                 intermediate_cte_name,
                 condition,
                 prop_json_path_param,
                 current_cte_name,
             )
-            cte_parts.append(intermediate_cte)
+            cte_collection.add_cte(intermediate_cte_name, intermediate_cte_sql)
             current_cte_name = intermediate_cte_name
 
         field_to_cte_alias_map[condition.unique_key] = current_cte_name
 
-    if not cte_parts:
-        return "", {}
-
-    cte_part_sql = ",\n".join(cte_parts)
-
-    return cte_part_sql, field_to_cte_alias_map
+    return cte_collection, field_to_cte_alias_map
 
 
 def _build_leaf_cte_sql(
@@ -784,7 +780,6 @@ def _build_leaf_cte_sql(
 ) -> str:
     # Build the leaf CTE that unions both object_versions and table_rows
     return f"""
-    {leaf_cte_name} AS (
         SELECT
             digest,
             {val_dump_select}
@@ -804,7 +799,7 @@ def _build_leaf_cte_sql(
         WHERE project_id = {param_slot(project_param, "String")}
         {val_condition_sql}
         GROUP BY project_id, digest
-    )"""
+    """
 
 
 def _build_intermediate_cte_sql(
@@ -827,7 +822,6 @@ def _build_intermediate_cte_sql(
         intermediate_val_dump_select = "any(prev.object_val_dump) AS object_val_dump,"
         join_clause_for_ordering = f"JOIN {current_cte_name} prev ON JSON_VALUE(ov.val_dump, {param_slot(prop_json_path_param, 'String')}) = prev.ref"
     return f"""
-    {intermediate_cte_name} AS (
         SELECT
             ov.digest,
             {intermediate_val_dump_select}
@@ -840,7 +834,7 @@ def _build_intermediate_cte_sql(
                 SELECT ref FROM {current_cte_name}
             )
         GROUP BY ov.project_id, ov.object_id, ov.digest
-    )"""
+    """
 
 
 def has_object_ref_field(field_path: str, expand_columns: list[str]) -> bool:

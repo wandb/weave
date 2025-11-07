@@ -2,7 +2,6 @@
 version: 2
 
 projectIgnorePaths:
-  - "docs"
   - "integration_tests"
 
 # only trigger pull request alerts when these files change.

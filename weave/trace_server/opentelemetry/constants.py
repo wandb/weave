@@ -102,8 +102,8 @@ USAGE_KEYS = {
 }
 
 # ATTRIBUTE_KEYS: Maps common LLM call metadata attributes to the types of attributes expected in weave traces
+# Exception is wandb.attributes which populates its keys to the root level
 # This is used to populate the `attributes_dump` column in clickhouse
-# Prior to dumping, the full span is dumped under another key not listed here called `otel_span`
 ATTRIBUTE_KEYS = {
     # System prompt/instructions
     "system": [
@@ -132,6 +132,10 @@ WB_KEYS = {
     # Custom display name for the call in the UI
     "display_name": ["wandb.display_name"],
     "thread_id": ["gcp.vertex.agent.session_id", "wandb.thread_id"],
+    "attributes": ["wandb.attributes"],
+    "wb_run_id": ["wandb.wb_run_id"],
+    "wb_run_step": ["wandb.wb_run_step"],
+    "wb_run_step_end": ["wandb.wb_run_step_end"],
     "is_turn": [
         "gcp.vertex.agent.session_id",
         "wandb.is_turn",

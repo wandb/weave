@@ -994,3 +994,147 @@ def test_log_score_context_manager_with_nested_ops(client):
     assert predict_and_score_call.output["scores"]["ambiguity"] == 0.3
     assert predict_and_score_call.output["scores"]["llm_judge"] == "I'm a mock response"
     assert predict_and_score_call.output["scores"]["length_check"] is True
+
+
+def test_log_example_basic(client):
+    """Test basic functionality of log_example method."""
+    ev = EvaluationLogger()
+
+    # Log a complete example with inputs, output, and scores
+    ev.log_example(
+        inputs={"question": "What is 2+2?"},
+        output="4",
+        scores={"correctness": 1.0, "fluency": 0.9},
+    )
+
+    ev.log_summary({"avg_score": 0.95})
+    client.flush()
+
+    calls = client.get_calls()
+
+    # Find the predict_and_score call
+    predict_and_score_call = None
+    for call in calls:
+        if op_name_from_call(call) == "Evaluation.predict_and_score":
+            predict_and_score_call = call
+            break
+
+    assert predict_and_score_call is not None
+    assert predict_and_score_call.inputs["example"] == {"question": "What is 2+2?"}
+    assert predict_and_score_call.output["output"] == "4"
+    assert predict_and_score_call.output["scores"]["correctness"] == 1.0
+    assert predict_and_score_call.output["scores"]["fluency"] == 0.9
+
+
+def test_log_example_multiple_examples(client):
+    """Test logging multiple examples using log_example."""
+    ev = EvaluationLogger()
+
+    # Log multiple examples
+    examples = [
+        ({"q": "What is 1+1?"}, "2", {"correct": 1.0, "speed": 0.8}),
+        ({"q": "What is 2+2?"}, "4", {"correct": 1.0, "speed": 0.9}),
+        ({"q": "What is 3+3?"}, "6", {"correct": 1.0, "speed": 0.95}),
+    ]
+
+    for inputs, output, scores in examples:
+        ev.log_example(inputs=inputs, output=output, scores=scores)
+
+    ev.log_summary({"total": 3})
+    client.flush()
+
+    calls = client.get_calls()
+
+    # Should have 3 predict_and_score calls, one for each example
+    predict_and_score_calls = [
+        c for c in calls if op_name_from_call(c) == "Evaluation.predict_and_score"
+    ]
+    assert len(predict_and_score_calls) == 3
+
+    # Verify each example was logged correctly
+    for i, (inputs, output, scores) in enumerate(examples):
+        call = predict_and_score_calls[i]
+        assert call.inputs["example"] == inputs
+        assert call.output["output"] == output
+        for scorer_name, score_value in scores.items():
+            assert call.output["scores"][scorer_name] == score_value
+
+
+def test_log_example_with_empty_scores(client):
+    """Test log_example with empty scores dictionary."""
+    ev = EvaluationLogger()
+
+    # Log example with no scores
+    ev.log_example(
+        inputs={"input": "test"},
+        output="result",
+        scores={},
+    )
+
+    ev.finish()
+    client.flush()
+
+    calls = client.get_calls()
+    predict_and_score_call = None
+    for call in calls:
+        if op_name_from_call(call) == "Evaluation.predict_and_score":
+            predict_and_score_call = call
+            break
+
+    assert predict_and_score_call is not None
+    assert predict_and_score_call.inputs["example"] == {"input": "test"}
+    assert predict_and_score_call.output["output"] == "result"
+    # Scores should be empty
+    assert predict_and_score_call.output["scores"] == {}
+
+
+def test_log_example_after_finalization_raises_error(client):
+    """Test that log_example raises ValueError when called after finalization."""
+    ev = EvaluationLogger()
+
+    # Log one example successfully
+    ev.log_example(
+        inputs={"q": "test"},
+        output="answer",
+        scores={"score": 1.0},
+    )
+
+    # Finalize the evaluation
+    ev.finish()
+
+    # Attempting to log another example should raise an error
+    with pytest.raises(
+        ValueError,
+        match="Cannot log example after evaluation has been finalized",
+    ):
+        ev.log_example(
+            inputs={"q": "another test"},
+            output="another answer",
+            scores={"score": 0.5},
+        )
+
+
+def test_log_example_after_log_summary_raises_error(client):
+    """Test that log_example raises ValueError when called after log_summary."""
+    ev = EvaluationLogger()
+
+    # Log one example successfully
+    ev.log_example(
+        inputs={"q": "test"},
+        output="answer",
+        scores={"score": 1.0},
+    )
+
+    # Call log_summary (which also finalizes)
+    ev.log_summary({"total": 1})
+
+    # Attempting to log another example should raise an error
+    with pytest.raises(
+        ValueError,
+        match="Cannot log example after evaluation has been finalized",
+    ):
+        ev.log_example(
+            inputs={"q": "another test"},
+            output="another answer",
+            scores={"score": 0.5},
+        )

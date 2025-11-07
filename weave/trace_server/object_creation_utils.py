@@ -34,6 +34,41 @@ def summarize(evaluation_results):
     # TODO: Implement actual summarization logic
     return {"summary": "not_implemented"}
 """
+PLACEHOLDER_EVALUATION_EVALUATE_OP_SOURCE = """import weave
+@weave.op()
+def evaluate(evaluation, model):
+    \"\"\"Placeholder evaluate function.\"\"\"
+    # TODO: Implement actual evaluation logic
+    return {"status": "not_implemented"}
+"""
+PLACEHOLDER_EVALUATION_PREDICT_AND_SCORE_OP_SOURCE = """import weave
+@weave.op()
+def predict_and_score(evaluation, example):
+    \"\"\"Placeholder predict_and_score function.\"\"\"
+    # TODO: Implement actual predict and score logic
+    return {"prediction": None, "scores": {}}
+"""
+PLACEHOLDER_EVALUATION_SUMMARIZE_OP_SOURCE = """import weave
+@weave.op()
+def summarize(evaluation_results):
+    \"\"\"Placeholder summarize function.\"\"\"
+    # TODO: Implement actual summarization logic
+    return {"summary": "not_implemented"}
+"""
+PLACEHOLDER_MODEL_PREDICT_OP_SOURCE = """import weave
+@weave.op()
+def predict(model, **inputs):
+    \"\"\"Placeholder model predict function.\"\"\"
+    # System-generated op for model predictions
+    return model.predict(**inputs)
+"""
+PLACEHOLDER_SCORER_SCORE_OP_SOURCE = """import weave
+@weave.op()
+def score(scorer, **inputs):
+    \"\"\"Placeholder scorer score function.\"\"\"
+    # System-generated op for scoring
+    return scorer.score(**inputs)
+"""
 
 
 def make_safe_name(name: str | None) -> str:
@@ -156,6 +191,45 @@ def build_scorer_val(
         "summarize": summarize_op_ref,
         "column_map": column_map,
     }
+
+
+def build_model_val(
+    name: str,
+    description: str | None,
+    source_file_digest: str,
+    attributes: dict[str, Any] | None = None,
+    class_name: str = "Model",
+) -> dict[str, Any]:
+    """Build the value dictionary for a Model object.
+
+    Args:
+        name: The model name
+        description: Optional description of the model
+        source_file_digest: Digest of the uploaded source code file
+        attributes: Optional additional attributes for the model
+        class_name: The class name (defaults to "Model" for base models, or a custom name for subclasses)
+
+    Returns:
+        Dictionary representing the model object value
+    """
+    if class_name == "Model":
+        bases = ["Object", "BaseModel"]
+    else:
+        bases = ["Model", "Object", "BaseModel"]
+
+    result = {
+        "_type": class_name,
+        "_class_name": class_name,
+        "_bases": bases,
+        "name": name,
+        "description": description,
+        "files": {OP_SOURCE_FILE_NAME: source_file_digest},
+    }
+
+    if attributes is not None:
+        result.update(attributes)
+
+    return result
 
 
 def build_evaluation_val(

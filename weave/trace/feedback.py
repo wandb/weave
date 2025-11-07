@@ -282,10 +282,3 @@ def _validate_feedback_type(feedback_type: str, annotation_ref: str | None) -> N
         raise ValueError(
             "To add annotation feedback, feedback_type must conform to the format: 'wandb.annotation.<name>'."
         )
-
-
-__docspec__ = [
-    Feedbacks,
-    FeedbackQuery,
-    RefFeedbackQuery,
-]

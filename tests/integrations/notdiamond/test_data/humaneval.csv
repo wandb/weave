@@ -1,4 +1,4 @@
-Task,Input,Actual,anthropic/claude-3-5-sonnet-20240620/response,anthropic/claude-3-5-sonnet-20240620/final_score,openai/gpt-4o-2024-05-13/response,openai/gpt-4o-2024-05-13/final_score,google/gemini-1.5-pro-latest/response,google/gemini-1.5-pro-latest/final_score,openai/gpt-4-turbo-2024-04-09/response,openai/gpt-4-turbo-2024-04-09/final_score,anthropic/claude-3-opus-20240229/response,anthropic/claude-3-opus-20240229/final_score
+Task,Input,Actual,openai/gpt-4o/response,openai/gpt-4o/final_score,google/gemini-2.5-flash/response,google/gemini-2.5-flash/final_score,openai/gpt-4-turbo/response,openai/gpt-4-turbo/final_score,anthropic/claude-sonnet-4-5/response,anthropic/claude-sonnet-4-5/final_score
 HumanEval/0,"from typing import List
 
 

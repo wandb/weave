@@ -1,0 +1,34 @@
+name: ❓ Question
+description: Use this template to ask a question about Weave or its features.
+title: "[Q]: "
+labels:
+  - "question"
+
+body:
+  - type: textarea
+    attributes:
+      label: Ask your question
+      value: |
+        <!--- Ask your question here --->
+    validations:
+      required: true
+
+  - type: input
+    attributes:
+      label: Weave Project Link
+      description: >
+        If applicable, please provide a link to your Weave project (e.g., https://wandb.ai/your-entity/your-project/weave).
+        This helps us provide more specific and contextual answers.
+      placeholder: "https://wandb.ai/entity/project/weave"
+    validations:
+      required: false
+
+  - type: textarea
+    attributes:
+      label: Screenshots
+      description: >
+        If applicable, add screenshots to help explain your question. You can drag and drop images here or paste them
+        directly into this field.
+      placeholder: "Drag and drop screenshots here or paste image URLs"
+    validations:
+      required: false

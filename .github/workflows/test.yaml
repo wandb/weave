@@ -188,22 +188,6 @@ jobs:
       - name: Run nox
         run: nox -e lint
 
-  trace-docs:
-    name: Trace docs
-    timeout-minutes: 10
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: "20"
-      - name: Setup docs
-        run: make setup-docs-ci
-      - name: Run docs
-        run: make docs
-
   trace_no_server:
     name: Trace non-trace server tests
     timeout-minutes: 10
@@ -256,8 +240,7 @@ jobs:
             "13",
             #
           ]
-        nox-shard:
-          [
+        nox-shard: [
             "trace1",
             "trace2",
             "trace3",
@@ -440,8 +423,7 @@ jobs:
             "13",
             #
           ]
-        nox-shard:
-          [
+        nox-shard: [
             "trace1",
             "trace2",
             "trace3",

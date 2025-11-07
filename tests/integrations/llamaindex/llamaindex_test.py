@@ -1,5 +1,6 @@
 import os
 from collections.abc import Generator
+from pathlib import Path
 
 import pytest
 from llama_index.core import (
@@ -832,9 +833,11 @@ async def test_llamaindex_workflow(client: WeaveClient) -> None:
     # Check the captured calls
     calls = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
     flattened_calls = flatten_calls(calls)
-    print(len(flattened_calls))
+    print(flattened_calls_to_names(flattened_calls))
 
-    assert len(flattened_calls) == 6
+    # LlamaIndex 0.14.1+ no longer emits TestWorkflow-done span and SpanDrop event
+    # Expected hierarchy: run -> step_one, step_two, step_three
+    assert len(flattened_calls) == 4
 
 
 @pytest.mark.skip_clickhouse_client
@@ -847,19 +850,24 @@ async def test_llamaindex_workflow(client: WeaveClient) -> None:
 async def test_llamaindex_quick_start(client: WeaveClient) -> None:
     api_key = os.environ.get("OPENAI_API_KEY", "sk-DUMMY_KEY")
 
-    documents = SimpleDirectoryReader("integrations/llamaindex/test_data").load_data()
+    # Get paths relative to this test file
+    test_dir = Path(__file__).parent
+    test_data_dir = test_dir / "test_data"
+    vector_index_dir = test_dir / "vector_index"
+
+    documents = SimpleDirectoryReader(str(test_data_dir)).load_data()
     parser = SentenceSplitter()
     nodes = parser.get_nodes_from_documents(documents)
 
-    if os.path.exists("integrations/llamaindex/vector_index/"):
+    if os.path.exists(vector_index_dir):
         storage_context = StorageContext.from_defaults(
-            persist_dir="integrations/llamaindex/vector_index/"
+            persist_dir=str(vector_index_dir)
         )
         index = load_index_from_storage(storage_context)
     else:
-        os.makedirs("integrations/llamaindex/vector_index/", exist_ok=True)
+        os.makedirs(vector_index_dir, exist_ok=True)
         index = VectorStoreIndex(nodes)
-        index.storage_context.persist("integrations/llamaindex/vector_index/")
+        index.storage_context.persist(str(vector_index_dir))
 
     query_engine = index.as_query_engine()
 
@@ -886,7 +894,8 @@ async def test_llamaindex_quick_start(client: WeaveClient) -> None:
     calls = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
     flattened_calls = flatten_calls(calls)
 
-    assert len(flattened_calls) == 50
+    # LlamaIndex 0.14.1+ no longer emits FunctionAgent-done span and SpanDrop event
+    assert len(flattened_calls) == 48
     assert flattened_calls_to_names(flattened_calls) == [
         ("llama_index.span.SentenceSplitter-parse_nodes", 0),
         ("llama_index.span.SentenceSplitter.split_text_metadata_aware", 1),
@@ -936,6 +945,4 @@ async def test_llamaindex_quick_start(client: WeaveClient) -> None:
         ("llama_index.event.LLMChatInProgress", 4),
         ("openai.chat.completions.create", 5),
         ("llama_index.span.FunctionAgent.parse_agent_output", 1),
-        ("llama_index.span.FunctionAgent-done", 1),
-        ("llama_index.event.SpanDrop", 2),
     ]

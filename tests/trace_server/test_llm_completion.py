@@ -113,7 +113,7 @@ class TestGetCustomProviderInfo(unittest.TestCase):
         def mock_obj_read(req):
             if req.object_id == self.provider_id:
                 return tsi.ObjReadRes(obj=self.provider_obj)
-            elif req.object_id == f"{self.provider_id}-{self.model_id}":
+            elif req.object_id == self.model_name:
                 return tsi.ObjReadRes(obj=self.provider_model_obj)
             raise NotFoundError(f"Unknown object_id: {req.object_id}")
 
@@ -125,6 +125,7 @@ class TestGetCustomProviderInfo(unittest.TestCase):
             # Call the function under test
             provider_info = get_custom_provider_info(
                 project_id=self.project_id,
+                provider_name=self.provider_id,
                 model_name=self.model_name,
                 obj_read_func=self.mock_obj_read_func,
             )
@@ -169,6 +170,7 @@ class TestGetCustomProviderInfo(unittest.TestCase):
             with self.assertRaises(InvalidRequest) as context:
                 get_custom_provider_info(
                     project_id=self.project_id,
+                    provider_name=self.provider_id,
                     model_name=self.model_name,
                     obj_read_func=self.mock_obj_read_func,
                 )
@@ -195,12 +197,13 @@ class TestGetCustomProviderInfo(unittest.TestCase):
             with self.assertRaises(InvalidRequest) as context:
                 get_custom_provider_info(
                     project_id=self.project_id,
+                    provider_name=self.provider_id,
                     model_name=self.model_name,
                     obj_read_func=self.mock_obj_read_func,
                 )
 
             self.assertIn(
-                "Failed to fetch provider information",
+                "Failed to fetch provider model information",
                 str(context.exception),
                 "Expected error message about failed provider fetch not found",
             )
@@ -230,12 +233,13 @@ class TestGetCustomProviderInfo(unittest.TestCase):
             with self.assertRaises(InvalidRequest) as context:
                 get_custom_provider_info(
                     project_id=self.project_id,
+                    provider_name=self.provider_id,
                     model_name=self.model_name,
                     obj_read_func=self.mock_obj_read_func,
                 )
 
             self.assertIn(
-                "is not a Provider",
+                "Could not find Provider",
                 str(context.exception),
                 "Expected error message about incorrect provider type not found",
             )
@@ -265,12 +269,13 @@ class TestGetCustomProviderInfo(unittest.TestCase):
             with self.assertRaises(InvalidRequest) as context:
                 get_custom_provider_info(
                     project_id=self.project_id,
+                    provider_name=self.provider_id,
                     model_name=self.model_name,
                     obj_read_func=self.mock_obj_read_func,
                 )
 
             self.assertIn(
-                "is not a ProviderModel",
+                "Could not find Provider",
                 str(context.exception),
                 "Expected error message about incorrect provider model type not found",
             )
@@ -578,7 +583,7 @@ class TestLLMCompletionStreaming(unittest.TestCase):
             req = tsi.CompletionsCreateReq(
                 project_id="dGVzdF9wcm9qZWN0",
                 inputs=tsi.CompletionsCreateRequestInputs(
-                    model="custom-provider/model",
+                    model="custom::custom-provider::model",
                     messages=[{"role": "user", "content": "Say hello"}],
                 ),
                 track_llm_call=False,

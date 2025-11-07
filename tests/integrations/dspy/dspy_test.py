@@ -327,35 +327,35 @@ def test_dspy_evaluate(client: WeaveClient) -> None:
     assert len(flattened_calls) == 32
     assert flattened_calls_to_names(flattened_calls) == [
         ("Evaluation.evaluate", 0),
-        ("dspy.ChainOfThought", 1),
-        ("dspy.Predict", 2),
-        ("dspy.ChatAdapter", 3),
-        ("dspy.LM", 4),
-        ("dspy.LM.forward", 5),
-        ("litellm.completion", 6),
-        ("openai.chat.completions.create", 7),
-        ("dspy.ChainOfThought", 1),
-        ("dspy.Predict", 2),
-        ("dspy.ChatAdapter", 3),
-        ("dspy.LM", 4),
-        ("dspy.LM.forward", 5),
-        ("litellm.completion", 6),
-        ("openai.chat.completions.create", 7),
-        ("dspy.ChainOfThought", 1),
-        ("dspy.Predict", 2),
-        ("dspy.ChatAdapter", 3),
-        ("dspy.LM", 4),
-        ("dspy.LM.forward", 5),
-        ("litellm.completion", 6),
-        ("openai.chat.completions.create", 7),
         ("Evaluation.predict_and_score", 1),
         ("Model.predict", 2),
+        ("dspy.ChainOfThought", 3),
+        ("dspy.Predict", 4),
+        ("dspy.ChatAdapter", 5),
+        ("dspy.LM", 6),
+        ("dspy.LM.forward", 7),
+        ("litellm.completion", 8),
+        ("openai.chat.completions.create", 9),
         ("accuracy_metric", 2),
         ("Evaluation.predict_and_score", 1),
         ("Model.predict", 2),
+        ("dspy.ChainOfThought", 3),
+        ("dspy.Predict", 4),
+        ("dspy.ChatAdapter", 5),
+        ("dspy.LM", 6),
+        ("dspy.LM.forward", 7),
+        ("litellm.completion", 8),
+        ("openai.chat.completions.create", 9),
         ("accuracy_metric", 2),
         ("Evaluation.predict_and_score", 1),
         ("Model.predict", 2),
+        ("dspy.ChainOfThought", 3),
+        ("dspy.Predict", 4),
+        ("dspy.ChatAdapter", 5),
+        ("dspy.LM", 6),
+        ("dspy.LM.forward", 7),
+        ("litellm.completion", 8),
+        ("openai.chat.completions.create", 9),
         ("accuracy_metric", 2),
         ("Evaluation.summarize", 1),
     ]
@@ -365,6 +365,66 @@ def test_dspy_evaluate(client: WeaveClient) -> None:
     assert op_name_from_ref(call.op_name) == "Evaluation.evaluate"
     output = call.output
     assert output["output"]["Average Metric"] > 0.3
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=[
+        "authorization",
+        "organization",
+        "cookie",
+        "x-request-id",
+        "x-rate-limit",
+    ],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+)
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="Currently not working on Windows",
+)
+def test_dspy_evaluate_with_pydantic_prediction(client: WeaveClient) -> None:
+    """Evaluate a module that returns a Pydantic BaseModel prediction.
+
+    This validates that the patched serialization path in the DSPy↔Weave
+    integration can handle BaseModel outputs during evaluation without raising
+    errors and logs a proper Evaluation.evaluate root with an Average Metric.
+    """
+    from pydantic import BaseModel
+
+    class PResult(BaseModel):
+        question: str
+        answer: str
+
+    class NoLMPydanticModule(dspy.Module):
+        def forward(self, question: str) -> PResult:  # type: ignore[override]
+            # Deterministic answers; no LM calls
+            ans = "2" if "1 + 1" in question or "1+1" in question else "4"
+            return PResult(question=question, answer=ans)
+
+    def metric_fn(example: dspy.Example, prediction: PResult) -> float:
+        return (
+            1.0
+            if str(example.answer).strip() == str(prediction.answer).strip()
+            else 0.0
+        )
+
+    devset = [
+        dspy.Example(question="What is 1 + 1?", answer="2").with_inputs("question"),
+        dspy.Example(question="What is 2 + 2?", answer="4").with_inputs("question"),
+    ]
+
+    evaluate = dspy.Evaluate(devset=devset, metric=metric_fn, num_threads=1)
+    result = evaluate(NoLMPydanticModule())
+    assert 0 <= result.score <= 100
+
+    calls = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
+    assert len(calls) == 1
+    call = calls[0]
+    assert call.started_at < call.ended_at
+    assert op_name_from_ref(call.op_name) == "Evaluation.evaluate"
+    output = call.output
+    # Average Metric is in [0,1]; for our deterministic answers it should be 1.0
+    assert 0.0 <= output["output"]["Average Metric"] <= 1.0
 
 
 @pytest.mark.skip_clickhouse_client
