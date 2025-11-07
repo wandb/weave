@@ -6008,3 +6008,31 @@ def test_calls_query_filter_contains_in_message_array(client):
     #     )
     # )
     # assert len(calls) == 1
+
+
+def test_calls_query_sort_by_deselected_heavy_field(client):
+    @weave.op
+    def op1(x: int) -> int:
+        return x * 2
+
+    @weave.op
+    def op2(x: int) -> int:
+        return x * 3
+
+    op1(1)
+    op2(2)
+
+    # get call ids
+    calls = list(client.get_calls(columns=["id"]))
+    call_ids = [call.id for call in calls]
+
+    sort_by = [{"field": "inputs.x", "direction": "asc"}]
+    calls = client.get_calls(sort_by=sort_by, columns=["id"], include_costs=False)
+    assert len(calls) == 2
+    assert calls[0].id == call_ids[0]
+    assert calls[1].id == call_ids[1]
+
+    calls = client.get_calls(sort_by=sort_by, columns=["id"], include_costs=True)
+    assert len(calls) == 2
+    assert calls[0].id == call_ids[0]
+    assert calls[1].id == call_ids[1]
