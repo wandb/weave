@@ -355,6 +355,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         res = self.obj_create_batch(obj_creation_batch)
 
         for result in res:
+            if result.object_id is None:
+                raise RuntimeError("Otel Export - Expected object_id but got None")
+
             op_ref_uri = ri.InternalOpRef(
                 project_id=req.project_id,
                 name=result.object_id,
