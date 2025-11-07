@@ -74,9 +74,7 @@ def should_redact(key: str) -> bool:
     return key.lower() in _REDACT_KEYS
 
 
-def redact_dataclass_fields(
-    obj: Any, recursive_fn: Callable[[Any], Any]
-) -> Any:
+def redact_dataclass_fields(obj: Any, recursive_fn: Callable[[Any], Any]) -> Any:
     """Redact dataclass fields whose names are in the redact set.
 
     Args:
