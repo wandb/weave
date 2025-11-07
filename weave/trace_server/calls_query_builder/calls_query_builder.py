@@ -77,6 +77,7 @@ logger = logging.getLogger(__name__)
 CTE_FILTERED_CALLS = "filtered_calls"
 CTE_ALL_CALLS = "all_calls"
 
+DEFAULT_PROJECT_TABLE_ALIAS = "calls_merged"
 
 class QueryBuilderField(BaseModel):
     field: str
@@ -579,6 +580,7 @@ class CallsQuery(BaseModel):
     include_costs: bool = False
     include_storage_size: bool = False
     include_total_storage_size: bool = False
+    project_table_alias: str = DEFAULT_PROJECT_TABLE_ALIAS
 
     def add_field(self, field: str) -> "CallsQuery":
         name = get_field_by_name(field)
