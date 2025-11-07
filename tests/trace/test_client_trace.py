@@ -6036,3 +6036,98 @@ def test_calls_query_sort_by_deselected_heavy_field(client):
     assert len(calls) == 2
     assert calls[0].id == call_ids[0]
     assert calls[1].id == call_ids[1]
+
+
+def test_calls_query_sort_by_feedback_with_costs(client):
+    """Test sorting by feedback field with include_costs=True."""
+    if client_is_sqlite(client):
+        pytest.skip("Feedback ordering not supported in SQLite")
+
+    @weave.op
+    def op1(x: int) -> int:
+        return x * 2
+
+    @weave.op
+    def op2(x: int) -> int:
+        return x * 3
+
+    op1(1)
+    op2(2)
+
+    # get calls and add feedback with different scores
+    calls = list(client.get_calls(columns=["id"]))
+    call_ids = [call.id for call in calls]
+
+    # Add feedback with scores: first call gets score 5, second gets score 3
+    calls[0].feedback.add("score_feedback", {"score": 5})
+    calls[1].feedback.add("score_feedback", {"score": 3})
+
+    # Sort by feedback score in descending order - should get call[0] first (score 5)
+    sort_by = [{"field": "feedback.score_feedback.payload.score", "direction": "desc"}]
+    calls_with_costs = client.get_calls(
+        sort_by=sort_by, columns=["id"], include_costs=True
+    )
+    assert len(calls_with_costs) == 2
+    assert calls_with_costs[0].id == call_ids[0]  # Higher score (5) should be first
+    assert calls_with_costs[1].id == call_ids[1]  # Lower score (3) should be second
+
+    # Sort in ascending order - should get call[1] first (score 3)
+    sort_by_asc = [
+        {"field": "feedback.score_feedback.payload.score", "direction": "asc"}
+    ]
+    calls_asc = client.get_calls(
+        sort_by=sort_by_asc, columns=["id"], include_costs=True
+    )
+    assert len(calls_asc) == 2
+    assert calls_asc[0].id == call_ids[1]  # Lower score (3) should be first
+    assert calls_asc[1].id == call_ids[0]  # Higher score (5) should be second
+
+
+def test_calls_query_sort_by_ref_field_with_costs(client):
+    """Test sorting by ref field with include_costs=True and expand_columns."""
+    if client_is_sqlite(client):
+        pytest.skip(
+            "Ref field ordering with expand_columns not fully supported in SQLite"
+        )
+
+    # Create ref objects with different temperatures
+    model1 = {"name": "gpt-4", "temperature": 0.7}
+    model2 = {"name": "gpt-3.5", "temperature": 0.3}
+    model1_ref = weave.publish(model1)
+    model2_ref = weave.publish(model2)
+
+    @weave.op
+    def call_with_model(model, x: int) -> int:
+        return x * 2
+
+    # Call with different model refs
+    call_with_model(model1_ref, 1)
+    call_with_model(model2_ref, 2)
+
+    # get call ids
+    calls = list(client.get_calls(columns=["id"]))
+    call_ids = [call.id for call in calls]
+
+    # Sort by model temperature in descending order with costs
+    sort_by = [{"field": "inputs.model.temperature", "direction": "desc"}]
+    calls_with_costs = client.get_calls(
+        sort_by=sort_by,
+        columns=["id"],
+        include_costs=True,
+        expand_columns=["inputs.model"],
+    )
+    assert len(calls_with_costs) == 2
+    assert calls_with_costs[0].id == call_ids[0]  # Higher temp (0.7) should be first
+    assert calls_with_costs[1].id == call_ids[1]  # Lower temp (0.3) should be second
+
+    # Sort in ascending order
+    sort_by_asc = [{"field": "inputs.model.temperature", "direction": "asc"}]
+    calls_asc = client.get_calls(
+        sort_by=sort_by_asc,
+        columns=["id"],
+        include_costs=True,
+        expand_columns=["inputs.model"],
+    )
+    assert len(calls_asc) == 2
+    assert calls_asc[0].id == call_ids[1]  # Lower temp (0.3) should be first
+    assert calls_asc[1].id == call_ids[0]  # Higher temp (0.7) should be second
