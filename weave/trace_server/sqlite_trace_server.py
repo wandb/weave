@@ -1701,7 +1701,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         # Build the op object value structure with the file digest
         # Note: We store just the digest string, matching SDK's to_json output
         op_val = object_creation_utils.build_op_val(source_file_res.digest)
-        object_id = object_creation_utils.make_op_id(req.name)
+        object_id = object_creation_utils.make_object_id(req.name, "Op")
 
         # Create the object
         obj_req = tsi.ObjCreateReq(
@@ -1834,7 +1834,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         The dataset object references the table containing the actual row data.
         """
         # Create a safe ID for the dataset
-        dataset_id = object_creation_utils.make_dataset_id(req.name)
+        dataset_id = object_creation_utils.make_object_id(req.name, "Dataset")
 
         # Create a table and get its ref
         table_req = tsi.TableCreateReq(
@@ -1964,7 +1964,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         The scorer object references the op that implements the scoring logic.
         """
         # Generate a safe ID for the scorer
-        scorer_id = object_creation_utils.make_scorer_id(req.name)
+        scorer_id = object_creation_utils.make_object_id(req.name, "Scorer")
 
         # Create the score op first
         score_op_req = tsi.OpCreateV2Req(
@@ -2100,7 +2100,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         Creates placeholder ops for evaluate, predict_and_score, and summarize methods.
         """
         # Generate a safe ID for the evaluation
-        evaluation_id = object_creation_utils.make_evaluation_id(req.name)
+        evaluation_id = object_creation_utils.make_object_id(req.name, "Evaluation")
 
         # Create placeholder evaluate op
         evaluate_op_req = tsi.OpCreateV2Req(
@@ -2293,7 +2293,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         )
 
         # Generate object_id based on name
-        object_id = object_creation_utils.make_model_id(req.name)
+        object_id = object_creation_utils.make_object_id(req.name, "Model")
 
         # Create the object
         obj_req = tsi.ObjCreateReq(

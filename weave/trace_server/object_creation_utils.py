@@ -91,113 +91,26 @@ def make_safe_name(name: str | None) -> str:
     return name.replace(" ", "_").replace("/", "_").lower()
 
 
-def make_dataset_id(name: str | None) -> str:
-    """Create a dataset object ID from a dataset name.
+def make_object_id(name: str | None, default: str) -> str:
+    """Create an object ID from a name with a default fallback.
 
     Args:
-        name: The dataset name (can be None)
+        name: The object name (can be None)
+        default: The default object ID to use if name is None
 
     Returns:
-        The dataset object ID: "Dataset" if name is None, otherwise the sanitized name
+        The object ID: default if name is None, otherwise the sanitized name
 
     Examples:
-        >>> make_dataset_id(None)
+        >>> make_object_id(None, "Dataset")
         'Dataset'
-        >>> make_dataset_id("My Dataset")
+        >>> make_object_id("My Dataset", "Dataset")
         'my_dataset'
-        >>> make_dataset_id("user/model")
+        >>> make_object_id("user/model", "Model")
         'user_model'
     """
     if name is None:
-        return "Dataset"
-    return make_safe_name(name)
-
-
-def make_scorer_id(name: str | None) -> str:
-    """Create a scorer object ID from a scorer name.
-
-    Args:
-        name: The scorer name (can be None)
-
-    Returns:
-        The scorer object ID: "Scorer" if name is None, otherwise the sanitized name
-
-    Examples:
-        >>> make_scorer_id(None)
-        'Scorer'
-        >>> make_scorer_id("My Scorer")
-        'my_scorer'
-        >>> make_scorer_id("user/scorer")
-        'user_scorer'
-    """
-    if name is None:
-        return "Scorer"
-    return make_safe_name(name)
-
-
-def make_evaluation_id(name: str | None) -> str:
-    """Create an evaluation object ID from an evaluation name.
-
-    Args:
-        name: The evaluation name (can be None)
-
-    Returns:
-        The evaluation object ID: "Evaluation" if name is None, otherwise the sanitized name
-
-    Examples:
-        >>> make_evaluation_id(None)
-        'Evaluation'
-        >>> make_evaluation_id("My Evaluation")
-        'my_evaluation'
-        >>> make_evaluation_id("user/eval")
-        'user_eval'
-    """
-    if name is None:
-        return "Evaluation"
-    return make_safe_name(name)
-
-
-def make_model_id(name: str | None) -> str:
-    """Create a model object ID from a model name.
-
-    Args:
-        name: The model name (can be None)
-
-    Returns:
-        The model object ID: "Model" if name is None, otherwise the sanitized name
-
-    Examples:
-        >>> make_model_id(None)
-        'Model'
-        >>> make_model_id("My Model")
-        'my_model'
-        >>> make_model_id("user/model")
-        'user_model'
-    """
-    if name is None:
-        return "Model"
-    return make_safe_name(name)
-
-
-def make_op_id(name: str | None) -> str:
-    """Create an op object ID from an op name.
-
-    Args:
-        name: The op name (can be None)
-
-    Returns:
-        The op object ID: "Op" if name is None, otherwise the sanitized name
-
-    Examples:
-        >>> make_op_id(None)
-        'Op'
-        >>> make_op_id("My Op")
-        'my_op'
-        >>> make_op_id("user/op")
-        'user_op'
-    """
-    if name is None:
-        return "Op"
+        return default
     return make_safe_name(name)
 
 
