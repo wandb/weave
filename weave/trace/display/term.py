@@ -35,10 +35,18 @@ def in_colab() -> bool:
 configured = False
 
 
+def update_logger_level() -> None:
+    """Update the logger level based on current settings."""
+    log_level = settings.log_level()
+    logger.setLevel(getattr(logging, log_level))
+
+
 def configure_logger() -> None:
     """Configure the root logger for Weave with custom formatting and log level."""
     global configured
     if configured:
+        # Even if already configured, update the log level in case settings changed
+        update_logger_level()
         return
     configured = True
     # Create a console handler
@@ -52,9 +60,8 @@ def configure_logger() -> None:
         logger.propagate = False
 
     # Set the log level based on environment variable
-    log_level = settings.log_level()
-    logger.setLevel(getattr(logging, log_level))
+    update_logger_level()
 
 
 # Export the logger for use in other modules
-__all__ = ["configure_logger", "logger"]
+__all__ = ["configure_logger", "logger", "update_logger_level"]
