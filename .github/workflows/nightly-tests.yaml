@@ -52,12 +52,12 @@ jobs:
             "mistral",
             "notdiamond",
             "openai",
-            "verifiers_test",
+            "verifiers-test",
             "vertexai",
             "pandas-test",
             "mcp",
             "smolagents",
-            "autogen_tests",
+            "autogen-tests",
           ]
       fail-fast: false
     services:
@@ -131,7 +131,7 @@ jobs:
         if: steps.filter_shards.outputs.skip != 'true'
         run: |
           # Shards that are in the regular test matrix and need trace_server markers
-          TRACE_SERVER_SHARDS="flow trace_server trace_server_bindings anthropic cerebras cohere crewai dspy groq google_genai google_ai_studio instructor langchain litellm llamaindex mistral notdiamond openai openai_agents vertexai bedrock scorers pandas-test huggingface smolagents mcp autogen_tests trace trace1 trace2 trace3 trace4 trace_no_server"
+          TRACE_SERVER_SHARDS="flow trace_server trace_server_bindings anthropic cerebras cohere crewai dspy groq google_genai google_ai_studio instructor langchain litellm llamaindex mistral notdiamond openai openai_agents vertexai bedrock scorers pandas-test huggingface smolagents mcp autogen-tests trace trace1 trace2 trace3 trace4 trace_no_server"
           if [[ " $TRACE_SERVER_SHARDS " =~ " ${{ matrix.shard }} " ]]; then
             echo "needs_markers=true" >> $GITHUB_OUTPUT
           else

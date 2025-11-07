@@ -263,12 +263,12 @@ jobs:
             "mistral",
             "notdiamond",
             "openai",
-            "verifiers_test",
+            "verifiers-test",
             "vertexai",
             "pandas-test",
             "mcp",
             "smolagents",
-            "autogen_tests",
+            "autogen-tests",
           ]
       fail-fast: false
     services:
@@ -446,12 +446,12 @@ jobs:
             "mistral",
             "notdiamond",
             "openai",
-            "verifiers_test",
+            "verifiers-test",
             "vertexai",
             "pandas-test",
             "mcp",
             "smolagents",
-            "autogen_tests",
+            "autogen-tests",
           ]
       fail-fast: false
     steps:

@@ -11,7 +11,7 @@ SUPPORTED_PYTHON_VERSIONS = ["3.9", "3.10", "3.11", "3.12", "3.13"]
 PY313_INCOMPATIBLE_SHARDS = [
     "cohere",
     "notdiamond",
-    "verifiers_test",
+    "verifiers-test",
 ]
 PY39_INCOMPATIBLE_SHARDS = [
     "crewai",
@@ -19,13 +19,13 @@ PY39_INCOMPATIBLE_SHARDS = [
     "mcp",
     "smolagents",
     "dspy",
-    "autogen_tests",
+    "autogen-tests",
     "langchain",
-    "verifiers_test",
+    "verifiers-test",
     "notdiamond",
 ]
 PY310_INCOMPATIBLE_SHARDS = [
-    "verifiers_test",
+    "verifiers-test",
 ]
 NUM_TRACE_SERVER_SHARDS = 4
 
@@ -103,8 +103,8 @@ trace_server_shards = [f"trace{i}" for i in range(1, NUM_TRACE_SERVER_SHARDS + 1
         "smolagents",
         "mcp",
         "verdict",
-        "verifiers_test",
-        "autogen_tests",
+        "verifiers-test",
+        "autogen-tests",
         "trace",
         *trace_server_shards,
         "trace_no_server",
@@ -120,7 +120,18 @@ def tests(session, shard):
     if session.python.startswith("3.10") and shard in PY310_INCOMPATIBLE_SHARDS:
         session.skip(f"Skipping {shard=} as it is not compatible with Python 3.10")
 
-    session.install("-e", f".[{shard},test]")
+    # Dependency groups (pandas-test, autogen-tests, verifiers-test) need special handling
+    # They can't be installed with .[group] syntax since they're in [dependency-groups]
+    test_dependency_groups = ["pandas-test", "autogen-tests", "verifiers-test"]
+
+    if shard in test_dependency_groups:
+        # Install the package editable with test group, then add the specific test group
+        session.install("-e", ".")
+        session.run("uv", "sync", "--group", "test", "--group", shard, external=True)
+    else:
+        # Regular optional dependency installation (also installs test group)
+        session.install("-e", ".")
+        session.run("uv", "sync", "--group", "test", f"--extra={shard}", external=True)
 
     env = {
         k: session.env.get(k) or os.getenv(k)
@@ -161,8 +172,8 @@ def tests(session, shard):
         "trace_server_bindings": ["tests/trace_server_bindings"],
         "mistral": ["tests/integrations/mistral/"],
         "scorers": ["tests/scorers/"],
-        "autogen_tests": ["tests/integrations/autogen/"],
-        "verifiers_test": ["tests/integrations/verifiers/"],
+        "autogen-tests": ["tests/integrations/autogen/"],
+        "verifiers-test": ["tests/integrations/verifiers/"],
         "trace": ["tests/trace/"],
         **{shard: ["tests/trace/"] for shard in trace_server_shards},
         "trace_no_server": ["tests/trace/"],
@@ -199,7 +210,7 @@ def tests(session, shard):
     if shard == "trace_no_server":
         pytest_args.extend(["-m", "not trace_server"])
 
-    if shard == "verifiers_test":
+    if shard == "verifiers-test":
         # Pinning to this commit because the latest version of the gsm8k environment is broken.
         session.install(
             "git+https://github.com/willccbb/verifiers.git@b4d851db42cebbab2358b827fd0ed19773631937#subdirectory=environments/gsm8k"
