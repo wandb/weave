@@ -167,8 +167,7 @@ def test_query_heavy_column_simple_filter_with_order() -> None:
         )
         SELECT
             calls_merged.id AS id,
-            any(calls_merged.inputs_dump) AS inputs_dump,
-            any(calls_merged.started_at) AS started_at
+            any(calls_merged.inputs_dump) AS inputs_dump
         FROM calls_merged
         WHERE
             calls_merged.project_id = {pb_1:String}
@@ -215,8 +214,7 @@ def test_query_heavy_column_simple_filter_with_order_and_limit() -> None:
         )
         SELECT
             calls_merged.id AS id,
-            any(calls_merged.inputs_dump) AS inputs_dump,
-            any(calls_merged.started_at) AS started_at
+            any(calls_merged.inputs_dump) AS inputs_dump
         FROM calls_merged
         WHERE
             calls_merged.project_id = {pb_1:String}
@@ -299,8 +297,7 @@ def test_query_heavy_column_simple_filter_with_order_and_limit_and_mixed_query_c
         )
         SELECT
             calls_merged.id AS id,
-            any(calls_merged.inputs_dump) AS inputs_dump,
-            any(calls_merged.started_at) AS started_at
+            any(calls_merged.inputs_dump) AS inputs_dump
         FROM calls_merged
         WHERE
             calls_merged.project_id = {pb_9:String}
@@ -2624,15 +2621,31 @@ def test_query_with_optimization_and_attributes_order() -> None:
         )
     )
 
-    sql = cq.as_sql(ParamBuilder())
-
-    # Verify we're using the optimization pattern (filtered_calls CTE)
-    assert "filtered_calls AS" in sql
-
-    # Verify started_at is selected in the main query (after the CTE)
-    # so it's available for ORDER BY
-    assert "any(calls_merged.started_at) AS started_at" in sql
-
-    # Verify started_at is in the ORDER BY
-    assert "ORDER BY" in sql
-    assert "started_at" in sql.split("ORDER BY")[-1]
+    assert_sql(
+        cq,
+        """
+        WITH filtered_calls AS (
+            SELECT
+                calls_merged.id AS id
+            FROM calls_merged
+            WHERE calls_merged.project_id = {pb_1:String}
+                AND ((calls_merged.op_name IN {pb_0:Array(String)})
+                    OR (calls_merged.op_name IS NULL))
+            GROUP BY (calls_merged.project_id, calls_merged.id)
+            HAVING (
+                ((any(calls_merged.deleted_at) IS NULL))
+                AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+            )
+            ORDER BY any(calls_merged.started_at) ASC
+        )
+        SELECT
+            calls_merged.id AS id,
+            any(calls_merged.inputs_dump) AS inputs_dump
+        FROM calls_merged
+        WHERE calls_merged.project_id = {pb_1:String}
+            AND (calls_merged.id IN filtered_calls)
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        ORDER BY any(calls_merged.started_at) ASC
+        """,
+        {"pb_0": ["my_op"], "pb_1": "project"},
+    )
