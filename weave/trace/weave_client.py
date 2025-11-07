@@ -82,6 +82,7 @@ from weave.trace.settings import (
 )
 from weave.trace.table import Table
 from weave.trace.table_upload_chunking import ChunkingConfig, TableChunkManager
+from weave.trace.util import log_once
 from weave.trace.vals import WeaveObject, WeaveTable, make_trace_obj
 from weave.trace.wandb_run_context import (
     WandbRunContext,
@@ -1022,12 +1023,22 @@ class WeaveClient:
             WandbRunContext if a run is active (either from override or global wandb.run),
             or None if no run is active.
         """
+        global_context = get_global_wb_run_context()
+
         # Check override first
         if self._wandb_run_context is not None:
+            # Warn if there's also a global wandb.run active
+            if global_context is not None:
+                log_once(
+                    logger.warning,
+                    f"Client-level WandB run context override is active (run_id={self._wandb_run_context.run_id}), "
+                    f"ignoring global wandb.run (run_id={global_context.run_id}). "
+                    "This is intentional if you're explicitly associating traces with a different run.",
+                )
             return self._wandb_run_context
 
         # Fall back to global wandb.run
-        return get_global_wb_run_context()
+        return global_context
 
     @trace_sentry.global_trace_sentry.watch()
     def delete_call(self, call: Call) -> None:
