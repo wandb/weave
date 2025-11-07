@@ -736,7 +736,7 @@ class TestModel(weave.Model):
         res = client.server.model_create_v2(req)
 
         # Verify response
-        assert res.object_id == "model_testmodel"
+        assert res.object_id == "testmodel"
         assert res.digest is not None
         assert res.version_index == 0
         assert res.model_ref is not None
@@ -868,7 +868,7 @@ class MultiVersionModel(weave.Model):
         # Delete all versions (None means delete all)
         delete_req = tsi.ModelDeleteV2Req(
             project_id=project_id,
-            object_id="model_multiversionmodel",
+            object_id="multiversionmodel",
             digests=None,
         )
         delete_res = client.server.model_delete_v2(delete_req)

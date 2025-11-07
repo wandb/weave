@@ -1474,10 +1474,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # Create the op "val" that the SDK would have created
         # Note: We store just the digest string, matching SDK's to_json output
         op_val = object_creation_utils.build_op_val(source_file_res.digest)
+        object_id = object_creation_utils.make_op_id(req.name)
         obj_req = tsi.ObjCreateReq(
             obj=tsi.ObjSchemaForInsert(
                 project_id=req.project_id,
-                object_id=req.name,
+                object_id=object_id,
                 val=op_val,
                 wb_user_id=None,
             )
@@ -1488,14 +1489,14 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # immediately available, so we retry a few times)
         obj_read_req = tsi.ObjReadReq(
             project_id=req.project_id,
-            object_id=req.name,
+            object_id=object_id,
             digest=obj_result.digest,
         )
         obj_read_res = self._obj_read_with_retry(obj_read_req)
 
         return tsi.OpCreateV2Res(
             digest=obj_result.digest,
-            object_id=req.name,
+            object_id=object_id,
             version_index=obj_read_res.obj.version_index,
         )
 
@@ -1676,8 +1677,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         The dataset object references the table containing the actual row data.
         """
         # Create a safe ID for the dataset
-        safe_name = object_creation_utils.make_safe_name(req.name)
-        dataset_id = f"dataset_{safe_name}"
+        dataset_id = object_creation_utils.make_dataset_id(req.name)
 
         # Create a table and get its ref
         table_req = tsi.TableCreateReq(
@@ -1814,8 +1814,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         The scorer object references the op that implements the scoring logic.
         """
         # Create a safe ID for the scorer
-        safe_name = object_creation_utils.make_safe_name(req.name)
-        scorer_id = f"scorer_{safe_name}"
+        scorer_id = object_creation_utils.make_scorer_id(req.name)
 
         # Create the score op
         score_op_req = tsi.OpCreateV2Req(
@@ -1952,10 +1951,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         Creates placeholder ops for evaluate, predict_and_score, and summarize methods.
         """
         # Create a safe ID for the evaluation
-        if req.name is None:
-            evaluation_id = "Evaluation"
-        else:
-            evaluation_id = object_creation_utils.make_safe_name(req.name)
+        evaluation_id = object_creation_utils.make_evaluation_id(req.name)
 
         # Create placeholder evaluate op
         evaluate_op_req = tsi.OpCreateV2Req(
@@ -2144,8 +2140,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
 
         # Generate object_id based on name
-        safe_name = object_creation_utils.make_safe_name(req.name)
-        object_id = f"model_{safe_name}"
+        object_id = object_creation_utils.make_model_id(req.name)
 
         # Create the object
         obj_req = tsi.ObjCreateReq(
