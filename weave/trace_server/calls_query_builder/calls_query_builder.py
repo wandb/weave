@@ -25,10 +25,11 @@ Outstanding Optimizations/Work:
 
 """
 
+import datetime
 import logging
 import re
 from collections.abc import Callable, KeysView
-from typing import Literal, cast
+from typing import Any, Literal, cast
 
 from pydantic import BaseModel, Field
 from typing_extensions import Self
@@ -2104,8 +2105,100 @@ def build_calls_complete_batch_update_query(
         exception = CASE {exception_case_expr} END,
         wb_run_step_end = CASE {wb_run_step_end_case_expr} END,
         updated_at = now64(3)
-    WHERE project_id = {param_slot(project_id_param, 'String')}
+    WHERE project_id = {param_slot(project_id_param, "String")}
       AND id IN ({ids_in_clause})
     """
 
     return safely_format_sql(raw_sql, logger)
+
+
+def _build_calls_complete_update_query(
+    project_id: str,
+    call_ids: list[str],
+    update_fields: dict[str, tuple[Any, str]],
+    wb_user_id: str,
+    updated_at: datetime.datetime,
+    pb: ParamBuilder,
+) -> str | None:
+    """Build a parameterized UPDATE query for calls_complete table.
+
+    Args:
+        project_id: The project ID to filter by
+        call_ids: List of call IDs to update
+        update_fields: Dictionary mapping field names to (value, clickhouse_type) tuples
+        wb_user_id: User ID performing the update
+        updated_at: Timestamp of the update
+        pb: ParamBuilder for parameterized queries
+
+    Returns:
+        Formatted SQL query string or None if no call_ids provided
+    """
+    # Handle empty list case
+    if not call_ids:
+        return None
+
+    # Build parameters
+    project_id_param = pb.add_param(project_id)
+    call_ids_param = pb.add_param(call_ids)
+    updated_at_param = pb.add_param(updated_at)
+    wb_user_id_param = pb.add_param(wb_user_id)
+
+    # Build SET clause with custom fields + standard audit fields
+    set_clauses = []
+    for field_name, (value, clickhouse_type) in update_fields.items():
+        param = pb.add_param(value)
+        set_clauses.append(f"{field_name} = {param_slot(param, clickhouse_type)}")
+
+    # Add standard audit fields
+    set_clauses.append(f"updated_at = {param_slot(updated_at_param, 'DateTime64(3)')}")
+    set_clauses.append(f"wb_user_id = {param_slot(wb_user_id_param, 'String')}")
+    set_sql = ", ".join(set_clauses)
+
+    raw_sql = f"""
+        UPDATE calls_complete
+        SET
+            {set_sql}
+        WHERE project_id = {param_slot(project_id_param, 'String')}
+            AND id IN {param_slot(call_ids_param, 'Array(String)')}
+    """
+    return safely_format_sql(raw_sql, logger)
+
+
+def build_calls_complete_update_display_name_query(
+    project_id: str,
+    call_id: str,
+    display_name: str,
+    wb_user_id: str,
+    updated_at: datetime.datetime,
+    pb: ParamBuilder,
+) -> str | None:
+    """Build a parameterized UPDATE query for calls_complete table to update the display_name field."""
+    return _build_calls_complete_update_query(
+        project_id=project_id,
+        call_ids=[call_id],
+        update_fields={"display_name": (display_name, "String")},
+        wb_user_id=wb_user_id,
+        updated_at=updated_at,
+        pb=pb,
+    )
+
+
+def build_calls_complete_batch_delete_query(
+    project_id: str,
+    call_ids: list[str],
+    deleted_at: datetime.datetime,
+    wb_user_id: str,
+    updated_at: datetime.datetime,
+    pb: ParamBuilder,
+) -> str | None:
+    """Build a parameterized DELETE query for calls_complete table.
+    This uses ClickHouse's lightweight DELETE with parameterized IN clause.
+    """
+    return _build_calls_complete_update_query(
+        project_id=project_id,
+        call_ids=call_ids,
+        update_fields={"deleted_at": (deleted_at, "DateTime64(3)")},
+        wb_user_id=wb_user_id,
+        updated_at=updated_at,
+        pb=pb,
+    )

@@ -28,6 +28,7 @@ from tenacity import (
     stop_after_attempt,
     wait_exponential,
 )
+
 from weave.trace_server import clickhouse_trace_server_migrator as wf_migrator
 from weave.trace_server import clickhouse_trace_server_settings as ch_settings
 from weave.trace_server import constants, object_creation_utils
@@ -45,9 +46,10 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     OrderField,
     QueryBuilderDynamicField,
     QueryBuilderField,
+    build_calls_complete_batch_delete_query,
+    build_calls_complete_batch_update_query,
     build_calls_stats_query,
     combine_conditions,
-    build_calls_complete_batch_update_query,
 )
 from weave.trace_server.clickhouse_schema import (
     ALL_CALL_INSERT_COLUMNS,
@@ -130,6 +132,7 @@ from weave.trace_server.project_query_builder import make_project_stats_query
 from weave.trace_server.project_version.project_version import (
     TableRoutingResolver,
 )
+from weave.trace_server.project_version.types import ProjectVersion
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 from weave.trace_server.table_query_builder import (
     ROW_ORDER_COLUMN_NAME,
@@ -493,7 +496,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # Returns the id of the newly created call
         return tsi.CallEndRes()
 
-    def _split_call_batch_v2(self, batch: tsi.CallsUpsertBatchV2Req) -> tuple[
+    def _split_call_batch_v2(
+        self,
+        batch: list[
+            tsi.CallBatchStartMode | tsi.CallBatchEndMode | tsi.CallBatchCompleteMode
+        ],
+    ) -> tuple[
         list[tsi.StartedCallSchemaForInsert],
         list[tsi.EndedCallSchemaForInsert],
         list[tsi.CompletedCallSchemaForInsert],
@@ -595,13 +603,16 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.calls_query_stream")
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
         """Returns a stream of calls that match the given query."""
-        self._noop_project_version_latency_test(project_id=req.project_id)
+        project_version = self.project_version_resolver.get_project_version_sync(
+            req.project_id
+        )
 
         cq = CallsQuery(
             project_id=req.project_id,
             include_costs=req.include_costs or False,
             include_storage_size=req.include_storage_size or False,
             include_total_storage_size=req.include_total_storage_size or False,
+            project_version=project_version,
         )
         columns = ALL_CALL_SELECT_COLUMNS
         if req.columns:
@@ -814,6 +825,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
         parent_trace_ids = [p.trace_id for p in parents]
 
+        # TODO: increase limit in calls_complete delete case
         # get first 10k calls with trace_ids matching parents
         all_calls = list(
             self.calls_query_stream(
@@ -829,6 +841,16 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             root_ids=req.call_ids,
             all_calls=all_calls,
         )
+
+        project_version = self.project_version_resolver.get_project_version_sync(
+            req.project_id
+        )
+        if project_version == ProjectVersion.CALLS_COMPLETE_VERSION:
+            return self._calls_complete_delete_batch(
+                project_id=req.project_id,
+                wb_user_id=req.wb_user_id,
+                call_ids=all_descendants,
+            )
 
         deleted_at = datetime.datetime.now()
         insertables = [
@@ -847,6 +869,34 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         return tsi.CallsDeleteRes(num_deleted=len(all_descendants))
 
+    def _calls_complete_delete_batch(
+        self, project_id: str, wb_user_id: str, call_ids: list[str]
+    ) -> tsi.CallsDeleteRes:
+        """Update the deleted_at field for a batch of calls in the calls_complete table.
+
+        Args:
+            project_id: The project ID
+            call_ids: The list of call IDs to delete
+        """
+        if not call_ids:
+            return tsi.CallsDeleteRes(num_deleted=0)
+
+        pb = ParamBuilder()
+        deleted_at = datetime.datetime.now()
+        update_sql = build_calls_complete_batch_delete_query(
+            project_id=project_id,
+            wb_user_id=wb_user_id,
+            call_ids=call_ids,
+            deleted_at=deleted_at,
+            updated_at=deleted_at,
+            pb=pb,
+        )
+        if update_sql is None:
+            return tsi.CallsDeleteRes(num_deleted=0)
+
+        self._command(update_sql, pb.get_params())
+        return tsi.CallsDeleteRes(num_deleted=len(call_ids))
+
     def _ensure_valid_update_field(self, req: tsi.CallUpdateReq) -> None:
         valid_update_fields = ["display_name"]
         for field in valid_update_fields:
@@ -861,6 +911,18 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def call_update(self, req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
         assert_non_null_wb_user_id(req)
         self._ensure_valid_update_field(req)
+
+        project_version = self.project_version_resolver.get_project_version_sync(
+            req.project_id
+        )
+        if project_version == ProjectVersion.CALLS_COMPLETE_VERSION:
+            return self._calls_complete_update(
+                project_id=req.project_id,
+                wb_user_id=req.wb_user_id,
+                call_id=req.call_id,
+                display_name=req.display_name,
+            )
+
         renamed_insertable = CallUpdateCHInsertable(
             project_id=req.project_id,
             id=req.call_id,

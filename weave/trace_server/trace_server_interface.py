@@ -206,8 +206,7 @@ class EndedCallSchemaForInsert(BaseModel):
 
 
 class CompletedCallSchemaForInsert(BaseModel):
-    """
-    Schema for inserting a completed call directly into the calls_complete table.
+    """Schema for inserting a completed call directly into the calls_complete table.
 
     This represents a call that is already finished at insertion time, with both
     start and end information provided together.
