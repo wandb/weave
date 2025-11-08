@@ -96,6 +96,7 @@ from weave.trace_server.file_storage import (
     maybe_get_storage_client_from_env,
     read_from_bucket,
     store_in_bucket,
+    store_in_bucket_batched,
 )
 from weave.trace_server.file_storage_uris import FileStorageURI
 from weave.trace_server.ids import generate_id
@@ -482,6 +483,85 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         except StopIteration:
             call = None
         return tsi.CallReadRes(call=call)
+
+    def file_create_batched(self, req: tsi.FileCreateBatchReq) -> tsi.FileCreateBatchRes:
+        # Materialize requests for multiple passes and order preservation
+        reqs = list(req.batch)
+        if not reqs:
+            return tsi.FileCreateBatchRes(res=[])
+
+        client = self.file_storage_client
+
+        # Compute digests and partition into bucket vs clickhouse groups per request
+        digests: list[str] = [bytes_digest(r.content) for r in reqs]
+        use_bucket_flags: list[bool] = []
+        for r in reqs:
+            use_bucket_flags.append(
+                client is not None and self._should_use_file_storage_for_writes(r.project_id)
+            )
+
+        # Prepare bucket batch items
+        bucket_indices: list[int] = [i for i, flag in enumerate(use_bucket_flags) if flag]
+        bucket_target_uris: dict[int, FileStorageURI] = {}
+        if client is not None and bucket_indices:
+            # Build (path, data) pairs
+            to_upload: list[tuple[str, bytes]] = [
+                (key_for_project_digest(reqs[i].project_id, digests[i]), reqs[i].content)
+                for i in bucket_indices
+            ]
+            # Perform batched upload synchronously to ensure availability before insert
+            uris = store_in_bucket_batched(
+                client,
+                to_upload,
+                wait_for_completion=True,
+            )
+            for idx, uri in zip(bucket_indices, uris):
+                bucket_target_uris[idx] = uri
+
+        # Insert DB rows for bucket-backed files in a single batch
+        if bucket_target_uris:
+            rows = []
+            for i in bucket_indices:
+                r = reqs[i]
+                rows.append(
+                    (
+                        r.project_id,
+                        digests[i],
+                        0,
+                        1,
+                        r.name,
+                        b"",
+                        len(r.content),
+                        bucket_target_uris[i].to_uri_str(),
+                    )
+                )
+            self._insert(
+                "files",
+                data=rows,
+                column_names=[
+                    "project_id",
+                    "digest",
+                    "chunk_index",
+                    "n_chunks",
+                    "name",
+                    "val_bytes",
+                    "bytes_stored",
+                    "file_storage_uri",
+                ],
+            )
+
+        # Process clickhouse-backed files individually using existing logic
+        for i, r in enumerate(reqs):
+            if not use_bucket_flags[i]:
+                try:
+                    self._file_create_clickhouse(r, digests[i])
+                except FileStorageWriteError:
+                    # For symmetry with single file_create handling
+                    self._file_create_clickhouse(r, digests[i])
+
+        # Build results in input order
+        results = [tsi.FileCreateRes(digest=d) for d in digests]
+        return tsi.FileCreateBatchRes(res=results)
 
     def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
         stream = self.calls_query_stream(req)
