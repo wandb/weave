@@ -29,7 +29,6 @@ from tenacity import (
     wait_exponential,
 )
 
-from weave.trace import refs
 from weave.trace_server import clickhouse_trace_server_migrator as wf_migrator
 from weave.trace_server import clickhouse_trace_server_settings as ch_settings
 from weave.trace_server import constants, object_creation_utils

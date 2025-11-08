@@ -30,9 +30,9 @@ def score(output: str, target: str) -> dict:
     assert create_res.digest is not None
     assert create_res.object_id == "scorer_exact_match"
     assert create_res.version_index == 0
-    # Verify scorer returns a reference string
-    assert isinstance(create_res.scorer, str)
-    assert create_res.scorer.startswith("weave:///")
+    # Verify ref returns a reference string
+    assert isinstance(create_res.ref, str)
+    assert create_res.ref.startswith("weave:///")
 
 
 def test_scorer_create_v2_without_description(trace_server):
@@ -55,7 +55,7 @@ def score(output: str) -> dict:
     assert create_res.digest is not None
     assert create_res.object_id == "scorer_length_scorer"
     assert create_res.version_index == 0
-    assert isinstance(create_res.scorer, str)
+    assert isinstance(create_res.ref, str)
 
 
 def test_scorer_read_v2_basic(trace_server):
