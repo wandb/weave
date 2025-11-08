@@ -185,6 +185,7 @@ async def test_images_in_dataset_for_evaluation(client, dataset_ref):
     assert "model_latency" in res
     assert "mean" in res["model_latency"]
     assert isinstance(res["model_latency"]["mean"], (int, float))
+    assert False, "Intentionally failing test"
 
 
 @pytest.mark.skip("Temporarily skip live tests")
