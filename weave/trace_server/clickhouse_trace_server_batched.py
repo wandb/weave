@@ -1497,13 +1497,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
         obj_read_res = self._obj_read_with_retry(obj_read_req)
 
-        # Construct the op reference URI
-        entity, project = req.project_id.split("/", 1)
-        op_ref = refs.OpRef(
-            entity=entity,
-            project=project,
+        # Construct the op reference URI using InternalOpRef since this is an internal method
+        # The external adapter will convert it back to external format
+        op_ref = ri.InternalOpRef(
+            project_id=req.project_id,
             name=req.name,
-            _digest=obj_result.digest,
+            version=obj_result.digest,
         ).uri()
 
         return tsi.OpCreateV2Res(
@@ -1732,13 +1731,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
         obj_read_res = self._obj_read_with_retry(obj_read_req)
 
-        # Construct the dataset reference URI
-        entity, project = req.project_id.split("/", 1)
-        dataset_ref = refs.ObjectRef(
-            entity=entity,
-            project=project,
+        # Construct the dataset reference URI using InternalObjectRef since this is an internal method
+        # The external adapter will convert it back to external format
+        dataset_ref = ri.InternalObjectRef(
+            project_id=req.project_id,
             name=dataset_id,
-            _digest=obj_result.digest,
+            version=obj_result.digest,
         ).uri()
 
         return tsi.DatasetCreateV2Res(
@@ -1887,13 +1885,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
         obj_read_res = self._obj_read_with_retry(obj_read_req)
 
-        # Construct the scorer reference URI
-        entity, project = req.project_id.split("/", 1)
-        scorer_ref = refs.ObjectRef(
-            entity=entity,
-            project=project,
+        # Construct the scorer reference URI using InternalObjectRef since this is an internal method
+        # The external adapter will convert it back to external format
+        scorer_ref = ri.InternalObjectRef(
+            project_id=req.project_id,
             name=scorer_id,
-            _digest=obj_result.digest,
+            version=obj_result.digest,
         ).uri()
 
         return tsi.ScorerCreateV2Res(
@@ -2048,13 +2045,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
         obj_read_res = self._obj_read_with_retry(obj_read_req)
 
-        # Construct the evaluation reference URI
-        entity, project = req.project_id.split("/", 1)
-        evaluation_ref = refs.ObjectRef(
-            entity=entity,
-            project=project,
+        # Construct the evaluation reference URI using InternalObjectRef since this is an internal method
+        # The external adapter will convert it back to external format
+        evaluation_ref = ri.InternalObjectRef(
+            project_id=req.project_id,
             name=evaluation_id,
-            _digest=obj_result.digest,
+            version=obj_result.digest,
         ).uri()
 
         return tsi.EvaluationCreateV2Res(
@@ -2199,13 +2195,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
         obj_read_res = self._obj_read_with_retry(obj_read_req)
 
-        # Construct the model reference URI
-        entity, project = req.project_id.split("/", 1)
-        model_ref = refs.ObjectRef(
-            entity=entity,
-            project=project,
+        # Construct the model reference URI using InternalObjectRef since this is an internal method
+        # The external adapter will convert it back to external format
+        model_ref = ri.InternalObjectRef(
+            project_id=req.project_id,
             name=object_id,
-            _digest=obj_result.digest,
+            version=obj_result.digest,
         ).uri()
 
         return tsi.ModelCreateV2Res(
