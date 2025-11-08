@@ -1278,9 +1278,13 @@ class OpCreateV2Req(OpCreateV2Body):
 class OpCreateV2Res(BaseModel):
     """Response model for creating an Op object."""
 
+    project_id: str = Field(
+        ..., description="The `entity/project` where this op is saved"
+    )
     digest: str = Field(..., description="The digest of the created op")
     object_id: str = Field(..., description="The ID of the created op")
     version_index: int = Field(..., description="The version index of the created op")
+    ref: str = Field(..., description="Reference URI to the created op")
 
 
 class OpReadV2Req(BaseModel):
@@ -1354,11 +1358,15 @@ class DatasetCreateV2Req(DatasetCreateV2Body):
 
 
 class DatasetCreateV2Res(BaseModel):
+    project_id: str = Field(
+        ..., description="The `entity/project` where this dataset is saved"
+    )
     digest: str = Field(..., description="The digest of the created dataset")
     object_id: str = Field(..., description="The ID of the created dataset")
     version_index: int = Field(
         ..., description="The version index of the created dataset"
     )
+    ref: str = Field(..., description="Reference URI to the created dataset")
 
 
 class DatasetReadV2Req(BaseModel):
@@ -1437,15 +1445,15 @@ class ScorerCreateV2Req(ScorerCreateV2Body):
 
 
 class ScorerCreateV2Res(BaseModel):
+    project_id: str = Field(
+        ..., description="The `entity/project` where this scorer is saved"
+    )
     digest: str = Field(..., description="The digest of the created scorer")
     object_id: str = Field(..., description="The ID of the created scorer")
     version_index: int = Field(
         ..., description="The version index of the created scorer"
     )
-    scorer: str = Field(
-        ...,
-        description="Full reference to the created scorer",
-    )
+    ref: str = Field(..., description="Reference URI to the created scorer")
 
 
 class ScorerReadV2Req(BaseModel):
@@ -1531,14 +1539,15 @@ class EvaluationCreateV2Req(EvaluationCreateV2Body):
 
 
 class EvaluationCreateV2Res(BaseModel):
+    project_id: str = Field(
+        ..., description="The `entity/project` where this evaluation is saved"
+    )
     digest: str = Field(..., description="The digest of the created evaluation")
     object_id: str = Field(..., description="The ID of the created evaluation")
     version_index: int = Field(
         ..., description="The version index of the created evaluation"
     )
-    evaluation_ref: str = Field(
-        ..., description="Full reference to the created evaluation"
-    )
+    ref: str = Field(..., description="Reference URI to the created evaluation")
 
 
 class EvaluationReadV2Req(BaseModel):
@@ -1639,15 +1648,15 @@ class ModelCreateV2Req(ModelCreateV2Body):
 
 
 class ModelCreateV2Res(BaseModel):
+    project_id: str = Field(
+        ..., description="The `entity/project` where this model is saved"
+    )
     digest: str = Field(..., description="The digest of the created model")
     object_id: str = Field(..., description="The ID of the created model")
     version_index: int = Field(
         ..., description="The version index of the created model"
     )
-    model_ref: str = Field(
-        ...,
-        description="Full reference to the created model",
-    )
+    ref: str = Field(..., description="Reference URI to the created model")
 
 
 class ModelReadV2Req(BaseModel):

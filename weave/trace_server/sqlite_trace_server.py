@@ -13,6 +13,7 @@ from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
     ExportTraceServiceRequest,
 )
 
+from weave.trace import refs
 from weave.trace_server import constants, object_creation_utils
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
@@ -1720,10 +1721,21 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         )
         obj_read_res = self.obj_read(obj_read_req)
 
+        # Construct the op reference URI
+        entity, project = req.project_id.split("/", 1)
+        op_ref = refs.OpRef(
+            entity=entity,
+            project=project,
+            name=req.name,
+            _digest=obj_result.digest,
+        ).uri()
+
         return tsi.OpCreateV2Res(
             digest=obj_result.digest,
             object_id=req.name,
             version_index=obj_read_res.obj.version_index,
+            project_id=req.project_id,
+            ref=op_ref,
         )
 
     def op_read_v2(self, req: tsi.OpReadV2Req) -> tsi.OpReadV2Res:
@@ -1873,10 +1885,21 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         )
         obj_read_res = self.obj_read(obj_read_req)
 
+        # Construct the dataset reference URI
+        entity, project = req.project_id.split("/", 1)
+        dataset_ref = refs.ObjectRef(
+            entity=entity,
+            project=project,
+            name=dataset_id,
+            _digest=obj_result.digest,
+        ).uri()
+
         return tsi.DatasetCreateV2Res(
             digest=obj_result.digest,
             object_id=dataset_id,
             version_index=obj_read_res.obj.version_index,
+            project_id=req.project_id,
+            ref=dataset_ref,
         )
 
     def dataset_read_v2(self, req: tsi.DatasetReadV2Req) -> tsi.DatasetReadV2Res:
@@ -2011,18 +2034,21 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         )
         obj_read_res = self.obj_read(obj_read_req)
 
-        # Construct the scorer reference using InternalObjectRef
-        scorer_ref = ri.InternalObjectRef(
-            project_id=req.project_id,
+        # Construct the scorer reference URI
+        entity, project = req.project_id.split("/", 1)
+        scorer_ref = refs.ObjectRef(
+            entity=entity,
+            project=project,
             name=scorer_id,
-            version=obj_result.digest,
+            _digest=obj_result.digest,
         ).uri()
 
         return tsi.ScorerCreateV2Res(
             digest=obj_result.digest,
             object_id=scorer_id,
             version_index=obj_read_res.obj.version_index,
-            scorer=scorer_ref,
+            project_id=req.project_id,
+            ref=scorer_ref,
         )
 
     def scorer_read_v2(self, req: tsi.ScorerReadV2Req) -> tsi.ScorerReadV2Res:
@@ -2164,18 +2190,21 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         )
         obj_read_res = self.obj_read(obj_read_req)
 
-        # Build evaluation reference - external adapter will convert to external format
-        evaluation_ref = ri.InternalObjectRef(
-            project_id=req.project_id,
+        # Construct the evaluation reference URI
+        entity, project = req.project_id.split("/", 1)
+        evaluation_ref = refs.ObjectRef(
+            entity=entity,
+            project=project,
             name=evaluation_id,
-            version=obj_result.digest,
+            _digest=obj_result.digest,
         ).uri()
 
         return tsi.EvaluationCreateV2Res(
             digest=obj_result.digest,
             object_id=evaluation_id,
             version_index=obj_read_res.obj.version_index,
-            evaluation_ref=evaluation_ref,
+            project_id=req.project_id,
+            ref=evaluation_ref,
         )
 
     def evaluation_read_v2(
@@ -2315,18 +2344,21 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         )
         obj_read_res = self.obj_read(obj_read_req)
 
-        # Build model reference - external adapter will convert to external format
-        model_ref = ri.InternalObjectRef(
-            project_id=req.project_id,
+        # Construct the model reference URI
+        entity, project = req.project_id.split("/", 1)
+        model_ref = refs.ObjectRef(
+            entity=entity,
+            project=project,
             name=object_id,
-            version=obj_result.digest,
+            _digest=obj_result.digest,
         ).uri()
 
         return tsi.ModelCreateV2Res(
             digest=obj_result.digest,
             object_id=object_id,
             version_index=obj_read_res.obj.version_index,
-            model_ref=model_ref,
+            project_id=req.project_id,
+            ref=model_ref,
         )
 
     def model_read_v2(self, req: tsi.ModelReadV2Req) -> tsi.ModelReadV2Res:
