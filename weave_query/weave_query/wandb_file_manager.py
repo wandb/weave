@@ -13,8 +13,16 @@ from aiohttp import BasicAuth
 from requests.auth import HTTPBasicAuth
 from wandb.sdk.lib import hashutil
 
+from weave_query import (
+    artifact_wandb,
+    cache,
+    engine_trace,
+    errors,
+    filesystem,
+    wandb_api,
+    weave_http,
+)
 from weave_query import environment as weave_env
-from weave_query import filesystem, artifact_wandb, cache, errors, wandb_api, engine_trace, weave_http
 
 tracer = engine_trace.tracer()  # type: ignore
 
@@ -76,7 +84,7 @@ def _local_path_and_download_url(
                 urllib.parse.quote(manifest_entry.get("birthArtifactID", "")),  # type: ignore
                 md5_hex,
                 urllib.parse.quote(file_name),
-                )
+            )
         # For artifactsV2 (which is all artifacts now), the file download handler ignores the entity
         # parameter while parsing the url, and fetches the files directly via the artifact id
         # Refer to: https://github.com/wandb/core/blob/7cfee1cd07ddc49fe7ba70ce3d213d2a11bd4456/services/gorilla/api/handler/artifacts.go#L179
@@ -209,6 +217,7 @@ class WandbFileManagerAsync:
                 return None
             file_path, download_url = res
             if await self.fs.exists(file_path):
+                print(f"File already exists: {file_path}")
                 return file_path
             wandb_api_context = wandb_api.get_wandb_api_context()
             headers = None

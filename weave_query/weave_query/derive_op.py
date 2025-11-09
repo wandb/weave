@@ -2,25 +2,33 @@
 # These derived ops are not yet fully Weave serializable due to some non-json stuff
 #     in their closure. So we disable legacy_strict_op_saving when deriving them.
 
+import asyncio
+import concurrent.futures
 import copy
 import inspect
+import os
 import typing
 
-from weave_query import weave_types as types
 from weave_query import (
-    storage,
-    weave_internal,
-    errors,
-    parallelism,
-    registry_mem,
+    artifact_fs,
     box,
     context_state,
+    errors,
     execute_fast,
+    filesystem,
     graph,
     op_args,
     op_def,
     op_policy,
+    parallelism,
+    registry_mem,
+    storage,
+    wandb_api,
+    wandb_file_manager,
+    weave_http,
+    weave_internal,
 )
+from weave_query import weave_types as types
 from weave_query.language_features.tagging import tag_store
 
 USE_PARALLEL_DOWNLOAD = True
@@ -82,6 +90,51 @@ disallow_mapping_type_name_list = [
     "dataframeTable",
     "ArrowWeaveList",
 ]
+
+
+def download_contents(artifact_uris):
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
+    async def download_contents_async(artifact_uris):
+        fs_async = filesystem.FilesystemAsync()
+        http_async = weave_http.HttpAsync(fs_async)
+        api_async = wandb_api.WandbApiAsync()
+        wandb_file_manager_async = wandb_file_manager.WandbFileManagerAsync(
+            fs_async, http_async, api_async
+        )
+
+        async with api_async.connector:
+            async with http_async:
+                await asyncio.gather(
+                    *[
+                        wandb_file_manager_async.ensure_file(uri)
+                        for uri in artifact_uris
+                    ]
+                )
+
+    loop.run_until_complete(download_contents_async(artifact_uris))
+    loop.close()
+
+
+def pre_download_with_processes(files):
+    artifact_uris = [
+        file.artifact._read_artifact_uri.with_path(file.path)
+        for file in files
+        if isinstance(file, artifact_fs.FilesystemArtifactFile)
+    ]
+
+    WORKER_COUNT = os.cpu_count() // 2
+    with concurrent.futures.ProcessPoolExecutor(
+        max_workers=WORKER_COUNT,
+    ) as executor:
+        batch_size = max(1, len(artifact_uris) // WORKER_COUNT)
+        batches = [
+            artifact_uris[i : i + batch_size]
+            for i in range(0, len(artifact_uris), batch_size)
+        ]
+
+        list(executor.map(download_contents, batches))
 
 
 # This class implements a nullable mappable derived op handler. It will create a new op
@@ -253,13 +306,19 @@ class MappedDeriveOpHandler(DeriveOpHandler):
                 or orig_op.name.endswith("run-history2")
                 or orig_op.name.endswith("run-history3")
             ):
+                if orig_op.name.endswith("file-table"):
+                    pre_download_with_processes(list_)
 
                 def download_one(x):
                     with tag_store.with_tag_store_state(
                         tag_store_curr_node_id, tag_store_mem_map
                     ):
+                        import time
+
+                        start_time = time.time()
                         if x == None or types.is_optional(first_arg.type):
                             return None
+
                         called = orig_op(x, **new_inputs)
                         # Use the use path to get caching.
                         try:
@@ -267,6 +326,8 @@ class MappedDeriveOpHandler(DeriveOpHandler):
                         except errors.WeaveArtifactCollectionNotFound:
                             return None
                         res = storage.deref(res)
+                        end_time = time.time()
+                        print(f"Download time: {end_time - start_time}")
                         return res
 
                 if USE_PARALLEL_DOWNLOAD:
