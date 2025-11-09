@@ -21,3 +21,10 @@ class Batch(BaseModel):
 
 class ServerInfoRes(BaseModel):
     min_required_weave_python_version: str
+
+
+class WeaveIdInfoRes(BaseModel):
+    id_compute_version: int
+    digest_algorithm: str
+    digest_encoding: str
+    run_id_separator: str

@@ -322,6 +322,13 @@ class WeaveClient:
         self.entity = entity
         self.project = project
         self.server = server
+        # Internal project ID resolved from W&B (gorilla). Optional until resolved.
+        self.internal_project_id: str | None = None
+        # ID/Digest config fetched from trace server
+        self.id_compute_version: int | None = None
+        self.digest_algorithm: str | None = None
+        self.digest_encoding: str | None = None
+        self.run_id_separator: str | None = None
         self._anonymous_ops: dict[str, Op] = {}
         self._wandb_run_context: WandbRunContext | None = None
         parallelism_main, parallelism_upload = get_parallelism_settings()
@@ -1872,6 +1879,155 @@ class WeaveClient:
 
     def _project_id(self) -> str:
         return f"{self.entity}/{self.project}"
+
+    # -------- Ref / ID conversion helpers --------
+    def to_internal_project_id(self, project_id: str) -> str:
+        """Convert external project id (entity/project) to internal id.
+
+        For now, only the current client's project is supported. This validates
+        the project matches the client's external id and uses the resolved
+        internal project id when available.
+        """
+        if project_id != self._project_id():
+            raise ValueError(
+                f"Invalid project ID: expected '{self._project_id()}', got '{project_id}'"
+            )
+        if not self.internal_project_id:
+            raise RuntimeError(
+                "Internal project id not resolved yet. Call weave.init first."
+            )
+        return self.internal_project_id
+
+    def to_external_project_id(self, internal_project_id: str) -> str | None:
+        """Convert internal project id to external 'entity/project'.
+
+        Returns None if the provided internal id does not match this client's
+        project (callers may render a private ref in that case).
+        """
+        if not self.internal_project_id:
+            raise RuntimeError(
+                "Internal project id not resolved yet. Call weave.init first."
+            )
+        if internal_project_id != self.internal_project_id:
+            return None
+        return self._project_id()
+
+    def to_internal_refs(self, obj: Any) -> Any:
+        """Recursively convert any external weave refs in `obj` to internal refs."""
+        from weave.trace_server.trace_server_converter import (
+            universal_ext_to_int_ref_converter,
+        )
+
+        return universal_ext_to_int_ref_converter(obj, self.to_internal_project_id)
+
+    def to_external_refs(self, obj: Any) -> Any:
+        """Recursively convert any internal weave refs in `obj` to external refs."""
+        from weave.trace_server.trace_server_converter import (
+            universal_int_to_ext_ref_converter,
+        )
+
+        return universal_int_to_ext_ref_converter(obj, self.to_external_project_id)
+
+    # -------- Local digest + internal ref builders --------
+    def _compute_digest_bytes(self, data: bytes) -> str:
+        import hashlib
+        import base64
+
+        algo = (self.digest_algorithm or "sha256").lower()
+        enc = (self.digest_encoding or "base64url").lower()
+
+        if algo == "md5":
+            h = hashlib.md5()
+        elif algo == "sha256":
+            h = hashlib.sha256()
+        else:
+            raise ValueError(f"Unsupported digest algorithm: {self.digest_algorithm}")
+        h.update(data)
+        if enc == "hex":
+            return h.hexdigest()
+        elif enc in ("base64", "base64url"):
+            b64 = base64.urlsafe_b64encode(h.digest()).decode("utf-8").rstrip("=")
+            return b64
+        elif enc == "base64url_custom":
+            b64 = base64.urlsafe_b64encode(h.digest()).decode("utf-8").rstrip("=")
+            # Server sometimes replaces '-'/'_' for backend compatibility
+            return b64.replace("-", "X").replace("_", "Y")
+        else:
+            raise ValueError(f"Unsupported digest encoding: {self.digest_encoding}")
+
+    def compute_digest_str(self, s: str) -> str:
+        return self._compute_digest_bytes(s.encode("utf-8"))
+
+    def internal_object_ref_uri(self, name: str, version: str, extra: list[str] | None = None) -> str:
+        if not self.internal_project_id:
+            raise RuntimeError("Internal project id not resolved")
+        from weave.trace_server.refs_internal import InternalObjectRef
+
+        ref = InternalObjectRef(
+            project_id=self.internal_project_id,
+            name=name,
+            version=version,
+            extra=extra or [],
+        )
+        return ref.uri()
+
+    def internal_op_ref_uri(self, name: str, version: str, extra: list[str] | None = None) -> str:
+        if not self.internal_project_id:
+            raise RuntimeError("Internal project id not resolved")
+        from weave.trace_server.refs_internal import InternalOpRef
+
+        ref = InternalOpRef(
+            project_id=self.internal_project_id,
+            name=name,
+            version=version,
+            extra=extra or [],
+        )
+        return ref.uri()
+
+    def internal_table_ref_uri(self, digest: str) -> str:
+        if not self.internal_project_id:
+            raise RuntimeError("Internal project id not resolved")
+        from weave.trace_server.refs_internal import InternalTableRef
+
+        ref = InternalTableRef(project_id=self.internal_project_id, digest=digest)
+        return ref.uri()
+
+    def internal_call_ref_uri(self, call_id: str) -> str:
+        if not self.internal_project_id:
+            raise RuntimeError("Internal project id not resolved")
+        from weave.trace_server.refs_internal import InternalCallRef
+
+        ref = InternalCallRef(project_id=self.internal_project_id, id=call_id)
+        return ref.uri()
+
+    # -------- Run ID conversion helpers --------
+    def to_internal_run_id(self, run_id: str) -> str:
+        """Convert external run id entity/project/run -> internalProjectId<sep>run."""
+        if not self.internal_project_id:
+            raise RuntimeError("Internal project id not resolved")
+        sep = self.run_id_separator or ":"
+        try:
+            entity, project, run = run_id.split("/")
+        except ValueError:
+            raise ValueError("Run ID should be in the format <entity>/<project>/<run>")
+        if f"{entity}/{project}" != self._project_id():
+            raise ValueError(
+                f"Invalid run project: expected '{self._project_id()}', got '{entity}/{project}'"
+            )
+        return f"{self.internal_project_id}{sep}{run}"
+
+    def to_external_run_id(self, internal_run_id: str) -> str:
+        if not self.internal_project_id:
+            raise RuntimeError("Internal project id not resolved")
+        sep = self.run_id_separator or ":"
+        parts = internal_run_id.split(sep)
+        if len(parts) != 2:
+            raise ValueError("Internal run ID should be in the format <project_id><sep><run>")
+        project_id, run = parts
+        if project_id != self.internal_project_id:
+            # Only convert for this client's project
+            raise ValueError("Internal run ID does not belong to this client project")
+        return f"{self.entity}/{self.project}/{run}"
 
     @trace_sentry.global_trace_sentry.watch()
     def _op_calls(self, op: Op) -> CallsIter:

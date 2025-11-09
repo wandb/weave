@@ -25,6 +25,7 @@ from weave.trace_server_bindings.models import (
     EndBatchItem,
     ServerInfoRes,
     StartBatchItem,
+    WeaveIdInfoRes,
 )
 from weave.utils import http_requests as requests
 from weave.utils.retry import get_current_retry_id, with_retry
@@ -368,6 +369,13 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
         )
         handle_response_error(r, "/server_info")
         return ServerInfoRes.model_validate(r.json())
+
+    def weave_id_info(self) -> WeaveIdInfoRes:
+        r = self.get(
+            "/weave/id_info",
+        )
+        handle_response_error(r, "/weave/id_info")
+        return WeaveIdInfoRes.model_validate(r.json())
 
     def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
         # TODO: Add docs link (DOCS-1390)

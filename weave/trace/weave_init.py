@@ -12,7 +12,11 @@ from weave.trace import (
     weave_client,
 )
 from weave.trace.context import weave_client_context as weave_client_context
-from weave.trace.settings import should_redact_pii, use_server_cache
+from weave.trace.settings import (
+    should_redact_pii,
+    use_server_cache,
+    should_use_client_id_adapter,
+)
 from weave.trace.wandb_run_context import (
     check_wandb_run_matches,
     get_global_wb_run_context,
@@ -24,6 +28,11 @@ from weave.trace_server_bindings import remote_http_trace_server
 from weave.trace_server_bindings.caching_middleware_trace_server import (
     CachingMiddlewareTraceServer,
 )
+from weave.trace_server_bindings.client_id_converting_trace_server import (
+    FixedIdConverter,
+    wrap_with_id_conversion,
+)
+from weave.compat.wandb.wandb_thin import internal_api as wandb_internal_api
 
 logger = logging.getLogger(__name__)
 
@@ -149,6 +158,29 @@ def init_weave(
     if use_server_cache():
         server = CachingMiddlewareTraceServer.from_env(server)
 
+    # Fetch ID/digest info and internal project ID before creating the client,
+    # so we can wrap the server with an ID-converting adapter.
+    id_info = None
+    try:
+        id_info = remote_server.weave_id_info()
+    except Exception:
+        id_info = None
+
+    internal_project_id: str | None = None
+    try:
+        api = wandb_internal_api.Api()
+        internal_project_id = api.project_internal_id(entity_name, project_name)
+    except Exception:
+        internal_project_id = None
+
+    if internal_project_id and id_info is not None and should_use_client_id_adapter():
+        converter = FixedIdConverter(
+            external_project_id=f"{entity_name}/{project_name}",
+            internal_project_id=internal_project_id,
+            run_id_separator=id_info.run_id_separator,
+        )
+        server = wrap_with_id_conversion(server, converter)
+
     client = weave_client.WeaveClient(
         entity_name, project_name, server, ensure_project_exists
     )
@@ -197,6 +229,15 @@ def init_weave(
             "user": user_context,
         }
     )
+
+    # Cache resolved id_info and internal project id on the client for local conversions
+    if id_info is not None:
+        client.id_compute_version = id_info.id_compute_version
+        client.digest_algorithm = id_info.digest_algorithm
+        client.digest_encoding = id_info.digest_encoding
+        client.run_id_separator = id_info.run_id_separator
+    if internal_project_id:
+        client.internal_project_id = internal_project_id
 
     return client
 

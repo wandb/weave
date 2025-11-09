@@ -187,6 +187,17 @@ class UserSettings(BaseModel):
     Can be overridden with the environment variable `WEAVE_USE_PARALLEL_TABLE_UPLOAD`
     """
 
+    use_client_id_adapter: bool = True
+    """
+    Toggles client-side ID/ref conversion adapter wrapping the server.
+
+    If True (default), the SDK converts external ↔ internal IDs/refs locally before
+    invoking the server. Enable this when the server no longer performs its own
+    external↔internal conversion.
+
+    Can be overridden with the environment variable `WEAVE_USE_CLIENT_ID_ADAPTER`.
+    """
+
     model_config = ConfigDict(extra="forbid")
     _is_first_apply: bool = PrivateAttr(True)
 
@@ -297,6 +308,11 @@ def should_enable_disk_fallback() -> bool:
 def should_use_parallel_table_upload() -> bool:
     """Returns whether parallel table upload chunking should be used."""
     return _should("use_parallel_table_upload")
+
+
+def should_use_client_id_adapter() -> bool:
+    """Returns whether client-side ID/ref conversion adapter should be used."""
+    return _should("use_client_id_adapter")
 
 
 def should_implicitly_patch_integrations() -> bool:

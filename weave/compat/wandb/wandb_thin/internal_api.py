@@ -217,6 +217,28 @@ class Api:
     def project(self, entity: str, name: str) -> dict[str, Any]:
         return self.query(self.PROJECT_QUERY, entityName=entity, name=name)
 
+    PROJECT_INTERNAL_ID_QUERY = gql.gql(
+        """
+        query ProjectInternalId($name: String!, $entityName: String!) {
+            project(name: $name, entityName: $entityName) {
+                internalId
+            }
+        }
+        """
+    )
+
+    def project_internal_id(self, entity: str, name: str) -> Optional[str]:
+        try:
+            res = self.query(
+                self.PROJECT_INTERNAL_ID_QUERY, entityName=entity, name=name
+            )
+        except gql.transport.exceptions.TransportQueryError:
+            return None
+        project = res.get("project") if isinstance(res, dict) else None
+        if not project:
+            return None
+        return project.get("internalId")
+
 
 class ApiAsync:
     def __init__(self) -> None:
