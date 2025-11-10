@@ -750,6 +750,7 @@ class CallsQuery(BaseModel):
             hardcoded_filter=self.hardcoded_filter,
             limit=self.limit,
             offset=self.offset,
+            project_version=self.project_version,
         )
 
     def set_include_costs(self, include_costs: bool) -> "CallsQuery":
@@ -923,6 +924,7 @@ class CallsQuery(BaseModel):
             project_version=self.project_version,
             include_storage_size=self.include_storage_size,
             include_total_storage_size=self.include_total_storage_size,
+            project_version=self.project_version,
         )
 
         # Select Fields:
@@ -1534,6 +1536,7 @@ ALLOWED_CALL_FIELDS_COMPLETE = {
     "wb_run_id": CallsCompleteField(field="wb_run_id"),
     "wb_run_step": CallsCompleteField(field="wb_run_step"),
     "wb_run_step_end": CallsCompleteField(field="wb_run_step_end"),
+    "deleted_at": CallsCompleteField(field="deleted_at"),
     "display_name": CallsCompleteField(field="display_name"),
     "storage_size_bytes": AggFieldWithTableOverrides(
         field="storage_size_bytes",
@@ -2241,6 +2244,7 @@ def build_calls_stats_query(
     inner_query = cq.as_sql(param_builder)
     calls_query_sql = f"SELECT {', '.join(aggregated_columns[k] for k in aggregated_columns)} FROM ({inner_query})"
 
+
     return (calls_query_sql, aggregated_columns.keys())
 
 
@@ -2383,6 +2387,8 @@ def build_calls_complete_batch_update_query(
     exception_cases = []
     wb_run_step_end_cases = []
 
+    print("DOING UPDATE BATCH ON CALL IDS", [c.id for c in end_calls])
+
     for call in end_calls:
         call_id = call.id
         call_ids.append(call_id)
@@ -2472,12 +2478,12 @@ def build_calls_complete_batch_update_query(
     raw_sql = f"""
     UPDATE calls_complete
     SET
-        ended_at = CASE {ended_at_case_expr} END,
-        output_dump = CASE {output_dump_case_expr} END,
-        output_refs = CASE {output_refs_case_expr} END,
-        summary_dump = CASE {summary_dump_case_expr} END,
-        exception = CASE {exception_case_expr} END,
-        wb_run_step_end = CASE {wb_run_step_end_case_expr} END,
+        ended_at = CASE {ended_at_case_expr} ELSE ended_at END,
+        output_dump = CASE {output_dump_case_expr} ELSE output_dump END,
+        output_refs = CASE {output_refs_case_expr} ELSE output_refs END,
+        summary_dump = CASE {summary_dump_case_expr} ELSE summary_dump END,
+        exception = CASE {exception_case_expr} ELSE exception END,
+        wb_run_step_end = CASE {wb_run_step_end_case_expr} ELSE wb_run_step_end END,
         updated_at = now64(3)
     WHERE project_id = {param_slot(project_id_param, "String")}
       AND id IN ({ids_in_clause})
