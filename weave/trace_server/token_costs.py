@@ -546,7 +546,7 @@ def build_cost_ctes(
 def get_cost_final_select(
     pb: ParamBuilder,
     select_fields: list[str],
-    order_fields: list["OrderField"],  # type: ignore
+    order_fields: list["OrderField"],
     project_id: str,
 ) -> str:
     """Get the final SELECT statement for cost queries.
