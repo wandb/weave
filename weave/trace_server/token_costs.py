@@ -565,7 +565,7 @@ def cost_query(
     call_table_alias: str,
     project_id: str,
     select_fields: list[str],
-    order_fields: list[tsi.SortBy],
+    order_fields: list["OrderField"],
 ) -> str:
     """Build complete cost query with CTEs and final SELECT.
 
@@ -593,7 +593,7 @@ def cost_query(
     """
     ctes = build_cost_ctes(pb, call_table_alias, project_id)
     cte_sql = ",\n".join(f"{cte.name} AS ({cte.sql})" for cte in ctes)
-    final_select = get_cost_final_select(pb, select_fields, order_fields)
+    final_select = get_cost_final_select(pb, select_fields, order_fields, project_id)
     return f"{cte_sql}\n\n{final_select}"
 
 

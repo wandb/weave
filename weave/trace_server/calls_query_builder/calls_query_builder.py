@@ -837,9 +837,9 @@ class CallsQuery(BaseModel):
                     # For non-dynamic fields (like started_at, op_name, etc.),
                     # add the field directly to ensure it's available in CTEs
                     if field_obj not in select_query.select_fields:
-                        assert isinstance(
-                            field_obj, CallsMergedField
-                        ), "Field must be a CallsMergedField"
+                        assert isinstance(field_obj, CallsMergedField), (
+                            "Field must be a CallsMergedField"
+                        )
                         select_query.select_fields.append(field_obj)
 
         filtered_calls_sql = filter_query._as_sql_base_format(
