@@ -33,7 +33,6 @@ from typing import Callable, Literal, Optional, cast
 from pydantic import BaseModel, Field
 
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.calls_query_builder.cte import CTECollection
 from weave.trace_server.calls_query_builder.object_ref_query_builder import (
     ObjectRefCondition,
     ObjectRefOrderCondition,
