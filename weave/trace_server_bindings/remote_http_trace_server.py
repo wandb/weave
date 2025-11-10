@@ -133,33 +133,110 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
     @with_retry
-    def _send_batch_to_server(self, encoded_data: bytes) -> None:
+    def _send_batch_to_server(
+        self, encoded_data: bytes, entity: str = "", project: str = ""
+    ) -> None:
         """Send a batch of data to the server with retry logic.
 
         This method is separated from _flush_calls to avoid recursive retries.
         First tries the v2 endpoint, falls back to legacy on 404.
         """
-        # Try v2 endpoint first
-        try:
-            r = self.post(
-                "/v2/calls/upsert/batch",
-                data=encoded_data,  # type: ignore
-            )
-            handle_response_error(r, "/v2/calls/upsert/batch")
-        except requests.HTTPError as e:
-            # If v2 endpoint doesn't exist (404), fall back to legacy upsert_batch
-            if e.response.status_code == 404:
+        # Try v2 endpoint first if we have entity/project
+        if entity and project:
+            try:
+                url = f"/v2/{entity}/{project}/calls/upsert/batch"
+                r = self.post(
+                    url,
+                    data=encoded_data,  # type: ignore
+                )
+                handle_response_error(r, url)
+                return
+            except requests.HTTPError as e:
+                # If v2 endpoint doesn't exist (404), fall back to legacy upsert_batch
+                if e.response.status_code != 404:
+                    # Re-raise non-404 errors
+                    raise
                 logger.debug(
                     "V2 upsert batch endpoint not available, falling back to legacy upsert_batch"
                 )
-                r = self.post(
-                    "/call/upsert_batch",
-                    data=encoded_data,  # type: ignore
+
+        # Fall back to legacy endpoint
+        r = self.post(
+            "/call/upsert_batch",
+            data=encoded_data,  # type: ignore
+        )
+        handle_response_error(r, "/call/upsert_batch")
+
+    def _consolidate_batch(
+        self, batch: list[Union[StartBatchItem, EndBatchItem, CompleteBatchItem]]
+    ) -> list[Union[StartBatchItem, EndBatchItem, CompleteBatchItem]]:
+        """Consolidate start/end pairs in a batch into complete items.
+
+        Looks for pairs of start and end items with matching IDs and combines them
+        into CompleteBatchItems. Unpaired starts and ends are left as-is.
+        """
+        # Build maps of call IDs to their items
+        starts: dict[str, StartBatchItem] = {}
+        ends: dict[str, EndBatchItem] = {}
+        completes: list[CompleteBatchItem] = []
+
+        # First pass: collect all items by type and ID
+        for item in batch:
+            if isinstance(item, StartBatchItem):
+                starts[item.req.start.id] = item
+            elif isinstance(item, EndBatchItem):
+                ends[item.req.end.id] = item
+            elif isinstance(item, CompleteBatchItem):
+                completes.append(item)
+
+        # Second pass: match starts with ends and create completes
+        consolidated: list[Union[StartBatchItem, EndBatchItem, CompleteBatchItem]] = []
+        paired_ids: set[str] = set()
+
+        for call_id, start_item in starts.items():
+            if call_id in ends:
+                # Found a pair - create a complete item
+                end_item = ends[call_id]
+                complete_call = tsi.CompletedCallSchemaForInsert(
+                    project_id=start_item.req.start.project_id,
+                    id=start_item.req.start.id,
+                    trace_id=start_item.req.start.trace_id,
+                    op_name=start_item.req.start.op_name,
+                    display_name=start_item.req.start.display_name,
+                    parent_id=start_item.req.start.parent_id,
+                    thread_id=start_item.req.start.thread_id,
+                    turn_id=start_item.req.start.turn_id,
+                    started_at=start_item.req.start.started_at,
+                    attributes=start_item.req.start.attributes,
+                    inputs=start_item.req.start.inputs,
+                    ended_at=end_item.req.end.ended_at,
+                    exception=end_item.req.end.exception,
+                    output=end_item.req.end.output,
+                    summary=end_item.req.end.summary,
+                    wb_user_id=start_item.req.start.wb_user_id,
+                    wb_run_id=start_item.req.start.wb_run_id,
+                    wb_run_step=start_item.req.start.wb_run_step,
+                    wb_run_step_end=end_item.req.end.wb_run_step_end,
                 )
-                handle_response_error(r, "/call/upsert_batch")
-            else:
-                # Re-raise non-404 errors
-                raise
+                consolidated.append(
+                    CompleteBatchItem(req=tsi.CallCompleteReq(complete=complete_call))
+                )
+                paired_ids.add(call_id)
+
+        # Add unpaired starts
+        for call_id, start_item in starts.items():
+            if call_id not in paired_ids:
+                consolidated.append(start_item)
+
+        # Add unpaired ends
+        for call_id, end_item in ends.items():
+            if call_id not in paired_ids:
+                consolidated.append(end_item)
+
+        # Add pre-existing completes
+        consolidated.extend(completes)
+
+        return consolidated
 
     def _flush_calls(
         self,
@@ -177,6 +254,25 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         if len(batch) == 0:
             return
 
+        # Consolidate start/end pairs into completes
+        batch = self._consolidate_batch(batch)
+
+        # Extract entity/project from first item in batch
+        entity = ""
+        project = ""
+        if len(batch) > 0:
+            first_item = batch[0]
+            project_id = ""
+            if isinstance(first_item, StartBatchItem):
+                project_id = first_item.req.start.project_id
+            elif isinstance(first_item, EndBatchItem):
+                project_id = first_item.req.end.project_id
+            elif isinstance(first_item, CompleteBatchItem):
+                project_id = first_item.req.complete.project_id
+
+            if project_id and "/" in project_id:
+                entity, project = project_id.split("/", 1)
+
         def get_item_id(item: StartBatchItem | EndBatchItem | CompleteBatchItem | dict[str, Any]) -> str:
             if isinstance(item, StartBatchItem):
                 return f"{item.req.start.id}-start"
@@ -190,11 +286,14 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
             data = Batch(batch=batch).model_dump_json()
             return data.encode("utf-8")
 
+        def send_batch_fn(encoded_data: bytes) -> None:
+            self._send_batch_to_server(encoded_data, entity=entity, project=project)
+
         process_batch_with_retry(
             batch_name="calls",
             batch=batch,
             remote_request_bytes_limit=self.remote_request_bytes_limit,
-            send_batch_fn=self._send_batch_to_server,
+            send_batch_fn=send_batch_fn,
             processor_obj=self.call_processor,
             should_update_batch_size=_should_update_batch_size,
             get_item_id_fn=get_item_id,
