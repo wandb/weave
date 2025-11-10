@@ -19,6 +19,7 @@ from weave.trace_server.validation import (
 )
 
 if TYPE_CHECKING:
+    from weave.trace_server.calls_query_builder.calls_query_builder import OrderField
     from weave.trace_server.calls_query_builder.cte import CTE
 
 DUMMY_LLM_ID = "weave_dummy_llm_id"
@@ -335,15 +336,25 @@ def final_call_select_with_cost(
     param_builder: ParamBuilder,
     price_table_alias: str,
     select_fields: list[str],
-    order_fields: list[tsi.SortBy],
+    order_fields: list["OrderField"],
+    project_id: str,
 ) -> PreparedSelect:
     # We filter out summary_dump, because we add costs to summary dump in the select statement
     final_select_fields = [field for field in select_fields if field != "summary_dump"]
 
+    # circular dependency
+    from weave.trace_server.calls_query_builder.calls_query_builder import (
+        CallsMergedFeedbackPayloadField,
+    )
+
     # Add any fields from order_fields that aren't already in final_select_fields
     # This ensures that fields used in ORDER BY are available in the query scope
+    # Note: Skip feedback fields as they're handled via LEFT JOIN and can't be in SELECT
     for order_field in order_fields:
-        field_name = order_field.field
+        if isinstance(order_field.field, CallsMergedFeedbackPayloadField):
+            continue
+
+        field_name = order_field.field.field
         if field_name not in final_select_fields and field_name != "summary_dump":
             final_select_fields.append(field_name)
 
@@ -442,12 +453,51 @@ def final_call_select_with_cost(
             tsi.Query(**{"$expr": {"$eq": [{"$getField": "rank"}, {"$literal": 1}]}})
         )
         .group_by(final_select_fields)
-        .order_by(order_fields)
     )
 
     final_prepared_query = final_query.prepare(
         database_type="clickhouse", param_builder=param_builder
     )
+    needs_feedback = any(
+        isinstance(order_field.field, CallsMergedFeedbackPayloadField)
+        for order_field in order_fields
+    )
+
+    # If feedback join is needed, inject it into the SQL after the FROM clause
+    if needs_feedback:
+        project_param = param_builder.add_param(project_id)
+        feedback_join = f"""
+        LEFT JOIN (
+            SELECT * FROM feedback WHERE feedback.project_id = {{{project_param}:String}}
+        ) AS feedback ON (
+            feedback.weave_ref = concat('weave-trace-internal:///', {{{project_param}:String}}, '/call/', {price_table_alias}.id))
+        """
+        sql_parts = final_prepared_query.sql.split(f"\nFROM {price_table_alias}\n")
+        inserted_sql = (
+            f"{sql_parts[0]}\nFROM {price_table_alias}\n{feedback_join}\n{sql_parts[1]}"
+        )
+        final_prepared_query = PreparedSelect(
+            sql=inserted_sql,
+            parameters=final_prepared_query.parameters,
+            fields=final_prepared_query.fields,
+        )
+
+    # Generate ORDER BY SQL from OrderField objects to preserve complex expressions
+    if order_fields:
+        order_by_sql_parts = []
+        for order_field in order_fields:
+            # Generate the ORDER BY SQL for this field using the ranked_prices table alias
+            order_sql = order_field.as_sql(param_builder, price_table_alias)
+            order_by_sql_parts.append(order_sql)
+        order_by_sql = ", ".join(order_by_sql_parts)
+
+        # Append ORDER BY to the prepared query
+        final_prepared_query = PreparedSelect(
+            sql=f"{final_prepared_query.sql}\nORDER BY {order_by_sql}",
+            parameters=final_prepared_query.parameters,
+            fields=final_prepared_query.fields,
+        )
+
     return final_prepared_query
 
 
@@ -493,19 +543,21 @@ def build_cost_ctes(
 def get_cost_final_select(
     pb: ParamBuilder,
     select_fields: list[str],
-    order_fields: list[tsi.SortBy],
+    order_fields: list["OrderField"],  # type: ignore
+    project_id: str,
 ) -> str:
     """Get the final SELECT statement for cost queries.
 
     Args:
         pb: Parameter builder for SQL parameters
         select_fields: Fields to select
-        order_fields: Fields to order by
+        order_fields: OrderField objects to order by (preserves complex expressions)
+        project_id: Project ID for feedback joins
 
     Returns:
         Final SELECT SQL statement
     """
-    return f"-- Final Select, which just selects the correct fields, and adds a costs object\n{final_call_select_with_cost(pb, 'ranked_prices', select_fields, order_fields).sql}"
+    return f"-- Final Select, which just selects the correct fields, and adds a costs object\n{final_call_select_with_cost(pb, 'ranked_prices', select_fields, order_fields, project_id).sql}"
 
 
 def cost_query(

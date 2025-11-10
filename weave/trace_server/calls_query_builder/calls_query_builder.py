@@ -822,6 +822,10 @@ class CallsQuery(BaseModel):
         if self.include_costs:
             for order_field in self.order_fields:
                 field_obj = order_field.field
+                # Skip feedback fields - they're handled via LEFT JOIN and don't need to be selected
+                if isinstance(field_obj, CallsMergedFeedbackPayloadField):
+                    continue
+
                 if isinstance(
                     field_obj, (CallsMergedDynamicField, QueryBuilderDynamicField)
                 ):
@@ -829,6 +833,14 @@ class CallsQuery(BaseModel):
                     base_field = get_field_by_name(field_obj.field)
                     if base_field not in select_query.select_fields:
                         select_query.select_fields.append(base_field)
+                else:
+                    # For non-dynamic fields (like started_at, op_name, etc.),
+                    # add the field directly to ensure it's available in CTEs
+                    if field_obj not in select_query.select_fields:
+                        assert isinstance(
+                            field_obj, CallsMergedField
+                        ), "Field must be a CallsMergedField"
+                        select_query.select_fields.append(field_obj)
 
         filtered_calls_sql = filter_query._as_sql_base_format(
             pb,
@@ -853,9 +865,12 @@ class CallsQuery(BaseModel):
         ctes.add_cte(CTE_ALL_CALLS, base_sql)
         self._add_cost_ctes_to_builder(ctes, pb)
 
-        order_by_fields = self._convert_to_orm_sort_fields()
         select_fields = [field.field for field in self.select_fields]
-        final_select = get_cost_final_select(pb, select_fields, order_by_fields)
+        # Pass the OrderField objects directly to preserve complex expressions
+        # Also pass project_id for building feedback joins if needed
+        final_select = get_cost_final_select(
+            pb, select_fields, self.order_fields, self.project_id
+        )
 
         raw_sql = ctes.to_sql() + "\n" + final_select
         return safely_format_sql(raw_sql, logger)
