@@ -2056,9 +2056,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         """List scorer objects by delegating to objs_query with Scorer filtering."""
         obj_query_req = tsi.ObjQueryReq(
             project_id=req.project_id,
-            filter=tsi.ObjectVersionFilter(
-                base_object_classes=["Scorer"], is_op=False
-            ),
+            filter=tsi.ObjectVersionFilter(base_object_classes=["Scorer"], is_op=False),
             limit=req.limit,
             offset=req.offset,
         )
@@ -2396,9 +2394,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         """List model objects by delegating to objs_query with Model filtering."""
         obj_query_req = tsi.ObjQueryReq(
             project_id=req.project_id,
-            filter=tsi.ObjectVersionFilter(
-                base_object_classes=["Model"], is_op=False
-            ),
+            filter=tsi.ObjectVersionFilter(base_object_classes=["Model"], is_op=False),
             limit=req.limit,
             offset=req.offset,
         )
