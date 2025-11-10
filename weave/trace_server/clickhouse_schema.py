@@ -143,6 +143,7 @@ class CallUpdateCHInsertable(BaseModel):
     _output_refs_v = field_validator("output_refs")(validation.refs_list_validator)
 
 
+
 # Very critical that this matches the calls table schema! This should
 # essentially be the DB version of CallSchema with the addition of the
 # created_at and updated_at fields

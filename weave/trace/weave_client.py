@@ -98,14 +98,12 @@ from weave.trace_server.interface.feedback_types import (
     runnable_feedback_runnable_ref_selector,
 )
 from weave.trace_server.trace_server_interface import (
-    CallCompleteReq,
     CallEndReq,
     CallsDeleteReq,
     CallsFilter,
     CallsQueryReq,
     CallStartReq,
     CallUpdateReq,
-    CompletedCallSchemaForInsert,
     CostCreateInput,
     CostCreateReq,
     CostCreateRes,
@@ -351,7 +349,6 @@ class WeaveClient:
         if hasattr(self.server, "get_feedback_processor"):
             self._server_feedback_processor = self.server.get_feedback_processor()
         self.send_file_cache = WeaveClientSendFileCache()
-        self._call_starts: dict[str, CallStartReq] = {}
 
     ################ High Level Convenience Methods ################
 
@@ -809,8 +806,6 @@ class WeaveClient:
                     "Inputs may be dropped."
                 )
 
-            # Cache the start request for potential combination with end
-            self._call_starts[call_id] = call_start_req
             self.server.call_start(call_start_req)
             return True
 
@@ -956,8 +951,8 @@ class WeaveClient:
             )
 
             # Check if we have a cached start for this call
-            # call.id is always a string, but mypy doesn't know that
-            call_start_req = self._call_starts.pop(call.id, None)  # type: ignore[arg-type]
+            assert isinstance(call.id, str)
+            call_start_req = self._call_starts.pop(call.id, None)
 
             if call_start_req is not None:
                 # Combine start and end into a complete call
@@ -974,12 +969,9 @@ class WeaveClient:
                     attributes=call_start_req.start.attributes,
                     inputs=call_start_req.start.inputs,
                     ended_at=ended_at,
-                    exception=exception_str,
                     output=output_json,
                     summary=merged_summary,
-                    wb_user_id=call_start_req.start.wb_user_id,
-                    wb_run_id=call_start_req.start.wb_run_id,
-                    wb_run_step=call_start_req.start.wb_run_step,
+                    exception=exception_str,
                     wb_run_step_end=current_wb_run_step_end,
                 )
 
@@ -1004,13 +996,7 @@ class WeaveClient:
                         wb_run_step_end=current_wb_run_step_end,
                     )
                 )
-                bytes_size = len(call_end_req.model_dump_json())
-                if bytes_size > MAX_TRACE_PAYLOAD_SIZE:
-                    logger.warning(
-                        f"Trace output size ({bytes_size} bytes) exceeds the maximum allowed size of {MAX_TRACE_PAYLOAD_SIZE} bytes. "
-                        "Output may be dropped."
-                    )
-                self.server.call_end(call_end_req)
+            self.server.call_end(call_end_req)
 
         self.future_executor.defer(send_end_call)
 
