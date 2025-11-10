@@ -6036,3 +6036,90 @@ def test_calls_query_sort_by_deselected_heavy_field(client):
     assert len(calls) == 2
     assert calls[0].id == call_ids[0]
     assert calls[1].id == call_ids[1]
+
+
+def test_calls_query_sort_by_nested_attributes_field_with_costs(client):
+    """Test sorting by nested attributes field with cost query and minimal columns."""
+
+    @weave.op
+    def op1(x: int) -> int:
+        return x * 2
+
+    @weave.op
+    def op2(x: int) -> int:
+        return x * 3
+
+    # Create calls with attributes
+    call1 = client.create_call(op1, {"x": 1}, attributes={"metadata": {"priority": 2}})
+    client.finish_call(call1, 2)
+
+    call2 = client.create_call(op2, {"x": 2}, attributes={"metadata": {"priority": 1}})
+    client.finish_call(call2, 6)
+
+    # Get call ids in order of creation
+    calls = list(client.get_calls(columns=["id"]))
+    call_ids = [call.id for call in calls]
+
+    # Sort by nested attribute field (ascending: 1, 2)
+    sort_by = [{"field": "attributes.metadata.priority", "direction": "asc"}]
+    calls = client.get_calls(sort_by=sort_by, columns=["id"], include_costs=False)
+    assert len(calls) == 2
+    assert calls[0].id == call_ids[1]  # call2 has priority 1
+    assert calls[1].id == call_ids[0]  # call1 has priority 2
+
+    # Test with include_costs=True
+    calls = client.get_calls(sort_by=sort_by, columns=["id"], include_costs=True)
+    assert len(calls) == 2
+    assert calls[0].id == call_ids[1]  # call2 has priority 1
+    assert calls[1].id == call_ids[0]  # call1 has priority 2
+
+
+@pytest.mark.asyncio
+async def test_calls_query_sort_by_feedback_field_with_costs(client):
+    """Test sorting by feedback field with cost query and minimal columns."""
+    if client_is_sqlite(client):
+        # Not implemented in sqlite - skip
+        pytest.skip("Sorting by feedback fields not implemented in SQLite")
+
+    @weave.op
+    def my_scorer(x: int, output: int) -> dict:
+        return {"score": x + output}
+
+    @weave.op
+    def op1(x: int) -> int:
+        return x * 2
+
+    @weave.op
+    def op2(x: int) -> int:
+        return x * 3
+
+    # Create and finish calls, then apply scorer
+    _, call1 = op1.call(1)
+    await call1.apply_scorer(my_scorer)
+
+    _, call2 = op2.call(2)
+    await call2.apply_scorer(my_scorer)
+
+    filter = tsi.CallsFilter(op_names=[call1.op_name, call2.op_name])
+
+    # Get call ids in order of creation
+    calls = list(client.get_calls(columns=["id"], filter=filter))
+    call_ids = [call.id for call in calls]
+
+    # Sort by feedback field (ascending: score of 3 for call1, 8 for call2)
+    sort_by = [
+        {
+            "field": "feedback.[wandb.runnable.my_scorer].payload.output.score",
+            "direction": "asc",
+        }
+    ]
+    calls = client.get_calls(sort_by=sort_by, columns=["id"], filter=filter, include_costs=False)
+    assert len(calls) == 2
+    assert calls[0].id == call_ids[0]  # call1 has score 3 (1+2)
+    assert calls[1].id == call_ids[1]  # call2 has score 8 (2+6)
+
+    # Test with include_costs=True
+    calls = client.get_calls(sort_by=sort_by, columns=["id"], filter=filter, include_costs=True)
+    assert len(calls) == 2
+    assert calls[0].id == call_ids[0]  # call1 has score 3
+    assert calls[1].id == call_ids[1]  # call2 has score 8
