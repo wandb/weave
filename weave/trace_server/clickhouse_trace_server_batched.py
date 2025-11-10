@@ -65,6 +65,7 @@ from weave.trace_server.clickhouse_schema import (
     CallEndCHInsertable,
     CallStartCHInsertable,
     CallUpdateCHInsertable,
+    CompletedCallCHInsertable,
     FileChunkCreateCHInsertable,
     ObjCHInsertable,
     ObjDeleteCHInsertable,
@@ -4990,6 +4991,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._flush_calls")
     def _flush_calls(self) -> None:
         self._analyze_call_batch_breakdown()
+
         try:
             self._insert_call_batch(self._call_batch)
         except InsertTooLarge:
