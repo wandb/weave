@@ -60,7 +60,7 @@ from weave.trace_server.orm import (
     combine_conditions,
     python_value_to_ch_type,
 )
-from weave.trace_server.token_costs import build_cost_ctes, get_cost_final_select
+from weave.trace_server.token_costs import cost_query
 from weave.trace_server.trace_server_common import assert_parameter_length_less_than_max
 from weave.trace_server.trace_server_interface_util import (
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
@@ -817,19 +817,6 @@ class CallsQuery(BaseModel):
         # SUPER IMPORTANT: still need to re-sort the final query
         select_query.order_fields = self.order_fields
 
-        # When using the CTE pattern, ensure all fields used in ordering
-        # are selected in select_query so they're available in the final query's ORDER BY.
-        if self.include_costs:
-            for order_field in self.order_fields:
-                field_obj = order_field.field
-                if isinstance(
-                    field_obj, (CallsMergedDynamicField, QueryBuilderDynamicField)
-                ):
-                    # we need to add the base field, not the dynamic one
-                    base_field = get_field_by_name(field_obj.field)
-                    if base_field not in select_query.select_fields:
-                        select_query.select_fields.append(base_field)
-
         filtered_calls_sql = filter_query._as_sql_base_format(
             pb,
             table_alias,
@@ -838,41 +825,40 @@ class CallsQuery(BaseModel):
         )
         ctes.add_cte(CTE_FILTERED_CALLS, filtered_calls_sql)
 
-        base_sql = select_query._as_sql_base_format(
-            pb,
-            table_alias,
-            id_subquery_name=CTE_FILTERED_CALLS,
-            field_to_object_join_alias_map=field_to_object_join_alias_map,
-            expand_columns=self.expand_columns,
-        )
-
-        if not self.include_costs:
-            raw_sql = ctes.to_sql() + "\n" + base_sql
-            return safely_format_sql(raw_sql, logger)
-
-        ctes.add_cte(CTE_ALL_CALLS, base_sql)
-        self._add_cost_ctes_to_builder(ctes, pb)
-
-        order_by_fields = self._convert_to_orm_sort_fields()
-        select_fields = [field.field for field in self.select_fields]
-        final_select = get_cost_final_select(pb, select_fields, order_by_fields)
-
-        raw_sql = ctes.to_sql() + "\n" + final_select
-        return safely_format_sql(raw_sql, logger)
-
-    def _add_cost_ctes_to_builder(self, ctes: CTECollection, pb: ParamBuilder) -> None:
-        cost_cte_list = build_cost_ctes(pb, CTE_ALL_CALLS, self.project_id)
-        for cte in cost_cte_list:
-            ctes.add_cte(cte.name, cte.sql)
-
-    def _convert_to_orm_sort_fields(self) -> list[tsi.SortBy]:
-        return [
-            tsi.SortBy(
-                field=sort_by.field.field,
-                direction=cast(Literal["asc", "desc"], sort_by.direction.lower()),
+        if self.include_costs:
+            # TODO: We should unify the calls query order by fields to be orm sort by fields
+            order_by_fields = [
+                tsi.SortBy(
+                    field=sort_by.field.field,
+                    direction=cast(Literal["asc", "desc"], sort_by.direction.lower()),
+                )
+                for sort_by in self.order_fields
+            ]
+            select_fields = [field.field for field in self.select_fields]
+            all_calls_sql = select_query._as_sql_base_format(
+                pb,
+                table_alias,
+                id_subquery_name=CTE_FILTERED_CALLS,
+                field_to_object_join_alias_map=field_to_object_join_alias_map,
+                expand_columns=self.expand_columns,
             )
-            for sort_by in self.order_fields
-        ]
+            ctes.add_cte(CTE_ALL_CALLS, all_calls_sql)
+
+            inner_sql = cost_query(
+                pb, CTE_ALL_CALLS, self.project_id, select_fields, order_by_fields
+            )
+            raw_sql = ctes.to_sql() + ",\n" + inner_sql
+        else:
+            base_sql = select_query._as_sql_base_format(
+                pb,
+                table_alias,
+                id_subquery_name=CTE_FILTERED_CALLS,
+                field_to_object_join_alias_map=field_to_object_join_alias_map,
+                expand_columns=self.expand_columns,
+            )
+            raw_sql = ctes.to_sql() + "\n" + base_sql
+
+        return safely_format_sql(raw_sql, logger)
 
     def _build_where_clause_optimizations(
         self,
