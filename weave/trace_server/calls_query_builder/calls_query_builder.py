@@ -514,7 +514,7 @@ class CallsQuery(BaseModel):
             hardcoded_filter=self.hardcoded_filter,
             limit=self.limit,
             offset=self.offset,
-            read_table=self.read_table,
+            project_version=self.project_version,
         )
 
     def set_include_costs(self, include_costs: bool) -> "CallsQuery":
@@ -688,6 +688,7 @@ class CallsQuery(BaseModel):
             read_table=self.read_table,
             include_storage_size=self.include_storage_size,
             include_total_storage_size=self.include_total_storage_size,
+            project_version=self.project_version,
         )
 
         # Select Fields:
@@ -1811,6 +1812,7 @@ def build_calls_stats_query(
     inner_query = cq.as_sql(param_builder)
     calls_query_sql = f"SELECT {', '.join(aggregated_columns[k] for k in aggregated_columns)} FROM ({inner_query})"
 
+
     return (calls_query_sql, aggregated_columns.keys())
 
 
@@ -2070,6 +2072,8 @@ def build_calls_complete_batch_update_query(
         "exception": [],
         "wb_run_step_end": [],
     }
+
+    print("DOING UPDATE BATCH ON CALL IDS", [c.id for c in end_calls])
 
     for call in end_calls:
         call_ids.append(call.id)
