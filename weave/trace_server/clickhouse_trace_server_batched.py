@@ -1763,7 +1763,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         Returns the rows reference as a string.
         """
         # Query the objects
-        dataset_filter = tsi.ObjectVersionFilter(base_object_classes=["Dataset"])
+        dataset_filter = tsi.ObjectVersionFilter(
+            base_object_classes=["Dataset"], is_op=False
+        )
         obj_query_req = tsi.ObjQueryReq(
             project_id=req.project_id,
             filter=dataset_filter,
@@ -1905,7 +1907,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def scorer_list_v2(self, req: tsi.ScorerListV2Req) -> Iterator[tsi.ScorerReadV2Res]:
         """List scorer objects by delegating to objs_query with Scorer filtering."""
         # Query the objects
-        scorer_filter = tsi.ObjectVersionFilter(base_object_classes=["Scorer"])
+        scorer_filter = tsi.ObjectVersionFilter(
+            base_object_classes=["Scorer"], is_op=False
+        )
         obj_query_req = tsi.ObjQueryReq(
             project_id=req.project_id,
             filter=scorer_filter,
@@ -2074,7 +2078,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # Query the objects
         obj_query_req = tsi.ObjQueryReq(
             project_id=req.project_id,
-            filter=tsi.ObjectVersionFilter(base_object_classes=["Evaluation"]),
+            filter=tsi.ObjectVersionFilter(
+                base_object_classes=["Evaluation"], is_op=False
+            ),
             limit=req.limit,
             offset=req.offset,
         )
@@ -2243,7 +2249,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         """List model objects by delegating to objs_query with Model filtering."""
         obj_query_req = tsi.ObjQueryReq(
             project_id=req.project_id,
-            filter=tsi.ObjectVersionFilter(base_object_classes=["Model"]),
+            filter=tsi.ObjectVersionFilter(
+                base_object_classes=["Model"], is_op=False
+            ),
             limit=req.limit,
             offset=req.offset,
         )
