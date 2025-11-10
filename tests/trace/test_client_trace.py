@@ -6113,13 +6113,17 @@ async def test_calls_query_sort_by_feedback_field_with_costs(client):
             "direction": "asc",
         }
     ]
-    calls = client.get_calls(sort_by=sort_by, columns=["id"], filter=filter, include_costs=False)
+    calls = client.get_calls(
+        sort_by=sort_by, columns=["id"], filter=filter, include_costs=False
+    )
     assert len(calls) == 2
     assert calls[0].id == call_ids[0]  # call1 has score 3 (1+2)
     assert calls[1].id == call_ids[1]  # call2 has score 8 (2+6)
 
     # Test with include_costs=True
-    calls = client.get_calls(sort_by=sort_by, columns=["id"], filter=filter, include_costs=True)
+    calls = client.get_calls(
+        sort_by=sort_by, columns=["id"], filter=filter, include_costs=True
+    )
     assert len(calls) == 2
     assert calls[0].id == call_ids[0]  # call1 has score 3
     assert calls[1].id == call_ids[1]  # call2 has score 8

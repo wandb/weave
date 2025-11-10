@@ -444,7 +444,6 @@ def final_call_select_with_cost(
             *usage_with_costs_fields,
         ],
     )
-
     final_query = (
         ranked_price_table.select()
         .fields(final_select_fields)
@@ -458,12 +457,13 @@ def final_call_select_with_cost(
     final_prepared_query = final_query.prepare(
         database_type="clickhouse", param_builder=param_builder
     )
+    final_sql = final_prepared_query.sql
+
+    # Add feedback join if needed
     needs_feedback = any(
         isinstance(order_field.field, CallsMergedFeedbackPayloadField)
         for order_field in order_fields
     )
-
-    # If feedback join is needed, inject it into the SQL after the FROM clause
     if needs_feedback:
         project_param = param_builder.add_param(project_id)
         feedback_join = f"""
@@ -472,31 +472,34 @@ def final_call_select_with_cost(
         ) AS feedback ON (
             feedback.weave_ref = concat('weave-trace-internal:///', {{{project_param}:String}}, '/call/', {price_table_alias}.id))
         """
-        sql_parts = final_prepared_query.sql.split(f"\nFROM {price_table_alias}\n")
-        inserted_sql = (
-            f"{sql_parts[0]}\nFROM {price_table_alias}\n{feedback_join}\n{sql_parts[1]}"
-        )
-        final_prepared_query = PreparedSelect(
-            sql=inserted_sql,
-            parameters=final_prepared_query.parameters,
-            fields=final_prepared_query.fields,
-        )
+        # Insert the join after the FROM clause
+        from_marker = f"\nFROM {price_table_alias}\n"
+        if from_marker in final_sql:
+            parts = final_sql.split(from_marker, 1)
+            final_sql = f"{parts[0]}{from_marker}{feedback_join}\n{parts[1]}"
+        else:
+            raise ValueError(
+                f"Could not find FROM marker in SQL for feedback join: {from_marker}"
+            )
 
-    # Generate ORDER BY SQL from OrderField objects to preserve complex expressions
+    # Add ORDER BY clause if needed
+    # Note: We append ORDER BY manually because OrderField.as_sql() has complex logic
+    # that generates multiple ORDER BY clauses for dynamic fields, which the ORM's
+    # order_by() method doesn't support.
     if order_fields:
         order_by_sql_parts = []
         for order_field in order_fields:
-            # Generate the ORDER BY SQL for this field using the ranked_prices table alias
             order_sql = order_field.as_sql(param_builder, price_table_alias)
             order_by_sql_parts.append(order_sql)
         order_by_sql = ", ".join(order_by_sql_parts)
+        final_sql = f"{final_sql}\nORDER BY {order_by_sql}"
 
-        # Append ORDER BY to the prepared query
-        final_prepared_query = PreparedSelect(
-            sql=f"{final_prepared_query.sql}\nORDER BY {order_by_sql}",
-            parameters=final_prepared_query.parameters,
-            fields=final_prepared_query.fields,
-        )
+    # Return the final prepared query with updated SQL
+    final_prepared_query = PreparedSelect(
+        sql=final_sql,
+        parameters=param_builder.get_params(),
+        fields=final_prepared_query.fields,
+    )
 
     return final_prepared_query
 
