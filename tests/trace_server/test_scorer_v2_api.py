@@ -28,7 +28,7 @@ def score(output: str, target: str) -> dict:
     create_res = trace_server.scorer_create_v2(create_req)
 
     assert create_res.digest is not None
-    assert create_res.object_id == "scorer_exact_match"
+    assert create_res.object_id == "exact_match"
     assert create_res.version_index == 0
     # Verify scorer returns a reference string
     assert isinstance(create_res.scorer, str)
@@ -53,7 +53,7 @@ def score(output: str) -> dict:
     create_res = trace_server.scorer_create_v2(create_req)
 
     assert create_res.digest is not None
-    assert create_res.object_id == "scorer_length_scorer"
+    assert create_res.object_id == "length_scorer"
     assert create_res.version_index == 0
     assert isinstance(create_res.scorer, str)
 
@@ -78,12 +78,12 @@ def score(output: str, target: str) -> dict:
     # Read the scorer back
     read_req = tsi.ScorerReadV2Req(
         project_id=project_id,
-        object_id="scorer_case_insensitive_match",
+        object_id="case_insensitive_match",
         digest=create_res.digest,
     )
     read_res = trace_server.scorer_read_v2(read_req)
 
-    assert read_res.object_id == "scorer_case_insensitive_match"
+    assert read_res.object_id == "case_insensitive_match"
     assert read_res.digest == create_res.digest
     assert read_res.version_index == 0
     assert read_res.name == "case_insensitive_match"
@@ -235,7 +235,7 @@ def test_scorer_delete_v2_single_version(trace_server):
     # Delete the specific version
     delete_req = tsi.ScorerDeleteV2Req(
         project_id=project_id,
-        object_id="scorer_delete_test",
+        object_id="delete_test",
         digests=[create_res.digest],
     )
     delete_res = trace_server.scorer_delete_v2(delete_req)
@@ -245,7 +245,7 @@ def test_scorer_delete_v2_single_version(trace_server):
     # Verify the scorer is deleted (should raise ObjectDeletedError)
     read_req = tsi.ScorerReadV2Req(
         project_id=project_id,
-        object_id="scorer_delete_test",
+        object_id="delete_test",
         digest=create_res.digest,
     )
     with pytest.raises(ObjectDeletedError):
@@ -271,7 +271,7 @@ def test_scorer_delete_v2_all_versions(trace_server):
     # Delete all versions (no digests specified)
     delete_req = tsi.ScorerDeleteV2Req(
         project_id=project_id,
-        object_id="scorer_versioned_scorer",
+        object_id="versioned_scorer",
         digests=None,
     )
     delete_res = trace_server.scorer_delete_v2(delete_req)
@@ -298,7 +298,7 @@ def test_scorer_delete_v2_multiple_versions(trace_server):
     # Delete the first two versions
     delete_req = tsi.ScorerDeleteV2Req(
         project_id=project_id,
-        object_id="scorer_multi_version_scorer",
+        object_id="multi_version_scorer",
         digests=digests[:2],
     )
     delete_res = trace_server.scorer_delete_v2(delete_req)
@@ -309,7 +309,7 @@ def test_scorer_delete_v2_multiple_versions(trace_server):
     for digest in digests[:2]:
         read_req = tsi.ScorerReadV2Req(
             project_id=project_id,
-            object_id="scorer_multi_version_scorer",
+            object_id="multi_version_scorer",
             digest=digest,
         )
         with pytest.raises(ObjectDeletedError):
@@ -319,7 +319,7 @@ def test_scorer_delete_v2_multiple_versions(trace_server):
     for digest in digests[2:]:
         read_req = tsi.ScorerReadV2Req(
             project_id=project_id,
-            object_id="scorer_multi_version_scorer",
+            object_id="multi_version_scorer",
             digest=digest,
         )
         read_res = trace_server.scorer_read_v2(read_req)
@@ -386,7 +386,7 @@ def score(output: str) -> dict:
     # Read it back and verify metadata is preserved
     read_req = tsi.ScorerReadV2Req(
         project_id=project_id,
-        object_id="scorer_special_chars",
+        object_id="special_chars",
         digest=create_res.digest,
     )
     read_res = trace_server.scorer_read_v2(read_req)
@@ -417,7 +417,7 @@ def score(output: str) -> dict:
     # Read it back and verify metadata is preserved
     read_req = tsi.ScorerReadV2Req(
         project_id=project_id,
-        object_id="scorer_unicode_scorer",
+        object_id="unicode_scorer",
         digest=create_res.digest,
     )
     read_res = trace_server.scorer_read_v2(read_req)
@@ -447,7 +447,7 @@ def test_scorer_list_after_deletion(trace_server):
     # Delete one scorer
     delete_req = tsi.ScorerDeleteV2Req(
         project_id=project_id,
-        object_id="scorer_delete_me",
+        object_id="delete_me",
         digests=None,
     )
     trace_server.scorer_delete_v2(delete_req)
@@ -506,12 +506,12 @@ def score(output: str, target: str) -> dict:
     create_res = trace_server.scorer_create_v2(create_req)
 
     assert create_res.digest is not None
-    assert create_res.object_id == "scorer_json_similarity"
+    assert create_res.object_id == "json_similarity"
 
     # Read it back
     read_req = tsi.ScorerReadV2Req(
         project_id=project_id,
-        object_id="scorer_json_similarity",
+        object_id="json_similarity",
         digest=create_res.digest,
     )
     read_res = trace_server.scorer_read_v2(read_req)
