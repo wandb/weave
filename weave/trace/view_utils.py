@@ -133,4 +133,6 @@ def set_call_view(
         views.update(legacy_views)
 
     project_id = client._project_id()
-    views[name] = to_json(content_obj, project_id, client, use_dictify=False)
+    from weave.trace.serialization.serialize import to_wire_json
+
+    views[name] = to_wire_json(content_obj, project_id, client)

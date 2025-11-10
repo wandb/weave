@@ -239,6 +239,15 @@ def init_weave(
     if internal_project_id:
         client.internal_project_id = internal_project_id
 
+    # Set server request header mode based on availability of internal ID/config
+    try:
+        if internal_project_id and id_info is not None:
+            remote_server.set_id_format_mode("internal")
+        else:
+            remote_server.set_id_format_mode("auto")
+    except Exception:
+        pass
+
     return client
 
 

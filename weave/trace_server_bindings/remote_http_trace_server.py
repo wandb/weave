@@ -90,6 +90,15 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
     def set_auth(self, auth: tuple[str, str]) -> None:
         self._auth = auth
 
+    def set_id_format_mode(self, mode: str) -> None:
+        """Set the desired ID/ref format mode header for all requests.
+
+        mode: "internal" | "external" | "auto"
+        """
+        if self._extra_headers is None:
+            self._extra_headers = {}
+        self._extra_headers["X-Weave-Id-Format"] = mode
+
     def _build_dynamic_request_headers(self) -> dict[str, str]:
         """Build headers for HTTP requests, including extra headers and retry ID."""
         headers = dict(self._extra_headers) if self._extra_headers else {}

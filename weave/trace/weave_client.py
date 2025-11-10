@@ -583,7 +583,7 @@ class WeaveClient:
 
         return _make_calls_iterator(
             self.server,
-            self._project_id(),
+            self._wire_project_id(),
             filter=filter,
             limit_override=limit,
             offset_override=offset,
@@ -621,7 +621,7 @@ class WeaveClient:
         calls = list(
             self.server.calls_query_stream(
                 CallsQueryReq(
-                    project_id=self._project_id(),
+                    project_id=self._wire_project_id(),
                     filter=CallsFilter(call_ids=[call_id]),
                     include_costs=include_costs,
                     include_feedback=include_feedback,
@@ -766,7 +766,7 @@ class WeaveClient:
             current_wb_run_step = None
 
         started_at = datetime.datetime.now(tz=datetime.timezone.utc)
-        project_id = self._project_id()
+        project_id = self._wire_project_id()
 
         should_print_call_link_ = should_print_call_link()
         current_call = call_context.get_current_call()
@@ -778,14 +778,22 @@ class WeaveClient:
 
                 maybe_redacted_inputs_with_refs = redact_pii(inputs_with_refs)
 
-            inputs_json = to_json(
-                maybe_redacted_inputs_with_refs, project_id, self, use_dictify=False
+            from weave.trace.serialization.serialize import to_wire_json
+
+            inputs_json = to_wire_json(
+                maybe_redacted_inputs_with_refs, project_id, self
             )
+            # Explicitly convert op ref URI to internal form for server internal mode
+            try:
+                op_uri_internal = self.to_internal_refs(op_def_ref.uri())
+            except Exception:
+                op_uri_internal = op_def_ref.uri()
+
             call_start_req = CallStartReq(
                 start=StartedCallSchemaForInsert(
                     project_id=project_id,
                     id=call_id,
-                    op_name=op_def_ref.uri(),
+                    op_name=op_uri_internal,
                     display_name=call.display_name,
                     trace_id=trace_id,
                     started_at=started_at,
@@ -940,8 +948,10 @@ class WeaveClient:
 
                 maybe_redacted_output_as_refs = redact_pii(output_as_refs)
 
-            output_json = to_json(
-                maybe_redacted_output_as_refs, project_id, self, use_dictify=False
+            from weave.trace.serialization.serialize import to_wire_json
+
+            output_json = to_wire_json(
+                maybe_redacted_output_as_refs, project_id, self
             )
 
             # Capture wb_run_step_end at call end time
@@ -1051,7 +1061,7 @@ class WeaveClient:
     def delete_call(self, call: Call) -> None:
         self.server.calls_delete(
             CallsDeleteReq(
-                project_id=self._project_id(),
+                project_id=self._wire_project_id(),
                 call_ids=[call.id],
             )
         )
@@ -1067,7 +1077,7 @@ class WeaveClient:
         """
         self.server.calls_delete(
             CallsDeleteReq(
-                project_id=self._project_id(),
+                project_id=self._wire_project_id(),
                 call_ids=call_ids,
             )
         )
@@ -1076,7 +1086,7 @@ class WeaveClient:
     def delete_object_version(self, object: ObjectRef) -> None:
         self.server.obj_delete(
             ObjDeleteReq(
-                project_id=self._project_id(),
+                project_id=self._wire_project_id(),
                 object_id=object.name,
                 digests=[object.digest],
             )
@@ -1094,7 +1104,7 @@ class WeaveClient:
         """
         result = self.server.obj_delete(
             ObjDeleteReq(
-                project_id=self._project_id(),
+                project_id=self._wire_project_id(),
                 object_id=object_name,
                 digests=None,
             )
@@ -1114,7 +1124,7 @@ class WeaveClient:
         """
         result = self.server.obj_delete(
             ObjDeleteReq(
-                project_id=self._project_id(),
+                project_id=self._wire_project_id(),
                 object_id=object_name,
                 digests=digests,
             )
@@ -1125,7 +1135,7 @@ class WeaveClient:
     def delete_op_version(self, op: OpRef) -> None:
         self.server.obj_delete(
             ObjDeleteReq(
-                project_id=self._project_id(),
+                project_id=self._wire_project_id(),
                 object_id=op.name,
                 digests=[op.digest],
             )
@@ -1143,7 +1153,7 @@ class WeaveClient:
         """
         result = self.server.obj_delete(
             ObjDeleteReq(
-                project_id=self._project_id(),
+                project_id=self._wire_project_id(),
                 object_id=op_name,
                 digests=None,
             )
@@ -1284,7 +1294,7 @@ class WeaveClient:
             provider_id=provider_id,
         )
         return self.server.cost_create(
-            CostCreateReq(project_id=self._project_id(), costs={llm_id: cost})
+            CostCreateReq(project_id=self._wire_project_id(), costs={llm_id: cost})
         )
 
     def purge_costs(self, ids: list[str] | str) -> None:
@@ -1308,7 +1318,7 @@ class WeaveClient:
             ]
         }
         self.server.cost_purge(
-            CostPurgeReq(project_id=self._project_id(), query=Query(**{"$expr": expr}))
+            CostPurgeReq(project_id=self._wire_project_id(), query=Query(**{"$expr": expr}))
         )
 
     def query_costs(
@@ -1372,7 +1382,7 @@ class WeaveClient:
 
         res = self.server.cost_query(
             CostQueryReq(
-                project_id=self._project_id(),
+                project_id=self._wire_project_id(),
                 query=rewritten_query,
                 offset=offset,
                 limit=limit,
@@ -1452,7 +1462,7 @@ class WeaveClient:
         }
 
         freq = FeedbackCreateReq(
-            project_id=self._project_id(),
+            project_id=self._wire_project_id(),
             weave_ref=weave_ref_uri,
             feedback_type=RUNNABLE_FEEDBACK_TYPE_PREFIX + "." + runnable_ref.name,
             payload=payload,
@@ -1636,10 +1646,12 @@ class WeaveClient:
         def send_obj_create() -> ObjCreateRes:
             # `to_json` is mostly fast, except for CustomWeaveTypes
             # which incur network costs to serialize the payload
-            json_val = to_json(val, self._project_id(), self)
+            from weave.trace.serialization.serialize import to_wire_json
+
+            json_val = to_wire_json(val, self._wire_project_id(), self)
             req = ObjCreateReq(
                 obj=ObjSchemaForInsert(
-                    project_id=self.entity + "/" + self.project,
+                    project_id=self._wire_project_id(),
                     object_id=name,
                     val=json_val,
                 )
@@ -1678,9 +1690,11 @@ class WeaveClient:
         return self._save_object_basic(op, name)
 
     def _send_table_create(self, rows: list[Any]) -> TableCreateRes:
-        json_rows = to_json(rows, self._project_id(), self)
+        from weave.trace.serialization.serialize import to_wire_json
+
+        json_rows = to_wire_json(rows, self._project_id(), self)
         req = TableCreateReq(
-            table=TableSchemaForInsert(project_id=self._project_id(), rows=json_rows)
+            table=TableSchemaForInsert(project_id=self._wire_project_id(), rows=json_rows)
         )
         return self.server.table_create(req)
 
@@ -1746,7 +1760,7 @@ class WeaveClient:
         use_parallel_chunks = False
         if use_chunking and should_use_parallel_table_upload():
             test_req = TableCreateFromDigestsReq(
-                project_id=self._project_id(), row_digests=[]
+                project_id=self._wire_project_id(), row_digests=[]
             )
 
             def test_func(req: TableCreateFromDigestsReq) -> Any:
@@ -1794,7 +1808,7 @@ class WeaveClient:
 
             # Create final table from digests
             create_req = TableCreateFromDigestsReq(
-                project_id=self._project_id(), row_digests=all_row_digests
+                project_id=self._wire_project_id(), row_digests=all_row_digests
             )
             create_res = self.server.table_create_from_digests(create_req)
 
@@ -1820,7 +1834,9 @@ class WeaveClient:
         first_raw_chunk = raw_chunks[0]
 
         def create_first_chunk() -> TableCreateRes:
-            serialized_rows = to_json(first_raw_chunk, self._project_id(), self)
+            from weave.trace.serialization.serialize import to_wire_json
+
+            serialized_rows = to_wire_json(first_raw_chunk, self._project_id(), self)
             return self._send_table_create(serialized_rows)
 
         base_future = self.future_executor.defer(create_first_chunk)
@@ -1836,10 +1852,12 @@ class WeaveClient:
             # Process remaining chunks sequentially (each depends on previous)
             for raw_chunk in raw_chunks[1:]:
                 # Serialize each chunk separately to avoid recursion
-                serialized_chunk = to_json(raw_chunk, self._project_id(), self)
+                from weave.trace.serialization.serialize import to_wire_json
+
+                serialized_chunk = to_wire_json(raw_chunk, self._project_id(), self)
                 payloads = [TableAppendSpecPayload(row=row) for row in serialized_chunk]
                 update_req = TableUpdateReq(
-                    project_id=self._project_id(),
+                    project_id=self._wire_project_id(),
                     base_digest=current_digest,
                     updates=[TableAppendSpec(append=payload) for payload in payloads],
                 )
@@ -1858,7 +1876,7 @@ class WeaveClient:
     def _append_to_table(self, table_digest: str, rows: list[dict]) -> WeaveTable:
         payloads = [TableAppendSpecPayload(row=row) for row in rows]
         table_update_req = TableUpdateReq(
-            project_id=self._project_id(),
+                    project_id=self._wire_project_id(),
             base_digest=table_digest,
             updates=[TableAppendSpec(append=payload) for payload in payloads],
         )
@@ -1880,6 +1898,15 @@ class WeaveClient:
     def _project_id(self) -> str:
         return f"{self.entity}/{self.project}"
 
+    def _wire_project_id(self) -> str:
+        """Project ID to use on the wire (internal if available)."""
+        if self.internal_project_id:
+            try:
+                return self.to_internal_project_id(self._project_id())
+            except Exception:
+                pass
+        return self._project_id()
+
     # -------- Ref / ID conversion helpers --------
     def to_internal_project_id(self, project_id: str) -> str:
         """Convert external project id (entity/project) to internal id.
@@ -1888,7 +1915,13 @@ class WeaveClient:
         the project matches the client's external id and uses the resolved
         internal project id when available.
         """
-        if project_id != self._project_id():
+        # Accept either external (entity/project) or already-internal ID
+        if project_id == self._project_id():
+            pass
+        elif self.internal_project_id and project_id == self.internal_project_id:
+            # Already internal
+            return self.internal_project_id
+        else:
             raise ValueError(
                 f"Invalid project ID: expected '{self._project_id()}', got '{project_id}'"
             )
@@ -1908,6 +1941,9 @@ class WeaveClient:
             raise RuntimeError(
                 "Internal project id not resolved yet. Call weave.init first."
             )
+        # Accept either internal or external
+        if internal_project_id == self._project_id():
+            return self._project_id()
         if internal_project_id != self.internal_project_id:
             return None
         return self._project_id()
@@ -2047,7 +2083,7 @@ class WeaveClient:
 
         response = self.server.objs_query(
             ObjQueryReq(
-                project_id=self._project_id(),
+            project_id=self._wire_project_id(),
                 filter=filter,
             )
         )
@@ -2062,7 +2098,7 @@ class WeaveClient:
             display_name = ""
         self.server.call_update(
             CallUpdateReq(
-                project_id=self._project_id(),
+                project_id=self._wire_project_id(),
                 call_id=call.id,
                 display_name=elide_display_name(display_name),
             )

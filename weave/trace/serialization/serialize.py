@@ -106,6 +106,20 @@ def to_json(
     return result
 
 
+def to_wire_json(obj: Any, project_id: str, client: "WeaveClient") -> Any:
+    """Serialize obj and convert any weave refs to internal form for transmission.
+
+    This builds on to_json but applies the client's ref conversion so requests
+    can be sent without relying on server-side external→internal conversion.
+    """
+    json_val = to_json(obj, project_id, client, use_dictify=False)
+    try:
+        return client.to_internal_refs(json_val)
+    except Exception:
+        # If conversion fails for any reason, fall back to the original JSON
+        return json_val
+
+
 class EncodedCustomObjDictWithFilesAsDigests(TypedDict, total=False):
     _type: Literal["CustomWeaveType"]
     weave_type: custom_objs.WeaveTypeDict

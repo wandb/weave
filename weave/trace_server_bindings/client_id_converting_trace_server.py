@@ -27,16 +27,22 @@ class FixedIdConverter(tsi_adapter.IdConverter):
         self._run_sep = run_id_separator
 
     def ext_to_int_project_id(self, project_id: str) -> str:
-        if project_id != self._external_project_id:
-            raise ValueError(
-                f"Invalid project ID: expected '{self._external_project_id}', got '{project_id}'"
-            )
-        return self._internal_project_id
+        # Accept either external (entity/project) or already-internal
+        if project_id == self._external_project_id:
+            return self._internal_project_id
+        if project_id == self._internal_project_id:
+            return project_id
+        raise ValueError(
+            f"Invalid project ID: expected '{self._external_project_id}', got '{project_id}'"
+        )
 
     def int_to_ext_project_id(self, project_id: str) -> Optional[str]:
-        if project_id != self._internal_project_id:
-            return None
-        return self._external_project_id
+        # Accept either internal or external and return external if matches
+        if project_id == self._internal_project_id:
+            return self._external_project_id
+        if project_id == self._external_project_id:
+            return self._external_project_id
+        return None
 
     def ext_to_int_run_id(self, run_id: str) -> str:
         parts = run_id.split("/")
@@ -77,4 +83,3 @@ def wrap_with_id_conversion(
 ) -> tsi.FullTraceServerInterface:
     """Wrap a server with external<->internal conversion using provided converter."""
     return tsi_adapter.ExternalTraceServer(internal_server, converter)
-
