@@ -37,7 +37,7 @@ from pydantic import BaseModel, Field
 from typing_extensions import Self
 
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.project_version import ProjectVersion
+from weave.trace_server.project_version.types import ProjectVersion
 from weave.trace_server.calls_query_builder.cte import CTECollection
 from weave.trace_server.calls_query_builder.object_ref_query_builder import (
     ObjectRefCondition,
@@ -496,7 +496,7 @@ class Condition(BaseModel):
         table_alias: str,
         expand_columns: list[str] | None = None,
         field_to_object_join_alias_map: dict[str, str] | None = None,
-        project_version: ProjectVersion = ProjectVersion.MERGED,
+        project_version: ProjectVersion = ProjectVersion.CALLS_MERGED_VERSION,
     ) -> str:
         # Check if this condition involves object references
         if (
@@ -529,12 +529,12 @@ class Condition(BaseModel):
         return combine_conditions(conditions.conditions, "AND")
 
     def _get_consumed_fields(
-        self, project_version: ProjectVersion = ProjectVersion.MERGED
+        self, project_version: ProjectVersion = ProjectVersion.CALLS_MERGED_VERSION
     ) -> list[CallsMergedField]:
         if self._consumed_fields is None:
             table_name = (
                 "calls_complete"
-                if project_version == ProjectVersion.COMPLETE
+                if project_version == ProjectVersion.CALLS_COMPLETE_VERSION
                 else "calls_merged"
             )
             self.as_sql(ParamBuilder(), table_name, project_version=project_version)
@@ -612,7 +612,7 @@ class CallsQuery(BaseModel):
     include_costs: bool = False
     include_storage_size: bool = False
     include_total_storage_size: bool = False
-    project_version: ProjectVersion = ProjectVersion.MERGED
+    project_version: ProjectVersion = ProjectVersion.CALLS_MERGED_VERSION
 
     def add_field(self, field: str) -> "CallsQuery":
         name = get_field_by_name(field, self.project_version)
@@ -625,7 +625,7 @@ class CallsQuery(BaseModel):
         """Get the table name based on project version."""
         return (
             "calls_complete"
-            if self.project_version == ProjectVersion.COMPLETE
+            if self.project_version == ProjectVersion.CALLS_COMPLETE_VERSION
             else "calls_merged"
         )
 
@@ -1218,7 +1218,7 @@ class CallsQuery(BaseModel):
 
         Routes to the appropriate implementation based on project version.
         """
-        if self.project_version == ProjectVersion.COMPLETE:
+        if self.project_version == ProjectVersion.CALLS_COMPLETE_VERSION:
             return self._as_sql_complete_format(
                 pb,
                 table_alias,
@@ -1459,7 +1459,7 @@ DISALLOWED_FILTERING_FIELDS = {"storage_size_bytes", "total_storage_size_bytes"}
 
 
 def get_field_by_name(
-    name: str, project_version: ProjectVersion = ProjectVersion.MERGED
+    name: str, project_version: ProjectVersion = ProjectVersion.CALLS_MERGED_VERSION
 ) -> CallsMergedField:
     """Get field definition by name, version-aware for different storage tables.
 
@@ -1472,7 +1472,7 @@ def get_field_by_name(
     """
     field_map = (
         ALLOWED_CALL_FIELDS_COMPLETE
-        if project_version == ProjectVersion.COMPLETE
+        if project_version == ProjectVersion.CALLS_COMPLETE_VERSION
         else ALLOWED_CALL_FIELDS
     )
 
@@ -1589,7 +1589,7 @@ def process_query_to_conditions(
     param_builder: ParamBuilder,
     table_alias: str,
     use_agg_fn: bool = True,
-    project_version: ProjectVersion = ProjectVersion.MERGED,
+    project_version: ProjectVersion = ProjectVersion.CALLS_MERGED_VERSION,
 ) -> FilterToConditions:
     """Converts a Query to a list of conditions for a clickhouse query."""
     conditions = []
@@ -2057,7 +2057,7 @@ def process_calls_filter_to_conditions(
 def build_calls_stats_query(
     req: tsi.CallsQueryStatsReq,
     param_builder: ParamBuilder,
-    project_version: ProjectVersion = ProjectVersion.MERGED,
+    project_version: ProjectVersion = ProjectVersion.CALLS_MERGED_VERSION,
 ) -> tuple[str, KeysView[str]]:
     """Build a stats query for calls, automatically using optimized queries when possible.
 
@@ -2110,7 +2110,7 @@ def build_calls_stats_query(
 def _try_optimized_stats_query(
     req: tsi.CallsQueryStatsReq, 
     param_builder: ParamBuilder,
-    project_version: ProjectVersion = ProjectVersion.MERGED,
+    project_version: ProjectVersion = ProjectVersion.CALLS_MERGED_VERSION,
 ) -> str | None:
     """Try to match request to an optimized special-case query.
 
@@ -2146,12 +2146,12 @@ def _try_optimized_stats_query(
 def _optimized_project_contains_call_query(
     project_id: str,
     param_builder: ParamBuilder,
-    project_version: ProjectVersion = ProjectVersion.MERGED,
+    project_version: ProjectVersion = ProjectVersion.CALLS_MERGED_VERSION,
 ) -> str:
     """Returns a query that checks if the project contains any calls."""
     table_name = (
         "calls_complete"
-        if project_version == ProjectVersion.COMPLETE
+        if project_version == ProjectVersion.CALLS_COMPLETE_VERSION
         else "calls_merged"
     )
     return safely_format_sql(
@@ -2172,7 +2172,8 @@ def _optimized_project_contains_call_query(
 def _optimized_wb_run_id_not_null_query(
     project_id: str,
     param_builder: ParamBuilder,
-    project_version: ProjectVersion = ProjectVersion.MERGED,
+    project_version: ProjectVersion = ProjectVersion.CALLS_MERGED_VERSION
+    ,
 ) -> str:
     """Optimized query for checking existence of calls with wb_run_id not null.
 
@@ -2180,7 +2181,7 @@ def _optimized_wb_run_id_not_null_query(
     """
     table_name = (
         "calls_complete"
-        if project_version == ProjectVersion.COMPLETE
+        if project_version == ProjectVersion.CALLS_COMPLETE_VERSION
         else "calls_merged"
     )
     project_id_param = param_builder.add_param(project_id)
