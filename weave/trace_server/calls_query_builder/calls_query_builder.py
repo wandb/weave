@@ -286,6 +286,39 @@ class AggregatedDataSizeField(CallsMergedField):
         return f"{conditional_field} AS {self.field}"
 
 
+class AggregatedDataSizeFieldComplete(CallsMergedField):
+    """Non-aggregated version of AggregatedDataSizeField for calls_complete table."""
+
+    join_table_name: str
+
+    def is_heavy(self) -> bool:
+        return True
+
+    def as_sql(
+        self,
+        pb: ParamBuilder,
+        table_alias: str,
+        cast: Optional[tsi_query.CastTo] = None,
+    ) -> str:
+        # This field is not supposed to be called yet. For now, we just take the parent class's
+        # implementation. Consider re-implementation for future use.
+        return super().as_sql(pb, table_alias, cast)
+
+    def as_select_sql(self, pb: ParamBuilder, table_alias: str) -> str:
+        # It doesn't make sense for a non-root call to have a total storage size,
+        # even if a value could be computed.
+        # For calls_complete, no aggregation functions are needed since there's no GROUP BY.
+        conditional_field = f"""
+        CASE
+            WHEN {table_alias}.parent_id IS NULL
+            THEN {self.join_table_name}.total_storage_size_bytes
+            ELSE NULL
+        END
+        """
+
+        return f"{conditional_field} AS {self.field}"
+
+
 class QueryBuilderDynamicField(QueryBuilderField):
     # This is a temporary solution to address a specific use case.
     # We need to reuse the `CallsMergedDynamicField` mechanics in the table_query,
@@ -1012,12 +1045,12 @@ class CallsQuery(BaseModel):
 
         id_subquery = ""
         if id_subquery_name is not None:
-            id_subquery = f"AND (calls_merged.id IN {id_subquery_name})"
+            id_subquery = f"AND ({table_alias}.id IN {id_subquery_name})"
 
         # special optimization for call_ids filter
         id_mask = ""
         if self.hardcoded_filter and self.hardcoded_filter.filter.call_ids:
-            id_mask = f"AND (calls_merged.id IN {param_slot(pb.add_param(self.hardcoded_filter.filter.call_ids), 'Array(String)')})"
+            id_mask = f"AND ({table_alias}.id IN {param_slot(pb.add_param(self.hardcoded_filter.filter.call_ids), 'Array(String)')})"
 
         return WhereFilters(
             id_mask=id_mask,
@@ -1064,7 +1097,7 @@ class CallsQuery(BaseModel):
             LEFT JOIN (
                 SELECT * FROM feedback WHERE feedback.project_id = {param_slot(project_param, "String")}
             ) AS feedback ON (
-                feedback.weave_ref = concat('weave-trace-internal:///', {param_slot(project_param, "String")}, '/call/', calls_merged.id))
+                feedback.weave_ref = concat('weave-trace-internal:///', {param_slot(project_param, "String")}, '/call/', {table_alias}.id))
             """
 
         # Storage size join
@@ -1075,11 +1108,11 @@ class CallsQuery(BaseModel):
                 SELECT
                     id,
                     sum(COALESCE(attributes_size_bytes,0) + COALESCE(inputs_size_bytes,0) + COALESCE(output_size_bytes,0) + COALESCE(summary_size_bytes,0)) AS storage_size_bytes
-                FROM calls_merged_stats
+                FROM {table_alias}_stats
                 WHERE project_id = {param_slot(project_param, "String")}
                 GROUP BY id
             ) AS {STORAGE_SIZE_TABLE_NAME}
-            ON calls_merged.id = {STORAGE_SIZE_TABLE_NAME}.id
+            ON {table_alias}.id = {STORAGE_SIZE_TABLE_NAME}.id
             """
 
         # Total storage size join
@@ -1090,11 +1123,11 @@ class CallsQuery(BaseModel):
                 SELECT
                     trace_id,
                     sum(COALESCE(attributes_size_bytes,0) + COALESCE(inputs_size_bytes,0) + COALESCE(output_size_bytes,0) + COALESCE(summary_size_bytes,0)) AS total_storage_size_bytes
-                FROM calls_merged_stats
+                FROM {table_alias}_stats
                 WHERE project_id = {param_slot(project_param, "String")}
                 GROUP BY trace_id
             ) AS {ROLLED_UP_CALL_MERGED_STATS_TABLE_NAME}
-            ON calls_merged.trace_id = {ROLLED_UP_CALL_MERGED_STATS_TABLE_NAME}.trace_id
+            ON {table_alias}.trace_id = {ROLLED_UP_CALL_MERGED_STATS_TABLE_NAME}.trace_id
             """
 
         # Object reference joins for ordering
@@ -1325,8 +1358,6 @@ class CallsQuery(BaseModel):
         select_fields_sql = ", ".join(
             field.as_select_sql(pb, table_alias) for field in self.select_fields
         )
-
-        # For complete mode, we need conditions in WHERE, not HAVING
         where_conditions: list[str] = []
         needs_feedback = False
 
@@ -1346,11 +1377,12 @@ class CallsQuery(BaseModel):
         if self.hardcoded_filter is not None:
             where_conditions.append(self.hardcoded_filter.as_sql(pb, table_alias))
 
-        where_filters = self._build_where_clause_optimizations(
-            pb, table_alias, expand_columns, id_subquery_name
-        )
+        # where_filters = self._build_where_clause_optimizations(
+        #     pb, table_alias, expand_columns, id_subquery_name, self.project_version
+        # )
+
         # Add query conditions to WHERE clause
-        where_conditions_sql = where_filters.to_sql()
+        where_conditions_sql = ""
         if where_conditions:
             where_conditions_sql += "AND " + combine_conditions(where_conditions, "AND")
         order_by_sql, limit_sql, offset_sql, needs_feedback_order = (
@@ -1446,10 +1478,10 @@ ALLOWED_CALL_FIELDS_COMPLETE = {
     "display_name": CallsCompleteField(field="display_name"),
     "storage_size_bytes": AggFieldWithTableOverrides(
         field="storage_size_bytes",
-        agg_fn="any",
+        agg_fn="",
         table_name=STORAGE_SIZE_TABLE_NAME,
     ),
-    "total_storage_size_bytes": AggregatedDataSizeField(
+    "total_storage_size_bytes": AggregatedDataSizeFieldComplete(
         field="total_storage_size_bytes",
         join_table_name=ROLLED_UP_CALL_MERGED_STATS_TABLE_NAME,
     ),
@@ -1461,7 +1493,7 @@ DISALLOWED_FILTERING_FIELDS = {"storage_size_bytes", "total_storage_size_bytes"}
 
 def get_field_by_name(
     name: str, project_version: ProjectVersion = ProjectVersion.CALLS_MERGED_VERSION
-) -> CallsMergedField:
+) -> QueryBuilderField:
     """Get field definition by name, version-aware for different storage tables.
 
     Args:
