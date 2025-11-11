@@ -6,7 +6,7 @@ from typing import Optional
 from weave.trace_server import (
     external_to_internal_trace_server_adapter,
 )
-from weave.trace_server import objects_interface as oi
+from weave.trace_server import object_interface as oi
 from weave.trace_server import trace_server_interface as tsi
 
 

@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Form, UploadFile
 from fastapi.params import Header
 from fastapi.responses import StreamingResponse
 
-from weave.trace_server import objects_interface as oi
+from weave.trace_server import object_interface as oi
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.trace_service import ServerInfoRes, TraceService
 
@@ -23,14 +23,14 @@ COMPLETIONS_TAG_NAME = "Completions"
 ACTIONS_TAG_NAME = "Actions"
 OTEL_TAG_NAME = "OpenTelemetry"
 THREADS_TAG_NAME = "Threads"
-V2_OPS_TAG_NAME = "V2 -- Ops"
-V2_DATASETS_TAG_NAME = "V2 -- Datasets"
-V2_SCORERS_TAG_NAME = "V2 -- Scorers"
-V2_EVALUATIONS_TAG_NAME = "V2 -- Evaluations"
-V2_MODELS_TAG_NAME = "V2 -- Models"
-V2_EVALUATION_RUNS_TAG_NAME = "V2 -- Evaluation Runs"
-V2_PREDICTIONS_TAG_NAME = "V2 -- Predictions"
-V2_SCORES_TAG_NAME = "V2 -- Scores"
+OPS_TAG_NAME = "Ops"
+DATASETS_TAG_NAME = "Datasets"
+SCORERS_TAG_NAME = "Scorers"
+EVALUATIONS_TAG_NAME = "Evaluations"
+MODELS_TAG_NAME = "Models"
+EVALUATION_RUNS_TAG_NAME = "Evaluation Runs"
+PREDICTIONS_TAG_NAME = "Predictions"
+SCORES_TAG_NAME = "Scores"
 
 
 class AuthParams(NamedTuple):
@@ -121,7 +121,7 @@ def generate_routes_v2(
 
     @router.post(
         "/{entity}/{project}/ops",
-        tags=[V2_OPS_TAG_NAME],
+        tags=[OPS_TAG_NAME],
         operation_id="op_create_v2",
     )
     def op_create_v2(
@@ -137,7 +137,7 @@ def generate_routes_v2(
 
     @router.get(
         "/{entity}/{project}/ops/{object_id}/versions/{digest}",
-        tags=[V2_OPS_TAG_NAME],
+        tags=[OPS_TAG_NAME],
         operation_id="op_read_v2",
     )
     def op_read_v2(
@@ -154,7 +154,7 @@ def generate_routes_v2(
 
     @router.get(
         "/{entity}/{project}/ops",
-        tags=[V2_OPS_TAG_NAME],
+        tags=[OPS_TAG_NAME],
         operation_id="op_list_v2",
         response_class=StreamingResponse,
         responses={
@@ -188,7 +188,7 @@ def generate_routes_v2(
 
     @router.delete(
         "/{entity}/{project}/ops/{object_id}",
-        tags=[V2_OPS_TAG_NAME],
+        tags=[OPS_TAG_NAME],
         operation_id="op_delete_v2",
     )
     def op_delete_v2(
@@ -207,7 +207,7 @@ def generate_routes_v2(
 
     @router.post(
         "/{entity}/{project}/datasets",
-        tags=[V2_DATASETS_TAG_NAME],
+        tags=[DATASETS_TAG_NAME],
         operation_id="dataset_create_v2",
     )
     def dataset_create_v2(
@@ -223,7 +223,7 @@ def generate_routes_v2(
 
     @router.get(
         "/{entity}/{project}/datasets/{object_id}/versions/{digest}",
-        tags=[V2_DATASETS_TAG_NAME],
+        tags=[DATASETS_TAG_NAME],
         operation_id="dataset_read_v2",
     )
     def dataset_read_v2(
@@ -242,7 +242,7 @@ def generate_routes_v2(
 
     @router.get(
         "/{entity}/{project}/datasets",
-        tags=[V2_DATASETS_TAG_NAME],
+        tags=[DATASETS_TAG_NAME],
         operation_id="dataset_list_v2",
         response_class=StreamingResponse,
         responses={
@@ -276,7 +276,7 @@ def generate_routes_v2(
 
     @router.delete(
         "/{entity}/{project}/datasets/{object_id}",
-        tags=[V2_DATASETS_TAG_NAME],
+        tags=[DATASETS_TAG_NAME],
         operation_id="dataset_delete_v2",
     )
     def dataset_delete_v2(
@@ -295,7 +295,7 @@ def generate_routes_v2(
 
     @router.post(
         "/{entity}/{project}/scorers",
-        tags=[V2_SCORERS_TAG_NAME],
+        tags=[SCORERS_TAG_NAME],
         operation_id="scorer_create_v2",
     )
     def scorer_create_v2(
@@ -311,7 +311,7 @@ def generate_routes_v2(
 
     @router.get(
         "/{entity}/{project}/scorers/{object_id}/versions/{digest}",
-        tags=[V2_SCORERS_TAG_NAME],
+        tags=[SCORERS_TAG_NAME],
         operation_id="scorer_read_v2",
     )
     def scorer_read_v2(
@@ -330,7 +330,7 @@ def generate_routes_v2(
 
     @router.get(
         "/{entity}/{project}/scorers",
-        tags=[V2_SCORERS_TAG_NAME],
+        tags=[SCORERS_TAG_NAME],
         operation_id="scorer_list_v2",
         response_class=StreamingResponse,
         responses={
@@ -364,7 +364,7 @@ def generate_routes_v2(
 
     @router.delete(
         "/{entity}/{project}/scorers/{object_id}",
-        tags=[V2_SCORERS_TAG_NAME],
+        tags=[SCORERS_TAG_NAME],
         operation_id="scorer_delete_v2",
     )
     def scorer_delete_v2(
@@ -383,7 +383,7 @@ def generate_routes_v2(
 
     @router.post(
         "/{entity}/{project}/evaluations",
-        tags=[V2_EVALUATIONS_TAG_NAME],
+        tags=[EVALUATIONS_TAG_NAME],
         operation_id="evaluation_create_v2",
     )
     def evaluation_create_v2(
@@ -399,7 +399,7 @@ def generate_routes_v2(
 
     @router.get(
         "/{entity}/{project}/evaluations/{object_id}/versions/{digest}",
-        tags=[V2_EVALUATIONS_TAG_NAME],
+        tags=[EVALUATIONS_TAG_NAME],
         operation_id="evaluation_read_v2",
     )
     def evaluation_read_v2(
@@ -418,7 +418,7 @@ def generate_routes_v2(
 
     @router.get(
         "/{entity}/{project}/evaluations",
-        tags=[V2_EVALUATIONS_TAG_NAME],
+        tags=[EVALUATIONS_TAG_NAME],
         operation_id="evaluation_list_v2",
         response_class=StreamingResponse,
         responses={
@@ -452,7 +452,7 @@ def generate_routes_v2(
 
     @router.delete(
         "/{entity}/{project}/evaluations/{object_id}",
-        tags=[V2_EVALUATIONS_TAG_NAME],
+        tags=[EVALUATIONS_TAG_NAME],
         operation_id="evaluation_delete_v2",
     )
     def evaluation_delete_v2(
@@ -471,7 +471,7 @@ def generate_routes_v2(
 
     @router.post(
         "/{entity}/{project}/evaluation_runs",
-        tags=[V2_EVALUATION_RUNS_TAG_NAME],
+        tags=[EVALUATION_RUNS_TAG_NAME],
         operation_id="evaluation_run_create_v2",
     )
     def evaluation_run_create_v2(
@@ -489,7 +489,7 @@ def generate_routes_v2(
 
     @router.get(
         "/{entity}/{project}/evaluation_runs/{evaluation_run_id}",
-        tags=[V2_EVALUATION_RUNS_TAG_NAME],
+        tags=[EVALUATION_RUNS_TAG_NAME],
         operation_id="evaluation_run_read_v2",
     )
     def evaluation_run_read_v2(
@@ -507,7 +507,7 @@ def generate_routes_v2(
 
     @router.get(
         "/{entity}/{project}/evaluation_runs",
-        tags=[V2_EVALUATION_RUNS_TAG_NAME],
+        tags=[EVALUATION_RUNS_TAG_NAME],
         operation_id="evaluation_run_list_v2",
         response_class=StreamingResponse,
         responses={
@@ -543,7 +543,7 @@ def generate_routes_v2(
 
     @router.delete(
         "/{entity}/{project}/evaluation_runs",
-        tags=[V2_EVALUATION_RUNS_TAG_NAME],
+        tags=[EVALUATION_RUNS_TAG_NAME],
         operation_id="evaluation_run_delete_v2",
     )
     def evaluation_run_delete_v2(
@@ -563,7 +563,7 @@ def generate_routes_v2(
 
     @router.post(
         "/{entity}/{project}/evaluation_runs/{evaluation_run_id}/finish",
-        tags=[V2_EVALUATION_RUNS_TAG_NAME],
+        tags=[EVALUATION_RUNS_TAG_NAME],
         operation_id="evaluation_run_finish_v2",
     )
     def evaluation_run_finish_v2(
@@ -586,7 +586,7 @@ def generate_routes_v2(
 
     @router.post(
         "/{entity}/{project}/models",
-        tags=[V2_MODELS_TAG_NAME],
+        tags=[MODELS_TAG_NAME],
         operation_id="model_create_v2",
     )
     def model_create_v2(
@@ -602,7 +602,7 @@ def generate_routes_v2(
 
     @router.get(
         "/{entity}/{project}/models/{object_id}/versions/{digest}",
-        tags=[V2_MODELS_TAG_NAME],
+        tags=[MODELS_TAG_NAME],
         operation_id="model_read_v2",
     )
     def model_read_v2(
@@ -619,7 +619,7 @@ def generate_routes_v2(
 
     @router.get(
         "/{entity}/{project}/models",
-        tags=[V2_MODELS_TAG_NAME],
+        tags=[MODELS_TAG_NAME],
         operation_id="model_list_v2",
         response_class=StreamingResponse,
         responses={
@@ -653,7 +653,7 @@ def generate_routes_v2(
 
     @router.delete(
         "/{entity}/{project}/models/{object_id}",
-        tags=[V2_MODELS_TAG_NAME],
+        tags=[MODELS_TAG_NAME],
         operation_id="model_delete_v2",
     )
     def model_delete_v2(
@@ -674,7 +674,7 @@ def generate_routes_v2(
 
     @router.post(
         "/{entity}/{project}/predictions",
-        tags=[V2_PREDICTIONS_TAG_NAME],
+        tags=[PREDICTIONS_TAG_NAME],
         operation_id="prediction_create_v2",
     )
     def prediction_create_v2(
@@ -690,7 +690,7 @@ def generate_routes_v2(
 
     @router.get(
         "/{entity}/{project}/predictions/{prediction_id}",
-        tags=[V2_PREDICTIONS_TAG_NAME],
+        tags=[PREDICTIONS_TAG_NAME],
         operation_id="prediction_read_v2",
     )
     def prediction_read_v2(
@@ -706,7 +706,7 @@ def generate_routes_v2(
 
     @router.get(
         "/{entity}/{project}/predictions",
-        tags=[V2_PREDICTIONS_TAG_NAME],
+        tags=[PREDICTIONS_TAG_NAME],
         operation_id="prediction_list_v2",
         response_class=StreamingResponse,
         responses={
@@ -746,7 +746,7 @@ def generate_routes_v2(
 
     @router.delete(
         "/{entity}/{project}/predictions",
-        tags=[V2_PREDICTIONS_TAG_NAME],
+        tags=[PREDICTIONS_TAG_NAME],
         operation_id="prediction_delete_v2",
     )
     def prediction_delete_v2(
@@ -764,7 +764,7 @@ def generate_routes_v2(
 
     @router.post(
         "/{entity}/{project}/predictions/{prediction_id}/finish",
-        tags=[V2_PREDICTIONS_TAG_NAME],
+        tags=[PREDICTIONS_TAG_NAME],
         operation_id="prediction_finish_v2",
     )
     def prediction_finish_v2(
@@ -788,7 +788,7 @@ def generate_routes_v2(
 
     @router.post(
         "/{entity}/{project}/scores",
-        tags=[V2_SCORES_TAG_NAME],
+        tags=[SCORES_TAG_NAME],
         operation_id="score_create_v2",
     )
     def score_create_v2(
@@ -804,7 +804,7 @@ def generate_routes_v2(
 
     @router.get(
         "/{entity}/{project}/scores/{score_id}",
-        tags=[V2_SCORES_TAG_NAME],
+        tags=[SCORES_TAG_NAME],
         operation_id="score_read_v2",
     )
     def score_read_v2(
@@ -820,7 +820,7 @@ def generate_routes_v2(
 
     @router.get(
         "/{entity}/{project}/scores",
-        tags=[V2_SCORES_TAG_NAME],
+        tags=[SCORES_TAG_NAME],
         operation_id="score_list_v2",
         response_class=StreamingResponse,
         responses={
@@ -860,7 +860,7 @@ def generate_routes_v2(
 
     @router.delete(
         "/{entity}/{project}/scores",
-        tags=[V2_SCORES_TAG_NAME],
+        tags=[SCORES_TAG_NAME],
         operation_id="score_delete_v2",
     )
     def score_delete_v2(

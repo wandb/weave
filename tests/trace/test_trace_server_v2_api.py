@@ -13,7 +13,7 @@ This module tests the API endpoints for:
 The tests run against both SQLite and ClickHouse backends.
 """
 
-from weave.trace_server import objects_interface as oi
+from weave.trace_server import object_interface as oi
 from weave.trace_server import trace_server_interface as tsi
 
 

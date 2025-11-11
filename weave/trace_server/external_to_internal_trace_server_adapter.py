@@ -4,7 +4,7 @@ from collections.abc import Iterator
 from functools import cached_property
 from typing import Callable, TypeVar
 
-from weave.trace_server import objects_interface as oi
+from weave.trace_server import object_interface as oi
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.trace_server_converter import (
     universal_ext_to_int_ref_converter,

@@ -6,7 +6,7 @@ Tests verify that the Dataset V2 API correctly creates, reads, lists, and delete
 import pytest
 
 from tests.trace_server.conftest import TEST_ENTITY
-from weave.trace_server import objects_interface as oi
+from weave.trace_server import object_interface as oi
 from weave.trace_server.errors import NotFoundError, ObjectDeletedError
 
 

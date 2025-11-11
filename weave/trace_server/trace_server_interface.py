@@ -7,7 +7,7 @@ from typing import Any, Literal, Optional, Protocol, Union
 from pydantic import BaseModel, ConfigDict, Field, field_serializer
 from typing_extensions import TypedDict
 
-from weave.trace_server import objects_interface as oi
+from weave.trace_server import object_interface as oi
 from weave.trace_server.interface.query import Query
 
 WB_USER_ID_DESCRIPTION = (
