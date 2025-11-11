@@ -1512,7 +1512,6 @@ ALLOWED_CALL_FIELDS_COMPLETE = {
     "wb_run_id": CallsCompleteField(field="wb_run_id"),
     "wb_run_step": CallsCompleteField(field="wb_run_step"),
     "wb_run_step_end": CallsCompleteField(field="wb_run_step_end"),
-    "deleted_at": CallsCompleteField(field="deleted_at"),
     "display_name": CallsCompleteField(field="display_name"),
     "storage_size_bytes": AggFieldWithTableOverrides(
         field="storage_size_bytes",
@@ -2462,7 +2461,6 @@ def build_calls_complete_batch_update_query(
     if not end_calls:
         return ""
 
-    # All calls should be from the same project
     project_id = end_calls[0].project_id
     call_ids = []
 
@@ -2475,8 +2473,6 @@ def build_calls_complete_batch_update_query(
         "exception": [],
         "wb_run_step_end": [],
     }
-
-    print("DOING UPDATE BATCH ON CALL IDS", [c.id for c in end_calls])
 
     for call in end_calls:
         call_ids.append(call.id)
