@@ -4,10 +4,10 @@ Tests verify that the Scorer API correctly creates, reads, lists, and deletes sc
 """
 
 import pytest
+from weave.trace_server.object_interface.errors import NotFoundError, ObjectDeletedError
 
 from tests.trace_server.conftest import TEST_ENTITY
 from weave.trace_server import object_interface as oi
-from weave.trace_server.object_interface.errors import NotFoundError, ObjectDeletedError
 
 
 def test_scorer_create_basic(trace_server):
