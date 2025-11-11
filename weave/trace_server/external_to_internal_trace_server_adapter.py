@@ -446,6 +446,10 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
 
     # === V2 APIs ===
 
+    def usage_analytics(self, req: tsi.UsageAnalyticsReq) -> tsi.UsageAnalyticsRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(self._internal_trace_server.usage_analytics, req)
+
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         return self._ref_apply(self._internal_trace_server.op_create, req)
