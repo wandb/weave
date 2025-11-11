@@ -1,6 +1,7 @@
 import datetime
 from collections.abc import Iterator
 from enum import Enum
+from functools import cached_property
 from typing import Any, Literal, Optional, Protocol, Union
 
 from pydantic import BaseModel, ConfigDict, Field, field_serializer
@@ -1357,5 +1358,5 @@ class FullTraceServerInterface(TraceServerInterface, Protocol):
     for implementations that need to support both API versions.
     """
 
-    @property
+    @cached_property
     def object_interface(self) -> oi.ObjectInterface: ...
