@@ -36,7 +36,6 @@ from pydantic import BaseModel, Field
 from typing_extensions import Self
 
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.project_version.types import ProjectVersion
 from weave.trace_server.calls_query_builder.cte import CTECollection
 from weave.trace_server.calls_query_builder.object_ref_query_builder import (
     ObjectRefCondition,
@@ -65,6 +64,7 @@ from weave.trace_server.orm import (
     python_value_to_ch_type,
     split_escaped_field_path,
 )
+from weave.trace_server.project_version.types import ProjectVersion
 from weave.trace_server.token_costs import build_cost_ctes, get_cost_final_select
 from weave.trace_server.trace_server_common import assert_parameter_length_less_than_max
 from weave.trace_server.trace_server_interface_util import (
@@ -76,6 +76,7 @@ logger = logging.getLogger(__name__)
 
 CTE_FILTERED_CALLS = "filtered_calls"
 CTE_ALL_CALLS = "all_calls"
+
 
 class QueryBuilderField(BaseModel):
     field: str
@@ -2171,8 +2172,7 @@ def _optimized_project_contains_call_query(
 def _optimized_wb_run_id_not_null_query(
     project_id: str,
     param_builder: ParamBuilder,
-    project_version: ProjectVersion = ProjectVersion.CALLS_MERGED_VERSION
-    ,
+    project_version: ProjectVersion = ProjectVersion.CALLS_MERGED_VERSION,
 ) -> str:
     """Optimized query for checking existence of calls with wb_run_id not null.
 
