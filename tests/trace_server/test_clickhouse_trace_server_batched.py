@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, Mock, patch
 
 from weave.trace_server import clickhouse_trace_server_batched as chts
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
+from weave.trace_server.secret_fetcher_context import secret_fetcher_context
 
 
 class MockObjectReadError(Exception):
@@ -159,7 +159,14 @@ def test_completions_create_stream_custom_provider():
         },
     ]
 
+    # Set up mock secret fetcher
+    mock_secret_fetcher = MagicMock()
+    mock_secret_fetcher.fetch.return_value = {
+        "secrets": {"CUSTOM_API_KEY": "test-api-key-value"}
+    }
+
     with (
+        secret_fetcher_context(mock_secret_fetcher),
         patch(
             "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
         ) as mock_litellm,
@@ -219,43 +226,33 @@ def test_completions_create_stream_custom_provider():
 
         mock_obj_read.side_effect = mock_obj_read_func
 
-        # Set up mock secret fetcher
-        mock_secret_fetcher = MagicMock()
-        mock_secret_fetcher.fetch.return_value = {
-            "secrets": {"CUSTOM_API_KEY": "test-api-key-value"}
-        }
-        token = _secret_fetcher_context.set(mock_secret_fetcher)
+        # Create test request
+        req = tsi.CompletionsCreateReq(
+            project_id="test_project",
+            inputs=tsi.CompletionsCreateRequestInputs(
+                model="custom::custom-provider::model",
+                messages=[{"role": "user", "content": "Say hello"}],
+            ),
+            track_llm_call=False,
+        )
 
-        try:
-            # Create test request
-            req = tsi.CompletionsCreateReq(
-                project_id="test_project",
-                inputs=tsi.CompletionsCreateRequestInputs(
-                    model="custom::custom-provider::model",
-                    messages=[{"role": "user", "content": "Say hello"}],
-                ),
-                track_llm_call=False,
-            )
+        server = chts.ClickHouseTraceServer(host="test_host")
+        stream = server.completions_create_stream(req)
+        chunks = list(stream)
 
-            server = chts.ClickHouseTraceServer(host="test_host")
-            stream = server.completions_create_stream(req)
-            chunks = list(stream)
+        assert len(chunks) == 2
+        assert chunks[0]["choices"][0]["delta"]["content"] == "Streamed"
+        assert chunks[1]["choices"][0]["finish_reason"] == "stop"
+        assert "usage" in chunks[1]
 
-            assert len(chunks) == 2
-            assert chunks[0]["choices"][0]["delta"]["content"] == "Streamed"
-            assert chunks[1]["choices"][0]["finish_reason"] == "stop"
-            assert "usage" in chunks[1]
-
-            # Verify litellm was called with correct parameters
-            mock_litellm.assert_called_once()
-            call_args = mock_litellm.call_args[1]
-            assert (
-                call_args.get("api_base")
-                or call_args.get("base_url") == "https://api.custom.com"
-            )
-            assert call_args["extra_headers"] == {"X-Custom": "value"}
-        finally:
-            _secret_fetcher_context.reset(token)
+        # Verify litellm was called with correct parameters
+        mock_litellm.assert_called_once()
+        call_args = mock_litellm.call_args[1]
+        assert (
+            call_args.get("api_base")
+            or call_args.get("base_url") == "https://api.custom.com"
+        )
+        assert call_args["extra_headers"] == {"X-Custom": "value"}
 
 
 def test_completions_create_stream_custom_provider_with_tracking():
@@ -293,7 +290,14 @@ def test_completions_create_stream_custom_provider_with_tracking():
         },
     ]
 
+    # Set up mock secret fetcher
+    mock_secret_fetcher = MagicMock()
+    mock_secret_fetcher.fetch.return_value = {
+        "secrets": {"CUSTOM_API_KEY": "test-api-key-value"}
+    }
+
     with (
+        secret_fetcher_context(mock_secret_fetcher),
         patch(
             "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
         ) as mock_litellm,
@@ -354,54 +358,44 @@ def test_completions_create_stream_custom_provider_with_tracking():
 
         mock_obj_read.side_effect = mock_obj_read_func
 
-        # Set up mock secret fetcher
-        mock_secret_fetcher = MagicMock()
-        mock_secret_fetcher.fetch.return_value = {
-            "secrets": {"CUSTOM_API_KEY": "test-api-key-value"}
-        }
-        token = _secret_fetcher_context.set(mock_secret_fetcher)
+        # Create test request with tracking enabled
+        req = tsi.CompletionsCreateReq(
+            project_id="dGVzdF9wcm9qZWN0",
+            inputs=tsi.CompletionsCreateRequestInputs(
+                model="custom::custom-provider::model",
+                messages=[{"role": "user", "content": "Say hello"}],
+            ),
+            track_llm_call=True,
+        )
 
-        try:
-            # Create test request with tracking enabled
-            req = tsi.CompletionsCreateReq(
-                project_id="dGVzdF9wcm9qZWN0",
-                inputs=tsi.CompletionsCreateRequestInputs(
-                    model="custom::custom-provider::model",
-                    messages=[{"role": "user", "content": "Say hello"}],
-                ),
-                track_llm_call=True,
-            )
+        server = chts.ClickHouseTraceServer(host="test_host")
+        stream = server.completions_create_stream(req)
+        chunks = list(stream)
 
-            server = chts.ClickHouseTraceServer(host="test_host")
-            stream = server.completions_create_stream(req)
-            chunks = list(stream)
+        # Verify streaming functionality
+        assert len(chunks) == 3  # Meta chunk + 2 content chunks
+        assert "_meta" in chunks[0]
+        assert "weave_call_id" in chunks[0]["_meta"]
+        assert chunks[1]["choices"][0]["delta"]["content"] == "Streamed"
+        assert chunks[2]["choices"][0]["finish_reason"] == "stop"
+        assert "usage" in chunks[2]
 
-            # Verify streaming functionality
-            assert len(chunks) == 3  # Meta chunk + 2 content chunks
-            assert "_meta" in chunks[0]
-            assert "weave_call_id" in chunks[0]["_meta"]
-            assert chunks[1]["choices"][0]["delta"]["content"] == "Streamed"
-            assert chunks[2]["choices"][0]["finish_reason"] == "stop"
-            assert "usage" in chunks[2]
+        # Verify call tracking
+        assert mock_insert_call.call_count == 2  # Start and end calls
+        start_call = mock_insert_call.call_args_list[0][0][0]
+        end_call = mock_insert_call.call_args_list[1][0][0]
+        assert start_call.project_id == "dGVzdF9wcm9qZWN0"
+        assert end_call.project_id == "dGVzdF9wcm9qZWN0"
+        assert end_call.id == start_call.id
 
-            # Verify call tracking
-            assert mock_insert_call.call_count == 2  # Start and end calls
-            start_call = mock_insert_call.call_args_list[0][0][0]
-            end_call = mock_insert_call.call_args_list[1][0][0]
-            assert start_call.project_id == "dGVzdF9wcm9qZWN0"
-            assert end_call.project_id == "dGVzdF9wcm9qZWN0"
-            assert end_call.id == start_call.id
-
-            # Verify litellm was called with correct parameters
-            mock_litellm.assert_called_once()
-            call_args = mock_litellm.call_args[1]
-            assert (
-                call_args.get("api_base")
-                or call_args.get("base_url") == "https://api.custom.com"
-            )
-            assert call_args["extra_headers"] == {"X-Custom": "value"}
-        finally:
-            _secret_fetcher_context.reset(token)
+        # Verify litellm was called with correct parameters
+        mock_litellm.assert_called_once()
+        call_args = mock_litellm.call_args[1]
+        assert (
+            call_args.get("api_base")
+            or call_args.get("base_url") == "https://api.custom.com"
+        )
+        assert call_args["extra_headers"] == {"X-Custom": "value"}
 
 
 def test_completions_create_stream_multiple_choices():
@@ -469,36 +463,33 @@ def test_completions_create_stream_multiple_choices():
     # Mock the secret fetcher
     mock_secret_fetcher = MagicMock()
     mock_secret_fetcher.fetch.return_value = {"secrets": {"OPENAI_API_KEY": "test-key"}}
-    token = _secret_fetcher_context.set(mock_secret_fetcher)
 
-    try:
-        with (
-            patch(
-                "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
-            ) as mock_litellm,
-            patch.object(
-                chts.ClickHouseTraceServer, "_insert_call"
-            ) as mock_insert_call,
-        ):
-            # Mock the litellm completion stream
-            mock_stream = MagicMock()
-            mock_stream.__iter__.return_value = mock_chunks
-            mock_litellm.return_value = mock_stream
+    with (
+        secret_fetcher_context(mock_secret_fetcher),
+        patch(
+            "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
+        ) as mock_litellm,
+        patch.object(chts.ClickHouseTraceServer, "_insert_call") as mock_insert_call,
+    ):
+        # Mock the litellm completion stream
+        mock_stream = MagicMock()
+        mock_stream.__iter__.return_value = mock_chunks
+        mock_litellm.return_value = mock_stream
 
-            # Create test request with n=2 and tracking enabled
-            req = tsi.CompletionsCreateReq(
-                project_id="dGVzdF9wcm9qZWN0",
-                inputs=tsi.CompletionsCreateRequestInputs(
-                    model="gpt-3.5-turbo",
-                    messages=[{"role": "user", "content": "Say hello"}],
-                    n=2,  # Request 2 completions
-                ),
-                track_llm_call=True,
-            )
+        # Create test request with n=2 and tracking enabled
+        req = tsi.CompletionsCreateReq(
+            project_id="dGVzdF9wcm9qZWN0",
+            inputs=tsi.CompletionsCreateRequestInputs(
+                model="gpt-3.5-turbo",
+                messages=[{"role": "user", "content": "Say hello"}],
+                n=2,  # Request 2 completions
+            ),
+            track_llm_call=True,
+        )
 
-            server = chts.ClickHouseTraceServer(host="test_host")
-            stream = server.completions_create_stream(req)
-            chunks = list(stream)
+        server = chts.ClickHouseTraceServer(host="test_host")
+        stream = server.completions_create_stream(req)
+        chunks = list(stream)
 
         # Verify streaming functionality
         assert len(chunks) == 4  # Meta chunk + 3 content chunks
@@ -561,8 +552,6 @@ def test_completions_create_stream_multiple_choices():
         mock_litellm.assert_called_once()
         call_args = mock_litellm.call_args[1]
         assert call_args["inputs"].n == 2
-    finally:
-        _secret_fetcher_context.reset(token)
 
 
 def test_completions_create_stream_single_choice_unified_wrapper():
@@ -603,36 +592,33 @@ def test_completions_create_stream_single_choice_unified_wrapper():
     # Mock the secret fetcher
     mock_secret_fetcher = MagicMock()
     mock_secret_fetcher.fetch.return_value = {"secrets": {"OPENAI_API_KEY": "test-key"}}
-    token = _secret_fetcher_context.set(mock_secret_fetcher)
 
-    try:
-        with (
-            patch(
-                "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
-            ) as mock_litellm,
-            patch.object(
-                chts.ClickHouseTraceServer, "_insert_call"
-            ) as mock_insert_call,
-        ):
-            # Mock the litellm completion stream
-            mock_stream = MagicMock()
-            mock_stream.__iter__.return_value = mock_chunks
-            mock_litellm.return_value = mock_stream
+    with (
+        secret_fetcher_context(mock_secret_fetcher),
+        patch(
+            "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
+        ) as mock_litellm,
+        patch.object(chts.ClickHouseTraceServer, "_insert_call") as mock_insert_call,
+    ):
+        # Mock the litellm completion stream
+        mock_stream = MagicMock()
+        mock_stream.__iter__.return_value = mock_chunks
+        mock_litellm.return_value = mock_stream
 
-            # Create test request with n=1 and tracking enabled
-            req = tsi.CompletionsCreateReq(
-                project_id="dGVzdF9wcm9qZWN0",
-                inputs=tsi.CompletionsCreateRequestInputs(
-                    model="gpt-3.5-turbo",
-                    messages=[{"role": "user", "content": "Say hello"}],
-                    n=1,  # Single completion
-                ),
-                track_llm_call=True,
-            )
+        # Create test request with n=1 and tracking enabled
+        req = tsi.CompletionsCreateReq(
+            project_id="dGVzdF9wcm9qZWN0",
+            inputs=tsi.CompletionsCreateRequestInputs(
+                model="gpt-3.5-turbo",
+                messages=[{"role": "user", "content": "Say hello"}],
+                n=1,  # Single completion
+            ),
+            track_llm_call=True,
+        )
 
-            server = chts.ClickHouseTraceServer(host="test_host")
-            stream = server.completions_create_stream(req)
-            chunks = list(stream)
+        server = chts.ClickHouseTraceServer(host="test_host")
+        stream = server.completions_create_stream(req)
+        chunks = list(stream)
 
         # Verify streaming functionality - should maintain legacy format
         assert len(chunks) == 3  # Meta chunk + 2 content chunks
@@ -681,5 +667,3 @@ def test_completions_create_stream_single_choice_unified_wrapper():
         mock_litellm.assert_called_once()
         call_args = mock_litellm.call_args[1]
         assert call_args["inputs"].n == 1
-    finally:
-        _secret_fetcher_context.reset(token)
