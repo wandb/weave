@@ -1,10 +1,12 @@
 import base64
 import typing
+from functools import cached_property
 from typing import Optional
 
 from weave.trace_server import (
     external_to_internal_trace_server_adapter,
 )
+from weave.trace_server import objects_interface as oi
 from weave.trace_server import trace_server_interface as tsi
 
 
@@ -136,6 +138,31 @@ class TestOnlyUserInjectingExternalTraceServer(
         req.wb_user_id = self._user_id
         return super().evaluate_model(req)
 
+    @cached_property
+    def object_interface(self) -> oi.ObjectInterface:
+        return TestOnlyUserInjectingExternalObjectInterface(self)
+
+
+def externalize_trace_server(
+    trace_server: tsi.TraceServerInterface,
+    user_id: str = "test_user",
+    id_converter: Optional[
+        external_to_internal_trace_server_adapter.IdConverter
+    ] = None,
+) -> TestOnlyUserInjectingExternalTraceServer:
+    return TestOnlyUserInjectingExternalTraceServer(
+        trace_server,
+        id_converter or DummyIdConverter(),
+        user_id,
+    )
+
+
+class TestOnlyUserInjectingExternalObjectInterface(
+    external_to_internal_trace_server_adapter.ExternalObjectInterface
+):
+    def __init__(self, external_trace_server: TestOnlyUserInjectingExternalTraceServer):
+        self._external_trace_server = external_trace_server
+
     def evaluation_run_delete_v2(
         self, req: tsi.EvaluationRunDeleteV2Req
     ) -> tsi.EvaluationRunDeleteV2Res:
@@ -157,17 +184,3 @@ class TestOnlyUserInjectingExternalTraceServer(
     def score_delete_v2(self, req: tsi.ScoreDeleteV2Req) -> tsi.ScoreDeleteV2Res:
         req.wb_user_id = self._user_id
         return super().score_delete_v2(req)
-
-
-def externalize_trace_server(
-    trace_server: tsi.TraceServerInterface,
-    user_id: str = "test_user",
-    id_converter: Optional[
-        external_to_internal_trace_server_adapter.IdConverter
-    ] = None,
-) -> TestOnlyUserInjectingExternalTraceServer:
-    return TestOnlyUserInjectingExternalTraceServer(
-        trace_server,
-        id_converter or DummyIdConverter(),
-        user_id,
-    )
