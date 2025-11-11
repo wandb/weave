@@ -60,7 +60,6 @@ from weave.trace_server.calls_query_builder.optimization_builder import (
 from weave.trace_server.calls_query_builder.utils import (
     json_dump_field_as_sql,
     param_slot,
-    split_escaped_field_path,
 )
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.orm import (
@@ -68,6 +67,7 @@ from weave.trace_server.orm import (
     combine_conditions,
     python_value_to_ch_type,
     quote_json_path,
+    split_escaped_field_path,
 )
 
 if TYPE_CHECKING:

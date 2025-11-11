@@ -51,7 +51,6 @@ from weave.trace_server.calls_query_builder.utils import (
     json_dump_field_as_sql,
     param_slot,
     safely_format_sql,
-    split_escaped_field_path,
 )
 from weave.trace_server.errors import InvalidFieldError
 from weave.trace_server.interface import query as tsi_query
@@ -60,6 +59,7 @@ from weave.trace_server.orm import (
     clickhouse_cast,
     combine_conditions,
     python_value_to_ch_type,
+    split_escaped_field_path,
 )
 from weave.trace_server.token_costs import build_cost_ctes, get_cost_final_select
 from weave.trace_server.trace_server_common import assert_parameter_length_less_than_max
