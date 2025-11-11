@@ -25,9 +25,7 @@ def score(output: str, target: str) -> dict:
         description="A simple exact match scorer",
         op_source_code=op_source_code,
     )
-    create_res = trace_server.object_interface.object_interface.scorer_create(
-        create_req
-    )
+    create_res = trace_server.object_interface.scorer_create(create_req)
 
     assert create_res.digest is not None
     assert create_res.object_id == "exact_match"
