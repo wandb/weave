@@ -192,7 +192,7 @@ updates:
           - "python-multipart*"
 
       # Pandas testing
-      pandas-test:
+      pandas_test:
         patterns:
           - "pandas*"
     # Limit the number of open PRs
