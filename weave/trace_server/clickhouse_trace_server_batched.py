@@ -64,7 +64,6 @@ from weave.trace_server.clickhouse_schema import (
     CallEndCHInsertable,
     CallStartCHInsertable,
     CallUpdateCHInsertable,
-    CompletedCallCHInsertable,
     FileChunkCreateCHInsertable,
     ObjCHInsertable,
     ObjDeleteCHInsertable,

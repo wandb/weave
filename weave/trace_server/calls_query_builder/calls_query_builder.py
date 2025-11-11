@@ -2059,7 +2059,6 @@ def build_calls_complete_batch_update_query(
     if not end_calls:
         return ""
 
-    # All calls should be from the same project
     project_id = end_calls[0].project_id
     call_ids = []
 
@@ -2072,8 +2071,6 @@ def build_calls_complete_batch_update_query(
         "exception": [],
         "wb_run_step_end": [],
     }
-
-    print("DOING UPDATE BATCH ON CALL IDS", [c.id for c in end_calls])
 
     for call in end_calls:
         call_ids.append(call.id)
