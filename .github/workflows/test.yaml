@@ -184,7 +184,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install nox uv==0.8.6
+          pip install nox uv
       - name: Run nox
         run: nox -e lint
 
@@ -213,7 +213,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install nox uv==0.8.6
+          pip install nox uv
       - name: Run nox (Non Trace Server)
         run: |
           nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- \
@@ -318,7 +318,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install nox uv==0.8.6
+          pip install nox uv
       - name: Run nox (Sqlite Trace Server)
         env:
           WEAVE_SENTRY_ENV: ci
@@ -397,7 +397,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install nox uv==0.8.6
+          pip install nox uv
       - name: Run nox (Non Trace Server)
         run: |
           nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- -m "not trace_server"
@@ -464,7 +464,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install nox uv==0.8.6
+          pip install nox uv
       - name: Run nox (Sqlite Trace Server)
         env:
           WEAVE_SENTRY_ENV: ci

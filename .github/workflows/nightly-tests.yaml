@@ -125,7 +125,7 @@ jobs:
         if: steps.filter_shards.outputs.skip != 'true'
         run: |
           python -m pip install --upgrade pip
-          pip install nox uv==0.8.6
+          pip install nox uv
       - name: Check if shard needs trace_server markers
         id: check_trace_markers
         if: steps.filter_shards.outputs.skip != 'true'
