@@ -556,11 +556,11 @@ def split_escaped_field_path(path: str) -> list[str]:
     while i < len(path):
         # handle escaped period case, not a new part
         if path[i] == "\\" and i + 1 < len(path) and path[i + 1] == ".":
-            current_part.append('.')
+            current_part.append(".")
             i += 2
-        elif path[i] == '.':
+        elif path[i] == ".":
             if current_part or len(parts) == 0:
-                parts.append(''.join(current_part))
+                parts.append("".join(current_part))
                 current_part = []
             i += 1
         else:
@@ -568,7 +568,7 @@ def split_escaped_field_path(path: str) -> list[str]:
             i += 1
 
     if current_part or len(parts) > 0:
-        parts.append(''.join(current_part))
+        parts.append("".join(current_part))
 
     return parts
 

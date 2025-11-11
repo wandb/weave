@@ -4088,9 +4088,9 @@ def test_calls_query_with_dotted_field_keys(client):
         )
 
         calls = list(client.get_calls(query=query))
-        assert (
-            len(calls) == test_case["expected_count"]
-        ), f"Test '{test_case['name']}' failed: expected {test_case['expected_count']} calls, got {len(calls)}"
+        assert len(calls) == test_case["expected_count"], (
+            f"Test '{test_case['name']}' failed: expected {test_case['expected_count']} calls, got {len(calls)}"
+        )
 
         # Run assertions
         assertions = test_case["assertions"](calls)

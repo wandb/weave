@@ -10,7 +10,6 @@ from weave.trace_server.orm import (
     ParamBuilder,
     clickhouse_cast,
     quote_json_path_parts,
-    split_escaped_field_path,
 )
 
 
