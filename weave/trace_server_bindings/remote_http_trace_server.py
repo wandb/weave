@@ -2,6 +2,7 @@ import datetime
 import io
 import logging
 from collections.abc import Iterator
+from functools import cached_property
 from typing import Any, Optional, Union, cast
 from zoneinfo import ZoneInfo
 
@@ -10,6 +11,7 @@ from pydantic.json_schema import SkipJsonSchema
 
 from weave.trace.env import weave_trace_server_url
 from weave.trace.settings import max_calls_queue_size, should_enable_disk_fallback
+from weave.trace_server import objects_interface as oi
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ids import generate_id
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
@@ -749,49 +751,54 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
     ) -> tsi.EvaluationStatusRes:
         raise NotImplementedError("evaluation_status is not implemented")
 
-    # === V2 APIs ===
+    @cached_property
+    def object_interface(self) -> oi.ObjectInterface:
+        return RemoteHTTPObjectInterface(self)
 
-    def op_create_v2(
-        self, req: Union[tsi.OpCreateV2Req, dict[str, Any]]
-    ) -> tsi.OpCreateV2Res:
+
+class RemoteHTTPObjectInterface(oi.ObjectInterface):
+    def __init__(self, remote_http_trace_server: RemoteHTTPTraceServer) -> None:
+        self._server = remote_http_trace_server
+
+    # === Object APIs ===
+
+    def op_create(self, req: Union[oi.OpCreateReq, dict[str, Any]]) -> oi.OpCreateRes:
         if isinstance(req, dict):
-            req = tsi.OpCreateV2Req.model_validate(req)
-        req = cast(tsi.OpCreateV2Req, req)
+            req = oi.OpCreateReq.model_validate(req)
+        req = cast(oi.OpCreateReq, req)
         entity, project = req.project_id.split("/", 1)
         url = f"/v2/{entity}/{project}/ops"
-        # For create, we need to send the body without project_id (OpCreateV2Body)
+        # For create, we need to send the body without project_id (OpCreateBody)
         body_data = req.model_dump(exclude={"project_id"})
-        body = tsi.OpCreateV2Body.model_validate(body_data)
-        return self._generic_request(
+        body = oi.OpCreateBody.model_validate(body_data)
+        return self._server._generic_request(
             url,
             body,
-            tsi.OpCreateV2Body,
-            tsi.OpCreateV2Res,
+            oi.OpCreateBody,
+            oi.OpCreateRes,
             method="POST",
         )
 
-    def op_read_v2(
-        self, req: Union[tsi.OpReadV2Req, dict[str, Any]]
-    ) -> tsi.OpReadV2Res:
+    def op_read(self, req: Union[oi.OpReadReq, dict[str, Any]]) -> oi.OpReadRes:
         if isinstance(req, dict):
-            req = tsi.OpReadV2Req.model_validate(req)
-        req = cast(tsi.OpReadV2Req, req)
+            req = oi.OpReadReq.model_validate(req)
+        req = cast(oi.OpReadReq, req)
         entity, project = req.project_id.split("/", 1)
         url = f"/v2/{entity}/{project}/ops/{req.object_id}/versions/{req.digest}"
-        return self._generic_request(
+        return self._server._generic_request(
             url,
             req,
-            tsi.OpReadV2Req,
-            tsi.OpReadV2Res,
+            oi.OpReadReq,
+            oi.OpReadRes,
             method="GET",
         )
 
-    def op_list_v2(
-        self, req: Union[tsi.OpListV2Req, dict[str, Any]]
-    ) -> Iterator[tsi.OpReadV2Res]:
+    def op_list(
+        self, req: Union[oi.OpListReq, dict[str, Any]]
+    ) -> Iterator[oi.OpReadRes]:
         if isinstance(req, dict):
-            req = tsi.OpListV2Req.model_validate(req)
-        req = cast(tsi.OpListV2Req, req)
+            req = oi.OpListReq.model_validate(req)
+        req = cast(oi.OpListReq, req)
         entity, project = req.project_id.split("/", 1)
         url = f"/v2/{entity}/{project}/ops"
         # Build query params
@@ -800,79 +807,75 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
             params["limit"] = req.limit
         if req.offset is not None:
             params["offset"] = req.offset
-        if req.eager:
-            params["eager"] = "true"
-        return self._generic_stream_request(
+        return self._server._generic_stream_request(
             url,
             req,
-            tsi.OpListV2Req,
-            tsi.OpReadV2Res,
+            oi.OpListReq,
+            oi.OpReadRes,
             method="GET",
             params=params,
         )
 
-    def op_delete_v2(
-        self, req: Union[tsi.OpDeleteV2Req, dict[str, Any]]
-    ) -> tsi.OpDeleteV2Res:
+    def op_delete(self, req: Union[oi.OpDeleteReq, dict[str, Any]]) -> oi.OpDeleteRes:
         if isinstance(req, dict):
-            req = tsi.OpDeleteV2Req.model_validate(req)
-        req = cast(tsi.OpDeleteV2Req, req)
+            req = oi.OpDeleteReq.model_validate(req)
+        req = cast(oi.OpDeleteReq, req)
         entity, project = req.project_id.split("/", 1)
         url = f"/v2/{entity}/{project}/ops/{req.object_id}"
         # Build query params
         params = {}
         if req.digests:
             params["digests"] = req.digests
-        return self._generic_request(
+        return self._server._generic_request(
             url,
             req,
-            tsi.OpDeleteV2Req,
-            tsi.OpDeleteV2Res,
+            oi.OpDeleteReq,
+            oi.OpDeleteRes,
             method="DELETE",
             params=params,
         )
 
-    def dataset_create_v2(
-        self, req: Union[tsi.DatasetCreateV2Req, dict[str, Any]]
-    ) -> tsi.DatasetCreateV2Res:
+    def dataset_create(
+        self, req: Union[oi.DatasetCreateReq, dict[str, Any]]
+    ) -> oi.DatasetCreateRes:
         if isinstance(req, dict):
-            req = tsi.DatasetCreateV2Req.model_validate(req)
-        req = cast(tsi.DatasetCreateV2Req, req)
+            req = oi.DatasetCreateReq.model_validate(req)
+        req = cast(oi.DatasetCreateReq, req)
         entity, project = req.project_id.split("/", 1)
         url = f"/v2/{entity}/{project}/datasets"
-        # For create, we need to send the body without project_id (DatasetCreateV2Body)
+        # For create, we need to send the body without project_id (DatasetCreateBody)
         body_data = req.model_dump(exclude={"project_id"})
-        body = tsi.DatasetCreateV2Body.model_validate(body_data)
-        return self._generic_request(
+        body = oi.DatasetCreateBody.model_validate(body_data)
+        return self._server._generic_request(
             url,
             body,
-            tsi.DatasetCreateV2Body,
-            tsi.DatasetCreateV2Res,
+            oi.DatasetCreateBody,
+            oi.DatasetCreateRes,
             method="POST",
         )
 
-    def dataset_read_v2(
-        self, req: Union[tsi.DatasetReadV2Req, dict[str, Any]]
-    ) -> tsi.DatasetReadV2Res:
+    def dataset_read(
+        self, req: Union[oi.DatasetReadReq, dict[str, Any]]
+    ) -> oi.DatasetReadRes:
         if isinstance(req, dict):
-            req = tsi.DatasetReadV2Req.model_validate(req)
-        req = cast(tsi.DatasetReadV2Req, req)
+            req = oi.DatasetReadReq.model_validate(req)
+        req = cast(oi.DatasetReadReq, req)
         entity, project = req.project_id.split("/", 1)
         url = f"/v2/{entity}/{project}/datasets/{req.object_id}/versions/{req.digest}"
-        return self._generic_request(
+        return self._server._generic_request(
             url,
             req,
-            tsi.DatasetReadV2Req,
-            tsi.DatasetReadV2Res,
+            oi.DatasetReadReq,
+            oi.DatasetReadRes,
             method="GET",
         )
 
-    def dataset_list_v2(
-        self, req: Union[tsi.DatasetListV2Req, dict[str, Any]]
-    ) -> Iterator[tsi.DatasetReadV2Res]:
+    def dataset_list(
+        self, req: Union[oi.DatasetListReq, dict[str, Any]]
+    ) -> Iterator[oi.DatasetReadRes]:
         if isinstance(req, dict):
-            req = tsi.DatasetListV2Req.model_validate(req)
-        req = cast(tsi.DatasetListV2Req, req)
+            req = oi.DatasetListReq.model_validate(req)
+        req = cast(oi.DatasetListReq, req)
         entity, project = req.project_id.split("/", 1)
         url = f"/v2/{entity}/{project}/datasets"
         # Build query params
@@ -881,77 +884,77 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
             params["limit"] = req.limit
         if req.offset is not None:
             params["offset"] = req.offset
-        return self._generic_stream_request(
+        return self._server._generic_stream_request(
             url,
             req,
-            tsi.DatasetListV2Req,
-            tsi.DatasetReadV2Res,
+            oi.DatasetListReq,
+            oi.DatasetReadRes,
             method="GET",
             params=params,
         )
 
-    def dataset_delete_v2(
-        self, req: Union[tsi.DatasetDeleteV2Req, dict[str, Any]]
-    ) -> tsi.DatasetDeleteV2Res:
+    def dataset_delete(
+        self, req: Union[oi.DatasetDeleteReq, dict[str, Any]]
+    ) -> oi.DatasetDeleteRes:
         if isinstance(req, dict):
-            req = tsi.DatasetDeleteV2Req.model_validate(req)
-        req = cast(tsi.DatasetDeleteV2Req, req)
+            req = oi.DatasetDeleteReq.model_validate(req)
+        req = cast(oi.DatasetDeleteReq, req)
         entity, project = req.project_id.split("/", 1)
         url = f"/v2/{entity}/{project}/datasets/{req.object_id}"
         # Build query params
         params = {}
         if req.digests:
             params["digests"] = req.digests
-        return self._generic_request(
+        return self._server._generic_request(
             url,
             req,
-            tsi.DatasetDeleteV2Req,
-            tsi.DatasetDeleteV2Res,
+            oi.DatasetDeleteReq,
+            oi.DatasetDeleteRes,
             method="DELETE",
             params=params,
         )
 
-    def scorer_create_v2(
-        self, req: Union[tsi.ScorerCreateV2Req, dict[str, Any]]
-    ) -> tsi.ScorerCreateV2Res:
+    def scorer_create(
+        self, req: Union[oi.ScorerCreateReq, dict[str, Any]]
+    ) -> oi.ScorerCreateRes:
         if isinstance(req, dict):
-            req = tsi.ScorerCreateV2Req.model_validate(req)
-        req = cast(tsi.ScorerCreateV2Req, req)
+            req = oi.ScorerCreateReq.model_validate(req)
+        req = cast(oi.ScorerCreateReq, req)
         entity, project = req.project_id.split("/", 1)
         url = f"/v2/{entity}/{project}/scorers"
-        # For create, we need to send the body without project_id (ScorerCreateV2Body)
+        # For create, we need to send the body without project_id (ScorerCreateBody)
         body_data = req.model_dump(exclude={"project_id"})
-        body = tsi.ScorerCreateV2Body.model_validate(body_data)
-        return self._generic_request(
+        body = oi.ScorerCreateBody.model_validate(body_data)
+        return self._server._generic_request(
             url,
             body,
-            tsi.ScorerCreateV2Body,
-            tsi.ScorerCreateV2Res,
+            oi.ScorerCreateBody,
+            oi.ScorerCreateRes,
             method="POST",
         )
 
-    def scorer_read_v2(
-        self, req: Union[tsi.ScorerReadV2Req, dict[str, Any]]
-    ) -> tsi.ScorerReadV2Res:
+    def scorer_read(
+        self, req: Union[oi.ScorerReadReq, dict[str, Any]]
+    ) -> oi.ScorerReadRes:
         if isinstance(req, dict):
-            req = tsi.ScorerReadV2Req.model_validate(req)
-        req = cast(tsi.ScorerReadV2Req, req)
+            req = oi.ScorerReadReq.model_validate(req)
+        req = cast(oi.ScorerReadReq, req)
         entity, project = req.project_id.split("/", 1)
         url = f"/v2/{entity}/{project}/scorers/{req.object_id}/versions/{req.digest}"
-        return self._generic_request(
+        return self._server._generic_request(
             url,
             req,
-            tsi.ScorerReadV2Req,
-            tsi.ScorerReadV2Res,
+            oi.ScorerReadReq,
+            oi.ScorerReadRes,
             method="GET",
         )
 
-    def scorer_list_v2(
-        self, req: Union[tsi.ScorerListV2Req, dict[str, Any]]
-    ) -> Iterator[tsi.ScorerReadV2Res]:
+    def scorer_list(
+        self, req: Union[oi.ScorerListReq, dict[str, Any]]
+    ) -> Iterator[oi.ScorerReadRes]:
         if isinstance(req, dict):
-            req = tsi.ScorerListV2Req.model_validate(req)
-        req = cast(tsi.ScorerListV2Req, req)
+            req = oi.ScorerListReq.model_validate(req)
+        req = cast(oi.ScorerListReq, req)
         entity, project = req.project_id.split("/", 1)
         url = f"/v2/{entity}/{project}/scorers"
         # Build query params
@@ -960,79 +963,79 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
             params["limit"] = req.limit
         if req.offset is not None:
             params["offset"] = req.offset
-        return self._generic_stream_request(
+        return self._server._generic_stream_request(
             url,
             req,
-            tsi.ScorerListV2Req,
-            tsi.ScorerReadV2Res,
+            oi.ScorerListReq,
+            oi.ScorerReadRes,
             method="GET",
             params=params,
         )
 
-    def scorer_delete_v2(
-        self, req: Union[tsi.ScorerDeleteV2Req, dict[str, Any]]
-    ) -> tsi.ScorerDeleteV2Res:
+    def scorer_delete(
+        self, req: Union[oi.ScorerDeleteReq, dict[str, Any]]
+    ) -> oi.ScorerDeleteRes:
         if isinstance(req, dict):
-            req = tsi.ScorerDeleteV2Req.model_validate(req)
-        req = cast(tsi.ScorerDeleteV2Req, req)
+            req = oi.ScorerDeleteReq.model_validate(req)
+        req = cast(oi.ScorerDeleteReq, req)
         entity, project = req.project_id.split("/", 1)
         url = f"/v2/{entity}/{project}/scorers/{req.object_id}"
         # Build query params
         params = {}
         if req.digests:
             params["digests"] = req.digests
-        return self._generic_request(
+        return self._server._generic_request(
             url,
             req,
-            tsi.ScorerDeleteV2Req,
-            tsi.ScorerDeleteV2Res,
+            oi.ScorerDeleteReq,
+            oi.ScorerDeleteRes,
             method="DELETE",
             params=params,
         )
 
-    def evaluation_create_v2(
-        self, req: Union[tsi.EvaluationCreateV2Req, dict[str, Any]]
-    ) -> tsi.EvaluationCreateV2Res:
+    def evaluation_create(
+        self, req: Union[oi.EvaluationCreateReq, dict[str, Any]]
+    ) -> oi.EvaluationCreateRes:
         if isinstance(req, dict):
-            req = tsi.EvaluationCreateV2Req.model_validate(req)
-        req = cast(tsi.EvaluationCreateV2Req, req)
+            req = oi.EvaluationCreateReq.model_validate(req)
+        req = cast(oi.EvaluationCreateReq, req)
         entity, project = req.project_id.split("/", 1)
         url = f"/v2/{entity}/{project}/evaluations"
-        # For create, we need to send the body without project_id (EvaluationCreateV2Body)
+        # For create, we need to send the body without project_id (EvaluationCreateBody)
         body_data = req.model_dump(exclude={"project_id"})
-        body = tsi.EvaluationCreateV2Body.model_validate(body_data)
-        return self._generic_request(
+        body = oi.EvaluationCreateBody.model_validate(body_data)
+        return self._server._generic_request(
             url,
             body,
-            tsi.EvaluationCreateV2Body,
-            tsi.EvaluationCreateV2Res,
+            oi.EvaluationCreateBody,
+            oi.EvaluationCreateRes,
             method="POST",
         )
 
-    def evaluation_read_v2(
-        self, req: Union[tsi.EvaluationReadV2Req, dict[str, Any]]
-    ) -> tsi.EvaluationReadV2Res:
+    def evaluation_read(
+        self, req: Union[oi.EvaluationReadReq, dict[str, Any]]
+    ) -> oi.EvaluationReadRes:
         if isinstance(req, dict):
-            req = tsi.EvaluationReadV2Req.model_validate(req)
-        req = cast(tsi.EvaluationReadV2Req, req)
+            req = oi.EvaluationReadReq.model_validate(req)
+        req = cast(oi.EvaluationReadReq, req)
         entity, project = req.project_id.split("/", 1)
         url = (
             f"/v2/{entity}/{project}/evaluations/{req.object_id}/versions/{req.digest}"
         )
-        return self._generic_request(
+        return self._server._generic_request(
             url,
             req,
-            tsi.EvaluationReadV2Req,
-            tsi.EvaluationReadV2Res,
+            oi.EvaluationReadReq,
+            oi.EvaluationReadRes,
             method="GET",
         )
 
-    def evaluation_list_v2(
-        self, req: Union[tsi.EvaluationListV2Req, dict[str, Any]]
-    ) -> Iterator[tsi.EvaluationReadV2Res]:
+    def evaluation_list(
+        self, req: Union[oi.EvaluationListReq, dict[str, Any]]
+    ) -> Iterator[oi.EvaluationReadRes]:
         if isinstance(req, dict):
-            req = tsi.EvaluationListV2Req.model_validate(req)
-        req = cast(tsi.EvaluationListV2Req, req)
+            req = oi.EvaluationListReq.model_validate(req)
+        req = cast(oi.EvaluationListReq, req)
         entity, project = req.project_id.split("/", 1)
         url = f"/v2/{entity}/{project}/evaluations"
         # Build query params
@@ -1041,79 +1044,77 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
             params["limit"] = req.limit
         if req.offset is not None:
             params["offset"] = req.offset
-        return self._generic_stream_request(
+        return self._server._generic_stream_request(
             url,
             req,
-            tsi.EvaluationListV2Req,
-            tsi.EvaluationReadV2Res,
+            oi.EvaluationListReq,
+            oi.EvaluationReadRes,
             method="GET",
             params=params,
         )
 
-    def evaluation_delete_v2(
-        self, req: Union[tsi.EvaluationDeleteV2Req, dict[str, Any]]
-    ) -> tsi.EvaluationDeleteV2Res:
+    def evaluation_delete(
+        self, req: Union[oi.EvaluationDeleteReq, dict[str, Any]]
+    ) -> oi.EvaluationDeleteRes:
         if isinstance(req, dict):
-            req = tsi.EvaluationDeleteV2Req.model_validate(req)
-        req = cast(tsi.EvaluationDeleteV2Req, req)
+            req = oi.EvaluationDeleteReq.model_validate(req)
+        req = cast(oi.EvaluationDeleteReq, req)
         entity, project = req.project_id.split("/", 1)
         url = f"/v2/{entity}/{project}/evaluations/{req.object_id}"
         # Build query params
         params = {}
         if req.digests:
             params["digests"] = req.digests
-        return self._generic_request(
+        return self._server._generic_request(
             url,
             req,
-            tsi.EvaluationDeleteV2Req,
-            tsi.EvaluationDeleteV2Res,
+            oi.EvaluationDeleteReq,
+            oi.EvaluationDeleteRes,
             method="DELETE",
             params=params,
         )
 
-    # Model V2 API
+    # Model API
 
-    def model_create_v2(
-        self, req: Union[tsi.ModelCreateV2Req, dict[str, Any]]
-    ) -> tsi.ModelCreateV2Res:
+    def model_create(
+        self, req: Union[oi.ModelCreateReq, dict[str, Any]]
+    ) -> oi.ModelCreateRes:
         if isinstance(req, dict):
-            req = tsi.ModelCreateV2Req.model_validate(req)
-        req = cast(tsi.ModelCreateV2Req, req)
+            req = oi.ModelCreateReq.model_validate(req)
+        req = cast(oi.ModelCreateReq, req)
         entity, project = req.project_id.split("/", 1)
         url = f"/v2/{entity}/{project}/models"
-        body = tsi.ModelCreateV2Body.model_validate(
-            req.model_dump(exclude={"project_id"})
-        )
-        return self._generic_request(
+        body = oi.ModelCreateBody.model_validate(req.model_dump(exclude={"project_id"}))
+        return self._server._generic_request(
             url,
             body,
-            tsi.ModelCreateV2Body,
-            tsi.ModelCreateV2Res,
+            oi.ModelCreateBody,
+            oi.ModelCreateRes,
             method="POST",
         )
 
-    def model_read_v2(
-        self, req: Union[tsi.ModelReadV2Req, dict[str, Any]]
-    ) -> tsi.ModelReadV2Res:
+    def model_read(
+        self, req: Union[oi.ModelReadReq, dict[str, Any]]
+    ) -> oi.ModelReadRes:
         if isinstance(req, dict):
-            req = tsi.ModelReadV2Req.model_validate(req)
-        req = cast(tsi.ModelReadV2Req, req)
+            req = oi.ModelReadReq.model_validate(req)
+        req = cast(oi.ModelReadReq, req)
         entity, project = req.project_id.split("/", 1)
         url = f"/v2/{entity}/{project}/models/{req.object_id}/versions/{req.digest}"
-        return self._generic_request(
+        return self._server._generic_request(
             url,
             req,
-            tsi.ModelReadV2Req,
-            tsi.ModelReadV2Res,
+            oi.ModelReadReq,
+            oi.ModelReadRes,
             method="GET",
         )
 
-    def model_list_v2(
-        self, req: Union[tsi.ModelListV2Req, dict[str, Any]]
-    ) -> Iterator[tsi.ModelReadV2Res]:
+    def model_list(
+        self, req: Union[oi.ModelListReq, dict[str, Any]]
+    ) -> Iterator[oi.ModelReadRes]:
         if isinstance(req, dict):
-            req = tsi.ModelListV2Req.model_validate(req)
-        req = cast(tsi.ModelListV2Req, req)
+            req = oi.ModelListReq.model_validate(req)
+        req = cast(oi.ModelListReq, req)
         entity, project = req.project_id.split("/", 1)
         url = f"/v2/{entity}/{project}/models"
         # Build query params
@@ -1122,76 +1123,76 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
             params["limit"] = req.limit
         if req.offset is not None:
             params["offset"] = req.offset
-        return self._generic_stream_request(
+        return self._server._generic_stream_request(
             url,
             req,
-            tsi.ModelListV2Req,
-            tsi.ModelReadV2Res,
+            oi.ModelListReq,
+            oi.ModelReadRes,
             method="GET",
             params=params,
         )
 
-    def model_delete_v2(
-        self, req: Union[tsi.ModelDeleteV2Req, dict[str, Any]]
-    ) -> tsi.ModelDeleteV2Res:
+    def model_delete(
+        self, req: Union[oi.ModelDeleteReq, dict[str, Any]]
+    ) -> oi.ModelDeleteRes:
         if isinstance(req, dict):
-            req = tsi.ModelDeleteV2Req.model_validate(req)
-        req = cast(tsi.ModelDeleteV2Req, req)
+            req = oi.ModelDeleteReq.model_validate(req)
+        req = cast(oi.ModelDeleteReq, req)
         entity, project = req.project_id.split("/", 1)
         url = f"/v2/{entity}/{project}/models/{req.object_id}"
         # Build query params
         params = {}
         if req.digests:
             params["digests"] = req.digests
-        return self._generic_request(
+        return self._server._generic_request(
             url,
             req,
-            tsi.ModelDeleteV2Req,
-            tsi.ModelDeleteV2Res,
+            oi.ModelDeleteReq,
+            oi.ModelDeleteRes,
             method="DELETE",
             params=params,
         )
 
-    def evaluation_run_create_v2(
-        self, req: Union[tsi.EvaluationRunCreateV2Req, dict[str, Any]]
-    ) -> tsi.EvaluationRunCreateV2Res:
+    def evaluation_run_create(
+        self, req: Union[oi.EvaluationRunCreateReq, dict[str, Any]]
+    ) -> oi.EvaluationRunCreateRes:
         if isinstance(req, dict):
-            req = tsi.EvaluationRunCreateV2Req.model_validate(req)
-        req = cast(tsi.EvaluationRunCreateV2Req, req)
+            req = oi.EvaluationRunCreateReq.model_validate(req)
+        req = cast(oi.EvaluationRunCreateReq, req)
         entity, project = req.project_id.split("/", 1)
         url = f"/v2/{entity}/{project}/evaluation_runs"
-        # For create, we need to send the body without project_id (EvaluationRunCreateV2Body)
+        # For create, we need to send the body without project_id (EvaluationRunCreateBody)
         body_data = req.model_dump(exclude={"project_id"})
-        body = tsi.EvaluationRunCreateV2Body.model_validate(body_data)
-        return self._generic_request(
+        body = oi.EvaluationRunCreateBody.model_validate(body_data)
+        return self._server._generic_request(
             url,
             body,
-            tsi.EvaluationRunCreateV2Body,
-            tsi.EvaluationRunCreateV2Res,
+            oi.EvaluationRunCreateBody,
+            oi.EvaluationRunCreateRes,
         )
 
-    def evaluation_run_read_v2(
-        self, req: Union[tsi.EvaluationRunReadV2Req, dict[str, Any]]
-    ) -> tsi.EvaluationRunReadV2Res:
+    def evaluation_run_read(
+        self, req: Union[oi.EvaluationRunReadReq, dict[str, Any]]
+    ) -> oi.EvaluationRunReadRes:
         if isinstance(req, dict):
-            req = tsi.EvaluationRunReadV2Req.model_validate(req)
-        req = cast(tsi.EvaluationRunReadV2Req, req)
+            req = oi.EvaluationRunReadReq.model_validate(req)
+        req = cast(oi.EvaluationRunReadReq, req)
         entity, project = req.project_id.split("/", 1)
         url = f"/v2/{entity}/{project}/evaluation_runs/{req.evaluation_run_id}"
-        return self._generic_request(
+        return self._server._generic_request(
             url,
             req,
-            tsi.EvaluationRunReadV2Req,
-            tsi.EvaluationRunReadV2Res,
+            oi.EvaluationRunReadReq,
+            oi.EvaluationRunReadRes,
             method="GET",
         )
 
-    def evaluation_run_list_v2(
-        self, req: Union[tsi.EvaluationRunListV2Req, dict[str, Any]]
-    ) -> Iterator[tsi.EvaluationRunReadV2Res]:
+    def evaluation_run_list(
+        self, req: Union[oi.EvaluationRunListReq, dict[str, Any]]
+    ) -> Iterator[oi.EvaluationRunReadRes]:
         if isinstance(req, dict):
-            req = tsi.EvaluationRunListV2Req.model_validate(req)
-        req = cast(tsi.EvaluationRunListV2Req, req)
+            req = oi.EvaluationRunListReq.model_validate(req)
+        req = cast(oi.EvaluationRunListReq, req)
         entity, project = req.project_id.split("/", 1)
         url = f"/v2/{entity}/{project}/evaluation_runs"
         # Build query params
@@ -1207,93 +1208,93 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
                 params["model_refs"] = ",".join(req.filter.models)
             if req.filter.evaluation_run_ids:
                 params["evaluation_run_ids"] = ",".join(req.filter.evaluation_run_ids)
-        return self._generic_stream_request(
+        return self._server._generic_stream_request(
             url,
             req,
-            tsi.EvaluationRunListV2Req,
-            tsi.EvaluationRunReadV2Res,
+            oi.EvaluationRunListReq,
+            oi.EvaluationRunReadRes,
             method="GET",
             params=params,
         )
 
-    def evaluation_run_delete_v2(
-        self, req: Union[tsi.EvaluationRunDeleteV2Req, dict[str, Any]]
-    ) -> tsi.EvaluationRunDeleteV2Res:
+    def evaluation_run_delete(
+        self, req: Union[oi.EvaluationRunDeleteReq, dict[str, Any]]
+    ) -> oi.EvaluationRunDeleteRes:
         if isinstance(req, dict):
-            req = tsi.EvaluationRunDeleteV2Req.model_validate(req)
-        req = cast(tsi.EvaluationRunDeleteV2Req, req)
+            req = oi.EvaluationRunDeleteReq.model_validate(req)
+        req = cast(oi.EvaluationRunDeleteReq, req)
         entity, project = req.project_id.split("/", 1)
         url = f"/v2/{entity}/{project}/evaluation_runs"
         # Build query params - evaluation_run_ids are passed as a query param
         params = {"evaluation_run_ids": req.evaluation_run_ids}
-        return self._generic_request(
+        return self._server._generic_request(
             url,
             req,
-            tsi.EvaluationRunDeleteV2Req,
-            tsi.EvaluationRunDeleteV2Res,
+            oi.EvaluationRunDeleteReq,
+            oi.EvaluationRunDeleteRes,
             method="DELETE",
             params=params,
         )
 
-    def evaluation_run_finish_v2(
-        self, req: Union[tsi.EvaluationRunFinishV2Req, dict[str, Any]]
-    ) -> tsi.EvaluationRunFinishV2Res:
+    def evaluation_run_finish(
+        self, req: Union[oi.EvaluationRunFinishReq, dict[str, Any]]
+    ) -> oi.EvaluationRunFinishRes:
         if isinstance(req, dict):
-            req = tsi.EvaluationRunFinishV2Req.model_validate(req)
-        req = cast(tsi.EvaluationRunFinishV2Req, req)
+            req = oi.EvaluationRunFinishReq.model_validate(req)
+        req = cast(oi.EvaluationRunFinishReq, req)
         entity, project = req.project_id.split("/", 1)
         url = f"/v2/{entity}/{project}/evaluation_runs/{req.evaluation_run_id}/finish"
-        return self._generic_request(
+        return self._server._generic_request(
             url,
             req,
-            tsi.EvaluationRunFinishV2Req,
-            tsi.EvaluationRunFinishV2Res,
+            oi.EvaluationRunFinishReq,
+            oi.EvaluationRunFinishRes,
             method="POST",
         )
 
-    # Prediction V2 API
+    # Prediction API
 
-    def prediction_create_v2(
-        self, req: Union[tsi.PredictionCreateV2Req, dict[str, Any]]
-    ) -> tsi.PredictionCreateV2Res:
+    def prediction_create(
+        self, req: Union[oi.PredictionCreateReq, dict[str, Any]]
+    ) -> oi.PredictionCreateRes:
         if isinstance(req, dict):
-            req = tsi.PredictionCreateV2Req.model_validate(req)
-        req = cast(tsi.PredictionCreateV2Req, req)
+            req = oi.PredictionCreateReq.model_validate(req)
+        req = cast(oi.PredictionCreateReq, req)
         entity, project = req.project_id.split("/", 1)
         url = f"/v2/{entity}/{project}/predictions"
-        body = tsi.PredictionCreateV2Body.model_validate(
+        body = oi.PredictionCreateBody.model_validate(
             req.model_dump(exclude={"project_id"})
         )
-        return self._generic_request(
+        return self._server._generic_request(
             url,
             body,
-            tsi.PredictionCreateV2Body,
-            tsi.PredictionCreateV2Res,
+            oi.PredictionCreateBody,
+            oi.PredictionCreateRes,
             method="POST",
         )
 
-    def prediction_read_v2(
-        self, req: Union[tsi.PredictionReadV2Req, dict[str, Any]]
-    ) -> tsi.PredictionReadV2Res:
+    def prediction_read(
+        self, req: Union[oi.PredictionReadReq, dict[str, Any]]
+    ) -> oi.PredictionReadRes:
         if isinstance(req, dict):
-            req = tsi.PredictionReadV2Req.model_validate(req)
-        req = cast(tsi.PredictionReadV2Req, req)
+            req = oi.PredictionReadReq.model_validate(req)
+        req = cast(oi.PredictionReadReq, req)
         entity, project = req.project_id.split("/", 1)
         url = f"/v2/{entity}/{project}/predictions/{req.prediction_id}"
-        return self._generic_request(
+        return self._server._generic_request(
             url,
             req,
-            tsi.PredictionReadV2Req,
-            tsi.PredictionReadV2Res,
+            oi.PredictionReadReq,
+            oi.PredictionReadRes,
             method="GET",
         )
 
-    def prediction_list_v2(
-        self, req: Union[tsi.PredictionListV2Req, dict[str, Any]]
-    ) -> Iterator[tsi.PredictionReadV2Res]:
+    def prediction_list(
+        self, req: Union[oi.PredictionListReq, dict[str, Any]]
+    ) -> Iterator[oi.PredictionReadRes]:
         if isinstance(req, dict):
-            req = tsi.PredictionListV2Req.model_validate(req)
-        req = cast(tsi.PredictionListV2Req, req)
+            req = oi.PredictionListReq.model_validate(req)
+        req = cast(oi.PredictionListReq, req)
         entity, project = req.project_id.split("/", 1)
         url = f"/v2/{entity}/{project}/predictions"
         # Build query params
@@ -1304,93 +1305,91 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
             params["limit"] = req.limit
         if req.offset is not None:
             params["offset"] = req.offset
-        return self._generic_stream_request(
+        return self._server._generic_stream_request(
             url,
             req,
-            tsi.PredictionListV2Req,
-            tsi.PredictionReadV2Res,
+            oi.PredictionListReq,
+            oi.PredictionReadRes,
             method="GET",
             params=params,
         )
 
-    def prediction_delete_v2(
-        self, req: Union[tsi.PredictionDeleteV2Req, dict[str, Any]]
-    ) -> tsi.PredictionDeleteV2Res:
+    def prediction_delete(
+        self, req: Union[oi.PredictionDeleteReq, dict[str, Any]]
+    ) -> oi.PredictionDeleteRes:
         if isinstance(req, dict):
-            req = tsi.PredictionDeleteV2Req.model_validate(req)
-        req = cast(tsi.PredictionDeleteV2Req, req)
+            req = oi.PredictionDeleteReq.model_validate(req)
+        req = cast(oi.PredictionDeleteReq, req)
         entity, project = req.project_id.split("/", 1)
         url = f"/v2/{entity}/{project}/predictions"
         # Build query params - prediction_ids are passed as a query param
         params = {"prediction_ids": req.prediction_ids}
-        return self._generic_request(
+        return self._server._generic_request(
             url,
             req,
-            tsi.PredictionDeleteV2Req,
-            tsi.PredictionDeleteV2Res,
+            oi.PredictionDeleteReq,
+            oi.PredictionDeleteRes,
             method="DELETE",
             params=params,
         )
 
-    def prediction_finish_v2(
-        self, req: Union[tsi.PredictionFinishV2Req, dict[str, Any]]
-    ) -> tsi.PredictionFinishV2Res:
+    def prediction_finish(
+        self, req: Union[oi.PredictionFinishReq, dict[str, Any]]
+    ) -> oi.PredictionFinishRes:
         if isinstance(req, dict):
-            req = tsi.PredictionFinishV2Req.model_validate(req)
-        req = cast(tsi.PredictionFinishV2Req, req)
+            req = oi.PredictionFinishReq.model_validate(req)
+        req = cast(oi.PredictionFinishReq, req)
         entity, project = req.project_id.split("/", 1)
         url = f"/v2/{entity}/{project}/predictions/{req.prediction_id}/finish"
-        return self._generic_request(
+        return self._server._generic_request(
             url,
             req,
-            tsi.PredictionFinishV2Req,
-            tsi.PredictionFinishV2Res,
+            oi.PredictionFinishReq,
+            oi.PredictionFinishRes,
             method="POST",
         )
 
-    # Score V2 API
+    # Score API
 
-    def score_create_v2(
-        self, req: Union[tsi.ScoreCreateV2Req, dict[str, Any]]
-    ) -> tsi.ScoreCreateV2Res:
+    def score_create(
+        self, req: Union[oi.ScoreCreateReq, dict[str, Any]]
+    ) -> oi.ScoreCreateRes:
         if isinstance(req, dict):
-            req = tsi.ScoreCreateV2Req.model_validate(req)
-        req = cast(tsi.ScoreCreateV2Req, req)
+            req = oi.ScoreCreateReq.model_validate(req)
+        req = cast(oi.ScoreCreateReq, req)
         entity, project = req.project_id.split("/", 1)
         url = f"/v2/{entity}/{project}/scores"
-        body = tsi.ScoreCreateV2Body.model_validate(
-            req.model_dump(exclude={"project_id"})
-        )
-        return self._generic_request(
+        body = oi.ScoreCreateBody.model_validate(req.model_dump(exclude={"project_id"}))
+        return self._server._generic_request(
             url,
             body,
-            tsi.ScoreCreateV2Body,
-            tsi.ScoreCreateV2Res,
+            oi.ScoreCreateBody,
+            oi.ScoreCreateRes,
             method="POST",
         )
 
-    def score_read_v2(
-        self, req: Union[tsi.ScoreReadV2Req, dict[str, Any]]
-    ) -> tsi.ScoreReadV2Res:
+    def score_read(
+        self, req: Union[oi.ScoreReadReq, dict[str, Any]]
+    ) -> oi.ScoreReadRes:
         if isinstance(req, dict):
-            req = tsi.ScoreReadV2Req.model_validate(req)
-        req = cast(tsi.ScoreReadV2Req, req)
+            req = oi.ScoreReadReq.model_validate(req)
+        req = cast(oi.ScoreReadReq, req)
         entity, project = req.project_id.split("/", 1)
         url = f"/v2/{entity}/{project}/scores/{req.score_id}"
-        return self._generic_request(
+        return self._server._generic_request(
             url,
             req,
-            tsi.ScoreReadV2Req,
-            tsi.ScoreReadV2Res,
+            oi.ScoreReadReq,
+            oi.ScoreReadRes,
             method="GET",
         )
 
-    def score_list_v2(
-        self, req: Union[tsi.ScoreListV2Req, dict[str, Any]]
-    ) -> Iterator[tsi.ScoreReadV2Res]:
+    def score_list(
+        self, req: Union[oi.ScoreListReq, dict[str, Any]]
+    ) -> Iterator[oi.ScoreReadRes]:
         if isinstance(req, dict):
-            req = tsi.ScoreListV2Req.model_validate(req)
-        req = cast(tsi.ScoreListV2Req, req)
+            req = oi.ScoreListReq.model_validate(req)
+        req = cast(oi.ScoreListReq, req)
         entity, project = req.project_id.split("/", 1)
         url = f"/v2/{entity}/{project}/scores"
         # Build query params
@@ -1401,30 +1400,30 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
             params["limit"] = req.limit
         if req.offset is not None:
             params["offset"] = req.offset
-        return self._generic_stream_request(
+        return self._server._generic_stream_request(
             url,
             req,
-            tsi.ScoreListV2Req,
-            tsi.ScoreReadV2Res,
+            oi.ScoreListReq,
+            oi.ScoreReadRes,
             method="GET",
             params=params,
         )
 
-    def score_delete_v2(
-        self, req: Union[tsi.ScoreDeleteV2Req, dict[str, Any]]
-    ) -> tsi.ScoreDeleteV2Res:
+    def score_delete(
+        self, req: Union[oi.ScoreDeleteReq, dict[str, Any]]
+    ) -> oi.ScoreDeleteRes:
         if isinstance(req, dict):
-            req = tsi.ScoreDeleteV2Req.model_validate(req)
-        req = cast(tsi.ScoreDeleteV2Req, req)
+            req = oi.ScoreDeleteReq.model_validate(req)
+        req = cast(oi.ScoreDeleteReq, req)
         entity, project = req.project_id.split("/", 1)
         url = f"/v2/{entity}/{project}/scores"
         # Build query params - score_ids are passed as a query param
         params = {"score_ids": req.score_ids}
-        return self._generic_request(
+        return self._server._generic_request(
             url,
             req,
-            tsi.ScoreDeleteV2Req,
-            tsi.ScoreDeleteV2Res,
+            oi.ScoreDeleteReq,
+            oi.ScoreDeleteRes,
             method="DELETE",
             params=params,
         )
