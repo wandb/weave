@@ -866,8 +866,6 @@ class CallsQuery(BaseModel):
         self._add_cost_ctes_to_builder(ctes, pb)
 
         select_fields = [field.field for field in self.select_fields]
-        # Pass the OrderField objects directly to preserve complex expressions
-        # Also pass project_id for building feedback joins if needed
         final_select = get_cost_final_select(
             pb, select_fields, self.order_fields, self.project_id
         )
