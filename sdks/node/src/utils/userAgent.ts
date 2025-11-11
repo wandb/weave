@@ -1,10 +1,21 @@
 import {existsSync, readFileSync} from 'fs';
-import {join} from 'path';
+import {dirname, join} from 'path';
+import {fileURLToPath} from 'url';
 
 export let packageVersion: string;
 
-const twoLevelsUp = join(__dirname, '..', '..', 'package.json');
-const oneLevelUp = join(__dirname, '..', 'package.json');
+// Get current directory, handling both CommonJS and ESM
+let currentDir: string;
+try {
+  // CommonJS
+  currentDir = __dirname;
+} catch {
+  // ESM fallback
+  currentDir = dirname(fileURLToPath(import.meta.url));
+}
+
+const twoLevelsUp = join(currentDir, '..', '..', 'package.json');
+const oneLevelUp = join(currentDir, '..', 'package.json');
 
 if (existsSync(twoLevelsUp)) {
   // This is the case in the built npm package
