@@ -292,6 +292,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         calls: list[
             tuple[tsi.StartedCallSchemaForInsert, tsi.EndedCallSchemaForInsert]
         ] = []
+        completes: list[tsi.CompletedCallSchemaForInsert] = []
         rejected_spans = 0
         error_messages: list[str] = []
 
@@ -326,6 +327,20 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                             wb_run_id=req.wb_run_id,
                         )
                     )
+                    # SHADOW otel inserts into calls_complete in new projects
+                    project_version = (
+                        self.project_version_resolver.get_project_version_sync(
+                            req.project_id
+                        )
+                    )
+                    if project_version == ProjectVersion.CALLS_COMPLETE_VERSION:
+                        completes.append(
+                            span.to_complete(
+                                req.project_id,
+                                wb_user_id=req.wb_user_id,
+                                wb_run_id=req.wb_run_id,
+                            )
+                        )
 
         obj_id_idx_map = defaultdict(list)
         for idx, (start_call, _) in enumerate(calls):
@@ -359,6 +374,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             # Modify each of the matched start calls in place
             for idx in obj_id_idx_map[obj.object_id]:
                 calls[idx][0].op_name = op_ref_uri
+                completes[idx].op_name = op_ref_uri
             # Remove this ID from the mapping so that once the for loop is done we are left with only new objects
             obj_id_idx_map.pop(obj.object_id)
 
@@ -386,6 +402,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             ).uri()
             for idx in obj_id_idx_map[result.object_id]:
                 calls[idx][0].op_name = op_ref_uri
+                completes[idx].op_name = op_ref_uri
 
         batch = [
             item
@@ -397,6 +414,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         ]
         # TODO: Actually populate the error fields if call_start_batch fails
         self.call_start_batch(tsi.CallCreateBatchReq(batch=batch))
+
+        # SHADOW write completes to calls_complete table
+        if completes:
+            self._insert_call_batch(completes)
 
         if rejected_spans > 0:
             # Join the first 20 errors and return them delimited by ';'
