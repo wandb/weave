@@ -101,3 +101,52 @@ def json_dump_field_as_sql(
                 path_parts.append(", " + param_slot(pb.add_param(part), "String"))
         safe_path = "".join(path_parts)
         return f"(NOT (JSONType({root_field_sanitized}{safe_path}) = 'Null' OR JSONType({root_field_sanitized}{safe_path}) IS NULL))"
+
+def split_escaped_field_path(path: str) -> list[str]:
+    r"""Split a field path on dots, respecting backslash-escaped dots.
+
+    This function handles field names that contain literal dots by allowing
+    them to be escaped with a backslash. This is necessary because JSON keys
+    can contain dots, and we need a way to distinguish between:
+    - Nested field access: "output.metrics.run" -> ["output", "metrics", "run"]
+    - Field with dot in name: "output.metrics\.run" -> ["output", "metrics.run"]
+
+    Args:
+        path: The field path string, potentially with escaped dots
+
+    Returns:
+        List of field path segments with escape sequences removed
+
+    Examples:
+        >>> split_escaped_field_path("output.metrics.run")
+        ['output', 'metrics', 'run']
+        >>> split_escaped_field_path("output.metrics\\.run")
+        ['output', 'metrics.run']
+        >>> split_escaped_field_path("output.a\\.b\\.c.d")
+        ['output', 'a.b.c', 'd']
+    """
+    parts: list[str] = []
+    current_part: list[str] = []
+    i = 0
+
+    while i < len(path):
+        if path[i] == '\\' and i + 1 < len(path) and path[i + 1] == '.':
+            # Escaped dot - add literal dot to current part
+            current_part.append('.')
+            i += 2
+        elif path[i] == '.':
+            # Unescaped dot - field separator
+            if current_part or len(parts) == 0:  # Handle empty parts at start
+                parts.append(''.join(current_part))
+                current_part = []
+            i += 1
+        else:
+            # Regular character
+            current_part.append(path[i])
+            i += 1
+
+    # Add the last part
+    if current_part or len(parts) > 0:
+        parts.append(''.join(current_part))
+
+    return parts
