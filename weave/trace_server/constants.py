@@ -7,7 +7,7 @@ MAX_DISPLAY_NAME_LENGTH = 1024
 MAX_OP_NAME_LENGTH = 128
 MAX_OBJECT_NAME_LENGTH = 128
 
-# Evaluation Run V2 API Constants
+# Evaluation Run Constants
 EVALUATION_RUN_OP_NAME = "Evaluation.evaluate"
 EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME = "Evaluation.predict_and_score"
 EVALUATION_SUMMARIZE_OP_NAME = "Evaluation.summarize"

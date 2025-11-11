@@ -2384,8 +2384,6 @@ class SqliteObjectsInterface(oi.ObjectInterface):
         result = self._server.obj_delete(obj_delete_req)
         return oi.EvaluationDeleteRes(num_deleted=result.num_deleted)
 
-    # Model V2 API
-
     def model_create(self, req: oi.ModelCreateReq) -> oi.ModelCreateRes:
         """Create a model object.
 
@@ -2861,8 +2859,6 @@ class SqliteObjectsInterface(oi.ObjectInterface):
         self._server.call_end(call_end_req)
         return oi.EvaluationRunFinishRes(success=True)
 
-    # Prediction V2 API
-
     def prediction_create(self, req: oi.PredictionCreateReq) -> oi.PredictionCreateRes:
         """Create a prediction as a call with special attributes.
 
@@ -3287,8 +3283,6 @@ class SqliteObjectsInterface(oi.ObjectInterface):
         self._server.call_end(parent_end_req)
 
         return oi.PredictionFinishRes(success=True)
-
-    # Score V2 API
 
     def score_create(self, req: oi.ScoreCreateReq) -> oi.ScoreCreateRes:
         """Create a score as a call with special attributes.

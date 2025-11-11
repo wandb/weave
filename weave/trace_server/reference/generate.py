@@ -12,7 +12,7 @@ from weave.trace_server.trace_service import ServerInfoRes, TraceService
 
 SERVICE_TAG_NAME = "Service"
 CALLS_TAG_NAME = "Calls"
-OPS_TAG_NAME = "Ops"
+OPS_TAG_NAME = "Ops (Legacy)"
 OBJECTS_TAG_NAME = "Objects"
 TABLES_TAG_NAME = "Tables"
 REFS_TAG_NAME = "Refs"
