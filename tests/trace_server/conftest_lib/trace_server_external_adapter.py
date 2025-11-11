@@ -161,24 +161,24 @@ class TestOnlyUserInjectingExternalObjectInterface(
     external_to_internal_trace_server_adapter.ExternalObjectInterface
 ):
     def __init__(self, external_trace_server: TestOnlyUserInjectingExternalTraceServer):
-        self._external_trace_server = external_trace_server
+        self._server = external_trace_server
 
     def evaluation_run_delete(
         self, req: oi.EvaluationRunDeleteReq
     ) -> oi.EvaluationRunDeleteRes:
-        req.wb_user_id = self._external_trace_server._user_id
+        req.wb_user_id = self._server._user_id
         return super().evaluation_run_delete(req)
 
     def evaluation_run_finish(
         self, req: oi.EvaluationRunFinishReq
     ) -> oi.EvaluationRunFinishRes:
-        req.wb_user_id = self._external_trace_server._user_id
+        req.wb_user_id = self._server._user_id
         return super().evaluation_run_finish(req)
 
     def prediction_delete(self, req: oi.PredictionDeleteReq) -> oi.PredictionDeleteRes:
-        req.wb_user_id = self._external_trace_server._user_id
+        req.wb_user_id = self._server._user_id
         return super().prediction_delete(req)
 
     def score_delete(self, req: oi.ScoreDeleteReq) -> oi.ScoreDeleteRes:
-        req.wb_user_id = self._external_trace_server._user_id
+        req.wb_user_id = self._server._user_id
         return super().score_delete(req)
