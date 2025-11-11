@@ -1,6 +1,6 @@
-"""Tests for Trace Server V2 API endpoints.
+"""Tests for Trace Server API endpoints.
 
-This module tests the V2 API endpoints for:
+This module tests the API endpoints for:
 - Ops (create, read, list, delete)
 - Datasets (create, read, list, delete)
 - Scorers (create, read, list, delete)
@@ -17,11 +17,11 @@ from weave.trace_server import objects_interface as oi
 from weave.trace_server import trace_server_interface as tsi
 
 
-class TestOpsV2API:
-    """Tests for Ops V2 API endpoints."""
+class TestOpsAPI:
+    """Tests for Ops API endpoints."""
 
     def test_op_create(self, client):
-        """Test creating an op via V2 API."""
+        """Test creating an op via API."""
         project_id = client._project_id()
 
         # Create an op
@@ -38,7 +38,7 @@ class TestOpsV2API:
         assert res.version_index == 0
 
     def test_op_read(self, client):
-        """Test reading an op via V2 API."""
+        """Test reading an op via API."""
         project_id = client._project_id()
 
         # Create an op first
@@ -65,8 +65,8 @@ class TestOpsV2API:
         assert read_res.code == source_code
         assert read_res.created_at is not None
 
-    def test_op_list_v2(self, client):
-        """Test listing ops via V2 API."""
+    def test_op_list(self, client):
+        """Test listing ops via API."""
         project_id = client._project_id()
 
         # Create multiple ops
@@ -89,8 +89,8 @@ class TestOpsV2API:
         assert "list_test_op_1" in op_names
         assert "list_test_op_2" in op_names
 
-    def test_op_list_v2_with_limit(self, client):
-        """Test listing ops with limit via V2 API."""
+    def test_op_list_with_limit(self, client):
+        """Test listing ops with limit via API."""
         project_id = client._project_id()
 
         # Create multiple ops
@@ -109,8 +109,8 @@ class TestOpsV2API:
         # Verify limit is respected
         assert len(ops) == 2
 
-    def test_op_delete_v2(self, client):
-        """Test deleting an op via V2 API."""
+    def test_op_delete(self, client):
+        """Test deleting an op via API."""
         project_id = client._project_id()
 
         # Create an op
@@ -132,8 +132,8 @@ class TestOpsV2API:
         # Verify deletion
         assert delete_res.num_deleted == 1
 
-    def test_op_delete_v2_all_versions(self, client):
-        """Test deleting all versions of an op via V2 API."""
+    def test_op_delete_all_versions(self, client):
+        """Test deleting all versions of an op via API."""
         project_id = client._project_id()
 
         # Create multiple versions
@@ -159,11 +159,11 @@ class TestOpsV2API:
         assert delete_res.num_deleted == 3
 
 
-class TestDatasetsV2API:
-    """Tests for Datasets V2 API endpoints."""
+class TestDatasetsAPI:
+    """Tests for Datasets API endpoints."""
 
-    def test_dataset_create_v2(self, client):
-        """Test creating a dataset via V2 API."""
+    def test_dataset_create(self, client):
+        """Test creating a dataset via API."""
         project_id = client._project_id()
 
         # Create a dataset
@@ -184,8 +184,8 @@ class TestDatasetsV2API:
         assert res.digest is not None
         assert res.version_index == 0
 
-    def test_dataset_read_v2(self, client):
-        """Test reading a dataset via V2 API."""
+    def test_dataset_read(self, client):
+        """Test reading a dataset via API."""
         project_id = client._project_id()
 
         # Create a dataset first
@@ -218,8 +218,8 @@ class TestDatasetsV2API:
         assert read_res.rows is not None  # Field is 'rows', not 'rows_ref'
         assert read_res.created_at is not None
 
-    def test_dataset_list_v2(self, client):
-        """Test listing datasets via V2 API."""
+    def test_dataset_list(self, client):
+        """Test listing datasets via API."""
         project_id = client._project_id()
 
         # Create multiple datasets
@@ -242,8 +242,8 @@ class TestDatasetsV2API:
         assert "list_dataset_1" in dataset_names
         assert "list_dataset_2" in dataset_names
 
-    def test_dataset_delete_v2(self, client):
-        """Test deleting a dataset via V2 API."""
+    def test_dataset_delete(self, client):
+        """Test deleting a dataset via API."""
         project_id = client._project_id()
 
         # Create a dataset
@@ -266,11 +266,11 @@ class TestDatasetsV2API:
         assert delete_res.num_deleted == 1
 
 
-class TestScorersV2API:
-    """Tests for Scorers V2 API endpoints."""
+class TestScorersAPI:
+    """Tests for Scorers API endpoints."""
 
-    def test_scorer_create_v2(self, client):
-        """Test creating a scorer via V2 API."""
+    def test_scorer_create(self, client):
+        """Test creating a scorer via API."""
         project_id = client._project_id()
 
         # Create a scorer
@@ -288,8 +288,8 @@ class TestScorersV2API:
         assert res.digest is not None
         assert res.version_index == 0
 
-    def test_scorer_read_v2(self, client):
-        """Test reading a scorer via V2 API."""
+    def test_scorer_read(self, client):
+        """Test reading a scorer via API."""
         project_id = client._project_id()
 
         # Create a scorer first
@@ -323,8 +323,8 @@ class TestScorersV2API:
         )  # ScorerReadV2Res has 'score_op', not 'code'
         assert read_res.created_at is not None
 
-    def test_scorer_list_v2(self, client):
-        """Test listing scorers via V2 API."""
+    def test_scorer_list(self, client):
+        """Test listing scorers via API."""
         project_id = client._project_id()
 
         # Create multiple scorers
@@ -347,8 +347,8 @@ class TestScorersV2API:
         assert "list_scorer_1" in scorer_names
         assert "list_scorer_2" in scorer_names
 
-    def test_scorer_delete_v2(self, client):
-        """Test deleting a scorer via V2 API."""
+    def test_scorer_delete(self, client):
+        """Test deleting a scorer via API."""
         project_id = client._project_id()
 
         # Create a scorer
@@ -371,11 +371,11 @@ class TestScorersV2API:
         assert delete_res.num_deleted == 1
 
 
-class TestEvaluationsV2API:
-    """Tests for Evaluations V2 API endpoints."""
+class TestEvaluationsAPI:
+    """Tests for Evaluations API endpoints."""
 
-    def test_evaluation_create_v2(self, client):
-        """Test creating an evaluation via V2 API."""
+    def test_evaluation_create(self, client):
+        """Test creating an evaluation via API."""
         project_id = client._project_id()
 
         # First create a dataset
@@ -407,8 +407,8 @@ class TestEvaluationsV2API:
         assert res.version_index == 0
         assert res.evaluation_ref is not None
 
-    def test_evaluation_read_v2(self, client):
-        """Test reading an evaluation via V2 API."""
+    def test_evaluation_read(self, client):
+        """Test reading an evaluation via API."""
         project_id = client._project_id()
 
         # Create dataset and evaluation first
@@ -456,8 +456,8 @@ class TestEvaluationsV2API:
         assert read_res.summarize_op is not None
         assert read_res.created_at is not None
 
-    def test_evaluation_list_v2(self, client):
-        """Test listing evaluations via V2 API."""
+    def test_evaluation_list(self, client):
+        """Test listing evaluations via API."""
         project_id = client._project_id()
 
         # Create dataset
@@ -492,8 +492,8 @@ class TestEvaluationsV2API:
         assert "list_evaluation_1" in eval_names
         assert "list_evaluation_2" in eval_names
 
-    def test_evaluation_delete_v2(self, client):
-        """Test deleting an evaluation via V2 API."""
+    def test_evaluation_delete(self, client):
+        """Test deleting an evaluation via API."""
         project_id = client._project_id()
 
         # Create dataset and evaluation
@@ -581,8 +581,8 @@ class TestEvaluationsV2API:
         assert scorer_ref2 in read_res.scorers
 
 
-class TestV2APIIntegration:
-    """Integration tests for V2 API endpoints."""
+class TestAPIIntegration:
+    """Integration tests for API endpoints."""
 
     def test_complete_evaluation_workflow(self, client):
         """Test a complete workflow: create dataset, scorers, and evaluation."""
@@ -677,7 +677,7 @@ class TestV2APIIntegration:
         assert scorer2_read_res.name == "length_check"
 
     def test_versioning_workflow(self, client):
-        """Test that versioning works correctly across V2 API."""
+        """Test that versioning works correctly across API."""
         project_id = client._project_id()
 
         # Create multiple versions of the same op
@@ -713,11 +713,11 @@ class TestV2APIIntegration:
             assert read_res.version_index == version.version_index
 
 
-class TestModelsV2API:
-    """Tests for Models V2 API endpoints."""
+class TestModelsAPI:
+    """Tests for Models API endpoints."""
 
-    def test_model_create_v2(self, client):
-        """Test creating a model via V2 API."""
+    def test_model_create(self, client):
+        """Test creating a model via API."""
         project_id = client._project_id()
 
         # Create a model
@@ -744,8 +744,8 @@ class TestModel(weave.Model):
         assert res.version_index == 0
         assert res.model_ref is not None
 
-    def test_model_read_v2(self, client):
-        """Test reading a model via V2 API."""
+    def test_model_read(self, client):
+        """Test reading a model via API."""
         project_id = client._project_id()
 
         # Create a model first
@@ -786,8 +786,8 @@ class MyTestModel(weave.Model):
         assert read_res.attributes.get("prompt") == "Hello"
         assert read_res.created_at is not None
 
-    def test_model_list_v2(self, client):
-        """Test listing models via V2 API."""
+    def test_model_list(self, client):
+        """Test listing models via API."""
         project_id = client._project_id()
 
         # Create multiple models
@@ -816,8 +816,8 @@ class ListTestModel{i}(weave.Model):
         assert "ListTestModel1" in model_names
         assert "ListTestModel2" in model_names
 
-    def test_model_delete_v2(self, client):
-        """Test deleting a model via V2 API."""
+    def test_model_delete(self, client):
+        """Test deleting a model via API."""
         project_id = client._project_id()
 
         # Create a model
@@ -845,8 +845,8 @@ class DeletableModel(weave.Model):
         # Verify deletion
         assert delete_res.num_deleted == 1
 
-    def test_model_delete_v2_all_versions(self, client):
-        """Test deleting all versions of a model via V2 API."""
+    def test_model_delete_all_versions(self, client):
+        """Test deleting all versions of a model via API."""
         project_id = client._project_id()
 
         # Create multiple versions
@@ -880,11 +880,11 @@ class MultiVersionModel(weave.Model):
         assert delete_res.num_deleted == 3
 
 
-class TestEvaluationRunsV2API:
-    """Tests for Evaluation Runs V2 API endpoints."""
+class TestEvaluationRunsAPI:
+    """Tests for Evaluation Runs API endpoints."""
 
-    def test_evaluation_run_create_v2(self, client):
-        """Test creating an evaluation run via V2 API."""
+    def test_evaluation_run_create(self, client):
+        """Test creating an evaluation run via API."""
         project_id = client._project_id()
         entity, project = project_id.split("/")
 
@@ -931,8 +931,8 @@ class EvalRunModel(weave.Model):
         # Verify response
         assert run_res.evaluation_run_id is not None
 
-    def test_evaluation_run_read_v2(self, client):
-        """Test reading an evaluation run via V2 API."""
+    def test_evaluation_run_read(self, client):
+        """Test reading an evaluation run via API."""
         project_id = client._project_id()
         entity, project = project_id.split("/")
 
@@ -986,8 +986,8 @@ class ReadEvalRunModel(weave.Model):
         assert read_res.evaluation == eval_res.evaluation_ref
         assert read_res.model == model_res.model_ref
 
-    def test_evaluation_run_list_v2(self, client):
-        """Test listing evaluation runs via V2 API."""
+    def test_evaluation_run_list(self, client):
+        """Test listing evaluation runs via API."""
         project_id = client._project_id()
         entity, project = project_id.split("/")
 
@@ -1043,8 +1043,8 @@ class ListEvalRunModel{i}(weave.Model):
         for run_id in run_ids:
             assert run_id in returned_ids
 
-    def test_evaluation_run_delete_v2(self, client):
-        """Test deleting evaluation runs via V2 API."""
+    def test_evaluation_run_delete(self, client):
+        """Test deleting evaluation runs via API."""
         project_id = client._project_id()
         entity, project = project_id.split("/")
 
@@ -1098,8 +1098,8 @@ class DeleteEvalRunModel(weave.Model):
         # Verify deletion
         assert delete_res.num_deleted == 1
 
-    def test_evaluation_run_finish_v2(self, client):
-        """Test finishing an evaluation run via V2 API."""
+    def test_evaluation_run_finish(self, client):
+        """Test finishing an evaluation run via API."""
         project_id = client._project_id()
         entity, project = project_id.split("/")
 
@@ -1155,11 +1155,11 @@ class FinishEvalRunModel(weave.Model):
         assert finish_res.success is True
 
 
-class TestPredictionsV2API:
-    """Tests for Predictions V2 API endpoints."""
+class TestPredictionsAPI:
+    """Tests for Predictions API endpoints."""
 
-    def test_prediction_create_v2(self, client):
-        """Test creating a prediction via V2 API."""
+    def test_prediction_create(self, client):
+        """Test creating a prediction via API."""
         project_id = client._project_id()
         entity, project = project_id.split("/")
 
@@ -1189,8 +1189,8 @@ class PredictionTestModel(weave.Model):
         # Verify response
         assert pred_res.prediction_id is not None
 
-    def test_prediction_read_v2(self, client):
-        """Test reading a prediction via V2 API."""
+    def test_prediction_read(self, client):
+        """Test reading a prediction via API."""
         project_id = client._project_id()
         entity, project = project_id.split("/")
 
@@ -1230,8 +1230,8 @@ class ReadPredictionModel(weave.Model):
         assert read_res.inputs == {"question": "What is 2+2?"}
         assert read_res.output == "4"
 
-    def test_prediction_list_v2(self, client):
-        """Test listing predictions via V2 API."""
+    def test_prediction_list(self, client):
+        """Test listing predictions via API."""
         project_id = client._project_id()
         entity, project = project_id.split("/")
 
@@ -1271,8 +1271,8 @@ class ListPredictionModel(weave.Model):
         for pred_id in pred_ids:
             assert pred_id in returned_ids
 
-    def test_prediction_delete_v2(self, client):
-        """Test deleting predictions via V2 API."""
+    def test_prediction_delete(self, client):
+        """Test deleting predictions via API."""
         project_id = client._project_id()
         entity, project = project_id.split("/")
 
@@ -1412,11 +1412,11 @@ class PredEvalRunModel(weave.Model):
         assert predict_and_score_res.call.output["output"] == "result"
 
 
-class TestScoresV2API:
-    """Tests for Scores V2 API endpoints."""
+class TestScoresAPI:
+    """Tests for Scores API endpoints."""
 
-    def test_score_create_v2(self, client):
-        """Test creating a score via V2 API."""
+    def test_score_create(self, client):
+        """Test creating a score via API."""
         project_id = client._project_id()
         entity, project = project_id.split("/")
 
@@ -1464,8 +1464,8 @@ class ScoreTestModel(weave.Model):
         # Verify response
         assert score_res.score_id is not None
 
-    def test_score_read_v2(self, client):
-        """Test reading a score via V2 API."""
+    def test_score_read(self, client):
+        """Test reading a score via API."""
         project_id = client._project_id()
         entity, project = project_id.split("/")
 
@@ -1522,8 +1522,8 @@ class ReadScoreModel(weave.Model):
         assert read_res.scorer == scorer_ref
         assert read_res.value == 0.85
 
-    def test_score_list_v2(self, client):
-        """Test listing scores via V2 API."""
+    def test_score_list(self, client):
+        """Test listing scores via API."""
         project_id = client._project_id()
         entity, project = project_id.split("/")
 
@@ -1580,8 +1580,8 @@ class ListScoreModel(weave.Model):
         for score_id in score_ids:
             assert score_id in returned_ids
 
-    def test_score_delete_v2(self, client):
-        """Test deleting scores via V2 API."""
+    def test_score_delete(self, client):
+        """Test deleting scores via API."""
         project_id = client._project_id()
         entity, project = project_id.split("/")
 
