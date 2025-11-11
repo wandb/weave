@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, Form, UploadFile
 from fastapi.params import Header
 from fastapi.responses import StreamingResponse
 
+from weave.trace_server import objects_interface as oi
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.trace_service import ServerInfoRes, TraceService
 
@@ -126,13 +127,13 @@ def generate_routes_v2(
     def op_create_v2(
         entity: str,
         project: str,
-        body: tsi.OpCreateV2Body,
+        body: oi.OpCreateBody,
         service: TraceService = Depends(get_service),  # noqa: B008
-    ) -> tsi.OpCreateV2Res:
+    ) -> oi.OpCreateRes:
         """Create an op object."""
         project_id = f"{entity}/{project}"
-        req = tsi.OpCreateV2Req(project_id=project_id, **body.model_dump())
-        return service.trace_server_interface.op_create_v2(req)
+        req = oi.OpCreateReq(project_id=project_id, **body.model_dump())
+        return service.trace_server_interface.object_interface.op_create(req)
 
     @router.get(
         "/{entity}/{project}/ops/{object_id}/versions/{digest}",
@@ -145,11 +146,11 @@ def generate_routes_v2(
         object_id: str,
         digest: str,
         service: TraceService = Depends(get_service),  # noqa: B008
-    ) -> tsi.OpReadV2Res:
+    ) -> oi.OpReadRes:
         """Get an op object."""
         project_id = f"{entity}/{project}"
-        req = tsi.OpReadV2Req(project_id=project_id, object_id=object_id, digest=digest)
-        return service.trace_server_interface.op_read_v2(req)
+        req = oi.OpReadReq(project_id=project_id, object_id=object_id, digest=digest)
+        return service.trace_server_interface.object_interface.op_read(req)
 
     @router.get(
         "/{entity}/{project}/ops",
@@ -163,7 +164,7 @@ def generate_routes_v2(
                     "application/jsonl": {
                         "schema": {
                             "type": "array",
-                            "items": {"$ref": "#/components/schemas/OpReadV2Res"},
+                            "items": {"$ref": "#/components/schemas/OpReadRes"},
                         }
                     }
                 },
@@ -179,9 +180,9 @@ def generate_routes_v2(
     ) -> StreamingResponse:
         """List op objects."""
         project_id = f"{entity}/{project}"
-        req = tsi.OpListV2Req(project_id=project_id, limit=limit, offset=offset)
+        req = oi.OpListReq(project_id=project_id, limit=limit, offset=offset)
         return StreamingResponse(
-            service.trace_server_interface.op_list_v2(req),
+            service.trace_server_interface.object_interface.op_list(req),
             media_type="application/jsonl",
         )
 
@@ -196,13 +197,13 @@ def generate_routes_v2(
         object_id: str,
         digests: list[str] | None = None,
         service: TraceService = Depends(get_service),  # noqa: B008
-    ) -> tsi.OpDeleteV2Res:
+    ) -> oi.OpDeleteRes:
         """Delete an op object. If digests are provided, only those versions are deleted. Otherwise, all versions are deleted."""
         project_id = f"{entity}/{project}"
-        req = tsi.OpDeleteV2Req(
+        req = oi.OpDeleteReq(
             project_id=project_id, object_id=object_id, digests=digests
         )
-        return service.trace_server_interface.op_delete_v2(req)
+        return service.trace_server_interface.object_interface.op_delete(req)
 
     @router.post(
         "/{entity}/{project}/datasets",
@@ -212,13 +213,13 @@ def generate_routes_v2(
     def dataset_create_v2(
         entity: str,
         project: str,
-        body: tsi.DatasetCreateV2Body,
+        body: oi.DatasetCreateBody,
         service: TraceService = Depends(get_service),  # noqa: B008
-    ) -> tsi.DatasetCreateV2Res:
+    ) -> oi.DatasetCreateRes:
         """Create a dataset object."""
         project_id = f"{entity}/{project}"
-        req = tsi.DatasetCreateV2Req(project_id=project_id, **body.model_dump())
-        return service.trace_server_interface.dataset_create_v2(req)
+        req = oi.DatasetCreateReq(project_id=project_id, **body.model_dump())
+        return service.trace_server_interface.object_interface.dataset_create(req)
 
     @router.get(
         "/{entity}/{project}/datasets/{object_id}/versions/{digest}",
@@ -231,13 +232,13 @@ def generate_routes_v2(
         object_id: str,
         digest: str,
         service: TraceService = Depends(get_service),  # noqa: B008
-    ) -> tsi.DatasetReadV2Res:
+    ) -> oi.DatasetReadRes:
         """Get a dataset object."""
         project_id = f"{entity}/{project}"
-        req = tsi.DatasetReadV2Req(
+        req = oi.DatasetReadReq(
             project_id=project_id, object_id=object_id, digest=digest
         )
-        return service.trace_server_interface.dataset_read_v2(req)
+        return service.trace_server_interface.object_interface.dataset_read(req)
 
     @router.get(
         "/{entity}/{project}/datasets",
@@ -251,7 +252,7 @@ def generate_routes_v2(
                     "application/jsonl": {
                         "schema": {
                             "type": "array",
-                            "items": {"$ref": "#/components/schemas/DatasetReadV2Res"},
+                            "items": {"$ref": "#/components/schemas/DatasetReadRes"},
                         }
                     }
                 },
@@ -267,9 +268,9 @@ def generate_routes_v2(
     ) -> StreamingResponse:
         """List dataset objects."""
         project_id = f"{entity}/{project}"
-        req = tsi.DatasetListV2Req(project_id=project_id, limit=limit, offset=offset)
+        req = oi.DatasetListReq(project_id=project_id, limit=limit, offset=offset)
         return StreamingResponse(
-            service.trace_server_interface.dataset_list_v2(req),
+            service.trace_server_interface.object_interface.dataset_list(req),
             media_type="application/jsonl",
         )
 
@@ -284,13 +285,13 @@ def generate_routes_v2(
         object_id: str,
         digests: list[str] | None = None,
         service: TraceService = Depends(get_service),  # noqa: B008
-    ) -> tsi.DatasetDeleteV2Res:
+    ) -> oi.DatasetDeleteRes:
         """Delete a dataset object."""
         project_id = f"{entity}/{project}"
-        req = tsi.DatasetDeleteV2Req(
+        req = oi.DatasetDeleteReq(
             project_id=project_id, object_id=object_id, digests=digests
         )
-        return service.trace_server_interface.dataset_delete_v2(req)
+        return service.trace_server_interface.object_interface.dataset_delete(req)
 
     @router.post(
         "/{entity}/{project}/scorers",
@@ -300,13 +301,13 @@ def generate_routes_v2(
     def scorer_create_v2(
         entity: str,
         project: str,
-        body: tsi.ScorerCreateV2Body,
+        body: oi.ScorerCreateBody,
         service: TraceService = Depends(get_service),  # noqa: B008
-    ) -> tsi.ScorerCreateV2Res:
+    ) -> oi.ScorerCreateRes:
         """Create a scorer object."""
         project_id = f"{entity}/{project}"
-        req = tsi.ScorerCreateV2Req(project_id=project_id, **body.model_dump())
-        return service.trace_server_interface.scorer_create_v2(req)
+        req = oi.ScorerCreateReq(project_id=project_id, **body.model_dump())
+        return service.trace_server_interface.object_interface.scorer_create(req)
 
     @router.get(
         "/{entity}/{project}/scorers/{object_id}/versions/{digest}",
@@ -319,13 +320,13 @@ def generate_routes_v2(
         object_id: str,
         digest: str,
         service: TraceService = Depends(get_service),  # noqa: B008
-    ) -> tsi.ScorerReadV2Res:
+    ) -> oi.ScorerReadRes:
         """Get a scorer object."""
         project_id = f"{entity}/{project}"
-        req = tsi.ScorerReadV2Req(
+        req = oi.ScorerReadReq(
             project_id=project_id, object_id=object_id, digest=digest
         )
-        return service.trace_server_interface.scorer_read_v2(req)
+        return service.trace_server_interface.object_interface.scorer_read(req)
 
     @router.get(
         "/{entity}/{project}/scorers",
@@ -339,7 +340,7 @@ def generate_routes_v2(
                     "application/jsonl": {
                         "schema": {
                             "type": "array",
-                            "items": {"$ref": "#/components/schemas/ScorerReadV2Res"},
+                            "items": {"$ref": "#/components/schemas/ScorerReadRes"},
                         }
                     }
                 },
@@ -355,9 +356,9 @@ def generate_routes_v2(
     ) -> StreamingResponse:
         """List scorer objects."""
         project_id = f"{entity}/{project}"
-        req = tsi.ScorerListV2Req(project_id=project_id, limit=limit, offset=offset)
+        req = oi.ScorerListReq(project_id=project_id, limit=limit, offset=offset)
         return StreamingResponse(
-            service.trace_server_interface.scorer_list_v2(req),
+            service.trace_server_interface.object_interface.scorer_list(req),
             media_type="application/jsonl",
         )
 
@@ -372,13 +373,13 @@ def generate_routes_v2(
         object_id: str,
         digests: list[str] | None = None,
         service: TraceService = Depends(get_service),  # noqa: B008
-    ) -> tsi.ScorerDeleteV2Res:
+    ) -> oi.ScorerDeleteRes:
         """Delete a scorer object."""
         project_id = f"{entity}/{project}"
-        req = tsi.ScorerDeleteV2Req(
+        req = oi.ScorerDeleteReq(
             project_id=project_id, object_id=object_id, digests=digests
         )
-        return service.trace_server_interface.scorer_delete_v2(req)
+        return service.trace_server_interface.object_interface.scorer_delete(req)
 
     @router.post(
         "/{entity}/{project}/evaluations",
@@ -386,11 +387,15 @@ def generate_routes_v2(
         operation_id="evaluation_create_v2",
     )
     def evaluation_create_v2(
-        req: tsi.EvaluationCreateV2Req,
+        entity: str,
+        project: str,
+        body: oi.EvaluationCreateBody,
         service: TraceService = Depends(get_service),  # noqa: B008
-    ) -> tsi.EvaluationCreateV2Res:
+    ) -> oi.EvaluationCreateRes:
         """Create an evaluation object."""
-        return service.trace_server_interface.evaluation_create_v2(req)
+        project_id = f"{entity}/{project}"
+        req = oi.EvaluationCreateReq(project_id=project_id, **body.model_dump())
+        return service.trace_server_interface.object_interface.evaluation_create(req)
 
     @router.get(
         "/{entity}/{project}/evaluations/{object_id}/versions/{digest}",
@@ -403,13 +408,13 @@ def generate_routes_v2(
         object_id: str,
         digest: str,
         service: TraceService = Depends(get_service),  # noqa: B008
-    ) -> tsi.EvaluationReadV2Res:
+    ) -> oi.EvaluationReadRes:
         """Get an evaluation object."""
         project_id = f"{entity}/{project}"
-        req = tsi.EvaluationReadV2Req(
+        req = oi.EvaluationReadReq(
             project_id=project_id, object_id=object_id, digest=digest
         )
-        return service.trace_server_interface.evaluation_read_v2(req)
+        return service.trace_server_interface.object_interface.evaluation_read(req)
 
     @router.get(
         "/{entity}/{project}/evaluations",
@@ -423,9 +428,7 @@ def generate_routes_v2(
                     "application/jsonl": {
                         "schema": {
                             "type": "array",
-                            "items": {
-                                "$ref": "#/components/schemas/EvaluationReadV2Res"
-                            },
+                            "items": {"$ref": "#/components/schemas/EvaluationReadRes"},
                         }
                     }
                 },
@@ -441,9 +444,9 @@ def generate_routes_v2(
     ) -> StreamingResponse:
         """List evaluation objects."""
         project_id = f"{entity}/{project}"
-        req = tsi.EvaluationListV2Req(project_id=project_id, limit=limit, offset=offset)
+        req = oi.EvaluationListReq(project_id=project_id, limit=limit, offset=offset)
         return StreamingResponse(
-            service.trace_server_interface.evaluation_list_v2(req),
+            service.trace_server_interface.object_interface.evaluation_list(req),
             media_type="application/jsonl",
         )
 
@@ -458,13 +461,13 @@ def generate_routes_v2(
         object_id: str,
         digests: list[str] | None = None,
         service: TraceService = Depends(get_service),  # noqa: B008
-    ) -> tsi.EvaluationDeleteV2Res:
+    ) -> oi.EvaluationDeleteRes:
         """Delete an evaluation object."""
         project_id = f"{entity}/{project}"
-        req = tsi.EvaluationDeleteV2Req(
+        req = oi.EvaluationDeleteReq(
             project_id=project_id, object_id=object_id, digests=digests
         )
-        return service.trace_server_interface.evaluation_delete_v2(req)
+        return service.trace_server_interface.object_interface.evaluation_delete(req)
 
     @router.post(
         "/{entity}/{project}/evaluation_runs",
@@ -474,13 +477,15 @@ def generate_routes_v2(
     def evaluation_run_create_v2(
         entity: str,
         project: str,
-        body: tsi.EvaluationRunCreateV2Body,
+        body: oi.EvaluationRunCreateBody,
         service: TraceService = Depends(get_service),  # noqa: B008
-    ) -> tsi.EvaluationRunCreateV2Res:
+    ) -> oi.EvaluationRunCreateRes:
         """Create an evaluation run."""
         project_id = f"{entity}/{project}"
-        req = tsi.EvaluationRunCreateV2Req(project_id=project_id, **body.model_dump())
-        return service.trace_server_interface.evaluation_run_create_v2(req)
+        req = oi.EvaluationRunCreateReq(project_id=project_id, **body.model_dump())
+        return service.trace_server_interface.object_interface.evaluation_run_create(
+            req
+        )
 
     @router.get(
         "/{entity}/{project}/evaluation_runs/{evaluation_run_id}",
@@ -492,13 +497,13 @@ def generate_routes_v2(
         project: str,
         evaluation_run_id: str,
         service: TraceService = Depends(get_service),  # noqa: B008
-    ) -> tsi.EvaluationRunReadV2Res:
+    ) -> oi.EvaluationRunReadRes:
         """Get an evaluation run."""
         project_id = f"{entity}/{project}"
-        req = tsi.EvaluationRunReadV2Req(
+        req = oi.EvaluationRunReadReq(
             project_id=project_id, evaluation_run_id=evaluation_run_id
         )
-        return service.trace_server_interface.evaluation_run_read_v2(req)
+        return service.trace_server_interface.object_interface.evaluation_run_read(req)
 
     @router.get(
         "/{entity}/{project}/evaluation_runs",
@@ -513,7 +518,7 @@ def generate_routes_v2(
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/components/schemas/EvaluationRunReadV2Res"
+                                "$ref": "#/components/schemas/EvaluationRunReadRes"
                             },
                         }
                     }
@@ -530,11 +535,9 @@ def generate_routes_v2(
     ) -> StreamingResponse:
         """List evaluation runs."""
         project_id = f"{entity}/{project}"
-        req = tsi.EvaluationRunListV2Req(
-            project_id=project_id, limit=limit, offset=offset
-        )
+        req = oi.EvaluationRunListReq(project_id=project_id, limit=limit, offset=offset)
         return StreamingResponse(
-            service.trace_server_interface.evaluation_run_list_v2(req),
+            service.trace_server_interface.object_interface.evaluation_run_list(req),
             media_type="application/jsonl",
         )
 
@@ -548,13 +551,15 @@ def generate_routes_v2(
         project: str,
         evaluation_run_ids: list[str],
         service: TraceService = Depends(get_service),  # noqa: B008
-    ) -> tsi.EvaluationRunDeleteV2Res:
+    ) -> oi.EvaluationRunDeleteRes:
         """Delete evaluation runs."""
         project_id = f"{entity}/{project}"
-        req = tsi.EvaluationRunDeleteV2Req(
+        req = oi.EvaluationRunDeleteReq(
             project_id=project_id, evaluation_run_ids=evaluation_run_ids
         )
-        return service.trace_server_interface.evaluation_run_delete_v2(req)
+        return service.trace_server_interface.object_interface.evaluation_run_delete(
+            req
+        )
 
     @router.post(
         "/{entity}/{project}/evaluation_runs/{evaluation_run_id}/finish",
@@ -565,17 +570,19 @@ def generate_routes_v2(
         entity: str,
         project: str,
         evaluation_run_id: str,
-        body: tsi.EvaluationRunFinishV2Body,
+        body: oi.EvaluationRunFinishBody,
         service: TraceService = Depends(get_service),  # noqa: B008
-    ) -> tsi.EvaluationRunFinishV2Res:
+    ) -> oi.EvaluationRunFinishRes:
         """Finish an evaluation run."""
         project_id = f"{entity}/{project}"
-        req = tsi.EvaluationRunFinishV2Req(
+        req = oi.EvaluationRunFinishReq(
             project_id=project_id,
             evaluation_run_id=evaluation_run_id,
             **body.model_dump(),
         )
-        return service.trace_server_interface.evaluation_run_finish_v2(req)
+        return service.trace_server_interface.object_interface.evaluation_run_finish(
+            req
+        )
 
     @router.post(
         "/{entity}/{project}/models",
@@ -585,13 +592,13 @@ def generate_routes_v2(
     def model_create_v2(
         entity: str,
         project: str,
-        body: tsi.ModelCreateV2Body,
+        body: oi.ModelCreateBody,
         service: TraceService = Depends(get_service),  # noqa: B008
-    ) -> tsi.ModelCreateV2Res:
+    ) -> oi.ModelCreateRes:
         """Create a model object."""
         project_id = f"{entity}/{project}"
-        req = tsi.ModelCreateV2Req(project_id=project_id, **body.model_dump())
-        return service.trace_server_interface.model_create_v2(req)
+        req = oi.ModelCreateReq(project_id=project_id, **body.model_dump())
+        return service.trace_server_interface.object_interface.model_create(req)
 
     @router.get(
         "/{entity}/{project}/models/{object_id}/versions/{digest}",
@@ -604,13 +611,11 @@ def generate_routes_v2(
         object_id: str,
         digest: str,
         service: TraceService = Depends(get_service),  # noqa: B008
-    ) -> tsi.ModelReadV2Res:
+    ) -> oi.ModelReadRes:
         """Get a model object."""
         project_id = f"{entity}/{project}"
-        req = tsi.ModelReadV2Req(
-            project_id=project_id, object_id=object_id, digest=digest
-        )
-        return service.trace_server_interface.model_read_v2(req)
+        req = oi.ModelReadReq(project_id=project_id, object_id=object_id, digest=digest)
+        return service.trace_server_interface.object_interface.model_read(req)
 
     @router.get(
         "/{entity}/{project}/models",
@@ -624,7 +629,7 @@ def generate_routes_v2(
                     "application/jsonl": {
                         "schema": {
                             "type": "array",
-                            "items": {"$ref": "#/components/schemas/ModelReadV2Res"},
+                            "items": {"$ref": "#/components/schemas/ModelReadRes"},
                         }
                     }
                 },
@@ -640,9 +645,9 @@ def generate_routes_v2(
     ) -> StreamingResponse:
         """List model objects."""
         project_id = f"{entity}/{project}"
-        req = tsi.ModelListV2Req(project_id=project_id, limit=limit, offset=offset)
+        req = oi.ModelListReq(project_id=project_id, limit=limit, offset=offset)
         return StreamingResponse(
-            service.trace_server_interface.model_list_v2(req),
+            service.trace_server_interface.object_interface.model_list(req),
             media_type="application/jsonl",
         )
 
@@ -657,13 +662,13 @@ def generate_routes_v2(
         object_id: str,
         digests: list[str] | None = None,
         service: TraceService = Depends(get_service),  # noqa: B008
-    ) -> tsi.ModelDeleteV2Res:
+    ) -> oi.ModelDeleteRes:
         """Delete a model object. If digests are provided, only those versions are deleted. Otherwise, all versions are deleted."""
         project_id = f"{entity}/{project}"
-        req = tsi.ModelDeleteV2Req(
+        req = oi.ModelDeleteReq(
             project_id=project_id, object_id=object_id, digests=digests
         )
-        return service.trace_server_interface.model_delete_v2(req)
+        return service.trace_server_interface.object_interface.model_delete(req)
 
     # Prediction Routes
 
@@ -675,13 +680,13 @@ def generate_routes_v2(
     def prediction_create_v2(
         entity: str,
         project: str,
-        body: tsi.PredictionCreateV2Body,
+        body: oi.PredictionCreateBody,
         service: TraceService = Depends(get_service),  # noqa: B008
-    ) -> tsi.PredictionCreateV2Res:
+    ) -> oi.PredictionCreateRes:
         """Create a prediction."""
         project_id = f"{entity}/{project}"
-        req = tsi.PredictionCreateV2Req(project_id=project_id, **body.model_dump())
-        return service.trace_server_interface.prediction_create_v2(req)
+        req = oi.PredictionCreateReq(project_id=project_id, **body.model_dump())
+        return service.trace_server_interface.object_interface.prediction_create(req)
 
     @router.get(
         "/{entity}/{project}/predictions/{prediction_id}",
@@ -693,13 +698,11 @@ def generate_routes_v2(
         project: str,
         prediction_id: str,
         service: TraceService = Depends(get_service),  # noqa: B008
-    ) -> tsi.PredictionReadV2Res:
+    ) -> oi.PredictionReadRes:
         """Get a prediction."""
         project_id = f"{entity}/{project}"
-        req = tsi.PredictionReadV2Req(
-            project_id=project_id, prediction_id=prediction_id
-        )
-        return service.trace_server_interface.prediction_read_v2(req)
+        req = oi.PredictionReadReq(project_id=project_id, prediction_id=prediction_id)
+        return service.trace_server_interface.object_interface.prediction_read(req)
 
     @router.get(
         "/{entity}/{project}/predictions",
@@ -713,9 +716,7 @@ def generate_routes_v2(
                     "application/jsonl": {
                         "schema": {
                             "type": "array",
-                            "items": {
-                                "$ref": "#/components/schemas/PredictionReadV2Res"
-                            },
+                            "items": {"$ref": "#/components/schemas/PredictionReadRes"},
                         }
                     }
                 },
@@ -732,14 +733,14 @@ def generate_routes_v2(
     ) -> StreamingResponse:
         """List predictions."""
         project_id = f"{entity}/{project}"
-        req = tsi.PredictionListV2Req(
+        req = oi.PredictionListReq(
             project_id=project_id,
             evaluation_run_id=evaluation_run_id,
             limit=limit,
             offset=offset,
         )
         return StreamingResponse(
-            service.trace_server_interface.prediction_list_v2(req),
+            service.trace_server_interface.object_interface.prediction_list(req),
             media_type="application/jsonl",
         )
 
@@ -753,13 +754,13 @@ def generate_routes_v2(
         project: str,
         prediction_ids: list[str],
         service: TraceService = Depends(get_service),  # noqa: B008
-    ) -> tsi.PredictionDeleteV2Res:
+    ) -> oi.PredictionDeleteRes:
         """Delete predictions."""
         project_id = f"{entity}/{project}"
-        req = tsi.PredictionDeleteV2Req(
+        req = oi.PredictionDeleteReq(
             project_id=project_id, prediction_ids=prediction_ids
         )
-        return service.trace_server_interface.prediction_delete_v2(req)
+        return service.trace_server_interface.object_interface.prediction_delete(req)
 
     @router.post(
         "/{entity}/{project}/predictions/{prediction_id}/finish",
@@ -771,17 +772,15 @@ def generate_routes_v2(
         project: str,
         prediction_id: str,
         service: TraceService = Depends(get_service),  # noqa: B008
-    ) -> tsi.PredictionFinishV2Res:
+    ) -> oi.PredictionFinishRes:
         """Finish a prediction."""
         print(
             f"DEBUG REST: prediction_finish_v2 called with prediction_id={prediction_id}"
         )
         project_id = f"{entity}/{project}"
-        req = tsi.PredictionFinishV2Req(
-            project_id=project_id, prediction_id=prediction_id
-        )
-        print("DEBUG REST: calling trace_server_interface.prediction_finish_v2")
-        result = service.trace_server_interface.prediction_finish_v2(req)
+        req = oi.PredictionFinishReq(project_id=project_id, prediction_id=prediction_id)
+        print("DEBUG REST: calling object_interface.prediction_finish")
+        result = service.trace_server_interface.object_interface.prediction_finish(req)
         print(f"DEBUG REST: prediction_finish_v2 completed, success={result.success}")
         return result
 
@@ -795,13 +794,13 @@ def generate_routes_v2(
     def score_create_v2(
         entity: str,
         project: str,
-        body: tsi.ScoreCreateV2Body,
+        body: oi.ScoreCreateBody,
         service: TraceService = Depends(get_service),  # noqa: B008
-    ) -> tsi.ScoreCreateV2Res:
+    ) -> oi.ScoreCreateRes:
         """Create a score."""
         project_id = f"{entity}/{project}"
-        req = tsi.ScoreCreateV2Req(project_id=project_id, **body.model_dump())
-        return service.trace_server_interface.score_create_v2(req)
+        req = oi.ScoreCreateReq(project_id=project_id, **body.model_dump())
+        return service.trace_server_interface.object_interface.score_create(req)
 
     @router.get(
         "/{entity}/{project}/scores/{score_id}",
@@ -813,11 +812,11 @@ def generate_routes_v2(
         project: str,
         score_id: str,
         service: TraceService = Depends(get_service),  # noqa: B008
-    ) -> tsi.ScoreReadV2Res:
+    ) -> oi.ScoreReadRes:
         """Get a score."""
         project_id = f"{entity}/{project}"
-        req = tsi.ScoreReadV2Req(project_id=project_id, score_id=score_id)
-        return service.trace_server_interface.score_read_v2(req)
+        req = oi.ScoreReadReq(project_id=project_id, score_id=score_id)
+        return service.trace_server_interface.object_interface.score_read(req)
 
     @router.get(
         "/{entity}/{project}/scores",
@@ -831,7 +830,7 @@ def generate_routes_v2(
                     "application/jsonl": {
                         "schema": {
                             "type": "array",
-                            "items": {"$ref": "#/components/schemas/ScoreReadV2Res"},
+                            "items": {"$ref": "#/components/schemas/ScoreReadRes"},
                         }
                     }
                 },
@@ -848,14 +847,14 @@ def generate_routes_v2(
     ) -> StreamingResponse:
         """List scores."""
         project_id = f"{entity}/{project}"
-        req = tsi.ScoreListV2Req(
+        req = oi.ScoreListReq(
             project_id=project_id,
             evaluation_run_id=evaluation_run_id,
             limit=limit,
             offset=offset,
         )
         return StreamingResponse(
-            service.trace_server_interface.score_list_v2(req),
+            service.trace_server_interface.object_interface.score_list(req),
             media_type="application/jsonl",
         )
 
@@ -869,11 +868,11 @@ def generate_routes_v2(
         project: str,
         score_ids: list[str],
         service: TraceService = Depends(get_service),  # noqa: B008
-    ) -> tsi.ScoreDeleteV2Res:
+    ) -> oi.ScoreDeleteRes:
         """Delete scores."""
         project_id = f"{entity}/{project}"
-        req = tsi.ScoreDeleteV2Req(project_id=project_id, score_ids=score_ids)
-        return service.trace_server_interface.score_delete_v2(req)
+        req = oi.ScoreDeleteReq(project_id=project_id, score_ids=score_ids)
+        return service.trace_server_interface.object_interface.score_delete(req)
 
     return router
 
