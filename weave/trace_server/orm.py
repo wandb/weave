@@ -4,9 +4,10 @@ Abstracts away some of their differences and allows building up SQL queries in a
 
 import datetime
 import json
+import re
 import typing
 from dataclasses import dataclass
-import re
+
 from pydantic import BaseModel
 from typing_extensions import TypeAlias
 
