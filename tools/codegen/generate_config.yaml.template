@@ -31,6 +31,3 @@ openapi_output: tools/codegen/openapi.json
 
 # Package name for pyproject.toml updates (required)
 package_name: weave_server_sdk
-
-# Whether to use release version instead of git SHA (optional, defaults to false)
-release: false

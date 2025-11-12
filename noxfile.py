@@ -32,7 +32,7 @@ NUM_TRACE_SERVER_SHARDS = 4
 
 @nox.session
 def lint(session):
-    session.install("pre-commit", "jupyter")
+    session.run("uv", "sync", "--active", "--group", "dev")
     dry_run = session.posargs and "dry-run" in session.posargs
     all_files = session.posargs and "--all-files" in session.posargs
     ruff_only = session.posargs and "--ruff-only" in session.posargs
@@ -63,6 +63,22 @@ def lint(session):
 
 
 trace_server_shards = [f"trace{i}" for i in range(1, NUM_TRACE_SERVER_SHARDS + 1)]
+
+# Shards that don't have corresponding optional dependencies in pyproject.toml
+# Note: _test/_tests shards are dependency groups, not optional dependencies
+SHARDS_WITHOUT_EXTRAS = {
+    "custom",
+    "flow",
+    "trace",
+    "trace_no_server",
+    "trace_server",
+    "trace_server_bindings",
+    *trace_server_shards,
+    "openai_realtime",
+    "autogen_tests",
+    "verifiers_test",
+    "pandas_test",
+}
 
 
 @nox.session(python=SUPPORTED_PYTHON_VERSIONS)
@@ -98,7 +114,7 @@ trace_server_shards = [f"trace{i}" for i in range(1, NUM_TRACE_SERVER_SHARDS + 1
         "vertexai",
         "bedrock",
         "scorers",
-        "pandas-test",
+        "pandas_test",
         "huggingface",
         "smolagents",
         "mcp",
@@ -120,7 +136,20 @@ def tests(session, shard):
     if session.python.startswith("3.10") and shard in PY310_INCOMPATIBLE_SHARDS:
         session.skip(f"Skipping {shard=} as it is not compatible with Python 3.10")
 
-    session.install("-e", f".[{shard},test]")
+    # Only add --extra shard if the shard has a corresponding optional dependency
+    # Use --active to sync to the active nox virtual environment
+    # Test-related shards (ending in _test/_tests) are dependency groups, not extras
+    sync_args = ["uv", "sync", "--active", "--group", "test"]
+
+    if shard not in SHARDS_WITHOUT_EXTRAS:
+        sync_args.extend(["--extra", shard])
+    elif shard in ("autogen_tests", "verifiers_test", "pandas_test"):
+        sync_args.extend(["--group", shard])
+    elif shard == "trace_server":
+        # trace_server shard needs both trace_server dependency group and trace_server_tests
+        sync_args.extend(["--group", "trace_server", "--group", "trace_server_tests"])
+
+    session.run(*sync_args)
 
     env = {
         k: session.env.get(k) or os.getenv(k)
