@@ -4,6 +4,7 @@ Abstracts away some of their differences and allows building up SQL queries in a
 
 import datetime
 import json
+import re
 import typing
 from dataclasses import dataclass
 
@@ -528,6 +529,33 @@ def clickhouse_cast(
         raise ValueError(f"Unknown cast: {cast}")
 
 
+def split_escaped_field_path(path: str) -> list[str]:
+    r"""Split a field path on dots, respecting backslash-escaped dots.
+
+    This function handles field names that contain literal dots by allowing
+    them to be escaped with a backslash. This is necessary because JSON keys
+    can contain dots, and we need a way to distinguish between:
+    - Nested field access: "output.metrics.run" -> ["output", "metrics", "run"]
+    - Field with dot in name: "output.metrics\.run" -> ["output", "metrics.run"]
+
+    Args:
+        path: The field path string, potentially with escaped dots
+
+    Returns:
+        List of field path segments with escape sequences removed
+
+    Examples:
+        >>> split_escaped_field_path("output.metrics.run")
+        ['output', 'metrics', 'run']
+        >>> split_escaped_field_path("output.a\\.b\\.c.d")
+        ['output', 'a.b.c', 'd']
+    """
+    parts = re.split(r"(?<!\\)\.", path)
+    # turn '\.' back into '.' inside each segment
+    formd_parts = [p.replace(r"\.", ".") for p in parts]
+    return formd_parts
+
+
 def quote_json_path(path: str) -> str:
     """Helper function to quote a json path for use in a clickhouse query. Moreover,
     this converts index operations from dot notation (conforms to Mongo) to bracket
@@ -535,7 +563,7 @@ def quote_json_path(path: str) -> str:
 
     See comments on `GetFieldOperator` for current limitations
     """
-    parts = path.split(".")
+    parts = split_escaped_field_path(path)
     return quote_json_path_parts(parts)
 
 
