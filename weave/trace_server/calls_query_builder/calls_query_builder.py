@@ -2158,8 +2158,8 @@ def _build_calls_complete_update_query(
         UPDATE calls_complete
         SET
             {set_sql}
-        WHERE project_id = {param_slot(project_id_param, 'String')}
-            AND id IN {param_slot(call_ids_param, 'Array(String)')}
+        WHERE project_id = {param_slot(project_id_param, "String")}
+            AND id IN {param_slot(call_ids_param, "Array(String)")}
     """
     return safely_format_sql(raw_sql, logger)
 

@@ -61,6 +61,7 @@ from weave.trace_server.clickhouse_schema import (
     CallCHInsertable,
     CallDeleteCHInsertable,
     CallEndCHInsertable,
+    CallCompleteCHInsertable,
     CallStartCHInsertable,
     CallUpdateCHInsertable,
     FileChunkCreateCHInsertable,
@@ -518,7 +519,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 completes.append(item.req.complete)
         return starts, ends, completes
 
-    def upsert_calls_batch_v2(
+    def calls_upsert_batch_v2(
         self, req: tsi.CallsUpsertBatchV2Req
     ) -> tsi.CallsUpsertBatchV2Res:
         # First organize the batch into starts, ends and completes.
@@ -526,13 +527,43 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # Ends hit a special UPDATE path
         starts, ends, completes = self._split_call_batch_v2(req.batch)
 
-        # Insert starts and completes immediately
-        self._insert_call_batch(starts + completes)
+        # Convert API-level schemas to CH-insertable schemas and track converted calls
+        ch_insertable_starts = [
+            _start_call_for_insert_to_ch_insertable_start_call(start, self)
+            for start in starts
+        ]
+        ch_insertable_completes = [
+            _completed_call_for_insert_to_ch_insertable_completed_call(complete)
+            for complete in completes
+        ]
+        ch_insertable_calls = ch_insertable_starts + ch_insertable_completes
 
-        # Update ends using a batch update
+        # Convert to batch data format
+        # For calls_complete table, we need proper defaults for non-nullable columns
+        # that don't exist in CallStartCHInsertable:
+        # - output_dump: String (not nullable) -> default to "{}"
+        # - summary_dump: String (not nullable) -> default to "{}"
+        column_defaults = {
+            "output_dump": "{}",
+            "summary_dump": "{}",
+        }
+
+        batch_data = []
+        for call in ch_insertable_calls:
+            call_dict = call.model_dump()
+            row = []
+            for col in ALL_CALL_INSERT_COLUMNS:
+                row.append(call_dict.get(col, column_defaults.get(col)))
+            batch_data.append(row)
+        self._insert_call_batch(batch_data, "calls_complete")
+
         self._calls_complete_update_end_batch(ends)
 
-        return tsi.CallsUpsertBatchV2Res()
+        res = [
+            tsi.CallUpsertRes(id=c.id, trace_id=c.trace_id) for c in starts + completes
+        ]
+
+        return tsi.CallsUpsertBatchV2Res(res=res)
 
     def _calls_complete_update_end_batch(
         self, end_calls: list[tsi.EndedCallSchemaForInsert]
@@ -5143,6 +5174,62 @@ def _end_call_for_insert_to_ch_insertable_end_call(
         output_dump=_any_value_to_dump(output),
         output_refs=output_refs,
         wb_run_step_end=end_call.wb_run_step_end,
+    )
+
+
+def _completed_call_for_insert_to_ch_insertable_completed_call(
+    complete_call: tsi.CompletedCallSchemaForInsert,
+) -> CallCompleteCHInsertable:
+    """Converts a CompletedCallSchemaForInsert to a CallCompleteCHInsertable.
+
+    This function handles calls that are already finished at insertion time,
+    with both start and end information provided together.
+
+    Args:
+        complete_call: The completed call schema from the API
+        trace_server: Optional trace server interface (currently unused but kept for consistency)
+
+    Returns:
+        CallCompleteCHInsertable: The complete call ready for ClickHouse insertion
+    """
+    # Process inputs and extract refs
+    inputs = complete_call.inputs
+    input_refs = extract_refs_from_values(inputs)
+
+    # Process output and extract refs
+    output = complete_call.output
+    output_refs = extract_refs_from_values(output)
+
+    # Process otel_dump if present
+    otel_dump_str = None
+    if complete_call.otel_dump is not None:
+        otel_dump_str = _dict_value_to_dump(complete_call.otel_dump)
+
+    return CallCompleteCHInsertable(
+        # Start fields
+        project_id=complete_call.project_id,
+        id=complete_call.id,
+        trace_id=complete_call.trace_id,
+        parent_id=complete_call.parent_id,
+        thread_id=complete_call.thread_id,
+        turn_id=complete_call.turn_id,
+        op_name=complete_call.op_name,
+        started_at=complete_call.started_at,
+        attributes_dump=_dict_value_to_dump(complete_call.attributes),
+        inputs_dump=_dict_value_to_dump(inputs),
+        input_refs=input_refs,
+        display_name=complete_call.display_name,
+        otel_dump=otel_dump_str,
+        wb_user_id=complete_call.wb_user_id,
+        wb_run_id=complete_call.wb_run_id,
+        wb_run_step=complete_call.wb_run_step,
+        # End fields
+        ended_at=complete_call.ended_at,
+        exception=complete_call.exception,
+        summary_dump=_dict_value_to_dump(dict(complete_call.summary)),
+        output_dump=_any_value_to_dump(output),
+        output_refs=output_refs,
+        wb_run_step_end=complete_call.wb_run_step_end,
     )
 
 
