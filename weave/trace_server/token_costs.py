@@ -148,7 +148,6 @@ class CostQueryParts:
         where_clause = _build_where_clause(param_builder)
         group_by_clause = _build_group_by_clause(final_select_fields)
 
-        # Build feedback JOIN if needed
         needs_feedback = any(
             isinstance(order_field.field, CallsMergedFeedbackPayloadField)
             for order_field in order_fields
@@ -159,7 +158,6 @@ class CostQueryParts:
                 param_builder, project_id, price_table_alias
             )
 
-        # Build ORDER BY if needed
         order_by_clause = None
         if order_fields:
             order_by_parts = []
@@ -180,25 +178,7 @@ class CostQueryParts:
         )
 
     def as_sql(self) -> str:
-        """Assemble the query parts into complete SQL.
-
-        Returns:
-            Complete SQL query string
-
-        Examples:
-            >>> parts = CostQueryParts(
-            ...     select_clause="SELECT id, name",
-            ...     from_table="ranked_prices",
-            ...     order_by_clause="name ASC"
-            ... )
-            >>> sql = parts.as_sql()
-            >>> "SELECT id, name" in sql
-            True
-            >>> "FROM ranked_prices" in sql
-            True
-            >>> "ORDER BY name ASC" in sql
-            True
-        """
+        """Assemble the query parts into complete SQL"""
         sql_parts = []
 
         sql_parts.append(self.select_clause)
