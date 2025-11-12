@@ -2,7 +2,7 @@ import base64
 import re
 from dataclasses import dataclass
 from datetime import datetime
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.clickhouse_schema import SelectableCHCallSchema
@@ -90,14 +90,8 @@ class CostQueryParts:
     where_clause: Optional[str] = None
     group_by_clause: Optional[str] = None
     order_by_clause: Optional[str] = None
-    parameters: dict = None
-    fields: list[str] = None
-
-    def __post_init__(self):
-        if self.parameters is None:
-            self.parameters = {}
-        if self.fields is None:
-            self.fields = []
+    parameters: dict[str, Any] = {}
+    fields: list[str] = []
 
     @classmethod
     def build_for_costs(
@@ -597,8 +591,8 @@ def _build_where_clause(param_builder: ParamBuilder) -> str:
     Returns:
         WHERE clause condition
     """
-    rank_param = param_builder.add_param(1, "rank", "UInt64")
-    return f"rank = {rank_param}"
+    rank_param = param_builder.add_param(1)
+    return f"(rank = {{{rank_param}:UInt64}})"
 
 
 def _build_group_by_clause(select_fields: list[str]) -> str:
