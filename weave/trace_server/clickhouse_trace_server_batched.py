@@ -1462,10 +1462,20 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
         obj_read_res = self._obj_read_with_retry(obj_read_req)
 
+        # Construct the op reference URI using InternalOpRef since this is an internal method
+        # The external adapter will convert it back to external format
+        op_ref = ri.InternalOpRef(
+            project_id=req.project_id,
+            name=req.name,
+            version=obj_result.digest,
+        ).uri()
+
         return tsi.OpCreateV2Res(
             digest=obj_result.digest,
             object_id=object_id,
             version_index=obj_read_res.obj.version_index,
+            project_id=req.project_id,
+            ref=op_ref,
         )
 
     def op_read_v2(self, req: tsi.OpReadV2Req) -> tsi.OpReadV2Res:
@@ -1685,10 +1695,20 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
         obj_read_res = self._obj_read_with_retry(obj_read_req)
 
+        # Construct the dataset reference URI using InternalObjectRef since this is an internal method
+        # The external adapter will convert it back to external format
+        dataset_ref = ri.InternalObjectRef(
+            project_id=req.project_id,
+            name=dataset_id,
+            version=obj_result.digest,
+        ).uri()
+
         return tsi.DatasetCreateV2Res(
             digest=obj_result.digest,
             object_id=dataset_id,
             version_index=obj_read_res.obj.version_index,
+            project_id=req.project_id,
+            ref=dataset_ref,
         )
 
     def dataset_read_v2(self, req: tsi.DatasetReadV2Req) -> tsi.DatasetReadV2Res:
@@ -1828,17 +1848,20 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
         obj_read_res = self._obj_read_with_retry(obj_read_req)
 
-        # Get the ref and return the create result
+        # Construct the scorer reference URI using InternalObjectRef since this is an internal method
+        # The external adapter will convert it back to external format
         scorer_ref = ri.InternalObjectRef(
             project_id=req.project_id,
             name=scorer_id,
             version=obj_result.digest,
         ).uri()
+
         return tsi.ScorerCreateV2Res(
             digest=obj_result.digest,
             object_id=scorer_id,
             version_index=obj_read_res.obj.version_index,
-            scorer=scorer_ref,
+            project_id=req.project_id,
+            ref=scorer_ref,
         )
 
     def scorer_read_v2(self, req: tsi.ScorerReadV2Req) -> tsi.ScorerReadV2Res:
@@ -1982,17 +2005,20 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
         obj_read_res = self._obj_read_with_retry(obj_read_req)
 
-        # Get the ref and return the create result
+        # Construct the evaluation reference URI using InternalObjectRef since this is an internal method
+        # The external adapter will convert it back to external format
         evaluation_ref = ri.InternalObjectRef(
             project_id=req.project_id,
             name=evaluation_id,
             version=obj_result.digest,
         ).uri()
+
         return tsi.EvaluationCreateV2Res(
             digest=obj_result.digest,
             object_id=evaluation_id,
             version_index=obj_read_res.obj.version_index,
-            evaluation_ref=evaluation_ref,
+            project_id=req.project_id,
+            ref=evaluation_ref,
         )
 
     def evaluation_read_v2(
@@ -2128,7 +2154,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
         obj_read_res = self._obj_read_with_retry(obj_read_req)
 
-        # Build model reference - external adapter will convert to external format
+        # Construct the model reference URI using InternalObjectRef since this is an internal method
+        # The external adapter will convert it back to external format
         model_ref = ri.InternalObjectRef(
             project_id=req.project_id,
             name=object_id,
@@ -2139,7 +2166,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             digest=obj_result.digest,
             object_id=object_id,
             version_index=obj_read_res.obj.version_index,
-            model_ref=model_ref,
+            project_id=req.project_id,
+            ref=model_ref,
         )
 
     def model_read_v2(self, req: tsi.ModelReadV2Req) -> tsi.ModelReadV2Res:
