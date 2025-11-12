@@ -6127,3 +6127,110 @@ async def test_calls_query_sort_by_feedback_field_with_costs(client):
     assert len(calls) == 2
     assert calls[0].id == call_ids[0]  # call1 has score 3
     assert calls[1].id == call_ids[1]  # call2 has score 8
+
+
+def test_calls_query_ordering_with_costs_comprehensive(client):
+    @weave.op
+    def my_op(x: int) -> int:
+        return x
+
+    # Calls with multiple sortable attributes
+    call1 = client.create_call(
+        my_op, {"x": 1}, attributes={"category": "A", "priority": 2}
+    )
+    client.finish_call(call1, 1)
+    time.sleep(0.01)
+
+    call2 = client.create_call(
+        my_op, {"x": 2}, attributes={"category": "A", "priority": 1}
+    )
+    client.finish_call(call2, 2)
+    time.sleep(0.01)
+
+    call3 = client.create_call(
+        my_op, {"x": 3}, attributes={"category": "B", "priority": 1}
+    )
+    client.finish_call(call3, 3)
+    time.sleep(0.01)
+
+    # Calls with deeply nested attributes
+    call4 = client.create_call(
+        my_op,
+        {"x": 4},
+        attributes={"metadata": {"config": {"model": {"temperature": 0.1}}}},
+    )
+    client.finish_call(call4, 4)
+    time.sleep(0.01)
+
+    call5 = client.create_call(
+        my_op,
+        {"x": 5},
+        attributes={"metadata": {"config": {"model": {"temperature": 0.9}}}},
+    )
+    client.finish_call(call5, 5)
+    time.sleep(0.01)
+
+    # Call with missing/NULL attributes
+    call6 = client.create_call(my_op, {"x": 6}, attributes={})
+    client.finish_call(call6, 6)
+
+    # Test Case 1: Multiple order fields with costs
+    sort_by = [
+        {"field": "attributes.category", "direction": "asc"},
+        {"field": "attributes.priority", "direction": "asc"},
+    ]
+    calls = list(
+        client.get_calls(
+            sort_by=sort_by,
+            columns=["id"],
+            include_costs=True,
+            filter=tsi.CallsFilter(call_ids=[call1.id, call2.id, call3.id]),
+        )
+    )
+    assert len(calls) == 3
+    assert calls[0].id == call2.id  # Category A, priority 1
+    assert calls[1].id == call1.id  # Category A, priority 2
+    assert calls[2].id == call3.id  # Category B, priority 1
+
+    # Test Case 2: Deeply nested attributes (4 levels) with costs
+    sort_by = [
+        {"field": "attributes.metadata.config.model.temperature", "direction": "asc"}
+    ]
+    calls = list(
+        client.get_calls(
+            sort_by=sort_by,
+            columns=["id"],
+            include_costs=True,
+            filter=tsi.CallsFilter(call_ids=[call4.id, call5.id]),
+        )
+    )
+    assert len(calls) == 2
+    assert calls[0].id == call4.id  # temperature 0.1
+    assert calls[1].id == call5.id  # temperature 0.9
+
+    # Test Case 3: NULL/missing attributes with costs
+    sort_by = [{"field": "attributes.priority", "direction": "asc"}]
+    calls = list(
+        client.get_calls(
+            sort_by=sort_by,
+            columns=["id"],
+            include_costs=True,
+            filter=tsi.CallsFilter(call_ids=[call1.id, call2.id, call6.id]),
+        )
+    )
+    assert len(calls) == 3
+    # Calls with values come first, then NULLs
+    calls_with_priority = [c for c in calls if c.id in [call1.id, call2.id]]
+    assert calls_with_priority[0].id == call2.id  # priority 1
+    assert calls_with_priority[1].id == call1.id  # priority 2
+
+    # Test Case 4: Regular field (started_at) with costs
+    sort_by = [{"field": "started_at", "direction": "desc"}]
+    calls = list(
+        client.get_calls(sort_by=sort_by, columns=["id"], include_costs=True, limit=3)
+    )
+    assert len(calls) == 3
+    # Should be ordered by most recent first
+    assert calls[0].id == call6.id
+    assert calls[1].id == call5.id
+    assert calls[2].id == call4.id
