@@ -94,9 +94,7 @@ USAGE_KEYS = {
         ("llm.token_count.completion", try_parse_int),
         ("ai.usage.completionTokens", try_parse_int),  # Vercel
     ],
-    "output_tokens": [
-        ("gen_ai.usage.output_tokens", try_parse_int)
-    ],
+    "output_tokens": [("gen_ai.usage.output_tokens", try_parse_int)],
     # Maps Weave's "total_tokens" to keys from different standards
     "total_tokens": [
         ("llm.usage.total_tokens", try_parse_int),
