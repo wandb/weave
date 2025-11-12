@@ -99,6 +99,11 @@ class CallsMergedField(QueryBuilderField):
         return False
 
 
+class CallsCompleteField(CallsMergedField):
+    def is_heavy(self) -> bool:
+        return False
+
+
 class CallsMergedAggField(CallsMergedField):
     agg_fn: str
 
@@ -177,6 +182,40 @@ class CallsMergedSummaryField(CallsMergedField):
         handler = get_summary_field_handler(self.summary_field)
         if handler:
             sql = handler(pb, table_alias)
+            return clickhouse_cast(sql, cast)
+        else:
+            supported_fields = ", ".join(SUMMARY_FIELD_HANDLERS.keys())
+            raise NotImplementedError(
+                f"Summary field '{self.summary_field}' not implemented. "
+                f"Supported fields are: {supported_fields}"
+            )
+
+    def as_select_sql(self, pb: ParamBuilder, table_alias: str) -> str:
+        return f"{self.as_sql(pb, table_alias)} AS {self.field}"
+
+    def is_heavy(self) -> bool:
+        # These are computed from non-heavy fields (status uses exception and ended_at)
+        # If we add more summary fields that depend on heavy fields,
+        # this would need to be made more sophisticated
+        return False
+
+
+class CallsCompleteSummaryField(CallsCompleteField):
+    """Field class for computed summary values in calls_complete table."""
+
+    field: str
+    summary_field: str
+
+    def as_sql(
+        self,
+        pb: ParamBuilder,
+        table_alias: str,
+        cast: Optional[tsi_query.CastTo] = None,
+    ) -> str:
+        # Look up handler for the requested summary field
+        handler = get_summary_field_handler(self.summary_field)
+        if handler:
+            sql = handler(pb, table_alias, ProjectVersion.CALLS_COMPLETE_VERSION)
             return clickhouse_cast(sql, cast)
         else:
             supported_fields = ", ".join(SUMMARY_FIELD_HANDLERS.keys())
@@ -351,13 +390,6 @@ class QueryBuilderDynamicField(QueryBuilderField):
                 "Dynamic fields cannot be selected directly, yet - implement me!"
             )
         return f"{super().as_sql(pb, table_alias)} AS {self.field}"
-
-
-class CallsCompleteField(CallsMergedField):
-    """Field class for calls_complete table (no aggregation needed)."""
-
-    def is_heavy(self) -> bool:
-        return False
 
 
 class CallsCompleteDynamicField(QueryBuilderDynamicField):
@@ -874,7 +906,9 @@ class CallsQuery(BaseModel):
             return self._as_sql_base_format(pb, table_alias)
 
         # Build two queries, first filter query CTE, then select the columns
-        filter_query = CallsQuery(project_id=self.project_id)
+        filter_query = CallsQuery(
+            project_id=self.project_id, project_version=self.project_version
+        )
         select_query = CallsQuery(
             project_id=self.project_id,
             include_storage_size=self.include_storage_size,
@@ -915,7 +949,9 @@ class CallsQuery(BaseModel):
                     field_obj, (CallsMergedDynamicField, QueryBuilderDynamicField)
                 ):
                     # we need to add the base field, not the dynamic one
-                    base_field = get_field_by_name(field_obj.field)
+                    base_field = get_field_by_name(
+                        field_obj.field, self.project_version
+                    )
                     if base_field not in select_query.select_fields:
                         select_query.select_fields.append(base_field)
                 else:
@@ -1374,14 +1410,27 @@ class CallsQuery(BaseModel):
                 if query_condition.is_feedback():
                     needs_feedback = True
 
+        # Add id_subquery filter if provided (for CTE-based queries)
+        # This is critical for applying the limit from the filter query
+        id_subquery_filter = (
+            f"AND ({table_alias}.id IN {id_subquery_name})"
+            if id_subquery_name is not None
+            else ""
+        )
+        op_name_sql = process_op_name_filter_to_sql(
+            self.hardcoded_filter, pb, table_alias
+        )
+        trace_id_sql = process_trace_id_filter_to_sql(
+            self.hardcoded_filter, pb, table_alias
+        )
+        trace_roots_sql = process_trace_roots_only_filter_to_sql(
+            self.hardcoded_filter, pb, table_alias
+        )
+
+        # Add the rest of the hardcoded filters
         if self.hardcoded_filter is not None:
             where_conditions.append(self.hardcoded_filter.as_sql(pb, table_alias))
 
-        # where_filters = self._build_where_clause_optimizations(
-        #     pb, table_alias, expand_columns, id_subquery_name, self.project_version
-        # )
-
-        # Add query conditions to WHERE clause
         where_conditions_sql = ""
         if where_conditions:
             where_conditions_sql += "AND " + combine_conditions(where_conditions, "AND")
@@ -1406,6 +1455,10 @@ class CallsQuery(BaseModel):
         FROM calls_complete
         {joins.to_sql()}
         WHERE calls_complete.project_id = {param_slot(project_param, "String")}
+        {id_subquery_filter}
+        {trace_id_sql}
+        {trace_roots_sql}
+        {op_name_sql}
         {where_conditions_sql}
         {order_by_sql}
         {limit_sql}
@@ -1515,7 +1568,12 @@ def get_field_by_name(
         elif name.startswith("summary.weave."):
             # Handle summary.weave.* fields
             summary_field = name[len("summary.weave.") :]
-            return CallsMergedSummaryField(field=name, summary_field=summary_field)
+            if project_version == ProjectVersion.CALLS_COMPLETE_VERSION:
+                return CallsCompleteSummaryField(
+                    field=name, summary_field=summary_field
+                )
+            else:
+                return CallsMergedSummaryField(field=name, summary_field=summary_field)
         else:
             field_parts = split_escaped_field_path(name)
             start_part = field_parts[0]
@@ -1536,16 +1594,24 @@ def get_field_by_name(
 
 
 # Handler function for status summary field
-def _handle_status_summary_field(pb: ParamBuilder, table_alias: str) -> str:
+def _handle_status_summary_field(
+    pb: ParamBuilder,
+    table_alias: str,
+    project_version: ProjectVersion = ProjectVersion.CALLS_MERGED_VERSION,
+) -> str:
     # Status logic:
     # - If exception is not null -> ERROR
     # - Else if ended_at is null -> RUNNING
     # - Else -> SUCCESS
-    exception_sql = get_field_by_name("exception").as_sql(pb, table_alias)
-    ended_to_sql = get_field_by_name("ended_at").as_sql(pb, table_alias)
-    status_counts_sql = get_field_by_name("summary.status_counts.error").as_sql(
-        pb, table_alias, cast="int"
+    exception_sql = get_field_by_name("exception", project_version).as_sql(
+        pb, table_alias
     )
+    ended_to_sql = get_field_by_name("ended_at", project_version).as_sql(
+        pb, table_alias
+    )
+    status_counts_sql = get_field_by_name(
+        "summary.status_counts.error", project_version
+    ).as_sql(pb, table_alias, cast="int")
 
     error_param = pb.add_param(tsi.TraceStatus.ERROR.value)
     running_param = pb.add_param(tsi.TraceStatus.RUNNING.value)
@@ -1561,12 +1627,20 @@ def _handle_status_summary_field(pb: ParamBuilder, table_alias: str) -> str:
 
 
 # Handler function for latency_ms summary field
-def _handle_latency_ms_summary_field(pb: ParamBuilder, table_alias: str) -> str:
+def _handle_latency_ms_summary_field(
+    pb: ParamBuilder,
+    table_alias: str,
+    project_version: ProjectVersion = ProjectVersion.CALLS_MERGED_VERSION,
+) -> str:
     # Latency_ms logic:
     # - If ended_at is null or there's an exception, return null
     # - Otherwise calculate milliseconds between started_at and ended_at
-    started_at_sql = get_field_by_name("started_at").as_sql(pb, table_alias)
-    ended_at_sql = get_field_by_name("ended_at").as_sql(pb, table_alias)
+    started_at_sql = get_field_by_name("started_at", project_version).as_sql(
+        pb, table_alias
+    )
+    ended_at_sql = get_field_by_name("ended_at", project_version).as_sql(
+        pb, table_alias
+    )
 
     # Convert time difference to milliseconds
     # Use toUnixTimestamp64Milli for direct and precise millisecond difference
@@ -1579,14 +1653,20 @@ def _handle_latency_ms_summary_field(pb: ParamBuilder, table_alias: str) -> str:
 
 
 # Handler function for trace_name summary field
-def _handle_trace_name_summary_field(pb: ParamBuilder, table_alias: str) -> str:
+def _handle_trace_name_summary_field(
+    pb: ParamBuilder,
+    table_alias: str,
+    project_version: ProjectVersion = ProjectVersion.CALLS_MERGED_VERSION,
+) -> str:
     # Trace_name logic:
     # - If display_name is available, use that
     # - Else if op_name starts with 'weave-trace-internal:///', extract the name using regex
     # - Otherwise, just use op_name directly
 
-    display_name_sql = get_field_by_name("display_name").as_sql(pb, table_alias)
-    op_name_sql = get_field_by_name("op_name").as_sql(pb, table_alias)
+    display_name_sql = get_field_by_name("display_name", project_version).as_sql(
+        pb, table_alias
+    )
+    op_name_sql = get_field_by_name("op_name", project_version).as_sql(pb, table_alias)
 
     return f"""CASE
         WHEN {display_name_sql} IS NOT NULL AND {display_name_sql} != '' THEN {display_name_sql}
