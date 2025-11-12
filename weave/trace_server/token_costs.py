@@ -1,6 +1,6 @@
 import base64
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Optional
 
@@ -90,8 +90,8 @@ class CostQueryParts:
     where_clause: Optional[str] = None
     group_by_clause: Optional[str] = None
     order_by_clause: Optional[str] = None
-    parameters: dict[str, Any] = {}
-    fields: list[str] = []
+    parameters: dict[str, Any] = field(default_factory=dict)
+    fields: list[str] = field(default_factory=list)
 
     @classmethod
     def build_for_costs(
