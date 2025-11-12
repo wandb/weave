@@ -3,10 +3,12 @@ import datetime
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.orm import ParamBuilder
 
+from weave.trace_server.project_version import ProjectVersion
 
 def make_threads_query(
     project_id: str,
     pb: ParamBuilder,
+    project_version: ProjectVersion,
     *,
     limit: int | None = None,
     offset: int | None = None,
@@ -133,36 +135,56 @@ def make_threads_query(
     # - call_duration: Calculate call duration in milliseconds
     # - Group by call id to merge partial rows
     # - Filter to turn calls only
-    query = f"""
-    SELECT
-        aggregated_thread_id AS thread_id,
-        COUNT(*) AS turn_count,
-        min(call_start_time) AS start_time,
-        max(call_end_time) AS last_updated,
-        argMin(id, call_start_time) AS first_turn_id,
-        argMax(id, call_end_time) AS last_turn_id,
-        quantile(0.5)(call_duration) AS p50_turn_duration_ms,
-        quantile(0.99)(call_duration) AS p99_turn_duration_ms
-    FROM (
+    if project_version == ProjectVersion.CALLS_MERGED_VERSION:
+        query = f"""
         SELECT
-            id,
-            any(thread_id) AS aggregated_thread_id,
-            min(started_at) AS call_start_time,
-            max(ended_at) AS call_end_time,
-            CASE
-                WHEN call_end_time IS NOT NULL AND call_start_time IS NOT NULL
-                THEN dateDiff('millisecond', call_start_time, call_end_time)
-                ELSE NULL
-            END AS call_duration
-        FROM calls_merged
+            aggregated_thread_id AS thread_id,
+            COUNT(*) AS turn_count,
+            min(call_start_time) AS start_time,
+            max(call_end_time) AS last_updated,
+            argMin(id, call_start_time) AS first_turn_id,
+            argMax(id, call_end_time) AS last_turn_id,
+            quantile(0.5)(call_duration) AS p50_turn_duration_ms,
+            quantile(0.99)(call_duration) AS p99_turn_duration_ms
+        FROM (
+            SELECT
+                id,
+                any(thread_id) AS aggregated_thread_id,
+                min(started_at) AS call_start_time,
+                max(ended_at) AS call_end_time,
+                CASE
+                    WHEN call_end_time IS NOT NULL AND call_start_time IS NOT NULL
+                    THEN dateDiff('millisecond', call_start_time, call_end_time)
+                    ELSE NULL
+                END AS call_duration
+            FROM calls_merged
+            WHERE project_id = {{{project_id_param}: String}}
+                {sortable_datetime_filter_clause}
+                {where_thread_filter_clause}
+            GROUP BY (project_id, id)
+            HAVING id = any(turn_id) {having_thread_filter_clause}
+        ) AS properly_merged_calls
+        GROUP BY aggregated_thread_id
+        """
+    else:
+        query = f"""
+        SELECT
+            aggregated_thread_id AS thread_id,
+            COUNT(*) AS turn_count,
+            min(call_start_time) AS start_time,
+            max(call_end_time) AS last_updated,
+            argMin(id, call_start_time) AS first_turn_id,
+            argMax(id, call_end_time) AS last_turn_id,
+            quantile(0.5)(call_duration) AS p50_turn_duration_ms,
+            quantile(0.99)(call_duration) AS p99_turn_duration_ms
+        FROM
+            calls_complete
         WHERE project_id = {{{project_id_param}: String}}
             {sortable_datetime_filter_clause}
             {where_thread_filter_clause}
-        GROUP BY (project_id, id)
+        GROUP BY aggregated_thread_id
         HAVING id = any(turn_id) {having_thread_filter_clause}
-    ) AS properly_merged_calls
-    GROUP BY aggregated_thread_id
-    """
+        """
 
     # Add sorting
     if sort_by:
