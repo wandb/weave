@@ -6,11 +6,7 @@ from typing import Optional
 import sqlparse
 
 from weave.trace_server.interface import query as tsi_query
-from weave.trace_server.orm import (
-    ParamBuilder,
-    clickhouse_cast,
-    quote_json_path_parts,
-)
+from weave.trace_server.orm import ParamBuilder, clickhouse_cast, quote_json_path_parts
 
 
 def param_slot(param_name: str, param_type: str) -> str:
