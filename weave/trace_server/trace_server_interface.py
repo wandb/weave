@@ -2084,6 +2084,11 @@ class TraceServerInterface(Protocol):
     def evaluate_model(self, req: EvaluateModelReq) -> EvaluateModelRes: ...
     def evaluation_status(self, req: EvaluationStatusReq) -> EvaluationStatusRes: ...
 
+    # Usage Analytics API
+    # Time-series usage stats grouped by time bucket and model
+    # Request/response models are defined below
+    def usage_analytics(self, req: "UsageAnalyticsReq") -> "UsageAnalyticsRes": ...
+
 
 class TraceServerInterfaceV2(Protocol):
     """V2 API endpoints for Trace Server.
@@ -2177,3 +2182,63 @@ class FullTraceServerInterface(TraceServerInterface, TraceServerInterfaceV2, Pro
     """
 
     pass
+
+
+# === Usage Analytics API Models ===
+
+
+class UsageBinPreset(str, Enum):
+    last_7d = "last_7d"
+    last_24h = "last_24h"
+    last_1h = "last_1h"
+
+
+class UsageTimeRange(BaseModelStrict):
+    preset: Optional[UsageBinPreset] = Field(
+        default=None, description="Predefined time ranges"
+    )
+    start: Optional[datetime.datetime] = Field(
+        default=None, description="Inclusive start (UTC)"
+    )
+    end: Optional[datetime.datetime] = Field(
+        default=None, description="Exclusive end (UTC)"
+    )
+
+
+class UsageAggregation(BaseModelStrict):
+    type: Literal["avg", "sum", "quantile"]
+    q: Optional[float] = Field(
+        default=None,
+        description="Quantile value in [0,1] for type='quantile'. If provided, a single pXX column is emitted.",
+    )
+    qs: Optional[list[float]] = Field(
+        default=None,
+        description="Optional list of quantiles; emits multiple pXX columns",
+    )
+
+
+class UsageMetricSpec(BaseModelStrict):
+    metric: str = Field(
+        description="Metric key within summary.usage[model]. Ex: 'prompt_tokens'"
+    )
+    aggregations: list[UsageAggregation]
+
+
+class UsageFilter(BaseModelStrict):
+    op_name_like: Optional[str] = Field(
+        default=None, description="Optional LIKE filter for op_name"
+    )
+
+
+class UsageAnalyticsReq(BaseModelStrict):
+    project_id: str
+    time: UsageTimeRange
+    metrics: list[UsageMetricSpec]
+    filter: Optional[UsageFilter] = None
+    timezone: Optional[str] = Field(default="UTC", description="Timezone for bucketing")
+
+
+class UsageAnalyticsRes(BaseModel):
+    bucket_size: str
+    timezone: str
+    rows: list[dict[str, Any]]

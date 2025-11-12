@@ -49,6 +49,9 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     build_calls_stats_query,
     combine_conditions,
 )
+from weave.trace_server.calls_query_builder.usage_query_builder import (
+    build_usage_analytics_query,
+)
 from weave.trace_server.clickhouse_schema import (
     ALL_CALL_INSERT_COLUMNS,
     ALL_CALL_JSON_COLUMNS,
@@ -505,6 +508,25 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         return tsi.CallsQueryStatsRes(
             count=res_dict.get("count", 0),
             total_storage_size_bytes=res_dict.get("total_storage_size_bytes"),
+        )
+
+    def usage_analytics(self, req: tsi.UsageAnalyticsReq) -> tsi.UsageAnalyticsRes:
+        """Return usage analytics grouped by bucket and model with requested aggregations."""
+        pb = ParamBuilder()
+        sql, columns, parameters, bucket_size = build_usage_analytics_query(req, pb)
+        query_result = self._query(sql, parameters)
+        rows: list[dict[str, Any]] = []
+        for tup in query_result.result_rows:
+            row = {}
+            for idx, col in enumerate(columns):
+                val = tup[idx] if idx < len(tup) else None
+                if col == "bucket" and isinstance(val, datetime.datetime):
+                    row[col] = val.isoformat()
+                else:
+                    row[col] = val
+            rows.append(row)
+        return tsi.UsageAnalyticsRes(
+            bucket_size=bucket_size, timezone=req.timezone or "UTC", rows=rows
         )
 
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
