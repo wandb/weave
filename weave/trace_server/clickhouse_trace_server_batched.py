@@ -250,12 +250,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self._project_version_resolver = ProjectVersionResolver.get_instance()
         return self._project_version_resolver
 
-    def _noop_project_version_latency_test(self, project_id: str) -> None:
-        # NOOP for testing latency impact of project switcher
-        try:
-            self.project_version_resolver.get_project_version_sync(project_id)
-        except Exception as e:
-            logger.warning(f"Error getting project version: {e}")
+    def _get_calls_table_alias(self, project_id: str) -> str:
+        project_version = self.project_version_resolver.get_project_version_sync(
+            project_id
+        )
+        return "calls_complete" if project_version == ProjectVersion.CALLS_COMPLETE_VERSION else "calls_merged"
 
     def _get_existing_ops_from_spans(
         self, seen_ids: set[str], project_id: str, limit: int | None = None
@@ -666,10 +665,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         """Returns a stats object for the given query. This is useful for counts or other
         aggregate statistics that are not directly queryable from the calls themselves.
         """
-        self._noop_project_version_latency_test(req.project_id)
-
+        project_version = self.project_version_resolver.get_project_version_sync(
+            req.project_id
+        )
         pb = ParamBuilder()
-        query, columns = build_calls_stats_query(req, pb)
+        query, columns = build_calls_stats_query(req, pb, project_version)
         raw_res = self._query(query, pb.get_params())
 
         res_dict = (
@@ -1582,15 +1582,16 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         return tsi.RefsReadBatchRes(vals=vals)
 
     def project_stats(self, req: tsi.ProjectStatsReq) -> tsi.ProjectStatsRes:
-        self._noop_project_version_latency_test(req.project_id)
-
         def _default_true(val: bool | None) -> bool:
             return True if val is None else val
+
+        calls_table_alias = self._get_calls_table_alias(req.project_id)
 
         pb = ParamBuilder()
         query, columns = make_project_stats_query(
             req.project_id,
             pb,
+            calls_table_alias=calls_table_alias,
             include_trace_storage_size=_default_true(req.include_trace_storage_size),
             include_objects_storage_size=_default_true(req.include_object_storage_size),
             include_tables_storage_size=_default_true(req.include_table_storage_size),
@@ -1609,8 +1610,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self, req: tsi.ThreadsQueryReq
     ) -> Iterator[tsi.ThreadSchema]:
         """Stream threads with aggregated statistics sorted by last activity."""
-        self._noop_project_version_latency_test(req.project_id)
-
         pb = ParamBuilder()
 
         # Extract filter values
@@ -1622,10 +1621,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             before_datetime = req.filter.before_datetime
             thread_ids = req.filter.thread_ids
 
+        project_version = self.project_version_resolver.get_project_version_sync(req.project_id)
+
         # Use the dedicated query builder
         query = make_threads_query(
             project_id=req.project_id,
             pb=pb,
+            project_version=project_version,
             limit=req.limit,
             offset=req.offset,
             sort_by=req.sort_by,
