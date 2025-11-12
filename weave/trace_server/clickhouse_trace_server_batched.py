@@ -1,5 +1,6 @@
 # Clickhouse Trace Server
 
+import asyncio
 import dataclasses
 import datetime
 import hashlib
@@ -7,7 +8,7 @@ import json
 import logging
 import threading
 from collections import defaultdict
-from collections.abc import Iterator, Sequence
+from collections.abc import AsyncIterator, Iterator, Sequence
 from contextlib import contextmanager
 from re import sub
 from typing import Any, Callable, Optional, Union, cast
@@ -1459,7 +1460,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 p99_turn_duration_ms=p99_turn_duration_ms,
             )
 
-    def op_create_v2(self, req: tsi.OpCreateV2Req) -> tsi.OpCreateV2Res:
+    async def op_create_v2(self, req: tsi.OpCreateV2Req) -> tsi.OpCreateV2Res:
         """Create an op object by delegating to obj_create.
 
         Args:
@@ -1506,7 +1507,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             version_index=obj_read_res.obj.version_index,
         )
 
-    def op_read_v2(self, req: tsi.OpReadV2Req) -> tsi.OpReadV2Res:
+    async def op_read_v2(self, req: tsi.OpReadV2Req) -> tsi.OpReadV2Res:
         """Get a specific op object by delegating to obj_read with op filtering.
 
         Returns the actual source code of the op.
@@ -1569,7 +1570,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             code=code,
         )
 
-    def op_list_v2(self, req: tsi.OpListV2Req) -> Iterator[tsi.OpReadV2Res]:
+    async def op_list_v2(self, req: tsi.OpListV2Req) -> AsyncIterator[tsi.OpReadV2Res]:
         """List op objects in a project by delegating to objs_query with op filtering."""
         # Query the objects
         op_filter = tsi.ObjectVersionFilter(is_op=True)
@@ -1638,7 +1639,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 code=code,
             )
 
-    def op_delete_v2(self, req: tsi.OpDeleteV2Req) -> tsi.OpDeleteV2Res:
+    async def op_delete_v2(self, req: tsi.OpDeleteV2Req) -> tsi.OpDeleteV2Res:
         """Delete op object versions by delegating to obj_delete with op filtering."""
         # First verify that the objects are indeed ops by querying them
         object_query_builder = ObjectMetadataQueryBuilder(req.project_id)
@@ -1677,7 +1678,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         return tsi.OpDeleteV2Res(num_deleted=obj_delete_res.num_deleted)
 
-    def dataset_create_v2(self, req: tsi.DatasetCreateV2Req) -> tsi.DatasetCreateV2Res:
+    async def dataset_create_v2(self, req: tsi.DatasetCreateV2Req) -> tsi.DatasetCreateV2Res:
         """Create a dataset object by first creating a table for rows, then creating the dataset object.
 
         The dataset object references the table containing the actual row data.
@@ -1729,7 +1730,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             version_index=obj_read_res.obj.version_index,
         )
 
-    def dataset_read_v2(self, req: tsi.DatasetReadV2Req) -> tsi.DatasetReadV2Res:
+    async def dataset_read_v2(self, req: tsi.DatasetReadV2Req) -> tsi.DatasetReadV2Res:
         """Get a dataset object by delegating to obj_read with retry logic.
 
         Returns the rows reference as a string.
@@ -1758,9 +1759,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             rows=rows_ref,
         )
 
-    def dataset_list_v2(
+    async def dataset_list_v2(
         self, req: tsi.DatasetListV2Req
-    ) -> Iterator[tsi.DatasetReadV2Res]:
+    ) -> AsyncIterator[tsi.DatasetReadV2Res]:
         """List dataset objects by delegating to objs_query with Dataset filtering.
 
         Returns the rows reference as a string.
@@ -1804,7 +1805,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 rows=rows_ref,
             )
 
-    def dataset_delete_v2(self, req: tsi.DatasetDeleteV2Req) -> tsi.DatasetDeleteV2Res:
+    async def dataset_delete_v2(self, req: tsi.DatasetDeleteV2Req) -> tsi.DatasetDeleteV2Res:
         """Delete dataset objects by delegating to obj_delete."""
         obj_delete_req = tsi.ObjDeleteReq(
             project_id=req.project_id,
@@ -1814,7 +1815,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         result = self.obj_delete(obj_delete_req)
         return tsi.DatasetDeleteV2Res(num_deleted=result.num_deleted)
 
-    def scorer_create_v2(self, req: tsi.ScorerCreateV2Req) -> tsi.ScorerCreateV2Res:
+    async def scorer_create_v2(self, req: tsi.ScorerCreateV2Req) -> tsi.ScorerCreateV2Res:
         """Create a scorer object by first creating its score op, then creating the scorer object.
 
         The scorer object references the op that implements the scoring logic.
@@ -1822,22 +1823,26 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # Create a safe ID for the scorer
         scorer_id = object_creation_utils.make_object_id(req.name, "Scorer")
 
-        # Create the score op
+        # Create the score and summarize ops concurrently using TaskGroup
         score_op_req = tsi.OpCreateV2Req(
             project_id=req.project_id,
             name=f"{scorer_id}_score",
             source_code=req.op_source_code,
         )
-        score_op_res = self.op_create_v2(score_op_req)
-        score_op_ref = score_op_res.digest
-
-        # Create the default summarize op
         summarize_op_req = tsi.OpCreateV2Req(
             project_id=req.project_id,
             name=f"{scorer_id}_summarize",
             source_code=object_creation_utils.PLACEHOLDER_SCORER_SUMMARIZE_OP_SOURCE,
         )
-        summarize_op_res = self.op_create_v2(summarize_op_req)
+
+        async with asyncio.TaskGroup() as tg:
+            score_task = tg.create_task(self.op_create_v2(score_op_req))
+            summarize_task = tg.create_task(self.op_create_v2(summarize_op_req))
+
+        score_op_res = score_task.result()
+        summarize_op_res = summarize_task.result()
+
+        score_op_ref = score_op_res.digest
         summarize_op_ref = summarize_op_res.digest
 
         # Create the scorer object
@@ -1879,7 +1884,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             scorer=scorer_ref,
         )
 
-    def scorer_read_v2(self, req: tsi.ScorerReadV2Req) -> tsi.ScorerReadV2Res:
+    async def scorer_read_v2(self, req: tsi.ScorerReadV2Req) -> tsi.ScorerReadV2Res:
         """Get a scorer object by delegating to obj_read with retry logic."""
         obj_req = tsi.ObjReadReq(
             project_id=req.project_id,
@@ -1904,7 +1909,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             score_op=val.get("score", ""),
         )
 
-    def scorer_list_v2(self, req: tsi.ScorerListV2Req) -> Iterator[tsi.ScorerReadV2Res]:
+    async def scorer_list_v2(self, req: tsi.ScorerListV2Req) -> AsyncIterator[tsi.ScorerReadV2Res]:
         """List scorer objects by delegating to objs_query with Scorer filtering."""
         # Query the objects
         scorer_filter = tsi.ObjectVersionFilter(base_object_classes=["Scorer"])
@@ -1939,7 +1944,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 score_op=score_op,
             )
 
-    def scorer_delete_v2(self, req: tsi.ScorerDeleteV2Req) -> tsi.ScorerDeleteV2Res:
+    async def scorer_delete_v2(self, req: tsi.ScorerDeleteV2Req) -> tsi.ScorerDeleteV2Res:
         """Delete scorer objects by delegating to obj_delete."""
         obj_delete_req = tsi.ObjDeleteReq(
             project_id=req.project_id,
@@ -1949,7 +1954,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         result = self.obj_delete(obj_delete_req)
         return tsi.ScorerDeleteV2Res(num_deleted=result.num_deleted)
 
-    def evaluation_create_v2(
+    async def evaluation_create_v2(
         self, req: tsi.EvaluationCreateV2Req
     ) -> tsi.EvaluationCreateV2Res:
         """Create an evaluation object.
@@ -1959,31 +1964,34 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # Create a safe ID for the evaluation
         evaluation_id = object_creation_utils.make_object_id(req.name, "Evaluation")
 
-        # Create placeholder evaluate op
+        # Create placeholder ops concurrently using TaskGroup
         evaluate_op_req = tsi.OpCreateV2Req(
             project_id=req.project_id,
             name=f"{evaluation_id}.evaluate",
             source_code=object_creation_utils.PLACEHOLDER_EVALUATE_OP_SOURCE,
         )
-        evaluate_op_res = self.op_create_v2(evaluate_op_req)
-        evaluate_ref = evaluate_op_res.digest
-
-        # Create placeholder predict_and_score op
         predict_and_score_op_req = tsi.OpCreateV2Req(
             project_id=req.project_id,
             name=f"{evaluation_id}.predict_and_score",
             source_code=object_creation_utils.PLACEHOLDER_PREDICT_AND_SCORE_OP_SOURCE,
         )
-        predict_and_score_op_res = self.op_create_v2(predict_and_score_op_req)
-        predict_and_score_ref = predict_and_score_op_res.digest
-
-        # Create placeholder summarize op
         summarize_op_req = tsi.OpCreateV2Req(
             project_id=req.project_id,
             name=f"{evaluation_id}.summarize",
             source_code=object_creation_utils.PLACEHOLDER_EVALUATION_SUMMARIZE_OP_SOURCE,
         )
-        summarize_op_res = self.op_create_v2(summarize_op_req)
+
+        async with asyncio.TaskGroup() as tg:
+            evaluate_task = tg.create_task(self.op_create_v2(evaluate_op_req))
+            predict_and_score_task = tg.create_task(self.op_create_v2(predict_and_score_op_req))
+            summarize_task = tg.create_task(self.op_create_v2(summarize_op_req))
+
+        evaluate_op_res = evaluate_task.result()
+        predict_and_score_op_res = predict_and_score_task.result()
+        summarize_op_res = summarize_task.result()
+
+        evaluate_ref = evaluate_op_res.digest
+        predict_and_score_ref = predict_and_score_op_res.digest
         summarize_ref = summarize_op_res.digest
 
         # Create the evaluation object
@@ -2033,7 +2041,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             evaluation_ref=evaluation_ref,
         )
 
-    def evaluation_read_v2(
+    async def evaluation_read_v2(
         self, req: tsi.EvaluationReadV2Req
     ) -> tsi.EvaluationReadV2Res:
         """Get an evaluation object by delegating to obj_read with retry logic."""
@@ -2066,9 +2074,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             summarize_op=val.get("summarize", ""),
         )
 
-    def evaluation_list_v2(
+    async def evaluation_list_v2(
         self, req: tsi.EvaluationListV2Req
-    ) -> Iterator[tsi.EvaluationReadV2Res]:
+    ) -> AsyncIterator[tsi.EvaluationReadV2Res]:
         """List evaluation objects by delegating to objs_query with Evaluation filtering."""
         # Query the objects
         obj_query_req = tsi.ObjQueryReq(
@@ -2106,7 +2114,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 summarize_op=val.get("summarize", "") if isinstance(val, dict) else "",
             )
 
-    def evaluation_delete_v2(
+    async def evaluation_delete_v2(
         self, req: tsi.EvaluationDeleteV2Req
     ) -> tsi.EvaluationDeleteV2Res:
         """Delete evaluation objects by delegating to obj_delete."""
@@ -2120,7 +2128,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     # Model V2 API
 
-    def model_create_v2(self, req: tsi.ModelCreateV2Req) -> tsi.ModelCreateV2Res:
+    async def model_create_v2(self, req: tsi.ModelCreateV2Req) -> tsi.ModelCreateV2Res:
         """Create a model object.
 
         Args:
@@ -2180,7 +2188,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             model_ref=model_ref,
         )
 
-    def model_read_v2(self, req: tsi.ModelReadV2Req) -> tsi.ModelReadV2Res:
+    async def model_read_v2(self, req: tsi.ModelReadV2Req) -> tsi.ModelReadV2Res:
         """Read a model object.
 
         Args:
@@ -2237,7 +2245,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             attributes=attributes if attributes else None,
         )
 
-    def model_list_v2(self, req: tsi.ModelListV2Req) -> Iterator[tsi.ModelReadV2Res]:
+    async def model_list_v2(self, req: tsi.ModelListV2Req) -> AsyncIterator[tsi.ModelReadV2Res]:
         """List model objects by delegating to objs_query with Model filtering."""
         obj_query_req = tsi.ObjQueryReq(
             project_id=req.project_id,
@@ -2288,7 +2296,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 attributes=attributes if attributes else None,
             )
 
-    def model_delete_v2(self, req: tsi.ModelDeleteV2Req) -> tsi.ModelDeleteV2Res:
+    async def model_delete_v2(self, req: tsi.ModelDeleteV2Req) -> tsi.ModelDeleteV2Res:
         """Delete model objects by delegating to obj_delete.
 
         Args:
@@ -2305,7 +2313,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         result = self.obj_delete(obj_delete_req)
         return tsi.ModelDeleteV2Res(num_deleted=result.num_deleted)
 
-    def evaluation_run_create_v2(
+    async def evaluation_run_create_v2(
         self, req: tsi.EvaluationRunCreateV2Req
     ) -> tsi.EvaluationRunCreateV2Res:
         """Create an evaluation run as a call with special attributes."""
@@ -2317,7 +2325,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             name=constants.EVALUATION_RUN_OP_NAME,
             source_code=object_creation_utils.PLACEHOLDER_EVALUATION_EVALUATE_OP_SOURCE,
         )
-        op_create_res = self.op_create_v2(op_create_req)
+        op_create_res = await self.op_create_v2(op_create_req)
 
         # Build the op ref
         op_ref = ri.InternalOpRef(
@@ -2351,7 +2359,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         return tsi.EvaluationRunCreateV2Res(evaluation_run_id=evaluation_run_id)
 
-    def evaluation_run_read_v2(
+    async def evaluation_run_read_v2(
         self, req: tsi.EvaluationRunReadV2Req
     ) -> tsi.EvaluationRunReadV2Res:
         """Read an evaluation run by reading the underlying call."""
@@ -2376,9 +2384,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             summary=call.summary,
         )
 
-    def evaluation_run_list_v2(
+    async def evaluation_run_list_v2(
         self, req: tsi.EvaluationRunListV2Req
-    ) -> Iterator[tsi.EvaluationRunReadV2Res]:
+    ) -> AsyncIterator[tsi.EvaluationRunReadV2Res]:
         """List evaluation runs by querying calls with evaluation_run attribute."""
         # Build query conditions to filter at database level
         conditions: list[tsi_query.Operand] = []
@@ -2466,7 +2474,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 summary=call.summary,
             )
 
-    def evaluation_run_delete_v2(
+    async def evaluation_run_delete_v2(
         self, req: tsi.EvaluationRunDeleteV2Req
     ) -> tsi.EvaluationRunDeleteV2Res:
         """Delete evaluation runs by deleting the underlying calls."""
@@ -2478,7 +2486,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         res = self.calls_delete(calls_delete_req)
         return tsi.EvaluationRunDeleteV2Res(num_deleted=res.num_deleted)
 
-    def evaluation_run_finish_v2(
+    async def evaluation_run_finish_v2(
         self, req: tsi.EvaluationRunFinishV2Req
     ) -> tsi.EvaluationRunFinishV2Res:
         """Finish an evaluation run by ending the underlying call.
@@ -2611,7 +2619,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     # Prediction V2 API
 
-    def prediction_create_v2(
+    async def prediction_create_v2(
         self, req: tsi.PredictionCreateV2Req
     ) -> tsi.PredictionCreateV2Res:
         """Create a prediction as a call with special attributes.
@@ -2623,6 +2631,18 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             PredictionCreateV2Res with the prediction_id
         """
         prediction_id = generate_id()
+
+        # Parse the model ref to get the model name (needed for predict op creation)
+        try:
+            model_ref = ri.parse_internal_uri(req.model)
+            if isinstance(model_ref, (ri.InternalObjectRef, ri.InternalOpRef)):
+                model_name = model_ref.name
+            else:
+                # Fallback to default if not an object/op ref
+                model_name = "Model"
+        except ri.InvalidInternalRef:
+            # Fallback to default if parsing fails
+            model_name = "Model"
 
         # Determine trace_id and parent_id based on evaluation_run_id
         if req.evaluation_run_id:
@@ -2642,13 +2662,25 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 raise NotFoundError(f"Evaluation run {req.evaluation_run_id} not found")
             evaluation_ref = call.inputs.get("self")
 
-            # Create the predict_and_score op
+            # Create the predict_and_score and predict ops concurrently using TaskGroup
             predict_and_score_op_req = tsi.OpCreateV2Req(
                 project_id=req.project_id,
                 name=constants.EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME,
                 source_code=object_creation_utils.PLACEHOLDER_EVALUATION_PREDICT_AND_SCORE_OP_SOURCE,
             )
-            predict_and_score_op_res = self.op_create_v2(predict_and_score_op_req)
+            predict_op_name = f"{model_name}.predict"
+            predict_op_req = tsi.OpCreateV2Req(
+                project_id=req.project_id,
+                name=predict_op_name,
+                source_code=object_creation_utils.PLACEHOLDER_MODEL_PREDICT_OP_SOURCE,
+            )
+
+            async with asyncio.TaskGroup() as tg:
+                predict_and_score_task = tg.create_task(self.op_create_v2(predict_and_score_op_req))
+                predict_task = tg.create_task(self.op_create_v2(predict_op_req))
+
+            predict_and_score_op_res = predict_and_score_task.result()
+            predict_op_res = predict_task.result()
 
             # Build the predict_and_score op ref
             predict_and_score_op_ref = ri.InternalOpRef(
@@ -2688,26 +2720,14 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             trace_id = prediction_id
             parent_id = None
 
-        # Parse the model ref to get the model name
-        try:
-            model_ref = ri.parse_internal_uri(req.model)
-            if isinstance(model_ref, (ri.InternalObjectRef, ri.InternalOpRef)):
-                model_name = model_ref.name
-            else:
-                # Fallback to default if not an object/op ref
-                model_name = "Model"
-        except ri.InvalidInternalRef:
-            # Fallback to default if parsing fails
-            model_name = "Model"
-
-        # Create the predict op with the model-specific name
-        predict_op_name = f"{model_name}.predict"
-        predict_op_req = tsi.OpCreateV2Req(
-            project_id=req.project_id,
-            name=predict_op_name,
-            source_code=object_creation_utils.PLACEHOLDER_MODEL_PREDICT_OP_SOURCE,
-        )
-        predict_op_res = self.op_create_v2(predict_op_req)
+            # Create the predict op with the model-specific name
+            predict_op_name = f"{model_name}.predict"
+            predict_op_req = tsi.OpCreateV2Req(
+                project_id=req.project_id,
+                name=predict_op_name,
+                source_code=object_creation_utils.PLACEHOLDER_MODEL_PREDICT_OP_SOURCE,
+            )
+            predict_op_res = await self.op_create_v2(predict_op_req)
 
         # Build the predict op ref
         predict_op_ref = ri.InternalOpRef(
@@ -2761,7 +2781,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         return tsi.PredictionCreateV2Res(prediction_id=prediction_id)
 
-    def prediction_read_v2(
+    async def prediction_read_v2(
         self, req: tsi.PredictionReadV2Req
     ) -> tsi.PredictionReadV2Res:
         """Read a prediction by reading the underlying call.
@@ -2813,9 +2833,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             wb_user_id=call.wb_user_id,
         )
 
-    def prediction_list_v2(
+    async def prediction_list_v2(
         self, req: tsi.PredictionListV2Req
-    ) -> Iterator[tsi.PredictionReadV2Res]:
+    ) -> AsyncIterator[tsi.PredictionReadV2Res]:
         """List predictions by querying calls with prediction attribute.
 
         Args:
@@ -2896,7 +2916,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 wb_user_id=call.wb_user_id,
             )
 
-    def prediction_delete_v2(
+    async def prediction_delete_v2(
         self, req: tsi.PredictionDeleteV2Req
     ) -> tsi.PredictionDeleteV2Res:
         """Delete predictions by deleting the underlying calls.
@@ -2915,7 +2935,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         res = self.calls_delete(calls_delete_req)
         return tsi.PredictionDeleteV2Res(num_deleted=res.num_deleted)
 
-    def prediction_finish_v2(
+    async def prediction_finish_v2(
         self, req: tsi.PredictionFinishV2Req
     ) -> tsi.PredictionFinishV2Res:
         """Finish a prediction by ending the underlying call.
@@ -3047,7 +3067,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     # Score V2 API
 
-    def score_create_v2(self, req: tsi.ScoreCreateV2Req) -> tsi.ScoreCreateV2Res:
+    async def score_create_v2(self, req: tsi.ScoreCreateV2Req) -> tsi.ScoreCreateV2Res:
         """Create a score as a call with special attributes.
 
         Args:
@@ -3106,7 +3126,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             name=score_op_name,
             source_code=object_creation_utils.PLACEHOLDER_SCORER_SCORE_OP_SOURCE,
         )
-        score_op_res = self.op_create_v2(score_op_req)
+        score_op_res = await self.op_create_v2(score_op_req)
 
         # Build the score op ref
         score_op_ref = ri.InternalOpRef(
@@ -3186,7 +3206,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         return tsi.ScoreCreateV2Res(score_id=score_id)
 
-    def score_read_v2(self, req: tsi.ScoreReadV2Req) -> tsi.ScoreReadV2Res:
+    async def score_read_v2(self, req: tsi.ScoreReadV2Req) -> tsi.ScoreReadV2Res:
         """Read a score by reading the underlying call.
 
         Args:
@@ -3237,7 +3257,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             wb_user_id=call.wb_user_id,
         )
 
-    def score_list_v2(self, req: tsi.ScoreListV2Req) -> Iterator[tsi.ScoreReadV2Res]:
+    async def score_list_v2(self, req: tsi.ScoreListV2Req) -> AsyncIterator[tsi.ScoreReadV2Res]:
         """List scores by querying calls with score attribute.
 
         Args:
@@ -3318,7 +3338,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 wb_user_id=call.wb_user_id,
             )
 
-    def score_delete_v2(self, req: tsi.ScoreDeleteV2Req) -> tsi.ScoreDeleteV2Res:
+    async def score_delete_v2(self, req: tsi.ScoreDeleteV2Req) -> tsi.ScoreDeleteV2Res:
         """Delete scores by deleting the underlying calls.
 
         Args:
