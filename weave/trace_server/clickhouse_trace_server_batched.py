@@ -53,14 +53,13 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     CallsQuery,
     HardCodedFilter,
     OrderField,
-    QueryBuilderDynamicField,
-    QueryBuilderField,
     build_calls_complete_batch_delete_query,
     build_calls_complete_batch_update_query,
     build_calls_complete_update_display_name_query,
     build_calls_stats_query,
     combine_conditions,
 )
+from weave.trace_server.calls_query_builder.fields import DynamicField, SimpleField
 from weave.trace_server.clickhouse_schema import (
     ALL_CALL_INSERT_COLUMNS,
     ALL_CALL_JSON_COLUMNS,
@@ -149,6 +148,7 @@ from weave.trace_server.project_version.project_version import (
 from weave.trace_server.project_version.types import (
     CallSource,
     ProjectDataResidence,
+    ReadTable,
     WriteTarget,
 )
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
@@ -287,48 +287,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             return self._table_routing_resolver
         self._table_routing_resolver = TableRoutingResolver()
         return self._table_routing_resolver
-
-    @property
-    def use_distributed_mode(self) -> bool:
-        """Check if ClickHouse is configured to use distributed tables.
-
-        Returns the value from WF_CLICKHOUSE_USE_DISTRIBUTED_TABLES environment variable.
-
-        Returns:
-            bool: True if using distributed tables, False otherwise.
-        """
-        return wf_env.wf_clickhouse_use_distributed_tables()
-
-    @property
-    def clickhouse_cluster_name(self) -> str | None:
-        """Get the ClickHouse cluster name from environment.
-
-        Returns:
-            str | None: The cluster name from WF_CLICKHOUSE_REPLICATED_CLUSTER, or None if not set.
-        """
-        return wf_env.wf_clickhouse_replicated_cluster()
-
-    def _get_calls_complete_table_name(self) -> str:
-        """Get the appropriate table name for calls_complete updates.
-
-        In distributed mode, UPDATE statements must target the local table
-        (with LOCAL_TABLE_SUFFIX) instead of the distributed table.
-
-        Returns:
-            str: Table name to use for UPDATE statements.
-        """
-        if self.use_distributed_mode:
-            return f"calls_complete{ch_settings.LOCAL_TABLE_SUFFIX}"
-        return "calls_complete"
-
-    def _noop_project_version_latency_test(self, project_id: str) -> None:
-        # NOOP for testing latency impact of project switcher
-        try:
-            self.table_routing_resolver.resolve_read_table(project_id, self.ch_client)
-        except Exception as e:
-            logger.warning(
-                f"Error getting project version for project [{project_id}]: {e}"
-            )
 
     def _get_existing_ops_from_spans(
         self, seen_ids: set[str], project_id: str, limit: int | None = None
@@ -503,8 +461,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.kafka_producer.flush")
     def _flush_kafka_producer(self) -> None:
-        if wf_env.wf_enable_online_eval():
-            self.kafka_producer.flush()
+        self.kafka_producer.flush()
 
     @contextmanager
     def call_batch(self) -> Iterator[None]:
@@ -878,10 +835,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         """Returns a stats object for the given query. This is useful for counts or other
         aggregate statistics that are not directly queryable from the calls themselves.
         """
-        self._noop_project_version_latency_test(req.project_id)
-
+        read_table = self.table_routing_resolver.resolve_read_table(
+            req.project_id, self.ch_client
+        )
         pb = ParamBuilder()
-        query, columns = build_calls_stats_query(req, pb)
+        query, columns = build_calls_stats_query(req, pb, read_table)
         raw_res = self._query(query, pb.get_params())
 
         res_dict = (
@@ -898,10 +856,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.calls_query_stream")
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
         """Returns a stream of calls that match the given query."""
-        self._noop_project_version_latency_test(project_id=req.project_id)
-
+        read_table = self.table_routing_resolver.resolve_read_table(
+            req.project_id, self.ch_client
+        )
         cq = CallsQuery(
             project_id=req.project_id,
+            read_table=read_table,
             include_costs=req.include_costs or False,
             include_storage_size=req.include_storage_size or False,
             include_total_storage_size=req.include_total_storage_size or False,
@@ -946,7 +906,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         for col in columns:
             cq.add_field(col)
         if req.filter is not None:
-            cq.set_hardcoded_filter(HardCodedFilter(filter=req.filter))
+            cq.set_hardcoded_filter(
+                HardCodedFilter(filter=req.filter, read_table=read_table)
+            )
         if req.query is not None:
             cq.add_condition(req.query.expr_)
 
@@ -956,18 +918,20 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 cq.add_order(sort_by.field, sort_by.direction)
             # If user isn't already sorting by id, add id as secondary sort for consistency
             if not any(sort_by.field == "id" for sort_by in req.sort_by):
-                cq.add_order("id", "asc")
+                cq.add_order("id", "desc")
         else:
             # Default sorting: started_at with id as secondary sort for consistency
             cq.add_order("started_at", "asc")
-            cq.add_order("id", "asc")
+            cq.add_order("id", "desc")
         if req.limit is not None:
             cq.set_limit(req.limit)
         if req.offset is not None:
             cq.set_offset(req.offset)
 
         pb = ParamBuilder()
-        raw_res = self._query_stream(cq.as_sql(pb), pb.get_params())
+        raw_res = self._query_stream(
+            cq.as_sql(pb), pb.get_params(), read_table=read_table
+        )
 
         select_columns = [c.field for c in cq.select_fields]
         expand_columns = req.expand_columns or []
@@ -1653,8 +1617,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     )
 
                 field = OrderField(
-                    field=QueryBuilderDynamicField(
-                        field=VAL_DUMP_COLUMN_NAME, extra_path=extra_path
+                    field=DynamicField(
+                        field=VAL_DUMP_COLUMN_NAME,
+                        extra_path=extra_path,
                     ),
                     direction="ASC" if sort.direction.lower() == "asc" else "DESC",
                 )
@@ -1688,7 +1653,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if not sort_fields:
             sort_fields = [
                 OrderField(
-                    field=QueryBuilderField(field=ROW_ORDER_COLUMN_NAME),
+                    field=SimpleField(field=ROW_ORDER_COLUMN_NAME),
                     direction="ASC",
                 )
             ]
@@ -1803,15 +1768,18 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         return tsi.RefsReadBatchRes(vals=vals)
 
     def project_stats(self, req: tsi.ProjectStatsReq) -> tsi.ProjectStatsRes:
-        self._noop_project_version_latency_test(req.project_id)
-
         def _default_true(val: bool | None) -> bool:
             return True if val is None else val
+
+        calls_table_alias = self.table_routing_resolver.resolve_read_table(
+            req.project_id, self.ch_client
+        ).value
 
         pb = ParamBuilder()
         query, columns = make_project_stats_query(
             req.project_id,
             pb,
+            calls_table_alias=calls_table_alias,
             include_trace_storage_size=_default_true(req.include_trace_storage_size),
             include_objects_storage_size=_default_true(req.include_object_storage_size),
             include_tables_storage_size=_default_true(req.include_table_storage_size),
@@ -1830,8 +1798,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self, req: tsi.ThreadsQueryReq
     ) -> Iterator[tsi.ThreadSchema]:
         """Stream threads with aggregated statistics sorted by last activity."""
-        self._noop_project_version_latency_test(req.project_id)
-
         pb = ParamBuilder()
 
         # Extract filter values
@@ -1843,10 +1809,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             before_datetime = req.filter.before_datetime
             thread_ids = req.filter.thread_ids
 
+        read_table = self.table_routing_resolver.resolve_read_table(
+            req.project_id, self.ch_client
+        )
+
         # Use the dedicated query builder
         query = make_threads_query(
             project_id=req.project_id,
             pb=pb,
+            read_table=read_table,
             limit=req.limit,
             offset=req.offset,
             sort_by=req.sort_by,
@@ -5305,13 +5276,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     def _run_migrations(self) -> None:
         logger.info("Running migrations")
-        migrator = wf_migrator.get_clickhouse_trace_server_migrator(
-            self._mint_client(),
-            replicated=wf_env.wf_clickhouse_replicated(),
-            replicated_path=wf_env.wf_clickhouse_replicated_path(),
-            replicated_cluster=wf_env.wf_clickhouse_replicated_cluster(),
-            use_distributed=wf_env.wf_clickhouse_use_distributed_tables(),
-        )
+        migrator = wf_migrator.ClickHouseTraceServerMigrator(self._mint_client())
         migrator.apply_migrations(self._database)
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._query_stream")
@@ -5321,6 +5286,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         parameters: dict[str, Any],
         column_formats: dict[str, Any] | None = None,
         settings: dict[str, Any] | None = None,
+        read_table: ReadTable | None = None,
     ) -> Iterator[tuple]:
         """Streams the results of a query from the database."""
         if not settings:
@@ -5345,6 +5311,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                         "query": query,
                         "parameters": parameters,
                         "summary": summary,
+                        "read_table": read_table,
                     },
                 )
                 yield from stream
@@ -5355,6 +5322,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     "error_str": str(e),
                     "query": query,
                     "parameters": parameters,
+                    "read_table": read_table,
                 },
             )
             # always raises, optionally with custom error class
