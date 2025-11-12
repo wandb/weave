@@ -6,7 +6,7 @@ import datetime
 import json
 import typing
 from dataclasses import dataclass
-
+import re
 from pydantic import BaseModel
 from typing_extensions import TypeAlias
 
@@ -549,28 +549,10 @@ def split_escaped_field_path(path: str) -> list[str]:
         >>> split_escaped_field_path("output.a\\.b\\.c.d")
         ['output', 'a.b.c', 'd']
     """
-    parts: list[str] = []
-    current_part: list[str] = []
-    i = 0
-
-    while i < len(path):
-        # handle escaped period case, not a new part
-        if path[i] == "\\" and i + 1 < len(path) and path[i + 1] == ".":
-            current_part.append(".")
-            i += 2
-        elif path[i] == ".":
-            if current_part or len(parts) == 0:
-                parts.append("".join(current_part))
-                current_part = []
-            i += 1
-        else:
-            current_part.append(path[i])
-            i += 1
-
-    if current_part or len(parts) > 0:
-        parts.append("".join(current_part))
-
-    return parts
+    parts = re.split(r"(?<!\\)\.", path)
+    # turn '\.' back into '.' inside each segment
+    formd_parts = [p.replace(r"\.", ".") for p in parts]
+    return formd_parts
 
 
 def quote_json_path(path: str) -> str:
