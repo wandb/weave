@@ -150,7 +150,6 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
                     data=encoded_data,  # type: ignore
                 )
                 handle_response_error(r, url)
-                return
             except requests.HTTPError as e:
                 # If v2 endpoint doesn't exist (404), fall back to legacy upsert_batch
                 if e.response.status_code != 404:
@@ -159,6 +158,8 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
                 logger.debug(
                     "V2 upsert batch endpoint not available, falling back to legacy upsert_batch"
                 )
+            else:
+                return
 
         # Fall back to legacy endpoint
         r = self.post(
@@ -542,7 +543,7 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
 
         if self.should_batch:
             assert self.call_processor is not None
-            # Enqueue to batch processor for batching with other calls
+
             self.call_processor.enqueue([CompleteBatchItem(req=req_as_obj)])
             return tsi.CallUpsertRes(
                 id=req_as_obj.complete.id, trace_id=req_as_obj.complete.trace_id
