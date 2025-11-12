@@ -98,7 +98,7 @@ def get_weave_usage(attributes: dict[str, Any]) -> dict[str, Any]:
         and isinstance(usage["input_tokens"], int)
         and isinstance(usage["output_tokens"], int)
     ):
-        usage["total_tokens"] = usage["prompt_tokens"] + usage["completion_tokens"]
+        usage["total_tokens"] = usage["input_tokens"] + usage["output_tokens"]
     return usage
 
 
