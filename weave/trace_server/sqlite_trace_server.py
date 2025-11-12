@@ -788,15 +788,6 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             conn.commit()
         return tsi.CallUpdateRes()
 
-    def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
-        raise NotImplementedError()
-
-    def op_read(self, req: tsi.OpReadReq) -> tsi.OpReadRes:
-        raise NotImplementedError()
-
-    def ops_query(self, req: tsi.OpQueryReq) -> tsi.OpQueryRes:
-        raise NotImplementedError()
-
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
         conn, cursor = get_conn_cursor(self.db_path)
 
@@ -1684,7 +1675,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         """Create an op object by delegating to obj_create.
 
         Args:
-            req: OpCreateReq containing project_id, name, description, and source_code
+            req: OpCreateV2Req containing project_id, name, description, and source_code
 
         Returns:
             OpCreateV2Res with digest, object_id, version_index, and op_ref

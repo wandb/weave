@@ -780,44 +780,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         return tsi.CallUpdateRes()
 
-    def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
-        raise NotImplementedError()
-
-    def op_read(self, req: tsi.OpReadReq) -> tsi.OpReadRes:
-        object_query_builder = ObjectMetadataQueryBuilder(req.project_id)
-        object_query_builder.add_is_op_condition(True)
-        object_query_builder.add_digests_conditions(req.digest)
-        object_query_builder.add_object_ids_condition([req.name], "op_name")
-        object_query_builder.set_include_deleted(include_deleted=True)
-
-        objs = self._select_objs_query(object_query_builder)
-        if len(objs) == 0:
-            raise NotFoundError(f"Obj {req.name}:{req.digest} not found")
-
-        op = objs[0]
-        if op.deleted_at is not None:
-            raise ObjectDeletedError(
-                f"Op {req.name}:v{op.version_index} was deleted at {op.deleted_at}",
-                deleted_at=op.deleted_at,
-            )
-
-        return tsi.OpReadRes(op_obj=_ch_obj_to_obj_schema(op))
-
-    def ops_query(self, req: tsi.OpQueryReq) -> tsi.OpQueryRes:
-        object_query_builder = ObjectMetadataQueryBuilder(req.project_id)
-        object_query_builder.add_is_op_condition(True)
-        if req.filter:
-            if req.filter.op_names:
-                object_query_builder.add_object_ids_condition(
-                    req.filter.op_names, "op_names"
-                )
-            if req.filter.latest_only:
-                object_query_builder.add_is_latest_condition()
-
-        ch_objs = self._select_objs_query(object_query_builder)
-        objs = [_ch_obj_to_obj_schema(call) for call in ch_objs]
-        return tsi.OpQueryRes(op_objs=objs)
-
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
         processed_result = process_incoming_object_val(
             req.obj.val, req.obj.builtin_object_class

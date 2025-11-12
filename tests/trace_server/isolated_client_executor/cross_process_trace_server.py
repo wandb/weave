@@ -305,18 +305,6 @@ class CrossProcessTraceServerSender(tsi.TraceServerInterface):
         """Start calls in batch."""
         return self._send_request("call_start_batch", req)
 
-    def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
-        """Create an operation."""
-        return self._send_request("op_create", req)
-
-    def op_read(self, req: tsi.OpReadReq) -> tsi.OpReadRes:
-        """Read an operation."""
-        return self._send_request("op_read", req)
-
-    def ops_query(self, req: tsi.OpQueryReq) -> tsi.OpQueryRes:
-        """Query operations."""
-        return self._send_request("ops_query", req)
-
     def cost_create(self, req: tsi.CostCreateReq) -> tsi.CostCreateRes:
         """Create cost data."""
         return self._send_request("cost_create", req)
