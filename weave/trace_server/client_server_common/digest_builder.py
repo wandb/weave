@@ -26,6 +26,7 @@ external_ref_prefix = "weave:///"
 internal_ref_prefix = "weave-internal:///"
 
 
+# TODO: Should we call this "dangerous" or "unstable"?
 def bytes_digest(bytes_val: bytes) -> str:
     hasher = hashlib.sha256()
     hasher.update(bytes_val)
@@ -34,6 +35,7 @@ def bytes_digest(bytes_val: bytes) -> str:
     return base64_encoded_hash.replace("-", "X").replace("_", "Y").rstrip("=")
 
 
+# TODO: Should we call this "dangerous" or "unstable"?
 def str_digest(str_val: str) -> str:
     return bytes_digest(str_val.encode())
 
@@ -74,6 +76,7 @@ def _map_val(obj: E, func: Callable[[E], E]) -> E:
 
 
 def _make_stabilized_ref_str(stable_content_address: str) -> str:
+    # TODO: Make a call on this name - we really can't change it once it is in there
     return f"__stabilized_ref__:///{stable_content_address}"
 
 
