@@ -1128,27 +1128,6 @@ def generate_routes(
             iter([res.content]), media_type="application/octet-stream"
         )
 
-    # @router.post("/op/create", tags=[OPS_TAG_NAME])
-    # def op_create(
-    #     req: tsi.OpCreateReq,
-    #     server: tsi.TraceServerInterface = Depends(get_server),
-    # ) -> tsi.OpCreateRes:
-    #     return server.op_create(req)
-
-    # @router.post("/op/read", tags=[OPS_TAG_NAME])
-    # def op_read(
-    #     req: tsi.OpReadReq,
-    #     server: tsi.TraceServerInterface = Depends(get_server),
-    # ) -> tsi.OpReadRes:
-    #     return server.op_read(req)
-
-    # @router.post("/ops/query", tags=[OPS_TAG_NAME])
-    # def ops_query(
-    #     req: tsi.OpQueryReq,
-    #     server: tsi.TraceServerInterface = Depends(get_server),
-    # ) -> tsi.OpQueryRes:
-    #     return server.ops_query(req)
-
     @router.post("/cost/create", tags=[COST_TAG_NAME])
     def cost_create(
         req: tsi.CostCreateReq,

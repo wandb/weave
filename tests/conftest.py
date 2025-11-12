@@ -120,16 +120,6 @@ class ThrowingServer(tsi.TraceServerInterface):
     def call_update(self, req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
         raise DummyTestException("FAILURE - call_update, req:", req)
 
-    # Op API
-    def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
-        raise DummyTestException("FAILURE - op_create, req:", req)
-
-    def op_read(self, req: tsi.OpReadReq) -> tsi.OpReadRes:
-        raise DummyTestException("FAILURE - op_read, req:", req)
-
-    def ops_query(self, req: tsi.OpQueryReq) -> tsi.OpQueryRes:
-        raise DummyTestException("FAILURE - ops_query, req:", req)
-
     # Cost API
     def cost_create(self, req: tsi.CostCreateReq) -> tsi.CostCreateRes:
         raise DummyTestException("FAILURE - cost_create, req:", req)

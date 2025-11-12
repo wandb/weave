@@ -454,19 +454,6 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
             "/call/update", req, tsi.CallUpdateReq, tsi.CallUpdateRes
         )
 
-    # Op API
-
-    def op_create(self, req: Union[tsi.OpCreateReq, dict[str, Any]]) -> tsi.OpCreateRes:
-        return self._generic_request(
-            "/op/create", req, tsi.OpCreateReq, tsi.OpCreateRes
-        )
-
-    def op_read(self, req: Union[tsi.OpReadReq, dict[str, Any]]) -> tsi.OpReadRes:
-        return self._generic_request("/op/read", req, tsi.OpReadReq, tsi.OpReadRes)
-
-    def ops_query(self, req: Union[tsi.OpQueryReq, dict[str, Any]]) -> tsi.OpQueryRes:
-        return self._generic_request("/ops/query", req, tsi.OpQueryReq, tsi.OpQueryRes)
-
     # Obj API
 
     def obj_create(
