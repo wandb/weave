@@ -411,9 +411,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Call start response.
         """
-        if isinstance(req, dict):
-            req = tsi.CallStartReq.model_validate(req)
-
+        req = self._validate_request(req, tsi.CallStartReq)
         req = cast(tsi.CallStartReq, req)
 
         if self.should_batch:
@@ -475,9 +473,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Call end response.
         """
-        if isinstance(req, dict):
-            req = tsi.CallEndReq.model_validate(req)
-
+        req = self._validate_request(req, tsi.CallEndReq)
         req = cast(tsi.CallEndReq, req)
 
         if self.should_batch:
@@ -525,9 +521,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Yields:
             CallSchema instances.
         """
-        if isinstance(req, dict):
-            req = tsi.CallsQueryReq.model_validate(req)
-
+        req = self._validate_request(req, tsi.CallsQueryReq)
         req = cast(tsi.CallsQueryReq, req)
 
         self._update_client_headers()
@@ -582,11 +576,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Call update response.
         """
-        if isinstance(req, dict):
-            req = tsi.CallUpdateReq.model_validate(req)
-
-        req = cast(tsi.CallUpdateReq, req)
-
         self._stainless_request(
             req,
             tsi.CallUpdateReq,
@@ -686,8 +675,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Table update response.
         """
-        if isinstance(req, dict):
-            req = tsi.TableUpdateReq.model_validate(req)
+        req = self._validate_request(req, tsi.TableUpdateReq)
         req = cast(tsi.TableUpdateReq, req)
 
         # Handle large requests by splitting
@@ -894,9 +882,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Feedback create response.
         """
-        if isinstance(req, dict):
-            req = tsi.FeedbackCreateReq.model_validate(req)
-
+        req = self._validate_request(req, tsi.FeedbackCreateReq)
         req = cast(tsi.FeedbackCreateReq, req)
 
         if self.should_batch:
@@ -1224,8 +1210,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Yields:
             OpReadRes instances.
         """
-        if isinstance(req, dict):
-            req = tsi.OpListReq.model_validate(req)
+        req = self._validate_request(req, tsi.OpListReq)
         req = cast(tsi.OpListReq, req)
         entity, project = req.project_id.split("/", 1)
 
@@ -1252,8 +1237,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Op delete response.
         """
-        if isinstance(req, dict):
-            req = tsi.OpDeleteReq.model_validate(req)
+        req = self._validate_request(req, tsi.OpDeleteReq)
         req = cast(tsi.OpDeleteReq, req)
         entity, project = req.project_id.split("/", 1)
 
@@ -1317,8 +1301,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Yields:
             DatasetReadRes instances.
         """
-        if isinstance(req, dict):
-            req = tsi.DatasetListReq.model_validate(req)
+        req = self._validate_request(req, tsi.DatasetListReq)
         req = cast(tsi.DatasetListReq, req)
         entity, project = req.project_id.split("/", 1)
 
@@ -1345,8 +1328,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Dataset delete response.
         """
-        if isinstance(req, dict):
-            req = tsi.DatasetDeleteReq.model_validate(req)
+        req = self._validate_request(req, tsi.DatasetDeleteReq)
         req = cast(tsi.DatasetDeleteReq, req)
         entity, project = req.project_id.split("/", 1)
 
@@ -1408,8 +1390,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Yields:
             ScorerReadRes instances.
         """
-        if isinstance(req, dict):
-            req = tsi.ScorerListReq.model_validate(req)
+        req = self._validate_request(req, tsi.ScorerListReq)
         req = cast(tsi.ScorerListReq, req)
         entity, project = req.project_id.split("/", 1)
 
@@ -1436,8 +1417,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Scorer delete response.
         """
-        if isinstance(req, dict):
-            req = tsi.ScorerDeleteReq.model_validate(req)
+        req = self._validate_request(req, tsi.ScorerDeleteReq)
         req = cast(tsi.ScorerDeleteReq, req)
         entity, project = req.project_id.split("/", 1)
 
@@ -1501,8 +1481,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Yields:
             EvaluationReadRes instances.
         """
-        if isinstance(req, dict):
-            req = tsi.EvaluationListReq.model_validate(req)
+        req = self._validate_request(req, tsi.EvaluationListReq)
         req = cast(tsi.EvaluationListReq, req)
         entity, project = req.project_id.split("/", 1)
 
@@ -1529,8 +1508,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Evaluation delete response.
         """
-        if isinstance(req, dict):
-            req = tsi.EvaluationDeleteReq.model_validate(req)
+        req = self._validate_request(req, tsi.EvaluationDeleteReq)
         req = cast(tsi.EvaluationDeleteReq, req)
         entity, project = req.project_id.split("/", 1)
 
@@ -1592,8 +1570,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Yields:
             ModelReadRes instances.
         """
-        if isinstance(req, dict):
-            req = tsi.ModelListReq.model_validate(req)
+        req = self._validate_request(req, tsi.ModelListReq)
         req = cast(tsi.ModelListReq, req)
         entity, project = req.project_id.split("/", 1)
 
@@ -1620,8 +1597,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Model delete response.
         """
-        if isinstance(req, dict):
-            req = tsi.ModelDeleteReq.model_validate(req)
+        req = self._validate_request(req, tsi.ModelDeleteReq)
         req = cast(tsi.ModelDeleteReq, req)
         entity, project = req.project_id.split("/", 1)
 
@@ -1684,8 +1660,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Yields:
             EvaluationRunReadRes instances.
         """
-        if isinstance(req, dict):
-            req = tsi.EvaluationRunListReq.model_validate(req)
+        req = self._validate_request(req, tsi.EvaluationRunListReq)
         req = cast(tsi.EvaluationRunListReq, req)
         entity, project = req.project_id.split("/", 1)
 
@@ -1719,8 +1694,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Evaluation run delete response.
         """
-        if isinstance(req, dict):
-            req = tsi.EvaluationRunDeleteReq.model_validate(req)
+        req = self._validate_request(req, tsi.EvaluationRunDeleteReq)
         req = cast(tsi.EvaluationRunDeleteReq, req)
         entity, project = req.project_id.split("/", 1)
 
@@ -1741,8 +1715,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Evaluation run finish response.
         """
-        if isinstance(req, dict):
-            req = tsi.EvaluationRunFinishReq.model_validate(req)
+        req = self._validate_request(req, tsi.EvaluationRunFinishReq)
         req = cast(tsi.EvaluationRunFinishReq, req)
         entity, project = req.project_id.split("/", 1)
 
@@ -1808,8 +1781,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Yields:
             PredictionReadRes instances.
         """
-        if isinstance(req, dict):
-            req = tsi.PredictionListReq.model_validate(req)
+        req = self._validate_request(req, tsi.PredictionListReq)
         req = cast(tsi.PredictionListReq, req)
         entity, project = req.project_id.split("/", 1)
 
@@ -1838,8 +1810,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Prediction delete response.
         """
-        if isinstance(req, dict):
-            req = tsi.PredictionDeleteReq.model_validate(req)
+        req = self._validate_request(req, tsi.PredictionDeleteReq)
         req = cast(tsi.PredictionDeleteReq, req)
         entity, project = req.project_id.split("/", 1)
 
@@ -1860,8 +1831,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Prediction finish response.
         """
-        if isinstance(req, dict):
-            req = tsi.PredictionFinishReq.model_validate(req)
+        req = self._validate_request(req, tsi.PredictionFinishReq)
         req = cast(tsi.PredictionFinishReq, req)
         entity, project = req.project_id.split("/", 1)
 
@@ -1920,8 +1890,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Yields:
             ScoreReadRes instances.
         """
-        if isinstance(req, dict):
-            req = tsi.ScoreListReq.model_validate(req)
+        req = self._validate_request(req, tsi.ScoreListReq)
         req = cast(tsi.ScoreListReq, req)
         entity, project = req.project_id.split("/", 1)
 
@@ -1950,8 +1919,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Score delete response.
         """
-        if isinstance(req, dict):
-            req = tsi.ScoreDeleteReq.model_validate(req)
+        req = self._validate_request(req, tsi.ScoreDeleteReq)
         req = cast(tsi.ScoreDeleteReq, req)
         entity, project = req.project_id.split("/", 1)
 
