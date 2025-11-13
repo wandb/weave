@@ -6,6 +6,7 @@ from pydantic import BaseModel, BeforeValidator, Field
 from weave import Model, op
 from weave.trace.context.weave_client_context import WeaveInitError, get_weave_client
 from weave.trace_server.interface.builtin_object_classes import base_object_def
+from weave.utils.project_id import ProjectID
 from weave.trace_server.trace_server_interface import (
     CompletionsCreateReq,
     CompletionsCreateRequestInputs,
@@ -157,7 +158,7 @@ class LLMStructuredCompletionModel(Model):
             )
 
         req = self.prepare_completion_request(
-            project_id=f"{current_client.entity}/{current_client.project}",
+            project_id=ProjectID(current_client.entity, current_client.project).name,
             user_input=user_input,
             config=config,
             **template_vars,

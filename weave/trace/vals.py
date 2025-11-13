@@ -27,6 +27,7 @@ from weave.trace.refs import (
     RefWithExtra,
     TableRef,
 )
+from weave.utils.project_id import ProjectID
 from weave.trace.serialization.serialize import from_json
 from weave.trace.table import Table
 from weave.trace_server.errors import ObjectDeletedError
@@ -766,7 +767,7 @@ def make_trace_obj(
         new_ref = val
         extra = val.extra
         try:
-            project_id = f"{val.entity}/{val.project}"
+            project_id = ProjectID(val.entity, val.project).name
             read_res = server.obj_read(
                 ObjReadReq(
                     project_id=project_id,

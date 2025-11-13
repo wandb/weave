@@ -17,6 +17,7 @@ from weave.trace.serialization.serialize import from_json
 from weave.trace.util import log_once
 from weave.trace.vals import WeaveObject
 from weave.trace_server.constants import MAX_DISPLAY_NAME_LENGTH
+from weave.utils.project_id import ProjectID
 from weave.trace_server.interface.query import Query
 from weave.trace_server.trace_server_interface import (
     CallSchema,
@@ -114,10 +115,10 @@ class Call:
 
         if self._feedback is None:
             try:
-                entity, project = self.project_id.split("/")
+                project_id = ProjectID.from_string(self.project_id)
             except ValueError:
                 raise ValueError(f"Invalid project_id: {self.project_id}") from None
-            weave_ref = CallRef(entity, project, self.id)
+            weave_ref = CallRef(project_id.entity, project_id.project, self.id)
             self._feedback = RefFeedbackQuery(weave_ref.uri())
         return self._feedback
 
@@ -129,20 +130,20 @@ class Call:
             )
 
         try:
-            entity, project = self.project_id.split("/")
+            project_id = ProjectID.from_string(self.project_id)
         except ValueError:
             raise ValueError(f"Invalid project_id: {self.project_id}") from None
-        return urls.redirect_call(entity, project, self.id)
+        return urls.redirect_call(project_id.entity, project_id.project, self.id)
 
     @property
     def ref(self) -> CallRef:
-        entity, project = self.project_id.split("/")
+        project_id = ProjectID.from_string(self.project_id)
         if not self.id:
             raise ValueError(
                 "Can't get ref for call without ID, was `weave.init` called?"
             )
 
-        return CallRef(entity, project, self.id)
+        return CallRef(project_id.entity, project_id.project, self.id)
 
     # These are the children if we're using Call at read-time
     def children(self, *, page_size: int = DEFAULT_CALLS_PAGE_SIZE) -> CallsIter:
@@ -362,8 +363,8 @@ def _make_calls_iterator(
 
     # TODO: Should be Call, not WeaveObject
     def transform_func(call: CallSchema) -> WeaveObject:
-        entity, project = project_id.split("/")
-        return make_client_call(entity, project, call, server)
+        project_id_obj = ProjectID.from_string(project_id)
+        return make_client_call(project_id_obj.entity, project_id_obj.project, call, server)
 
     def size_func() -> int:
         response = server.calls_query_stats(

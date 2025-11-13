@@ -26,6 +26,7 @@ from tests.trace.util import (
     client_is_sqlite,
     get_info_loglines,
 )
+from weave.utils.project_id import ProjectID
 from tests.trace_server.conftest_lib.trace_server_external_adapter import (
     DummyIdConverter,
 )
@@ -111,7 +112,7 @@ def test_simple_op(client):
     )
     assert fetched_call == weave.trace.call.Call(
         _op_name=expected_name,
-        project_id=f"{client.entity}/{client.project}",
+        project_id=ProjectID(client.entity, client.project).name,
         trace_id=fetched_call.trace_id,
         parent_id=None,
         id=fetched_call.id,
@@ -3394,8 +3395,9 @@ def test_objects_and_keys_with_special_characters(client):
     weave.publish(obj)
     assert obj.ref is not None
 
-    entity, project = client._project_id().split("/")
-    project_id = f"{entity}/{project}"
+    project_id_obj = ProjectID.from_string(client._project_id())
+    entity, project = project_id_obj.entity, project_id_obj.project
+    project_id = ProjectID(entity, project).name
     ref_base = f"weave:///{project_id}"
     exp_name = sanitize_object_name(name_with_special_characters)
     assert exp_name == "n-a_m.e-100"

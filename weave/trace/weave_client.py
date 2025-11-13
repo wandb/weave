@@ -41,6 +41,7 @@ from weave.trace.interface_query_builder import (
     get_field_expr,
     literal_expr,
 )
+from weave.utils.project_id import ProjectID
 from weave.trace.object_record import (
     ObjectRecord,
     dataclass_object_record,
@@ -382,7 +383,7 @@ class WeaveClient:
 
     @trace_sentry.global_trace_sentry.watch()
     def get(self, ref: ObjectRef, *, objectify: bool = True) -> Any:
-        project_id = f"{ref.entity}/{ref.project}"
+        project_id = ProjectID(ref.entity, ref.project).name
         try:
             read_res = self.server.obj_read(
                 ObjReadReq(
@@ -501,10 +502,10 @@ class WeaveClient:
         for obj in eval_objs:
             # It's unfortunate we have to do this, but it's currently the easiest
             # way get the correct behaviour given our serialization layer...
-            entity, project = obj.project_id.split("/")
+            project_id = ProjectID.from_string(obj.project_id)
             ref = ObjectRef(
-                entity=entity,
-                project=project,
+                entity=project_id.entity,
+                project=project_id.project,
                 name=obj.val["name"],
                 _digest=obj.digest,
             )

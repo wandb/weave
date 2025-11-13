@@ -6,6 +6,7 @@ from weave.trace.refs import OpRef
 from weave.trace.weave_client import WeaveClient, get_ref
 from weave.trace_server.interface.builtin_object_classes import leaderboard
 from weave.trace_server.trace_server_interface import CallsFilter
+from weave.utils.project_id import ProjectID
 
 
 class LeaderboardModelEvaluationResult(BaseModel):
@@ -25,13 +26,13 @@ class LeaderboardModelResult(BaseModel):
 def get_leaderboard_results(
     spec: leaderboard.Leaderboard, client: WeaveClient
 ) -> list[LeaderboardModelResult]:
-    entity, project = client._project_id().split("/")
+    project_id = ProjectID.from_string(client._project_id())
     calls = client.get_calls(
         filter=CallsFilter(
             op_names=[
                 OpRef(
-                    entity=entity,
-                    project=project,
+                    entity=project_id.entity,
+                    project=project_id.project,
                     name="Evaluation.evaluate",
                     _digest="*",
                 ).uri()

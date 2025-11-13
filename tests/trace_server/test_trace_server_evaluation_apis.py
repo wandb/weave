@@ -23,6 +23,7 @@ from weave.trace_server.trace_server_interface import (
     TraceStatus,
 )
 from weave.trace_server.workers.evaluate_model_worker import evaluate_model_worker
+from weave.utils.project_id import ProjectID
 
 
 @pytest.mark.asyncio
@@ -89,7 +90,7 @@ async def test_evaluation_status(client):
 
 
 def setup_test_objects(server: TraceServerInterface, entity: str, project: str):
-    project_id = f"{entity}/{project}"
+    project_id = ProjectID(entity, project).name
 
     def create_model() -> str:
         """Create a test model and return its reference URI."""
@@ -277,7 +278,8 @@ def test_evaluate_model(client: WeaveClient, direct_script_execution):
     """
     is_sqlite = client_is_sqlite(client)
     project_id = client._project_id()
-    entity, project = project_id.split("/")
+    project_id_obj = ProjectID.from_string(project_id)
+    entity, project = project_id_obj.entity, project_id_obj.project
 
     def evaluate_model_wrapped(req: EvaluateModelReq):
         call_id = generate_id()
