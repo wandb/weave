@@ -313,7 +313,6 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
         handle_response_error(r, url)
         return r
 
-    @validate_call
     def _generic_request(
         self,
         url: str,
@@ -334,7 +333,6 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
 
         return res_model.model_validate(r.json())
 
-    @validate_call
     def _generic_stream_request(
         self,
         url: str,
