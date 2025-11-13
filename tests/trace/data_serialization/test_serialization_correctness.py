@@ -16,7 +16,7 @@ from weave.trace_server.trace_server_interface import (
     ObjCreateReq,
     ObjReadReq,
 )
-from weave.utils.project_id import ProjectID
+from weave.utils.project_id import to_project_id
 
 """
 IMPORTANT RULES: Once a SerializationTestCase is created, it should never be modified.
@@ -103,7 +103,7 @@ def test_serialization_correctness(
             project = ref.project
             name = ref.name
             digest = ref.digest
-            found_project_id = ProjectID(entity, project).name
+            found_project_id = to_project_id(entity, project)
             assert project_id == found_project_id
 
             for obj in case.exp_objects:

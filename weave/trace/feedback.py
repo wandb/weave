@@ -15,7 +15,7 @@ from weave.trace.display.rich.refs import Refs
 from weave.trace.refs import ObjectRef, Ref
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.interface.query import Query
-from weave.utils.project_id import ProjectID
+from weave.utils.project_id import to_project_id
 
 
 class Feedbacks(AbstractRichContainer[tsi.Feedback]):
@@ -131,7 +131,7 @@ class FeedbackQuery:
             },
         ]
         req = tsi.FeedbackQueryReq(
-            project_id=ProjectID(self.entity, self.project).name,
+            project_id=to_project_id(self.entity, self.project),
             query=self._query,
             sort_by=sort_by,
             offset=self.offset,
@@ -198,7 +198,7 @@ class RefFeedbackQuery(FeedbackQuery):
         annotation_ref: str | None = None,
     ) -> str:
         freq = tsi.FeedbackCreateReq(
-            project_id=ProjectID(self.entity, self.project).name,
+            project_id=to_project_id(self.entity, self.project),
             weave_ref=self.weave_ref,
             feedback_type=feedback_type,
             payload=payload,
@@ -266,7 +266,7 @@ class RefFeedbackQuery(FeedbackQuery):
             }
         }
         req = tsi.FeedbackPurgeReq(
-            project_id=ProjectID(self.entity, self.project).name,
+            project_id=to_project_id(self.entity, self.project),
             query=Query(**query),
         )
         self.client.server.feedback_purge(req)

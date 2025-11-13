@@ -51,7 +51,7 @@ from weave.trace_server.trace_server_interface_util import (
     extract_refs_from_values,
 )
 from weave.trace_server.validation_util import CHValidationError
-from weave.utils.project_id import ProjectID
+from weave.utils.project_id import from_project_id, to_project_id
 
 ## Hacky interface compatibility helpers
 
@@ -112,7 +112,7 @@ def test_simple_op(client):
     )
     assert fetched_call == weave.trace.call.Call(
         _op_name=expected_name,
-        project_id=ProjectID(client.entity, client.project).name,
+        project_id=to_project_id(client.entity, client.project),
         trace_id=fetched_call.trace_id,
         parent_id=None,
         id=fetched_call.id,
@@ -3395,9 +3395,8 @@ def test_objects_and_keys_with_special_characters(client):
     weave.publish(obj)
     assert obj.ref is not None
 
-    project_id_obj = ProjectID.from_string(client._project_id())
-    entity, project = project_id_obj.entity, project_id_obj.project
-    project_id = ProjectID(entity, project).name
+    entity, project = from_project_id(client._project_id())
+    project_id = to_project_id(entity, project)
     ref_base = f"weave:///{project_id}"
     exp_name = sanitize_object_name(name_with_special_characters)
     assert exp_name == "n-a_m.e-100"

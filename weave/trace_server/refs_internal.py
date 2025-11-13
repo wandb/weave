@@ -8,7 +8,7 @@ import dataclasses
 import urllib
 from typing import Any, Union
 
-from weave.utils.project_id import ProjectID
+from weave.utils.project_id import to_project_id
 
 WEAVE_INTERNAL_SCHEME = "weave-trace-internal"
 WEAVE_SCHEME = "weave"
@@ -181,7 +181,7 @@ def parse_internal_uri(
         if len(parts) < 3:
             raise InvalidInternalRef(f"Invalid URI: {uri}. Must have at least 3 parts")
         entity, project = parts[:2]
-        project_id = ProjectID(entity, project).name
+        project_id = to_project_id(entity, project)
         kind = "artifact"
         remaining = parts[2:]
     else:

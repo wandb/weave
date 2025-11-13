@@ -1,73 +1,70 @@
 """Utilities for working with project IDs."""
 
-import dataclasses
 
+def to_project_id(entity: str, project: str) -> str:
+    """Format entity and project as 'entity/project'.
 
-@dataclasses.dataclass(frozen=True)
-class ProjectID:
-    """Represents an entity and project pair.
-
-    Attributes:
+    Args:
         entity: Entity name.
         project: Project name.
 
+    Returns:
+        Project ID in format "entity/project".
+
+    Raises:
+        ValueError: If entity or project is empty or contains '/'.
+
     Examples:
-        >>> project_id = ProjectID.from_string("my-entity/my-project")
-        >>> project_id.entity
-        'my-entity'
-        >>> project_id.project
-        'my-project'
-        >>> project_id.name
+        >>> to_project_id("my-entity", "my-project")
         'my-entity/my-project'
-        >>> project_id = ProjectID("my-entity", "my-project")
-        >>> project_id.name
-        'my-entity/my-project'
+        >>> to_project_id("", "my-project")
+        Traceback (most recent call last):
+        ...
+        ValueError: entity must be non-empty
     """
+    if not entity:
+        raise ValueError("entity must be non-empty")
+    if not project:
+        raise ValueError("project must be non-empty")
+    if "/" in entity:
+        raise ValueError("entity cannot contain '/'")
+    if "/" in project:
+        raise ValueError("project cannot contain '/'")
+    return f"{entity}/{project}"
 
-    entity: str
-    project: str
 
-    def __post_init__(self) -> None:
-        """Validate entity and project values."""
-        if not self.entity:
-            raise ValueError("entity must be non-empty")
-        if not self.project:
-            raise ValueError("project must be non-empty")
-        if "/" in self.entity:
-            raise ValueError("entity cannot contain '/'")
-        if "/" in self.project:
-            raise ValueError("project cannot contain '/'")
+def from_project_id(project_id: str) -> tuple[str, str]:
+    """Parse 'entity/project' string into (entity, project) tuple.
 
-    @property
-    def name(self) -> str:
-        """Return the project ID in format "entity/project"."""
-        return f"{self.entity}/{self.project}"
+    Args:
+        project_id: Project ID in format "entity/project".
 
-    @classmethod
-    def from_string(cls, project_id: str) -> "ProjectID":
-        """Create ProjectID from a string in format "entity/project".
+    Returns:
+        Tuple of (entity, project).
 
-        Args:
-            project_id: Project ID in format "entity/project".
+    Raises:
+        ValueError: If project_id is not in the expected format or contains invalid values.
 
-        Returns:
-            ProjectID instance.
-
-        Raises:
-            ValueError: If project_id is not in the expected format.
-
-        Examples:
-            >>> ProjectID.from_string("my-entity/my-project")
-            ProjectID(entity='my-entity', project='my-project')
-            >>> ProjectID.from_string("invalid")
-            Traceback (most recent call last):
-            ...
-            ValueError: Invalid project_id format: invalid. Expected 'entity/project'
-        """
-        try:
-            entity, project = project_id.split("/", 1)
-        except ValueError as e:
-            raise ValueError(
-                f"Invalid project_id format: {project_id}. Expected 'entity/project'"
-            ) from e
-        return cls(entity=entity, project=project)
+    Examples:
+        >>> from_project_id("my-entity/my-project")
+        ('my-entity', 'my-project')
+        >>> from_project_id("invalid")
+        Traceback (most recent call last):
+        ...
+        ValueError: Invalid project_id format: invalid. Expected 'entity/project'
+    """
+    try:
+        entity, project = project_id.split("/", 1)
+    except ValueError as e:
+        raise ValueError(
+            f"Invalid project_id format: {project_id}. Expected 'entity/project'"
+        ) from e
+    if not entity:
+        raise ValueError("entity must be non-empty")
+    if not project:
+        raise ValueError("project must be non-empty")
+    if "/" in entity:
+        raise ValueError("entity cannot contain '/'")
+    if "/" in project:
+        raise ValueError("project cannot contain '/'")
+    return entity, project
