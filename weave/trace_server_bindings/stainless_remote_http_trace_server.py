@@ -64,23 +64,6 @@ def split_project_id(project_id: str) -> tuple[str, str]:
         return entity, project
 
 
-def get_attr(req: BaseModel | dict[str, Any], attr: str) -> Any:
-    """Safely get attribute from request object or dict.
-
-    This is kinda ugly but necessary because we conform to the TraceServerInterface definition
-
-    Args:
-        req: Request object or dict.
-        attr: Attribute name to get.
-
-    Returns:
-        Attribute value.
-    """
-    if isinstance(req, dict):
-        return req.get(attr)
-    return getattr(req, attr)
-
-
 class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
     """Drop-in replacement for RemoteHTTPTraceServer using the stainless client.
 
