@@ -12,8 +12,6 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Optional
 
-from typing_extensions import Self
-
 from opentelemetry.proto.common.v1.common_pb2 import InstrumentationScope
 from opentelemetry.proto.resource.v1.resource_pb2 import Resource as PbResource
 from opentelemetry.proto.trace.v1.trace_pb2 import (
@@ -31,6 +29,7 @@ from opentelemetry.proto.trace.v1.trace_pb2 import (
 from opentelemetry.proto.trace.v1.trace_pb2 import (
     TracesData as PbTracesData,
 )
+from typing_extensions import Self
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.constants import MAX_DISPLAY_NAME_LENGTH, MAX_OP_NAME_LENGTH
@@ -235,7 +234,7 @@ class Span:
     @classmethod
     def from_proto(
         cls, proto_span: PbSpan, resource: Optional[Resource] = None
-    ) -> "Span":
+    ) -> Self:
         """Create a Span from a protobuf Span."""
         parent_id = None
         if proto_span.parent_span_id:
@@ -446,7 +445,7 @@ class ScopeSpans:
     @classmethod
     def from_proto(
         cls, proto_scope_spans: PbScopeSpans, resource: Optional[Resource] = None
-    ) -> "ScopeSpans":
+    ) -> Self:
         """Create a ScopeSpans from a protobuf ScopeSpans."""
         return cls(
             scope=proto_scope_spans.scope,

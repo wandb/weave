@@ -7,7 +7,7 @@ import shutil
 from enum import Enum
 from typing import TYPE_CHECKING, Any
 
-from typing_extensions import Self, TypeIs
+from typing_extensions import TypeIs
 
 from weave.trace.serialization import serializer
 from weave.trace.serialization.custom_objs import MemTraceFilesArtifact
@@ -51,7 +51,7 @@ class VideoFormat(str, Enum):
         return self.value
 
     @classmethod
-    def _missing_(cls, value: Any) -> Self:
+    def _missing_(cls, value: Any) -> VideoFormat:
         return cls.UNSUPPORTED
 
 

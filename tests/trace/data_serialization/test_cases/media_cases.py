@@ -125,12 +125,12 @@ media_cases = [
                 "_metadata.json": "k3eN5qEgVIyMLbUc8sQrx1LRU0gxf7l6dD9LIoSoa0M",
                 "audio.wav": "xfOhnNfgQxRzgWZ6DC1QEGt9vrJWcathymKPPZQmmIw",
             },
-            "load_op": "weave:///shawn/test-project/op/load_weave.type_handlers.Audio.audio.Audio:rhUJYHAtujfj6PiXSjwdygp1066f006hM3HRZFpvYdI",
+            "load_op": "weave:///shawn/test-project/op/load_weave.type_handlers.Audio.audio.Audio:NC1prtu0N9Hs4EX552lwSCskFcVfXpPMVGnsmNHYZQo",
         },
         exp_objects=[
             {
                 "object_id": "load_weave.type_handlers.Audio.audio.Audio",
-                "digest": "rhUJYHAtujfj6PiXSjwdygp1066f006hM3HRZFpvYdI",
+                "digest": "NC1prtu0N9Hs4EX552lwSCskFcVfXpPMVGnsmNHYZQo",
                 "exp_val": {
                     "_type": "CustomWeaveType",
                     "weave_type": {"type": "Op"},
@@ -216,12 +216,12 @@ media_cases = [
             "_type": "CustomWeaveType",
             "weave_type": {"type": "moviepy.video.VideoClip.VideoClip"},
             "files": {"video.mp4": "Aoxws9QUryX0YiZ8ScTAyi4YzX2SO5QHTsLsYABBMjc"},
-            "load_op": "weave:///shawn/test-project/op/load_moviepy.video.VideoClip.VideoClip:f93jTm5UMbq6MbX2082R4jxb7V2iBrEputpkcMfdWMg",
+            "load_op": "weave:///shawn/test-project/op/load_moviepy.video.VideoClip.VideoClip:5BQg1JdxA1ibpqo2T5HMZAdMnVfRXNNCvYSXReAwbXc",
         },
         exp_objects=[
             {
                 "object_id": "load_moviepy.video.VideoClip.VideoClip",
-                "digest": "f93jTm5UMbq6MbX2082R4jxb7V2iBrEputpkcMfdWMg",
+                "digest": "5BQg1JdxA1ibpqo2T5HMZAdMnVfRXNNCvYSXReAwbXc",
                 "exp_val": {
                     "_type": "CustomWeaveType",
                     "weave_type": {"type": "Op"},
