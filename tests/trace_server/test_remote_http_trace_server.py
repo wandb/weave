@@ -7,7 +7,6 @@ from pydantic import ValidationError
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ids import generate_id
-from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
 
 
 def generate_start(id) -> tsi.StartedCallSchemaForInsert:
@@ -33,10 +32,10 @@ def generate_start(id) -> tsi.StartedCallSchemaForInsert:
 
 
 @pytest.fixture
-def trace_server():
+def trace_server(remote_http_trace_server):
     """Create a RemoteHTTPTraceServer instance for testing."""
     trace_server_url = "http://example.com"
-    return RemoteHTTPTraceServer(trace_server_url)
+    return remote_http_trace_server(trace_server_url)
 
 
 @patch("weave.utils.http_requests.post")

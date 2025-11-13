@@ -17,7 +17,6 @@ from weave.trace_server.ids import generate_id
 from weave.trace_server_bindings.remote_http_trace_server import (
     Batch,
     EndBatchItem,
-    RemoteHTTPTraceServer,
     StartBatchItem,
 )
 
@@ -64,8 +63,8 @@ def success_response():
 
 
 @pytest.fixture
-def server(request):
-    server_ = RemoteHTTPTraceServer("http://example.com", should_batch=True)
+def server(request, remote_http_trace_server):
+    server_ = remote_http_trace_server("http://example.com", should_batch=True)
 
     if request.param == "normal":
         server_._send_batch_to_server = MagicMock()
@@ -275,9 +274,9 @@ def test_non_uniform_batch_items(server):
 
 
 @patch("weave.utils.http_requests.post")
-def test_timeout_retry_mechanism(mock_post, success_response):
+def test_timeout_retry_mechanism(mock_post, success_response, remote_http_trace_server):
     """Test that timeouts trigger the retry mechanism."""
-    server = RemoteHTTPTraceServer("http://example.com", should_batch=True)
+    server = remote_http_trace_server("http://example.com", should_batch=True)
 
     # Mock server to raise errors twice, then succeed
     mock_post.side_effect = [
@@ -297,7 +296,9 @@ def test_timeout_retry_mechanism(mock_post, success_response):
 @pytest.mark.disable_logging_error_check
 @pytest.mark.parametrize("server", ["fast_retrying"], indirect=True)
 @patch("weave.utils.http_requests.post")
-def test_post_timeout(mock_post, success_response, server, log_collector):
+def test_post_timeout(
+    mock_post, success_response, server, log_collector, remote_http_trace_server
+):
     """Test that we can still send new batches even if one batch times out.
 
     This test modifies the retry mechanism to use a short wait time and limited retries
@@ -326,7 +327,7 @@ def test_post_timeout(mock_post, success_response, server, log_collector):
     ]
 
     # Create a new server since the old one has shutdown its batch processor
-    new_server = RemoteHTTPTraceServer("http://example.com", should_batch=False)
+    new_server = remote_http_trace_server("http://example.com", should_batch=False)
     fast_retry = tenacity.retry(
         wait=tenacity.wait_fixed(0.1),
         stop=tenacity.stop_after_attempt(2),

@@ -125,6 +125,7 @@ SHARDS_WITHOUT_EXTRAS = {
         "trace",
         *trace_server_shards,
         "trace_no_server",
+        "stainless",
     ],
 )
 def tests(session, shard):
@@ -149,6 +150,9 @@ def tests(session, shard):
     elif shard == "trace_server":
         # trace_server shard needs both trace_server dependency group and trace_server_tests
         sync_args.extend(["--group", "trace_server", "--group", "trace_server_tests"])
+    elif shard == "stainless":
+        # stainless shard needs the stainless extra
+        sync_args.extend(["--extra", "stainless"])
 
     session.run(*sync_args)
 
@@ -196,6 +200,7 @@ def tests(session, shard):
         "trace": ["tests/trace/"],
         **{shard: ["tests/trace/"] for shard in trace_server_shards},
         "trace_no_server": ["tests/trace/"],
+        "stainless": ["tests/trace_server_bindings/"],
     }
 
     test_dirs = test_dirs_dict.get(shard, default_test_dirs)
@@ -228,6 +233,10 @@ def tests(session, shard):
 
     if shard == "trace_no_server":
         pytest_args.extend(["-m", "not trace_server"])
+
+    # Set trace-server flag for stainless shard
+    if shard == "stainless":
+        pytest_args.extend(["--trace-server=stainless"])
 
     if shard == "verifiers_test":
         # Pinning to this commit because the latest version of the gsm8k environment is broken.
