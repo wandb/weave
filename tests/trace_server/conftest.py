@@ -1,12 +1,8 @@
 import os
 from typing import Callable
-from unittest import mock
 
 import pytest
-from weave.trace_server import (
-    clickhouse_trace_server_batched,
-    clickhouse_trace_server_migrator,
-)
+from weave.trace_server import clickhouse_trace_server_batched
 from weave.trace_server.secret_fetcher_context import secret_fetcher_context
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer
 
@@ -84,94 +80,6 @@ def _get_worker_db_suffix(request) -> str:
     return f"_w{worker_id.replace('gw', '')}"
 
 
-def _patch_migrator_for_worker(ch_client, management_db):
-    """Create patched migration methods that use worker-specific management database."""
-    # Store original methods before patching
-    original_create_db_sql = (
-        clickhouse_trace_server_migrator.ClickHouseTraceServerMigrator._create_db_sql
-    )
-
-    def patched_get_status(db_name: str) -> dict:
-        """Query migration status from worker-specific management database."""
-        column_names = ["db_name", "curr_version", "partially_applied_version"]
-        select_columns = ", ".join(column_names)
-        query = f"SELECT {select_columns} FROM {management_db}.migrations WHERE db_name = '{db_name}'"
-
-        res = ch_client.query(query)
-        result_rows = res.result_rows if res else []
-
-        if not result_rows:
-            ch_client.insert(
-                f"{management_db}.migrations",
-                data=[[db_name, 0, None]],
-                column_names=column_names,
-            )
-            return {
-                "curr_version": 0,
-                "partially_applied_version": None,
-                "db_name": db_name,
-            }
-
-        return dict(zip(column_names, result_rows[0]))
-
-    def patched_update_status(
-        target_db: str, target_version: int, is_start: bool = True
-    ) -> None:
-        """Update migration status in worker-specific management database."""
-        if is_start:
-            ch_client.command(
-                f"ALTER TABLE {management_db}.migrations "
-                f"UPDATE partially_applied_version = {target_version} "
-                f"WHERE db_name = '{target_db}'"
-            )
-        else:
-            ch_client.command(
-                f"ALTER TABLE {management_db}.migrations "
-                f"UPDATE curr_version = {target_version}, partially_applied_version = NULL "
-                f"WHERE db_name = '{target_db}'"
-            )
-
-    def patched_create_db_sql(self, db_name: str) -> str:
-        """Use worker-specific name for db_management database."""
-        if db_name == "db_management":
-            db_name = management_db
-        return original_create_db_sql(self, db_name)
-
-    def patched_initialize_migration_db(self) -> None:
-        """Initialize worker-specific management database."""
-        self.ch_client.command(self._create_db_sql(management_db))
-        create_table_sql = f"""
-            CREATE TABLE IF NOT EXISTS {management_db}.migrations
-            (
-                db_name String,
-                curr_version UInt64,
-                partially_applied_version Nullable(UInt64)
-            ) ENGINE = MergeTree() ORDER BY db_name
-        """
-        self.ch_client.command(create_table_sql)
-
-    return (
-        mock.patch.object(
-            clickhouse_trace_server_migrator.ClickHouseTraceServerMigrator,
-            "_create_db_sql",
-            patched_create_db_sql,
-        ),
-        mock.patch.object(
-            clickhouse_trace_server_migrator.ClickHouseTraceServerMigrator,
-            "_initialize_migration_db",
-            patched_initialize_migration_db,
-        ),
-        mock.patch(
-            "weave.trace_server.clickhouse_trace_server_migrator.ClickHouseTraceServerMigrator._get_migration_status",
-            side_effect=patched_get_status,
-        ),
-        mock.patch(
-            "weave.trace_server.clickhouse_trace_server_migrator.ClickHouseTraceServerMigrator._update_migration_status",
-            side_effect=patched_update_status,
-        ),
-    )
-
-
 @pytest.fixture
 def get_ch_trace_server(
     ensure_clickhouse_db,
@@ -205,12 +113,17 @@ def get_ch_trace_server(
             ch_server.ch_client.command(f"DROP DATABASE IF EXISTS {management_db}")
             ch_server.ch_client.command(f"DROP DATABASE IF EXISTS {unique_db}")
 
-            # Patch migrator to use worker-specific databases
-            patch1, patch2, patch3, patch4 = _patch_migrator_for_worker(
-                ch_server.ch_client, management_db
-            )
-            with patch1, patch2, patch3, patch4:
-                ch_server._run_migrations()
+            # Patch _run_migrations to use worker-specific management database
+            def patched_run_migrations():
+                import weave.trace_server.clickhouse_trace_server_migrator as wf_migrator
+
+                migrator = wf_migrator.ClickHouseTraceServerMigrator(
+                    ch_server._mint_client(), management_db=management_db
+                )
+                migrator.apply_migrations(ch_server._database)
+
+            ch_server._run_migrations = patched_run_migrations  # type: ignore[assignment]
+            ch_server._run_migrations()
 
             result = externalize_trace_server(
                 ch_server, TEST_ENTITY, id_converter=id_converter
