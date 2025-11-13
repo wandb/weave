@@ -229,8 +229,8 @@ jobs:
 
   trace-tests:
     name: Trace nox tests
-    timeout-minutes: 30
-    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    runs-on: ${{ matrix.nox-shard == 'trace' && 'ubuntu-latest-8-cores' || 'ubuntu-latest' }}
     strategy:
       matrix:
         python-version-major: ["3"]
@@ -242,10 +242,7 @@ jobs:
           ]
         nox-shard:
           [
-            "trace1",
-            "trace2",
-            "trace3",
-            "trace4",
+            "trace",
             "flow",
             "trace_server",
             "trace_server_bindings",
@@ -376,7 +373,7 @@ jobs:
   # ==== Windows Jobs ====
   windows_trace_no_server:
     name: Windows Trace non-trace server tests
-    timeout-minutes: 15
+    timeout-minutes: 10
     runs-on: windows-latest
     strategy:
       matrix:
@@ -414,7 +411,7 @@ jobs:
 
   windows_trace_tests:
     name: Windows Trace nox tests
-    timeout-minutes: 45
+    timeout-minutes: 15
     runs-on: windows-latest
     strategy:
       matrix:
@@ -427,10 +424,7 @@ jobs:
           ]
         nox-shard:
           [
-            "trace1",
-            "trace2",
-            "trace3",
-            "trace4",
+            "trace",
             "flow",
             "trace_server",
             "trace_server_bindings",
