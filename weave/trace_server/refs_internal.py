@@ -12,6 +12,7 @@ from typing import Any, Union
 class InvalidInternalRef(ValueError):
     pass
 
+
 WEAVE_INTERNAL_SCHEME = "weave-trace-internal"
 WEAVE_SCHEME = "weave"
 WEAVE_PRIVATE_SCHEME = "weave-private"
