@@ -272,6 +272,105 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         )
         return res_type.model_validate(response.model_dump())
 
+    def _stainless_delete_object(
+        self,
+        req: TReq | dict[str, Any],
+        req_type: type[TReq],
+        res_type: type[TRes],
+        stainless_api: Callable[..., Any],
+        *,
+        exclude: set[str] | None = None,
+        **extra_kwargs: Any,
+    ) -> TRes:
+        """Helper method for Object API delete requests that split project_id into entity/project.
+
+        Automatically handles common delete patterns:
+        - Extracts object_id if present
+        - Transforms digests to body parameter if present
+        - Excludes digests from model dump
+
+        Args:
+            req: Request object or dict to validate. If already validated, will be used as-is.
+            req_type: Type of the request model.
+            res_type: Type of the response model.
+            stainless_api: Stainless API callable to invoke.
+            exclude: Set of field names to exclude from request dump (in addition to digests).
+            **extra_kwargs: Additional keyword arguments to pass to the API.
+
+        Returns:
+            Validated response model instance.
+        """
+        # validate_request is idempotent - only validates if req is a dict
+        req = validate_request(req, req_type)
+        self._update_client_headers()
+        entity, project = split_project_id(req.project_id)
+
+        exclude_set = {"project_id", "digests"}
+        if exclude:
+            exclude_set.update(exclude)
+
+        # Automatically extract object_id and body if present
+        extra_kwargs_dict = dict(extra_kwargs)
+        if hasattr(req, "object_id") and req.object_id is not None:
+            extra_kwargs_dict["object_id"] = req.object_id
+            exclude_set.add("object_id")
+        if hasattr(req, "digests"):
+            # Match original behavior: pass digests if truthy, otherwise None
+            extra_kwargs_dict["body"] = req.digests if req.digests else None
+
+        dump_kwargs: dict[str, Any] = {"by_alias": True}
+        exclude_set.update(extra_kwargs_dict.keys())
+        if exclude_set:
+            dump_kwargs["exclude"] = exclude_set
+
+        req_dict = req.model_dump(**dump_kwargs)
+        response = stainless_api(
+            entity=entity, project=project, **req_dict, **extra_kwargs_dict
+        )
+        return res_type.model_validate(response.model_dump())
+
+    def _stainless_list_object(
+        self,
+        req: TReq | dict[str, Any],
+        req_type: type[TReq],
+        stainless_api: Callable[..., Any],
+        *,
+        exclude: set[str] | None = None,
+        **extra_kwargs: Any,
+    ) -> Iterator[Any]:
+        """Helper method for Object API list requests that split project_id into entity/project.
+
+        Args:
+            req: Request object or dict to validate. If already validated, will be used as-is.
+            req_type: Type of the request model.
+            stainless_api: Stainless API callable to invoke.
+            exclude: Set of field names to exclude from request dump.
+            **extra_kwargs: Additional keyword arguments to pass to the API.
+
+        Yields:
+            Raw response items from the stainless API (caller should validate).
+        """
+        # validate_request is idempotent - only validates if req is a dict
+        req = validate_request(req, req_type)
+        self._update_client_headers()
+        entity, project = split_project_id(req.project_id)
+
+        exclude_set = {"project_id"}
+        if exclude:
+            exclude_set.update(exclude)
+
+        dump_kwargs: dict[str, Any] = {"by_alias": True, "exclude_none": True}
+        exclude_set.update(extra_kwargs.keys())
+        if exclude_set:
+            dump_kwargs["exclude"] = exclude_set
+
+        req_dict = req.model_dump(**dump_kwargs)
+        response = stainless_api(
+            entity=entity, project=project, **req_dict, **extra_kwargs
+        )
+        # JSONLDecoder is iterable
+        yield from response
+
     def _flush_calls(
         self,
         batch: list[StartBatchItem | EndBatchItem],
@@ -1253,19 +1352,12 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Yields:
             OpReadRes instances.
         """
-        self._update_client_headers()
-        entity, project = split_project_id(req.project_id)
-        kwargs: dict[str, Any] = {"entity": entity, "project": project}
-        if req.limit is not None:
-            kwargs["limit"] = req.limit
-        if req.offset is not None:
-            kwargs["offset"] = req.offset
-        if req.eager:
-            kwargs["eager"] = "true"
-
-        response = self._stainless_client.v2.ops.list(**kwargs)
-        # JSONLDecoder is iterable
-        for item in response:
+        for item in self._stainless_list_object(
+            req,
+            tsi.OpListReq,
+            self._stainless_client.v2.ops.list,
+            eager="true" if req.eager else None,
+        ):
             yield tsi.OpReadRes.model_validate(item.model_dump())
 
     @validate_call
@@ -1278,15 +1370,12 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Op delete response.
         """
-        self._update_client_headers()
-        entity, project = split_project_id(req.project_id)
-        body = None
-        if req.digests:
-            body = req.digests
-        response = self._stainless_client.v2.ops.delete(
-            entity=entity, project=project, object_id=req.object_id, body=body
+        return self._stainless_delete_object(
+            req,
+            tsi.OpDeleteReq,
+            tsi.OpDeleteRes,
+            self._stainless_client.v2.ops.delete,
         )
-        return tsi.OpDeleteRes.model_validate(response.model_dump())
 
     @validate_call
     def dataset_create(self, req: tsi.DatasetCreateReq) -> tsi.DatasetCreateRes:
@@ -1334,17 +1423,11 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Yields:
             DatasetReadRes instances.
         """
-        self._update_client_headers()
-        entity, project = split_project_id(req.project_id)
-        kwargs: dict[str, Any] = {"entity": entity, "project": project}
-        if req.limit is not None:
-            kwargs["limit"] = req.limit
-        if req.offset is not None:
-            kwargs["offset"] = req.offset
-
-        response = self._stainless_client.v2.datasets.list(**kwargs)
-        # JSONLDecoder is iterable
-        for item in response:
+        for item in self._stainless_list_object(
+            req,
+            tsi.DatasetListReq,
+            self._stainless_client.v2.datasets.list,
+        ):
             yield tsi.DatasetReadRes.model_validate(item.model_dump())
 
     @validate_call
@@ -1357,15 +1440,12 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Dataset delete response.
         """
-        self._update_client_headers()
-        entity, project = split_project_id(req.project_id)
-        body = None
-        if req.digests:
-            body = req.digests
-        response = self._stainless_client.v2.datasets.delete(
-            entity=entity, project=project, object_id=req.object_id, body=body
+        return self._stainless_delete_object(
+            req,
+            tsi.DatasetDeleteReq,
+            tsi.DatasetDeleteRes,
+            self._stainless_client.v2.datasets.delete,
         )
-        return tsi.DatasetDeleteRes.model_validate(response.model_dump())
 
     @validate_call
     def scorer_create(self, req: tsi.ScorerCreateReq) -> tsi.ScorerCreateRes:
@@ -1413,17 +1493,11 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Yields:
             ScorerReadRes instances.
         """
-        self._update_client_headers()
-        entity, project = split_project_id(req.project_id)
-        kwargs: dict[str, Any] = {"entity": entity, "project": project}
-        if req.limit is not None:
-            kwargs["limit"] = req.limit
-        if req.offset is not None:
-            kwargs["offset"] = req.offset
-
-        response = self._stainless_client.v2.scorers.list(**kwargs)
-        # JSONLDecoder is iterable
-        for item in response:
+        for item in self._stainless_list_object(
+            req,
+            tsi.ScorerListReq,
+            self._stainless_client.v2.scorers.list,
+        ):
             yield tsi.ScorerReadRes.model_validate(item.model_dump())
 
     @validate_call
@@ -1436,15 +1510,12 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Scorer delete response.
         """
-        self._update_client_headers()
-        entity, project = split_project_id(req.project_id)
-        body = None
-        if req.digests:
-            body = req.digests
-        response = self._stainless_client.v2.scorers.delete(
-            entity=entity, project=project, object_id=req.object_id, body=body
+        return self._stainless_delete_object(
+            req,
+            tsi.ScorerDeleteReq,
+            tsi.ScorerDeleteRes,
+            self._stainless_client.v2.scorers.delete,
         )
-        return tsi.ScorerDeleteRes.model_validate(response.model_dump())
 
     @validate_call
     def evaluation_create(
@@ -1496,17 +1567,11 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Yields:
             EvaluationReadRes instances.
         """
-        self._update_client_headers()
-        entity, project = split_project_id(req.project_id)
-        kwargs: dict[str, Any] = {"entity": entity, "project": project}
-        if req.limit is not None:
-            kwargs["limit"] = req.limit
-        if req.offset is not None:
-            kwargs["offset"] = req.offset
-
-        response = self._stainless_client.v2.evaluations.list(**kwargs)
-        # JSONLDecoder is iterable
-        for item in response:
+        for item in self._stainless_list_object(
+            req,
+            tsi.EvaluationListReq,
+            self._stainless_client.v2.evaluations.list,
+        ):
             yield tsi.EvaluationReadRes.model_validate(item.model_dump())
 
     @validate_call
@@ -1521,15 +1586,12 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Evaluation delete response.
         """
-        self._update_client_headers()
-        entity, project = split_project_id(req.project_id)
-        body = None
-        if req.digests:
-            body = req.digests
-        response = self._stainless_client.v2.evaluations.delete(
-            entity=entity, project=project, object_id=req.object_id, body=body
+        return self._stainless_delete_object(
+            req,
+            tsi.EvaluationDeleteReq,
+            tsi.EvaluationDeleteRes,
+            self._stainless_client.v2.evaluations.delete,
         )
-        return tsi.EvaluationDeleteRes.model_validate(response.model_dump())
 
     @validate_call
     def model_create(self, req: tsi.ModelCreateReq) -> tsi.ModelCreateRes:
@@ -1577,17 +1639,11 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Yields:
             ModelReadRes instances.
         """
-        self._update_client_headers()
-        entity, project = split_project_id(req.project_id)
-        kwargs: dict[str, Any] = {"entity": entity, "project": project}
-        if req.limit is not None:
-            kwargs["limit"] = req.limit
-        if req.offset is not None:
-            kwargs["offset"] = req.offset
-
-        response = self._stainless_client.v2.models.list(**kwargs)
-        # JSONLDecoder is iterable
-        for item in response:
+        for item in self._stainless_list_object(
+            req,
+            tsi.ModelListReq,
+            self._stainless_client.v2.models.list,
+        ):
             yield tsi.ModelReadRes.model_validate(item.model_dump())
 
     @validate_call
@@ -1600,15 +1656,12 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Model delete response.
         """
-        self._update_client_headers()
-        entity, project = split_project_id(req.project_id)
-        body = None
-        if req.digests:
-            body = req.digests
-        response = self._stainless_client.v2.models.delete(
-            entity=entity, project=project, object_id=req.object_id, body=body
+        return self._stainless_delete_object(
+            req,
+            tsi.ModelDeleteReq,
+            tsi.ModelDeleteRes,
+            self._stainless_client.v2.models.delete,
         )
-        return tsi.ModelDeleteRes.model_validate(response.model_dump())
 
     @validate_call
     def evaluation_run_create(
@@ -1661,24 +1714,23 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Yields:
             EvaluationRunReadRes instances.
         """
-        self._update_client_headers()
-        entity, project = split_project_id(req.project_id)
-        kwargs: dict[str, Any] = {"entity": entity, "project": project}
-        if req.limit is not None:
-            kwargs["limit"] = req.limit
-        if req.offset is not None:
-            kwargs["offset"] = req.offset
+        extra_kwargs: dict[str, Any] = {}
         if req.filter:
             if req.filter.evaluations:
-                kwargs["evaluation_refs"] = ",".join(req.filter.evaluations)
+                extra_kwargs["evaluation_refs"] = ",".join(req.filter.evaluations)
             if req.filter.models:
-                kwargs["model_refs"] = ",".join(req.filter.models)
+                extra_kwargs["model_refs"] = ",".join(req.filter.models)
             if req.filter.evaluation_run_ids:
-                kwargs["evaluation_run_ids"] = ",".join(req.filter.evaluation_run_ids)
-
-        response = self._stainless_client.v2.evaluation_runs.list(**kwargs)
-        # JSONLDecoder is iterable
-        for item in response:
+                extra_kwargs["evaluation_run_ids"] = ",".join(
+                    req.filter.evaluation_run_ids
+                )
+        for item in self._stainless_list_object(
+            req,
+            tsi.EvaluationRunListReq,
+            self._stainless_client.v2.evaluation_runs.list,
+            exclude={"filter"},
+            **extra_kwargs,
+        ):
             yield tsi.EvaluationRunReadRes.model_validate(item.model_dump())
 
     @validate_call
@@ -1693,12 +1745,13 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Evaluation run delete response.
         """
-        self._update_client_headers()
-        entity, project = split_project_id(req.project_id)
-        response = self._stainless_client.v2.evaluation_runs.delete(
-            entity=entity, project=project, evaluation_run_ids=req.evaluation_run_ids
+        return self._stainless_delete_object(
+            req,
+            tsi.EvaluationRunDeleteReq,
+            tsi.EvaluationRunDeleteRes,
+            self._stainless_client.v2.evaluation_runs.delete,
+            evaluation_run_ids=req.evaluation_run_ids,
         )
-        return tsi.EvaluationRunDeleteRes.model_validate(response.model_dump())
 
     @validate_call
     def evaluation_run_finish(
@@ -1774,19 +1827,11 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Yields:
             PredictionReadRes instances.
         """
-        self._update_client_headers()
-        entity, project = split_project_id(req.project_id)
-        kwargs: dict[str, Any] = {"entity": entity, "project": project}
-        if req.evaluation_run_id is not None:
-            kwargs["evaluation_run_id"] = req.evaluation_run_id
-        if req.limit is not None:
-            kwargs["limit"] = req.limit
-        if req.offset is not None:
-            kwargs["offset"] = req.offset
-
-        response = self._stainless_client.v2.predictions.list(**kwargs)
-        # JSONLDecoder is iterable
-        for item in response:
+        for item in self._stainless_list_object(
+            req,
+            tsi.PredictionListReq,
+            self._stainless_client.v2.predictions.list,
+        ):
             yield tsi.PredictionReadRes.model_validate(item.model_dump())
 
     @validate_call
@@ -1801,12 +1846,13 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Prediction delete response.
         """
-        self._update_client_headers()
-        entity, project = split_project_id(req.project_id)
-        response = self._stainless_client.v2.predictions.delete(
-            entity=entity, project=project, prediction_ids=req.prediction_ids
+        return self._stainless_delete_object(
+            req,
+            tsi.PredictionDeleteReq,
+            tsi.PredictionDeleteRes,
+            self._stainless_client.v2.predictions.delete,
+            prediction_ids=req.prediction_ids,
         )
-        return tsi.PredictionDeleteRes.model_validate(response.model_dump())
 
     @validate_call
     def prediction_finish(
@@ -1822,9 +1868,10 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         """
         self._update_client_headers()
         entity, project = split_project_id(req.project_id)
-        req_dict = req.model_dump(exclude={"prediction_id"}, by_alias=True)
         response = self._stainless_client.v2.predictions.finish(
-            entity=entity, project=project, prediction_id=req.prediction_id, **req_dict
+            entity=entity,
+            project=project,
+            prediction_id=req.prediction_id,
         )
         return tsi.PredictionFinishRes.model_validate(response.model_dump())
 
@@ -1873,19 +1920,11 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Yields:
             ScoreReadRes instances.
         """
-        self._update_client_headers()
-        entity, project = split_project_id(req.project_id)
-        kwargs: dict[str, Any] = {"entity": entity, "project": project}
-        if req.evaluation_run_id is not None:
-            kwargs["evaluation_run_id"] = req.evaluation_run_id
-        if req.limit is not None:
-            kwargs["limit"] = req.limit
-        if req.offset is not None:
-            kwargs["offset"] = req.offset
-
-        response = self._stainless_client.v2.scores.list(**kwargs)
-        # JSONLDecoder is iterable
-        for item in response:
+        for item in self._stainless_list_object(
+            req,
+            tsi.ScoreListReq,
+            self._stainless_client.v2.scores.list,
+        ):
             yield tsi.ScoreReadRes.model_validate(item.model_dump())
 
     @validate_call
@@ -1898,9 +1937,10 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Score delete response.
         """
-        self._update_client_headers()
-        entity, project = split_project_id(req.project_id)
-        response = self._stainless_client.v2.scores.delete(
-            entity=entity, project=project, score_ids=req.score_ids
+        return self._stainless_delete_object(
+            req,
+            tsi.ScoreDeleteReq,
+            tsi.ScoreDeleteRes,
+            self._stainless_client.v2.scores.delete,
+            score_ids=req.score_ids,
         )
-        return tsi.ScoreDeleteRes.model_validate(response.model_dump())
