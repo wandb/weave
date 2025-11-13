@@ -65,6 +65,10 @@ PROCESS_TERMINATION_TIMEOUT_SECONDS = 5.0
 SIGNAL_STOP = "STOP"
 SIGNAL_EXEC = "EXEC"
 
+# =============================================================================
+# Exceptions
+# =============================================================================
+
 
 class IsolatedClientExecutorError(Exception):
     """Base exception for IsolatedClientExecutor errors."""
@@ -72,6 +76,7 @@ class IsolatedClientExecutorError(Exception):
 
 class IsolatedClientExecutorTimeoutError(IsolatedClientExecutorError):
     """Exception for function execution timeouts."""
+
 
 # =============================================================================
 # Type Definitions
