@@ -40,17 +40,17 @@ class HostAndBaseURL:
 def api_key(request):
     """Parametrized fixture for different API key formats."""
     if request.param == "valid-saas":
+        return "a" * 86
+    elif request.param == "valid-saas-legacy":
         return "a" * 40
     elif request.param == "valid-onprem":
+        return "local-" + "b" * 86
+    elif request.param == "valid-onprem-legacy":
         return "local-" + "b" * 40
     elif request.param == "invalid-too-short":
         return "short"
-    elif request.param == "invalid-too-long":
-        return "a" * 41
     elif request.param == "invalid-onprem-too-short":
-        return "local-short"
-    elif request.param == "invalid-onprem-too-long":
-        return "local-" + "c" * 41
+        return "local-short-" + "c" * 39
 
     raise ValueError(f"Invalid API key type: {request.param}")
 
@@ -79,12 +79,15 @@ def host_and_base_url(request):
     return HostAndBaseURL(host, base_url)
 
 
-all_valid_keys = ["valid-saas", "valid-onprem"]
+all_valid_keys = [
+    "valid-saas",
+    "valid-saas-legacy",
+    "valid-onprem",
+    "valid-onprem-legacy",
+]
 all_invalid_keys = [
     "invalid-too-short",
-    "invalid-too-long",
     "invalid-onprem-too-short",
-    "invalid-onprem-too-long",
 ]
 all_hosts = ["saas", "aws", "gcp", "azure", "onprem"]
 
