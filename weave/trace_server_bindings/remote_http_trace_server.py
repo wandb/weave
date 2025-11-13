@@ -2,7 +2,7 @@ import datetime
 import io
 import logging
 from collections.abc import Iterator
-from typing import Any, Optional, Union, cast
+from typing import Any, Optional, Union
 from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, Field, validate_call
@@ -893,7 +893,9 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
         )
 
     @validate_call
-    def evaluation_create(self, req: tsi.EvaluationCreateReq) -> tsi.EvaluationCreateRes:
+    def evaluation_create(
+        self, req: tsi.EvaluationCreateReq
+    ) -> tsi.EvaluationCreateRes:
         entity, project = req.project_id.split("/", 1)
         url = f"/v2/{entity}/{project}/evaluations"
         # For create, we need to send the body without project_id (EvaluationCreateBody)
@@ -943,7 +945,9 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
         )
 
     @validate_call
-    def evaluation_delete(self, req: tsi.EvaluationDeleteReq) -> tsi.EvaluationDeleteRes:
+    def evaluation_delete(
+        self, req: tsi.EvaluationDeleteReq
+    ) -> tsi.EvaluationDeleteRes:
         entity, project = req.project_id.split("/", 1)
         url = f"/v2/{entity}/{project}/evaluations/{req.object_id}"
         # Build query params
@@ -1116,7 +1120,9 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
     # Prediction V2 API
 
     @validate_call
-    def prediction_create(self, req: tsi.PredictionCreateReq) -> tsi.PredictionCreateRes:
+    def prediction_create(
+        self, req: tsi.PredictionCreateReq
+    ) -> tsi.PredictionCreateRes:
         entity, project = req.project_id.split("/", 1)
         url = f"/v2/{entity}/{project}/predictions"
         body = tsi.PredictionCreateBody.model_validate(
@@ -1166,7 +1172,9 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
         )
 
     @validate_call
-    def prediction_delete(self, req: tsi.PredictionDeleteReq) -> tsi.PredictionDeleteRes:
+    def prediction_delete(
+        self, req: tsi.PredictionDeleteReq
+    ) -> tsi.PredictionDeleteRes:
         entity, project = req.project_id.split("/", 1)
         url = f"/v2/{entity}/{project}/predictions"
         # Build query params - prediction_ids are passed as a query param
@@ -1181,7 +1189,9 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
         )
 
     @validate_call
-    def prediction_finish(self, req: tsi.PredictionFinishReq) -> tsi.PredictionFinishRes:
+    def prediction_finish(
+        self, req: tsi.PredictionFinishReq
+    ) -> tsi.PredictionFinishRes:
         entity, project = req.project_id.split("/", 1)
         url = f"/v2/{entity}/{project}/predictions/{req.prediction_id}/finish"
         return self._generic_request(
