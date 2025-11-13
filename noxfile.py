@@ -32,12 +32,7 @@ NUM_TRACE_SERVER_SHARDS = 4
 
 @nox.session
 def lint(session):
-    # By default, use --frozen to prevent lock file regeneration
-    # Pass --regenerate-lock to allow lock file updates
-    regenerate_lock = session.posargs and "--regenerate-lock" in session.posargs
-    sync_args = ["uv", "sync", "--active", "--group", "dev"]
-    if not regenerate_lock:
-        sync_args.append("--frozen")
+    sync_args = ["uv", "sync", "--active", "--group", "dev", "--frozen"]
     session.run(*sync_args)
 
     dry_run = session.posargs and "dry-run" in session.posargs
@@ -146,7 +141,7 @@ def tests(session, shard):
     # Only add --extra shard if the shard has a corresponding optional dependency
     # Use --active to sync to the active nox virtual environment
     # Test-related shards (ending in _test/_tests) are dependency groups, not extras
-    sync_args = ["uv", "sync", "--active", "--group", "test"]
+    sync_args = ["uv", "sync", "--active", "--group", "test", "--frozen"]
 
     if shard not in SHARDS_WITHOUT_EXTRAS:
         sync_args.extend(["--extra", shard])
@@ -155,12 +150,6 @@ def tests(session, shard):
     elif shard == "trace_server":
         # trace_server shard needs both trace_server dependency group and trace_server_tests
         sync_args.extend(["--group", "trace_server", "--group", "trace_server_tests"])
-
-    # By default, use --frozen to prevent lock file regeneration
-    # Pass --regenerate-lock to allow lock file updates
-    regenerate_lock = session.posargs and "--regenerate-lock" in session.posargs
-    if not regenerate_lock:
-        sync_args.append("--frozen")
 
     session.run(*sync_args)
 
