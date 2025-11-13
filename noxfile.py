@@ -73,7 +73,7 @@ SHARDS_WITHOUT_EXTRAS = {
     "trace_no_server",
     "trace_server",
     "trace_server_bindings",
-    *trace_server_shards,
+    # *trace_server_shards,
     "openai_realtime",
     "autogen_tests",
     "verifiers_test",
@@ -224,7 +224,7 @@ def tests(session, shard):
     #             "-m trace_server",
     #         ]
     #     )
-    
+
     # Run all trace tests when shard is "trace"
     if shard == "trace":
         pytest_args.extend(["-m", "trace_server"])
