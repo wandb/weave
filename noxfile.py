@@ -32,8 +32,7 @@ NUM_TRACE_SERVER_SHARDS = 4
 
 @nox.session
 def lint(session):
-    sync_args = ["uv", "sync", "--active", "--group", "dev", "--frozen"]
-    session.run(*sync_args)
+    session.run("uv", "sync", "--active", "--group", "dev", "--frozen")
 
     dry_run = session.posargs and "dry-run" in session.posargs
     all_files = session.posargs and "--all-files" in session.posargs
