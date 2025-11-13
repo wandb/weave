@@ -6,6 +6,7 @@ from typing import Any, Optional, Union, cast
 from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, Field
+from typing_extensions import Self
 from pydantic.json_schema import SkipJsonSchema
 
 from weave.trace.env import weave_trace_server_url
@@ -81,7 +82,7 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
         )
 
     @classmethod
-    def from_env(cls, should_batch: bool = False) -> "RemoteHTTPTraceServer":
+    def from_env(cls, should_batch: bool = False) -> Self:
         # Explicitly calling `RemoteHTTPTraceServer` constructor here to ensure
         # that type checking is applied to the constructor.
         return RemoteHTTPTraceServer(weave_trace_server_url(), should_batch)

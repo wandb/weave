@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Any, Literal, TypedDict
 
 from pydantic import BaseModel
+from typing_extensions import Self
 
 from weave.trace import urls
 from weave.trace.api import publish as weave_publish
@@ -972,7 +973,7 @@ class SavedView:
         return default_columns
 
     @classmethod
-    def load(cls, ref: str) -> SavedView:
+    def load(cls, ref: str) -> Self:
         obj_ref = weave_ref(ref)
         base = obj_ref.get()
         instance = cls.__new__(cls)
