@@ -6,9 +6,6 @@ and provide a convenient interface for users.
 
 from __future__ import annotations
 
-import pytest
-
-from tests.trace_server.conftest import TEST_ENTITY
 from weave.trace.weave_client import WeaveClient
 
 
