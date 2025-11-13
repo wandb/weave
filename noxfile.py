@@ -62,8 +62,6 @@ def lint(session):
         session.run("pre-commit", "run", "--hook-stage=pre-push")
 
 
-# trace_server_shards = [f"trace{i}" for i in range(1, NUM_TRACE_SERVER_SHARDS + 1)]  # No longer using sharding
-
 # Shards that don't have corresponding optional dependencies in pyproject.toml
 # Note: _test/_tests shards are dependency groups, not optional dependencies
 SHARDS_WITHOUT_EXTRAS = {
@@ -73,7 +71,6 @@ SHARDS_WITHOUT_EXTRAS = {
     "trace_no_server",
     "trace_server",
     "trace_server_bindings",
-    # *trace_server_shards,
     "openai_realtime",
     "autogen_tests",
     "verifiers_test",
@@ -122,7 +119,6 @@ SHARDS_WITHOUT_EXTRAS = {
         "verifiers_test",
         "autogen_tests",
         "trace",
-        # *trace_server_shards,  # No longer using sharding for trace tests
         "trace_no_server",
     ],
 )
@@ -193,7 +189,6 @@ def tests(session, shard):
         "autogen_tests": ["tests/integrations/autogen/"],
         "verifiers_test": ["tests/integrations/verifiers/"],
         "trace": ["tests/trace/"],
-        # **{shard: ["tests/trace/"] for shard in trace_server_shards},
         "trace_no_server": ["tests/trace/"],
     }
 
@@ -214,21 +209,9 @@ def tests(session, shard):
         "--cov-branch",
     ]
 
-    # # Handle trace sharding: run every 3rd test starting at different offsets
-    # if shard in trace_server_shards:
-    #     shard_id = int(shard[-1]) - 1
-    #     pytest_args.extend(
-    #         [
-    #             f"--shard-id={shard_id}",
-    #             f"--num-shards={NUM_TRACE_SERVER_SHARDS}",
-    #             "-m trace_server",
-    #         ]
-    #     )
-
     # Run all trace tests when shard is "trace"
     if shard == "trace":
         pytest_args.extend(["-m", "trace_server"])
-        # Use higher parallelism since we consolidated 4 shards into 1
         # Each worker gets its own isolated database namespace
         session.posargs.insert(0, "-n8")
 
