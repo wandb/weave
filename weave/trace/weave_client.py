@@ -90,6 +90,10 @@ from weave.trace.wandb_run_context import (
     get_global_wb_run_context,
 )
 from weave.trace.weave_client_send_file_cache import WeaveClientSendFileCache
+from weave.trace_server.client_server_common.digest_builder import (
+    ref_stable_json_digest,
+    table_digest_from_row_digests,
+)
 from weave.trace_server.constants import MAX_OBJECT_NAME_LENGTH
 from weave.trace_server.ids import generate_id
 from weave.trace_server.interface.feedback_types import (
@@ -1626,10 +1630,11 @@ class WeaveClient:
 
         name = sanitize_object_name(name)
 
+        json_val = to_json(val, self._project_id(), self)
+
         def send_obj_create() -> ObjCreateRes:
             # `to_json` is mostly fast, except for CustomWeaveTypes
             # which incur network costs to serialize the payload
-            json_val = to_json(val, self._project_id(), self)
             req = ObjCreateReq(
                 obj=ObjSchemaForInsert(
                     project_id=self.entity + "/" + self.project,
@@ -1639,16 +1644,14 @@ class WeaveClient:
             )
             return self.server.obj_create(req)
 
-        res_future: Future[ObjCreateRes] = self.future_executor.defer(send_obj_create)
-        digest_future: Future[str] = self.future_executor.then(
-            [res_future], lambda res: res[0].digest
-        )
+        self.future_executor.defer(send_obj_create)
+        digest = ref_stable_json_digest(json_val)
 
         ref: Ref
         if is_op(orig_val):
-            ref = OpRef(self.entity, self.project, name, digest_future)
+            ref = OpRef(self.entity, self.project, name, digest)
         else:
-            ref = ObjectRef(self.entity, self.project, name, digest_future)
+            ref = ObjectRef(self.entity, self.project, name, digest)
 
         # Attach the ref to the object
         try:
@@ -1670,8 +1673,7 @@ class WeaveClient:
 
         return self._save_object_basic(op, name)
 
-    def _send_table_create(self, rows: list[Any]) -> TableCreateRes:
-        json_rows = to_json(rows, self._project_id(), self)
+    def _send_table_create(self, json_rows: list[Any]) -> TableCreateRes:
         req = TableCreateReq(
             table=TableSchemaForInsert(project_id=self._project_id(), rows=json_rows)
         )
@@ -1689,29 +1691,23 @@ class WeaveClient:
         if isinstance(table, WeaveTable) and table.table_ref is not None:
             return table.table_ref
 
+        json_rows = to_json(list(table.rows), self._project_id(), self)
+
         chunking_config = self._should_use_chunking(table)
         if not chunking_config.use_chunking:
             # Simple case: defer the entire serialization and upload
-            res_future: Future[TableCreateRes] = self.future_executor.defer(
-                lambda: self._send_table_create(list(table.rows))
-            )
+            self.future_executor.defer(lambda: self._send_table_create(json_rows))
         elif chunking_config.use_parallel_chunks:
             # Need to chunk up, use parallelism
-            res_future = self._create_table_with_parallel_chunks(table)
+            self._create_table_with_parallel_chunks(json_rows)
         else:
             # Legacy method for large tables and old servers
-            res_future = self._create_table_with_incremental_updates(table)
+            self._create_table_with_incremental_updates(json_rows)
 
-        digest_future: Future[str] = self.future_executor.then(
-            [res_future], lambda res: res[0].digest
-        )
-        row_digests_future: Future[list[str]] = self.future_executor.then(
-            [res_future], lambda res: res[0].row_digests
-        )
+        row_digests = [ref_stable_json_digest(row) for row in json_rows]
+        table_digest = table_digest_from_row_digests(row_digests)
 
-        table_ref = TableRef(
-            self.entity, self.project, digest_future, row_digests_future
-        )
+        table_ref = TableRef(self.entity, self.project, table_digest, row_digests)
 
         table.ref = table_ref
 
@@ -1762,12 +1758,12 @@ class WeaveClient:
         )
 
     def _create_table_with_parallel_chunks(
-        self, table: Table | WeaveTable
+        self, json_rows: list[Any]
     ) -> Future[TableCreateRes]:
         """Execute the actual parallel chunk upload."""
         # Create chunks from raw table data (not serialized yet)
         chunk_manager = TableChunkManager()
-        raw_chunks: list[list[Any]] = chunk_manager.create_chunks(table.rows)
+        raw_chunks: list[list[Any]] = chunk_manager.create_chunks(json_rows)
 
         # Create chunks in parallel using future_executor - defer serialization
         chunk_futures = []
@@ -1800,12 +1796,12 @@ class WeaveClient:
         return self.future_executor.then(chunk_futures, combine_chunks_and_create_table)
 
     def _create_table_with_incremental_updates(
-        self, table: Table | WeaveTable
+        self, json_rows: list[Any]
     ) -> Future[TableCreateRes]:
         """Create table using incremental table_update pattern (fallback)."""
         # Create chunks from raw table data (not serialized yet)
         chunk_manager = TableChunkManager()
-        raw_chunks: list[list[Any]] = chunk_manager.create_chunks(table.rows)
+        raw_chunks: list[list[Any]] = chunk_manager.create_chunks(json_rows)
         if not raw_chunks:
             return self.future_executor.defer(lambda: self._send_table_create([]))
 
