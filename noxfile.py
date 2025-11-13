@@ -195,10 +195,11 @@ def tests(session, shard):
     test_dirs = test_dirs_dict.get(shard, default_test_dirs)
 
     # Each worker gets its own isolated database namespace
-    # Only use parallel workers if we have more than 1 CPU core
-    cpu_count = os.cpu_count()
-    if cpu_count is not None and cpu_count > 1:
-        session.posargs.insert(0, f"-n{cpu_count}")
+    # Only use parallel workers for the trace shard if we have more than 1 CPU core
+    if shard == "trace":
+        cpu_count = os.cpu_count()
+        if cpu_count is not None and cpu_count > 1:
+            session.posargs.insert(0, f"-n{cpu_count}")
 
     # Add sharding logic for trace1, trace2, trace3
     pytest_args = [
