@@ -67,6 +67,7 @@ from weave.trace_server.orm import (
     combine_conditions,
     python_value_to_ch_type,
     quote_json_path,
+    split_escaped_field_path,
 )
 
 if TYPE_CHECKING:
@@ -141,7 +142,7 @@ class ObjectRefCondition(BaseModel):
 
     def get_root_field(self) -> str:
         """Get the root field name (e.g., 'inputs_dump' from 'inputs.model.config.temperature')."""
-        field_parts = self.field_path.split(".")
+        field_parts = split_escaped_field_path(self.field_path)
         root = field_parts[0] + "_dump"
         return root
 
@@ -212,12 +213,12 @@ class ObjectRefCondition(BaseModel):
         if not expand_match:
             raise ValueError(f"No expand column match found for {self.field_path}")
 
-        expand_parts = expand_match.split(".")
+        expand_parts = split_escaped_field_path(expand_match)
         if len(expand_parts) > 1:
             return ".".join(expand_parts[1:])
 
         object_property_path = self.get_object_property_path()
-        property_parts = object_property_path.split(".")
+        property_parts = split_escaped_field_path(object_property_path)
         return property_parts[0]
 
     @property
@@ -265,7 +266,7 @@ class ObjectRefCondition(BaseModel):
         root_field = self.get_root_field()
         key = self.get_accessor_key()
 
-        key_parts = key.split(".") if key else []
+        key_parts = split_escaped_field_path(key) if key else []
         field_sql = f"{table_alias}.{root_field}"
         if use_agg_fn:
             field_sql = f"any({field_sql})"
@@ -721,7 +722,7 @@ def build_object_ref_ctes(
                 pb,
                 "object_versions",
                 "any(val_dump)",
-                leaf_property.split("."),
+                split_escaped_field_path(leaf_property),
             )
             val_dump_select = f"nullIf({json_extract_sql}, '') AS object_val_dump,"
         elif isinstance(condition, ObjectRefFilterCondition):

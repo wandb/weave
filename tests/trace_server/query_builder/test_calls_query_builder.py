@@ -2399,3 +2399,51 @@ def test_query_with_optimization_and_attributes_order() -> None:
         """,
         {"pb_0": ["my_op"], "pb_1": "project"},
     )
+
+
+def test_query_filter_with_escaped_dots_in_field_names() -> None:
+    r"""Test filtering by fields with literal dots in their names.
+
+    This tests the case where a JSON key actually contains dots in its name.
+    For example: {"output": {"metrics.scorer.run": {"value": 42}}}
+
+    Using escaped dots in the field path: "output.metrics\\.scorer\\.run.value"
+    means we want to access: output["metrics.scorer.run"]["value"]
+    NOT: output["metrics"]["scorer"]["run"]["value"]
+    """
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    # Filter on a field with escaped dots
+    # This means: output -> "metrics.scorer.run" (single key with dots) -> value
+    cq.add_condition(
+        tsi_query.EqOperation.model_validate(
+            {
+                "$eq": [
+                    {"$getField": "output.metrics\\.scorer\\.run.value"},
+                    {"$literal": 42},
+                ]
+            }
+        )
+    )
+
+    assert_sql(
+        cq,
+        """
+        SELECT calls_merged.id AS id
+        FROM calls_merged
+        WHERE calls_merged.project_id = {pb_3:String}
+        AND ((calls_merged.output_dump LIKE {pb_2:String}
+                OR calls_merged.output_dump IS NULL))
+        GROUP BY (calls_merged.project_id,
+                calls_merged.id)
+        HAVING (((coalesce(nullIf(JSON_VALUE(any(calls_merged.output_dump), {pb_0:String}), 'null'), '') = {pb_1:UInt64}))
+                AND ((any(calls_merged.deleted_at) IS NULL))
+                AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+        """,
+        {
+            "pb_0": '$."metrics.scorer.run"."value"',
+            "pb_1": 42,
+            "pb_2": "%42%",
+            "pb_3": "project",
+        },
+    )
