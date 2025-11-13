@@ -30,7 +30,7 @@ import logging
 import re
 from collections.abc import Callable, KeysView
 from typing import Any, Literal, cast
-
+import json
 from pydantic import BaseModel, Field
 from typing_extensions import Self
 
@@ -45,6 +45,9 @@ from weave.trace_server.calls_query_builder.object_ref_query_builder import (
     has_object_ref_field,
     is_object_ref_operand,
     process_query_for_object_refs,
+)
+from weave.trace_server.trace_server_interface_util import (
+    extract_refs_from_values,
 )
 from weave.trace_server.calls_query_builder.optimization_builder import (
     process_query_to_optimization_sql,
@@ -1984,18 +1987,8 @@ def build_calls_complete_batch_update_query(
     Returns:
         Formatted SQL UPDATE command string
     """
-    from weave.trace_server.trace_server_interface_util import (
-        extract_refs_from_values,
-    )
-
     if not end_calls:
         return ""
-
-    # Import here to avoid circular dependency
-    from weave.trace_server.clickhouse_trace_server_batched import (
-        _any_value_to_dump,
-        _dict_value_to_dump,
-    )
 
     # All calls should be from the same project (validated assumption)
     project_id = end_calls[0].project_id
@@ -2016,8 +2009,8 @@ def build_calls_complete_batch_update_query(
         # Create unique parameter names for each call's values
         id_param = pb.add_param(call_id)
         ended_at_param = pb.add_param(call.ended_at)
-        output_dump_param = pb.add_param(_any_value_to_dump(call.output))
-        summary_dump_param = pb.add_param(_dict_value_to_dump(dict(call.summary)))
+        output_dump_param = pb.add_param(json.dumps(call.output))
+        summary_dump_param = pb.add_param(json.dumps(dict(call.summary)))
 
         # Build CASE condition for ended_at
         ended_at_cases.append(
