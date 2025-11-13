@@ -250,6 +250,21 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         )
         return res_type.model_validate(response.model_dump())
 
+    def _prepare_v2_request(self, req: BaseModel) -> tuple[str, str]:
+        """Prepare v2 API request by updating headers and splitting project_id.
+
+        Args:
+            req: Request object with project_id attribute.
+
+        Returns:
+            Tuple of (entity, project) from split project_id.
+
+        Examples:
+            >>> entity, project = self._prepare_v2_request(req)
+        """
+        self._update_client_headers()
+        return split_project_id(req.project_id)
+
     def _stainless_list_object(
         self,
         req: BaseModel,
@@ -1210,8 +1225,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Op create response.
         """
-        self._update_client_headers()
-        entity, project = split_project_id(req.project_id)
+        entity, project = self._prepare_v2_request(req)
         response = self._stainless_client.v2.ops.create(
             entity=entity,
             project=project,
@@ -1230,8 +1244,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Op read response.
         """
-        self._update_client_headers()
-        entity, project = split_project_id(req.project_id)
+        entity, project = self._prepare_v2_request(req)
         response = self._stainless_client.v2.ops.read(
             entity=entity,
             project=project,
@@ -1250,8 +1263,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Yields:
             OpReadRes instances.
         """
-        self._update_client_headers()
-        entity, project = split_project_id(req.project_id)
+        entity, project = self._prepare_v2_request(req)
         response = self._stainless_client.v2.ops.list(
             entity=entity,
             project=project,
@@ -1271,8 +1283,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Op delete response.
         """
-        self._update_client_headers()
-        entity, project = split_project_id(req.project_id)
+        entity, project = self._prepare_v2_request(req)
         response = self._stainless_client.v2.ops.delete(
             entity=entity,
             project=project,
@@ -1290,8 +1301,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Dataset create response.
         """
-        self._update_client_headers()
-        entity, project = split_project_id(req.project_id)
+        entity, project = self._prepare_v2_request(req)
         response = self._stainless_client.v2.datasets.create(
             entity=entity,
             project=project,
@@ -1311,8 +1321,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Dataset read response.
         """
-        self._update_client_headers()
-        entity, project = split_project_id(req.project_id)
+        entity, project = self._prepare_v2_request(req)
         response = self._stainless_client.v2.datasets.read(
             entity=entity,
             project=project,
@@ -1331,8 +1340,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Yields:
             DatasetReadRes instances.
         """
-        self._update_client_headers()
-        entity, project = split_project_id(req.project_id)
+        entity, project = self._prepare_v2_request(req)
         response = self._stainless_client.v2.datasets.list(
             entity=entity,
             project=project,
@@ -1352,8 +1360,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Dataset delete response.
         """
-        self._update_client_headers()
-        entity, project = split_project_id(req.project_id)
+        entity, project = self._prepare_v2_request(req)
         response = self._stainless_client.v2.datasets.delete(
             entity=entity,
             project=project,
@@ -1371,8 +1378,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Scorer create response.
         """
-        self._update_client_headers()
-        entity, project = split_project_id(req.project_id)
+        entity, project = self._prepare_v2_request(req)
         response = self._stainless_client.v2.scorers.create(
             entity=entity,
             project=project,
@@ -1392,8 +1398,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Scorer read response.
         """
-        self._update_client_headers()
-        entity, project = split_project_id(req.project_id)
+        entity, project = self._prepare_v2_request(req)
         response = self._stainless_client.v2.scorers.read(
             entity=entity,
             project=project,
@@ -1412,8 +1417,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Yields:
             ScorerReadRes instances.
         """
-        self._update_client_headers()
-        entity, project = split_project_id(req.project_id)
+        entity, project = self._prepare_v2_request(req)
         response = self._stainless_client.v2.scorers.list(
             entity=entity,
             project=project,
@@ -1433,8 +1437,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Scorer delete response.
         """
-        self._update_client_headers()
-        entity, project = split_project_id(req.project_id)
+        entity, project = self._prepare_v2_request(req)
         response = self._stainless_client.v2.scorers.delete(
             entity=entity,
             project=project,
@@ -1454,8 +1457,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Evaluation create response.
         """
-        self._update_client_headers()
-        entity, project = split_project_id(req.project_id)
+        entity, project = self._prepare_v2_request(req)
         response = self._stainless_client.v2.evaluations.create(
             entity=entity,
             project=project,
@@ -1477,8 +1479,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Evaluation read response.
         """
-        self._update_client_headers()
-        entity, project = split_project_id(req.project_id)
+        entity, project = self._prepare_v2_request(req)
         response = self._stainless_client.v2.evaluations.read(
             entity=entity,
             project=project,
@@ -1499,8 +1500,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Yields:
             EvaluationReadRes instances.
         """
-        self._update_client_headers()
-        entity, project = split_project_id(req.project_id)
+        entity, project = self._prepare_v2_request(req)
         response = self._stainless_client.v2.evaluations.list(
             entity=entity,
             project=project,
@@ -1522,8 +1522,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Evaluation delete response.
         """
-        self._update_client_headers()
-        entity, project = split_project_id(req.project_id)
+        entity, project = self._prepare_v2_request(req)
         response = self._stainless_client.v2.evaluations.delete(
             entity=entity,
             project=project,
@@ -1541,8 +1540,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Model create response.
         """
-        self._update_client_headers()
-        entity, project = split_project_id(req.project_id)
+        entity, project = self._prepare_v2_request(req)
         response = self._stainless_client.v2.models.create(
             entity=entity,
             project=project,
@@ -1563,8 +1561,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Model read response.
         """
-        self._update_client_headers()
-        entity, project = split_project_id(req.project_id)
+        entity, project = self._prepare_v2_request(req)
         response = self._stainless_client.v2.models.read(
             entity=entity,
             project=project,
@@ -1583,8 +1580,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Yields:
             ModelReadRes instances.
         """
-        self._update_client_headers()
-        entity, project = split_project_id(req.project_id)
+        entity, project = self._prepare_v2_request(req)
         response = self._stainless_client.v2.models.list(
             entity=entity,
             project=project,
@@ -1604,8 +1600,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Model delete response.
         """
-        self._update_client_headers()
-        entity, project = split_project_id(req.project_id)
+        entity, project = self._prepare_v2_request(req)
         response = self._stainless_client.v2.models.delete(
             entity=entity,
             project=project,
@@ -1625,8 +1620,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Evaluation run create response.
         """
-        self._update_client_headers()
-        entity, project = split_project_id(req.project_id)
+        entity, project = self._prepare_v2_request(req)
         response = self._stainless_client.v2.evaluation_runs.create(
             entity=entity,
             project=project,
@@ -1647,8 +1641,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Evaluation run read response.
         """
-        self._update_client_headers()
-        entity, project = split_project_id(req.project_id)
+        entity, project = self._prepare_v2_request(req)
         response = self._stainless_client.v2.evaluation_runs.read(
             entity=entity,
             project=project,
@@ -1668,8 +1661,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Yields:
             EvaluationRunReadRes instances.
         """
-        self._update_client_headers()
-        entity, project = split_project_id(req.project_id)
+        entity, project = self._prepare_v2_request(req)
 
         # Extract filter parameters with explicit typing
         evaluation_refs: str | None = (
@@ -1713,8 +1705,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Evaluation run delete response.
         """
-        self._update_client_headers()
-        entity, project = split_project_id(req.project_id)
+        entity, project = self._prepare_v2_request(req)
         response = self._stainless_client.v2.evaluation_runs.delete(
             entity=entity,
             project=project,
@@ -1734,8 +1725,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Evaluation run finish response.
         """
-        self._update_client_headers()
-        entity, project = split_project_id(req.project_id)
+        entity, project = self._prepare_v2_request(req)
         response = self._stainless_client.v2.evaluation_runs.finish(
             entity=entity,
             project=project,
@@ -1756,8 +1746,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Prediction create response.
         """
-        self._update_client_headers()
-        entity, project = split_project_id(req.project_id)
+        entity, project = self._prepare_v2_request(req)
         response = self._stainless_client.v2.predictions.create(
             entity=entity,
             project=project,
@@ -1778,8 +1767,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Prediction read response.
         """
-        self._update_client_headers()
-        entity, project = split_project_id(req.project_id)
+        entity, project = self._prepare_v2_request(req)
         response = self._stainless_client.v2.predictions.read(
             entity=entity,
             project=project,
@@ -1799,8 +1787,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Yields:
             PredictionReadRes instances.
         """
-        self._update_client_headers()
-        entity, project = split_project_id(req.project_id)
+        entity, project = self._prepare_v2_request(req)
         response = self._stainless_client.v2.predictions.list(
             entity=entity,
             project=project,
@@ -1823,8 +1810,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Prediction delete response.
         """
-        self._update_client_headers()
-        entity, project = split_project_id(req.project_id)
+        entity, project = self._prepare_v2_request(req)
         response = self._stainless_client.v2.predictions.delete(
             entity=entity,
             project=project,
@@ -1844,8 +1830,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Prediction finish response.
         """
-        self._update_client_headers()
-        entity, project = split_project_id(req.project_id)
+        entity, project = self._prepare_v2_request(req)
         response = self._stainless_client.v2.predictions.finish(
             entity=entity,
             project=project,
@@ -1863,8 +1848,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Score create response.
         """
-        self._update_client_headers()
-        entity, project = split_project_id(req.project_id)
+        entity, project = self._prepare_v2_request(req)
         response = self._stainless_client.v2.scores.create(
             entity=entity,
             project=project,
@@ -1885,8 +1869,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Score read response.
         """
-        self._update_client_headers()
-        entity, project = split_project_id(req.project_id)
+        entity, project = self._prepare_v2_request(req)
         response = self._stainless_client.v2.scores.read(
             entity=entity,
             project=project,
@@ -1904,8 +1887,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Yields:
             ScoreReadRes instances.
         """
-        self._update_client_headers()
-        entity, project = split_project_id(req.project_id)
+        entity, project = self._prepare_v2_request(req)
         response = self._stainless_client.v2.scores.list(
             entity=entity,
             project=project,
@@ -1926,8 +1908,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Score delete response.
         """
-        self._update_client_headers()
-        entity, project = split_project_id(req.project_id)
+        entity, project = self._prepare_v2_request(req)
         response = self._stainless_client.v2.scores.delete(
             entity=entity,
             project=project,
