@@ -21,6 +21,8 @@ from weave.trace.settings import (
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
 from weave.trace_server_bindings.caches import DiskCache, LRUCache, StackedCache
+from weave.trace_server_bindings.client_interface import TraceServerClientInterface
+from weave.trace_server_bindings.models import ServerInfoRes
 
 logger = logging.getLogger(__name__)
 
@@ -71,12 +73,12 @@ class CachingMiddlewareTraceServer(tsi.FullTraceServerInterface):
         _cache_recorder: Metrics tracking cache hits, misses, errors and skips
     """
 
-    _next_trace_server: tsi.FullTraceServerInterface
+    _next_trace_server: TraceServerClientInterface
     _cache_prefix: str
 
     def __init__(
         self,
-        next_trace_server: tsi.FullTraceServerInterface,
+        next_trace_server: TraceServerClientInterface,
         cache_dir: str | None = None,
         size_limit: int = 1_000_000_000,
     ):
@@ -120,7 +122,7 @@ class CachingMiddlewareTraceServer(tsi.FullTraceServerInterface):
         return None
 
     @classmethod
-    def from_env(cls, next_trace_server: tsi.FullTraceServerInterface) -> Self:
+    def from_env(cls, next_trace_server: TraceServerClientInterface) -> Self:
         cache_dir = server_cache_dir()
         size_limit = server_cache_size_limit()
         return cls(next_trace_server, cache_dir, size_limit)
@@ -416,6 +418,9 @@ class CachingMiddlewareTraceServer(tsi.FullTraceServerInterface):
         )
 
     # Remaining Un-cacheable Methods:
+
+    def server_info(self) -> ServerInfoRes:
+        return self._next_trace_server.server_info()
 
     def ensure_project_exists(
         self, entity: str, project: str
