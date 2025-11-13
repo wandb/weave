@@ -3,7 +3,6 @@ import os
 import sys
 from collections.abc import Generator
 from pathlib import Path
-from typing import Optional
 
 import pytest
 import yaml
@@ -75,7 +74,7 @@ def preference_id():
 def test_train_router(
     client: WeaveClient,
     model_evals: dict[str, EvaluationResults],
-    preference_id: Optional[str],
+    preference_id: str | None,
 ):
     api_key = os.getenv("NOTDIAMOND_API_KEY", "DUMMY_API_KEY")
     preference_id = train_router(

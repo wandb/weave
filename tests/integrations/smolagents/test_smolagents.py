@@ -1,6 +1,5 @@
 import os
 from collections.abc import Generator
-from typing import Optional
 
 import pytest
 
@@ -158,7 +157,7 @@ def test_tool_calling_agent_weather(client):
     model = OpenAIServerModel(model_id="gpt-4.1")
 
     @tool
-    def get_weather(location: str, celsius: Optional[bool] = False) -> str:
+    def get_weather(location: str, celsius: bool | None = False) -> str:
         """Get weather in the next days at given location.
 
         Args:
@@ -227,7 +226,7 @@ def test_code_agent_weather(client):
     model = OpenAIServerModel(model_id="gpt-4.1")
 
     @tool
-    def get_weather(location: str, celsius: Optional[bool] = False) -> str:
+    def get_weather(location: str, celsius: bool | None = False) -> str:
         """Get weather in the next days at given location.
 
         Args:

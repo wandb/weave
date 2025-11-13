@@ -1,7 +1,8 @@
 import json
 import logging
 import sys
-from typing import Any, Callable, Union
+from collections.abc import Callable
+from typing import Any
 
 import pytest
 from spec import SerializationTestCase
@@ -16,6 +17,7 @@ from weave.trace_server.trace_server_interface import (
     ObjCreateReq,
     ObjReadReq,
 )
+from weave.utils.project_id import to_project_id
 
 """
 IMPORTANT RULES: Once a SerializationTestCase is created, it should never be modified.
@@ -73,7 +75,7 @@ def test_serialization_correctness(
         found_refs = set()
         found_files = set()
 
-        def ref_visitor(path: list[Union[str, int]], obj: Any):
+        def ref_visitor(path: list[str | int], obj: Any):
             if isinstance(obj, str):
                 try:
                     ref = ObjectRef.parse_uri(obj)
@@ -81,7 +83,7 @@ def test_serialization_correctness(
                 except (ValueError, TypeError):
                     pass
 
-        def file_visitor(path: list[Union[str, int]], obj: Any):
+        def file_visitor(path: list[str | int], obj: Any):
             if isinstance(obj, dict) and "files" in obj:
                 files = obj["files"]
                 if isinstance(files, dict):
@@ -102,7 +104,7 @@ def test_serialization_correctness(
             project = ref.project
             name = ref.name
             digest = ref.digest
-            found_project_id = f"{entity}/{project}"
+            found_project_id = to_project_id(entity, project)
             assert project_id == found_project_id
 
             for obj in case.exp_objects:
@@ -298,12 +300,12 @@ def test_serialization_correctness(
 
 def json_visitor(
     obj: Any,
-    visitor: Callable[[list[Union[str, int]], Any], None],
+    visitor: Callable[[list[str | int], Any], None],
 ):
     def _json_visitor(
         obj: Any,
-        visitor: Callable[[list[Union[str, int]], Any], None],
-        path: list[Union[str, int]],
+        visitor: Callable[[list[str | int], Any], None],
+        path: list[str | int],
     ):
         visitor(path, obj)
 

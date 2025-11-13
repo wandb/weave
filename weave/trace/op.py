@@ -13,6 +13,7 @@ from collections import defaultdict
 from collections.abc import (
     AsyncGenerator,
     AsyncIterator,
+    Callable,
     Coroutine,
     Generator,
     Iterator,
@@ -24,7 +25,6 @@ from types import MethodType
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
     Generic,
     TypedDict,
     TypeVar,
@@ -59,27 +59,11 @@ from weave.trace.util import log_once
 if TYPE_CHECKING:
     from weave.trace.call import Call, CallsIter, NoOpCall
 
-
 S = TypeVar("S")
 V = TypeVar("V")
 
 P = ParamSpec("P")
 R = TypeVar("R")
-
-
-if sys.version_info < (3, 10):
-
-    def aiter(obj: AsyncIterator[V]) -> AsyncIterator[V]:
-        return obj.__aiter__()
-
-    async def anext(obj: AsyncIterator[V], default: V | None = None) -> V:
-        try:
-            return await obj.__anext__()
-        except StopAsyncIteration:
-            if default is not None:
-                return default
-            else:
-                raise
 
 
 logger = logging.getLogger(__name__)
@@ -92,6 +76,9 @@ UNINITIALIZED_MSG = "Warning: Traces will not be logged. Call weave.init to log 
 
 
 class DisplayNameFuncError(ValueError): ...
+
+
+class OpCallError(Exception): ...
 
 
 # Call, original function output, exception if occurred
@@ -250,9 +237,6 @@ def _is_unbound_method(func: Callable) -> bool:
     is_method = params and params[0].name in {"self", "cls"}
 
     return bool(is_method)
-
-
-class OpCallError(Exception): ...
 
 
 def _default_on_input_handler(func: Op, args: tuple, kwargs: dict) -> ProcessedInputs:

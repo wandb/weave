@@ -212,7 +212,7 @@ def test_images_in_load_of_dataset(client):
     ref = weave.publish(dataset)
 
     dataset = ref.get()
-    for gotten_row, local_row in zip(dataset, rows):
+    for gotten_row, local_row in zip(dataset, rows, strict=False):
         assert isinstance(gotten_row["img"], Image.Image)
         assert gotten_row["img"].size == local_row["img"].size
         assert gotten_row["img"].tobytes() == local_row["img"].tobytes()

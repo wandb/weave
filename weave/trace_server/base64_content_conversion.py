@@ -7,7 +7,7 @@ with content objects stored in bucket storage.
 import json
 import logging
 import re
-from typing import Any, TypeVar, Union
+from typing import Any, TypeVar
 
 from weave.trace_server.trace_server_interface import (
     CallEndReq,
@@ -134,7 +134,7 @@ def replace_base64_with_content_objects(
     return _visit(vals)
 
 
-R = TypeVar("R", bound=Union[CallStartReq, CallEndReq])
+R = TypeVar("R", bound=CallStartReq | CallEndReq)
 
 
 def process_call_req_to_content(

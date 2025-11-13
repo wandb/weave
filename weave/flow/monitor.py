@@ -1,5 +1,3 @@
-from typing import Optional
-
 from pydantic import Field
 from typing_extensions import Self
 
@@ -50,7 +48,7 @@ class Monitor(Object):
     sampling_rate: float = Field(ge=0, le=1, default=1)
     scorers: list[Scorer]
     op_names: list[str]
-    query: Optional[Query] = None
+    query: Query | None = None
     active: bool = False
 
     def activate(self) -> ObjectRef:

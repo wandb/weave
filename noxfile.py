@@ -7,31 +7,23 @@ nox.options.reuse_existing_virtualenvs = True
 nox.options.stop_on_first_error = True
 
 
-SUPPORTED_PYTHON_VERSIONS = ["3.9", "3.10", "3.11", "3.12", "3.13"]
-PY313_INCOMPATIBLE_SHARDS = [
-    "cohere",
-    "notdiamond",
-    "verifiers_test",
-]
-PY39_INCOMPATIBLE_SHARDS = [
-    "crewai",
-    "google_genai",
-    "mcp",
-    "smolagents",
-    "dspy",
-    "autogen_tests",
-    "langchain",
-    "verifiers_test",
-    "notdiamond",
-]
-PY310_INCOMPATIBLE_SHARDS = [
-    "verifiers_test",
-]
+SUPPORTED_PYTHON_VERSIONS = ["3.10", "3.11", "3.12", "3.13"]
+INCOMPATIBLE_SHARDS = {
+    "3.10": [
+        "notdiamond",
+        "verifiers_test",
+    ],
+    "3.13": [
+        "cohere",
+        "notdiamond",
+        "verifiers_test",
+    ],
+}
 NUM_TRACE_SERVER_SHARDS = 4
 
 
 @nox.session
-def lint(session):
+def lint(session: nox.Session):
     session.run("uv", "sync", "--active", "--group", "dev", "--frozen")
 
     dry_run = session.posargs and "dry-run" in session.posargs
@@ -63,8 +55,6 @@ def lint(session):
         session.run("pre-commit", "run", "--hook-stage=pre-push")
 
 
-trace_server_shards = [f"trace{i}" for i in range(1, NUM_TRACE_SERVER_SHARDS + 1)]
-
 # Shards that don't have corresponding optional dependencies in pyproject.toml
 # Note: _test/_tests shards are dependency groups, not optional dependencies
 SHARDS_WITHOUT_EXTRAS = {
@@ -74,7 +64,6 @@ SHARDS_WITHOUT_EXTRAS = {
     "trace_no_server",
     "trace_server",
     "trace_server_bindings",
-    *trace_server_shards,
     "openai_realtime",
     "autogen_tests",
     "verifiers_test",
@@ -123,19 +112,16 @@ SHARDS_WITHOUT_EXTRAS = {
         "verifiers_test",
         "autogen_tests",
         "trace",
-        *trace_server_shards,
         "trace_no_server",
     ],
 )
-def tests(session, shard):
-    if session.python.startswith("3.13") and shard in PY313_INCOMPATIBLE_SHARDS:
-        session.skip(f"Skipping {shard=} as it is not compatible with Python 3.13")
-
-    if session.python.startswith("3.9") and shard in PY39_INCOMPATIBLE_SHARDS:
-        session.skip(f"Skipping {shard=} as it is not compatible with Python 3.9")
-
-    if session.python.startswith("3.10") and shard in PY310_INCOMPATIBLE_SHARDS:
-        session.skip(f"Skipping {shard=} as it is not compatible with Python 3.10")
+def tests(session: nox.Session, shard: str):
+    python_version = session.python[:4]  # e.g., "3.10"
+    if shard in INCOMPATIBLE_SHARDS.get(python_version, []):
+        session.skip(
+            f"Skipping {shard=} as it is not compatible with Python {python_version}"
+        )
+        return
 
     # Only add --extra shard if the shard has a corresponding optional dependency
     # Use --active to sync to the active nox virtual environment
@@ -189,20 +175,30 @@ def tests(session, shard):
         "flow": ["tests/flow/"],
         "trace_server": ["tests/trace_server/"],
         "trace_server_bindings": ["tests/trace_server_bindings"],
-        "mistral": ["tests/integrations/mistral/"],
         "scorers": ["tests/scorers/"],
         "autogen_tests": ["tests/integrations/autogen/"],
         "verifiers_test": ["tests/integrations/verifiers/"],
-        "trace": ["tests/trace/"],
-        **{shard: ["tests/trace/"] for shard in trace_server_shards},
+        "trace": [
+            "tests/trace/",
+            "tests/compat/",
+            "tests/utils/",
+            "tests/wandb_interface/",
+        ],
         "trace_no_server": ["tests/trace/"],
     }
 
     test_dirs = test_dirs_dict.get(shard, default_test_dirs)
 
-    # seems to resolve ci issues
-    if shard == "llamaindex":
-        session.posargs.insert(0, "-n4")
+    for test_dir in test_dirs:
+        if not os.path.exists(test_dir):
+            raise ValueError(f"Test directory {test_dir} does not exist")
+
+    # Each worker gets its own isolated database namespace
+    # Only use parallel workers for the trace shard if we have more than 1 CPU core
+    if shard == "trace":
+        cpu_count = os.cpu_count()
+        if cpu_count is not None and cpu_count > 1:
+            session.posargs.insert(0, f"-n{cpu_count}")
 
     # Add sharding logic for trace1, trace2, trace3
     pytest_args = [
@@ -215,16 +211,8 @@ def tests(session, shard):
         "--cov-branch",
     ]
 
-    # Handle trace sharding: run every 3rd test starting at different offsets
-    if shard in trace_server_shards:
-        shard_id = int(shard[-1]) - 1
-        pytest_args.extend(
-            [
-                f"--shard-id={shard_id}",
-                f"--num-shards={NUM_TRACE_SERVER_SHARDS}",
-                "-m trace_server",
-            ]
-        )
+    if shard == "trace":
+        pytest_args.extend(["-m", "trace_server"])
 
     if shard == "trace_no_server":
         pytest_args.extend(["-m", "not trace_server"])

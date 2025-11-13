@@ -1,5 +1,5 @@
 from collections.abc import Iterator
-from typing import Any, Optional
+from typing import Any
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.clickhouse_schema import SelectableCHObjSchema
@@ -27,25 +27,25 @@ OBJECT_METADATA_COLUMNS = [
 ]
 
 
-def _make_optional_part(query_keyword: str, part: Optional[str]) -> str:
+def _make_optional_part(query_keyword: str, part: str | None) -> str:
     if part is None or part == "":
         return ""
     return f"{query_keyword} {part}"
 
 
-def _make_limit_part(limit: Optional[int]) -> str:
+def _make_limit_part(limit: int | None) -> str:
     if limit is None:
         return ""
     return _make_optional_part("LIMIT", str(limit))
 
 
-def _make_offset_part(offset: Optional[int]) -> str:
+def _make_offset_part(offset: int | None) -> str:
     if offset is None:
         return ""
     return _make_optional_part("OFFSET", str(offset))
 
 
-def _make_sort_part(sort_by: Optional[list[tsi.SortBy]]) -> str:
+def _make_sort_part(sort_by: list[tsi.SortBy] | None) -> str:
     if not sort_by:
         return ""
 
@@ -60,7 +60,7 @@ def _make_sort_part(sort_by: Optional[list[tsi.SortBy]]) -> str:
     return _make_optional_part("ORDER BY", ", ".join(sort_clauses))
 
 
-def _make_conditions_part(conditions: Optional[list[str]]) -> str:
+def _make_conditions_part(conditions: list[str] | None) -> str:
     if not conditions:
         return ""
     conditions_str = combine_conditions(conditions, "AND")
@@ -68,7 +68,7 @@ def _make_conditions_part(conditions: Optional[list[str]]) -> str:
 
 
 def _make_object_id_conditions_part(
-    object_id_conditions: Optional[list[str]], add_where_clause: bool = False
+    object_id_conditions: list[str] | None, add_where_clause: bool = False
 ) -> str:
     """Formats object_id_conditions into a query string. In this file is it only
     used after the WHERE project_id... clause, but passing add_where_clause=True
@@ -98,7 +98,7 @@ def format_metadata_objects_from_query_result(
 
         columns_with_val_dump += ["val_dump"]
 
-        row_dict = dict(zip(columns_with_val_dump, row_with_val_dump))
+        row_dict = dict(zip(columns_with_val_dump, row_with_val_dump, strict=False))
 
         row_model = SelectableCHObjSchema.model_validate(row_dict)
         result.append(row_model)
@@ -109,9 +109,9 @@ class ObjectMetadataQueryBuilder:
     def __init__(
         self,
         project_id: str,
-        conditions: Optional[list[str]] = None,
-        object_id_conditions: Optional[list[str]] = None,
-        parameters: Optional[dict[str, Any]] = None,
+        conditions: list[str] | None = None,
+        object_id_conditions: list[str] | None = None,
+        parameters: dict[str, Any] | None = None,
         include_deleted: bool = False,
     ):
         self.project_id = project_id
@@ -120,8 +120,8 @@ class ObjectMetadataQueryBuilder:
             self.parameters.update({"project_id": project_id})
         self._conditions: list[str] = conditions or []
         self._object_id_conditions: list[str] = object_id_conditions or []
-        self._limit: Optional[int] = None
-        self._offset: Optional[int] = None
+        self._limit: int | None = None
+        self._offset: int | None = None
         self._sort_by: list[tsi.SortBy] = []
         self._include_deleted: bool = include_deleted
         self.include_storage_size: bool = False
@@ -152,7 +152,7 @@ class ObjectMetadataQueryBuilder:
         return _make_offset_part(self._offset)
 
     def _make_digest_condition(
-        self, digest: str, param_key: Optional[str] = None, index: Optional[int] = None
+        self, digest: str, param_key: str | None = None, index: int | None = None
     ) -> str:
         """If digest is "latest", return the condition for the latest version.
         Otherwise, return the condition for the version with the given digest.
@@ -173,7 +173,7 @@ class ObjectMetadataQueryBuilder:
             return self._make_version_digest_condition(digest, param_key, index)
 
     def _make_version_digest_condition(
-        self, digest: str, param_key: str, index: Optional[int] = None
+        self, digest: str, param_key: str, index: int | None = None
     ) -> str:
         if index is not None:
             param_key = f"{param_key}_{index}"
@@ -181,7 +181,7 @@ class ObjectMetadataQueryBuilder:
         return f"digest = {{{param_key}: String}}"
 
     def _make_version_index_condition(
-        self, version_index: int, param_key: str, index: Optional[int] = None
+        self, version_index: int, param_key: str, index: int | None = None
     ) -> str:
         if index is not None:
             param_key = f"{param_key}_{index}"
@@ -198,7 +198,7 @@ class ObjectMetadataQueryBuilder:
         self._conditions.append(digests_condition)
 
     def add_object_ids_condition(
-        self, object_ids: list[str], param_key: Optional[str] = None
+        self, object_ids: list[str], param_key: str | None = None
     ) -> None:
         if len(object_ids) == 1:
             param_key = param_key or "object_id"
