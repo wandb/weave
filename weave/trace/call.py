@@ -130,14 +130,14 @@ class Call:
             )
 
         try:
-            entity, project = parse_project_id(self.project_id)
+            entity, project = from_project_id(self.project_id)
         except ValueError:
             raise ValueError(f"Invalid project_id: {self.project_id}") from None
         return urls.redirect_call(entity, project, self.id)
 
     @property
     def ref(self) -> CallRef:
-        entity, project = parse_project_id(self.project_id)
+        entity, project = from_project_id(self.project_id)
         if not self.id:
             raise ValueError(
                 "Can't get ref for call without ID, was `weave.init` called?"
@@ -364,9 +364,7 @@ def _make_calls_iterator(
     # TODO: Should be Call, not WeaveObject
     def transform_func(call: CallSchema) -> WeaveObject:
         entity, project = from_project_id(project_id)
-        return make_client_call(
-            entity, project, call, server
-        )
+        return make_client_call(entity, project, call, server)
 
     def size_func() -> int:
         response = server.calls_query_stats(
