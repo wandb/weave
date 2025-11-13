@@ -4120,10 +4120,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         prompt = getattr(req.inputs, "prompt", None)
         template_vars = getattr(req.inputs, "template_vars", None)
         prompt_messages = []
-        initial_messages = getattr(req.inputs, "messages", None) or []
-
         # Store original messages before template var replacement (for tracking)
-        original_initial_messages = initial_messages
+        initial_messages = getattr(req.inputs, "messages", None) or []
 
         if prompt:
             try:
@@ -4190,7 +4188,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             # and include prompt and template_vars
             tracked_inputs = req.inputs.model_dump(exclude_none=True)
             tracked_inputs["model"] = model_name
-            tracked_inputs["messages"] = original_initial_messages
+            tracked_inputs["messages"] = initial_messages
             if prompt:
                 tracked_inputs["prompt"] = prompt
             if template_vars:
