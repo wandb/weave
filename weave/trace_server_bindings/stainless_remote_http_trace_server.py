@@ -4,7 +4,7 @@ import datetime
 import io
 import logging
 from collections.abc import Iterator
-from typing import Any, Callable, TypeVar
+from typing import Any, Callable, TypeVar, overload
 from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, validate_call
@@ -229,6 +229,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         response = stainless_api(**req_dict, **extra_kwargs)
         return res_type.model_validate(response.model_dump())
 
+    @overload
     def _stainless_request_object(
         self,
         req: TReq | dict[str, Any],
@@ -237,20 +238,57 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         stainless_api: Callable[..., Any],
         *,
         exclude: set[str] | None = None,
+        exclude_none: bool = False,
+        return_iterator: bool = False,
         **extra_kwargs: Any,
-    ) -> TRes:
+    ) -> TRes: ...
+
+    @overload
+    def _stainless_request_object(
+        self,
+        req: TReq | dict[str, Any],
+        req_type: type[TReq],
+        res_type: None,
+        stainless_api: Callable[..., Any],
+        *,
+        exclude: set[str] | None = None,
+        exclude_none: bool = False,
+        return_iterator: bool = True,
+        **extra_kwargs: Any,
+    ) -> Iterator[Any]: ...
+
+    def _stainless_request_object(
+        self,
+        req: TReq | dict[str, Any],
+        req_type: type[TReq],
+        res_type: type[TRes] | None,
+        stainless_api: Callable[..., Any],
+        *,
+        exclude: set[str] | None = None,
+        exclude_none: bool = False,
+        return_iterator: bool = False,
+        **extra_kwargs: Any,
+    ) -> TRes | Iterator[Any]:
         """Helper method for Object API requests that split project_id into entity/project.
 
+        Handles all object API patterns including create, read, update, delete, and list operations.
+        Automatically handles common patterns:
+        - Extracts object_id if present (for delete operations)
+        - Transforms digests to body parameter if present (for delete operations)
+        - Excludes digests from model dump (for delete operations)
+
         Args:
             req: Request object or dict to validate. If already validated, will be used as-is.
             req_type: Type of the request model.
-            res_type: Type of the response model.
+            res_type: Type of the response model. None if return_iterator is True.
             stainless_api: Stainless API callable to invoke.
             exclude: Set of field names to exclude from request dump.
+            exclude_none: Whether to exclude None values from model dump (for list operations).
+            return_iterator: If True, returns iterator instead of validated response.
             **extra_kwargs: Additional keyword arguments to pass to the API.
 
         Returns:
-            Validated response model instance.
+            Validated response model instance, or iterator if return_iterator is True.
         """
         # validate_request is idempotent - only validates if req is a dict
         req = validate_request(req, req_type)
@@ -262,6 +300,8 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             exclude_set.update(exclude)
 
         dump_kwargs: dict[str, Any] = {"by_alias": True}
+        if exclude_none:
+            dump_kwargs["exclude_none"] = True
         exclude_set.update(extra_kwargs.keys())
         if exclude_set:
             dump_kwargs["exclude"] = exclude_set
@@ -270,106 +310,15 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         response = stainless_api(
             entity=entity, project=project, **req_dict, **extra_kwargs
         )
-        return res_type.model_validate(response.model_dump())
 
-    def _stainless_delete_object(
-        self,
-        req: TReq | dict[str, Any],
-        req_type: type[TReq],
-        res_type: type[TRes],
-        stainless_api: Callable[..., Any],
-        *,
-        exclude: set[str] | None = None,
-        **extra_kwargs: Any,
-    ) -> TRes:
-        """Helper method for Object API delete requests that split project_id into entity/project.
-
-        Automatically handles common delete patterns:
-        - Extracts object_id if present
-        - Transforms digests to body parameter if present
-        - Excludes digests from model dump
-
-        Args:
-            req: Request object or dict to validate. If already validated, will be used as-is.
-            req_type: Type of the request model.
-            res_type: Type of the response model.
-            stainless_api: Stainless API callable to invoke.
-            exclude: Set of field names to exclude from request dump (in addition to digests).
-            **extra_kwargs: Additional keyword arguments to pass to the API.
-
-        Returns:
-            Validated response model instance.
-        """
-        # validate_request is idempotent - only validates if req is a dict
-        req = validate_request(req, req_type)
-        self._update_client_headers()
-        entity, project = split_project_id(req.project_id)
-
-        exclude_set = {"project_id", "digests"}
-        if exclude:
-            exclude_set.update(exclude)
-
-        # Automatically extract object_id and body if present
-        extra_kwargs_dict = dict(extra_kwargs)
-        if hasattr(req, "object_id") and req.object_id is not None:
-            extra_kwargs_dict["object_id"] = req.object_id
-            exclude_set.add("object_id")
-        if hasattr(req, "digests"):
-            # Match original behavior: pass digests if truthy, otherwise None
-            extra_kwargs_dict["body"] = req.digests if req.digests else None
-
-        dump_kwargs: dict[str, Any] = {"by_alias": True}
-        exclude_set.update(extra_kwargs_dict.keys())
-        if exclude_set:
-            dump_kwargs["exclude"] = exclude_set
-
-        req_dict = req.model_dump(**dump_kwargs)
-        response = stainless_api(
-            entity=entity, project=project, **req_dict, **extra_kwargs_dict
-        )
-        return res_type.model_validate(response.model_dump())
-
-    def _stainless_list_object(
-        self,
-        req: TReq | dict[str, Any],
-        req_type: type[TReq],
-        stainless_api: Callable[..., Any],
-        *,
-        exclude: set[str] | None = None,
-        **extra_kwargs: Any,
-    ) -> Iterator[Any]:
-        """Helper method for Object API list requests that split project_id into entity/project.
-
-        Args:
-            req: Request object or dict to validate. If already validated, will be used as-is.
-            req_type: Type of the request model.
-            stainless_api: Stainless API callable to invoke.
-            exclude: Set of field names to exclude from request dump.
-            **extra_kwargs: Additional keyword arguments to pass to the API.
-
-        Yields:
-            Raw response items from the stainless API (caller should validate).
-        """
-        # validate_request is idempotent - only validates if req is a dict
-        req = validate_request(req, req_type)
-        self._update_client_headers()
-        entity, project = split_project_id(req.project_id)
-
-        exclude_set = {"project_id"}
-        if exclude:
-            exclude_set.update(exclude)
-
-        dump_kwargs: dict[str, Any] = {"by_alias": True, "exclude_none": True}
-        exclude_set.update(extra_kwargs.keys())
-        if exclude_set:
-            dump_kwargs["exclude"] = exclude_set
-
-        req_dict = req.model_dump(**dump_kwargs)
-        response = stainless_api(
-            entity=entity, project=project, **req_dict, **extra_kwargs
-        )
-        # JSONLDecoder is iterable
-        yield from response
+        if return_iterator:
+            # JSONLDecoder is iterable
+            return response  # type: ignore[return-value]
+        else:
+            assert res_type is not None, (
+                "res_type must be provided when return_iterator is False"
+            )
+            return res_type.model_validate(response.model_dump())
 
     def _flush_calls(
         self,
@@ -1352,12 +1301,16 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Yields:
             OpReadRes instances.
         """
-        for item in self._stainless_list_object(
+        response = self._stainless_request_object(
             req,
             tsi.OpListReq,
+            None,
             self._stainless_client.v2.ops.list,
+            exclude_none=True,
+            return_iterator=True,
             eager="true" if req.eager else None,
-        ):
+        )
+        for item in response:
             yield tsi.OpReadRes.model_validate(item.model_dump())
 
     @validate_call
@@ -1370,11 +1323,14 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Op delete response.
         """
-        return self._stainless_delete_object(
+        return self._stainless_request_object(
             req,
             tsi.OpDeleteReq,
             tsi.OpDeleteRes,
             self._stainless_client.v2.ops.delete,
+            exclude={"digests"},
+            object_id=req.object_id,
+            body=req.digests if req.digests else None,
         )
 
     @validate_call
@@ -1423,11 +1379,15 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Yields:
             DatasetReadRes instances.
         """
-        for item in self._stainless_list_object(
+        response = self._stainless_request_object(
             req,
             tsi.DatasetListReq,
+            None,
             self._stainless_client.v2.datasets.list,
-        ):
+            exclude_none=True,
+            return_iterator=True,
+        )
+        for item in response:
             yield tsi.DatasetReadRes.model_validate(item.model_dump())
 
     @validate_call
@@ -1440,11 +1400,14 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Dataset delete response.
         """
-        return self._stainless_delete_object(
+        return self._stainless_request_object(
             req,
             tsi.DatasetDeleteReq,
             tsi.DatasetDeleteRes,
             self._stainless_client.v2.datasets.delete,
+            exclude={"digests"},
+            object_id=req.object_id,
+            body=req.digests if req.digests else None,
         )
 
     @validate_call
@@ -1493,11 +1456,15 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Yields:
             ScorerReadRes instances.
         """
-        for item in self._stainless_list_object(
+        response = self._stainless_request_object(
             req,
             tsi.ScorerListReq,
+            None,
             self._stainless_client.v2.scorers.list,
-        ):
+            exclude_none=True,
+            return_iterator=True,
+        )
+        for item in response:
             yield tsi.ScorerReadRes.model_validate(item.model_dump())
 
     @validate_call
@@ -1510,11 +1477,14 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Scorer delete response.
         """
-        return self._stainless_delete_object(
+        return self._stainless_request_object(
             req,
             tsi.ScorerDeleteReq,
             tsi.ScorerDeleteRes,
             self._stainless_client.v2.scorers.delete,
+            exclude={"digests"},
+            object_id=req.object_id,
+            body=req.digests if req.digests else None,
         )
 
     @validate_call
@@ -1567,11 +1537,15 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Yields:
             EvaluationReadRes instances.
         """
-        for item in self._stainless_list_object(
+        response = self._stainless_request_object(
             req,
             tsi.EvaluationListReq,
+            None,
             self._stainless_client.v2.evaluations.list,
-        ):
+            exclude_none=True,
+            return_iterator=True,
+        )
+        for item in response:
             yield tsi.EvaluationReadRes.model_validate(item.model_dump())
 
     @validate_call
@@ -1586,11 +1560,14 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Evaluation delete response.
         """
-        return self._stainless_delete_object(
+        return self._stainless_request_object(
             req,
             tsi.EvaluationDeleteReq,
             tsi.EvaluationDeleteRes,
             self._stainless_client.v2.evaluations.delete,
+            exclude={"digests"},
+            object_id=req.object_id,
+            body=req.digests if req.digests else None,
         )
 
     @validate_call
@@ -1639,11 +1616,15 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Yields:
             ModelReadRes instances.
         """
-        for item in self._stainless_list_object(
+        response = self._stainless_request_object(
             req,
             tsi.ModelListReq,
+            None,
             self._stainless_client.v2.models.list,
-        ):
+            exclude_none=True,
+            return_iterator=True,
+        )
+        for item in response:
             yield tsi.ModelReadRes.model_validate(item.model_dump())
 
     @validate_call
@@ -1656,11 +1637,14 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Model delete response.
         """
-        return self._stainless_delete_object(
+        return self._stainless_request_object(
             req,
             tsi.ModelDeleteReq,
             tsi.ModelDeleteRes,
             self._stainless_client.v2.models.delete,
+            exclude={"digests"},
+            object_id=req.object_id,
+            body=req.digests if req.digests else None,
         )
 
     @validate_call
@@ -1724,13 +1708,17 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
                 extra_kwargs["evaluation_run_ids"] = ",".join(
                     req.filter.evaluation_run_ids
                 )
-        for item in self._stainless_list_object(
+        response = self._stainless_request_object(
             req,
             tsi.EvaluationRunListReq,
+            None,
             self._stainless_client.v2.evaluation_runs.list,
             exclude={"filter"},
+            exclude_none=True,
+            return_iterator=True,
             **extra_kwargs,
-        ):
+        )
+        for item in response:
             yield tsi.EvaluationRunReadRes.model_validate(item.model_dump())
 
     @validate_call
@@ -1745,7 +1733,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Evaluation run delete response.
         """
-        return self._stainless_delete_object(
+        return self._stainless_request_object(
             req,
             tsi.EvaluationRunDeleteReq,
             tsi.EvaluationRunDeleteRes,
@@ -1827,11 +1815,15 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Yields:
             PredictionReadRes instances.
         """
-        for item in self._stainless_list_object(
+        response = self._stainless_request_object(
             req,
             tsi.PredictionListReq,
+            None,
             self._stainless_client.v2.predictions.list,
-        ):
+            exclude_none=True,
+            return_iterator=True,
+        )
+        for item in response:
             yield tsi.PredictionReadRes.model_validate(item.model_dump())
 
     @validate_call
@@ -1846,7 +1838,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Prediction delete response.
         """
-        return self._stainless_delete_object(
+        return self._stainless_request_object(
             req,
             tsi.PredictionDeleteReq,
             tsi.PredictionDeleteRes,
@@ -1920,11 +1912,15 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Yields:
             ScoreReadRes instances.
         """
-        for item in self._stainless_list_object(
+        response = self._stainless_request_object(
             req,
             tsi.ScoreListReq,
+            None,
             self._stainless_client.v2.scores.list,
-        ):
+            exclude_none=True,
+            return_iterator=True,
+        )
+        for item in response:
             yield tsi.ScoreReadRes.model_validate(item.model_dump())
 
     @validate_call
@@ -1937,7 +1933,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Score delete response.
         """
-        return self._stainless_delete_object(
+        return self._stainless_request_object(
             req,
             tsi.ScoreDeleteReq,
             tsi.ScoreDeleteRes,
