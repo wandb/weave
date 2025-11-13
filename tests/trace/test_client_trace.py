@@ -545,17 +545,16 @@ def test_trace_call_query_filter_input_object_version_refs(client):
 
 
 def test_trace_call_wb_run_step_query(client):
-    full_wb_run_id = f"{client.entity}/{client.project}/test-run"
     from weave.trace import weave_client
+    from weave.trace.wandb_run_context import WandbRunContext
 
     step_counter = iter(range(100))
-    with (
-        mock.patch.object(
-            weave_client, "safe_current_wb_run_id", return_value=full_wb_run_id
-        ),
-        mock.patch.object(  # noqa: PT008
-            weave_client, "safe_current_wb_run_step", lambda: next(step_counter)
-        ),
+
+    def mock_context():
+        return WandbRunContext(run_id="test-run", step=next(step_counter))
+
+    with mock.patch.object(
+        weave_client, "get_global_wb_run_context", side_effect=mock_context
     ):
         call_spec = simple_line_call_bootstrap()
 
@@ -634,6 +633,84 @@ def test_trace_call_wb_run_step_query(client):
     exp_steps = sorted(exp_end_steps, reverse=True)
     found_steps = [c.wb_run_step_end for c in res.calls]
     assert found_steps == exp_steps
+
+
+def test_trace_call_wb_run_context_override(client):
+    """Test that client.set_wandb_run_context() overrides wandb run info."""
+    # Set the context with a specific run_id and step
+    client.set_wandb_run_context(run_id="test-run", step=0)
+
+    # Create calls using simple_line_call_bootstrap
+    call_spec = simple_line_call_bootstrap()
+
+    # Query the calls to verify the override worked
+    server = get_client_trace_server(client)
+    res = server.calls_query(
+        tsi.CallsQueryReq(project_id=get_client_project_id(client))
+    )
+
+    # All calls should have the overridden wb_run_id
+    expected_wb_run_id = f"{client.entity}/{client.project}/test-run"
+    for call in res.calls:
+        assert call.wb_run_id == expected_wb_run_id
+
+    # All calls should have step 0 for both start and end (since we set a fixed value)
+    for call in res.calls:
+        assert call.wb_run_step == 0
+        assert call.wb_run_step_end == 0
+
+    # Test querying by wb_run_step
+    query = tsi.Query(
+        **{"$expr": {"$eq": [{"$getField": "wb_run_step"}, {"$literal": 0}]}}
+    )
+    res = server.calls_query(
+        tsi.CallsQueryReq(project_id=get_client_project_id(client), query=query)
+    )
+    # All calls should match since they all have step 0
+    assert len(res.calls) == call_spec.total_calls
+
+    # Test sorting by wb_run_step (all should be 0)
+    res = server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=get_client_project_id(client),
+            sort_by=[tsi.SortBy(field="wb_run_step", direction="desc")],
+        )
+    )
+    assert all(c.wb_run_step == 0 for c in res.calls)
+
+    # Test sorting by wb_run_step_end (all should be 0)
+    res = server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=get_client_project_id(client),
+            sort_by=[tsi.SortBy(field="wb_run_step_end", direction="desc")],
+        )
+    )
+    assert all(c.wb_run_step_end == 0 for c in res.calls)
+
+    # Clear the context
+    client.clear_wandb_run_context()
+
+    # Create a new call to verify it no longer has the override
+    @weave.op
+    def test_op_after_clear():
+        return "done"
+
+    test_op_after_clear()
+
+    # Get the latest call (should be the one we just created)
+    res = server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=get_client_project_id(client),
+            sort_by=[tsi.SortBy(field="started_at", direction="desc")],
+            limit=1,
+        )
+    )
+    assert len(res.calls) == 1
+    latest_call = res.calls[0]
+
+    # The wb_run_id and wb_run_step should be None now (no override, no global wandb.run)
+    assert latest_call.wb_run_id is None
+    assert latest_call.wb_run_step is None
 
 
 def test_trace_call_query_filter_output_object_version_refs(client):
@@ -809,13 +886,18 @@ def test_trace_call_query_filter_wb_run_ids(client):
     full_wb_run_id_1 = f"{client.entity}/{client.project}/test-run-1"
     full_wb_run_id_2 = f"{client.entity}/{client.project}/test-run-2"
     from weave.trace import weave_client
+    from weave.trace.wandb_run_context import WandbRunContext
 
     with mock.patch.object(
-        weave_client, "safe_current_wb_run_id", return_value=full_wb_run_id_1
+        weave_client,
+        "get_global_wb_run_context",
+        return_value=WandbRunContext(run_id="test-run-1", step=0),
     ):
         call_spec_1 = simple_line_call_bootstrap()
     with mock.patch.object(
-        weave_client, "safe_current_wb_run_id", return_value=full_wb_run_id_2
+        weave_client,
+        "get_global_wb_run_context",
+        return_value=WandbRunContext(run_id="test-run-2", step=0),
     ):
         call_spec_2 = simple_line_call_bootstrap()
     call_spec_3 = simple_line_call_bootstrap()
@@ -5926,3 +6008,31 @@ def test_calls_query_filter_contains_in_message_array(client):
     #     )
     # )
     # assert len(calls) == 1
+
+
+def test_calls_query_sort_by_deselected_heavy_field(client):
+    @weave.op
+    def op1(x: int) -> int:
+        return x * 2
+
+    @weave.op
+    def op2(x: int) -> int:
+        return x * 3
+
+    op1(1)
+    op2(2)
+
+    # get call ids
+    calls = list(client.get_calls(columns=["id"]))
+    call_ids = [call.id for call in calls]
+
+    sort_by = [{"field": "inputs.x", "direction": "asc"}]
+    calls = client.get_calls(sort_by=sort_by, columns=["id"], include_costs=False)
+    assert len(calls) == 2
+    assert calls[0].id == call_ids[0]
+    assert calls[1].id == call_ids[1]
+
+    calls = client.get_calls(sort_by=sort_by, columns=["id"], include_costs=True)
+    assert len(calls) == 2
+    assert calls[0].id == call_ids[0]
+    assert calls[1].id == call_ids[1]

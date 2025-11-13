@@ -2,6 +2,23 @@
 
 This tool generates code from the OpenAPI specification for Python, Node.js, and TypeScript using Stainless.
 
+## Quick Start
+
+The simplest way to generate code:
+
+```bash
+make generate-bindings
+```
+
+This single command will:
+
+1. Retrieve the OpenAPI specification from a temporary FastAPI server
+2. Generate Python code using Stainless
+3. Create a git branch with the generated code
+4. Update `pyproject.toml` with the git SHA reference
+
+The CLI uses a configuration file (`tools/codegen/generate_config.yaml`) and focuses on correctness and simplicity.
+
 ## Setup
 
 1. Install weave locally:
@@ -32,28 +49,29 @@ This tool generates code from the OpenAPI specification for Python, Node.js, and
    brew install stainless-api/tap/stl
    ```
 
-## Commands / ARGS
-
-Note: If you run `make generate-bindings` from the weave root directory as suggested below, you'll need to pass the commands as with `ARGS=`, for example `ARGS="all"`. See more below.
-
-- **get-openapi-spec**: Starts a temporary server to fetch and save the OpenAPI spec.
-- **generate-code**: Generates client code using Stainless. You can specify the path for code generation for each language.
-- **update-pyproject**: Updates pyproject.toml with either the generated git SHA (normal dev) or the published pypi version (release).
-- **all**: Runs the full pipeline. Configuration can be provided via a YAML file (default: tools/codegen/generate_config.yaml).
-
 ## Usage
 
-For help, run (from the weave root directory):
-
-```
-make generate-bindings ARGS="--help"
-```
-
-To run the full pipeline:
+The CLI (`generate.py`) provides a single command that handles the entire workflow:
 
 ```bash
-make generate-bindings ARGS="all"
+# Using make (recommended)
+make generate-bindings
+
+# Or directly
+uv run tools/codegen/generate.py
+
+# With custom config file
+uv run tools/codegen/generate.py --config /path/to/config.yaml
 ```
+
+The CLI:
+
+- Generates Python code (optionally supports Node.js and TypeScript)
+- Uses a config file for all settings
+- Ensures generated code exists on a referenceable git branch/SHA
+- Provides clear error messages and validation
+- No interactive prompts - fails fast if configuration is missing
+- Automatically sets upstream tracking when pushing branches
 
 ## Stainless configuration
 

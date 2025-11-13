@@ -357,13 +357,14 @@ def _validate_api_key(api_key: str) -> None:
         >>> _validate_api_key("short")  # Raises ValueError
     """
     if "-" in api_key:  # on-prem style
-        _, key = api_key.split("-", 1)
+        parts = api_key.split("-")
+        key = parts[-1]
     else:  # normal style
         key = api_key
 
-    if len(key) != 40:
+    if len(key) < 40:
         raise ValueError(
-            f"API key must be 40 characters long, yours was {len(key)}"
+            f"API key must be at least 40 characters long, yours was {len(key)}"
         ) from None
 
 

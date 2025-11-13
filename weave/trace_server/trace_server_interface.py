@@ -172,6 +172,9 @@ class StartedCallSchemaForInsert(BaseModel):
     # Inputs
     inputs: dict[str, Any]
 
+    # OTEL span data source of truth
+    otel_dump: Optional[dict[str, Any]] = None
+
     # WB Metadata
     wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
     wb_run_id: Optional[str] = None
@@ -247,6 +250,7 @@ class OtelExportReq(BaseModel):
     project_id: str
     # traces must be ExportTraceServiceRequest payload but allowing Any removes the proto package as a requirement.
     traces: Any
+    wb_run_id: Optional[str] = None
     wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
@@ -320,7 +324,7 @@ class CallsDeleteReq(BaseModelStrict):
 
 
 class CallsDeleteRes(BaseModel):
-    pass
+    num_deleted: int = Field(..., description="The number of calls deleted")
 
 
 class CompletionsCreateRequestInputs(BaseModel):
@@ -513,44 +517,13 @@ class CallUpdateRes(BaseModel):
     pass
 
 
-class OpCreateReq(BaseModelStrict):
-    op_obj: ObjSchemaForInsert
-
-
-class OpCreateRes(BaseModel):
-    digest: str
-
-
-class OpReadReq(BaseModelStrict):
-    project_id: str
-    name: str
-    digest: str
-
-
-class OpReadRes(BaseModel):
-    op_obj: ObjSchema
-
-
-class OpVersionFilter(BaseModel):
-    op_names: Optional[list[str]] = None
-    latest_only: Optional[bool] = None
-
-
-class OpQueryReq(BaseModelStrict):
-    project_id: str
-    filter: Optional[OpVersionFilter] = None
-
-
-class OpQueryRes(BaseModel):
-    op_objs: list[ObjSchema]
-
-
 class ObjCreateReq(BaseModelStrict):
     obj: ObjSchemaForInsert
 
 
 class ObjCreateRes(BaseModel):
-    digest: str  #
+    digest: str
+    object_id: Optional[str] = None
 
 
 class ObjReadReq(BaseModelStrict):
@@ -1243,7 +1216,7 @@ class EvaluationStatusRes(BaseModel):
     ]
 
 
-class OpCreateV2Body(BaseModel):
+class OpCreateBody(BaseModel):
     """Request body for creating an Op object via REST API.
 
     This model excludes project_id since it comes from the URL path in RESTful endpoints.
@@ -1258,18 +1231,19 @@ class OpCreateV2Body(BaseModel):
     )
 
 
-class OpCreateV2Req(OpCreateV2Body):
+class OpCreateReq(OpCreateBody):
     """Request model for creating an Op object.
 
-    Extends OpCreateV2Body by adding project_id for internal API usage.
+    Extends OpCreateBody by adding project_id for internal API usage.
     """
 
     project_id: str = Field(
         ..., description="The project where this object will be saved"
     )
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
-class OpCreateV2Res(BaseModel):
+class OpCreateRes(BaseModel):
     """Response model for creating an Op object."""
 
     digest: str = Field(..., description="The digest of the created op")
@@ -1277,15 +1251,16 @@ class OpCreateV2Res(BaseModel):
     version_index: int = Field(..., description="The version index of the created op")
 
 
-class OpReadV2Req(BaseModel):
+class OpReadReq(BaseModel):
     project_id: str = Field(
         ..., description="The `entity/project` where this op is saved"
     )
     object_id: str = Field(..., description="The op ID")
     digest: str = Field(..., description="The digest of the op object")
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
-class OpReadV2Res(BaseModel):
+class OpReadRes(BaseModel):
     """Response model for reading an Op object.
 
     The code field contains the actual source code of the op.
@@ -1298,7 +1273,7 @@ class OpReadV2Res(BaseModel):
     code: str = Field(..., description="The actual op source code")
 
 
-class OpListV2Req(BaseModel):
+class OpListReq(BaseModel):
     project_id: str = Field(
         ..., description="The `entity/project` where these ops are saved"
     )
@@ -1306,9 +1281,10 @@ class OpListV2Req(BaseModel):
         default=None, description="Maximum number of ops to return"
     )
     offset: Optional[int] = Field(default=None, description="Number of ops to skip")
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
-class OpDeleteV2Req(BaseModel):
+class OpDeleteReq(BaseModel):
     project_id: str = Field(
         ..., description="The `entity/project` where this op is saved"
     )
@@ -1317,15 +1293,16 @@ class OpDeleteV2Req(BaseModel):
         default=None,
         description="List of digests to delete. If not provided, all digests for the op will be deleted.",
     )
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
-class OpDeleteV2Res(BaseModel):
+class OpDeleteRes(BaseModel):
     num_deleted: int = Field(
         ..., description="Number of op versions deleted from this op"
     )
 
 
-class DatasetCreateV2Body(BaseModel):
+class DatasetCreateBody(BaseModel):
     name: Optional[str] = Field(
         None,
         description="The name of this dataset.  Datasets with the same name will be versioned together.",
@@ -1337,13 +1314,14 @@ class DatasetCreateV2Body(BaseModel):
     rows: list[dict[str, Any]] = Field(..., description="Dataset rows")
 
 
-class DatasetCreateV2Req(DatasetCreateV2Body):
+class DatasetCreateReq(DatasetCreateBody):
     project_id: str = Field(
         ..., description="The `entity/project` where this dataset will be saved"
     )
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
-class DatasetCreateV2Res(BaseModel):
+class DatasetCreateRes(BaseModel):
     digest: str = Field(..., description="The digest of the created dataset")
     object_id: str = Field(..., description="The ID of the created dataset")
     version_index: int = Field(
@@ -1351,15 +1329,16 @@ class DatasetCreateV2Res(BaseModel):
     )
 
 
-class DatasetReadV2Req(BaseModel):
+class DatasetReadReq(BaseModel):
     project_id: str = Field(
         ..., description="The `entity/project` where this dataset is saved"
     )
     object_id: str = Field(..., description="The dataset ID")
     digest: str = Field(..., description="The digest of the dataset object")
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
-class DatasetReadV2Res(BaseModel):
+class DatasetReadRes(BaseModel):
     object_id: str = Field(..., description="The dataset ID")
     digest: str = Field(..., description="The digest of the dataset object")
     version_index: int = Field(..., description="The version index of the object")
@@ -1374,7 +1353,7 @@ class DatasetReadV2Res(BaseModel):
     )
 
 
-class DatasetListV2Req(BaseModel):
+class DatasetListReq(BaseModel):
     project_id: str = Field(
         ..., description="The `entity/project` where these datasets are saved"
     )
@@ -1384,9 +1363,10 @@ class DatasetListV2Req(BaseModel):
     offset: Optional[int] = Field(
         default=None, description="Number of datasets to skip"
     )
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
-class DatasetDeleteV2Req(BaseModelStrict):
+class DatasetDeleteReq(BaseModelStrict):
     project_id: str = Field(
         ..., description="The `entity/project` where this dataset is saved"
     )
@@ -1395,13 +1375,14 @@ class DatasetDeleteV2Req(BaseModelStrict):
         default=None,
         description="List of digests to delete. If not provided, all digests for the dataset will be deleted.",
     )
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
-class DatasetDeleteV2Res(BaseModel):
-    num_deleted: int = Field(..., description="Number of d  ataset versions deleted")
+class DatasetDeleteRes(BaseModel):
+    num_deleted: int = Field(..., description="Number of dataset versions deleted")
 
 
-class ScorerCreateV2Body(BaseModel):
+class ScorerCreateBody(BaseModel):
     name: str = Field(
         ...,
         description="The name of this scorer.  Scorers with the same name will be versioned together.",
@@ -1416,13 +1397,14 @@ class ScorerCreateV2Body(BaseModel):
     )
 
 
-class ScorerCreateV2Req(ScorerCreateV2Body):
+class ScorerCreateReq(ScorerCreateBody):
     project_id: str = Field(
         ..., description="The `entity/project` where this scorer will be saved"
     )
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
-class ScorerCreateV2Res(BaseModel):
+class ScorerCreateRes(BaseModel):
     digest: str = Field(..., description="The digest of the created scorer")
     object_id: str = Field(..., description="The ID of the created scorer")
     version_index: int = Field(
@@ -1434,15 +1416,16 @@ class ScorerCreateV2Res(BaseModel):
     )
 
 
-class ScorerReadV2Req(BaseModel):
+class ScorerReadReq(BaseModel):
     project_id: str = Field(
         ..., description="The `entity/project` where this scorer is saved"
     )
     object_id: str = Field(..., description="The scorer ID")
     digest: str = Field(..., description="The digest of the scorer")
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
-class ScorerReadV2Res(BaseModel):
+class ScorerReadRes(BaseModel):
     object_id: str = Field(..., description="The scorer ID")
     digest: str = Field(..., description="The digest of the scorer")
     version_index: int = Field(..., description="The version index of the object")
@@ -1457,7 +1440,7 @@ class ScorerReadV2Res(BaseModel):
     )
 
 
-class ScorerListV2Req(BaseModel):
+class ScorerListReq(BaseModel):
     project_id: str = Field(
         ..., description="The `entity/project` where these scorers are saved"
     )
@@ -1465,9 +1448,10 @@ class ScorerListV2Req(BaseModel):
         default=None, description="Maximum number of scorers to return"
     )
     offset: Optional[int] = Field(default=None, description="Number of scorers to skip")
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
-class ScorerDeleteV2Req(BaseModelStrict):
+class ScorerDeleteReq(BaseModelStrict):
     project_id: str = Field(
         ..., description="The `entity/project` where this scorer is saved"
     )
@@ -1476,13 +1460,14 @@ class ScorerDeleteV2Req(BaseModelStrict):
         default=None,
         description="List of digests to delete. If not provided, all digests for the scorer will be deleted",
     )
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
-class ScorerDeleteV2Res(BaseModel):
+class ScorerDeleteRes(BaseModel):
     num_deleted: int = Field(..., description="Number of scorer versions deleted")
 
 
-class EvaluationCreateV2Body(BaseModel):
+class EvaluationCreateBody(BaseModel):
     name: str = Field(
         ...,
         description="The name of this evaluation.  Evaluations with the same name will be versioned together.",
@@ -1506,13 +1491,14 @@ class EvaluationCreateV2Body(BaseModel):
     )
 
 
-class EvaluationCreateV2Req(EvaluationCreateV2Body):
+class EvaluationCreateReq(EvaluationCreateBody):
     project_id: str = Field(
         ..., description="The `entity/project` where this evaluation will be saved"
     )
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
-class EvaluationCreateV2Res(BaseModel):
+class EvaluationCreateRes(BaseModel):
     digest: str = Field(..., description="The digest of the created evaluation")
     object_id: str = Field(..., description="The ID of the created evaluation")
     version_index: int = Field(
@@ -1523,15 +1509,16 @@ class EvaluationCreateV2Res(BaseModel):
     )
 
 
-class EvaluationReadV2Req(BaseModel):
+class EvaluationReadReq(BaseModel):
     project_id: str = Field(
         ..., description="The `entity/project` where this evaluation is saved"
     )
     object_id: str = Field(..., description="The evaluation ID")
     digest: str = Field(..., description="The digest of the evaluation")
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
-class EvaluationReadV2Res(BaseModel):
+class EvaluationReadRes(BaseModel):
     object_id: str = Field(..., description="The evaluation ID")
     digest: str = Field(..., description="The digest of the evaluation")
     version_index: int = Field(..., description="The version index of the evaluation")
@@ -1561,7 +1548,7 @@ class EvaluationReadV2Res(BaseModel):
     )
 
 
-class EvaluationListV2Req(BaseModel):
+class EvaluationListReq(BaseModel):
     project_id: str = Field(
         ..., description="The `entity/project` where these evaluations are saved"
     )
@@ -1571,9 +1558,10 @@ class EvaluationListV2Req(BaseModel):
     offset: Optional[int] = Field(
         default=None, description="Number of evaluations to skip"
     )
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
-class EvaluationDeleteV2Req(BaseModel):
+class EvaluationDeleteReq(BaseModel):
     project_id: str = Field(
         ..., description="The `entity/project` where this evaluation is saved"
     )
@@ -1582,10 +1570,387 @@ class EvaluationDeleteV2Req(BaseModel):
         default=None,
         description="List of digests to delete. If not provided, all digests for the evaluation will be deleted.",
     )
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
-class EvaluationDeleteV2Res(BaseModel):
+class EvaluationDeleteRes(BaseModel):
     num_deleted: int = Field(..., description="Number of evaluation versions deleted")
+
+
+# Model API Models
+
+
+class ModelCreateBody(BaseModel):
+    name: str = Field(
+        ...,
+        description="The name of this model. Models with the same name will be versioned together.",
+    )
+    description: Optional[str] = Field(
+        None,
+        description="A description of this model",
+    )
+    source_code: str = Field(
+        ...,
+        description="Complete source code for the Model class including imports",
+    )
+    attributes: Optional[dict[str, Any]] = Field(
+        None,
+        description="Additional attributes to be stored with the model",
+    )
+
+
+class ModelCreateReq(ModelCreateBody):
+    project_id: str = Field(
+        ..., description="The `entity/project` where this model will be saved"
+    )
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class ModelCreateRes(BaseModel):
+    digest: str = Field(..., description="The digest of the created model")
+    object_id: str = Field(..., description="The ID of the created model")
+    version_index: int = Field(
+        ..., description="The version index of the created model"
+    )
+    model_ref: str = Field(
+        ...,
+        description="Full reference to the created model",
+    )
+
+
+class ModelReadReq(BaseModel):
+    project_id: str = Field(
+        ..., description="The `entity/project` where this model is saved"
+    )
+    object_id: str = Field(..., description="The model ID")
+    digest: str = Field(..., description="The digest of the model object")
+
+
+class ModelReadRes(BaseModel):
+    object_id: str = Field(..., description="The model ID")
+    digest: str = Field(..., description="The digest of the model")
+    version_index: int = Field(..., description="The version index of the object")
+    created_at: datetime.datetime = Field(..., description="When the model was created")
+    name: str = Field(..., description="The name of the model")
+    description: Optional[str] = Field(None, description="Description of the model")
+    source_code: str = Field(
+        ...,
+        description="The source code of the model",
+    )
+    attributes: Optional[dict[str, Any]] = Field(
+        None, description="Additional attributes stored with the model"
+    )
+
+
+class ModelListReq(BaseModel):
+    project_id: str = Field(
+        ..., description="The `entity/project` where these models are saved"
+    )
+    limit: Optional[int] = Field(
+        default=None, description="Maximum number of models to return"
+    )
+    offset: Optional[int] = Field(default=None, description="Number of models to skip")
+
+
+class ModelDeleteReq(BaseModel):
+    project_id: str = Field(
+        ..., description="The `entity/project` where this model is saved"
+    )
+    object_id: str = Field(..., description="The model ID")
+    digests: Optional[list[str]] = Field(
+        None,
+        description="List of model digests to delete. If None, deletes all versions.",
+    )
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class ModelDeleteRes(BaseModel):
+    num_deleted: int = Field(..., description="Number of model versions deleted")
+
+
+# Evaluation Run API
+
+
+class EvaluationRunCreateBody(BaseModel):
+    evaluation: str = Field(
+        ..., description="Reference to the evaluation (weave:// URI)"
+    )
+    model: str = Field(..., description="Reference to the model (weave:// URI)")
+
+
+class EvaluationRunCreateReq(EvaluationRunCreateBody):
+    project_id: str = Field(
+        ..., description="The `entity/project` where this evaluation run will be saved"
+    )
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class EvaluationRunCreateRes(BaseModel):
+    evaluation_run_id: str = Field(
+        ..., description="The ID of the created evaluation run"
+    )
+
+
+class EvaluationRunReadReq(BaseModel):
+    project_id: str = Field(
+        ..., description="The `entity/project` where this evaluation run is saved"
+    )
+    evaluation_run_id: str = Field(..., description="The evaluation run ID")
+
+
+class EvaluationRunReadRes(BaseModel):
+    evaluation_run_id: str = Field(..., description="The evaluation run ID")
+    evaluation: str = Field(
+        ..., description="Reference to the evaluation (weave:// URI)"
+    )
+    model: str = Field(..., description="Reference to the model (weave:// URI)")
+    status: Optional[str] = Field(None, description="Status of the evaluation run")
+    started_at: Optional[datetime.datetime] = Field(
+        None, description="When the evaluation run started"
+    )
+    finished_at: Optional[datetime.datetime] = Field(
+        None, description="When the evaluation run finished"
+    )
+    summary: Optional[dict[str, Any]] = Field(
+        None, description="Summary data for the evaluation run"
+    )
+
+
+class EvaluationRunFilter(BaseModel):
+    evaluations: Optional[list[str]] = Field(
+        None, description="Filter by evaluation references"
+    )
+    models: Optional[list[str]] = Field(None, description="Filter by model references")
+    evaluation_run_ids: Optional[list[str]] = Field(
+        None, description="Filter by evaluation run IDs"
+    )
+
+
+class EvaluationRunListReq(BaseModel):
+    project_id: str = Field(
+        ..., description="The `entity/project` where these evaluation runs are saved"
+    )
+    filter: Optional[EvaluationRunFilter] = Field(
+        None, description="Filter criteria for evaluation runs"
+    )
+    limit: Optional[int] = Field(
+        default=None, description="Maximum number of evaluation runs to return"
+    )
+    offset: Optional[int] = Field(
+        default=None, description="Number of evaluation runs to skip"
+    )
+
+
+class EvaluationRunDeleteReq(BaseModel):
+    project_id: str = Field(
+        ..., description="The `entity/project` where these evaluation runs exist"
+    )
+    evaluation_run_ids: list[str] = Field(
+        ..., description="List of evaluation run IDs to delete"
+    )
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class EvaluationRunDeleteRes(BaseModel):
+    num_deleted: int = Field(..., description="Number of evaluation runs deleted")
+
+
+class EvaluationRunFinishBody(BaseModel):
+    """Request body for finishing an evaluation run via REST API.
+
+    This model excludes project_id and evaluation_run_id since they come from the URL path in RESTful endpoints.
+    """
+
+    summary: Optional[dict[str, Any]] = Field(
+        None, description="Optional summary dictionary for the evaluation run"
+    )
+
+
+class EvaluationRunFinishReq(EvaluationRunFinishBody):
+    project_id: str = Field(
+        ..., description="The `entity/project` where these evaluation runs exist"
+    )
+    evaluation_run_id: str = Field(..., description="The evaluation run ID to finish")
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class EvaluationRunFinishRes(BaseModel):
+    success: bool = Field(
+        ..., description="Whether the evaluation run was finished successfully"
+    )
+
+
+class PredictionCreateBody(BaseModel):
+    """Request body for creating a Prediction via REST API.
+
+    This model excludes project_id since it comes from the URL path in RESTful endpoints.
+    """
+
+    model: str = Field(..., description="The model reference (weave:// URI)")
+    inputs: dict[str, Any] = Field(..., description="The inputs to the prediction")
+    output: Any = Field(..., description="The output of the prediction")
+    evaluation_run_id: Optional[str] = Field(
+        None,
+        description="Optional evaluation run ID to link this prediction as a child call",
+    )
+
+
+class PredictionCreateReq(PredictionCreateBody):
+    """Request model for creating a Prediction.
+
+    Extends PredictionCreateBody by adding project_id for internal API usage.
+    """
+
+    project_id: str = Field(
+        ..., description="The `entity/project` where this prediction is saved"
+    )
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class PredictionCreateRes(BaseModel):
+    prediction_id: str = Field(..., description="The prediction ID")
+
+
+class PredictionReadReq(BaseModel):
+    project_id: str = Field(
+        ..., description="The `entity/project` where this prediction is saved"
+    )
+    prediction_id: str = Field(..., description="The prediction ID")
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class PredictionReadRes(BaseModel):
+    prediction_id: str = Field(..., description="The prediction ID")
+    model: str = Field(..., description="The model reference (weave:// URI)")
+    inputs: dict[str, Any] = Field(..., description="The inputs to the prediction")
+    output: Any = Field(..., description="The output of the prediction")
+    evaluation_run_id: Optional[str] = Field(
+        None, description="Evaluation run ID if this prediction is linked to one"
+    )
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class PredictionListReq(BaseModel):
+    project_id: str = Field(
+        ..., description="The `entity/project` where these predictions are saved"
+    )
+    evaluation_run_id: Optional[str] = Field(
+        None,
+        description="Optional evaluation run ID to filter predictions linked to this run",
+    )
+    limit: Optional[int] = Field(
+        default=None, description="Maximum number of predictions to return"
+    )
+    offset: Optional[int] = Field(
+        default=None, description="Number of predictions to skip"
+    )
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class PredictionListRes(BaseModel):
+    predictions: list[PredictionReadRes] = Field(..., description="The predictions")
+
+
+class PredictionDeleteReq(BaseModel):
+    project_id: str = Field(
+        ..., description="The `entity/project` where these predictions are saved"
+    )
+    prediction_ids: list[str] = Field(..., description="The prediction IDs to delete")
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class PredictionDeleteRes(BaseModel):
+    num_deleted: int = Field(..., description="Number of predictions deleted")
+
+
+class PredictionFinishReq(BaseModel):
+    project_id: str = Field(
+        ..., description="The `entity/project` where this prediction is saved"
+    )
+    prediction_id: str = Field(..., description="The prediction ID to finish")
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class PredictionFinishRes(BaseModel):
+    success: bool = Field(
+        ..., description="Whether the prediction was finished successfully"
+    )
+
+
+class ScoreCreateBody(BaseModel):
+    """Request body for creating a Score via REST API.
+
+    This model excludes project_id since it comes from the URL path in RESTful endpoints.
+    """
+
+    prediction_id: str = Field(..., description="The prediction ID")
+    scorer: str = Field(..., description="The scorer reference (weave:// URI)")
+    value: float = Field(..., description="The value of the score")
+    evaluation_run_id: Optional[str] = Field(
+        None,
+        description="Optional evaluation run ID to link this score as a child call",
+    )
+
+
+class ScoreCreateReq(ScoreCreateBody):
+    """Request model for creating a Score.
+
+    Extends ScoreCreateBody by adding project_id for internal API usage.
+    """
+
+    project_id: str = Field(
+        ..., description="The `entity/project` where this score is saved"
+    )
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class ScoreCreateRes(BaseModel):
+    score_id: str = Field(..., description="The score ID")
+
+
+class ScoreReadReq(BaseModel):
+    project_id: str = Field(
+        ..., description="The `entity/project` where this score is saved"
+    )
+    score_id: str = Field(..., description="The score ID")
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class ScoreReadRes(BaseModel):
+    score_id: str = Field(..., description="The score ID")
+    scorer: str = Field(..., description="The scorer reference (weave:// URI)")
+    value: float = Field(..., description="The value of the score")
+    evaluation_run_id: Optional[str] = Field(
+        None, description="Evaluation run ID if this score is linked to one"
+    )
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class ScoreListReq(BaseModel):
+    project_id: str = Field(
+        ..., description="The `entity/project` where these scores are saved"
+    )
+    evaluation_run_id: Optional[str] = Field(
+        None,
+        description="Optional evaluation run ID to filter scores linked to this run",
+    )
+    limit: Optional[int] = Field(
+        default=None, description="Maximum number of scores to return"
+    )
+    offset: Optional[int] = Field(default=None, description="Number of scores to skip")
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class ScoreDeleteReq(BaseModel):
+    project_id: str = Field(
+        ..., description="The `entity/project` where these scores are saved"
+    )
+    score_ids: list[str] = Field(..., description="The score IDs to delete")
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class ScoreDeleteRes(BaseModel):
+    num_deleted: int = Field(..., description="Number of scores deleted")
 
 
 class TraceServerInterface(Protocol):
@@ -1607,11 +1972,6 @@ class TraceServerInterface(Protocol):
     def calls_query_stats(self, req: CallsQueryStatsReq) -> CallsQueryStatsRes: ...
     def call_update(self, req: CallUpdateReq) -> CallUpdateRes: ...
     def call_start_batch(self, req: CallCreateBatchReq) -> CallCreateBatchRes: ...
-
-    # Op API
-    def op_create(self, req: OpCreateReq) -> OpCreateRes: ...
-    def op_read(self, req: OpReadReq) -> OpReadRes: ...
-    def ops_query(self, req: OpQueryReq) -> OpQueryRes: ...
 
     # Cost API
     def cost_create(self, req: CostCreateReq) -> CostCreateRes: ...
@@ -1688,50 +2048,84 @@ class TraceServerInterface(Protocol):
     def evaluation_status(self, req: EvaluationStatusReq) -> EvaluationStatusRes: ...
 
 
-class TraceServerInterfaceV2(Protocol):
-    """V2 API endpoints for Trace Server.
+class ObjectInterface(Protocol):
+    """Object API endpoints for Trace Server.
 
-    This protocol contains the next generation of trace server APIs that
+    This protocol contains object management APIs that
     provide cleaner, more RESTful interfaces. Implementations should support
     both this protocol and TraceServerInterface to maintain backward compatibility.
     """
 
     # Ops
-    def op_create_v2(self, req: OpCreateV2Req) -> OpCreateV2Res: ...
-    def op_read_v2(self, req: OpReadV2Req) -> OpReadV2Res: ...
-    def op_list_v2(self, req: OpListV2Req) -> Iterator[OpReadV2Res]: ...
-    def op_delete_v2(self, req: OpDeleteV2Req) -> OpDeleteV2Res: ...
+    def op_create(self, req: OpCreateReq) -> OpCreateRes: ...
+    def op_read(self, req: OpReadReq) -> OpReadRes: ...
+    def op_list(self, req: OpListReq) -> Iterator[OpReadRes]: ...
+    def op_delete(self, req: OpDeleteReq) -> OpDeleteRes: ...
 
     # Datasets
-    def dataset_create_v2(self, req: DatasetCreateV2Req) -> DatasetCreateV2Res: ...
-    def dataset_read_v2(self, req: DatasetReadV2Req) -> DatasetReadV2Res: ...
-    def dataset_list_v2(self, req: DatasetListV2Req) -> Iterator[DatasetReadV2Res]: ...
-    def dataset_delete_v2(self, req: DatasetDeleteV2Req) -> DatasetDeleteV2Res: ...
+    def dataset_create(self, req: DatasetCreateReq) -> DatasetCreateRes: ...
+    def dataset_read(self, req: DatasetReadReq) -> DatasetReadRes: ...
+    def dataset_list(self, req: DatasetListReq) -> Iterator[DatasetReadRes]: ...
+    def dataset_delete(self, req: DatasetDeleteReq) -> DatasetDeleteRes: ...
 
     # Scorers
-    def scorer_create_v2(self, req: ScorerCreateV2Req) -> ScorerCreateV2Res: ...
-    def scorer_read_v2(self, req: ScorerReadV2Req) -> ScorerReadV2Res: ...
-    def scorer_list_v2(self, req: ScorerListV2Req) -> Iterator[ScorerReadV2Res]: ...
-    def scorer_delete_v2(self, req: ScorerDeleteV2Req) -> ScorerDeleteV2Res: ...
+    def scorer_create(self, req: ScorerCreateReq) -> ScorerCreateRes: ...
+    def scorer_read(self, req: ScorerReadReq) -> ScorerReadRes: ...
+    def scorer_list(self, req: ScorerListReq) -> Iterator[ScorerReadRes]: ...
+    def scorer_delete(self, req: ScorerDeleteReq) -> ScorerDeleteRes: ...
 
     # Evaluations
-    def evaluation_create_v2(
-        self, req: EvaluationCreateV2Req
-    ) -> EvaluationCreateV2Res: ...
-    def evaluation_read_v2(self, req: EvaluationReadV2Req) -> EvaluationReadV2Res: ...
-    def evaluation_list_v2(
-        self, req: EvaluationListV2Req
-    ) -> Iterator[EvaluationReadV2Res]: ...
-    def evaluation_delete_v2(
-        self, req: EvaluationDeleteV2Req
-    ) -> EvaluationDeleteV2Res: ...
+    def evaluation_create(self, req: EvaluationCreateReq) -> EvaluationCreateRes: ...
+    def evaluation_read(self, req: EvaluationReadReq) -> EvaluationReadRes: ...
+    def evaluation_list(
+        self, req: EvaluationListReq
+    ) -> Iterator[EvaluationReadRes]: ...
+    def evaluation_delete(self, req: EvaluationDeleteReq) -> EvaluationDeleteRes: ...
+
+    # Models
+    def model_create(self, req: ModelCreateReq) -> ModelCreateRes: ...
+    def model_read(self, req: ModelReadReq) -> ModelReadRes: ...
+    def model_list(self, req: ModelListReq) -> Iterator[ModelReadRes]: ...
+    def model_delete(self, req: ModelDeleteReq) -> ModelDeleteRes: ...
+
+    # Evaluation Runs
+    def evaluation_run_create(
+        self, req: EvaluationRunCreateReq
+    ) -> EvaluationRunCreateRes: ...
+    def evaluation_run_read(
+        self, req: EvaluationRunReadReq
+    ) -> EvaluationRunReadRes: ...
+    def evaluation_run_list(
+        self, req: EvaluationRunListReq
+    ) -> Iterator[EvaluationRunReadRes]: ...
+    def evaluation_run_delete(
+        self, req: EvaluationRunDeleteReq
+    ) -> EvaluationRunDeleteRes: ...
+    def evaluation_run_finish(
+        self, req: EvaluationRunFinishReq
+    ) -> EvaluationRunFinishRes: ...
+
+    # Predictions
+    def prediction_create(self, req: PredictionCreateReq) -> PredictionCreateRes: ...
+    def prediction_read(self, req: PredictionReadReq) -> PredictionReadRes: ...
+    def prediction_list(
+        self, req: PredictionListReq
+    ) -> Iterator[PredictionReadRes]: ...
+    def prediction_delete(self, req: PredictionDeleteReq) -> PredictionDeleteRes: ...
+    def prediction_finish(self, req: PredictionFinishReq) -> PredictionFinishRes: ...
+
+    # Scores
+    def score_create(self, req: ScoreCreateReq) -> ScoreCreateRes: ...
+    def score_read(self, req: ScoreReadReq) -> ScoreReadRes: ...
+    def score_list(self, req: ScoreListReq) -> Iterator[ScoreReadRes]: ...
+    def score_delete(self, req: ScoreDeleteReq) -> ScoreDeleteRes: ...
 
 
-class FullTraceServerInterface(TraceServerInterface, TraceServerInterfaceV2, Protocol):
-    """Complete trace server interface supporting both V1 and V2 APIs.
+class FullTraceServerInterface(TraceServerInterface, ObjectInterface, Protocol):
+    """Complete trace server interface supporting both V1 and Object APIs.
 
     This protocol represents a trace server implementation that supports the full
-    set of APIs - both legacy V1 endpoints and modern V2 endpoints. Use this type
+    set of APIs - both legacy V1 endpoints and modern Object endpoints. Use this type
     for implementations that need to support both API versions.
     """
 

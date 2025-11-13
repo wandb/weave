@@ -45,6 +45,8 @@ class LiteralOperation(BaseModel):
         ```
     """
 
+    model_config = ConfigDict(populate_by_name=True)
+
     literal_: typing.Union[
         str,
         int,
@@ -87,6 +89,8 @@ class GetFieldOperator(BaseModel):
         ```
     """
 
+    model_config = ConfigDict(populate_by_name=True)
+
     get_field_: str = Field(alias="$getField")
 
 
@@ -104,6 +108,8 @@ class ConvertOperation(BaseModel):
         }
         ```
     """
+
+    model_config = ConfigDict(populate_by_name=True)
 
     convert_: "ConvertSpec" = Field(alias="$convert")
 
@@ -138,6 +144,8 @@ class AndOperation(BaseModel):
         ```
     """
 
+    model_config = ConfigDict(populate_by_name=True)
+
     and_: list["Operand"] = Field(alias="$and")
 
 
@@ -156,6 +164,8 @@ class OrOperation(BaseModel):
         ```
     """
 
+    model_config = ConfigDict(populate_by_name=True)
+
     or_: list["Operand"] = Field(alias="$or")
 
 
@@ -173,6 +183,8 @@ class NotOperation(BaseModel):
         ```
     """
 
+    model_config = ConfigDict(populate_by_name=True)
+
     not_: tuple["Operand"] = Field(alias="$not")
 
 
@@ -187,6 +199,8 @@ class EqOperation(BaseModel):
         }
         ```
     """
+
+    model_config = ConfigDict(populate_by_name=True)
 
     eq_: tuple["Operand", "Operand"] = Field(alias="$eq")
 
@@ -203,10 +217,12 @@ class GtOperation(BaseModel):
         ```
     """
 
+    model_config = ConfigDict(populate_by_name=True)
+
     gt_: tuple["Operand", "Operand"] = Field(alias="$gt")
 
 
-# https://www.mongodb.com/docs/manual/reference/operator/aggregation/gte/
+# https://www.mongodb.com/docs/manual/reference/aggregation/gte/
 class GteOperation(BaseModel):
     """Greater than or equal comparison.
 
@@ -217,6 +233,8 @@ class GteOperation(BaseModel):
         }
         ```
     """
+
+    model_config = ConfigDict(populate_by_name=True)
 
     gte_: tuple["Operand", "Operand"] = Field(alias="$gte")
 
@@ -237,6 +255,8 @@ class InOperation(BaseModel):
         }
         ```
     """
+
+    model_config = ConfigDict(populate_by_name=True)
 
     in_: tuple["Operand", list["Operand"]] = Field(alias="$in")
 
@@ -261,6 +281,8 @@ class ContainsOperation(BaseModel):
         }
         ```
     """
+
+    model_config = ConfigDict(populate_by_name=True)
 
     contains_: "ContainsSpec" = Field(alias="$contains")
 
@@ -305,7 +327,7 @@ ContainsOperation.model_rebuild()
 
 
 class Query(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
     # Here, we use `expr_` to match the MongoDB query language's "aggregation" operator syntax.
     # This is certainly a subset of the full MongoDB query language, but it is a good starting point.

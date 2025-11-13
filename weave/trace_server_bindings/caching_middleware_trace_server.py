@@ -451,16 +451,6 @@ class CachingMiddlewareTraceServer(tsi.FullTraceServerInterface):
     def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
         return self._next_trace_server.otel_export(req)
 
-    # Op API
-    def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
-        return self._next_trace_server.op_create(req)
-
-    def op_read(self, req: tsi.OpReadReq) -> tsi.OpReadRes:
-        return self._next_trace_server.op_read(req)
-
-    def ops_query(self, req: tsi.OpQueryReq) -> tsi.OpQueryRes:
-        return self._next_trace_server.ops_query(req)
-
     # Cost API
     def cost_create(self, req: tsi.CostCreateReq) -> tsi.CostCreateRes:
         return self._next_trace_server.cost_create(req)
@@ -531,73 +521,147 @@ class CachingMiddlewareTraceServer(tsi.FullTraceServerInterface):
     ) -> tsi.EvaluationStatusRes:
         return self._next_trace_server.evaluation_status(req)
 
-    # === V2 APIs ===
+    # === Object APIs ===
 
-    def op_create_v2(self, req: tsi.OpCreateV2Req) -> tsi.OpCreateV2Res:
-        return self._next_trace_server.op_create_v2(req)
+    def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
+        return self._next_trace_server.op_create(req)
 
-    def op_read_v2(self, req: tsi.OpReadV2Req) -> tsi.OpReadV2Res:
+    def op_read(self, req: tsi.OpReadReq) -> tsi.OpReadRes:
         if not digest_is_cacheable(req.digest):
-            return self._next_trace_server.op_read_v2(req)
+            return self._next_trace_server.op_read(req)
         return self._with_cache_pydantic(
-            self._next_trace_server.op_read_v2, req, tsi.OpReadV2Res
+            self._next_trace_server.op_read, req, tsi.OpReadRes
         )
 
-    def op_list_v2(self, req: tsi.OpListV2Req) -> Iterator[tsi.OpReadV2Res]:
-        return self._next_trace_server.op_list_v2(req)
+    def op_list(self, req: tsi.OpListReq) -> Iterator[tsi.OpReadRes]:
+        return self._next_trace_server.op_list(req)
 
-    def op_delete_v2(self, req: tsi.OpDeleteV2Req) -> tsi.OpDeleteV2Res:
-        return self._next_trace_server.op_delete_v2(req)
+    def op_delete(self, req: tsi.OpDeleteReq) -> tsi.OpDeleteRes:
+        return self._next_trace_server.op_delete(req)
 
-    def dataset_create_v2(self, req: tsi.DatasetCreateV2Req) -> tsi.DatasetCreateV2Res:
-        return self._next_trace_server.dataset_create_v2(req)
+    def dataset_create(self, req: tsi.DatasetCreateReq) -> tsi.DatasetCreateRes:
+        return self._next_trace_server.dataset_create(req)
 
-    def dataset_read_v2(self, req: tsi.DatasetReadV2Req) -> tsi.DatasetReadV2Res:
+    def dataset_read(self, req: tsi.DatasetReadReq) -> tsi.DatasetReadRes:
         if not digest_is_cacheable(req.digest):
-            return self._next_trace_server.dataset_read_v2(req)
+            return self._next_trace_server.dataset_read(req)
         return self._with_cache_pydantic(
-            self._next_trace_server.dataset_read_v2, req, tsi.DatasetReadV2Res
+            self._next_trace_server.dataset_read, req, tsi.DatasetReadRes
         )
 
-    def dataset_list_v2(
-        self, req: tsi.DatasetListV2Req
-    ) -> Iterator[tsi.DatasetReadV2Res]:
-        return self._next_trace_server.dataset_list_v2(req)
+    def dataset_list(self, req: tsi.DatasetListReq) -> Iterator[tsi.DatasetReadRes]:
+        return self._next_trace_server.dataset_list(req)
 
-    def dataset_delete_v2(self, req: tsi.DatasetDeleteV2Req) -> tsi.DatasetDeleteV2Res:
-        return self._next_trace_server.dataset_delete_v2(req)
+    def dataset_delete(self, req: tsi.DatasetDeleteReq) -> tsi.DatasetDeleteRes:
+        return self._next_trace_server.dataset_delete(req)
 
-    def scorer_create_v2(self, req: tsi.ScorerCreateV2Req) -> tsi.ScorerCreateV2Res:
-        return self._next_trace_server.scorer_create_v2(req)
+    def scorer_create(self, req: tsi.ScorerCreateReq) -> tsi.ScorerCreateRes:
+        return self._next_trace_server.scorer_create(req)
 
-    def scorer_read_v2(self, req: tsi.ScorerReadV2Req) -> tsi.ScorerReadV2Res:
-        return self._next_trace_server.scorer_read_v2(req)
+    def scorer_read(self, req: tsi.ScorerReadReq) -> tsi.ScorerReadRes:
+        return self._next_trace_server.scorer_read(req)
 
-    def scorer_list_v2(self, req: tsi.ScorerListV2Req) -> Iterator[tsi.ScorerReadV2Res]:
-        return self._next_trace_server.scorer_list_v2(req)
+    def scorer_list(self, req: tsi.ScorerListReq) -> Iterator[tsi.ScorerReadRes]:
+        return self._next_trace_server.scorer_list(req)
 
-    def scorer_delete_v2(self, req: tsi.ScorerDeleteV2Req) -> tsi.ScorerDeleteV2Res:
-        return self._next_trace_server.scorer_delete_v2(req)
+    def scorer_delete(self, req: tsi.ScorerDeleteReq) -> tsi.ScorerDeleteRes:
+        return self._next_trace_server.scorer_delete(req)
 
-    def evaluation_create_v2(
-        self, req: tsi.EvaluationCreateV2Req
-    ) -> tsi.EvaluationCreateV2Res:
-        return self._next_trace_server.evaluation_create_v2(req)
+    def evaluation_create(
+        self, req: tsi.EvaluationCreateReq
+    ) -> tsi.EvaluationCreateRes:
+        return self._next_trace_server.evaluation_create(req)
 
-    def evaluation_read_v2(
-        self, req: tsi.EvaluationReadV2Req
-    ) -> tsi.EvaluationReadV2Res:
-        return self._next_trace_server.evaluation_read_v2(req)
+    def evaluation_read(self, req: tsi.EvaluationReadReq) -> tsi.EvaluationReadRes:
+        return self._next_trace_server.evaluation_read(req)
 
-    def evaluation_list_v2(
-        self, req: tsi.EvaluationListV2Req
-    ) -> Iterator[tsi.EvaluationReadV2Res]:
-        return self._next_trace_server.evaluation_list_v2(req)
+    def evaluation_list(
+        self, req: tsi.EvaluationListReq
+    ) -> Iterator[tsi.EvaluationReadRes]:
+        return self._next_trace_server.evaluation_list(req)
 
-    def evaluation_delete_v2(
-        self, req: tsi.EvaluationDeleteV2Req
-    ) -> tsi.EvaluationDeleteV2Res:
-        return self._next_trace_server.evaluation_delete_v2(req)
+    def evaluation_delete(
+        self, req: tsi.EvaluationDeleteReq
+    ) -> tsi.EvaluationDeleteRes:
+        return self._next_trace_server.evaluation_delete(req)
+
+    # Model API
+
+    def model_create(self, req: tsi.ModelCreateReq) -> tsi.ModelCreateRes:
+        return self._next_trace_server.model_create(req)
+
+    def model_read(self, req: tsi.ModelReadReq) -> tsi.ModelReadRes:
+        return self._next_trace_server.model_read(req)
+
+    def model_list(self, req: tsi.ModelListReq) -> Iterator[tsi.ModelReadRes]:
+        return self._next_trace_server.model_list(req)
+
+    def model_delete(self, req: tsi.ModelDeleteReq) -> tsi.ModelDeleteRes:
+        return self._next_trace_server.model_delete(req)
+
+    def evaluation_run_create(
+        self, req: tsi.EvaluationRunCreateReq
+    ) -> tsi.EvaluationRunCreateRes:
+        return self._next_trace_server.evaluation_run_create(req)
+
+    def evaluation_run_read(
+        self, req: tsi.EvaluationRunReadReq
+    ) -> tsi.EvaluationRunReadRes:
+        return self._next_trace_server.evaluation_run_read(req)
+
+    def evaluation_run_list(
+        self, req: tsi.EvaluationRunListReq
+    ) -> Iterator[tsi.EvaluationRunReadRes]:
+        return self._next_trace_server.evaluation_run_list(req)
+
+    def evaluation_run_delete(
+        self, req: tsi.EvaluationRunDeleteReq
+    ) -> tsi.EvaluationRunDeleteRes:
+        return self._next_trace_server.evaluation_run_delete(req)
+
+    def evaluation_run_finish(
+        self, req: tsi.EvaluationRunFinishReq
+    ) -> tsi.EvaluationRunFinishRes:
+        return self._next_trace_server.evaluation_run_finish(req)
+
+    # Prediction API
+
+    def prediction_create(
+        self, req: tsi.PredictionCreateReq
+    ) -> tsi.PredictionCreateRes:
+        return self._next_trace_server.prediction_create(req)
+
+    def prediction_read(self, req: tsi.PredictionReadReq) -> tsi.PredictionReadRes:
+        return self._next_trace_server.prediction_read(req)
+
+    def prediction_list(
+        self, req: tsi.PredictionListReq
+    ) -> Iterator[tsi.PredictionReadRes]:
+        return self._next_trace_server.prediction_list(req)
+
+    def prediction_delete(
+        self, req: tsi.PredictionDeleteReq
+    ) -> tsi.PredictionDeleteRes:
+        return self._next_trace_server.prediction_delete(req)
+
+    def prediction_finish(
+        self, req: tsi.PredictionFinishReq
+    ) -> tsi.PredictionFinishRes:
+        return self._next_trace_server.prediction_finish(req)
+
+    # Score API
+
+    def score_create(self, req: tsi.ScoreCreateReq) -> tsi.ScoreCreateRes:
+        return self._next_trace_server.score_create(req)
+
+    def score_read(self, req: tsi.ScoreReadReq) -> tsi.ScoreReadRes:
+        return self._next_trace_server.score_read(req)
+
+    def score_list(self, req: tsi.ScoreListReq) -> Iterator[tsi.ScoreReadRes]:
+        return self._next_trace_server.score_list(req)
+
+    def score_delete(self, req: tsi.ScoreDeleteReq) -> tsi.ScoreDeleteRes:
+        return self._next_trace_server.score_delete(req)
 
 
 def pydantic_bytes_safe_dump(obj: BaseModel) -> str:

@@ -22,6 +22,7 @@ PY39_INCOMPATIBLE_SHARDS = [
     "autogen_tests",
     "langchain",
     "verifiers_test",
+    "notdiamond",
 ]
 PY310_INCOMPATIBLE_SHARDS = [
     "verifiers_test",
@@ -31,7 +32,7 @@ PY310_INCOMPATIBLE_SHARDS = [
 
 @nox.session
 def lint(session):
-    session.install("pre-commit", "jupyter")
+    session.run("uv", "sync", "--active", "--group", "dev")
     dry_run = session.posargs and "dry-run" in session.posargs
     all_files = session.posargs and "--all-files" in session.posargs
     ruff_only = session.posargs and "--ruff-only" in session.posargs
@@ -63,6 +64,22 @@ def lint(session):
 
 # trace_server_shards = [f"trace{i}" for i in range(1, NUM_TRACE_SERVER_SHARDS + 1)]  # No longer using sharding
 
+# Shards that don't have corresponding optional dependencies in pyproject.toml
+# Note: _test/_tests shards are dependency groups, not optional dependencies
+SHARDS_WITHOUT_EXTRAS = {
+    "custom",
+    "flow",
+    "trace",
+    "trace_no_server",
+    "trace_server",
+    "trace_server_bindings",
+    *trace_server_shards,
+    "openai_realtime",
+    "autogen_tests",
+    "verifiers_test",
+    "pandas_test",
+}
+
 
 @nox.session(python=SUPPORTED_PYTHON_VERSIONS)
 @nox.parametrize(
@@ -82,7 +99,6 @@ def lint(session):
         "cohere",
         "crewai",
         "dspy",
-        "google_ai_studio",
         "google_genai",
         "groq",
         "instructor",
@@ -98,7 +114,7 @@ def lint(session):
         "vertexai",
         "bedrock",
         "scorers",
-        "pandas-test",
+        "pandas_test",
         "huggingface",
         "smolagents",
         "mcp",
@@ -120,8 +136,20 @@ def tests(session, shard):
     if session.python.startswith("3.10") and shard in PY310_INCOMPATIBLE_SHARDS:
         session.skip(f"Skipping {shard=} as it is not compatible with Python 3.10")
 
-    session.install("-e", f".[{shard},test]")
-    session.chdir("tests")
+    # Only add --extra shard if the shard has a corresponding optional dependency
+    # Use --active to sync to the active nox virtual environment
+    # Test-related shards (ending in _test/_tests) are dependency groups, not extras
+    sync_args = ["uv", "sync", "--active", "--group", "test"]
+
+    if shard not in SHARDS_WITHOUT_EXTRAS:
+        sync_args.extend(["--extra", shard])
+    elif shard in ("autogen_tests", "verifiers_test", "pandas_test"):
+        sync_args.extend(["--group", shard])
+    elif shard == "trace_server":
+        # trace_server shard needs both trace_server dependency group and trace_server_tests
+        sync_args.extend(["--group", "trace_server", "--group", "trace_server_tests"])
+
+    session.run(*sync_args)
 
     env = {
         k: session.env.get(k) or os.getenv(k)
@@ -135,10 +163,7 @@ def tests(session, shard):
         ]
     }
     # Add the GOOGLE_API_KEY environment variable for the "google" shard
-    if shard in ["google_ai_studio", "google_genai"]:
-        env["GOOGLE_API_KEY"] = session.env.get("GOOGLE_API_KEY")
-
-    if shard == "google_ai_studio":
+    if shard == "google_genai":
         env["GOOGLE_API_KEY"] = os.getenv("GOOGLE_API_KEY", "MISSING")
 
     # Add the NVIDIA_API_KEY environment variable for the "langchain_nvidia_ai_endpoints" shard
@@ -157,19 +182,19 @@ def tests(session, shard):
     if shard == "openai_agents":
         env["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY", "MISSING")
 
-    default_test_dirs = [f"integrations/{shard}/"]
+    default_test_dirs = [f"tests/integrations/{shard}/"]
     test_dirs_dict = {
         "custom": [],
-        "flow": ["flow/"],
-        "trace_server": ["trace_server/"],
-        "trace_server_bindings": ["trace_server_bindings"],
-        "mistral": ["integrations/mistral/"],
-        "scorers": ["scorers/"],
-        "autogen_tests": ["integrations/autogen/"],
-        "verifiers_test": ["integrations/verifiers/"],
-        "trace": ["trace/"],
-        # **{shard: ["trace/"] for shard in trace_server_shards},  # No longer using sharding
-        "trace_no_server": ["trace/"],
+        "flow": ["tests/flow/"],
+        "trace_server": ["tests/trace_server/"],
+        "trace_server_bindings": ["tests/trace_server_bindings"],
+        "mistral": ["tests/integrations/mistral/"],
+        "scorers": ["tests/scorers/"],
+        "autogen_tests": ["tests/integrations/autogen/"],
+        "verifiers_test": ["tests/integrations/verifiers/"],
+        "trace": ["tests/trace/"],
+        # **{shard: ["tests/trace/"] for shard in trace_server_shards},
+        "trace_no_server": ["tests/trace/"],
     }
 
     test_dirs = test_dirs_dict.get(shard, default_test_dirs)

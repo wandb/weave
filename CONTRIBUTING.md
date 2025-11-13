@@ -13,9 +13,12 @@
     - [Deprecating features](#deprecating-features)
 
 ## Issues
+
 1. Check the [issues](https://github.com/wandb/weave/issues) and [PRs](https://github.com/wandb/weave/pulls) to see if the feature/bug has already been requested/fixed. If not, [open an issue](https://github.com/wandb/weave/issues/new/choose). This helps us keep track of feature requests and bugs!
 2. If you're having issues, the best way we can help is when you can share a reproducible example.
+
    1. In general, it's helpful to use this format:
+
       ```
       <short description of the issue>
       <link to your project>
@@ -25,16 +28,18 @@
 
       <any other info you think is relevant>
       ```
-   2. For SDK issues, a reproducible script like [example_error_script.py](examples/contributing/example_error_script.py) is helpful.  We use `uv` which can run the script with the dependencies included.  If you know the dependencies, you can add them to the script.  [See the `uv` docs for more details](https://docs.astral.sh/uv/guides/scripts/).
+
+   2. For SDK issues, a reproducible script like [example_error_script.py](examples/contributing/example_error_script.py) is helpful. We use `uv` which can run the script with the dependencies included. If you know the dependencies, you can add them to the script. [See the `uv` docs for more details](https://docs.astral.sh/uv/guides/scripts/).
 
 ## PRs
+
 1. If you are a first-time contributor, welcome! To get started, make a fork and point to the main `weave` repo:
    ```sh
    git clone https://github.com/<your-username>/weave.git
    cd weave
    git remote add upstream https://github.com/wandb/weave.git
    ```
-3. Build!
+2. Build!
    1. Keep your fork up to date with the main `weave` repo:
       ```sh
       git checkout master
@@ -86,7 +91,6 @@ Examples can be found in the section below.
 | feat     | ✨ Feature       | Changes that add new functionality that directly impacts users                      | Yes          |
 | fix      | 🐛 Fix           | Changes that fix existing issues                                                    | Yes          |
 | refactor | 💎 Code Refactor | A code change that neither fixes a bug nor adds a new feature                       | No           |
-| docs     | 📜 Documentation | Documentation changes only                                                          | Maybe        |
 | style    | 💅 Style         | Changes that do not affect the meaning of the code (e.g. linting)                   | Maybe        |
 | chore    | ⚙️ Chores        | Changes that do not modify source code (e.g. CI configuration files, build scripts) | No           |
 | revert   | ♻️ Reverts       | Reverts a previous commit                                                           | Maybe        |

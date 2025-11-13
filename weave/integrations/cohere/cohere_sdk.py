@@ -4,14 +4,21 @@ import importlib
 from functools import wraps
 from typing import TYPE_CHECKING, Any, Callable
 
+from cohere.types.assistant_message_response import AssistantMessageResponse
+from cohere.types.assistant_message_response_content_item import (
+    TextAssistantMessageResponseContentItem,
+)
+from cohere.types.non_streamed_chat_response import NonStreamedChatResponse
+from cohere.types.usage import Usage
+from cohere.v2.types.v2chat_response import V2ChatResponse
+
 import weave
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
 from weave.trace.op import _add_accumulator
 
 if TYPE_CHECKING:
-    from cohere.types.non_streamed_chat_response import NonStreamedChatResponse
-    from cohere.v2.types.v2chat_response import V2ChatResponse
+    pass
 
 
 _cohere_patcher: MultiPatcher | None = None
@@ -38,12 +45,6 @@ def cohere_accumulator(acc: dict | None, value: Any) -> NonStreamedChatResponse:
 
 
 def cohere_accumulator_v2(acc: V2ChatResponse | None, value: Any) -> V2ChatResponse:
-    from cohere.types.assistant_message_response import AssistantMessageResponse
-    from cohere.types.assistant_message_response_content_item import (
-        TextAssistantMessageResponseContentItem,
-    )
-    from cohere.v2.types.v2chat_response import V2ChatResponse
-
     if acc is None:
         # Initialize accumulator with basic structure
         acc = V2ChatResponse(
@@ -126,8 +127,6 @@ def cohere_wrapper_v2(settings: OpSettings) -> Callable:
                 response = fn(*args, **kwargs)
 
                 try:
-                    from cohere.types.usage import Usage
-
                     # Extract usage information from meta and populate the usage field
                     if hasattr(response, "meta") and response.meta:
                         response.usage = Usage(
@@ -156,8 +155,6 @@ def cohere_wrapper_async_v2(settings: OpSettings) -> Callable:
                 response = await fn(*args, **kwargs)
 
                 try:
-                    from cohere.types.usage import Usage
-
                     # Extract usage information from meta and populate the usage field
                     if hasattr(response, "meta") and response.meta:
                         response.usage = Usage(

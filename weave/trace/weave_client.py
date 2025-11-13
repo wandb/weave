@@ -36,7 +36,6 @@ from weave.trace.concurrent.futures import FutureExecutor
 from weave.trace.constants import TRACE_CALL_EMOJI
 from weave.trace.context import call_context
 from weave.trace.feedback import FeedbackQuery
-from weave.trace.init_message import WANDB_AVAILABLE
 from weave.trace.interface_query_builder import (
     exists_expr,
     get_field_expr,
@@ -83,8 +82,13 @@ from weave.trace.settings import (
 )
 from weave.trace.table import Table
 from weave.trace.table_upload_chunking import ChunkingConfig, TableChunkManager
-from weave.trace.util import deprecated
+from weave.trace.util import log_once
 from weave.trace.vals import WeaveObject, WeaveTable, make_trace_obj
+from weave.trace.wandb_run_context import (
+    WandbRunContext,
+    check_wandb_run_matches,
+    get_global_wb_run_context,
+)
 from weave.trace.weave_client_send_file_cache import WeaveClientSendFileCache
 from weave.trace_server.constants import MAX_OBJECT_NAME_LENGTH
 from weave.trace_server.ids import generate_id
@@ -139,11 +143,9 @@ from weave.trace_server_bindings.http_utils import (
 from weave.utils.attributes_dict import AttributesDict
 from weave.utils.dict_utils import sum_dict_leaves, zip_dicts
 from weave.utils.exception import exception_to_json_str
-from weave.utils.sanitize import REDACTED_VALUE, should_redact
+from weave.utils.sanitize import REDACTED_VALUE, redact_dataclass_fields, should_redact
 
 if TYPE_CHECKING:
-    import wandb
-
     from weave.evaluation.eval import Evaluation
 
 # Controls if objects can have refs to projects not the WeaveClient project.
@@ -321,6 +323,7 @@ class WeaveClient:
         self.project = project
         self.server = server
         self._anonymous_ops: dict[str, Op] = {}
+        self._wandb_run_context: WandbRunContext | None = None
         parallelism_main, parallelism_upload = get_parallelism_settings()
         self.future_executor = FutureExecutor(max_workers=parallelism_main)
         self.future_executor_fastlane = FutureExecutor(max_workers=parallelism_upload)
@@ -587,14 +590,6 @@ class WeaveClient:
             page_size=page_size,
         )
 
-    @deprecated(new_name="get_calls")
-    def calls(
-        self,
-        filter: CallsFilter | None = None,
-        include_costs: bool = False,
-    ) -> CallsIter:
-        return self.get_calls(filter=filter, include_costs=include_costs)
-
     @trace_sentry.global_trace_sentry.watch()
     def get_call(
         self,
@@ -631,14 +626,6 @@ class WeaveClient:
             raise ValueError(f"Call not found: {call_id}")
         response_call = calls[0]
         return make_client_call(self.entity, self.project, response_call, self.server)
-
-    @deprecated(new_name="get_call")
-    def call(
-        self,
-        call_id: str,
-        include_costs: bool = False,
-    ) -> WeaveObject:
-        return self.get_call(call_id=call_id, include_costs=include_costs)
 
     @trace_sentry.global_trace_sentry.watch()
     def create_call(
@@ -762,9 +749,14 @@ class WeaveClient:
         if parent is not None:
             parent._children.append(call)
 
-        current_wb_run_id = safe_current_wb_run_id()
-        current_wb_run_step = safe_current_wb_run_step()
-        check_wandb_run_matches(current_wb_run_id, self.entity, self.project)
+        wb_run_context = self._get_current_wb_run_context()
+        if wb_run_context:
+            current_wb_run_id = f"{self.entity}/{self.project}/{wb_run_context.run_id}"
+            current_wb_run_step = wb_run_context.step
+            check_wandb_run_matches(current_wb_run_id, self.entity, self.project)
+        else:
+            current_wb_run_id = None
+            current_wb_run_step = None
 
         started_at = datetime.datetime.now(tz=datetime.timezone.utc)
         project_id = self._project_id()
@@ -946,7 +938,10 @@ class WeaveClient:
             )
 
             # Capture wb_run_step_end at call end time
-            current_wb_run_step_end = safe_current_wb_run_step()
+            wb_run_context_end = self._get_current_wb_run_context()
+            current_wb_run_step_end = (
+                wb_run_context_end.step if wb_run_context_end else None
+            )
 
             call_end_req = CallEndReq(
                 end=EndedCallSchemaForInsert(
@@ -979,6 +974,71 @@ class WeaveClient:
     def fail_call(self, call: Call, exception: BaseException) -> None:
         """Fail a call with an exception. This is a convenience method for finish_call."""
         return self.finish_call(call, exception=exception)
+
+    def set_wandb_run_context(self, run_id: str, step: int | None = None) -> None:
+        """Override wandb run_id and step for calls created by this client.
+
+        This allows you to associate Weave calls with a specific WandB run
+        that is not bound to the global wandb.run symbol.
+
+        Args:
+            run_id: The run ID (not including entity/project prefix).
+                    The client will automatically add the entity/project prefix.
+            step: The step number to use for calls. If None, step will not be set.
+
+        Examples:
+            ```python
+            client = weave.init("my-project")
+            client.set_wandb_run_context(run_id="my-run-id", step=5)
+            # Now all calls will be associated with entity/project/my-run-id at step 5
+
+            # Or without a step
+            client.set_wandb_run_context(run_id="my-run-id")
+            # Calls will be associated with entity/project/my-run-id with no step
+            ```
+        """
+        self._wandb_run_context = WandbRunContext(run_id=run_id, step=step)
+
+    def clear_wandb_run_context(self) -> None:
+        """Clear wandb run context override.
+
+        After calling this, calls will fall back to using the global wandb.run
+        (if available) for run_id and step information.
+
+        Examples:
+            ```python
+            client = weave.init("my-project")
+            client.set_wandb_run_context(run_id="my-run-id", step=5)
+            # ... make some calls ...
+            client.clear_wandb_run_context()
+            # Now calls will use global wandb.run again
+            ```
+        """
+        self._wandb_run_context = None
+
+    def _get_current_wb_run_context(self) -> WandbRunContext | None:
+        """Get the current WandB run context, checking override first then global state.
+
+        Returns:
+            WandbRunContext if a run is active (either from override or global wandb.run),
+            or None if no run is active.
+        """
+        global_context = get_global_wb_run_context()
+
+        # Check override first
+        if self._wandb_run_context is not None:
+            # Warn if there's also a global wandb.run active
+            if global_context is not None:
+                log_once(
+                    logger.warning,
+                    f"Client-level WandB run context override is active (run_id={self._wandb_run_context.run_id}), "
+                    f"ignoring global wandb.run (run_id={global_context.run_id}). "
+                    "This is intentional if you're explicitly associating traces with a different run.",
+                )
+            return self._wandb_run_context
+
+        # Fall back to global wandb.run
+        return global_context
 
     @trace_sentry.global_trace_sentry.watch()
     def delete_call(self, call: Call) -> None:
@@ -1172,19 +1232,6 @@ class WeaveClient:
             offset=offset,
             limit=limit,
             show_refs=True,
-        )
-
-    @deprecated(new_name="get_feedback")
-    def feedback(
-        self,
-        query: Query | str | None = None,
-        *,
-        reaction: str | None = None,
-        offset: int = 0,
-        limit: int = 100,
-    ) -> FeedbackQuery:
-        return self.get_feedback(
-            query=query, reaction=reaction, offset=offset, limit=limit
         )
 
     def add_cost(
@@ -2153,44 +2200,6 @@ def get_parallelism_settings() -> tuple[int | None, int | None]:
     return parallelism_main, parallelism_fastlane
 
 
-def _safe_get_wandb_run() -> wandb.sdk.wandb_run.Run | None:
-    if WANDB_AVAILABLE:
-        import wandb
-
-        return wandb.run
-    return None
-
-
-def safe_current_wb_run_id() -> str | None:
-    wandb_run = _safe_get_wandb_run()
-    if wandb_run is None:
-        return None
-
-    return f"{wandb_run.entity}/{wandb_run.project}/{wandb_run.id}"
-
-
-def safe_current_wb_run_step() -> int | None:
-    wandb_run = _safe_get_wandb_run()
-    if wandb_run is None:
-        return None
-    try:
-        return int(wandb_run.step)
-    except Exception:
-        return None
-
-
-def check_wandb_run_matches(
-    wandb_run_id: str | None, weave_entity: str, weave_project: str
-) -> None:
-    if wandb_run_id:
-        # ex: "entity/project/run_id"
-        wandb_entity, wandb_project, _ = wandb_run_id.split("/")
-        if wandb_entity != weave_entity or wandb_project != weave_project:
-            raise ValueError(
-                f'Project Mismatch: weave and wandb must be initialized using the same project. Found wandb.init targeting project "{wandb_entity}/{wandb_project}" and weave.init targeting project "{weave_entity}/{weave_project}". To fix, please use the same project for both library initializations.'
-            )
-
-
 def _build_anonymous_op(name: str, config: dict[str, Any] | None = None) -> Op:
     if config is None:
 
@@ -2241,6 +2250,9 @@ def redact_sensitive_keys(obj: Any) -> Any:
             tuple_res.append(redact_sensitive_keys(v))
         return tuple(tuple_res)
 
+    elif dataclasses.is_dataclass(obj):
+        return redact_dataclass_fields(obj, redact_sensitive_keys)
+
     return obj
 
 
@@ -2254,6 +2266,3 @@ def sanitize_object_name(name: str) -> str:
     if len(res) > MAX_OBJECT_NAME_LENGTH:
         res = res[:MAX_OBJECT_NAME_LENGTH]
     return res
-
-
-__docspec__ = [WeaveClient, Call, CallsIter]

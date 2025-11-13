@@ -6765,6 +6765,12 @@
       "input": 0.0002,
       "output": 0.0002,
       "created_at": "2025-04-14 09:41:48"
+    },
+    {
+      "provider": "watsonx",
+      "input": 2e-07,
+      "output": 2e-07,
+      "created_at": "2025-10-23 06:49:10"
     }
   ],
   "azure/gpt-4o-realtime-preview-2024-12-17": [
@@ -12393,6 +12399,12 @@
       "input": 3.3e-05,
       "output": 1.65e-05,
       "created_at": "2025-10-10 14:26:38"
+    },
+    {
+      "provider": "bedrock_converse",
+      "input": 3.3e-06,
+      "output": 1.65e-05,
+      "created_at": "2025-10-23 06:49:10"
     }
   ],
   "vertex_ai/claude-sonnet-4-5": [
@@ -12681,6 +12693,12 @@
       "input": 0.0001,
       "output": 0.00025,
       "created_at": "2025-10-10 14:26:38"
+    },
+    {
+      "provider": "watsonx",
+      "input": 6e-07,
+      "output": 6e-07,
+      "created_at": "2025-10-23 06:49:10"
     }
   ],
   "watsonx/ibm/granite-13b-chat-v2": [
@@ -12689,6 +12707,12 @@
       "input": 0.0005,
       "output": 0.002,
       "created_at": "2025-10-10 14:26:38"
+    },
+    {
+      "provider": "watsonx",
+      "input": 6e-07,
+      "output": 6e-07,
+      "created_at": "2025-10-23 06:49:10"
     }
   ],
   "watsonx/ibm/granite-13b-instruct-v2": [
@@ -12697,6 +12721,12 @@
       "input": 0.0005,
       "output": 0.002,
       "created_at": "2025-10-10 14:26:38"
+    },
+    {
+      "provider": "watsonx",
+      "input": 6e-07,
+      "output": 6e-07,
+      "created_at": "2025-10-23 06:49:10"
     }
   ],
   "watsonx/ibm/granite-3-3-8b-instruct": [
@@ -12705,6 +12735,12 @@
       "input": 0.00025,
       "output": 0.001,
       "created_at": "2025-10-10 14:26:38"
+    },
+    {
+      "provider": "watsonx",
+      "input": 2e-07,
+      "output": 2e-07,
+      "created_at": "2025-10-23 06:49:10"
     }
   ],
   "watsonx/ibm/granite-4-h-small": [
@@ -12713,6 +12749,12 @@
       "input": 0.000625,
       "output": 0.0025,
       "created_at": "2025-10-10 14:26:38"
+    },
+    {
+      "provider": "watsonx",
+      "input": 6e-08,
+      "output": 2.5e-07,
+      "created_at": "2025-10-23 06:49:10"
     }
   ],
   "watsonx/ibm/granite-guardian-3-2-2b": [
@@ -12721,6 +12763,12 @@
       "input": 0.00015,
       "output": 0.0006,
       "created_at": "2025-10-10 14:26:38"
+    },
+    {
+      "provider": "watsonx",
+      "input": 1e-07,
+      "output": 1e-07,
+      "created_at": "2025-10-23 06:49:10"
     }
   ],
   "watsonx/ibm/granite-guardian-3-3-8b": [
@@ -12729,6 +12777,12 @@
       "input": 0.00025,
       "output": 0.001,
       "created_at": "2025-10-10 14:26:38"
+    },
+    {
+      "provider": "watsonx",
+      "input": 2e-07,
+      "output": 2e-07,
+      "created_at": "2025-10-23 06:49:10"
     }
   ],
   "watsonx/ibm/granite-ttm-1024-96-r2": [
@@ -12737,6 +12791,12 @@
       "input": 0.000625,
       "output": 0.000625,
       "created_at": "2025-10-10 14:26:38"
+    },
+    {
+      "provider": "watsonx",
+      "input": 3.8e-07,
+      "output": 3.8e-07,
+      "created_at": "2025-10-23 06:49:10"
     }
   ],
   "watsonx/ibm/granite-ttm-1536-96-r2": [
@@ -12745,6 +12805,12 @@
       "input": 0.000625,
       "output": 0.000625,
       "created_at": "2025-10-10 14:26:38"
+    },
+    {
+      "provider": "watsonx",
+      "input": 3.8e-07,
+      "output": 3.8e-07,
+      "created_at": "2025-10-23 06:49:10"
     }
   ],
   "watsonx/ibm/granite-ttm-512-96-r2": [
@@ -12753,6 +12819,12 @@
       "input": 0.000625,
       "output": 0.000625,
       "created_at": "2025-10-10 14:26:38"
+    },
+    {
+      "provider": "watsonx",
+      "input": 3.8e-07,
+      "output": 3.8e-07,
+      "created_at": "2025-10-23 06:49:10"
     }
   ],
   "watsonx/ibm/granite-vision-3-2-2b": [
@@ -12761,6 +12833,12 @@
       "input": 0.00015,
       "output": 0.0006,
       "created_at": "2025-10-10 14:26:38"
+    },
+    {
+      "provider": "watsonx",
+      "input": 1e-07,
+      "output": 1e-07,
+      "created_at": "2025-10-23 06:49:10"
     }
   ],
   "watsonx/meta-llama/llama-3-2-11b-vision-instruct": [
@@ -12769,6 +12847,12 @@
       "input": 0.00025,
       "output": 0.001,
       "created_at": "2025-10-10 14:26:38"
+    },
+    {
+      "provider": "watsonx",
+      "input": 3.5e-07,
+      "output": 3.5e-07,
+      "created_at": "2025-10-23 06:49:10"
     }
   ],
   "watsonx/meta-llama/llama-3-2-1b-instruct": [
@@ -12777,6 +12861,12 @@
       "input": 0.0001,
       "output": 0.0002,
       "created_at": "2025-10-10 14:26:38"
+    },
+    {
+      "provider": "watsonx",
+      "input": 1e-07,
+      "output": 1e-07,
+      "created_at": "2025-10-23 06:49:10"
     }
   ],
   "watsonx/meta-llama/llama-3-2-3b-instruct": [
@@ -12785,6 +12875,12 @@
       "input": 0.00015,
       "output": 0.0006,
       "created_at": "2025-10-10 14:26:38"
+    },
+    {
+      "provider": "watsonx",
+      "input": 1.5e-07,
+      "output": 1.5e-07,
+      "created_at": "2025-10-23 06:49:10"
     }
   ],
   "watsonx/meta-llama/llama-3-2-90b-vision-instruct": [
@@ -12793,6 +12889,12 @@
       "input": 0.002,
       "output": 0.008,
       "created_at": "2025-10-10 14:26:38"
+    },
+    {
+      "provider": "watsonx",
+      "input": 2e-06,
+      "output": 2e-06,
+      "created_at": "2025-10-23 06:49:10"
     }
   ],
   "watsonx/meta-llama/llama-3-3-70b-instruct": [
@@ -12801,6 +12903,12 @@
       "input": 0.002,
       "output": 0.006,
       "created_at": "2025-10-10 14:26:38"
+    },
+    {
+      "provider": "watsonx",
+      "input": 7.1e-07,
+      "output": 7.1e-07,
+      "created_at": "2025-10-23 06:49:10"
     }
   ],
   "watsonx/meta-llama/llama-4-maverick-17b": [
@@ -12809,6 +12917,12 @@
       "input": 0.0005,
       "output": 0.002,
       "created_at": "2025-10-10 14:26:38"
+    },
+    {
+      "provider": "watsonx",
+      "input": 3.5e-07,
+      "output": 1.4e-06,
+      "created_at": "2025-10-23 06:49:10"
     }
   ],
   "watsonx/meta-llama/llama-guard-3-11b-vision": [
@@ -12817,6 +12931,12 @@
       "input": 0.00025,
       "output": 0.001,
       "created_at": "2025-10-10 14:26:38"
+    },
+    {
+      "provider": "watsonx",
+      "input": 3.5e-07,
+      "output": 3.5e-07,
+      "created_at": "2025-10-23 06:49:10"
     }
   ],
   "watsonx/mistralai/mistral-medium-2505": [
@@ -12825,6 +12945,12 @@
       "input": 0.00225,
       "output": 0.00675,
       "created_at": "2025-10-10 14:26:38"
+    },
+    {
+      "provider": "watsonx",
+      "input": 3e-06,
+      "output": 1e-05,
+      "created_at": "2025-10-23 06:49:10"
     }
   ],
   "watsonx/mistralai/mistral-small-2503": [
@@ -12833,6 +12959,12 @@
       "input": 0.0002,
       "output": 0.0006,
       "created_at": "2025-10-10 14:26:38"
+    },
+    {
+      "provider": "watsonx",
+      "input": 1e-07,
+      "output": 3e-07,
+      "created_at": "2025-10-23 06:49:10"
     }
   ],
   "watsonx/mistralai/pixtral-12b-2409": [
@@ -12841,6 +12973,12 @@
       "input": 0.00015,
       "output": 0.00015,
       "created_at": "2025-10-10 14:26:38"
+    },
+    {
+      "provider": "watsonx",
+      "input": 3.5e-07,
+      "output": 3.5e-07,
+      "created_at": "2025-10-23 06:49:10"
     }
   ],
   "watsonx/openai/gpt-oss-120b": [
@@ -12849,6 +12987,12 @@
       "input": 0.004,
       "output": 0.016,
       "created_at": "2025-10-10 14:26:38"
+    },
+    {
+      "provider": "watsonx",
+      "input": 1.5e-07,
+      "output": 6e-07,
+      "created_at": "2025-10-23 06:49:10"
     }
   ],
   "watsonx/sdaia/allam-1-13b-instruct": [
@@ -12857,6 +13001,12 @@
       "input": 0.0005,
       "output": 0.002,
       "created_at": "2025-10-10 14:26:38"
+    },
+    {
+      "provider": "watsonx",
+      "input": 1.8e-06,
+      "output": 1.8e-06,
+      "created_at": "2025-10-23 06:49:10"
     }
   ],
   "coreweave/OpenPipe/Qwen3-14B-Instruct": [
@@ -12865,6 +13015,340 @@
       "input": 5e-08,
       "output": 2.2e-07,
       "created_at": "2025-10-10 14:26:38"
+    }
+  ],
+  "anthropic.claude-haiku-4-5-20251001-v1:0": [
+    {
+      "provider": "bedrock",
+      "input": 1e-06,
+      "output": 5e-06,
+      "created_at": "2025-10-23 06:49:10"
+    }
+  ],
+  "anthropic.claude-haiku-4-5@20251001": [
+    {
+      "provider": "bedrock",
+      "input": 1e-06,
+      "output": 5e-06,
+      "created_at": "2025-10-23 06:49:10"
+    }
+  ],
+  "anthropic.claude-3-7-sonnet-20240620-v1:0": [
+    {
+      "provider": "bedrock",
+      "input": 3.6e-06,
+      "output": 1.8e-05,
+      "created_at": "2025-10-23 06:49:10"
+    }
+  ],
+  "apac.anthropic.claude-haiku-4-5-20251001-v1:0": [
+    {
+      "provider": "bedrock",
+      "input": 1.1e-06,
+      "output": 5.5e-06,
+      "created_at": "2025-10-23 06:49:10"
+    }
+  ],
+  "au.anthropic.claude-sonnet-4-5-20250929-v1:0": [
+    {
+      "provider": "bedrock_converse",
+      "input": 3.3e-06,
+      "output": 1.65e-05,
+      "created_at": "2025-10-23 06:49:10"
+    }
+  ],
+  "bedrock/us-gov-west-1/anthropic.claude-3-7-sonnet-20250219-v1:0": [
+    {
+      "provider": "bedrock",
+      "input": 3.6e-06,
+      "output": 1.8e-05,
+      "created_at": "2025-10-23 06:49:10"
+    }
+  ],
+  "claude-haiku-4-5-20251001": [
+    {
+      "provider": "anthropic",
+      "input": 1e-06,
+      "output": 5e-06,
+      "created_at": "2025-10-23 06:49:10"
+    }
+  ],
+  "claude-haiku-4-5": [
+    {
+      "provider": "anthropic",
+      "input": 1e-06,
+      "output": 5e-06,
+      "created_at": "2025-10-23 06:49:10"
+    }
+  ],
+  "eu.anthropic.claude-haiku-4-5-20251001-v1:0": [
+    {
+      "provider": "bedrock",
+      "input": 1.1e-06,
+      "output": 5.5e-06,
+      "created_at": "2025-10-23 06:49:10"
+    }
+  ],
+  "gemini-2.5-flash-image": [
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 3e-07,
+      "output": 2.5e-06,
+      "created_at": "2025-10-23 06:49:10"
+    }
+  ],
+  "gemini/gemini-2.5-flash-image": [
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 3e-07,
+      "output": 2.5e-06,
+      "created_at": "2025-10-23 06:49:10"
+    }
+  ],
+  "global.anthropic.claude-haiku-4-5-20251001-v1:0": [
+    {
+      "provider": "bedrock_converse",
+      "input": 1e-06,
+      "output": 5e-06,
+      "created_at": "2025-10-23 06:49:10"
+    },
+    {
+      "provider": "bedrock_converse",
+      "input": 1.1e-06,
+      "output": 5.5e-06,
+      "created_at": "2025-11-10 09:16:32"
+    }
+  ],
+  "lemonade/gpt-oss-20b-mxfp4-GGUF": [
+    {
+      "provider": "lemonade",
+      "input": 0.0,
+      "output": 0.0,
+      "created_at": "2025-10-23 06:49:10"
+    }
+  ],
+  "lemonade/gpt-oss-120b-mxfp-GGUF": [
+    {
+      "provider": "lemonade",
+      "input": 0.0,
+      "output": 0.0,
+      "created_at": "2025-10-23 06:49:10"
+    }
+  ],
+  "lemonade/Gemma-3-4b-it-GGUF": [
+    {
+      "provider": "lemonade",
+      "input": 0.0,
+      "output": 0.0,
+      "created_at": "2025-10-23 06:49:10"
+    }
+  ],
+  "lemonade/Qwen3-4B-Instruct-2507-GGUF": [
+    {
+      "provider": "lemonade",
+      "input": 0.0,
+      "output": 0.0,
+      "created_at": "2025-10-23 06:49:10"
+    }
+  ],
+  "jp.anthropic.claude-haiku-4-5-20251001-v1:0": [
+    {
+      "provider": "bedrock",
+      "input": 1.1e-06,
+      "output": 5.5e-06,
+      "created_at": "2025-10-23 06:49:10"
+    }
+  ],
+  "openrouter/anthropic/claude-sonnet-4.5": [
+    {
+      "provider": "openrouter",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-10-23 06:49:10"
+    }
+  ],
+  "together_ai/baai/bge-base-en-v1.5": [
+    {
+      "provider": "together_ai",
+      "input": 8e-09,
+      "output": 0.0,
+      "created_at": "2025-10-23 06:49:10"
+    }
+  ],
+  "together_ai/BAAI/bge-base-en-v1.5": [
+    {
+      "provider": "together_ai",
+      "input": 8e-09,
+      "output": 0.0,
+      "created_at": "2025-10-23 06:49:10"
+    }
+  ],
+  "us.anthropic.claude-haiku-4-5-20251001-v1:0": [
+    {
+      "provider": "bedrock",
+      "input": 1.1e-06,
+      "output": 5.5e-06,
+      "created_at": "2025-10-23 06:49:10"
+    }
+  ],
+  "au.anthropic.claude-haiku-4-5-20251001-v1:0": [
+    {
+      "provider": "bedrock_converse",
+      "input": 1.1e-06,
+      "output": 5.5e-06,
+      "created_at": "2025-10-23 06:49:10"
+    }
+  ],
+  "vercel_ai_gateway/glm-4.6": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 6e-07,
+      "output": 2.2e-06,
+      "created_at": "2025-10-23 06:49:10"
+    }
+  ],
+  "vertex_ai/claude-haiku-4-5@20251001": [
+    {
+      "provider": "vertex_ai-anthropic_models",
+      "input": 1e-06,
+      "output": 5e-06,
+      "created_at": "2025-10-23 06:49:10"
+    }
+  ],
+  "watsonx/mistralai/mistral-small-3-1-24b-instruct-2503": [
+    {
+      "provider": "watsonx",
+      "input": 1e-07,
+      "output": 3e-07,
+      "created_at": "2025-10-23 06:49:10"
+    }
+  ],
+  "azure/gpt-5-pro": [
+    {
+      "provider": "azure",
+      "input": 1.5e-05,
+      "output": 0.00012,
+      "created_at": "2025-11-10 09:16:32"
+    }
+  ],
+  "cohere/embed-v4.0": [
+    {
+      "provider": "cohere",
+      "input": 1.2e-07,
+      "output": 0.0,
+      "created_at": "2025-11-10 09:16:32"
+    }
+  ],
+  "gemini-live-2.5-flash-preview-native-audio-09-2025": [
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 3e-07,
+      "output": 2e-06,
+      "created_at": "2025-11-10 09:16:32"
+    }
+  ],
+  "gemini/gemini-live-2.5-flash-preview-native-audio-09-2025": [
+    {
+      "provider": "gemini",
+      "input": 3e-07,
+      "output": 2e-06,
+      "created_at": "2025-11-10 09:16:32"
+    }
+  ],
+  "gemini/gemini-embedding-001": [
+    {
+      "provider": "gemini",
+      "input": 1.5e-07,
+      "output": 0.0,
+      "created_at": "2025-11-10 09:16:32"
+    }
+  ],
+  "openrouter/anthropic/claude-haiku-4.5": [
+    {
+      "provider": "openrouter",
+      "input": 1e-06,
+      "output": 5e-06,
+      "created_at": "2025-11-10 09:16:32"
+    }
+  ],
+  "vercel_ai_gateway/zai/glm-4.6": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 4.5e-07,
+      "output": 1.8e-06,
+      "created_at": "2025-11-10 09:16:32"
+    }
+  ],
+  "vertex_ai/mistralai/codestral-2@001": [
+    {
+      "provider": "vertex_ai-mistral_models",
+      "input": 3e-07,
+      "output": 9e-07,
+      "created_at": "2025-11-10 09:16:32"
+    }
+  ],
+  "vertex_ai/codestral-2": [
+    {
+      "provider": "vertex_ai-mistral_models",
+      "input": 3e-07,
+      "output": 9e-07,
+      "created_at": "2025-11-10 09:16:32"
+    }
+  ],
+  "vertex_ai/codestral-2@001": [
+    {
+      "provider": "vertex_ai-mistral_models",
+      "input": 3e-07,
+      "output": 9e-07,
+      "created_at": "2025-11-10 09:16:32"
+    }
+  ],
+  "vertex_ai/mistralai/codestral-2": [
+    {
+      "provider": "vertex_ai-mistral_models",
+      "input": 3e-07,
+      "output": 9e-07,
+      "created_at": "2025-11-10 09:16:32"
+    }
+  ],
+  "vertex_ai/minimaxai/minimax-m2-maas": [
+    {
+      "provider": "vertex_ai-minimax_models",
+      "input": 3e-07,
+      "output": 1.2e-06,
+      "created_at": "2025-11-10 09:16:32"
+    }
+  ],
+  "vertex_ai/mistral-medium-3": [
+    {
+      "provider": "vertex_ai-mistral_models",
+      "input": 4e-07,
+      "output": 2e-06,
+      "created_at": "2025-11-10 09:16:32"
+    }
+  ],
+  "vertex_ai/mistral-medium-3@001": [
+    {
+      "provider": "vertex_ai-mistral_models",
+      "input": 4e-07,
+      "output": 2e-06,
+      "created_at": "2025-11-10 09:16:32"
+    }
+  ],
+  "vertex_ai/mistralai/mistral-medium-3": [
+    {
+      "provider": "vertex_ai-mistral_models",
+      "input": 4e-07,
+      "output": 2e-06,
+      "created_at": "2025-11-10 09:16:32"
+    }
+  ],
+  "vertex_ai/mistralai/mistral-medium-3@001": [
+    {
+      "provider": "vertex_ai-mistral_models",
+      "input": 4e-07,
+      "output": 2e-06,
+      "created_at": "2025-11-10 09:16:32"
     }
   ]
 }

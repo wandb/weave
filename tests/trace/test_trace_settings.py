@@ -9,7 +9,7 @@ import tenacity
 
 import weave
 from tests.trace.util import capture_output, flushing_callback
-from weave.trace.constants import TRACE_CALL_EMOJI
+from weave.trace.constants import TRACE_CALL_EMOJI, TRACE_OBJECT_EMOJI
 from weave.trace.settings import UserSettings, parse_and_apply_settings
 from weave.trace.weave_client import get_parallelism_settings
 from weave.utils.retry import with_retry
@@ -326,3 +326,60 @@ def test_retry_max_interval_env(caplog, monkeypatch) -> None:
     assert 25.0 in call_args
 
     del os.environ["WEAVE_RETRY_MAX_INTERVAL"]
+
+
+def test_log_level_setting(client_creator):
+    """Test that log_level setting properly silences publish messages."""
+
+    @weave.op
+    def test_func():
+        return 1
+
+    # Test with ERROR level - should NOT see publish messages
+    with client_creator(settings=UserSettings(log_level="ERROR")) as client:
+        callbacks = [flushing_callback(client)]
+        with capture_output(callbacks) as captured:
+            weave.publish(test_func, name="test_func_error")
+    output = captured.getvalue()
+    assert TRACE_OBJECT_EMOJI not in output
+    assert "Published to" not in output
+
+    # Test with INFO level - should see publish messages
+    with client_creator(settings=UserSettings(log_level="INFO")) as client:
+        callbacks = [flushing_callback(client)]
+        with capture_output(callbacks) as captured:
+            weave.publish(test_func, name="test_func_info")
+    output = captured.getvalue()
+    assert TRACE_OBJECT_EMOJI in output
+    assert "Published to" in output
+
+
+def test_log_level_env(client_creator):
+    """Test that WEAVE_LOG_LEVEL environment variable properly silences publish messages."""
+
+    @weave.op
+    def test_func():
+        return 1
+
+    # Test with ERROR level - should NOT see publish messages
+    os.environ["WEAVE_LOG_LEVEL"] = "ERROR"
+    with client_creator() as client:
+        callbacks = [flushing_callback(client)]
+        with capture_output(callbacks) as captured:
+            weave.publish(test_func, name="test_func_error_env")
+    output = captured.getvalue()
+    assert TRACE_OBJECT_EMOJI not in output
+    assert "Published to" not in output
+
+    # Test with INFO level - should see publish messages
+    os.environ["WEAVE_LOG_LEVEL"] = "INFO"
+    with client_creator() as client:
+        callbacks = [flushing_callback(client)]
+        with capture_output(callbacks) as captured:
+            weave.publish(test_func, name="test_func_info_env")
+    output = captured.getvalue()
+    assert TRACE_OBJECT_EMOJI in output
+    assert "Published to" in output
+
+    # Clean up after test
+    del os.environ["WEAVE_LOG_LEVEL"]

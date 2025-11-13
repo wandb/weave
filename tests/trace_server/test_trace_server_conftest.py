@@ -1,5 +1,6 @@
 import pytest
 
+from tests.trace_server.conftest import get_trace_server_flag
 from tests.trace_server.conftest_lib.trace_server_external_adapter import (
     TestOnlyUserInjectingExternalTraceServer,
 )
@@ -11,7 +12,7 @@ def test_trace_server_fixture(
     request, trace_server: TestOnlyUserInjectingExternalTraceServer
 ):
     assert isinstance(trace_server, TestOnlyUserInjectingExternalTraceServer)
-    if request.config.getoption("--trace-server") == "clickhouse":
+    if get_trace_server_flag(request) == "clickhouse":
         assert isinstance(trace_server._internal_trace_server, ClickHouseTraceServer)
     else:
         assert isinstance(trace_server._internal_trace_server, SqliteTraceServer)
@@ -22,4 +23,4 @@ def test_skip_clickhouse_client(
     request, trace_server: TestOnlyUserInjectingExternalTraceServer
 ):
     assert isinstance(trace_server, TestOnlyUserInjectingExternalTraceServer)
-    assert request.config.getoption("--trace-server") != "clickhouse"
+    assert get_trace_server_flag(request) != "clickhouse"
