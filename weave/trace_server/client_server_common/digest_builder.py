@@ -52,7 +52,6 @@ def ref_stable_json_digest(json_val: Any) -> str:
     return res
 
 
-
 def table_digest_from_row_digests(row_digests: list[str]) -> str:
     table_hasher = hashlib.sha256()
     for row_digest in row_digests:
@@ -107,7 +106,7 @@ def _stabilize_ref_str(ref: str) -> str:
     """
     if ref.startswith(external_ref_prefix):
         # Remove external_ref_prefix and the first two path segments (entity/project)
-        ref_body = ref[len(external_ref_prefix):]
+        ref_body = ref[len(external_ref_prefix) :]
         parts = ref_body.split("/")
         if len(parts) < 3:
             raise ValueError(f"Invalid URI: {ref}")
@@ -116,7 +115,7 @@ def _stabilize_ref_str(ref: str) -> str:
         return _make_stabilized_ref_str(stable_content_address)
     elif ref.startswith(internal_ref_prefix):
         # Remove internal_ref_prefix and the first path segment (project_id)
-        ref_body = ref[len(internal_ref_prefix):]
+        ref_body = ref[len(internal_ref_prefix) :]
         parts = ref_body.split("/")
         if len(parts) < 2:
             raise ValueError(f"Invalid URI: {ref}")
