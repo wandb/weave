@@ -15,10 +15,6 @@
 # and as the repository path for updating pyproject.toml
 python_output: /path/to/your/local/python/repo
 
-# Path to the Node package repository (optional)
-# Comment out or remove if not needed
-# node_output: /path/to/your/local/node/repo
-
 # Path to the TypeScript package repository (optional)
 # Comment out or remove if not needed
 # typescript_output: /path/to/your/local/typescript/repo
