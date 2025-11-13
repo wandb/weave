@@ -27,7 +27,6 @@ PY39_INCOMPATIBLE_SHARDS = [
 PY310_INCOMPATIBLE_SHARDS = [
     "verifiers_test",
 ]
-# NUM_TRACE_SERVER_SHARDS = 4  # No longer using sharding for trace tests
 
 
 @nox.session
@@ -195,9 +194,11 @@ def tests(session, shard):
 
     test_dirs = test_dirs_dict.get(shard, default_test_dirs)
 
-    # seems to resolve ci issues
-    if shard == "llamaindex":
-        session.posargs.insert(0, "-n4")
+    # Each worker gets its own isolated database namespace
+    # Only use parallel workers if we have more than 1 CPU core
+    cpu_count = os.cpu_count()
+    if cpu_count is not None and cpu_count > 1:
+        session.posargs.insert(0, f"-n{cpu_count}")
 
     # Add sharding logic for trace1, trace2, trace3
     pytest_args = [
@@ -210,11 +211,8 @@ def tests(session, shard):
         "--cov-branch",
     ]
 
-    # Run all trace tests when shard is "trace"
     if shard == "trace":
         pytest_args.extend(["-m", "trace_server"])
-        # Each worker gets its own isolated database namespace
-        session.posargs.insert(0, f"-n{os.cpu_count()}")
 
     if shard == "trace_no_server":
         pytest_args.extend(["-m", "not trace_server"])
