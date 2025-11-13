@@ -5,15 +5,16 @@ from pydantic import BaseModel
 from weave.trace_server import refs_internal as ri
 from weave.trace_server.errors import InvalidExternalRef
 
+
+class InvalidInternalRef(ValueError):
+    pass
+
+
 A = TypeVar("A")
 B = TypeVar("B")
 
 weave_prefix = ri.WEAVE_SCHEME + ":///"
 weave_internal_prefix = ri.WEAVE_INTERNAL_SCHEME + ":///"
-
-
-class InvalidInternalRef(ValueError):
-    pass
 
 
 def universal_ext_to_int_ref_converter(

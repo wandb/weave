@@ -32,6 +32,11 @@ from weave.utils.paginated_iterator import PaginatedIterator
 if TYPE_CHECKING:
     from weave.flow.scorer import ApplyScorerResult, Scorer
 
+
+class OpNameError(ValueError):
+    """Raised when an op name is invalid."""
+
+
 logger = logging.getLogger(__name__)
 
 DEFAULT_CALLS_PAGE_SIZE = 1000
@@ -304,10 +309,6 @@ class CallDict(TypedDict):
 
 
 CallsIter = PaginatedIterator[CallSchema, WeaveObject]
-
-
-class OpNameError(ValueError):
-    """Raised when an op name is invalid."""
 
 
 def elide_display_name(name: str) -> str:

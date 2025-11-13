@@ -23,6 +23,13 @@ from weave.trace_server.interface.builtin_object_classes.saved_view import (
     SavedView as SavedViewBase,
 )
 
+
+class QueryTranslationException(Exception):
+    """Exception raised when a query cannot be translated to or from filters."""
+
+    pass
+
+
 KNOWN_COLUMNS = [
     "id",
     "display_name",
@@ -281,12 +288,6 @@ def filters_to_query(filters: Filters | None) -> tsi.Query | None:
     filter_clauses = [filter_to_clause(f) for f in filters]
     expr = {"$and": filter_clauses}
     return tsi.Query(**{"$expr": expr})
-
-
-class QueryTranslationException(Exception):
-    """Exception raised when a query cannot be translated to or from filters."""
-
-    pass
 
 
 def operand_to_filter_eq(operand: tsi_query.EqOperation) -> Filter:

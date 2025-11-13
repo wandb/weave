@@ -8,16 +8,17 @@ from clickhouse_connect.driver.client import Client as CHClient
 
 from weave.trace_server.costs.insert_costs import insert_costs, should_insert_costs
 
+
+class MigrationError(RuntimeError):
+    """Raised when a migration error occurs."""
+
+
 logger = logging.getLogger(__name__)
 
 # These settings are only used when `replicated` mode is enabled for
 # self managed clickhouse instances.
 DEFAULT_REPLICATED_PATH = "/clickhouse/tables/{db}"
 DEFAULT_REPLICATED_CLUSTER = "weave_cluster"
-
-
-class MigrationError(RuntimeError):
-    """Raised when a migration error occurs."""
 
 
 class ClickHouseTraceServerMigrator:

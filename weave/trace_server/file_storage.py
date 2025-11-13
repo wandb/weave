@@ -77,6 +77,19 @@ from weave.trace_server.file_storage_uris import (
     S3FileStorageURI,
 )
 
+
+class FileStorageWriteError(Exception):
+    """Exception for failed file writes."""
+
+    pass
+
+
+class FileStorageReadError(Exception):
+    """Exception for failed file reads."""
+
+    pass
+
+
 # Configure logger
 logger = logging.getLogger(__name__)
 
@@ -110,18 +123,6 @@ class FileStorageClient:
     def read(self, uri: FileStorageURI) -> bytes:
         """Read data from the specified URI location in cloud storage."""
         pass
-
-
-class FileStorageWriteError(Exception):
-    """Exception for failed file writes."""
-
-    pass
-
-
-class FileStorageReadError(Exception):
-    """Exception for failed file reads."""
-
-    pass
 
 
 def store_in_bucket(

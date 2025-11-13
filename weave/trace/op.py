@@ -60,6 +60,12 @@ if TYPE_CHECKING:
     from weave.trace.call import Call, CallsIter, NoOpCall
 
 
+class DisplayNameFuncError(ValueError): ...
+
+
+class OpCallError(Exception): ...
+
+
 S = TypeVar("S")
 V = TypeVar("V")
 
@@ -89,9 +95,6 @@ CALL_CREATE_MSG = "Error creating call:\n{}"
 ASYNC_CALL_CREATE_MSG = "Error creating async call:\n{}"
 ON_OUTPUT_MSG = "Error capturing call output:\n{}"
 UNINITIALIZED_MSG = "Warning: Traces will not be logged. Call weave.init to log your traces to a project.\n"
-
-
-class DisplayNameFuncError(ValueError): ...
 
 
 # Call, original function output, exception if occurred
@@ -250,9 +253,6 @@ def _is_unbound_method(func: Callable) -> bool:
     is_method = params and params[0].name in {"self", "cls"}
 
     return bool(is_method)
-
-
-class OpCallError(Exception): ...
 
 
 def _default_on_input_handler(func: Op, args: tuple, kwargs: dict) -> ProcessedInputs:

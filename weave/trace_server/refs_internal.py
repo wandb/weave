@@ -8,6 +8,10 @@ import dataclasses
 import urllib
 from typing import Any, Union
 
+
+class InvalidInternalRef(ValueError):
+    pass
+
 WEAVE_INTERNAL_SCHEME = "weave-trace-internal"
 WEAVE_SCHEME = "weave"
 WEAVE_PRIVATE_SCHEME = "weave-private"
@@ -24,10 +28,6 @@ valid_edge_names = (
     OBJECT_ATTR_EDGE_NAME,
     TABLE_ROW_ID_EDGE_NAME,
 )
-
-
-class InvalidInternalRef(ValueError):
-    pass
 
 
 def extra_value_quoter(s: str) -> str:
