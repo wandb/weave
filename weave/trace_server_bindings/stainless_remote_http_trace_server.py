@@ -6,6 +6,7 @@ from typing import Any, Callable, Optional, TypeVar, Union, cast
 from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel
+from typing_extensions import Self
 from weave_server_sdk import Client as StainlessClient
 
 from weave.trace.env import weave_trace_server_url
@@ -62,8 +63,8 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         self._extra_headers: Optional[dict[str, str]] = extra_headers
 
         # Initialize stainless client
-        username = None
-        password = None
+        username = ""
+        password = ""
         if auth:
             username, password = auth
 
@@ -73,8 +74,8 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
 
         self._stainless_client = StainlessClient(
             base_url=trace_server_url,
-            username=username or "",
-            password=password or "",
+            username=username,
+            password=password,
             default_headers=default_headers,
             batch_requests=False,  # We handle batching ourselves
         )
@@ -94,15 +95,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
     def ensure_project_exists(
         self, entity: str, project: str
     ) -> tsi.EnsureProjectExistsRes:
-        """Ensure project exists on the server.
-
-        Args:
-            entity: Entity name.
-            project: Project name.
-
-        Returns:
-            EnsureProjectExistsRes with project name.
-        """
         # TODO: This should happen in the wandb backend, not here, and it's slow
         # (hundreds of ms)
         return tsi.EnsureProjectExistsRes.model_validate(
@@ -110,16 +102,8 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
     @classmethod
-    def from_env(cls, should_batch: bool = False) -> "StainlessRemoteHTTPTraceServer":
-        """Create instance from environment variables.
-
-        Args:
-            should_batch: Whether to enable batching.
-
-        Returns:
-            StainlessRemoteHTTPTraceServer instance.
-        """
-        return StainlessRemoteHTTPTraceServer(weave_trace_server_url(), should_batch)
+    def from_env(cls, should_batch: bool = False) -> Self:
+        return cls(weave_trace_server_url(), should_batch)
 
     def set_auth(self, auth: tuple[str, str]) -> None:
         """Set authentication credentials.
@@ -136,7 +120,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
 
     def _update_client_headers(self) -> None:
         """Update client headers with current retry ID and extra headers."""
-        headers = dict(self._extra_headers) if self._extra_headers else {}
+        headers = self._extra_headers.copy()
         if retry_id := get_current_retry_id():
             headers["X-Weave-Retry-Id"] = retry_id
         if headers:
