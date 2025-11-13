@@ -2,7 +2,7 @@
 
 Generates code from OpenAPI spec using Stainless:
 1. Retrieve OpenAPI spec from temporary FastAPI server
-2. Generate code using Stainless
+2. Generate code using Stainless (Python and/or TypeScript)
 3. Create git branch with generated code
 4. Update pyproject.toml with git SHA reference
 """
@@ -48,7 +48,6 @@ class Config:
     python_output: Path
     package_name: str
     openapi_output: Path
-    node_output: Path | None = None
     typescript_output: Path | None = None
 
 
@@ -95,12 +94,6 @@ def load_config(config_path: Path) -> Config:
     if not openapi_output.is_absolute():
         openapi_output = Path.cwd() / openapi_output
 
-    node_output = None
-    if "node_output" in data:
-        node_output = Path(data["node_output"]).expanduser().resolve()
-        if not node_output.exists():
-            error(f"Node output directory does not exist: {node_output}")
-
     typescript_output = None
     if "typescript_output" in data:
         typescript_output = Path(data["typescript_output"]).expanduser().resolve()
@@ -111,7 +104,6 @@ def load_config(config_path: Path) -> Config:
         python_output=python_output,
         package_name=data["package_name"],
         openapi_output=openapi_output,
-        node_output=node_output,
         typescript_output=typescript_output,
     )
 
@@ -203,6 +195,7 @@ def generate_code(config: Config) -> None:
     header("Generating code with Stainless")
     validate_environment()
 
+    targets = ["python"]
     cmd = [
         "stl",
         "builds",
@@ -215,11 +208,11 @@ def generate_code(config: Config) -> None:
         "--allow-empty",
         f"--+target=python:{config.python_output}",
     ]
-    if config.node_output:
-        cmd.append(f"--+target=node:{config.node_output}")
     if config.typescript_output:
         cmd.append(f"--+target=typescript:{config.typescript_output}")
+        targets.append("typescript")
 
+    info(f"Generating code for targets: {', '.join(targets)}")
     info(f"Running: {' '.join(cmd)}")
     try:
         subprocess.run(cmd, check=True, timeout=SUBPROCESS_TIMEOUT)
@@ -381,7 +374,12 @@ def generate(
         DEFAULT_CONFIG_PATH, "--config", "-c", help="Path to configuration file"
     ),
 ) -> None:
-    """Generate Stainless client code from OpenAPI spec."""
+    """Generate Stainless client code from OpenAPI spec.
+
+    Supports generating Python and/or TypeScript clients.
+    Configure targets in the config file using python_output and/or
+    typescript_output fields.
+    """
     header("Weave Code Generation")
     config = load_config(Path(config_path))
 
