@@ -53,17 +53,7 @@ def _get_anonymizer() -> AnonymizerEngine:
 def redact_pii(
     data: Union[dict[str, Any], str],
 ) -> Union[dict[str, Any], str]:
-    """Redact PII from data using Microsoft Presidio.
-
-    This function recursively traverses data structures and redacts PII from strings.
-    It uses singleton analyzer and anonymizer instances for performance.
-
-    Args:
-        data: Data to redact PII from (string, dict, list, or dataclass).
-
-    Returns:
-        Data with PII redacted.
-    """
+    """Redact PII from data using Microsoft Presidio recursively."""
     analyzer = _get_analyzer()
     anonymizer = _get_anonymizer()
     fields = redact_pii_fields()
@@ -100,19 +90,10 @@ def redact_pii(
 
 
 def redact_pii_string(data: str) -> str:
-    """Redact PII from a single string.
-
-    Args:
-        data: String to redact PII from.
-
-    Returns:
-        String with PII redacted.
-    """
     analyzer = _get_analyzer()
     anonymizer = _get_anonymizer()
     fields = redact_pii_fields()
     entities = DEFAULT_REDACTED_FIELDS if len(fields) == 0 else fields
-
     results = analyzer.analyze(text=data, language="en", entities=entities)
     if not results:
         return data
