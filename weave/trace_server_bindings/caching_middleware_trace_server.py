@@ -59,7 +59,7 @@ CACHE_DIR_PREFIX = "weave_trace_server_cache"
 CACHE_KEY_SUFFIX = "v_" + version.VERSION
 
 
-class CachingMiddlewareTraceServer(tsi.FullTraceServerInterface):
+class CachingMiddlewareTraceServer(TraceServerClientInterface):
     """A middleware trace server that provides caching functionality.
 
     This server wraps another trace server and caches responses to improve performance.

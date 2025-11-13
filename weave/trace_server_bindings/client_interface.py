@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Protocol, Self
+from typing import TYPE_CHECKING, Any, Protocol, Self
 
 from weave.trace_server.trace_server_interface import FullTraceServerInterface
 
@@ -17,7 +17,7 @@ class TraceServerClientInterface(FullTraceServerInterface, Protocol):
     """
 
     @classmethod
-    def from_env(cls, should_batch: bool) -> Self: ...
+    def from_env(cls, *args: Any, **kwargs: Any) -> Self: ...
     def server_info(self) -> ServerInfoRes: ...
     def ensure_project_exists(
         self, entity: str, project: str

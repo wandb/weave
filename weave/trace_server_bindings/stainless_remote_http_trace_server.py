@@ -63,9 +63,11 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         self.feedback_processor = None
         self.remote_request_bytes_limit = remote_request_bytes_limit
         self._extra_headers: dict[str, str] = extra_headers or {}
+        self._username: str = username
+        self._password: str = password
 
         # Initialize stainless client
-        default_headers = self._extra_headers
+        default_headers = self._extra_headers.copy()
         if retry_id := get_current_retry_id():
             default_headers["X-Weave-Retry-Id"] = retry_id
 
@@ -101,6 +103,26 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
     @classmethod
     def from_env(cls, should_batch: bool = False) -> Self:
         return cls(weave_trace_server_url(), should_batch)
+
+    def set_auth(self, auth: tuple[str, str]) -> None:
+        """Set authentication credentials.
+
+        Args:
+            auth: Tuple of (username, password) for authentication.
+        """
+        self._username, self._password = auth
+        # Recreate stainless client with new credentials
+        default_headers = self._extra_headers.copy()
+        if retry_id := get_current_retry_id():
+            default_headers["X-Weave-Retry-Id"] = retry_id
+
+        self._stainless_client = StainlessClient(
+            base_url=self.trace_server_url,
+            username=self._username,
+            password=self._password,
+            default_headers=default_headers,
+            batch_requests=False,  # We handle batching ourselves
+        )
 
     def _update_client_headers(self) -> None:
         """Update client headers with current retry ID and extra headers."""
