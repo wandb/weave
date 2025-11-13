@@ -417,7 +417,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         # SHADOW write completes to calls_complete table
         if completes:
-            self._insert_call_batch(completes)
+            self._insert_call_batch(completes, "calls_complete")
 
         if rejected_spans > 0:
             # Join the first 20 errors and return them delimited by ';'
