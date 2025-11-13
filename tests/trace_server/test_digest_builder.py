@@ -12,7 +12,7 @@ def test_ref_stable_json_digest():
     object_with_ext_ref_digest = ref_stable_json_digest(object_with_ext_ref)
 
     object_with_int_ref = {
-        "ref_to_thing": f"weave-internal:///project_id/object/my_thing:{basic_data_digest}"
+        "ref_to_thing": f"weave-trace-internal:///project_id/object/my_thing:{basic_data_digest}"
     }
     object_with_int_ref_digest = ref_stable_json_digest(object_with_int_ref)
 

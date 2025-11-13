@@ -23,7 +23,7 @@ import json
 from typing import Any, Callable, TypeVar, cast
 
 external_ref_prefix = "weave:///"
-internal_ref_prefix = "weave-internal:///"
+internal_ref_prefix = "weave-trace-internal:///"
 
 
 # TODO: Should we call this "dangerous" or "unstable"?

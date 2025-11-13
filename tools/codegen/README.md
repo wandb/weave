@@ -1,6 +1,6 @@
 # Weave SDK Code Generator
 
-This tool generates code from the OpenAPI specification for Python, Node.js, and TypeScript using Stainless.
+This tool generates code from the OpenAPI specification for Python and TypeScript using Stainless.
 
 ## Quick Start
 
@@ -66,7 +66,7 @@ uv run tools/codegen/generate.py --config /path/to/config.yaml
 
 The CLI:
 
-- Generates Python code (optionally supports Node.js and TypeScript)
+- Generates Python code (optionally supports TypeScript)
 - Uses a config file for all settings
 - Ensures generated code exists on a referenceable git branch/SHA
 - Provides clear error messages and validation
