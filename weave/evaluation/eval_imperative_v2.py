@@ -1,7 +1,7 @@
 """Imperative Evaluation Logger V2.
 
 This module provides a V2 version of the EvaluationLogger that uses the
-new V2 trace server APIs instead of the legacy call-based approach.
+trace server APIs instead of the legacy call-based approach.
 
 Example:
     ```python
@@ -90,7 +90,7 @@ def _default_dataset_name() -> str:
 
 
 def _convert_score_to_float(score: ScoreType) -> float:
-    """Convert a score to float format required by the V2 API.
+    """Convert a score to float format required by the API.
 
     Args:
         score: The score value (float, bool, int, or dict).
@@ -106,15 +106,13 @@ def _convert_score_to_float(score: ScoreType) -> float:
     elif isinstance(score, float):
         return score
     elif isinstance(score, dict):
-        raise TypeError(
-            f"Dict scores are not supported by the V2 API. Got dict: {score}"
-        )
+        raise TypeError(f"Dict scores are not supported by the API. Got dict: {score}")
     else:
         raise TypeError(f"Invalid score type: {type(score)}. Expected float or bool.")
 
 
 class ScoreLoggerV2(BaseModel):
-    """Interface for logging scores in V2 evaluation runs.
+    """Interface for logging scores in evaluation runs.
 
     This class is returned by `EvaluationLoggerV2.log_prediction()` and can be used
     to log scores for a specific prediction.
@@ -138,7 +136,7 @@ class ScoreLoggerV2(BaseModel):
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    def _prepare_finish_prediction(self) -> tsi.PredictionFinishV2Req | None:
+    def _prepare_finish_prediction(self) -> tsi.PredictionFinishReq | None:
         """Internal helper to prepare finish prediction request."""
         if self._has_finished:
             logger.warning("(NO-OP): Already called finish, returning.")
@@ -147,8 +145,8 @@ class ScoreLoggerV2(BaseModel):
         wc = require_weave_client()
         project_id = wc._project_id()
 
-        # Finish the prediction via V2 API
-        req = tsi.PredictionFinishV2Req(
+        # Finish the prediction via API
+        req = tsi.PredictionFinishReq(
             project_id=project_id,
             prediction_id=self.prediction_id,
         )
@@ -158,14 +156,14 @@ class ScoreLoggerV2(BaseModel):
     def finish(self) -> None:
         """Finish the prediction logging.
 
-        Calls prediction_finish_v2 to mark the prediction as complete.
+        Calls prediction_finish to mark the prediction as complete.
         """
         req = self._prepare_finish_prediction()
         if req is None:
             return
 
         wc = require_weave_client()
-        wc.server.prediction_finish_v2(req)
+        wc.server.prediction_finish(req)
         self._has_finished = True
 
         logger.debug(f"Finished prediction with prediction_id={self.prediction_id}")
@@ -173,14 +171,14 @@ class ScoreLoggerV2(BaseModel):
     async def afinish(self) -> None:
         """Finish the prediction logging (async version).
 
-        Calls prediction_finish_v2 to mark the prediction as complete.
+        Calls prediction_finish to mark the prediction as complete.
         """
         req = self._prepare_finish_prediction()
         if req is None:
             return
 
         wc = require_weave_client()
-        await asyncio.to_thread(wc.server.prediction_finish_v2, req)
+        await asyncio.to_thread(wc.server.prediction_finish, req)
         # Use sync finish's post-processing logic
         self._has_finished = True
         logger.debug(f"Finished prediction with prediction_id={self.prediction_id}")
@@ -189,7 +187,7 @@ class ScoreLoggerV2(BaseModel):
         self,
         scorer: Scorer | str,
         score: ScoreType,
-    ) -> tsi.ScoreCreateV2Req:
+    ) -> tsi.ScoreCreateReq:
         """Internal helper to prepare score logging request."""
         if self._has_finished:
             raise ValueError("Cannot log score after finish has been called")
@@ -204,8 +202,8 @@ class ScoreLoggerV2(BaseModel):
         # Convert score to float if needed (API expects float)
         score_value = _convert_score_to_float(score)
 
-        # Log the score via V2 API
-        req = tsi.ScoreCreateV2Req(
+        # Log the score via API
+        req = tsi.ScoreCreateReq(
             project_id=project_id,
             prediction_id=self.prediction_id,
             scorer=scorer_ref,
@@ -239,7 +237,7 @@ class ScoreLoggerV2(BaseModel):
         """
         req = self._prepare_score_logging(scorer, score)
         wc = require_weave_client()
-        res = wc.server.score_create_v2(req)
+        res = wc.server.score_create(req)
         self._process_score_result(scorer, score, res)
 
     async def alog_score(
@@ -255,7 +253,7 @@ class ScoreLoggerV2(BaseModel):
         """
         req = self._prepare_score_logging(scorer, score)
         wc = require_weave_client()
-        res = await asyncio.to_thread(wc.server.score_create_v2, req)
+        res = await asyncio.to_thread(wc.server.score_create, req)
         self._process_score_result(scorer, score, res)
 
     def _get_scorer_name(self, scorer: Scorer | str) -> str:
@@ -271,7 +269,7 @@ class EvaluationLoggerV2(BaseModel):
     """V2 imperative interface for logging evaluations.
 
     This class provides an imperative interface for logging evaluations using
-    the V2 trace server APIs. It offers cleaner separation between evaluation
+    the trace server APIs. It offers cleaner separation between evaluation
     setup and execution.
 
     Basic usage:
@@ -392,15 +390,15 @@ class EvaluationLoggerV2(BaseModel):
             # It's a string - call dataset_create API with the name as the str
             dataset_name = self.dataset
             # Create an empty dataset with just the name
-            req = tsi.DatasetCreateV2Req(
+            req = tsi.DatasetCreateReq(
                 project_id=project_id,
                 name=dataset_name,
                 description=None,
                 rows=[],  # Empty dataset
             )
 
-            res = wc.server.dataset_create_v2(req)
-            # Construct the dataset ref manually since DatasetCreateV2Res doesn't have a dataset_ref field
+            res = wc.server.dataset_create(req)
+            # Construct the dataset ref manually since DatasetCreateRes doesn't have a dataset_ref field
             self._dataset_ref = (
                 f"weave:///{entity}/{project}/object/{res.object_id}:{res.digest}"
             )
@@ -417,8 +415,8 @@ class EvaluationLoggerV2(BaseModel):
                 scorer_ref = self._prepare_scorer_ref(scorer)
                 scorer_refs.append(scorer_ref)
 
-        # Create the evaluation object via V2 API
-        eval_req = tsi.EvaluationCreateV2Req(
+        # Create the evaluation object via API
+        eval_req = tsi.EvaluationCreateReq(
             project_id=project_id,
             name=self.name or default_evaluation_display_name,
             description=self.description,
@@ -428,7 +426,7 @@ class EvaluationLoggerV2(BaseModel):
             eval_attributes=self.eval_attributes,
         )
 
-        eval_res = wc.server.evaluation_create_v2(eval_req)
+        eval_res = wc.server.evaluation_create(eval_req)
         self._evaluation_ref = (
             f"weave:///{entity}/{project}/object/{eval_res.object_id}:{eval_res.digest}"
         )
@@ -436,13 +434,13 @@ class EvaluationLoggerV2(BaseModel):
         logger.debug(f"Created evaluation: {self._evaluation_ref}")
 
         # Create the evaluation run
-        eval_run_req = tsi.EvaluationRunCreateV2Req(
+        eval_run_req = tsi.EvaluationRunCreateReq(
             project_id=project_id,
             evaluation=self._evaluation_ref,
             model=self._model_ref,
         )
 
-        eval_run_res = wc.server.evaluation_run_create_v2(eval_run_req)
+        eval_run_res = wc.server.evaluation_run_create(eval_run_req)
         self._eval_run_id = eval_run_res.evaluation_run_id
 
         logger.debug(f"Created evaluation run: {self._eval_run_id}")
@@ -491,7 +489,7 @@ class PlaceholderModel(Model):
     pass
 """
 
-            req = tsi.ModelCreateV2Req(
+            req = tsi.ModelCreateReq(
                 project_id=project_id,
                 name=model_name,
                 description=None,
@@ -499,7 +497,7 @@ class PlaceholderModel(Model):
                 attributes=None,
             )
 
-            res = wc.server.model_create_v2(req)
+            res = wc.server.model_create(req)
             model_ref = res.model_ref
         else:
             raise TypeError(f"Invalid model type: {type(model)}")
@@ -546,14 +544,14 @@ class PlaceholderModel(Model):
     raise NotImplementedError("Scorer created from string name - implement score method")
 """
 
-            req = tsi.ScorerCreateV2Req(
+            req = tsi.ScorerCreateReq(
                 project_id=project_id,
                 name=scorer_name,
                 description=None,
                 op_source_code=op_source_code,
             )
 
-            res = wc.server.scorer_create_v2(req)
+            res = wc.server.scorer_create(req)
             scorer_ref = res.scorer
         elif isinstance(scorer, Scorer):
             # Save the scorer if it doesn't have a ref yet
@@ -606,11 +604,11 @@ class PlaceholderModel(Model):
         self,
         inputs: dict[str, Any],
         output: Any,
-    ) -> tsi.PredictionCreateV2Req:
+    ) -> tsi.PredictionCreateReq:
         """Internal helper to prepare prediction logging.
 
         Returns:
-            PredictionCreateV2Req: The request object for creating a prediction.
+            PredictionCreateReq: The request object for creating a prediction.
         """
         if self._is_finalized:
             raise RuntimeError("Cannot log prediction after evaluation is finalized")
@@ -621,8 +619,8 @@ class PlaceholderModel(Model):
         wc = require_weave_client()
         project_id = wc._project_id()
 
-        # Log the prediction via V2 API
-        req = tsi.PredictionCreateV2Req(
+        # Log the prediction via API
+        req = tsi.PredictionCreateReq(
             project_id=project_id,
             model=self._model_ref,
             inputs=inputs,
@@ -656,7 +654,7 @@ class PlaceholderModel(Model):
         req = self._log_prediction_internal(inputs, output)
 
         wc = require_weave_client()
-        res = wc.server.prediction_create_v2(req)
+        res = wc.server.prediction_create(req)
 
         return self._create_score_logger(res.prediction_id, inputs, output)
 
@@ -684,7 +682,7 @@ class PlaceholderModel(Model):
         req = self._log_prediction_internal(inputs, output)
 
         wc = require_weave_client()
-        res = await asyncio.to_thread(wc.server.prediction_create_v2, req)
+        res = await asyncio.to_thread(wc.server.prediction_create, req)
 
         return self._create_score_logger(res.prediction_id, inputs, output)
 
@@ -799,7 +797,7 @@ class PlaceholderModel(Model):
         self,
         summary: dict | None = None,
         auto_summarize: bool = True,
-    ) -> tuple[tsi.EvaluationRunFinishV2Req, list[ScoreLoggerV2]]:
+    ) -> tuple[tsi.EvaluationRunFinishReq, list[ScoreLoggerV2]]:
         """Prepare summary logging request and get unfinished predictions.
 
         Args:
@@ -826,8 +824,8 @@ class PlaceholderModel(Model):
             pred for pred in self._accumulated_predictions if not pred._has_finished
         ]
 
-        # Finish the evaluation run via V2 API
-        req = tsi.EvaluationRunFinishV2Req(
+        # Finish the evaluation run via API
+        req = tsi.EvaluationRunFinishReq(
             project_id=project_id,
             evaluation_run_id=self._eval_run_id,
             summary=final_summary,
@@ -855,7 +853,7 @@ class PlaceholderModel(Model):
             pred.finish()
 
         wc = require_weave_client()
-        wc.server.evaluation_run_finish_v2(req)
+        wc.server.evaluation_run_finish(req)
 
         self._is_finalized = True
         logger.debug(f"Finished evaluation run: {self._eval_run_id}")
@@ -880,7 +878,7 @@ class PlaceholderModel(Model):
             await asyncio.gather(*[pred.afinish() for pred in unfinished_predictions])
 
         wc = require_weave_client()
-        await asyncio.to_thread(wc.server.evaluation_run_finish_v2, req)
+        await asyncio.to_thread(wc.server.evaluation_run_finish, req)
 
         self._is_finalized = True
         logger.debug(f"Finished evaluation run: {self._eval_run_id}")
