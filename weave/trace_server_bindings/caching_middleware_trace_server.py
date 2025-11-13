@@ -22,7 +22,6 @@ from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
 from weave.trace_server_bindings.caches import DiskCache, LRUCache, StackedCache
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface
-from weave.trace_server_bindings.models import ServerInfoRes
 
 logger = logging.getLogger(__name__)
 
@@ -418,9 +417,6 @@ class CachingMiddlewareTraceServer(tsi.FullTraceServerInterface):
         )
 
     # Remaining Un-cacheable Methods:
-
-    def server_info(self) -> ServerInfoRes:
-        return self._next_trace_server.server_info()
 
     def ensure_project_exists(
         self, entity: str, project: str

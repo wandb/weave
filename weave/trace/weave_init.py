@@ -21,6 +21,7 @@ from weave.trace_server_bindings.caching_middleware_trace_server import (
     CachingMiddlewareTraceServer,
 )
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface
+from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
 
 logger = logging.getLogger(__name__)
 
@@ -77,9 +78,7 @@ Args:
 """
 
 
-def _weave_is_available(
-    server: TraceServerClientInterface,
-) -> bool:
+def _weave_is_available(server: TraceServerClientInterface) -> bool:
     try:
         server.server_info()
     except JSONDecodeError:
@@ -238,10 +237,6 @@ def init_weave_get_server(
 
         res = StainlessRemoteHTTPTraceServer.from_env(should_batch)
     else:
-        from weave.trace_server_bindings.remote_http_trace_server import (
-            RemoteHTTPTraceServer,
-        )
-
         res = RemoteHTTPTraceServer.from_env(should_batch)
     if api_key is not None:
         res.set_auth(("api", api_key))
