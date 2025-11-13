@@ -89,6 +89,7 @@ from weave.trace.wandb_run_context import (
     check_wandb_run_matches,
     get_global_wb_run_context,
 )
+from weave.trace.weave_client_objects_api import WeaveClientObjectsAPIMixin
 from weave.trace.weave_client_send_file_cache import WeaveClientSendFileCache
 from weave.trace_server.constants import MAX_OBJECT_NAME_LENGTH
 from weave.trace_server.ids import generate_id
@@ -287,7 +288,7 @@ BACKGROUND_PARALLELISM_MIX = 0.5
 MAX_TRACE_PAYLOAD_SIZE = int(3.5 * 1024 * 1024)  # 3.5 MiB
 
 
-class WeaveClient:
+class WeaveClient(WeaveClientObjectsAPIMixin):
     server: TraceServerInterface
 
     # Main future executor, handling deferred tasks for the client
