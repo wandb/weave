@@ -39,17 +39,16 @@ from weave.trace_server.trace_server_interface import (
 )
 from weave.utils.iterators import ThreadSafeLazyList
 
+logger = logging.getLogger(__name__)
+
+REMOTE_ITER_PAGE_SIZE = 100
+
 
 class InternalError(Exception): ...
 
 
 class MissingSelfInstanceError(ValueError):
     pass
-
-
-logger = logging.getLogger(__name__)
-
-REMOTE_ITER_PAGE_SIZE = 100
 
 
 @dataclasses.dataclass

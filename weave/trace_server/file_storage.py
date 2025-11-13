@@ -77,6 +77,16 @@ from weave.trace_server.file_storage_uris import (
     S3FileStorageURI,
 )
 
+# Configure logger
+logger = logging.getLogger(__name__)
+
+# Default timeout values (in seconds)
+DEFAULT_CONNECT_TIMEOUT = 10
+DEFAULT_READ_TIMEOUT = 30
+RETRY_MAX_ATTEMPTS = 3
+RETRY_MIN_WAIT = 1  # seconds
+RETRY_MAX_WAIT = 10  # seconds
+
 
 class FileStorageWriteError(Exception):
     """Exception for failed file writes."""
@@ -88,17 +98,6 @@ class FileStorageReadError(Exception):
     """Exception for failed file reads."""
 
     pass
-
-
-# Configure logger
-logger = logging.getLogger(__name__)
-
-# Default timeout values (in seconds)
-DEFAULT_CONNECT_TIMEOUT = 10
-DEFAULT_READ_TIMEOUT = 30
-RETRY_MAX_ATTEMPTS = 3
-RETRY_MIN_WAIT = 1  # seconds
-RETRY_MAX_WAIT = 10  # seconds
 
 # Publicly exposed methods:
 

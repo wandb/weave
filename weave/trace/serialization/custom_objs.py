@@ -24,12 +24,11 @@ from weave.trace_server.trace_server_interface import (
     TraceServerInterface,
 )
 
+logger = logging.getLogger(__name__)
+
 
 class DecodeCustomObjectError(Exception):
     """An error that occurs while decoding a custom object."""
-
-
-logger = logging.getLogger(__name__)
 
 
 class WeaveTypeDict(TypedDict):

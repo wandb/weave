@@ -59,13 +59,6 @@ from weave.trace.util import log_once
 if TYPE_CHECKING:
     from weave.trace.call import Call, CallsIter, NoOpCall
 
-
-class DisplayNameFuncError(ValueError): ...
-
-
-class OpCallError(Exception): ...
-
-
 S = TypeVar("S")
 V = TypeVar("V")
 
@@ -95,6 +88,12 @@ CALL_CREATE_MSG = "Error creating call:\n{}"
 ASYNC_CALL_CREATE_MSG = "Error creating async call:\n{}"
 ON_OUTPUT_MSG = "Error capturing call output:\n{}"
 UNINITIALIZED_MSG = "Warning: Traces will not be logged. Call weave.init to log your traces to a project.\n"
+
+
+class DisplayNameFuncError(ValueError): ...
+
+
+class OpCallError(Exception): ...
 
 
 # Call, original function output, exception if occurred

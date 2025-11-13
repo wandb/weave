@@ -8,12 +8,11 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from weave.trace.weave_client import WeaveClient
 
-
-class WeaveInitError(Exception): ...
-
-
 _global_weave_client: WeaveClient | None = None
 lock = threading.Lock()
+
+
+class WeaveInitError(Exception): ...
 
 
 def set_weave_client_global(client: WeaveClient | None) -> None:

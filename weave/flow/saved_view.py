@@ -23,13 +23,6 @@ from weave.trace_server.interface.builtin_object_classes.saved_view import (
     SavedView as SavedViewBase,
 )
 
-
-class QueryTranslationException(Exception):
-    """Exception raised when a query cannot be translated to or from filters."""
-
-    pass
-
-
 KNOWN_COLUMNS = [
     "id",
     "display_name",
@@ -67,6 +60,12 @@ class Filter(BaseModel):
 
 
 Filters = list[Filter]
+
+
+class QueryTranslationException(Exception):
+    """Exception raised when a query cannot be translated to or from filters."""
+
+    pass
 
 
 class TableColumn(TypedDict):

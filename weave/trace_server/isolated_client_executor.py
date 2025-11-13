@@ -50,15 +50,6 @@ from weave.trace.context.weave_client_context import (
 )
 from weave.trace.weave_client import WeaveClient
 
-
-class IsolatedClientExecutorError(Exception):
-    """Base exception for IsolatedClientExecutor errors."""
-
-
-class IsolatedClientExecutorTimeoutError(IsolatedClientExecutorError):
-    """Exception for function execution timeouts."""
-
-
 logger = logging.getLogger(__name__)
 
 # =============================================================================
@@ -73,6 +64,14 @@ PROCESS_TERMINATION_TIMEOUT_SECONDS = 5.0
 # Request queue signal constants
 SIGNAL_STOP = "STOP"
 SIGNAL_EXEC = "EXEC"
+
+
+class IsolatedClientExecutorError(Exception):
+    """Base exception for IsolatedClientExecutor errors."""
+
+
+class IsolatedClientExecutorTimeoutError(IsolatedClientExecutorError):
+    """Exception for function execution timeouts."""
 
 # =============================================================================
 # Type Definitions
