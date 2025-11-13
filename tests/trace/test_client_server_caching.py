@@ -1,6 +1,7 @@
 import datetime
 import os
 import random
+import sys
 import tempfile
 import time
 from typing import Any
@@ -200,7 +201,10 @@ def test_server_cache_latency(client):
     added_latency = latency_with_cache - latency_without_cache
     print(f"Added latency: {added_latency}")
 
-    assert added_latency < 0.002
+    if sys.platform == "win32":
+        assert added_latency < 0.01  # Windows is slower
+    else:
+        assert added_latency < 0.002
 
 
 def test_file_create_caching(client):
