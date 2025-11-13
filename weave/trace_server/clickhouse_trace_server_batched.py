@@ -254,7 +254,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         project_version = self.project_version_resolver.get_project_version_sync(
             project_id
         )
-        return "calls_complete" if project_version == ProjectVersion.CALLS_COMPLETE_VERSION else "calls_merged"
+        return (
+            "calls_complete"
+            if project_version == ProjectVersion.CALLS_COMPLETE_VERSION
+            else "calls_merged"
+        )
 
     def _get_existing_ops_from_spans(
         self, seen_ids: set[str], project_id: str, limit: int | None = None
@@ -1621,7 +1625,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             before_datetime = req.filter.before_datetime
             thread_ids = req.filter.thread_ids
 
-        project_version = self.project_version_resolver.get_project_version_sync(req.project_id)
+        project_version = self.project_version_resolver.get_project_version_sync(
+            req.project_id
+        )
 
         # Use the dedicated query builder
         query = make_threads_query(
