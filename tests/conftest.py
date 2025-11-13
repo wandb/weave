@@ -371,11 +371,12 @@ def remote_http_trace_server(request):
                 StainlessRemoteHTTPTraceServer,
             )
 
-            return StainlessRemoteHTTPTraceServer
         except ImportError:
             pytest.skip("StainlessRemoteHTTPTraceServer not available")
-    else:
-        return remote_http_trace_server_module.RemoteHTTPTraceServer
+        else:
+            return StainlessRemoteHTTPTraceServer
+
+    return remote_http_trace_server_module.RemoteHTTPTraceServer
 
 
 def create_client(

@@ -240,7 +240,8 @@ jobs:
             "13",
             #
           ]
-        nox-shard: [
+        nox-shard:
+          [
             "trace1",
             "trace2",
             "trace3",
@@ -268,6 +269,7 @@ jobs:
             "pandas_test",
             "mcp",
             "smolagents",
+            "stainless",
             "autogen_tests",
           ]
       fail-fast: false
@@ -423,7 +425,8 @@ jobs:
             "13",
             #
           ]
-        nox-shard: [
+        nox-shard:
+          [
             "trace1",
             "trace2",
             "trace3",
@@ -451,6 +454,7 @@ jobs:
             "pandas_test",
             "mcp",
             "smolagents",
+            "stainless",
             "autogen_tests",
           ]
       fail-fast: false
