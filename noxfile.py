@@ -184,15 +184,18 @@ def tests(session, shard):
         "flow": ["tests/flow/"],
         "trace_server": ["tests/trace_server/"],
         "trace_server_bindings": ["tests/trace_server_bindings"],
-        "mistral": ["tests/integrations/mistral/"],
         "scorers": ["tests/scorers/"],
         "autogen_tests": ["tests/integrations/autogen/"],
         "verifiers_test": ["tests/integrations/verifiers/"],
-        "trace": ["tests/trace/"],
+        "trace": ["tests/trace/", "tests/compat/", "tests/utils/", "tests/wandb_interface/"],
         "trace_no_server": ["tests/trace/"],
     }
 
     test_dirs = test_dirs_dict.get(shard, default_test_dirs)
+
+    for test_dir in test_dirs:
+        if not os.path.exists(test_dir):
+            raise ValueError(f"Test directory {test_dir} does not exist")
 
     # Each worker gets its own isolated database namespace
     # Only use parallel workers for the trace shard if we have more than 1 CPU core
