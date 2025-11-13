@@ -24,16 +24,19 @@ def test_sqlite_storage_size_query_generation():
 
         # Create server instance
         server = slts.SqliteTraceServer("test.db")
+        try:
+            # Call the method that generates the query and consume the generator
+            list(server.calls_query_stream(req))
 
-        # Call the method that generates the query and consume the generator
-        list(server.calls_query_stream(req))
-
-        # Verify that cursor.execute was called with the correct query
-        mock_cursor.execute.assert_called_once()
-        call_args = mock_cursor.execute.call_args[0]
-        sql = call_args[0]
-        print(sql)
-        assert "storage_size_bytes" in sql  # Query should include storage_size_bytes
-        assert (
-            "total_storage_size_bytes" in sql
-        )  # Query should include total_storage_size_bytes
+            # Verify that cursor.execute was called with the correct query
+            mock_cursor.execute.assert_called_once()
+            call_args = mock_cursor.execute.call_args[0]
+            sql = call_args[0]
+            print(sql)
+            assert "storage_size_bytes" in sql  # Query should include storage_size_bytes
+            assert (
+                "total_storage_size_bytes" in sql
+            )  # Query should include total_storage_size_bytes
+        finally:
+            # Close the database connection to prevent resource leaks
+            server.close()

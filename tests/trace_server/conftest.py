@@ -1,3 +1,4 @@
+from collections.abc import Generator
 from typing import Callable
 
 import pytest
@@ -131,14 +132,31 @@ def local_secret_fetcher():
 @pytest.fixture
 def trace_server(
     request, local_secret_fetcher, get_ch_trace_server, get_sqlite_trace_server
-) -> TestOnlyUserInjectingExternalTraceServer:
+) -> Generator[TestOnlyUserInjectingExternalTraceServer, None, None]:
     trace_server_flag = get_trace_server_flag(request)
     if trace_server_flag == "clickhouse":
-        return get_ch_trace_server()
+        server = get_ch_trace_server()
+        yield server
     elif trace_server_flag == "sqlite":
-        return get_sqlite_trace_server()
+        server = get_sqlite_trace_server()
+        try:
+            yield server
+        finally:
+            # Close SQLite database connection to prevent resource leaks
+            if hasattr(server, "_internal_trace_server"):
+                internal_server = server._internal_trace_server
+                if isinstance(internal_server, SqliteTraceServer):
+                    internal_server.close()
     else:
         # Once we split the trace server and client code, we can raise here.
         # For now, just return the sqlite trace server so we don't break existing tests.
         # raise ValueError(f"Invalid trace server: {trace_server_flag}")
-        return get_sqlite_trace_server()
+        server = get_sqlite_trace_server()
+        try:
+            yield server
+        finally:
+            # Close SQLite database connection to prevent resource leaks
+            if hasattr(server, "_internal_trace_server"):
+                internal_server = server._internal_trace_server
+                if isinstance(internal_server, SqliteTraceServer):
+                    internal_server.close()

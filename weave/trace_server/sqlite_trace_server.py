@@ -1,6 +1,5 @@
 # Sqlite Trace Server
 
-import contextvars
 import datetime
 import hashlib
 import json
@@ -63,25 +62,46 @@ from weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker impo
     EvaluateModelDispatcher,
 )
 
-_conn_cursor: contextvars.ContextVar[
-    Optional[tuple[sqlite3.Connection, sqlite3.Cursor]]
-] = contextvars.ContextVar("conn_cursor", default=None)
+# Track connections per db_path to enable proper cleanup
+_connections: dict[str, tuple[sqlite3.Connection, sqlite3.Cursor]] = {}
+_connections_lock = threading.Lock()
 
 
 def get_conn_cursor(db_path: str) -> tuple[sqlite3.Connection, sqlite3.Cursor]:
-    # conn_cursor = _conn_cursor.get()
-    conn_cursor = None
-    if conn_cursor is None:
-        # Use uri=True for URIs like "file::memory:?cache=shared"
-        # This is required on Windows to properly handle URI paths
-        is_uri = db_path.startswith("file:")
-        conn = sqlite3.connect(db_path, uri=is_uri)
-        # Create an array reverse function.
-        conn.create_function("reverse", 1, lambda x: x[::-1])
-        cursor = conn.cursor()
-        conn_cursor = (conn, cursor)
-        _conn_cursor.set(conn_cursor)
-    return conn_cursor
+    """Get or create a connection and cursor for the given database path.
+
+    Connections are cached per db_path and should be closed using close_connection().
+    """
+    with _connections_lock:
+        if db_path not in _connections:
+            # Use uri=True for URIs like "file::memory:?cache=shared"
+            # This is required on Windows to properly handle URI paths
+            is_uri = db_path.startswith("file:")
+            conn = sqlite3.connect(db_path, uri=is_uri)
+            # Create an array reverse function.
+            conn.create_function("reverse", 1, lambda x: x[::-1])
+            cursor = conn.cursor()
+            _connections[db_path] = (conn, cursor)
+        return _connections[db_path]
+
+
+def close_connection(db_path: str) -> None:
+    """Close the connection for the given database path.
+
+    This should be called to properly clean up SQLite connections after use.
+    """
+    with _connections_lock:
+        if db_path in _connections:
+            conn, cursor = _connections[db_path]
+            try:
+                cursor.close()
+            except Exception:
+                pass  # Ignore errors when closing cursor
+            try:
+                conn.close()
+            except Exception:
+                pass  # Ignore errors when closing connection
+            del _connections[db_path]
 
 
 class SqliteTraceServer(tsi.FullTraceServerInterface):
@@ -93,6 +113,17 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         self.lock = threading.Lock()
         self.db_path = db_path
         self._evaluate_model_dispatcher = evaluate_model_dispatcher
+        self._closed = False
+
+    def close(self) -> None:
+        """Close the SQLite database connection.
+
+        This should be called to properly clean up resources after use, especially
+        in test scenarios to prevent resource leaks. This method is idempotent
+        and can be called multiple times safely.
+        """
+        close_connection(self.db_path)
+        self._closed = True
 
     def drop_tables(self) -> None:
         conn, cursor = get_conn_cursor(self.db_path)
