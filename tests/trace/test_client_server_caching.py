@@ -201,7 +201,7 @@ def test_server_cache_latency(client):
     added_latency = latency_with_cache - latency_without_cache
     print(f"Added latency: {added_latency}")
 
-    if sys.platform == "windows":
+    if sys.platform == "win32":
         assert added_latency < 0.01  # Windows is slower
     else:
         assert added_latency < 0.002
