@@ -27,7 +27,6 @@ from weave.trace.refs import (
     RefWithExtra,
     TableRef,
 )
-from weave.utils.project_id import ProjectID
 from weave.trace.serialization.serialize import from_json
 from weave.trace.table import Table
 from weave.trace_server.errors import ObjectDeletedError
@@ -39,6 +38,7 @@ from weave.trace_server.trace_server_interface import (
     TraceServerInterface,
 )
 from weave.utils.iterators import ThreadSafeLazyList
+from weave.utils.project_id import ProjectID
 
 logger = logging.getLogger(__name__)
 

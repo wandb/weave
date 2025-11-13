@@ -17,7 +17,6 @@ from weave.trace.serialization.serialize import from_json
 from weave.trace.util import log_once
 from weave.trace.vals import WeaveObject
 from weave.trace_server.constants import MAX_DISPLAY_NAME_LENGTH
-from weave.utils.project_id import ProjectID
 from weave.trace_server.interface.query import Query
 from weave.trace_server.trace_server_interface import (
     CallSchema,
@@ -29,6 +28,7 @@ from weave.trace_server.trace_server_interface import (
 )
 from weave.utils.attributes_dict import AttributesDict
 from weave.utils.paginated_iterator import PaginatedIterator
+from weave.utils.project_id import ProjectID
 
 if TYPE_CHECKING:
     from weave.flow.scorer import ApplyScorerResult, Scorer
@@ -364,7 +364,9 @@ def _make_calls_iterator(
     # TODO: Should be Call, not WeaveObject
     def transform_func(call: CallSchema) -> WeaveObject:
         project_id_obj = ProjectID.from_string(project_id)
-        return make_client_call(project_id_obj.entity, project_id_obj.project, call, server)
+        return make_client_call(
+            project_id_obj.entity, project_id_obj.project, call, server
+        )
 
     def size_func() -> int:
         response = server.calls_query_stats(

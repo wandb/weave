@@ -20,7 +20,6 @@ from weave.trace_server_bindings.http_utils import (
     log_dropped_feedback_batch,
     process_batch_with_retry,
 )
-from weave.utils.project_id import ProjectID
 from weave.trace_server_bindings.models import (
     Batch,
     EndBatchItem,
@@ -28,6 +27,7 @@ from weave.trace_server_bindings.models import (
     StartBatchItem,
 )
 from weave.utils import http_requests as requests
+from weave.utils.project_id import ProjectID
 from weave.utils.retry import get_current_retry_id, with_retry
 from weave.wandb_interface import project_creator
 

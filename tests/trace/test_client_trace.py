@@ -26,7 +26,6 @@ from tests.trace.util import (
     client_is_sqlite,
     get_info_loglines,
 )
-from weave.utils.project_id import ProjectID
 from tests.trace_server.conftest_lib.trace_server_external_adapter import (
     DummyIdConverter,
 )
@@ -52,6 +51,7 @@ from weave.trace_server.trace_server_interface_util import (
     extract_refs_from_values,
 )
 from weave.trace_server.validation_util import CHValidationError
+from weave.utils.project_id import ProjectID
 
 ## Hacky interface compatibility helpers
 

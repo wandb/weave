@@ -41,7 +41,6 @@ from weave.trace.interface_query_builder import (
     get_field_expr,
     literal_expr,
 )
-from weave.utils.project_id import ProjectID
 from weave.trace.object_record import (
     ObjectRecord,
     dataclass_object_record,
@@ -144,6 +143,7 @@ from weave.trace_server_bindings.http_utils import (
 from weave.utils.attributes_dict import AttributesDict
 from weave.utils.dict_utils import sum_dict_leaves, zip_dicts
 from weave.utils.exception import exception_to_json_str
+from weave.utils.project_id import ProjectID
 from weave.utils.sanitize import REDACTED_VALUE, redact_dataclass_fields, should_redact
 
 if TYPE_CHECKING:

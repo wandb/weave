@@ -6,11 +6,11 @@ from pydantic import BaseModel, BeforeValidator, Field
 from weave import Model, op
 from weave.trace.context.weave_client_context import WeaveInitError, get_weave_client
 from weave.trace_server.interface.builtin_object_classes import base_object_def
-from weave.utils.project_id import ProjectID
 from weave.trace_server.trace_server_interface import (
     CompletionsCreateReq,
     CompletionsCreateRequestInputs,
 )
+from weave.utils.project_id import ProjectID
 
 ResponseFormat = Literal["json_object", "json_schema", "text"]
 
