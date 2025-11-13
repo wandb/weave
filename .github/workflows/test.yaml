@@ -229,7 +229,7 @@ jobs:
 
   trace-tests:
     name: Trace nox tests
-    timeout-minutes: 60
+    timeout-minutes: 30
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -372,7 +372,7 @@ jobs:
   # ==== Windows Jobs ====
   windows_trace_no_server:
     name: Windows Trace non-trace server tests
-    timeout-minutes: 15
+    timeout-minutes: 10
     runs-on: windows-latest
     strategy:
       matrix:
@@ -410,7 +410,7 @@ jobs:
 
   windows_trace_tests:
     name: Windows Trace nox tests
-    timeout-minutes: 45
+    timeout-minutes: 30
     runs-on: windows-latest
     strategy:
       matrix:
@@ -421,11 +421,9 @@ jobs:
             "13",
             #
           ]
-        nox-shard: [
-            "trace1",
-            "trace2",
-            "trace3",
-            "trace4",
+        nox-shard:
+          [
+            "trace",
             "flow",
             "trace_server",
             "trace_server_bindings",
