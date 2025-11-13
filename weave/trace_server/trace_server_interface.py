@@ -332,7 +332,7 @@ class CallCompleteReq(BaseModelStrict):
     complete: CompletedCallSchemaForInsert
 
 
-class CallCompleteRes(BaseModel):
+class CallUpsertRes(BaseModel):
     id: str
     trace_id: str
 
@@ -2020,7 +2020,7 @@ class CallsUpsertBatchV2Req(BaseModel):
 
 
 class CallsUpsertBatchV2Res(BaseModel):
-    res: list[Union[CallStartRes, CallEndRes, CallCompleteRes]]
+    res: list[CallUpsertRes]
 
 
 class TraceServerInterface(Protocol):
