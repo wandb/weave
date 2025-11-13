@@ -187,7 +187,12 @@ def tests(session, shard):
         "scorers": ["tests/scorers/"],
         "autogen_tests": ["tests/integrations/autogen/"],
         "verifiers_test": ["tests/integrations/verifiers/"],
-        "trace": ["tests/trace/", "tests/compat/", "tests/utils/", "tests/wandb_interface/"],
+        "trace": [
+            "tests/trace/",
+            "tests/compat/",
+            "tests/utils/",
+            "tests/wandb_interface/",
+        ],
         "trace_no_server": ["tests/trace/"],
     }
 
