@@ -140,11 +140,22 @@ def get_ch_trace_server(
 
 
 @pytest.fixture
-def get_sqlite_trace_server() -> Callable[[], TestOnlyUserInjectingExternalTraceServer]:
+def get_sqlite_trace_server(
+    request,
+) -> Callable[[], TestOnlyUserInjectingExternalTraceServer]:
     def sqlite_trace_server_inner() -> TestOnlyUserInjectingExternalTraceServer:
         id_converter = DummyIdConverter()
+        # Use worker-specific database for pytest-xdist isolation
+        # Each worker gets its own isolated database
+        db_suffix = _get_worker_db_suffix(request)
+        if db_suffix:
+            # Use worker-specific in-memory database name for parallel execution
+            db_path = f"file::memory:?cache=shared&name=test{db_suffix}"
+        else:
+            # Single worker or sequential execution - use default shared memory
+            db_path = "file::memory:?cache=shared"
         sqlite_server = SqliteTraceServer(
-            "file::memory:?cache=shared",
+            db_path,
             evaluate_model_dispatcher=EvaluateModelTestDispatcher(
                 id_converter=id_converter
             ),
