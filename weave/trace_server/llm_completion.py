@@ -119,10 +119,10 @@ def resolve_prompt_messages(
         if prompt_obj_res.obj is None:
             raise NotFoundError(f"Could not find prompt with ref {prompt}")
 
-        # Validate that this is a MessagesPrompt object
-        if prompt_obj_res.obj.base_object_class != "MessagesPrompt":
+        # Validate that this is a Prompt or MessagesPrompt object
+        if prompt_obj_res.obj.base_object_class not in ("Prompt", "MessagesPrompt"):
             raise InvalidRequest(
-                f"Prompt {prompt} is not a MessagesPrompt (found {prompt_obj_res.obj.base_object_class})"
+                f"Prompt {prompt} is not a Prompt or MessagesPrompt (found {prompt_obj_res.obj.base_object_class})"
             )
 
         # Extract messages from the prompt object
