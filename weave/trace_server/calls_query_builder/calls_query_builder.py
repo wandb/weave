@@ -180,7 +180,7 @@ class CallsMergedSummaryField(CallsMergedField):
         # Look up handler for the requested summary field
         handler = get_summary_field_handler(self.summary_field)
         if handler:
-            sql = handler(pb, table_alias)
+            sql = handler(pb, table_alias, ProjectVersion.CALLS_MERGED_VERSION)
             return clickhouse_cast(sql, cast)
         else:
             supported_fields = ", ".join(SUMMARY_FIELD_HANDLERS.keys())
