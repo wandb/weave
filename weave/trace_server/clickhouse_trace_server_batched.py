@@ -104,6 +104,9 @@ from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.interface.feedback_types import RUNNABLE_FEEDBACK_TYPE_PREFIX
 from weave.trace_server.kafka import KafkaProducer
 from weave.trace_server.llm_completion import (
+    _build_choices_array,
+    _build_completion_response,
+    _create_completion_choice,
     get_custom_provider_info,
     lite_llm_completion,
     lite_llm_completion_stream,
@@ -777,44 +780,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         return tsi.CallUpdateRes()
 
-    def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
-        raise NotImplementedError()
-
-    def op_read(self, req: tsi.OpReadReq) -> tsi.OpReadRes:
-        object_query_builder = ObjectMetadataQueryBuilder(req.project_id)
-        object_query_builder.add_is_op_condition(True)
-        object_query_builder.add_digests_conditions(req.digest)
-        object_query_builder.add_object_ids_condition([req.name], "op_name")
-        object_query_builder.set_include_deleted(include_deleted=True)
-
-        objs = self._select_objs_query(object_query_builder)
-        if len(objs) == 0:
-            raise NotFoundError(f"Obj {req.name}:{req.digest} not found")
-
-        op = objs[0]
-        if op.deleted_at is not None:
-            raise ObjectDeletedError(
-                f"Op {req.name}:v{op.version_index} was deleted at {op.deleted_at}",
-                deleted_at=op.deleted_at,
-            )
-
-        return tsi.OpReadRes(op_obj=_ch_obj_to_obj_schema(op))
-
-    def ops_query(self, req: tsi.OpQueryReq) -> tsi.OpQueryRes:
-        object_query_builder = ObjectMetadataQueryBuilder(req.project_id)
-        object_query_builder.add_is_op_condition(True)
-        if req.filter:
-            if req.filter.op_names:
-                object_query_builder.add_object_ids_condition(
-                    req.filter.op_names, "op_names"
-                )
-            if req.filter.latest_only:
-                object_query_builder.add_is_latest_condition()
-
-        ch_objs = self._select_objs_query(object_query_builder)
-        objs = [_ch_obj_to_obj_schema(call) for call in ch_objs]
-        return tsi.OpQueryRes(op_objs=objs)
-
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
         processed_result = process_incoming_object_val(
             req.obj.val, req.obj.builtin_object_class
@@ -1477,10 +1442,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # Create the op "val" that the SDK would have created
         # Note: We store just the digest string, matching SDK's to_json output
         op_val = object_creation_utils.build_op_val(source_file_res.digest)
+        object_id = object_creation_utils.make_object_id(req.name, "Op")
         obj_req = tsi.ObjCreateReq(
             obj=tsi.ObjSchemaForInsert(
                 project_id=req.project_id,
-                object_id=req.name,
+                object_id=object_id,
                 val=op_val,
                 wb_user_id=None,
             )
@@ -1491,14 +1457,14 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # immediately available, so we retry a few times)
         obj_read_req = tsi.ObjReadReq(
             project_id=req.project_id,
-            object_id=req.name,
+            object_id=object_id,
             digest=obj_result.digest,
         )
         obj_read_res = self._obj_read_with_retry(obj_read_req)
 
         return tsi.OpCreateV2Res(
             digest=obj_result.digest,
-            object_id=req.name,
+            object_id=object_id,
             version_index=obj_read_res.obj.version_index,
         )
 
@@ -1679,8 +1645,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         The dataset object references the table containing the actual row data.
         """
         # Create a safe ID for the dataset
-        safe_name = object_creation_utils.make_safe_name(req.name)
-        dataset_id = f"dataset_{safe_name}"
+        dataset_id = object_creation_utils.make_object_id(req.name, "Dataset")
 
         # Create a table and get its ref
         table_req = tsi.TableCreateReq(
@@ -1819,8 +1784,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         The scorer object references the op that implements the scoring logic.
         """
         # Create a safe ID for the scorer
-        safe_name = object_creation_utils.make_safe_name(req.name)
-        scorer_id = f"scorer_{safe_name}"
+        scorer_id = object_creation_utils.make_object_id(req.name, "Scorer")
 
         # Create the score op
         score_op_req = tsi.OpCreateV2Req(
@@ -1959,10 +1923,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         Creates placeholder ops for evaluate, predict_and_score, and summarize methods.
         """
         # Create a safe ID for the evaluation
-        if req.name is None:
-            evaluation_id = "Evaluation"
-        else:
-            evaluation_id = object_creation_utils.make_safe_name(req.name)
+        evaluation_id = object_creation_utils.make_object_id(req.name, "Evaluation")
 
         # Create placeholder evaluate op
         evaluate_op_req = tsi.OpCreateV2Req(
@@ -2153,8 +2114,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
 
         # Generate object_id based on name
-        safe_name = object_creation_utils.make_safe_name(req.name)
-        object_id = f"model_{safe_name}"
+        object_id = object_creation_utils.make_object_id(req.name, "Model")
 
         # Create the object
         obj_req = tsi.ObjCreateReq(
@@ -4157,6 +4117,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         Mirrors ``completions_create`` but with streaming enabled.  If
         ``track_llm_call`` is True we emit a call_start record immediately and
         a call_end record once the stream finishes (successfully or not).
+
+        When req.inputs.n > 1, properly separates and tracks all choices
+        within a single call's output rather than creating separate calls.
         """
         # --- Shared setup logic (copy of completions_create up to litellm call)
         model_info = self._model_to_provider_info_map.get(req.inputs.model)
@@ -5104,63 +5067,28 @@ def _process_tool_call_delta(
                 ]
 
 
-def _clean_tool_calls(tool_calls: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Clean up tool_calls - remove incomplete ones and ensure proper format."""
-    cleaned_tool_calls = [
-        {
-            "function": {
-                "arguments": tool_call["function"]["arguments"],
-                "name": tool_call["function"]["name"],
-            },
-            "id": tool_call["id"],
-            "type": "function",
-        }
-        for tool_call in tool_calls
-        if tool_call.get("id") is not None
-        and tool_call.get("function", {}).get("name") is not None
-    ]
-    return cleaned_tool_calls
-
-
 def _build_aggregated_output(
     aggregated_metadata: dict[str, Any],
     assistant_acc: list[str],
     tool_calls: list[dict[str, Any]],
     chunk: dict[str, Any],
     reasoning_content: list[str],
+    choice_index: int = 0,
 ) -> dict[str, Any]:
     """Build the aggregated output from accumulated data."""
     current_finish_reason = chunk.get("choices", [{}])[0].get("finish_reason")
-    cleaned_tool_calls = _clean_tool_calls(tool_calls)
 
-    return {
-        "id": aggregated_metadata.get("id", ""),
-        "created": aggregated_metadata.get("created", 0),
-        "model": aggregated_metadata.get("model", ""),
-        "object": "chat.completion",
-        "system_fingerprint": aggregated_metadata.get("system_fingerprint", ""),
-        "choices": [
-            {
-                "finish_reason": current_finish_reason,
-                "index": 0,
-                "message": {
-                    "content": (
-                        "".join(assistant_acc)
-                        if assistant_acc
-                        else (None if cleaned_tool_calls else "")
-                    ),
-                    "role": "assistant",
-                    "tool_calls": (cleaned_tool_calls if cleaned_tool_calls else None),
-                    "function_call": None,
-                    "reasoning_content": (
-                        "".join(reasoning_content) if reasoning_content else None
-                    ),
-                },
-            }
-        ],
-        "usage": aggregated_metadata.get("usage", {}),
-        "service_tier": aggregated_metadata.get("service_tier", "default"),
-    }
+    # Use the typed approach for consistency
+    choice = _create_completion_choice(
+        choice_index=choice_index,
+        content_parts=assistant_acc,
+        tool_calls=tool_calls,
+        reasoning_parts=reasoning_content,
+        finish_reason=current_finish_reason,
+    )
+
+    choices_array = [dataclasses.asdict(choice)]
+    return _build_completion_response(aggregated_metadata, choices_array)
 
 
 def _create_tracked_stream_wrapper(
@@ -5176,12 +5104,19 @@ def _create_tracked_stream_wrapper(
         # (1) send meta chunk first so clients can associate stream
         yield {"_meta": {"weave_call_id": start_call.id}}
 
-        # Initialize accumulation variables
+        # Initialize accumulation variables for all choices
         aggregated_output: Optional[dict[str, Any]] = None
-        assistant_acc: list[str] = []
-        tool_calls: list[dict[str, Any]] = []
+        choice_contents: dict[int, list[str]] = {}  # Track content by choice index
+        choice_tool_calls: dict[
+            int, list[dict[str, Any]]
+        ] = {}  # Track tool calls by choice index
+        choice_reasoning_content: dict[
+            int, list[str]
+        ] = {}  # Track reasoning by choice index
+        choice_finish_reasons: dict[
+            int, Optional[str]
+        ] = {}  # Track finish reasons by choice index
         aggregated_metadata: dict[str, Any] = {}
-        reasoning_content: list[str] = []
 
         try:
             for chunk in chunk_iter:
@@ -5193,63 +5128,59 @@ def _create_tracked_stream_wrapper(
                 # Accumulate metadata from chunks
                 _update_metadata_from_chunk(chunk, aggregated_metadata)
 
-                # Process assistant content and tool calls
+                # Process all choices in the chunk
                 choices = chunk.get("choices")
                 if choices:
-                    delta = choices[0].get("delta")
-                    if delta and isinstance(delta, dict):
-                        # Accumulate assistant content
-                        content_piece = delta.get("content")
-                        if content_piece:
-                            assistant_acc.append(content_piece)
+                    for choice in choices:
+                        choice_index = choice.get("index", 0)
 
-                        # Handle tool calls
-                        tool_call_delta = delta.get("tool_calls")
-                        if tool_call_delta:
-                            _process_tool_call_delta(tool_call_delta, tool_calls)
+                        # Initialize choice accumulators if not present
+                        if choice_index not in choice_contents:
+                            choice_contents[choice_index] = []
+                            choice_tool_calls[choice_index] = []
+                            choice_reasoning_content[choice_index] = []
+                            choice_finish_reasons[choice_index] = None
 
-                        # Handle reasoning content
-                        reasoning_content_delta = delta.get("reasoning_content")
-                        if reasoning_content_delta:
-                            reasoning_content.append(reasoning_content_delta)
+                        # Update finish reason
+                        if "finish_reason" in choice:
+                            choice_finish_reasons[choice_index] = choice[
+                                "finish_reason"
+                            ]
 
-                # Build aggregated output
-                aggregated_output = _build_aggregated_output(
-                    aggregated_metadata,
-                    assistant_acc,
-                    tool_calls,
-                    chunk,
-                    reasoning_content,
-                )
+                        delta = choice.get("delta")
+                        if delta and isinstance(delta, dict):
+                            # Accumulate assistant content for this choice
+                            content_piece = delta.get("content")
+                            if content_piece:
+                                choice_contents[choice_index].append(content_piece)
+
+                            # Handle tool calls for this choice
+                            tool_call_delta = delta.get("tool_calls")
+                            if tool_call_delta:
+                                _process_tool_call_delta(
+                                    tool_call_delta, choice_tool_calls[choice_index]
+                                )
+
+                            # Handle reasoning content for this choice
+                            reasoning_content_delta = delta.get("reasoning_content")
+                            if reasoning_content_delta:
+                                choice_reasoning_content[choice_index].append(
+                                    reasoning_content_delta
+                                )
 
         finally:
-            # Handle fallback case for aggregated output
-            if aggregated_output is None and (
-                assistant_acc or tool_calls or reasoning_content
-            ):
-                cleaned_tool_calls = _clean_tool_calls(tool_calls)
-                aggregated_output = {
-                    "choices": [
-                        {
-                            "message": {
-                                "role": "assistant",
-                                "content": (
-                                    "".join(assistant_acc)
-                                    if assistant_acc
-                                    else (None if cleaned_tool_calls else "")
-                                ),
-                                "tool_calls": (
-                                    cleaned_tool_calls if cleaned_tool_calls else None
-                                ),
-                                "reasoning_content": (
-                                    "".join(reasoning_content)
-                                    if reasoning_content
-                                    else None
-                                ),
-                            }
-                        }
-                    ]
-                }
+            # Build final aggregated output with all choices
+            if choice_contents or choice_tool_calls or choice_reasoning_content:
+                choices_array = _build_choices_array(
+                    choice_contents,
+                    choice_tool_calls,
+                    choice_reasoning_content,
+                    choice_finish_reasons,
+                )
+                aggregated_output = _build_completion_response(
+                    aggregated_metadata,
+                    choices_array,
+                )
 
             # Prepare summary and end call
             summary: dict[str, Any] = {}

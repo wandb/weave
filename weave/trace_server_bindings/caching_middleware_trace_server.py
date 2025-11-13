@@ -451,16 +451,6 @@ class CachingMiddlewareTraceServer(tsi.FullTraceServerInterface):
     def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
         return self._next_trace_server.otel_export(req)
 
-    # Op API
-    def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
-        return self._next_trace_server.op_create(req)
-
-    def op_read(self, req: tsi.OpReadReq) -> tsi.OpReadRes:
-        return self._next_trace_server.op_read(req)
-
-    def ops_query(self, req: tsi.OpQueryReq) -> tsi.OpQueryRes:
-        return self._next_trace_server.ops_query(req)
-
     # Cost API
     def cost_create(self, req: tsi.CostCreateReq) -> tsi.CostCreateRes:
         return self._next_trace_server.cost_create(req)

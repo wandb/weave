@@ -221,29 +221,6 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
             req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
         return self._ref_apply(self._internal_trace_server.call_update, req)
 
-    def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
-        req.op_obj.project_id = self._idc.ext_to_int_project_id(req.op_obj.project_id)
-        return self._ref_apply(self._internal_trace_server.op_create, req)
-
-    def op_read(self, req: tsi.OpReadReq) -> tsi.OpReadRes:
-        original_project_id = req.project_id
-        req.project_id = self._idc.ext_to_int_project_id(original_project_id)
-        res = self._ref_apply(self._internal_trace_server.op_read, req)
-        if res.op_obj.project_id != req.project_id:
-            raise ValueError("Internal Error - Project Mismatch")
-        res.op_obj.project_id = original_project_id
-        return res
-
-    def ops_query(self, req: tsi.OpQueryReq) -> tsi.OpQueryRes:
-        original_project_id = req.project_id
-        req.project_id = self._idc.ext_to_int_project_id(original_project_id)
-        res = self._ref_apply(self._internal_trace_server.ops_query, req)
-        for op in res.op_objs:
-            if op.project_id != req.project_id:
-                raise ValueError("Internal Error - Project Mismatch")
-            op.project_id = original_project_id
-        return res
-
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
         req.obj.project_id = self._idc.ext_to_int_project_id(req.obj.project_id)
         if req.obj.wb_user_id is not None:

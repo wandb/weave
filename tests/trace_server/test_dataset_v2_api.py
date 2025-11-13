@@ -29,7 +29,7 @@ def test_dataset_create_v2_basic(trace_server):
     create_res = trace_server.dataset_create_v2(create_req)
 
     assert create_res.digest is not None
-    assert create_res.object_id == "dataset_my_dataset"
+    assert create_res.object_id == "my_dataset"
     assert create_res.version_index == 0
 
 
@@ -48,7 +48,7 @@ def test_dataset_create_v2_without_description(trace_server):
     create_res = trace_server.dataset_create_v2(create_req)
 
     assert create_res.digest is not None
-    assert create_res.object_id == "dataset_dataset_no_desc"
+    assert create_res.object_id == "dataset_no_desc"
     assert create_res.version_index == 0
 
 
@@ -72,12 +72,12 @@ def test_dataset_read_v2_basic(trace_server):
     # Read the dataset back
     read_req = tsi.DatasetReadV2Req(
         project_id=project_id,
-        object_id="dataset_people",
+        object_id="people",
         digest=create_res.digest,
     )
     read_res = trace_server.dataset_read_v2(read_req)
 
-    assert read_res.object_id == "dataset_people"
+    assert read_res.object_id == "people"
     assert read_res.digest == create_res.digest
     assert read_res.version_index == 0
     assert read_res.name == "people"
@@ -230,7 +230,7 @@ def test_dataset_delete_v2_single_version(trace_server):
     # Delete the specific version
     delete_req = tsi.DatasetDeleteV2Req(
         project_id=project_id,
-        object_id="dataset_delete_test",
+        object_id="delete_test",
         digests=[create_res.digest],
     )
     delete_res = trace_server.dataset_delete_v2(delete_req)
@@ -240,7 +240,7 @@ def test_dataset_delete_v2_single_version(trace_server):
     # Verify the dataset is deleted (should raise ObjectDeletedError)
     read_req = tsi.DatasetReadV2Req(
         project_id=project_id,
-        object_id="dataset_delete_test",
+        object_id="delete_test",
         digest=create_res.digest,
     )
     with pytest.raises(ObjectDeletedError):
@@ -266,7 +266,7 @@ def test_dataset_delete_v2_all_versions(trace_server):
     # Delete all versions (no digests specified)
     delete_req = tsi.DatasetDeleteV2Req(
         project_id=project_id,
-        object_id="dataset_versioned_dataset",
+        object_id="versioned_dataset",
         digests=None,
     )
     delete_res = trace_server.dataset_delete_v2(delete_req)
@@ -293,7 +293,7 @@ def test_dataset_delete_v2_multiple_versions(trace_server):
     # Delete the first two versions
     delete_req = tsi.DatasetDeleteV2Req(
         project_id=project_id,
-        object_id="dataset_multi_version_dataset",
+        object_id="multi_version_dataset",
         digests=digests[:2],
     )
     delete_res = trace_server.dataset_delete_v2(delete_req)
@@ -304,7 +304,7 @@ def test_dataset_delete_v2_multiple_versions(trace_server):
     for digest in digests[:2]:
         read_req = tsi.DatasetReadV2Req(
             project_id=project_id,
-            object_id="dataset_multi_version_dataset",
+            object_id="multi_version_dataset",
             digest=digest,
         )
         with pytest.raises(ObjectDeletedError):
@@ -314,7 +314,7 @@ def test_dataset_delete_v2_multiple_versions(trace_server):
     for digest in digests[2:]:
         read_req = tsi.DatasetReadV2Req(
             project_id=project_id,
-            object_id="dataset_multi_version_dataset",
+            object_id="multi_version_dataset",
             digest=digest,
         )
         read_res = trace_server.dataset_read_v2(read_req)
@@ -381,7 +381,7 @@ def test_dataset_with_special_characters(trace_server):
     # Read it back and verify metadata is preserved
     read_req = tsi.DatasetReadV2Req(
         project_id=project_id,
-        object_id="dataset_special_chars",
+        object_id="special_chars",
         digest=create_res.digest,
     )
     read_res = trace_server.dataset_read_v2(read_req)
@@ -414,7 +414,7 @@ def test_dataset_with_unicode(trace_server):
     # Read it back and verify metadata is preserved
     read_req = tsi.DatasetReadV2Req(
         project_id=project_id,
-        object_id="dataset_unicode_dataset",
+        object_id="unicode_dataset",
         digest=create_res.digest,
     )
     read_res = trace_server.dataset_read_v2(read_req)
@@ -444,7 +444,7 @@ def test_dataset_list_after_deletion(trace_server):
     # Delete one dataset
     delete_req = tsi.DatasetDeleteV2Req(
         project_id=project_id,
-        object_id="dataset_delete_me",
+        object_id="delete_me",
         digests=None,
     )
     trace_server.dataset_delete_v2(delete_req)
@@ -472,12 +472,12 @@ def test_dataset_empty_rows(trace_server):
     create_res = trace_server.dataset_create_v2(create_req)
 
     assert create_res.digest is not None
-    assert create_res.object_id == "dataset_empty_dataset"
+    assert create_res.object_id == "empty_dataset"
 
     # Read it back
     read_req = tsi.DatasetReadV2Req(
         project_id=project_id,
-        object_id="dataset_empty_dataset",
+        object_id="empty_dataset",
         digest=create_res.digest,
     )
     read_res = trace_server.dataset_read_v2(read_req)
@@ -505,7 +505,7 @@ def test_dataset_large_rows(trace_server):
     # Read it back
     read_req = tsi.DatasetReadV2Req(
         project_id=project_id,
-        object_id="dataset_large_dataset",
+        object_id="large_dataset",
         digest=create_res.digest,
     )
     read_res = trace_server.dataset_read_v2(read_req)

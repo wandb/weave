@@ -384,3 +384,144 @@ def lite_llm_completion_stream(
     # If the caller wants a custom return type transformation (currently unused)
     # they can wrap the generator themselves. We just return the raw iterator.
     return _generate_chunks()
+
+
+class ChoiceMessage(BaseModel):
+    """Typed representation of a choice message."""
+
+    content: Optional[str] = None
+    role: str
+    tool_calls: Optional[list[dict[str, Any]]] = None
+    function_call: Optional[dict[str, Any]] = None
+    reasoning_content: Optional[str] = None
+
+
+class CompletionChoice(BaseModel):
+    """Typed representation of a completion choice."""
+
+    finish_reason: Optional[str] = None
+    index: int
+    message: ChoiceMessage
+
+
+class CompletionResponse(BaseModel):
+    """Typed representation of a completion response."""
+
+    id: str
+    created: int
+    model: str
+    object: str
+    system_fingerprint: Optional[str] = None
+    choices: list[dict[str, Any]]
+    usage: dict[str, Any]
+    service_tier: Optional[str] = None
+
+
+def _build_choice_content(content_parts: list[str]) -> Optional[str]:
+    """Build content string from accumulated parts."""
+    if not content_parts:
+        return None
+    return "".join(content_parts)
+
+
+def _build_choice_reasoning(reasoning_parts: list[str]) -> Optional[str]:
+    """Build reasoning content string from accumulated parts."""
+    if not reasoning_parts:
+        return None
+    return "".join(reasoning_parts)
+
+
+def _create_completion_choice(
+    choice_index: int,
+    content_parts: list[str],
+    tool_calls: list[dict[str, Any]],
+    reasoning_parts: list[str],
+    finish_reason: Optional[str],
+) -> CompletionChoice:
+    """Create a properly structured completion choice."""
+    cleaned_tool_calls = _clean_tool_calls(tool_calls)
+    content = _build_choice_content(content_parts)
+
+    # If no content but we have tool calls, set content to None explicitly
+    if not content and cleaned_tool_calls:
+        content = None
+    elif not content:
+        content = ""
+
+    message = ChoiceMessage(
+        content=content,
+        role="assistant",
+        tool_calls=cleaned_tool_calls if cleaned_tool_calls else None,
+        function_call=None,
+        reasoning_content=_build_choice_reasoning(reasoning_parts),
+    )
+
+    return CompletionChoice(
+        finish_reason=finish_reason,
+        index=choice_index,
+        message=message,
+    )
+
+
+def _build_choices_array(
+    choice_contents: dict[int, list[str]],
+    choice_tool_calls: dict[int, list[dict[str, Any]]],
+    choice_reasoning_content: dict[int, list[str]],
+    choice_finish_reasons: dict[int, Optional[str]],
+) -> list[dict[str, Any]]:
+    """Build the choices array from accumulated choice data."""
+    # Get all choice indexes that have any data
+    all_choice_indexes = (
+        set(choice_contents.keys())
+        | set(choice_tool_calls.keys())
+        | set(choice_reasoning_content.keys())
+    )
+
+    choices = []
+    for choice_index in sorted(all_choice_indexes):
+        choice = _create_completion_choice(
+            choice_index=choice_index,
+            content_parts=choice_contents.get(choice_index, []),
+            tool_calls=choice_tool_calls.get(choice_index, []),
+            reasoning_parts=choice_reasoning_content.get(choice_index, []),
+            finish_reason=choice_finish_reasons.get(choice_index),
+        )
+        choices.append(choice.model_dump())
+
+    return choices
+
+
+def _build_completion_response(
+    aggregated_metadata: dict[str, Any],
+    choices_array: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Build a complete completion response."""
+    response = CompletionResponse(
+        id=aggregated_metadata.get("id") or "",
+        created=aggregated_metadata.get("created") or 0,
+        model=aggregated_metadata.get("model") or "",
+        object="chat.completion",
+        system_fingerprint=aggregated_metadata.get("system_fingerprint"),
+        choices=choices_array,
+        usage=aggregated_metadata.get("usage") or {},
+        service_tier=aggregated_metadata.get("service_tier"),
+    )
+    return response.model_dump()
+
+
+def _clean_tool_calls(tool_calls: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Clean up tool_calls - remove incomplete ones and ensure proper format."""
+    cleaned_tool_calls = [
+        {
+            "function": {
+                "arguments": tool_call["function"]["arguments"],
+                "name": tool_call["function"]["name"],
+            },
+            "id": tool_call["id"],
+            "type": "function",
+        }
+        for tool_call in tool_calls
+        if tool_call.get("id") is not None
+        and tool_call.get("function", {}).get("name") is not None
+    ]
+    return cleaned_tool_calls

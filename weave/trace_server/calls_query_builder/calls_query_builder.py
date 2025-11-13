@@ -59,6 +59,7 @@ from weave.trace_server.orm import (
     clickhouse_cast,
     combine_conditions,
     python_value_to_ch_type,
+    split_escaped_field_path,
 )
 from weave.trace_server.token_costs import build_cost_ctes, get_cost_final_select
 from weave.trace_server.trace_server_common import assert_parameter_length_less_than_max
@@ -205,7 +206,7 @@ class CallsMergedFeedbackPayloadField(CallsMergedField):
         feedback_type, path = match.groups()
         if feedback_type[0] != "[" or feedback_type[-1] != "]":
             raise InvalidFieldError(f"Invalid feedback type: {feedback_type}")
-        extra_path = path.split(".")
+        extra_path = split_escaped_field_path(path)
         feedback_type = feedback_type[1:-1]
         if extra_path[0] == "payload":
             return CallsMergedFeedbackPayloadField(
@@ -1255,7 +1256,7 @@ def get_field_by_name(name: str) -> CallsMergedField:
             summary_field = name[len("summary.weave.") :]
             return CallsMergedSummaryField(field=name, summary_field=summary_field)
         else:
-            field_parts = name.split(".")
+            field_parts = split_escaped_field_path(name)
             start_part = field_parts[0]
             dumped_start_part = start_part + "_dump"
             if dumped_start_part in ALLOWED_CALL_FIELDS:

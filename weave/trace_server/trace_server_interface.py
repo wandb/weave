@@ -517,38 +517,6 @@ class CallUpdateRes(BaseModel):
     pass
 
 
-class OpCreateReq(BaseModelStrict):
-    op_obj: ObjSchemaForInsert
-
-
-class OpCreateRes(BaseModel):
-    digest: str
-
-
-class OpReadReq(BaseModelStrict):
-    project_id: str
-    name: str
-    digest: str
-
-
-class OpReadRes(BaseModel):
-    op_obj: ObjSchema
-
-
-class OpVersionFilter(BaseModel):
-    op_names: Optional[list[str]] = None
-    latest_only: Optional[bool] = None
-
-
-class OpQueryReq(BaseModelStrict):
-    project_id: str
-    filter: Optional[OpVersionFilter] = None
-
-
-class OpQueryRes(BaseModel):
-    op_objs: list[ObjSchema]
-
-
 class ObjCreateReq(BaseModelStrict):
     obj: ObjSchemaForInsert
 
@@ -2004,11 +1972,6 @@ class TraceServerInterface(Protocol):
     def calls_query_stats(self, req: CallsQueryStatsReq) -> CallsQueryStatsRes: ...
     def call_update(self, req: CallUpdateReq) -> CallUpdateRes: ...
     def call_start_batch(self, req: CallCreateBatchReq) -> CallCreateBatchRes: ...
-
-    # Op API
-    def op_create(self, req: OpCreateReq) -> OpCreateRes: ...
-    def op_read(self, req: OpReadReq) -> OpReadRes: ...
-    def ops_query(self, req: OpQueryReq) -> OpQueryRes: ...
 
     # Cost API
     def cost_create(self, req: CostCreateReq) -> CostCreateRes: ...

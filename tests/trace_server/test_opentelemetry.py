@@ -1091,6 +1091,43 @@ class TestSemanticConventionParsing:
         assert usage.get("completion_tokens") == 25
         assert usage.get("total_tokens") == 40
 
+    def test_opentelemetry_usage_output_tokens_extraction(self):
+        """Test that gen_ai.usage.output_tokens is properly parsed and combined with input_tokens."""
+        # Test with gen_ai.usage.input_tokens and gen_ai.usage.output_tokens
+        attributes = create_attributes(
+            {
+                "gen_ai.usage.input_tokens": 10,
+                "gen_ai.usage.output_tokens": 20,
+            }
+        )
+
+        usage = get_weave_usage(attributes) or {}
+
+        # Verify individual tokens are parsed
+        assert usage.get("input_tokens") == 10
+        assert usage.get("output_tokens") == 20
+        # Verify total_tokens is calculated when not provided
+        assert usage.get("total_tokens") == 30
+
+    def test_opentelemetry_usage_output_tokens_with_explicit_total(self):
+        """Test that explicit total_tokens takes precedence over calculated value."""
+        # Test with explicit total_tokens provided
+        attributes = create_attributes(
+            {
+                "gen_ai.usage.input_tokens": 10,
+                "gen_ai.usage.output_tokens": 20,
+                "llm.usage.total_tokens": 35,  # Explicit total (might include overhead)
+            }
+        )
+
+        usage = get_weave_usage(attributes) or {}
+
+        # Verify individual tokens are parsed
+        assert usage.get("input_tokens") == 10
+        assert usage.get("output_tokens") == 20
+        # Verify explicit total_tokens is used instead of calculated value
+        assert usage.get("total_tokens") == 35
+
 
 class TestHelpers:
     def test_capture_parts(self):
