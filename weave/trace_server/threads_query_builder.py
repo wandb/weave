@@ -2,7 +2,7 @@ import datetime
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.orm import ParamBuilder
-from weave.trace_server.project_version import ProjectVersion
+from weave.trace_server.project_version.types import ProjectVersion
 
 
 def make_threads_query(
