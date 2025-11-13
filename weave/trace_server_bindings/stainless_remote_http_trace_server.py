@@ -6,11 +6,6 @@ from typing import Any, Callable, Optional, TypeVar, Union, cast
 from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel
-
-TReq = TypeVar("TReq", bound=BaseModel)
-TRes = TypeVar("TRes", bound=BaseModel)
-
-
 from weave_server_sdk import Client as StainlessClient
 
 from weave.trace.env import weave_trace_server_url
@@ -18,6 +13,7 @@ from weave.trace.settings import max_calls_queue_size, should_enable_disk_fallba
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ids import generate_id
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
+from weave.trace_server_bindings.client_interface import TraceServerClientInterface
 from weave.trace_server_bindings.http_utils import (
     REMOTE_REQUEST_BYTES_LIMIT,
     log_dropped_call_batch,
@@ -33,10 +29,13 @@ from weave.trace_server_bindings.models import (
 from weave.utils.retry import get_current_retry_id
 from weave.wandb_interface import project_creator
 
+TReq = TypeVar("TReq", bound=BaseModel)
+TRes = TypeVar("TRes", bound=BaseModel)
+
 logger = logging.getLogger(__name__)
 
 
-class StainlessRemoteHTTPTraceServer(tsi.FullTraceServerInterface):
+class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
     """Drop-in replacement for RemoteHTTPTraceServer using the stainless client.
 
     This implementation uses the stainless-generated client instead of manual HTTP requests.

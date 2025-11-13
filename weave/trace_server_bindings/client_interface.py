@@ -1,19 +1,25 @@
-from typing import TYPE_CHECKING, Any, Protocol, Self
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Protocol, Self
 
 from weave.trace_server.trace_server_interface import FullTraceServerInterface
 
 if TYPE_CHECKING:
+    from weave.trace_server import trace_server_interface as tsi
     from weave.trace_server_bindings.models import ServerInfoRes
 
 
 class TraceServerClientInterface(FullTraceServerInterface, Protocol):
-    """Interface for trace server client implementations that support server_info.
+    """Interface for trace server client implementations.
 
-    This protocol extends FullTraceServerInterface to include the server_info method,
-    which allows clients to query server capabilities and version information.
+    This protocol extends FullTraceServerInterface to include client-specific methods
+    for remote HTTP trace server implementations.
     """
 
     @classmethod
-    def from_env(cls, **kwargs: Any) -> Self: ...
-    def server_info(self) -> "ServerInfoRes": ...
+    def from_env(cls, should_batch: bool) -> Self: ...
+    def server_info(self) -> ServerInfoRes: ...
     def set_auth(self, auth: tuple[str, str]) -> None: ...
+    def ensure_project_exists(
+        self, entity: str, project: str
+    ) -> tsi.EnsureProjectExistsRes: ...
