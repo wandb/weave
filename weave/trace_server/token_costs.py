@@ -17,10 +17,10 @@ from weave.trace_server.validation import (
     validate_purge_req_multiple,
     validate_purge_req_one,
 )
+from weave.trace_server.calls_query_builder.cte import CTE
 
 if TYPE_CHECKING:
     from weave.trace_server.calls_query_builder.calls_query_builder import OrderField
-    from weave.trace_server.calls_query_builder.cte import CTE
 
 DUMMY_LLM_ID = "weave_dummy_llm_id"
 DUMMY_LLM_USAGE = (
@@ -480,7 +480,7 @@ def build_cost_ctes(
     pb: ParamBuilder,
     call_table_alias: str,
     project_id: str,
-) -> list["CTE"]:
+) -> list[CTE]:
     """Build CTEs for cost calculations.
 
     Returns a list of CTE objects for:
