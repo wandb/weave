@@ -27,7 +27,6 @@ PY39_INCOMPATIBLE_SHARDS = [
 PY310_INCOMPATIBLE_SHARDS = [
     "verifiers_test",
 ]
-NUM_TRACE_SERVER_SHARDS = 4
 
 
 @nox.session
@@ -63,8 +62,6 @@ def lint(session):
         session.run("pre-commit", "run", "--hook-stage=pre-push")
 
 
-trace_server_shards = [f"trace{i}" for i in range(1, NUM_TRACE_SERVER_SHARDS + 1)]
-
 # Shards that don't have corresponding optional dependencies in pyproject.toml
 # Note: _test/_tests shards are dependency groups, not optional dependencies
 SHARDS_WITHOUT_EXTRAS = {
@@ -74,7 +71,6 @@ SHARDS_WITHOUT_EXTRAS = {
     "trace_no_server",
     "trace_server",
     "trace_server_bindings",
-    *trace_server_shards,
     "openai_realtime",
     "autogen_tests",
     "verifiers_test",
@@ -123,7 +119,6 @@ SHARDS_WITHOUT_EXTRAS = {
         "verifiers_test",
         "autogen_tests",
         "trace",
-        *trace_server_shards,
         "trace_no_server",
     ],
 )
@@ -194,15 +189,17 @@ def tests(session, shard):
         "autogen_tests": ["tests/integrations/autogen/"],
         "verifiers_test": ["tests/integrations/verifiers/"],
         "trace": ["tests/trace/"],
-        **{shard: ["tests/trace/"] for shard in trace_server_shards},
         "trace_no_server": ["tests/trace/"],
     }
 
     test_dirs = test_dirs_dict.get(shard, default_test_dirs)
 
-    # seems to resolve ci issues
-    if shard == "llamaindex":
-        session.posargs.insert(0, "-n4")
+    # Each worker gets its own isolated database namespace
+    # Only use parallel workers for the trace shard if we have more than 1 CPU core
+    if shard == "trace":
+        cpu_count = os.cpu_count()
+        if cpu_count is not None and cpu_count > 1:
+            session.posargs.insert(0, f"-n{cpu_count}")
 
     # Add sharding logic for trace1, trace2, trace3
     pytest_args = [
@@ -215,16 +212,8 @@ def tests(session, shard):
         "--cov-branch",
     ]
 
-    # Handle trace sharding: run every 3rd test starting at different offsets
-    if shard in trace_server_shards:
-        shard_id = int(shard[-1]) - 1
-        pytest_args.extend(
-            [
-                f"--shard-id={shard_id}",
-                f"--num-shards={NUM_TRACE_SERVER_SHARDS}",
-                "-m trace_server",
-            ]
-        )
+    if shard == "trace":
+        pytest_args.extend(["-m", "trace_server"])
 
     if shard == "trace_no_server":
         pytest_args.extend(["-m", "not trace_server"])
