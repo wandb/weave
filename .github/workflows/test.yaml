@@ -229,7 +229,7 @@ jobs:
 
   trace-tests:
     name: Trace nox tests
-    timeout-minutes: 30
+    timeout-minutes: 15
     runs-on: ${{ matrix.nox-shard == 'trace' && 'ubuntu-latest-8-cores' || 'ubuntu-latest' }}
     strategy:
       matrix:
@@ -410,7 +410,7 @@ jobs:
 
   windows_trace_tests:
     name: Windows Trace nox tests
-    timeout-minutes: 30
+    timeout-minutes: 15
     runs-on: windows-latest
     strategy:
       matrix:
