@@ -381,11 +381,11 @@ class EvaluationLoggerV2(BaseModel):
         if isinstance(self.dataset, Dataset):
             # Check if ref already exists, use it; otherwise save the dataset
             if self.dataset.ref is not None:
-                self._dataset_ref = str(self.dataset.ref)
+                self._dataset_ref = self.dataset.ref.uri()
             else:
                 dataset_name = self.dataset.name or _default_dataset_name()
                 wc.save(self.dataset, name=dataset_name)
-                self._dataset_ref = str(self.dataset.ref)
+                self._dataset_ref = self.dataset.ref.uri()
         else:
             # It's a string - call dataset_create API with the name as the str
             dataset_name = self.dataset
@@ -456,7 +456,7 @@ class EvaluationLoggerV2(BaseModel):
         if isinstance(model, Model):
             # Use ref if available, otherwise use object id as cache key
             if model.ref is not None:
-                return str(model.ref)
+                return model.ref.uri()
             # Use model name if available, otherwise object id
             cache_key = model.name if model.name else f"model_{id(model)}"
         elif isinstance(model, str):
@@ -476,7 +476,7 @@ class EvaluationLoggerV2(BaseModel):
             # Save the model if it doesn't have a ref yet
             model_name = model.name or "model"
             wc.save(model, name=model_name)
-            model_ref = str(model.ref)
+            model_ref = model.ref.uri()
         elif isinstance(model, str):
             # It's a string - call model_create API with the name as the str
             model_name = model
@@ -513,13 +513,24 @@ class PlaceholderModel(Model):
 
         Uses caching to avoid repeated API calls for the same scorer.
         """
+        # If scorer is a string, try to look it up from the scorers list first
+        if isinstance(scorer, str):
+            scorer_name = scorer
+            # Look up the scorer from the scorers list passed to constructor
+            if self.scorers:
+                for s in self.scorers:
+                    if isinstance(s, Scorer) and s.name == scorer_name:
+                        # Found matching scorer, use it instead of the string
+                        scorer = s
+                        break
+
         # Generate cache key for this scorer
         if isinstance(scorer, str):
             cache_key = scorer
         elif isinstance(scorer, Scorer):
             # Use ref if available, otherwise use object id as cache key
             if scorer.ref is not None:
-                return str(scorer.ref)
+                return scorer.ref.uri()
             # Use scorer name if available, otherwise object id
             cache_key = scorer.name if scorer.name else f"scorer_{id(scorer)}"
         else:
@@ -557,7 +568,7 @@ class PlaceholderModel(Model):
             # Save the scorer if it doesn't have a ref yet
             scorer_name = scorer.name or "scorer"
             wc.save(scorer, name=scorer_name)
-            scorer_ref = str(scorer.ref)
+            scorer_ref = scorer.ref.uri()
         else:
             raise TypeError(f"Invalid scorer type: {type(scorer)}")
 
