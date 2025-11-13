@@ -37,7 +37,7 @@ def test_flask_server(flask_server):
     url = flask_server
     response = requests.get(url)
     assert response.status_code == 200
-    assert response.text == "0xTDJ6hEmsx8Wg9H75y42bL2WgvW5l4IXjuhHcrMh7A"
+    assert response.text == "ORYCggdaCVfQkkohLe2yl8TGfWSTYt5XdSWzWe716YU"
 
 
 def test_weave_client_global_accessible_in_thread(client):

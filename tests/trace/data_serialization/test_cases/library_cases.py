@@ -78,7 +78,7 @@ library_cases = [
             "_type": "Evaluation",
             "name": None,
             "description": None,
-            "dataset": "weave:///shawn/test-project/object/Dataset:N0VKaX8wr9kF9QQzM7mSQz3yKrJJjTiJi4c9Bt7RSTA",
+            "dataset": "weave:///shawn/test-project/object/Dataset:gc7uIQrayAXKgIlNvvYehEa6yVHUT7vO6pN8ZDjqX5w",
             "scorers": [
                 "weave:///shawn/test-project/object/MyScorer:K1OwZ5OGLRYNboUzGHPhnyR0W6PqWj431ieXWISYiyA",
                 "weave:///shawn/test-project/object/LLMAsAJudgeScorer:uCyQ5g10zJ2wLecCEYNAfm45MbWH1823FJ6ZGv9Gpco",
@@ -96,7 +96,7 @@ library_cases = [
         exp_objects=[
             {
                 "object_id": "Dataset",
-                "digest": "N0VKaX8wr9kF9QQzM7mSQz3yKrJJjTiJi4c9Bt7RSTA",
+                "digest": "gc7uIQrayAXKgIlNvvYehEa6yVHUT7vO6pN8ZDjqX5w",
                 "exp_val": {
                     "_type": "Dataset",
                     "name": None,
