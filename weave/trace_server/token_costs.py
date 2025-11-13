@@ -1,6 +1,5 @@
 import base64
 import re
-from dataclasses import dataclass, field
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Optional
 
@@ -64,145 +63,6 @@ LLM_TOKEN_PRICES_TABLE_NAME = "llm_token_prices"
 LLM_TOKEN_PRICES_TABLE = Table(
     name=LLM_TOKEN_PRICES_TABLE_NAME, cols=LLM_TOKEN_PRICES_COLUMNS
 )
-
-
-@dataclass
-class CostQueryParts:
-    """Structured representation of a cost query's components.
-
-    This class breaks down the cost query into logical parts that can be
-    assembled cleanly, avoiding brittle string manipulation.
-
-    Attributes:
-        select_clause: The SELECT portion (field list)
-        from_table: The table/CTE to select from
-        feedback_join: Optional LEFT JOIN for feedback data
-        where_clause: Optional WHERE conditions
-        group_by_clause: Optional GROUP BY fields
-        order_by_clause: Optional ORDER BY expressions
-        parameters: SQL parameters for the query
-        fields: List of field names being selected
-    """
-
-    select_clause: str
-    from_table: str
-    feedback_join: Optional[str] = None
-    where_clause: Optional[str] = None
-    group_by_clause: Optional[str] = None
-    order_by_clause: Optional[str] = None
-    parameters: dict[str, Any] = field(default_factory=dict)
-    fields: list[str] = field(default_factory=list)
-
-    @classmethod
-    def build_for_costs(
-        cls,
-        param_builder: ParamBuilder,
-        price_table_alias: str,
-        select_fields: list[str],
-        order_fields: list["OrderField"],
-        project_id: str,
-    ) -> "CostQueryParts":
-        """Build CostQueryParts for a cost query.
-
-        This is the main builder that constructs all query components
-        from scratch without any string manipulation or parsing.
-
-        Args:
-            param_builder: Parameter builder for SQL parameters
-            price_table_alias: Alias of the ranked_prices CTE
-            select_fields: Fields to select
-            order_fields: Fields to order by
-            project_id: Project ID for feedback joins
-
-        Returns:
-            CostQueryParts ready to be converted to SQL
-
-        Examples:
-            >>> pb = ParamBuilder()
-            >>> parts = CostQueryParts.build_for_costs(
-            ...     pb, "ranked_prices", ["id", "name"], [], "proj_123"
-            ... )
-            >>> sql = parts.as_sql()
-            >>> "SELECT" in sql and "FROM ranked_prices" in sql
-            True
-        """
-        # Filter out summary_dump - we add it via cost calculation
-        final_select_fields = [
-            field for field in select_fields if field != "summary_dump"
-        ]
-
-        # circular dependency
-        from weave.trace_server.calls_query_builder.calls_query_builder import (
-            CallsMergedFeedbackPayloadField,
-        )
-
-        # Add fields required for ORDER BY (but not feedback fields)
-        for order_field in order_fields:
-            if isinstance(order_field.field, CallsMergedFeedbackPayloadField):
-                continue
-            field_name = order_field.field.field
-            if field_name not in final_select_fields and field_name != "summary_dump":
-                final_select_fields.append(field_name)
-
-        select_clause = _build_select_clause(final_select_fields)
-        where_clause = _build_where_clause(param_builder)
-        group_by_clause = _build_group_by_clause(final_select_fields)
-
-        needs_feedback = any(
-            isinstance(order_field.field, CallsMergedFeedbackPayloadField)
-            for order_field in order_fields
-        )
-        feedback_join = None
-        if needs_feedback:
-            feedback_join = _build_feedback_join(
-                param_builder, project_id, price_table_alias
-            )
-
-        order_by_clause = None
-        if order_fields:
-            order_by_parts = []
-            for order_field in order_fields:
-                order_sql = order_field.as_sql(param_builder, price_table_alias)
-                order_by_parts.append(order_sql)
-            order_by_clause = ", ".join(order_by_parts)
-
-        return cls(
-            select_clause=select_clause,
-            from_table=price_table_alias,
-            feedback_join=feedback_join,
-            where_clause=where_clause,
-            group_by_clause=group_by_clause,
-            order_by_clause=order_by_clause,
-            parameters=param_builder.get_params(),
-            fields=final_select_fields,
-        )
-
-    def as_sql(self) -> str:
-        """Assemble the query parts into complete SQL"""
-        sql_parts = []
-
-        sql_parts.append(self.select_clause)
-        sql_parts.append(f"FROM {self.from_table}")
-        if self.feedback_join:
-            sql_parts.append(self.feedback_join)
-        if self.where_clause:
-            sql_parts.append(f"WHERE {self.where_clause}")
-        if self.group_by_clause:
-            sql_parts.append(f"GROUP BY {self.group_by_clause}")
-        if self.order_by_clause:
-            sql_parts.append(f"ORDER BY {self.order_by_clause}")
-
-        return "\n".join(sql_parts)
-
-    def to_prepared_select(self) -> PreparedSelect:
-        """Convert to a PreparedSelect object.
-
-        Returns:
-            PreparedSelect with assembled SQL and parameters
-        """
-        return PreparedSelect(
-            sql=self.as_sql(), parameters=self.parameters, fields=self.fields
-        )
 
 
 def get_calls_merged_columns() -> list[Column]:
@@ -445,14 +305,6 @@ def get_ranked_prices(
     return prepared_query
 
 
-# SELECT
-#   SELECT_FIELDS, (Passed in as a list)
-#   CONSTRUCTED_SUMMARY_OBJECT AS summary_dump
-# FROM ranked_prices
-# The group by joins the rows that were split back together
-# GROUP BY (all_calls.id, all_calls.project_id, all_calls.display_name)
-# WHERE rank = 1
-# From all the calls usage, group by and construct the costs object
 """
     Takes in something like the following:
     4 rows
@@ -547,44 +399,57 @@ def _build_cost_summary_dump_snippet() -> str:
     """
 
 
-def _build_select_clause(select_fields: list[str]) -> str:
-    """Build the SELECT clause with cost calculation.
+def _prepare_final_select_fields(
+    select_fields: list[str],
+    order_fields: list["OrderField"],
+) -> list[str]:
+    """Prepare the final list of fields to select.
+
+    Filters out summary_dump (we generate it ourselves) and adds any fields
+    needed for ORDER BY clauses (except feedback fields which come from a JOIN).
 
     Args:
-        select_fields: List of field names to select (excluding summary_dump)
+        select_fields: Requested fields to select
+        order_fields: Fields to order by
 
     Returns:
-        Complete SELECT clause including cost summary dump
+        Final list of field names to select
     """
-    # Add the cost summary dump snippet
-    summary_dump_snippet = _build_cost_summary_dump_snippet()
-    fields = ", ".join(select_fields)
-    return f"SELECT {fields},\n{summary_dump_snippet}"
+    from weave.trace_server.calls_query_builder.calls_query_builder import (
+        CallsMergedFeedbackPayloadField,
+    )
+
+    # Filter out summary_dump - we generate it ourselves with cost data
+    final_fields = [f for f in select_fields if f != "summary_dump"]
+
+    # Add fields required for ORDER BY (but not feedback fields - those come from JOIN)
+    for order_field in order_fields:
+        if isinstance(order_field.field, CallsMergedFeedbackPayloadField):
+            continue
+        field_name = order_field.field.field
+        if field_name not in final_fields and field_name != "summary_dump":
+            final_fields.append(field_name)
+
+    return final_fields
 
 
-def _build_where_clause(param_builder: ParamBuilder) -> str:
-    """Build the WHERE clause for rank = 1 filter.
+def _needs_feedback_join(order_fields: list["OrderField"]) -> bool:
+    """Check if any order field requires a feedback JOIN.
 
     Args:
-        param_builder: Parameter builder for SQL parameters
+        order_fields: Fields to order by
 
     Returns:
-        WHERE clause condition
+        True if feedback JOIN is needed
     """
-    rank_param = param_builder.add_param(1)
-    return f"(rank = {{{rank_param}:UInt64}})"
+    from weave.trace_server.calls_query_builder.calls_query_builder import (
+        CallsMergedFeedbackPayloadField,
+    )
 
-
-def _build_group_by_clause(select_fields: list[str]) -> str:
-    """Build the GROUP BY clause.
-
-    Args:
-        select_fields: List of field names to group by
-
-    Returns:
-        GROUP BY clause with field list
-    """
-    return ", ".join(select_fields)
+    return any(
+        isinstance(order_field.field, CallsMergedFeedbackPayloadField)
+        for order_field in order_fields
+    )
 
 
 def _build_feedback_join(
@@ -630,8 +495,6 @@ def build_cost_ctes(
     Returns:
         List of CTE objects
     """
-    from weave.trace_server.calls_query_builder.cte import CTE
-
     return [
         CTE(
             name="llm_usage",
@@ -652,24 +515,52 @@ def get_cost_final_select(
     order_fields: list["OrderField"],
     project_id: str,
 ) -> str:
-    """Get the final SELECT statement for cost queries.
+    """Build the final SELECT statement that adds costs to the results.
+
+    Takes ranked_prices CTE and generates a query that:
+    - Filters to rank=1 (best matching price for each LLM)
+    - Groups rows by call ID to reconstruct summary_dump with costs
+    - Optionally joins feedback data if needed for ordering
 
     Args:
         pb: Parameter builder for SQL parameters
         select_fields: Fields to select
-        order_fields: OrderField objects to order by (preserves complex expressions)
+        order_fields: Fields to order by
         project_id: Project ID for feedback joins
 
     Returns:
-        Final SELECT SQL statement
+        Complete SQL SELECT statement
     """
-    query_parts = CostQueryParts.build_for_costs(
-        pb, "ranked_prices", select_fields, order_fields, project_id
-    )
+    final_fields = _prepare_final_select_fields(select_fields, order_fields)
+    fields_str = ", ".join(final_fields)
+
+    # Build SELECT clause with cost calculation
+    summary_dump = _build_cost_summary_dump_snippet()
+    select_clause = f"SELECT {fields_str},\n{summary_dump}"
+
+    from_clause = "FROM ranked_prices"
+    feedback_join = ""
+    if _needs_feedback_join(order_fields):
+        feedback_join = "\n" + _build_feedback_join(pb, project_id, "ranked_prices")
+
+    where_clause = f"WHERE (rank = {{{pb.add_param(1)}:UInt64}})"
+    group_by = f"GROUP BY {', '.join(final_fields)}"
+    order_by = ""
+    if order_fields:
+        order_parts = [of.as_sql(pb, "ranked_prices") for of in order_fields]
+        order_by = f"ORDER BY {', '.join(order_parts)}"
+
+    parts = [select_clause, from_clause]
+    if feedback_join:
+        parts.append(feedback_join)
+    parts.extend([where_clause, group_by])
+    if order_by:
+        parts.append(order_by)
+
     comment = (
         "Final Select, which just selects the correct fields, and adds a costs object"
     )
-    return f"-- {comment}\n{query_parts.as_sql()}"
+    return f"-- {comment}\n" + "\n".join(parts)
 
 
 def cost_query(
