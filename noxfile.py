@@ -32,7 +32,8 @@ NUM_TRACE_SERVER_SHARDS = 4
 
 @nox.session
 def lint(session):
-    session.run("uv", "sync", "--active", "--group", "dev")
+    session.run("uv", "sync", "--active", "--group", "dev", "--frozen")
+
     dry_run = session.posargs and "dry-run" in session.posargs
     all_files = session.posargs and "--all-files" in session.posargs
     ruff_only = session.posargs and "--ruff-only" in session.posargs
@@ -139,7 +140,7 @@ def tests(session, shard):
     # Only add --extra shard if the shard has a corresponding optional dependency
     # Use --active to sync to the active nox virtual environment
     # Test-related shards (ending in _test/_tests) are dependency groups, not extras
-    sync_args = ["uv", "sync", "--active", "--group", "test"]
+    sync_args = ["uv", "sync", "--active", "--group", "test", "--frozen"]
 
     if shard not in SHARDS_WITHOUT_EXTRAS:
         sync_args.extend(["--extra", shard])
