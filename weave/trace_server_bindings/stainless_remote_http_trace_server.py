@@ -572,7 +572,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         # Use stream_query endpoint
         response = self._stainless_client.calls.stream_query(**req_dict)
         for item in response:
-            yield tsi.CallSchema.model_validate(item.model_dump())
+            yield tsi.CallSchema.model_validate(item)
 
     @validate_call
     def calls_query_stats(self, req: tsi.CallsQueryStatsReq) -> tsi.CallsQueryStatsRes:
@@ -1158,7 +1158,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         req_dict = req.model_dump(by_alias=True)
         response = self._stainless_client.threads.stream_query(**req_dict)
         for item in response:
-            yield tsi.ThreadSchema.model_validate(item.model_dump())
+            yield tsi.ThreadSchema.model_validate(item)
 
     @validate_call
     def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
@@ -1208,6 +1208,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             req,
             tsi.OpCreateRes,
             self._stainless_client.v2.ops.create,
+            exclude={"wb_user_id"},
         )
 
     @validate_call
@@ -1243,7 +1244,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             self._stainless_client.v2.ops.list,
         )
         for item in response:
-            yield tsi.OpReadRes.model_validate(item.model_dump())
+            yield tsi.OpReadRes.model_validate(item)
 
     @validate_call
     def op_delete(self, req: tsi.OpDeleteReq) -> tsi.OpDeleteRes:
@@ -1278,6 +1279,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             req,
             tsi.DatasetCreateRes,
             self._stainless_client.v2.datasets.create,
+            exclude={"wb_user_id"},
         )
 
     @validate_call
@@ -1313,7 +1315,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             self._stainless_client.v2.datasets.list,
         )
         for item in response:
-            yield tsi.DatasetReadRes.model_validate(item.model_dump())
+            yield tsi.DatasetReadRes.model_validate(item)
 
     @validate_call
     def dataset_delete(self, req: tsi.DatasetDeleteReq) -> tsi.DatasetDeleteRes:
@@ -1348,6 +1350,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             req,
             tsi.ScorerCreateRes,
             self._stainless_client.v2.scorers.create,
+            exclude={"wb_user_id"},
         )
 
     @validate_call
@@ -1383,7 +1386,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             self._stainless_client.v2.scorers.list,
         )
         for item in response:
-            yield tsi.ScorerReadRes.model_validate(item.model_dump())
+            yield tsi.ScorerReadRes.model_validate(item)
 
     @validate_call
     def scorer_delete(self, req: tsi.ScorerDeleteReq) -> tsi.ScorerDeleteRes:
@@ -1420,6 +1423,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             req,
             tsi.EvaluationCreateRes,
             self._stainless_client.v2.evaluations.create,
+            exclude={"wb_user_id"},
         )
 
     @validate_call
@@ -1457,7 +1461,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             self._stainless_client.v2.evaluations.list,
         )
         for item in response:
-            yield tsi.EvaluationReadRes.model_validate(item.model_dump())
+            yield tsi.EvaluationReadRes.model_validate(item)
 
     @validate_call
     def evaluation_delete(
@@ -1494,6 +1498,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             req,
             tsi.ModelCreateRes,
             self._stainless_client.v2.models.create,
+            exclude={"wb_user_id"},
         )
 
     @validate_call
@@ -1529,7 +1534,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             self._stainless_client.v2.models.list,
         )
         for item in response:
-            yield tsi.ModelReadRes.model_validate(item.model_dump())
+            yield tsi.ModelReadRes.model_validate(item)
 
     @validate_call
     def model_delete(self, req: tsi.ModelDeleteReq) -> tsi.ModelDeleteRes:
@@ -1566,6 +1571,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             req,
             tsi.EvaluationRunCreateRes,
             self._stainless_client.v2.evaluation_runs.create,
+            exclude={"wb_user_id"},
         )
 
     @validate_call
@@ -1616,7 +1622,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             **extra_kwargs,
         )
         for item in response:
-            yield tsi.EvaluationRunReadRes.model_validate(item.model_dump())
+            yield tsi.EvaluationRunReadRes.model_validate(item)
 
     @validate_call
     def evaluation_run_delete(
@@ -1678,6 +1684,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             req,
             tsi.PredictionCreateRes,
             self._stainless_client.v2.predictions.create,
+            exclude={"wb_user_id"},
         )
 
     @validate_call
@@ -1714,7 +1721,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             self._stainless_client.v2.predictions.list,
         )
         for item in response:
-            yield tsi.PredictionReadRes.model_validate(item.model_dump())
+            yield tsi.PredictionReadRes.model_validate(item)
 
     @validate_call
     def prediction_delete(
@@ -1770,6 +1777,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             req,
             tsi.ScoreCreateRes,
             self._stainless_client.v2.scores.create,
+            exclude={"wb_user_id"},
         )
 
     @validate_call
@@ -1804,7 +1812,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             self._stainless_client.v2.scores.list,
         )
         for item in response:
-            yield tsi.ScoreReadRes.model_validate(item.model_dump())
+            yield tsi.ScoreReadRes.model_validate(item)
 
     @validate_call
     def score_delete(self, req: tsi.ScoreDeleteReq) -> tsi.ScoreDeleteRes:
