@@ -2,6 +2,8 @@ import datetime
 import unittest
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from weave.trace_server import clickhouse_trace_server_batched as chts
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import (
@@ -632,6 +634,461 @@ class TestLLMCompletionStreaming(unittest.TestCase):
             # Get the stream and expect an exception
             with self.assertRaises(MissingLLMApiKeyError):
                 list(self.server.completions_create_stream(req))
+
+
+class TestPromptResolution(unittest.TestCase):
+    """Tests for prompt resolution and template variable substitution."""
+
+    def setUp(self):
+        """Set up test fixtures before each test."""
+        self.project_id = "test-project"
+        self.mock_secret_fetcher = MagicMock()
+        self.mock_secret_fetcher.fetch.return_value = {
+            "secrets": {"OPENAI_API_KEY": "test-api-key"}
+        }
+        self.token = _secret_fetcher_context.set(self.mock_secret_fetcher)
+
+    def tearDown(self):
+        _secret_fetcher_context.reset(self.token)
+
+    def test_replace_template_vars_in_messages(self):
+        """Test template variable replacement in messages."""
+        from weave.trace_server.llm_completion import replace_template_vars_in_messages
+
+        messages = [
+            {"role": "system", "content": "You are {assistant_name}."},
+            {"role": "user", "content": "My name is {user_name}."},
+        ]
+
+        template_vars = {"assistant_name": "Claude", "user_name": "Alice"}
+
+        result = replace_template_vars_in_messages(messages, template_vars)
+
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result[0]["content"], "You are Claude.")
+        self.assertEqual(result[1]["content"], "My name is Alice.")
+
+    def test_replace_template_vars_with_missing_variable(self):
+        """Test template variable replacement when a variable is missing."""
+        from weave.trace_server.errors import InvalidRequest
+        from weave.trace_server.llm_completion import replace_template_vars_in_messages
+
+        messages = [
+            {"role": "system", "content": "You are {assistant_name}."},
+        ]
+
+        template_vars = {}  # Missing assistant_name
+
+        # Should raise InvalidRequest when variable is missing
+        with self.assertRaises(InvalidRequest) as context:
+            replace_template_vars_in_messages(messages, template_vars)
+
+        self.assertIn("assistant_name", str(context.exception))
+
+    def test_replace_template_vars_with_complex_content(self):
+        """Test template variable replacement with list content (not currently supported)."""
+        from weave.trace_server.llm_completion import replace_template_vars_in_messages
+
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": "Hello {name}"},
+                    {"type": "image_url", "image_url": {"url": "https://example.com"}},
+                ],
+            }
+        ]
+
+        template_vars = {"name": "World"}
+
+        # Current implementation doesn't replace variables in list content, it just passes through
+        result = replace_template_vars_in_messages(messages, template_vars)
+
+        # Content should remain unchanged (list content replacement not implemented)
+        self.assertEqual(result[0]["content"][0]["text"], "Hello {name}")
+        self.assertEqual(
+            result[0]["content"][1]["image_url"]["url"], "https://example.com"
+        )
+
+    def test_resolve_prompt_messages(self):
+        """Test resolving prompt messages from a MessagesPrompt object."""
+        from weave.trace_server.llm_completion import resolve_prompt_messages
+
+        # Create a mock MessagesPrompt object
+        mock_prompt_obj = tsi.ObjSchema(
+            project_id=self.project_id,
+            object_id="test-prompt",
+            digest="digest-1",
+            base_object_class="MessagesPrompt",
+            leaf_object_class="MessagesPrompt",
+            val={
+                "messages": [
+                    {"role": "system", "content": "You are {assistant_name}."},
+                    {"role": "user", "content": "Hello!"},
+                ]
+            },
+            created_at=datetime.datetime.now(),
+            version_index=1,
+            is_latest=1,
+            kind="object",
+            deleted_at=None,
+        )
+
+        def mock_obj_read(req):
+            return tsi.ObjReadRes(obj=mock_prompt_obj)
+
+        prompt_uri = (
+            f"weave-trace-internal:///{self.project_id}/object/test-prompt:digest-1"
+        )
+
+        # Test without template vars
+        messages = resolve_prompt_messages(
+            prompt=prompt_uri,
+            project_id=self.project_id,
+            obj_read_func=mock_obj_read,
+            template_vars=None,
+        )
+
+        self.assertEqual(len(messages), 2)
+        self.assertEqual(messages[0]["role"], "system")
+        self.assertEqual(messages[0]["content"], "You are {assistant_name}.")
+        self.assertEqual(messages[1]["role"], "user")
+        self.assertEqual(messages[1]["content"], "Hello!")
+
+    def test_resolve_prompt_messages_with_template_vars(self):
+        """Test resolving prompt messages with template variable substitution."""
+        from weave.trace_server.llm_completion import resolve_prompt_messages
+
+        # Create a mock MessagesPrompt object
+        mock_prompt_obj = tsi.ObjSchema(
+            project_id=self.project_id,
+            object_id="test-prompt",
+            digest="digest-1",
+            base_object_class="MessagesPrompt",
+            leaf_object_class="MessagesPrompt",
+            val={
+                "messages": [
+                    {"role": "system", "content": "You are {assistant_name}."},
+                    {"role": "user", "content": "My topic is {topic}."},
+                ]
+            },
+            created_at=datetime.datetime.now(),
+            version_index=1,
+            is_latest=1,
+            kind="object",
+            deleted_at=None,
+        )
+
+        def mock_obj_read(req):
+            return tsi.ObjReadRes(obj=mock_prompt_obj)
+
+        prompt_uri = (
+            f"weave-trace-internal:///{self.project_id}/object/test-prompt:digest-1"
+        )
+        template_vars = {"assistant_name": "MathBot", "topic": "mathematics"}
+
+        # Test with template vars
+        messages = resolve_prompt_messages(
+            prompt=prompt_uri,
+            project_id=self.project_id,
+            obj_read_func=mock_obj_read,
+            template_vars=template_vars,
+        )
+
+        self.assertEqual(len(messages), 2)
+        self.assertEqual(messages[0]["content"], "You are MathBot.")
+        self.assertEqual(messages[1]["content"], "My topic is mathematics.")
+
+    def test_resolve_prompt_messages_invalid_prompt(self):
+        """Test error handling when prompt object is not a MessagesPrompt."""
+        from weave.trace_server.errors import InvalidRequest
+        from weave.trace_server.llm_completion import resolve_prompt_messages
+
+        # Create a mock object that is NOT a MessagesPrompt
+        mock_not_prompt = tsi.ObjSchema(
+            project_id=self.project_id,
+            object_id="test-obj",
+            digest="digest-1",
+            base_object_class="Model",
+            leaf_object_class="Model",
+            val={"name": "test"},
+            created_at=datetime.datetime.now(),
+            version_index=1,
+            is_latest=1,
+            kind="object",
+            deleted_at=None,
+        )
+
+        def mock_obj_read(req):
+            return tsi.ObjReadRes(obj=mock_not_prompt)
+
+        prompt_uri = (
+            f"weave-trace-internal:///{self.project_id}/object/test-obj:digest-1"
+        )
+
+        # Should raise InvalidRequest when object is not a MessagesPrompt
+        with self.assertRaises(InvalidRequest) as context:
+            resolve_prompt_messages(
+                prompt=prompt_uri,
+                project_id=self.project_id,
+                obj_read_func=mock_obj_read,
+                template_vars=None,
+            )
+
+        self.assertIn("is not a MessagesPrompt", str(context.exception))
+
+
+class TestStreamingWithPrompts(unittest.TestCase):
+    """Tests for streaming completions with prompt resolution and template variables."""
+
+    def setUp(self):
+        """Set up test fixtures before each test."""
+        self.server = chts.ClickHouseTraceServer(host="test_host")
+        self.project_id = "test-project"
+        self.mock_secret_fetcher = MagicMock()
+        self.mock_secret_fetcher.fetch.return_value = {
+            "secrets": {"OPENAI_API_KEY": "test-api-key"}
+        }
+        self.token = _secret_fetcher_context.set(self.mock_secret_fetcher)
+
+    def tearDown(self):
+        _secret_fetcher_context.reset(self.token)
+
+    def test_streaming_with_prompt_resolution(self):
+        """Test streaming completion with prompt resolution."""
+        # Mock the MessagesPrompt object
+        mock_prompt_obj = tsi.ObjSchema(
+            project_id=self.project_id,
+            object_id="test-prompt",
+            digest="digest-1",
+            base_object_class="MessagesPrompt",
+            leaf_object_class="MessagesPrompt",
+            val={
+                "messages": [
+                    {"role": "system", "content": "You are a helpful assistant."},
+                ]
+            },
+            created_at=datetime.datetime.now(),
+            version_index=1,
+            is_latest=1,
+            kind="object",
+            deleted_at=None,
+        )
+
+        # Mock response chunks
+        mock_chunks = [
+            {
+                "choices": [
+                    {
+                        "delta": {"content": "Hello"},
+                        "finish_reason": None,
+                        "index": 0,
+                    }
+                ],
+                "id": "test-id",
+                "model": "gpt-3.5-turbo",
+                "created": 1234567890,
+            },
+            {
+                "choices": [
+                    {
+                        "delta": {},
+                        "finish_reason": "stop",
+                        "index": 0,
+                    }
+                ],
+                "id": "test-id",
+                "model": "gpt-3.5-turbo",
+                "created": 1234567890,
+                "usage": {
+                    "prompt_tokens": 10,
+                    "completion_tokens": 1,
+                    "total_tokens": 11,
+                },
+            },
+        ]
+
+        with (
+            patch(
+                "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
+            ) as mock_litellm,
+            patch.object(chts.ClickHouseTraceServer, "obj_read") as mock_obj_read,
+        ):
+            # Mock the litellm completion stream
+            mock_stream = MagicMock()
+            mock_stream.__iter__.return_value = mock_chunks
+            mock_litellm.return_value = mock_stream
+
+            # Mock obj_read to return the prompt
+            mock_obj_read.return_value = tsi.ObjReadRes(obj=mock_prompt_obj)
+
+            prompt_uri = (
+                f"weave-trace-internal:///{self.project_id}/object/test-prompt:digest-1"
+            )
+
+            # Create test request with prompt
+            req = tsi.CompletionsCreateReq(
+                project_id=self.project_id,
+                inputs=tsi.CompletionsCreateRequestInputs(
+                    model="gpt-3.5-turbo",
+                    messages=[{"role": "user", "content": "Hi there"}],
+                    prompt=prompt_uri,
+                ),
+                track_llm_call=False,
+            )
+
+            # Get the stream
+            stream = self.server.completions_create_stream(req)
+
+            # Collect all chunks
+            chunks = list(stream)
+
+            # Verify the chunks
+            self.assertEqual(len(chunks), 2)
+            self.assertEqual(chunks[0]["choices"][0]["delta"]["content"], "Hello")
+            self.assertEqual(chunks[1]["choices"][0]["finish_reason"], "stop")
+
+            # Verify obj_read was called to resolve the prompt
+            mock_obj_read.assert_called_once()
+
+    def test_streaming_with_prompt_and_template_vars(self):
+        """Test streaming completion with prompt resolution and template variables."""
+        # Mock the MessagesPrompt object with template variables
+        mock_prompt_obj = tsi.ObjSchema(
+            project_id=self.project_id,
+            object_id="test-prompt",
+            digest="digest-1",
+            base_object_class="MessagesPrompt",
+            leaf_object_class="MessagesPrompt",
+            val={
+                "messages": [
+                    {"role": "system", "content": "You are {assistant_name}."},
+                    {"role": "user", "content": "Tell me about {topic}."},
+                ]
+            },
+            created_at=datetime.datetime.now(),
+            version_index=1,
+            is_latest=1,
+            kind="object",
+            deleted_at=None,
+        )
+
+        # Mock response chunks
+        mock_chunks = [
+            {
+                "choices": [
+                    {
+                        "delta": {"content": "Mathematics"},
+                        "finish_reason": None,
+                        "index": 0,
+                    }
+                ],
+                "id": "test-id",
+                "model": "gpt-3.5-turbo",
+                "created": 1234567890,
+            },
+            {
+                "choices": [
+                    {
+                        "delta": {},
+                        "finish_reason": "stop",
+                        "index": 0,
+                    }
+                ],
+                "id": "test-id",
+                "model": "gpt-3.5-turbo",
+                "created": 1234567890,
+                "usage": {
+                    "prompt_tokens": 15,
+                    "completion_tokens": 1,
+                    "total_tokens": 16,
+                },
+            },
+        ]
+
+        with (
+            patch(
+                "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
+            ) as mock_litellm,
+            patch.object(chts.ClickHouseTraceServer, "obj_read") as mock_obj_read,
+        ):
+            # Mock the litellm completion stream
+            mock_stream = MagicMock()
+            mock_stream.__iter__.return_value = mock_chunks
+            mock_litellm.return_value = mock_stream
+
+            # Mock obj_read to return the prompt
+            mock_obj_read.return_value = tsi.ObjReadRes(obj=mock_prompt_obj)
+
+            prompt_uri = (
+                f"weave-trace-internal:///{self.project_id}/object/test-prompt:digest-1"
+            )
+
+            # Create test request with prompt and template_vars
+            req = tsi.CompletionsCreateReq(
+                project_id=self.project_id,
+                inputs=tsi.CompletionsCreateRequestInputs(
+                    model="gpt-3.5-turbo",
+                    messages=[],
+                    prompt=prompt_uri,
+                    template_vars={"assistant_name": "MathBot", "topic": "mathematics"},
+                ),
+                track_llm_call=False,
+            )
+
+            # Get the stream
+            stream = self.server.completions_create_stream(req)
+
+            # Collect all chunks
+            chunks = list(stream)
+
+            # Verify the chunks
+            self.assertEqual(len(chunks), 2)
+            self.assertEqual(chunks[0]["choices"][0]["delta"]["content"], "Mathematics")
+            self.assertEqual(chunks[1]["choices"][0]["finish_reason"], "stop")
+
+            # Verify litellm was called with substituted messages
+            mock_litellm.assert_called_once()
+            call_kwargs = mock_litellm.call_args[1]
+            messages = call_kwargs["inputs"].messages
+
+            # Should have 2 messages with template vars replaced
+            self.assertEqual(len(messages), 2)
+            self.assertEqual(messages[0]["content"], "You are MathBot.")
+            self.assertEqual(messages[1]["content"], "Tell me about mathematics.")
+
+    @pytest.mark.disable_logging_error_check
+    def test_streaming_with_prompt_error(self):
+        """Test error handling when prompt resolution fails during streaming."""
+        with patch.object(chts.ClickHouseTraceServer, "obj_read") as mock_obj_read:
+            # Mock obj_read to raise an error
+            from weave.trace_server.errors import NotFoundError
+
+            mock_obj_read.side_effect = NotFoundError("Prompt not found")
+
+            prompt_uri = f"weave-trace-internal:///{self.project_id}/object/missing-prompt:digest-1"
+
+            # Create test request with non-existent prompt
+            req = tsi.CompletionsCreateReq(
+                project_id=self.project_id,
+                inputs=tsi.CompletionsCreateRequestInputs(
+                    model="gpt-3.5-turbo",
+                    messages=[{"role": "user", "content": "Hi"}],
+                    prompt=prompt_uri,
+                ),
+                track_llm_call=False,
+            )
+
+            # Get the stream
+            stream = self.server.completions_create_stream(req)
+
+            # Collect all chunks - should get error chunk
+            chunks = list(stream)
+
+            # Should have exactly one error chunk
+            self.assertEqual(len(chunks), 1)
+            self.assertIn("error", chunks[0])
+            self.assertIn("Failed to resolve prompt", chunks[0]["error"])
 
 
 if __name__ == "__main__":

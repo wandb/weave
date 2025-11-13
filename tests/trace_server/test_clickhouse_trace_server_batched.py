@@ -2,6 +2,8 @@ import json
 from datetime import datetime, timezone
 from unittest.mock import MagicMock, Mock, patch
 
+import pytest
+
 from weave.trace_server import clickhouse_trace_server_batched as chts
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.secret_fetcher_context import secret_fetcher_context
@@ -667,3 +669,388 @@ def test_completions_create_stream_single_choice_unified_wrapper():
         mock_litellm.assert_called_once()
         call_args = mock_litellm.call_args[1]
         assert call_args["inputs"].n == 1
+
+
+def test_completions_create_with_prompt():
+    """Test completions_create with prompt resolution (non-streaming)."""
+    # Mock the MessagesPrompt object
+    mock_prompt_obj = tsi.ObjSchema(
+        project_id="test_project",
+        object_id="test-prompt",
+        digest="digest-1",
+        base_object_class="MessagesPrompt",
+        leaf_object_class="MessagesPrompt",
+        val={
+            "messages": [
+                {"role": "system", "content": "You are a helpful assistant."},
+            ]
+        },
+        created_at=datetime.now(),
+        version_index=1,
+        is_latest=1,
+        kind="object",
+        deleted_at=None,
+    )
+
+    # Mock completion response
+    mock_response = {
+        "id": "test-id",
+        "object": "chat.completion",
+        "created": 1234567890,
+        "model": "gpt-3.5-turbo",
+        "choices": [
+            {
+                "index": 0,
+                "message": {"role": "assistant", "content": "Hello!"},
+                "finish_reason": "stop",
+            }
+        ],
+        "usage": {
+            "prompt_tokens": 10,
+            "completion_tokens": 1,
+            "total_tokens": 11,
+        },
+    }
+
+    # Set up mock secret fetcher
+    mock_secret_fetcher = MagicMock()
+    mock_secret_fetcher.fetch.return_value = {
+        "secrets": {"OPENAI_API_KEY": "test-api-key-value"}
+    }
+
+    with (
+        secret_fetcher_context(mock_secret_fetcher),
+        patch(
+            "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion"
+        ) as mock_litellm,
+        patch.object(chts.ClickHouseTraceServer, "obj_read") as mock_obj_read,
+    ):
+        # Mock the litellm completion
+        mock_litellm.return_value = tsi.CompletionsCreateRes(response=mock_response)
+
+        # Mock obj_read to return the prompt
+        mock_obj_read.return_value = tsi.ObjReadRes(obj=mock_prompt_obj)
+
+        prompt_uri = "weave-trace-internal:///test_project/object/test-prompt:digest-1"
+
+        # Create test request with prompt
+        req = tsi.CompletionsCreateReq(
+            project_id="test_project",
+            inputs=tsi.CompletionsCreateRequestInputs(
+                model="gpt-3.5-turbo",
+                messages=[{"role": "user", "content": "Hi there"}],
+                prompt=prompt_uri,
+            ),
+            track_llm_call=False,
+        )
+
+        server = chts.ClickHouseTraceServer(host="test_host")
+        result = server.completions_create(req)
+
+        # Verify the result
+        assert result.response == mock_response
+
+        # Verify obj_read was called to resolve the prompt
+        mock_obj_read.assert_called_once()
+
+        # Verify litellm was called with the prompt messages prepended
+        mock_litellm.assert_called_once()
+        call_kwargs = mock_litellm.call_args[1]
+        messages = call_kwargs["inputs"].messages
+
+        # Should have 2 messages: system from prompt + user input
+        assert len(messages) == 2
+        assert messages[0]["role"] == "system"
+        assert messages[0]["content"] == "You are a helpful assistant."
+        assert messages[1]["role"] == "user"
+        assert messages[1]["content"] == "Hi there"
+
+
+def test_completions_create_with_prompt_and_template_vars():
+    """Test completions_create with prompt and template variable substitution."""
+    # Mock the MessagesPrompt object with template variables
+    mock_prompt_obj = tsi.ObjSchema(
+        project_id="test_project",
+        object_id="test-prompt",
+        digest="digest-1",
+        base_object_class="MessagesPrompt",
+        leaf_object_class="MessagesPrompt",
+        val={
+            "messages": [
+                {"role": "system", "content": "You are {assistant_name}."},
+                {"role": "user", "content": "Tell me about {topic}."},
+            ]
+        },
+        created_at=datetime.now(),
+        version_index=1,
+        is_latest=1,
+        kind="object",
+        deleted_at=None,
+    )
+
+    # Mock completion response
+    mock_response = {
+        "id": "test-id",
+        "object": "chat.completion",
+        "created": 1234567890,
+        "model": "gpt-3.5-turbo",
+        "choices": [
+            {
+                "index": 0,
+                "message": {
+                    "role": "assistant",
+                    "content": "Mathematics is the study of numbers.",
+                },
+                "finish_reason": "stop",
+            }
+        ],
+        "usage": {
+            "prompt_tokens": 15,
+            "completion_tokens": 5,
+            "total_tokens": 20,
+        },
+    }
+
+    # Set up mock secret fetcher
+    mock_secret_fetcher = MagicMock()
+    mock_secret_fetcher.fetch.return_value = {
+        "secrets": {"OPENAI_API_KEY": "test-api-key-value"}
+    }
+
+    with (
+        secret_fetcher_context(mock_secret_fetcher),
+        patch(
+            "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion"
+        ) as mock_litellm,
+        patch.object(chts.ClickHouseTraceServer, "obj_read") as mock_obj_read,
+    ):
+        # Mock the litellm completion
+        mock_litellm.return_value = tsi.CompletionsCreateRes(response=mock_response)
+
+        # Mock obj_read to return the prompt
+        mock_obj_read.return_value = tsi.ObjReadRes(obj=mock_prompt_obj)
+
+        prompt_uri = "weave-trace-internal:///test_project/object/test-prompt:digest-1"
+
+        # Create test request with prompt and template_vars
+        req = tsi.CompletionsCreateReq(
+            project_id="test_project",
+            inputs=tsi.CompletionsCreateRequestInputs(
+                model="gpt-3.5-turbo",
+                messages=[],
+                prompt=prompt_uri,
+                template_vars={"assistant_name": "MathBot", "topic": "mathematics"},
+            ),
+            track_llm_call=False,
+        )
+
+        server = chts.ClickHouseTraceServer(host="test_host")
+        result = server.completions_create(req)
+
+        # Verify the result
+        assert result.response == mock_response
+
+        # Verify litellm was called with substituted messages
+        mock_litellm.assert_called_once()
+        call_kwargs = mock_litellm.call_args[1]
+        messages = call_kwargs["inputs"].messages
+
+        # Should have 2 messages with template vars replaced
+        assert len(messages) == 2
+        assert messages[0]["content"] == "You are MathBot."
+        assert messages[1]["content"] == "Tell me about mathematics."
+
+
+def test_completions_create_stream_with_prompt_and_template_vars():
+    """Test completions_create_stream with prompt and template variables."""
+    # Mock the MessagesPrompt object with template variables
+    mock_prompt_obj = tsi.ObjSchema(
+        project_id="test_project",
+        object_id="test-prompt",
+        digest="digest-1",
+        base_object_class="MessagesPrompt",
+        leaf_object_class="MessagesPrompt",
+        val={
+            "messages": [
+                {"role": "system", "content": "You are {assistant_name}."},
+            ]
+        },
+        created_at=datetime.now(),
+        version_index=1,
+        is_latest=1,
+        kind="object",
+        deleted_at=None,
+    )
+
+    # Mock response chunks
+    mock_chunks = [
+        {
+            "choices": [
+                {
+                    "delta": {"content": "Math"},
+                    "finish_reason": None,
+                    "index": 0,
+                }
+            ],
+            "id": "test-id",
+            "model": "gpt-3.5-turbo",
+            "created": 1234567890,
+        },
+        {
+            "choices": [
+                {
+                    "delta": {},
+                    "finish_reason": "stop",
+                    "index": 0,
+                }
+            ],
+            "id": "test-id",
+            "model": "gpt-3.5-turbo",
+            "created": 1234567890,
+            "usage": {
+                "prompt_tokens": 10,
+                "completion_tokens": 1,
+                "total_tokens": 11,
+            },
+        },
+    ]
+
+    # Set up mock secret fetcher
+    mock_secret_fetcher = MagicMock()
+    mock_secret_fetcher.fetch.return_value = {
+        "secrets": {"OPENAI_API_KEY": "test-api-key-value"}
+    }
+
+    with (
+        secret_fetcher_context(mock_secret_fetcher),
+        patch(
+            "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
+        ) as mock_litellm,
+        patch.object(chts.ClickHouseTraceServer, "obj_read") as mock_obj_read,
+    ):
+        # Mock the litellm completion stream
+        mock_stream = MagicMock()
+        mock_stream.__iter__.return_value = mock_chunks
+        mock_litellm.return_value = mock_stream
+
+        # Mock obj_read to return the prompt
+        mock_obj_read.return_value = tsi.ObjReadRes(obj=mock_prompt_obj)
+
+        prompt_uri = "weave-trace-internal:///test_project/object/test-prompt:digest-1"
+
+        # Create test request with prompt and template_vars
+        req = tsi.CompletionsCreateReq(
+            project_id="test_project",
+            inputs=tsi.CompletionsCreateRequestInputs(
+                model="gpt-3.5-turbo",
+                messages=[{"role": "user", "content": "What is {subject}?"}],
+                prompt=prompt_uri,
+                template_vars={"assistant_name": "MathBot", "subject": "algebra"},
+            ),
+            track_llm_call=False,
+        )
+
+        server = chts.ClickHouseTraceServer(host="test_host")
+        stream = server.completions_create_stream(req)
+        chunks = list(stream)
+
+        # Verify the chunks
+        assert len(chunks) == 2
+        assert chunks[0]["choices"][0]["delta"]["content"] == "Math"
+        assert chunks[1]["choices"][0]["finish_reason"] == "stop"
+
+        # Verify litellm was called with substituted messages
+        mock_litellm.assert_called_once()
+        call_kwargs = mock_litellm.call_args[1]
+        messages = call_kwargs["inputs"].messages
+
+        # Should have 2 messages: prompt + user (both with template vars replaced)
+        assert len(messages) == 2
+        assert messages[0]["content"] == "You are MathBot."
+        assert messages[1]["content"] == "What is algebra?"
+
+
+@pytest.mark.disable_logging_error_check
+def test_completions_create_prompt_not_found_error():
+    """Test error handling when prompt object is not found."""
+    # Set up mock secret fetcher
+    mock_secret_fetcher = MagicMock()
+    mock_secret_fetcher.fetch.return_value = {
+        "secrets": {"OPENAI_API_KEY": "test-api-key-value"}
+    }
+
+    with (
+        secret_fetcher_context(mock_secret_fetcher),
+        patch.object(chts.ClickHouseTraceServer, "obj_read") as mock_obj_read,
+    ):
+        # Mock obj_read to raise NotFoundError
+        from weave.trace_server.errors import NotFoundError
+
+        mock_obj_read.side_effect = NotFoundError("Prompt not found")
+
+        prompt_uri = (
+            "weave-trace-internal:///test_project/object/missing-prompt:digest-1"
+        )
+
+        # Create test request with non-existent prompt
+        req = tsi.CompletionsCreateReq(
+            project_id="test_project",
+            inputs=tsi.CompletionsCreateRequestInputs(
+                model="gpt-3.5-turbo",
+                messages=[{"role": "user", "content": "Hi"}],
+                prompt=prompt_uri,
+            ),
+            track_llm_call=False,
+        )
+
+        server = chts.ClickHouseTraceServer(host="test_host")
+        result = server.completions_create(req)
+
+        # Should return error response
+        assert "error" in result.response
+        assert "Failed to resolve prompt" in result.response["error"]
+
+
+@pytest.mark.disable_logging_error_check
+def test_completions_create_stream_prompt_not_found_error():
+    """Test error handling when prompt object is not found during streaming."""
+    # Set up mock secret fetcher
+    mock_secret_fetcher = MagicMock()
+    mock_secret_fetcher.fetch.return_value = {
+        "secrets": {"OPENAI_API_KEY": "test-api-key-value"}
+    }
+
+    with (
+        secret_fetcher_context(mock_secret_fetcher),
+        patch.object(chts.ClickHouseTraceServer, "obj_read") as mock_obj_read,
+    ):
+        # Mock obj_read to raise NotFoundError
+        from weave.trace_server.errors import NotFoundError
+
+        mock_obj_read.side_effect = NotFoundError("Prompt not found")
+
+        prompt_uri = (
+            "weave-trace-internal:///test_project/object/missing-prompt:digest-1"
+        )
+
+        # Create test request with non-existent prompt
+        req = tsi.CompletionsCreateReq(
+            project_id="test_project",
+            inputs=tsi.CompletionsCreateRequestInputs(
+                model="gpt-3.5-turbo",
+                messages=[{"role": "user", "content": "Hi"}],
+                prompt=prompt_uri,
+            ),
+            track_llm_call=False,
+        )
+
+        server = chts.ClickHouseTraceServer(host="test_host")
+        stream = server.completions_create_stream(req)
+
+        # Collect all chunks - should get error chunk
+        chunks = list(stream)
+
+        # Should have exactly one error chunk
+        assert len(chunks) == 1
+        assert "error" in chunks[0]
+        assert "Failed to resolve prompt" in chunks[0]["error"]

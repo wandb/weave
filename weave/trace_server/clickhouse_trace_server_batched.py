@@ -110,6 +110,7 @@ from weave.trace_server.llm_completion import (
     get_custom_provider_info,
     lite_llm_completion,
     lite_llm_completion_stream,
+    resolve_prompt_messages,
 )
 from weave.trace_server.methods.evaluation_status import evaluation_status
 from weave.trace_server.model_providers.model_providers import (
@@ -2060,13 +2061,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 dataset=val.get("dataset", "") if isinstance(val, dict) else "",
                 scorers=val.get("scorers", []) if isinstance(val, dict) else [],
                 trials=val.get("trials", 1) if isinstance(val, dict) else 1,
-                evaluation_name=val.get("evaluation_name")
-                if isinstance(val, dict)
-                else None,
+                evaluation_name=(
+                    val.get("evaluation_name") if isinstance(val, dict) else None
+                ),
                 evaluate_op=val.get("evaluate", "") if isinstance(val, dict) else "",
-                predict_and_score_op=val.get("predict_and_score", "")
-                if isinstance(val, dict)
-                else "",
+                predict_and_score_op=(
+                    val.get("predict_and_score", "") if isinstance(val, dict) else ""
+                ),
                 summarize_op=val.get("summarize", "") if isinstance(val, dict) else "",
             )
 
@@ -4035,6 +4036,48 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def completions_create(
         self, req: tsi.CompletionsCreateReq
     ) -> tsi.CompletionsCreateRes:
+        # --- Resolve prompt if provided and prepend messages
+        prompt = getattr(req.inputs, "prompt", None)
+        template_vars = getattr(req.inputs, "template_vars", None)
+        initial_messages = getattr(req.inputs, "messages", None)
+
+        # Store original messages before template var replacement (for tracking)
+        original_initial_messages = initial_messages
+
+        prompt_messages = []
+        if prompt:
+            try:
+                # Fetch prompt messages WITHOUT replacing template vars yet
+                prompt_messages = resolve_prompt_messages(
+                    prompt=prompt,
+                    project_id=req.project_id,
+                    obj_read_func=self.obj_read,
+                    template_vars=None,  # Don't replace vars yet
+                )
+            except Exception as e:
+                return tsi.CompletionsCreateRes(
+                    response={"error": f"Failed to resolve prompt: {e!s}"}
+                )
+
+        # Concatenate prompt messages with user messages
+        existing_messages = req.inputs.messages or []
+        req.inputs.messages = prompt_messages + existing_messages
+
+        # Apply template variable replacement to ALL messages (prompt + user) if template_vars provided
+        if template_vars and req.inputs.messages:
+            try:
+                from weave.trace_server.llm_completion import (
+                    replace_template_vars_in_messages,
+                )
+
+                req.inputs.messages = replace_template_vars_in_messages(
+                    req.inputs.messages, template_vars
+                )
+            except Exception as e:
+                return tsi.CompletionsCreateRes(
+                    response={"error": f"Failed to replace template vars: {e!s}"}
+                )
+
         # Use shared setup logic
         model_info = self._model_to_provider_info_map.get(req.inputs.model)
         try:
@@ -4047,10 +4090,17 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # Now that we have all the fields for both cases, we can make the API call
         start_time = datetime.datetime.now()
 
+        # Make a copy of inputs for the API call without prompt and template_vars
+        api_inputs = req.inputs.model_copy()
+        if hasattr(api_inputs, "prompt"):
+            api_inputs.prompt = None
+        if hasattr(api_inputs, "template_vars"):
+            api_inputs.template_vars = None
+
         # Make the API call
         res = lite_llm_completion(
             api_key=api_key,
-            inputs=req.inputs,
+            inputs=api_inputs,
             provider=provider,
             base_url=base_url,
             extra_headers=extra_headers,
@@ -4062,12 +4112,21 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if not req.track_llm_call:
             return tsi.CompletionsCreateRes(response=res.response)
 
+        # Prepare inputs for tracking: use original messages (with template syntax)
+        # and include prompt and template_vars
+        tracked_inputs = req.inputs.model_dump(exclude_none=True)
+        tracked_inputs["messages"] = original_initial_messages
+        if prompt:
+            tracked_inputs["prompt"] = prompt
+        if template_vars:
+            tracked_inputs["template_vars"] = template_vars
+
         start = tsi.StartedCallSchemaForInsert(
             project_id=req.project_id,
             wb_user_id=req.wb_user_id,
             op_name=COMPLETIONS_CREATE_OP_NAME,
             started_at=start_time,
-            inputs={**req.inputs.model_dump(exclude_none=True)},
+            inputs=tracked_inputs,
             attributes={},
         )
         start_call = _start_call_for_insert_to_ch_insertable_start_call(start, self)
@@ -4115,6 +4174,55 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         When req.inputs.n > 1, properly separates and tracks all choices
         within a single call's output rather than creating separate calls.
         """
+        # --- Resolve prompt if provided and prepend messages
+        prompt = getattr(req.inputs, "prompt", None)
+        template_vars = getattr(req.inputs, "template_vars", None)
+        prompt_messages = []
+        initial_messages = getattr(req.inputs, "messages", None) or []
+
+        # Store original messages before template var replacement (for tracking)
+        original_initial_messages = initial_messages
+
+        if prompt:
+            try:
+                # Fetch prompt messages WITHOUT replacing template vars yet
+                prompt_messages = resolve_prompt_messages(
+                    prompt=prompt,
+                    project_id=req.project_id,
+                    obj_read_func=self.obj_read,
+                    template_vars=None,  # Don't replace vars yet
+                )
+            except Exception as e:
+                logger.error(f"Failed to resolve prompt: {e}", exc_info=True)
+
+                # Yield error as single chunk then stop.
+                def _single_error_iter(err: Exception) -> Iterator[dict[str, str]]:
+                    yield {"error": f"Failed to resolve prompt: {err!s}"}
+
+                return _single_error_iter(e)
+
+        # Concatenate prompt messages with user messages
+        combined_messages = prompt_messages + initial_messages
+
+        # Apply template variable replacement to ALL messages (prompt + user) if template_vars provided
+        if template_vars and combined_messages:
+            try:
+                from weave.trace_server.llm_completion import (
+                    replace_template_vars_in_messages,
+                )
+
+                combined_messages = replace_template_vars_in_messages(
+                    combined_messages, template_vars
+                )
+            except Exception as e:
+                logger.error(f"Failed to replace template vars: {e}", exc_info=True)
+
+                # Yield error as single chunk then stop.
+                def _single_error_iter(err: Exception) -> Iterator[dict[str, str]]:
+                    yield {"error": f"Failed to replace template vars: {err!s}"}
+
+                return _single_error_iter(e)
+
         # --- Shared setup logic (copy of completions_create up to litellm call)
         model_info = self._model_to_provider_info_map.get(req.inputs.model)
         try:
@@ -4128,32 +4236,50 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             ) = _setup_completion_model_info(model_info, req, self.obj_read)
         except Exception as e:
             # Yield error as single chunk then stop.
-            def _single_error_iter(e: Exception) -> Iterator[dict[str, str]]:
-                yield {"error": str(e)}
+            def _single_error_iter(err: Exception) -> Iterator[dict[str, str]]:
+                yield {"error": str(err)}
 
             return _single_error_iter(e)
 
         # Track start call if requested
         start_call: Optional[CallStartCHInsertable] = None
         if req.track_llm_call:
-            inputs = req.inputs.model_dump(exclude_none=True)
-            inputs["model"] = model_name
+            # Prepare inputs for tracking: use original messages (with template syntax)
+            # and include prompt and template_vars
+            tracked_inputs = req.inputs.model_dump(exclude_none=True)
+            tracked_inputs["model"] = model_name
+            tracked_inputs["messages"] = original_initial_messages
+            if prompt:
+                tracked_inputs["prompt"] = prompt
+            if template_vars:
+                tracked_inputs["template_vars"] = template_vars
+
             start = tsi.StartedCallSchemaForInsert(
                 project_id=req.project_id,
                 wb_user_id=req.wb_user_id,
                 op_name=COMPLETIONS_CREATE_OP_NAME,
                 started_at=datetime.datetime.now(),
-                inputs={**inputs},
+                inputs=tracked_inputs,
                 attributes={},
             )
             start_call = _start_call_for_insert_to_ch_insertable_start_call(start, self)
             # Insert immediately so that callers can see the call in progress
             self._insert_call(start_call)
 
+        # Set the combined messages (with template vars replaced) for LiteLLM
+        req.inputs.messages = combined_messages
+
+        # Make a copy for the API call without prompt and template_vars
+        api_inputs = req.inputs.model_copy()
+        if hasattr(api_inputs, "prompt"):
+            api_inputs.prompt = None
+        if hasattr(api_inputs, "template_vars"):
+            api_inputs.template_vars = None
+
         # --- Build the underlying chunk iterator
         chunk_iter = lite_llm_completion_stream(
             api_key=api_key or "",
-            inputs=req.inputs,
+            inputs=api_inputs,
             provider=provider,
             base_url=base_url,
             extra_headers=extra_headers,
