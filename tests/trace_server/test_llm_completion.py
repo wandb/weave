@@ -800,7 +800,7 @@ class TestPromptResolution(unittest.TestCase):
         self.assertEqual(messages[1]["content"], "My topic is mathematics.")
 
     def test_resolve_prompt_messages_invalid_prompt(self):
-        """Test error handling when prompt object is not a MessagesPrompt."""
+        """Test error handling when prompt object is not a Prompt or MessagesPrompt."""
         from weave.trace_server.errors import InvalidRequest
         from weave.trace_server.llm_completion import resolve_prompt_messages
 
@@ -826,7 +826,7 @@ class TestPromptResolution(unittest.TestCase):
             f"weave-trace-internal:///{self.project_id}/object/test-obj:digest-1"
         )
 
-        # Should raise InvalidRequest when object is not a MessagesPrompt
+        # Should raise InvalidRequest when object is not a Prompt or MessagesPrompt
         with self.assertRaises(InvalidRequest) as context:
             resolve_prompt_messages(
                 prompt=prompt_uri,
@@ -835,7 +835,7 @@ class TestPromptResolution(unittest.TestCase):
                 template_vars=None,
             )
 
-        self.assertIn("is not a MessagesPrompt", str(context.exception))
+        self.assertIn("is not a Prompt or MessagesPrompt", str(context.exception))
 
 
 class TestStreamingWithPrompts(unittest.TestCase):
