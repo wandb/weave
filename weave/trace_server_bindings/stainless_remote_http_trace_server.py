@@ -64,21 +64,6 @@ def split_project_id(project_id: str) -> tuple[str, str]:
         return entity, project
 
 
-def validate_request(req: TReq | dict[str, Any], req_type: type[TReq]) -> TReq:
-    """Validate and normalize request object.
-
-    Args:
-        req: Request object or dict to validate.
-        req_type: Type of the request model.
-
-    Returns:
-        Validated request model instance.
-    """
-    if isinstance(req, dict):
-        return req_type.model_validate(req)
-    return req  # Already validated
-
-
 def get_attr(req: BaseModel | dict[str, Any], attr: str) -> Any:
     """Safely get attribute from request object or dict.
 
@@ -194,8 +179,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
 
     def _stainless_request(
         self,
-        req: TReq | dict[str, Any],
-        req_type: type[TReq],
+        req: BaseModel,
         res_type: type[TRes],
         stainless_api: Callable[..., Any],
         *,
@@ -205,8 +189,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         """Helper method to make a stainless API request with proper type conversion.
 
         Args:
-            req: Request object or dict to validate.
-            req_type: Type of the request model.
+            req: Request object (already validated by @validate_call).
             res_type: Type of the response model.
             stainless_api: Stainless API callable to invoke.
             exclude: Set of field names to exclude from request dump.
@@ -215,7 +198,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Validated response model instance.
         """
-        req = validate_request(req, req_type)
         self._update_client_headers()
 
         dump_kwargs: dict[str, Any] = {"by_alias": True}
@@ -231,8 +213,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
 
     def _stainless_request_object(
         self,
-        req: TReq | dict[str, Any],
-        req_type: type[TReq],
+        req: BaseModel,
         res_type: type[TRes],
         stainless_api: Callable[..., Any],
         *,
@@ -242,8 +223,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         """Helper method for Object API requests that split project_id into entity/project.
 
         Args:
-            req: Request object or dict to validate. If already validated, will be used as-is.
-            req_type: Type of the request model.
+            req: Request object (already validated by @validate_call).
             res_type: Type of the response model.
             stainless_api: Stainless API callable to invoke.
             exclude: Set of field names to exclude from request dump.
@@ -252,7 +232,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Validated response model instance.
         """
-        req = validate_request(req, req_type)
         self._update_client_headers()
         entity, project = split_project_id(req.project_id)
 
@@ -273,8 +252,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
 
     def _stainless_list_object(
         self,
-        req: TReq | dict[str, Any],
-        req_type: type[TReq],
+        req: BaseModel,
         stainless_api: Callable[..., Any],
         *,
         exclude: set[str] | None = None,
@@ -283,8 +261,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         """Helper method for Object API list requests that split project_id into entity/project.
 
         Args:
-            req: Request object or dict to validate. If already validated, will be used as-is.
-            req_type: Type of the request model.
+            req: Request object (already validated by @validate_call).
             stainless_api: Stainless API callable to invoke.
             exclude: Set of field names to exclude from request dump.
             **extra_kwargs: Additional keyword arguments to pass to the API.
@@ -292,7 +269,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             The stainless API response (typically an iterable like JSONLDecoder).
         """
-        req = validate_request(req, req_type)
         self._update_client_headers()
         entity, project = split_project_id(req.project_id)
 
@@ -496,7 +472,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             return tsi.CallStartRes(id=req.start.id, trace_id=req.start.trace_id)
 
         return self._stainless_request(
-            req, tsi.CallStartReq, tsi.CallStartRes, self._stainless_client.calls.start
+            req, tsi.CallStartRes, self._stainless_client.calls.start
         )
 
     @validate_call
@@ -552,9 +528,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             self.call_processor.enqueue([EndBatchItem(req=req)])
             return tsi.CallEndRes()
 
-        self._stainless_request(
-            req, tsi.CallEndReq, tsi.CallEndRes, self._stainless_client.calls.end
-        )
+        self._stainless_request(req, tsi.CallEndRes, self._stainless_client.calls.end)
         return tsi.CallEndRes()
 
     @validate_call
@@ -568,7 +542,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             Call read response.
         """
         return self._stainless_request(
-            req, tsi.CallReadReq, tsi.CallReadRes, self._stainless_client.calls.read
+            req, tsi.CallReadRes, self._stainless_client.calls.read
         )
 
     @validate_call
@@ -612,7 +586,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         """
         return self._stainless_request(
             req,
-            tsi.CallsQueryStatsReq,
             tsi.CallsQueryStatsRes,
             self._stainless_client.calls.query_stats,
         )
@@ -629,7 +602,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         """
         return self._stainless_request(
             req,
-            tsi.CallsDeleteReq,
             tsi.CallsDeleteRes,
             self._stainless_client.calls.delete,
         )
@@ -646,7 +618,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         """
         self._stainless_request(
             req,
-            tsi.CallUpdateReq,
             tsi.CallUpdateRes,
             self._stainless_client.calls.update,
         )
@@ -665,7 +636,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         """
         return self._stainless_request(
             req,
-            tsi.ObjCreateReq,
             tsi.ObjCreateRes,
             self._stainless_client.objects.create,
         )
@@ -681,7 +651,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             Object read response.
         """
         return self._stainless_request(
-            req, tsi.ObjReadReq, tsi.ObjReadRes, self._stainless_client.objects.read
+            req, tsi.ObjReadRes, self._stainless_client.objects.read
         )
 
     def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
@@ -695,7 +665,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         """
         return self._stainless_request(
             req,
-            tsi.ObjQueryReq,
             tsi.ObjQueryRes,
             self._stainless_client.objects.query,
         )
@@ -712,7 +681,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         """
         self._stainless_request(
             req,
-            tsi.ObjDeleteReq,
             tsi.ObjDeleteRes,
             self._stainless_client.objects.delete,
         )
@@ -731,7 +699,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         """
         return self._stainless_request(
             req,
-            tsi.TableCreateReq,
             tsi.TableCreateRes,
             self._stainless_client.tables.create,
         )
@@ -771,7 +738,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         else:
             return self._stainless_request(
                 req,
-                tsi.TableUpdateReq,
                 tsi.TableUpdateRes,
                 self._stainless_client.tables.update,
             )
@@ -788,7 +754,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         """
         return self._stainless_request(
             req,
-            tsi.TableQueryReq,
             tsi.TableQueryRes,
             self._stainless_client.tables.query,
         )
@@ -821,7 +786,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         """
         return self._stainless_request(
             req,
-            tsi.TableQueryStatsReq,
             tsi.TableQueryStatsRes,
             self._stainless_client.tables.query_stats,
         )
@@ -840,7 +804,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         """
         return self._stainless_request(
             req,
-            tsi.TableCreateFromDigestsReq,
             tsi.TableCreateFromDigestsRes,
             self._stainless_client.tables.create_from_digests,
         )
@@ -859,7 +822,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         """
         return self._stainless_request(
             req,
-            tsi.TableQueryStatsBatchReq,
             tsi.TableQueryStatsBatchRes,
             self._stainless_client.tables.query_stats_batch,
         )
@@ -876,7 +838,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         """
         return self._stainless_request(
             req,
-            tsi.RefsReadBatchReq,
             tsi.RefsReadBatchRes,
             self._stainless_client.refs.read_batch,
         )
@@ -939,7 +900,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         """
         return self._stainless_request(
             req,
-            tsi.FilesStatsReq,
             tsi.FilesStatsRes,
             self._stainless_client.files.stats,
         )
@@ -1011,7 +971,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         """
         return self._stainless_request(
             req,
-            tsi.FeedbackQueryReq,
             tsi.FeedbackQueryRes,
             self._stainless_client.feedback.query,
         )
@@ -1028,7 +987,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         """
         return self._stainless_request(
             req,
-            tsi.FeedbackPurgeReq,
             tsi.FeedbackPurgeRes,
             self._stainless_client.feedback.purge,
         )
@@ -1045,7 +1003,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         """
         return self._stainless_request(
             req,
-            tsi.FeedbackReplaceReq,
             tsi.FeedbackReplaceRes,
             self._stainless_client.feedback.replace,
         )
@@ -1064,7 +1021,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         """
         return self._stainless_request(
             req,
-            tsi.ActionsExecuteBatchReq,
             tsi.ActionsExecuteBatchRes,
             self._stainless_client.services.actions_execute_batch,
         )
@@ -1082,7 +1038,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         """
         return self._stainless_request(
             req,
-            tsi.CostQueryReq,
             tsi.CostQueryRes,
             self._stainless_client.costs.query,
         )
@@ -1099,7 +1054,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         """
         return self._stainless_request(
             req,
-            tsi.CostCreateReq,
             tsi.CostCreateRes,
             self._stainless_client.costs.create,
         )
@@ -1116,7 +1070,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         """
         return self._stainless_request(
             req,
-            tsi.CostPurgeReq,
             tsi.CostPurgeRes,
             self._stainless_client.costs.purge,
         )
@@ -1135,7 +1088,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         """
         return self._stainless_request(
             req,
-            tsi.CompletionsCreateReq,
             tsi.CompletionsCreateRes,
             self._stainless_client.completions.create,
         )
@@ -1186,7 +1138,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         """
         return self._stainless_request(
             req,
-            tsi.ProjectStatsReq,
             tsi.ProjectStatsRes,
             self._stainless_client.services.project_stats,
         )
@@ -1255,7 +1206,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         """
         return self._stainless_request_object(
             req,
-            tsi.OpCreateReq,
             tsi.OpCreateRes,
             self._stainless_client.v2.ops.create,
         )
@@ -1272,7 +1222,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         """
         return self._stainless_request_object(
             req,
-            tsi.OpReadReq,
             tsi.OpReadRes,
             self._stainless_client.v2.ops.read,
             object_id=req.object_id,
@@ -1291,7 +1240,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         """
         response = self._stainless_list_object(
             req,
-            tsi.OpListReq,
             self._stainless_client.v2.ops.list,
         )
         for item in response:
@@ -1309,7 +1257,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         """
         return self._stainless_request_object(
             req,
-            tsi.OpDeleteReq,
             tsi.OpDeleteRes,
             self._stainless_client.v2.ops.delete,
             exclude={"digests"},
@@ -1329,7 +1276,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         """
         return self._stainless_request_object(
             req,
-            tsi.DatasetCreateReq,
             tsi.DatasetCreateRes,
             self._stainless_client.v2.datasets.create,
         )
@@ -1346,7 +1292,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         """
         return self._stainless_request_object(
             req,
-            tsi.DatasetReadReq,
             tsi.DatasetReadRes,
             self._stainless_client.v2.datasets.read,
             object_id=req.object_id,
@@ -1365,7 +1310,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         """
         response = self._stainless_list_object(
             req,
-            tsi.DatasetListReq,
             self._stainless_client.v2.datasets.list,
         )
         for item in response:
@@ -1383,7 +1327,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         """
         return self._stainless_request_object(
             req,
-            tsi.DatasetDeleteReq,
             tsi.DatasetDeleteRes,
             self._stainless_client.v2.datasets.delete,
             exclude={"digests"},
@@ -1403,7 +1346,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         """
         return self._stainless_request_object(
             req,
-            tsi.ScorerCreateReq,
             tsi.ScorerCreateRes,
             self._stainless_client.v2.scorers.create,
         )
@@ -1420,7 +1362,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         """
         return self._stainless_request_object(
             req,
-            tsi.ScorerReadReq,
             tsi.ScorerReadRes,
             self._stainless_client.v2.scorers.read,
             object_id=req.object_id,
@@ -1439,7 +1380,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         """
         response = self._stainless_list_object(
             req,
-            tsi.ScorerListReq,
             self._stainless_client.v2.scorers.list,
         )
         for item in response:
@@ -1457,7 +1397,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         """
         return self._stainless_request_object(
             req,
-            tsi.ScorerDeleteReq,
             tsi.ScorerDeleteRes,
             self._stainless_client.v2.scorers.delete,
             exclude={"digests"},
@@ -1479,7 +1418,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         """
         return self._stainless_request_object(
             req,
-            tsi.EvaluationCreateReq,
             tsi.EvaluationCreateRes,
             self._stainless_client.v2.evaluations.create,
         )
@@ -1496,7 +1434,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         """
         return self._stainless_request_object(
             req,
-            tsi.EvaluationReadReq,
             tsi.EvaluationReadRes,
             self._stainless_client.v2.evaluations.read,
             object_id=req.object_id,
@@ -1517,7 +1454,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         """
         response = self._stainless_list_object(
             req,
-            tsi.EvaluationListReq,
             self._stainless_client.v2.evaluations.list,
         )
         for item in response:
@@ -1537,7 +1473,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         """
         return self._stainless_request_object(
             req,
-            tsi.EvaluationDeleteReq,
             tsi.EvaluationDeleteRes,
             self._stainless_client.v2.evaluations.delete,
             exclude={"digests"},
@@ -1557,7 +1492,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         """
         return self._stainless_request_object(
             req,
-            tsi.ModelCreateReq,
             tsi.ModelCreateRes,
             self._stainless_client.v2.models.create,
         )
@@ -1574,7 +1508,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         """
         return self._stainless_request_object(
             req,
-            tsi.ModelReadReq,
             tsi.ModelReadRes,
             self._stainless_client.v2.models.read,
             object_id=req.object_id,
@@ -1593,7 +1526,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         """
         response = self._stainless_list_object(
             req,
-            tsi.ModelListReq,
             self._stainless_client.v2.models.list,
         )
         for item in response:
@@ -1611,7 +1543,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         """
         return self._stainless_request_object(
             req,
-            tsi.ModelDeleteReq,
             tsi.ModelDeleteRes,
             self._stainless_client.v2.models.delete,
             exclude={"digests"},
@@ -1633,7 +1564,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         """
         return self._stainless_request_object(
             req,
-            tsi.EvaluationRunCreateReq,
             tsi.EvaluationRunCreateRes,
             self._stainless_client.v2.evaluation_runs.create,
         )
@@ -1652,7 +1582,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         """
         return self._stainless_request_object(
             req,
-            tsi.EvaluationRunReadReq,
             tsi.EvaluationRunReadRes,
             self._stainless_client.v2.evaluation_runs.read,
             evaluation_run_id=req.evaluation_run_id,
@@ -1682,7 +1611,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
                 )
         response = self._stainless_list_object(
             req,
-            tsi.EvaluationRunListReq,
             self._stainless_client.v2.evaluation_runs.list,
             exclude={"filter"},
             **extra_kwargs,
@@ -1704,7 +1632,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         """
         return self._stainless_request_object(
             req,
-            tsi.EvaluationRunDeleteReq,
             tsi.EvaluationRunDeleteRes,
             self._stainless_client.v2.evaluation_runs.delete,
             evaluation_run_ids=req.evaluation_run_ids,
@@ -1749,7 +1676,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         """
         return self._stainless_request_object(
             req,
-            tsi.PredictionCreateReq,
             tsi.PredictionCreateRes,
             self._stainless_client.v2.predictions.create,
         )
@@ -1766,7 +1692,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         """
         return self._stainless_request_object(
             req,
-            tsi.PredictionReadReq,
             tsi.PredictionReadRes,
             self._stainless_client.v2.predictions.read,
             prediction_id=req.prediction_id,
@@ -1786,7 +1711,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         """
         response = self._stainless_list_object(
             req,
-            tsi.PredictionListReq,
             self._stainless_client.v2.predictions.list,
         )
         for item in response:
@@ -1806,7 +1730,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         """
         return self._stainless_request_object(
             req,
-            tsi.PredictionDeleteReq,
             tsi.PredictionDeleteRes,
             self._stainless_client.v2.predictions.delete,
             prediction_ids=req.prediction_ids,
@@ -1845,7 +1768,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         """
         return self._stainless_request_object(
             req,
-            tsi.ScoreCreateReq,
             tsi.ScoreCreateRes,
             self._stainless_client.v2.scores.create,
         )
@@ -1862,7 +1784,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         """
         return self._stainless_request_object(
             req,
-            tsi.ScoreReadReq,
             tsi.ScoreReadRes,
             self._stainless_client.v2.scores.read,
             score_id=req.score_id,
@@ -1880,7 +1801,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         """
         response = self._stainless_list_object(
             req,
-            tsi.ScoreListReq,
             self._stainless_client.v2.scores.list,
         )
         for item in response:
@@ -1898,7 +1818,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         """
         return self._stainless_request_object(
             req,
-            tsi.ScoreDeleteReq,
             tsi.ScoreDeleteRes,
             self._stainless_client.v2.scores.delete,
             score_ids=req.score_ids,
