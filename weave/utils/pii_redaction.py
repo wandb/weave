@@ -1,5 +1,5 @@
 import dataclasses
-from typing import Any, Union
+from typing import Any, Optional, Union
 
 from presidio_analyzer import AnalyzerEngine
 from presidio_anonymizer import AnonymizerEngine
@@ -29,18 +29,52 @@ DEFAULT_REDACTED_FIELDS = [
     "FI_PERSONAL_IDENTITY_CODE",
 ]
 
+# Singleton instances for performance
+_analyzer_instance: Optional[AnalyzerEngine] = None
+_anonymizer_instance: Optional[AnonymizerEngine] = None
+
+
+def _get_analyzer() -> AnalyzerEngine:
+    """Get or create singleton AnalyzerEngine instance."""
+    global _analyzer_instance
+    if _analyzer_instance is None:
+        _analyzer_instance = AnalyzerEngine()
+    return _analyzer_instance
+
+
+def _get_anonymizer() -> AnonymizerEngine:
+    """Get or create singleton AnonymizerEngine instance."""
+    global _anonymizer_instance
+    if _anonymizer_instance is None:
+        _anonymizer_instance = AnonymizerEngine()
+    return _anonymizer_instance
+
 
 def redact_pii(
     data: Union[dict[str, Any], str],
 ) -> Union[dict[str, Any], str]:
-    analyzer = AnalyzerEngine()
-    anonymizer = AnonymizerEngine()
+    """Redact PII from data using Microsoft Presidio.
+
+    This function recursively traverses data structures and redacts PII from strings.
+    It uses singleton analyzer and anonymizer instances for performance.
+
+    Args:
+        data: Data to redact PII from (string, dict, list, or dataclass).
+
+    Returns:
+        Data with PII redacted.
+    """
+    analyzer = _get_analyzer()
+    anonymizer = _get_anonymizer()
     fields = redact_pii_fields()
     entities = DEFAULT_REDACTED_FIELDS if len(fields) == 0 else fields
 
     def redact_recursive(value: Any) -> Any:
         if isinstance(value, str):
             results = analyzer.analyze(text=value, language="en", entities=entities)
+            if not results:
+                return value
+
             redacted = anonymizer.anonymize(text=value, analyzer_results=results)
             return redacted.text
         elif isinstance(value, dict):
@@ -66,11 +100,23 @@ def redact_pii(
 
 
 def redact_pii_string(data: str) -> str:
-    analyzer = AnalyzerEngine()
-    anonymizer = AnonymizerEngine()
+    """Redact PII from a single string.
+
+    Args:
+        data: String to redact PII from.
+
+    Returns:
+        String with PII redacted.
+    """
+    analyzer = _get_analyzer()
+    anonymizer = _get_anonymizer()
     fields = redact_pii_fields()
     entities = DEFAULT_REDACTED_FIELDS if len(fields) == 0 else fields
+
     results = analyzer.analyze(text=data, language="en", entities=entities)
+    if not results:
+        return data
+
     redacted = anonymizer.anonymize(text=data, analyzer_results=results)
     return redacted.text
 
