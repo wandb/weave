@@ -26,6 +26,7 @@ Outstanding Optimizations/Work:
 """
 
 import datetime
+import json
 import logging
 import re
 from collections.abc import Callable, KeysView
@@ -45,9 +46,6 @@ from weave.trace_server.calls_query_builder.object_ref_query_builder import (
     has_object_ref_field,
     is_object_ref_operand,
     process_query_for_object_refs,
-)
-from weave.trace_server.trace_server_interface_util import (
-    extract_refs_from_values,
 )
 from weave.trace_server.calls_query_builder.optimization_builder import (
     process_query_to_optimization_sql,
@@ -70,6 +68,7 @@ from weave.trace_server.token_costs import build_cost_ctes, get_cost_final_selec
 from weave.trace_server.trace_server_common import assert_parameter_length_less_than_max
 from weave.trace_server.trace_server_interface_util import (
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
+    extract_refs_from_values,
 )
 
 logger = logging.getLogger(__name__)

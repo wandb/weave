@@ -59,9 +59,9 @@ from weave.trace_server.clickhouse_schema import (
     ALL_OBJ_INSERT_COLUMNS,
     REQUIRED_CALL_COLUMNS,
     CallCHInsertable,
+    CallCompleteCHInsertable,
     CallDeleteCHInsertable,
     CallEndCHInsertable,
-    CallCompleteCHInsertable,
     CallStartCHInsertable,
     CallUpdateCHInsertable,
     FileChunkCreateCHInsertable,
@@ -254,6 +254,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             logger.warning(
                 f"Error getting project version for project [{project_id}]: {e}"
             )
+
+    def _noop_project_version_latency_test(self, project_id: str) -> None:
+        # NOOP for testing latency impact of project switcher
+        try:
+            self.project_version_resolver.get_project_version_sync(project_id)
+        except Exception as e:
+            logger.warning(f"Error getting project version: {e}")
 
     def _get_existing_ops_from_spans(
         self, seen_ids: set[str], project_id: str, limit: int | None = None
@@ -634,16 +641,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.calls_query_stream")
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
         """Returns a stream of calls that match the given query."""
-        project_version = self.project_version_resolver.get_project_version_sync(
-            req.project_id
-        )
+        self._noop_project_version_latency_test(req.project_id)
 
         cq = CallsQuery(
             project_id=req.project_id,
             include_costs=req.include_costs or False,
             include_storage_size=req.include_storage_size or False,
             include_total_storage_size=req.include_total_storage_size or False,
-            project_version=project_version,
         )
         columns = ALL_CALL_SELECT_COLUMNS
         if req.columns:
@@ -877,6 +881,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             req.project_id
         )
         if project_version == ProjectVersion.CALLS_COMPLETE_VERSION:
+            assert req.wb_user_id is not None
             return self._calls_complete_delete_batch(
                 project_id=req.project_id,
                 wb_user_id=req.wb_user_id,
@@ -947,12 +952,18 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             req.project_id
         )
         if project_version == ProjectVersion.CALLS_COMPLETE_VERSION:
-            return self._calls_complete_update(
+            pb = ParamBuilder()
+            assert req.wb_user_id is not None
+            update_query = build_calls_complete_update_display_name_query(
                 project_id=req.project_id,
-                wb_user_id=req.wb_user_id,
                 call_id=req.call_id,
-                display_name=req.display_name,
+                display_name=req.display_name or "",
+                wb_user_id=req.wb_user_id,
+                updated_at=datetime.datetime.now(),
+                pb=pb,
             )
+            self._command(update_query, pb.get_params())
+            return tsi.CallUpdateRes()
 
         renamed_insertable = CallUpdateCHInsertable(
             project_id=req.project_id,
