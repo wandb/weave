@@ -1222,7 +1222,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             tsi.OpCreateReq,
             tsi.OpCreateRes,
             self._stainless_client.v2.ops.create,
-            exclude={"project_id"},
         )
 
     @validate_call
@@ -1304,7 +1303,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             tsi.DatasetCreateReq,
             tsi.DatasetCreateRes,
             self._stainless_client.v2.datasets.create,
-            exclude={"project_id"},
         )
 
     @validate_call
@@ -1384,7 +1382,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             tsi.ScorerCreateReq,
             tsi.ScorerCreateRes,
             self._stainless_client.v2.scorers.create,
-            exclude={"project_id"},
         )
 
     @validate_call
@@ -1466,7 +1463,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             tsi.EvaluationCreateReq,
             tsi.EvaluationCreateRes,
             self._stainless_client.v2.evaluations.create,
-            exclude={"project_id"},
         )
 
     @validate_call
@@ -1550,7 +1546,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             tsi.ModelCreateReq,
             tsi.ModelCreateRes,
             self._stainless_client.v2.models.create,
-            exclude={"project_id"},
         )
 
     @validate_call
@@ -1632,7 +1627,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             tsi.EvaluationRunCreateReq,
             tsi.EvaluationRunCreateRes,
             self._stainless_client.v2.evaluation_runs.create,
-            exclude={"project_id"},
         )
 
     @validate_call
@@ -1748,7 +1742,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             tsi.PredictionCreateReq,
             tsi.PredictionCreateRes,
             self._stainless_client.v2.predictions.create,
-            exclude={"project_id"},
         )
 
     @validate_call
@@ -1850,7 +1843,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             tsi.ScoreCreateReq,
             tsi.ScoreCreateRes,
             self._stainless_client.v2.scores.create,
-            exclude={"project_id"},
         )
 
     @validate_call
