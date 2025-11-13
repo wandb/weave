@@ -108,9 +108,11 @@ def get_ch_trace_server(
 
         try:
             id_converter = DummyIdConverter()
+            # Pass database explicitly to use worker-specific database name
             ch_server = clickhouse_trace_server_batched.ClickHouseTraceServer(
                 host=host,
                 port=port,
+                database=unique_db,
                 evaluate_model_dispatcher=EvaluateModelTestDispatcher(
                     id_converter=id_converter
                 ),
