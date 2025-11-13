@@ -62,10 +62,10 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         self.call_processor = None
         self.feedback_processor = None
         self.remote_request_bytes_limit = remote_request_bytes_limit
-        self._extra_headers: dict[str, str] | None = extra_headers
+        self._extra_headers: dict[str, str] = extra_headers or {}
 
         # Initialize stainless client
-        default_headers = dict(extra_headers) if extra_headers else {}
+        default_headers = self._extra_headers
         if retry_id := get_current_retry_id():
             default_headers["X-Weave-Retry-Id"] = retry_id
 
@@ -572,20 +572,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             self._stainless_client.calls.update,
         )
         return tsi.CallUpdateRes()
-
-    # Op API
-    def ops_query(self, req: tsi.OpQueryReq | dict[str, Any]) -> tsi.OpQueryRes:
-        """Query ops.
-
-        Args:
-            req: Op query request.
-
-        Returns:
-            Op query response.
-        """
-        return self._stainless_request(
-            req, tsi.OpQueryReq, tsi.OpQueryRes, self._stainless_client.objects.query
-        )
 
     # Obj API
     def obj_create(self, req: tsi.ObjCreateReq | dict[str, Any]) -> tsi.ObjCreateRes:
