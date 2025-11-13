@@ -213,7 +213,7 @@ def tests(session, shard):
     if shard == "trace":
         pytest_args.extend(["-m", "trace_server"])
         # Each worker gets its own isolated database namespace
-        session.posargs.insert(0, "-n8")
+        session.posargs.insert(0, f"-n{os.cpu_count()}")
 
     if shard == "trace_no_server":
         pytest_args.extend(["-m", "not trace_server"])
