@@ -81,7 +81,7 @@ library_cases = [
             "dataset": "weave:///shawn/test-project/object/Dataset:N0VKaX8wr9kF9QQzM7mSQz3yKrJJjTiJi4c9Bt7RSTA",
             "scorers": [
                 "weave:///shawn/test-project/object/MyScorer:K1OwZ5OGLRYNboUzGHPhnyR0W6PqWj431ieXWISYiyA",
-                "weave:///shawn/test-project/object/LLMAsAJudgeScorer:vXqDKUgLwZOzkucuvh1U2Sj7u9zbedVhRAlZ03bJTwQ",
+                "weave:///shawn/test-project/object/LLMAsAJudgeScorer:uCyQ5g10zJ2wLecCEYNAfm45MbWH1823FJ6ZGv9Gpco",
             ],
             "preprocess_model_input": None,
             "trials": 1,
@@ -140,7 +140,7 @@ library_cases = [
             },
             {
                 "object_id": "LLMAsAJudgeScorer",
-                "digest": "vXqDKUgLwZOzkucuvh1U2Sj7u9zbedVhRAlZ03bJTwQ",
+                "digest": "uCyQ5g10zJ2wLecCEYNAfm45MbWH1823FJ6ZGv9Gpco",
                 "exp_val": {
                     "_type": "LLMAsAJudgeScorer",
                     "name": None,
