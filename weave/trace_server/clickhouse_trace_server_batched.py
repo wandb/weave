@@ -4374,7 +4374,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         root_span = ddtrace.tracer.current_span()
         if root_span is not None:
             root_span.set_tags(
-                {"clickhouse_trace_server_batched._insert_call_batch.count": str(len(batch))}
+                {
+                    "clickhouse_trace_server_batched._insert_call_batch.count": str(
+                        len(batch)
+                    )
+                }
             )
         if not batch:
             return
@@ -4382,11 +4386,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         settings = {}
         if self._use_async_insert:
             settings = ch_settings.CLICKHOUSE_ASYNC_INSERT_SETTINGS.copy()
-            root_span.set_tags(
-                {
-                    "clickhouse_trace_server_batched._insert_call_batch.async_insert": True,
-                }
-            )
+            if root_span is not None:
+                root_span.set_tags(
+                    {
+                        "clickhouse_trace_server_batched._insert_call_batch.async_insert": True,
+                    }
+                )
         self._insert(
             "call_parts",
             data=batch,
