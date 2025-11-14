@@ -125,12 +125,12 @@ media_cases = [
                 "_metadata.json": "k3eN5qEgVIyMLbUc8sQrx1LRU0gxf7l6dD9LIoSoa0M",
                 "audio.wav": "xfOhnNfgQxRzgWZ6DC1QEGt9vrJWcathymKPPZQmmIw",
             },
-            "load_op": "weave:///shawn/test-project/op/load_weave.type_handlers.Audio.audio.Audio:NC1prtu0N9Hs4EX552lwSCskFcVfXpPMVGnsmNHYZQo",
+            "load_op": "weave:///shawn/test-project/op/load_weave.type_handlers.Audio.audio.Audio:rhUJYHAtujfj6PiXSjwdygp1066f006hM3HRZFpvYdI",
         },
         exp_objects=[
             {
                 "object_id": "load_weave.type_handlers.Audio.audio.Audio",
-                "digest": "NC1prtu0N9Hs4EX552lwSCskFcVfXpPMVGnsmNHYZQo",
+                "digest": "rhUJYHAtujfj6PiXSjwdygp1066f006hM3HRZFpvYdI",
                 "exp_val": {
                     "_type": "CustomWeaveType",
                     "weave_type": {"type": "Op"},
