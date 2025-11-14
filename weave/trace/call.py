@@ -38,6 +38,10 @@ logger = logging.getLogger(__name__)
 DEFAULT_CALLS_PAGE_SIZE = 1000
 
 
+class OpNameError(ValueError):
+    """Raised when an op name is invalid."""
+
+
 @dataclasses.dataclass
 class Call:
     """A Call represents a single operation executed as part of a trace.
@@ -305,10 +309,6 @@ class CallDict(TypedDict):
 
 
 CallsIter = PaginatedIterator[CallSchema, WeaveObject]
-
-
-class OpNameError(ValueError):
-    """Raised when an op name is invalid."""
 
 
 def elide_display_name(name: str) -> str:
