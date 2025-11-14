@@ -116,13 +116,11 @@ SHARDS_WITHOUT_EXTRAS = {
 )
 def tests(session, shard):
     python_version = session.python[:4]  # e.g., "3.10"
-    if (
-        python_version in INCOMPATIBLE_SHARDS
-        and shard in INCOMPATIBLE_SHARDS[python_version]
-    ):
+    if shard in INCOMPATIBLE_SHARDS.get(python_version, []):
         session.skip(
             f"Skipping {shard=} as it is not compatible with Python {python_version}"
         )
+        return
 
     # Only add --extra shard if the shard has a corresponding optional dependency
     # Use --active to sync to the active nox virtual environment
