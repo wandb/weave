@@ -11,12 +11,12 @@ from weave.trace.object_record import ObjectRecord
 from weave.trace.refs import ObjectRef, Ref, TableRef
 from weave.trace.serialization import custom_objs
 from weave.trace.serialization.dictifiable import try_to_dict
+from weave.trace_server.client_server_common.digest_builder import bytes_digest
 from weave.trace_server.trace_server_interface import (
     FileContentReadReq,
     FileCreateReq,
     TraceServerInterface,
 )
-from weave.trace_server.trace_server_interface_util import bytes_digest
 from weave.utils.sanitize import REDACTED_VALUE, should_redact
 
 if TYPE_CHECKING:

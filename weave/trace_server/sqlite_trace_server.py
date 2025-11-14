@@ -2,7 +2,6 @@
 
 import contextvars
 import datetime
-import hashlib
 import json
 import sqlite3
 import threading
@@ -16,6 +15,11 @@ from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
 from weave.trace_server import constants, object_creation_utils
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.client_server_common.digest_builder import (
+    bytes_digest,
+    ref_stable_json_digest,
+    table_digest_from_row_digests,
+)
 from weave.trace_server.errors import (
     InvalidRequest,
     NotFoundError,
@@ -53,9 +57,7 @@ from weave.trace_server.trace_server_common import (
 from weave.trace_server.trace_server_interface_util import (
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
     assert_non_null_wb_user_id,
-    bytes_digest,
     extract_refs_from_values,
-    str_digest,
 )
 from weave.trace_server.validation import object_id_validator
 from weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker import (
@@ -796,7 +798,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         )
         processed_val = processed_result["val"]
         json_val = json.dumps(processed_val)
-        digest = str_digest(json_val)
+        digest = ref_stable_json_digest(processed_val)
         project_id, object_id, wb_user_id = (
             req.obj.project_id,
             req.obj.object_id,
@@ -1032,7 +1034,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             if not isinstance(r, dict):
                 raise TypeError("All rows must be dictionaries")
             row_json = json.dumps(r)
-            row_digest = str_digest(row_json)
+            row_digest = ref_stable_json_digest(r)
             insert_rows.append((req.table.project_id, row_digest, row_json))
         with self.lock:
             cursor.executemany(
@@ -1042,10 +1044,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
 
             row_digests = [r[1] for r in insert_rows]
 
-            table_hasher = hashlib.sha256()
-            for row_digest in row_digests:
-                table_hasher.update(row_digest.encode())
-            digest = table_hasher.hexdigest()
+            digest = table_digest_from_row_digests(row_digests)
 
             cursor.execute(
                 "INSERT OR IGNORE INTO tables (project_id, digest, row_digests) VALUES (?, ?, ?)",
@@ -1060,12 +1059,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
     ) -> tsi.TableCreateFromDigestsRes:
         """Create a table by specifying row digests, instead actual rows."""
         conn, cursor = get_conn_cursor(self.db_path)
-
-        # Calculate table digest from row digests
-        table_hasher = hashlib.sha256()
-        for row_digest in req.row_digests:
-            table_hasher.update(row_digest.encode())
-        digest = table_hasher.hexdigest()
+        digest = table_digest_from_row_digests(req.row_digests)
 
         with self.lock:
             cursor.execute(
@@ -1101,7 +1095,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             if not isinstance(row_data, dict):
                 raise TypeError("All rows must be dictionaries")
             row_json = json.dumps(row_data)
-            row_digest = str_digest(row_json)
+            row_digest = ref_stable_json_digest(row_data)
             if row_digest not in known_digests:
                 new_rows_needed_to_insert.append((req.project_id, row_digest, row_json))
                 known_digests.add(row_digest)
@@ -1136,12 +1130,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 "INSERT OR IGNORE INTO table_rows (project_id, digest, val) VALUES (?, ?, ?)",
                 new_rows_needed_to_insert,
             )
-
-            table_hasher = hashlib.sha256()
-            for row_digest in final_row_digests:
-                table_hasher.update(row_digest.encode())
-            digest = table_hasher.hexdigest()
-
+            digest = table_digest_from_row_digests(final_row_digests)
             cursor.execute(
                 "INSERT OR IGNORE INTO tables (project_id, digest, row_digests) VALUES (?, ?, ?)",
                 (req.project_id, digest, json.dumps(final_row_digests)),
