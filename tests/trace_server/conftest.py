@@ -25,7 +25,7 @@ def pytest_addoption(parser):
             "--trace-server",
             action="store",
             default="clickhouse",
-            help="Specify the client object to use: sqlite, clickhouse, or stainless",
+            help="Specify the backend to use: sqlite or clickhouse",
         )
         parser.addoption(
             "--ch",
@@ -44,6 +44,12 @@ def pytest_addoption(parser):
             action="store",
             default="false",
             help="Use a clickhouse process instead of a container",
+        )
+        parser.addoption(
+            "--remote-http-trace-server",
+            action="store",
+            default="remote",
+            help="Specify the remote HTTP trace server implementation: remote or stainless",
         )
     except ValueError:
         pass
@@ -69,6 +75,15 @@ def get_trace_server_flag(request):
         return "sqlite"
     weave_server_flag = request.config.getoption("--trace-server")
     return weave_server_flag
+
+
+def get_remote_http_trace_server_flag(request):
+    """Get the remote HTTP trace server implementation to use.
+    
+    Returns:
+        str: Either 'remote' for RemoteHTTPTraceServer or 'stainless' for StainlessRemoteHTTPTraceServer
+    """
+    return request.config.getoption("--remote-http-trace-server")
 
 
 def _get_worker_db_suffix(request) -> str:

@@ -15,7 +15,11 @@ from fastapi.testclient import TestClient
 import weave
 from tests.trace.util import DummyTestException
 from tests.trace_server.conftest import *
-from tests.trace_server.conftest import TEST_ENTITY, get_trace_server_flag
+from tests.trace_server.conftest import (
+    TEST_ENTITY,
+    get_remote_http_trace_server_flag,
+    get_trace_server_flag,
+)
 from weave.trace import weave_client, weave_init
 from weave.trace.context import weave_client_context
 from weave.trace.context.call_context import set_call_stack
@@ -98,13 +102,15 @@ def pytest_sessionfinish(session, exitstatus):
 
 def pytest_collection_modifyitems(config, items):
     """Handle stainless-specific test markers."""
-    trace_server_flag = config.getoption("--trace-server", default="clickhouse")
-    
+    remote_http_trace_server_flag = config.getoption(
+        "--remote-http-trace-server", default="remote"
+    )
+
     skip_stainless = pytest.mark.skip(reason="Test not compatible with stainless implementation")
     skip_non_stainless = pytest.mark.skip(reason="Test only runs with stainless implementation")
-    
+
     for item in items:
-        if trace_server_flag == "stainless":
+        if remote_http_trace_server_flag == "stainless":
             # Skip tests marked with skip_stainless
             if "skip_stainless" in item.keywords:
                 item.add_marker(skip_stainless)
@@ -369,7 +375,7 @@ def make_server_recorder(server: tsi.TraceServerInterface):  # type: ignore
 def remote_http_trace_server(request):
     """Fixture that provides a factory for RemoteHTTPTraceServer or StainlessRemoteHTTPTraceServer.
 
-    When trace_server_flag is "stainless", this fixture returns StainlessRemoteHTTPTraceServer.
+    When remote_http_trace_server_flag is "stainless", this fixture returns StainlessRemoteHTTPTraceServer.
     Otherwise, it returns RemoteHTTPTraceServer.
 
     Returns:
@@ -381,9 +387,9 @@ def remote_http_trace_server(request):
         ...     server = remote_http_trace_server("http://example.com")
         ...     # Use server...
     """
-    trace_server_flag = get_trace_server_flag(request)
+    remote_http_trace_server_flag = get_remote_http_trace_server_flag(request)
     # Check if we're using stainless
-    if trace_server_flag == "stainless":
+    if remote_http_trace_server_flag == "stainless":
         try:
             from weave.trace_server_bindings.stainless_remote_http_trace_server import (
                 StainlessRemoteHTTPTraceServer,

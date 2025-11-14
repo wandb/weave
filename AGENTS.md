@@ -69,6 +69,8 @@ Examples:
 
 #### Backend Selection
 
+The `--trace-server` flag controls which **backend** (database) is used for testing:
+
 **SQLite (Default/Recommended for Development):**
 ```bash
 nox --no-install -e "tests-3.12(shard='trace')" -- tests/trace/test_client_trace.py::test_simple_op --trace-server=sqlite
@@ -80,6 +82,27 @@ nox --no-install -e "tests-3.12(shard='trace')" -- tests/trace/test_client_trace
 ```
 
 **Note:** ClickHouse tests require Docker to be running. If Docker is not available or you encounter Docker connection errors, use SQLite backend with `--trace-server=sqlite`.
+
+#### Remote HTTP Trace Server Implementation Selection
+
+The `--remote-http-trace-server` flag controls which **remote HTTP trace server implementation** is used for testing trace server bindings:
+
+**RemoteHTTPTraceServer (Default):**
+```bash
+nox --no-install -e "tests-3.12(shard='trace_server_bindings')" -- tests/trace_server_bindings/test_remote_http_trace_server_binding.py --remote-http-trace-server=remote
+```
+
+**StainlessRemoteHTTPTraceServer:**
+```bash
+nox --no-install -e "tests-3.12(shard='trace_server_bindings')" -- tests/trace_server_bindings/test_stainless_remote_http_trace_server_binding.py --remote-http-trace-server=stainless
+```
+
+**Important Notes:**
+- The `--trace-server` flag is for **backend selection** (SQLite vs ClickHouse)
+- The `--remote-http-trace-server` flag is for **trace server binding implementation** (RemoteHTTPTraceServer vs StainlessRemoteHTTPTraceServer)
+- These flags are independent and serve different purposes
+- Tests marked with `@pytest.mark.skip_stainless` will be skipped when using `--remote-http-trace-server=stainless`
+- Tests marked with `@pytest.mark.stainless_only` will only run when using `--remote-http-trace-server=stainless`
 
 #### Environment Issues
 
