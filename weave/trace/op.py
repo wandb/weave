@@ -46,9 +46,6 @@ from weave.trace.context.tests_context import get_raise_on_captured_errors
 from weave.trace.op_protocol import (
     CallDisplayNameFunc,
     FinishCallbackType,
-    OnFinishHandlerType,
-    OnInputHandlerType,
-    OnOutputHandlerType,
     Op,
     PostprocessInputsFunc,
     PostprocessOutputFunc,
