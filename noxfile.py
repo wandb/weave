@@ -22,7 +22,7 @@ NUM_TRACE_SERVER_SHARDS = 4
 
 
 @nox.session
-def lint(session):
+def lint(session: nox.Session):
     session.run("uv", "sync", "--active", "--group", "dev", "--frozen")
 
     dry_run = session.posargs and "dry-run" in session.posargs
@@ -114,7 +114,7 @@ SHARDS_WITHOUT_EXTRAS = {
         "trace_no_server",
     ],
 )
-def tests(session, shard):
+def tests(session: nox.Session, shard: str):
     python_version = session.python[:4]  # e.g., "3.10"
     if shard in INCOMPATIBLE_SHARDS.get(python_version, []):
         session.skip(
