@@ -38,6 +38,7 @@ from weave.trace_server.trace_server_interface import (
     TraceServerInterface,
 )
 from weave.utils.iterators import ThreadSafeLazyList
+from weave.utils.project_id import to_project_id
 
 logger = logging.getLogger(__name__)
 
@@ -766,7 +767,7 @@ def make_trace_obj(
         new_ref = val
         extra = val.extra
         try:
-            project_id = f"{val.entity}/{val.project}"
+            project_id = to_project_id(val.entity, val.project)
             read_res = server.obj_read(
                 ObjReadReq(
                     project_id=project_id,
