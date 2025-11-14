@@ -145,9 +145,6 @@ def tests(session, shard):
     elif shard == "trace_server":
         # trace_server shard needs both trace_server dependency group and trace_server_tests
         sync_args.extend(["--group", "trace_server", "--group", "trace_server_tests"])
-    elif shard == "stainless":
-        # stainless shard needs the stainless extra
-        sync_args.extend(["--extra", "stainless"])
 
     session.run(*sync_args)
 
@@ -187,7 +184,9 @@ def tests(session, shard):
         "custom": [],
         "flow": ["tests/flow/"],
         "trace_server": ["tests/trace_server/"],
-        "trace_server_bindings": ["tests/trace_server_bindings"],
+        "trace_server_bindings": [
+            "tests/trace_server_bindings/remote_http_trace_server"
+        ],
         "scorers": ["tests/scorers/"],
         "autogen_tests": ["tests/integrations/autogen/"],
         "verifiers_test": ["tests/integrations/verifiers/"],
@@ -198,7 +197,7 @@ def tests(session, shard):
             "tests/wandb_interface/",
         ],
         "trace_no_server": ["tests/trace/"],
-        "stainless": ["tests/trace_server_bindings/"],
+        "stainless": ["tests/trace_server_bindings/stainless_remote_http_trace_server"],
     }
 
     test_dirs = test_dirs_dict.get(shard, default_test_dirs)
