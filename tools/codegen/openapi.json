@@ -1542,14 +1542,14 @@
         ]
       }
     },
-    "/v2/{entity}/{project}/ops": {
+    "/object/{entity}/{project}/ops": {
       "post": {
         "tags": [
-          "V2 -- Ops"
+          "Ops"
         ],
-        "summary": "Op Create V2",
+        "summary": "Op Create",
         "description": "Create an op object.",
-        "operationId": "op_create_v2",
+        "operationId": "op_create",
         "security": [
           {
             "HTTPBasic": []
@@ -1580,7 +1580,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/OpCreateV2Body"
+                "$ref": "#/components/schemas/OpCreateBody"
               }
             }
           }
@@ -1591,7 +1591,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/OpCreateV2Res"
+                  "$ref": "#/components/schemas/OpCreateRes"
                 }
               }
             }
@@ -1610,11 +1610,11 @@
       },
       "get": {
         "tags": [
-          "V2 -- Ops"
+          "Ops"
         ],
-        "summary": "Op List V2",
+        "summary": "Op List",
         "description": "List op objects.",
-        "operationId": "op_list_v2",
+        "operationId": "op_list",
         "security": [
           {
             "HTTPBasic": []
@@ -1680,7 +1680,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/OpReadV2Res"
+                    "$ref": "#/components/schemas/OpReadRes"
                   }
                 }
               }
@@ -1699,14 +1699,14 @@
         }
       }
     },
-    "/v2/{entity}/{project}/ops/{object_id}/versions/{digest}": {
+    "/object/{entity}/{project}/ops/{object_id}/versions/{digest}": {
       "get": {
         "tags": [
-          "V2 -- Ops"
+          "Ops"
         ],
-        "summary": "Op Read V2",
+        "summary": "Op Read",
         "description": "Get an op object.",
-        "operationId": "op_read_v2",
+        "operationId": "op_read",
         "security": [
           {
             "HTTPBasic": []
@@ -1756,7 +1756,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/OpReadV2Res"
+                  "$ref": "#/components/schemas/OpReadRes"
                 }
               }
             }
@@ -1774,14 +1774,14 @@
         }
       }
     },
-    "/v2/{entity}/{project}/ops/{object_id}": {
+    "/object/{entity}/{project}/ops/{object_id}": {
       "delete": {
         "tags": [
-          "V2 -- Ops"
+          "Ops"
         ],
-        "summary": "Op Delete V2",
+        "summary": "Op Delete",
         "description": "Delete an op object. If digests are provided, only those versions are deleted. Otherwise, all versions are deleted.",
-        "operationId": "op_delete_v2",
+        "operationId": "op_delete",
         "security": [
           {
             "HTTPBasic": []
@@ -1842,7 +1842,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/OpDeleteV2Res"
+                  "$ref": "#/components/schemas/OpDeleteRes"
                 }
               }
             }
@@ -1860,14 +1860,14 @@
         }
       }
     },
-    "/v2/{entity}/{project}/datasets": {
+    "/object/{entity}/{project}/datasets": {
       "post": {
         "tags": [
-          "V2 -- Datasets"
+          "Datasets"
         ],
-        "summary": "Dataset Create V2",
+        "summary": "Dataset Create",
         "description": "Create a dataset object.",
-        "operationId": "dataset_create_v2",
+        "operationId": "dataset_create",
         "security": [
           {
             "HTTPBasic": []
@@ -1898,7 +1898,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/DatasetCreateV2Body"
+                "$ref": "#/components/schemas/DatasetCreateBody"
               }
             }
           }
@@ -1909,7 +1909,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DatasetCreateV2Res"
+                  "$ref": "#/components/schemas/DatasetCreateRes"
                 }
               }
             }
@@ -1928,11 +1928,11 @@
       },
       "get": {
         "tags": [
-          "V2 -- Datasets"
+          "Datasets"
         ],
-        "summary": "Dataset List V2",
+        "summary": "Dataset List",
         "description": "List dataset objects.",
-        "operationId": "dataset_list_v2",
+        "operationId": "dataset_list",
         "security": [
           {
             "HTTPBasic": []
@@ -1998,7 +1998,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/DatasetReadV2Res"
+                    "$ref": "#/components/schemas/DatasetReadRes"
                   }
                 }
               }
@@ -2017,14 +2017,14 @@
         }
       }
     },
-    "/v2/{entity}/{project}/datasets/{object_id}/versions/{digest}": {
+    "/object/{entity}/{project}/datasets/{object_id}/versions/{digest}": {
       "get": {
         "tags": [
-          "V2 -- Datasets"
+          "Datasets"
         ],
-        "summary": "Dataset Read V2",
+        "summary": "Dataset Read",
         "description": "Get a dataset object.",
-        "operationId": "dataset_read_v2",
+        "operationId": "dataset_read",
         "security": [
           {
             "HTTPBasic": []
@@ -2074,7 +2074,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DatasetReadV2Res"
+                  "$ref": "#/components/schemas/DatasetReadRes"
                 }
               }
             }
@@ -2092,14 +2092,14 @@
         }
       }
     },
-    "/v2/{entity}/{project}/datasets/{object_id}": {
+    "/object/{entity}/{project}/datasets/{object_id}": {
       "delete": {
         "tags": [
-          "V2 -- Datasets"
+          "Datasets"
         ],
-        "summary": "Dataset Delete V2",
+        "summary": "Dataset Delete",
         "description": "Delete a dataset object.",
-        "operationId": "dataset_delete_v2",
+        "operationId": "dataset_delete",
         "security": [
           {
             "HTTPBasic": []
@@ -2160,7 +2160,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DatasetDeleteV2Res"
+                  "$ref": "#/components/schemas/DatasetDeleteRes"
                 }
               }
             }
@@ -2178,14 +2178,14 @@
         }
       }
     },
-    "/v2/{entity}/{project}/scorers": {
+    "/object/{entity}/{project}/scorers": {
       "post": {
         "tags": [
-          "V2 -- Scorers"
+          "Scorers"
         ],
-        "summary": "Scorer Create V2",
+        "summary": "Scorer Create",
         "description": "Create a scorer object.",
-        "operationId": "scorer_create_v2",
+        "operationId": "scorer_create",
         "security": [
           {
             "HTTPBasic": []
@@ -2216,7 +2216,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ScorerCreateV2Body"
+                "$ref": "#/components/schemas/ScorerCreateBody"
               }
             }
           }
@@ -2227,7 +2227,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ScorerCreateV2Res"
+                  "$ref": "#/components/schemas/ScorerCreateRes"
                 }
               }
             }
@@ -2246,11 +2246,11 @@
       },
       "get": {
         "tags": [
-          "V2 -- Scorers"
+          "Scorers"
         ],
-        "summary": "Scorer List V2",
+        "summary": "Scorer List",
         "description": "List scorer objects.",
-        "operationId": "scorer_list_v2",
+        "operationId": "scorer_list",
         "security": [
           {
             "HTTPBasic": []
@@ -2316,7 +2316,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/ScorerReadV2Res"
+                    "$ref": "#/components/schemas/ScorerReadRes"
                   }
                 }
               }
@@ -2335,14 +2335,14 @@
         }
       }
     },
-    "/v2/{entity}/{project}/scorers/{object_id}/versions/{digest}": {
+    "/object/{entity}/{project}/scorers/{object_id}/versions/{digest}": {
       "get": {
         "tags": [
-          "V2 -- Scorers"
+          "Scorers"
         ],
-        "summary": "Scorer Read V2",
+        "summary": "Scorer Read",
         "description": "Get a scorer object.",
-        "operationId": "scorer_read_v2",
+        "operationId": "scorer_read",
         "security": [
           {
             "HTTPBasic": []
@@ -2392,7 +2392,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ScorerReadV2Res"
+                  "$ref": "#/components/schemas/ScorerReadRes"
                 }
               }
             }
@@ -2410,14 +2410,14 @@
         }
       }
     },
-    "/v2/{entity}/{project}/scorers/{object_id}": {
+    "/object/{entity}/{project}/scorers/{object_id}": {
       "delete": {
         "tags": [
-          "V2 -- Scorers"
+          "Scorers"
         ],
-        "summary": "Scorer Delete V2",
+        "summary": "Scorer Delete",
         "description": "Delete a scorer object.",
-        "operationId": "scorer_delete_v2",
+        "operationId": "scorer_delete",
         "security": [
           {
             "HTTPBasic": []
@@ -2478,7 +2478,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ScorerDeleteV2Res"
+                  "$ref": "#/components/schemas/ScorerDeleteRes"
                 }
               }
             }
@@ -2496,14 +2496,14 @@
         }
       }
     },
-    "/v2/{entity}/{project}/evaluations": {
+    "/object/{entity}/{project}/evaluations": {
       "post": {
         "tags": [
-          "V2 -- Evaluations"
+          "Evaluations"
         ],
-        "summary": "Evaluation Create V2",
+        "summary": "Evaluation Create",
         "description": "Create an evaluation object.",
-        "operationId": "evaluation_create_v2",
+        "operationId": "evaluation_create",
         "security": [
           {
             "HTTPBasic": []
@@ -2514,7 +2514,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/EvaluationCreateV2Req"
+                "$ref": "#/components/schemas/EvaluationCreateReq"
               }
             }
           }
@@ -2525,7 +2525,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EvaluationCreateV2Res"
+                  "$ref": "#/components/schemas/EvaluationCreateRes"
                 }
               }
             }
@@ -2544,11 +2544,11 @@
       },
       "get": {
         "tags": [
-          "V2 -- Evaluations"
+          "Evaluations"
         ],
-        "summary": "Evaluation List V2",
+        "summary": "Evaluation List",
         "description": "List evaluation objects.",
-        "operationId": "evaluation_list_v2",
+        "operationId": "evaluation_list",
         "security": [
           {
             "HTTPBasic": []
@@ -2614,7 +2614,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/EvaluationReadV2Res"
+                    "$ref": "#/components/schemas/EvaluationReadRes"
                   }
                 }
               }
@@ -2633,14 +2633,14 @@
         }
       }
     },
-    "/v2/{entity}/{project}/evaluations/{object_id}/versions/{digest}": {
+    "/object/{entity}/{project}/evaluations/{object_id}/versions/{digest}": {
       "get": {
         "tags": [
-          "V2 -- Evaluations"
+          "Evaluations"
         ],
-        "summary": "Evaluation Read V2",
+        "summary": "Evaluation Read",
         "description": "Get an evaluation object.",
-        "operationId": "evaluation_read_v2",
+        "operationId": "evaluation_read",
         "security": [
           {
             "HTTPBasic": []
@@ -2690,7 +2690,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EvaluationReadV2Res"
+                  "$ref": "#/components/schemas/EvaluationReadRes"
                 }
               }
             }
@@ -2708,14 +2708,14 @@
         }
       }
     },
-    "/v2/{entity}/{project}/evaluations/{object_id}": {
+    "/object/{entity}/{project}/evaluations/{object_id}": {
       "delete": {
         "tags": [
-          "V2 -- Evaluations"
+          "Evaluations"
         ],
-        "summary": "Evaluation Delete V2",
+        "summary": "Evaluation Delete",
         "description": "Delete an evaluation object.",
-        "operationId": "evaluation_delete_v2",
+        "operationId": "evaluation_delete",
         "security": [
           {
             "HTTPBasic": []
@@ -2776,7 +2776,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EvaluationDeleteV2Res"
+                  "$ref": "#/components/schemas/EvaluationDeleteRes"
                 }
               }
             }
@@ -2794,14 +2794,14 @@
         }
       }
     },
-    "/v2/{entity}/{project}/evaluation_runs": {
+    "/object/{entity}/{project}/evaluation_runs": {
       "post": {
         "tags": [
-          "V2 -- Evaluation Runs"
+          "Evaluation Runs"
         ],
-        "summary": "Evaluation Run Create V2",
+        "summary": "Evaluation Run Create",
         "description": "Create an evaluation run.",
-        "operationId": "evaluation_run_create_v2",
+        "operationId": "evaluation_run_create",
         "security": [
           {
             "HTTPBasic": []
@@ -2832,7 +2832,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/EvaluationRunCreateV2Body"
+                "$ref": "#/components/schemas/EvaluationRunCreateBody"
               }
             }
           }
@@ -2843,7 +2843,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EvaluationRunCreateV2Res"
+                  "$ref": "#/components/schemas/EvaluationRunCreateRes"
                 }
               }
             }
@@ -2862,11 +2862,11 @@
       },
       "get": {
         "tags": [
-          "V2 -- Evaluation Runs"
+          "Evaluation Runs"
         ],
-        "summary": "Evaluation Run List V2",
+        "summary": "Evaluation Run List",
         "description": "List evaluation runs.",
-        "operationId": "evaluation_run_list_v2",
+        "operationId": "evaluation_run_list",
         "security": [
           {
             "HTTPBasic": []
@@ -2932,7 +2932,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/EvaluationRunReadV2Res"
+                    "$ref": "#/components/schemas/EvaluationRunReadRes"
                   }
                 }
               }
@@ -2952,11 +2952,11 @@
       },
       "delete": {
         "tags": [
-          "V2 -- Evaluation Runs"
+          "Evaluation Runs"
         ],
-        "summary": "Evaluation Run Delete V2",
+        "summary": "Evaluation Run Delete",
         "description": "Delete evaluation runs.",
-        "operationId": "evaluation_run_delete_v2",
+        "operationId": "evaluation_run_delete",
         "security": [
           {
             "HTTPBasic": []
@@ -3002,7 +3002,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EvaluationRunDeleteV2Res"
+                  "$ref": "#/components/schemas/EvaluationRunDeleteRes"
                 }
               }
             }
@@ -3020,14 +3020,14 @@
         }
       }
     },
-    "/v2/{entity}/{project}/evaluation_runs/{evaluation_run_id}": {
+    "/object/{entity}/{project}/evaluation_runs/{evaluation_run_id}": {
       "get": {
         "tags": [
-          "V2 -- Evaluation Runs"
+          "Evaluation Runs"
         ],
-        "summary": "Evaluation Run Read V2",
+        "summary": "Evaluation Run Read",
         "description": "Get an evaluation run.",
-        "operationId": "evaluation_run_read_v2",
+        "operationId": "evaluation_run_read",
         "security": [
           {
             "HTTPBasic": []
@@ -3068,7 +3068,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EvaluationRunReadV2Res"
+                  "$ref": "#/components/schemas/EvaluationRunReadRes"
                 }
               }
             }
@@ -3086,14 +3086,14 @@
         }
       }
     },
-    "/v2/{entity}/{project}/evaluation_runs/{evaluation_run_id}/finish": {
+    "/object/{entity}/{project}/evaluation_runs/{evaluation_run_id}/finish": {
       "post": {
         "tags": [
-          "V2 -- Evaluation Runs"
+          "Evaluation Runs"
         ],
-        "summary": "Evaluation Run Finish V2",
+        "summary": "Evaluation Run Finish",
         "description": "Finish an evaluation run.",
-        "operationId": "evaluation_run_finish_v2",
+        "operationId": "evaluation_run_finish",
         "security": [
           {
             "HTTPBasic": []
@@ -3133,7 +3133,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/EvaluationRunFinishV2Body"
+                "$ref": "#/components/schemas/EvaluationRunFinishBody"
               }
             }
           }
@@ -3144,7 +3144,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EvaluationRunFinishV2Res"
+                  "$ref": "#/components/schemas/EvaluationRunFinishRes"
                 }
               }
             }
@@ -3162,14 +3162,14 @@
         }
       }
     },
-    "/v2/{entity}/{project}/models": {
+    "/object/{entity}/{project}/models": {
       "post": {
         "tags": [
-          "V2 -- Models"
+          "Models"
         ],
-        "summary": "Model Create V2",
+        "summary": "Model Create",
         "description": "Create a model object.",
-        "operationId": "model_create_v2",
+        "operationId": "model_create",
         "security": [
           {
             "HTTPBasic": []
@@ -3200,7 +3200,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ModelCreateV2Body"
+                "$ref": "#/components/schemas/ModelCreateBody"
               }
             }
           }
@@ -3211,7 +3211,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ModelCreateV2Res"
+                  "$ref": "#/components/schemas/ModelCreateRes"
                 }
               }
             }
@@ -3230,11 +3230,11 @@
       },
       "get": {
         "tags": [
-          "V2 -- Models"
+          "Models"
         ],
-        "summary": "Model List V2",
+        "summary": "Model List",
         "description": "List model objects.",
-        "operationId": "model_list_v2",
+        "operationId": "model_list",
         "security": [
           {
             "HTTPBasic": []
@@ -3300,7 +3300,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/ModelReadV2Res"
+                    "$ref": "#/components/schemas/ModelReadRes"
                   }
                 }
               }
@@ -3319,14 +3319,14 @@
         }
       }
     },
-    "/v2/{entity}/{project}/models/{object_id}/versions/{digest}": {
+    "/object/{entity}/{project}/models/{object_id}/versions/{digest}": {
       "get": {
         "tags": [
-          "V2 -- Models"
+          "Models"
         ],
-        "summary": "Model Read V2",
+        "summary": "Model Read",
         "description": "Get a model object.",
-        "operationId": "model_read_v2",
+        "operationId": "model_read",
         "security": [
           {
             "HTTPBasic": []
@@ -3376,7 +3376,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ModelReadV2Res"
+                  "$ref": "#/components/schemas/ModelReadRes"
                 }
               }
             }
@@ -3394,14 +3394,14 @@
         }
       }
     },
-    "/v2/{entity}/{project}/models/{object_id}": {
+    "/object/{entity}/{project}/models/{object_id}": {
       "delete": {
         "tags": [
-          "V2 -- Models"
+          "Models"
         ],
-        "summary": "Model Delete V2",
+        "summary": "Model Delete",
         "description": "Delete a model object. If digests are provided, only those versions are deleted. Otherwise, all versions are deleted.",
-        "operationId": "model_delete_v2",
+        "operationId": "model_delete",
         "security": [
           {
             "HTTPBasic": []
@@ -3462,7 +3462,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ModelDeleteV2Res"
+                  "$ref": "#/components/schemas/ModelDeleteRes"
                 }
               }
             }
@@ -3480,14 +3480,14 @@
         }
       }
     },
-    "/v2/{entity}/{project}/predictions": {
+    "/object/{entity}/{project}/predictions": {
       "post": {
         "tags": [
-          "V2 -- Predictions"
+          "Predictions"
         ],
-        "summary": "Prediction Create V2",
+        "summary": "Prediction Create",
         "description": "Create a prediction.",
-        "operationId": "prediction_create_v2",
+        "operationId": "prediction_create",
         "security": [
           {
             "HTTPBasic": []
@@ -3518,7 +3518,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/PredictionCreateV2Body"
+                "$ref": "#/components/schemas/PredictionCreateBody"
               }
             }
           }
@@ -3529,7 +3529,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PredictionCreateV2Res"
+                  "$ref": "#/components/schemas/PredictionCreateRes"
                 }
               }
             }
@@ -3548,11 +3548,11 @@
       },
       "get": {
         "tags": [
-          "V2 -- Predictions"
+          "Predictions"
         ],
-        "summary": "Prediction List V2",
+        "summary": "Prediction List",
         "description": "List predictions.",
-        "operationId": "prediction_list_v2",
+        "operationId": "prediction_list",
         "security": [
           {
             "HTTPBasic": []
@@ -3634,7 +3634,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/PredictionReadV2Res"
+                    "$ref": "#/components/schemas/PredictionReadRes"
                   }
                 }
               }
@@ -3654,11 +3654,11 @@
       },
       "delete": {
         "tags": [
-          "V2 -- Predictions"
+          "Predictions"
         ],
-        "summary": "Prediction Delete V2",
+        "summary": "Prediction Delete",
         "description": "Delete predictions.",
-        "operationId": "prediction_delete_v2",
+        "operationId": "prediction_delete",
         "security": [
           {
             "HTTPBasic": []
@@ -3704,7 +3704,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PredictionDeleteV2Res"
+                  "$ref": "#/components/schemas/PredictionDeleteRes"
                 }
               }
             }
@@ -3722,14 +3722,14 @@
         }
       }
     },
-    "/v2/{entity}/{project}/predictions/{prediction_id}": {
+    "/object/{entity}/{project}/predictions/{prediction_id}": {
       "get": {
         "tags": [
-          "V2 -- Predictions"
+          "Predictions"
         ],
-        "summary": "Prediction Read V2",
+        "summary": "Prediction Read",
         "description": "Get a prediction.",
-        "operationId": "prediction_read_v2",
+        "operationId": "prediction_read",
         "security": [
           {
             "HTTPBasic": []
@@ -3770,7 +3770,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PredictionReadV2Res"
+                  "$ref": "#/components/schemas/PredictionReadRes"
                 }
               }
             }
@@ -3788,14 +3788,14 @@
         }
       }
     },
-    "/v2/{entity}/{project}/predictions/{prediction_id}/finish": {
+    "/object/{entity}/{project}/predictions/{prediction_id}/finish": {
       "post": {
         "tags": [
-          "V2 -- Predictions"
+          "Predictions"
         ],
-        "summary": "Prediction Finish V2",
+        "summary": "Prediction Finish",
         "description": "Finish a prediction.",
-        "operationId": "prediction_finish_v2",
+        "operationId": "prediction_finish",
         "security": [
           {
             "HTTPBasic": []
@@ -3836,7 +3836,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PredictionFinishV2Res"
+                  "$ref": "#/components/schemas/PredictionFinishRes"
                 }
               }
             }
@@ -3854,14 +3854,14 @@
         }
       }
     },
-    "/v2/{entity}/{project}/scores": {
+    "/object/{entity}/{project}/scores": {
       "post": {
         "tags": [
-          "V2 -- Scores"
+          "Scores"
         ],
-        "summary": "Score Create V2",
+        "summary": "Score Create",
         "description": "Create a score.",
-        "operationId": "score_create_v2",
+        "operationId": "score_create",
         "security": [
           {
             "HTTPBasic": []
@@ -3892,7 +3892,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ScoreCreateV2Body"
+                "$ref": "#/components/schemas/ScoreCreateBody"
               }
             }
           }
@@ -3903,7 +3903,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ScoreCreateV2Res"
+                  "$ref": "#/components/schemas/ScoreCreateRes"
                 }
               }
             }
@@ -3922,11 +3922,11 @@
       },
       "get": {
         "tags": [
-          "V2 -- Scores"
+          "Scores"
         ],
-        "summary": "Score List V2",
+        "summary": "Score List",
         "description": "List scores.",
-        "operationId": "score_list_v2",
+        "operationId": "score_list",
         "security": [
           {
             "HTTPBasic": []
@@ -4008,7 +4008,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/ScoreReadV2Res"
+                    "$ref": "#/components/schemas/ScoreReadRes"
                   }
                 }
               }
@@ -4028,11 +4028,11 @@
       },
       "delete": {
         "tags": [
-          "V2 -- Scores"
+          "Scores"
         ],
-        "summary": "Score Delete V2",
+        "summary": "Score Delete",
         "description": "Delete scores.",
-        "operationId": "score_delete_v2",
+        "operationId": "score_delete",
         "security": [
           {
             "HTTPBasic": []
@@ -4078,7 +4078,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ScoreDeleteV2Res"
+                  "$ref": "#/components/schemas/ScoreDeleteRes"
                 }
               }
             }
@@ -4096,14 +4096,14 @@
         }
       }
     },
-    "/v2/{entity}/{project}/scores/{score_id}": {
+    "/object/{entity}/{project}/scores/{score_id}": {
       "get": {
         "tags": [
-          "V2 -- Scores"
+          "Scores"
         ],
-        "summary": "Score Read V2",
+        "summary": "Score Read",
         "description": "Get a score.",
-        "operationId": "score_read_v2",
+        "operationId": "score_read",
         "security": [
           {
             "HTTPBasic": []
@@ -4144,7 +4144,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ScoreReadV2Res"
+                  "$ref": "#/components/schemas/ScoreReadRes"
                 }
               }
             }
@@ -6116,7 +6116,7 @@
         ],
         "title": "CostQueryRes"
       },
-      "DatasetCreateV2Body": {
+      "DatasetCreateBody": {
         "properties": {
           "name": {
             "anyOf": [
@@ -6156,9 +6156,9 @@
         "required": [
           "rows"
         ],
-        "title": "DatasetCreateV2Body"
+        "title": "DatasetCreateBody"
       },
-      "DatasetCreateV2Res": {
+      "DatasetCreateRes": {
         "properties": {
           "digest": {
             "type": "string",
@@ -6182,23 +6182,23 @@
           "object_id",
           "version_index"
         ],
-        "title": "DatasetCreateV2Res"
+        "title": "DatasetCreateRes"
       },
-      "DatasetDeleteV2Res": {
+      "DatasetDeleteRes": {
         "properties": {
           "num_deleted": {
             "type": "integer",
             "title": "Num Deleted",
-            "description": "Number of d  ataset versions deleted"
+            "description": "Number of dataset versions deleted"
           }
         },
         "type": "object",
         "required": [
           "num_deleted"
         ],
-        "title": "DatasetDeleteV2Res"
+        "title": "DatasetDeleteRes"
       },
-      "DatasetReadV2Res": {
+      "DatasetReadRes": {
         "properties": {
           "object_id": {
             "type": "string",
@@ -6253,7 +6253,7 @@
           "name",
           "rows"
         ],
-        "title": "DatasetReadV2Res"
+        "title": "DatasetReadRes"
       },
       "EndedCallSchemaForInsert": {
         "properties": {
@@ -6406,7 +6406,7 @@
         "title": "EqOperation",
         "description": "Equality check between two operands.\n\nExample:\n    ```\n    {\n        \"$eq\": [{\"$getField\": \"op_name\"}, {\"$literal\": \"predict\"}]\n    }\n    ```"
       },
-      "EvaluationCreateV2Req": {
+      "EvaluationCreateReq": {
         "properties": {
           "name": {
             "type": "string",
@@ -6500,9 +6500,9 @@
           "dataset",
           "project_id"
         ],
-        "title": "EvaluationCreateV2Req"
+        "title": "EvaluationCreateReq"
       },
-      "EvaluationCreateV2Res": {
+      "EvaluationCreateRes": {
         "properties": {
           "digest": {
             "type": "string",
@@ -6532,9 +6532,9 @@
           "version_index",
           "evaluation_ref"
         ],
-        "title": "EvaluationCreateV2Res"
+        "title": "EvaluationCreateRes"
       },
-      "EvaluationDeleteV2Res": {
+      "EvaluationDeleteRes": {
         "properties": {
           "num_deleted": {
             "type": "integer",
@@ -6546,9 +6546,9 @@
         "required": [
           "num_deleted"
         ],
-        "title": "EvaluationDeleteV2Res"
+        "title": "EvaluationDeleteRes"
       },
-      "EvaluationReadV2Res": {
+      "EvaluationReadRes": {
         "properties": {
           "object_id": {
             "type": "string",
@@ -6666,9 +6666,9 @@
           "scorers",
           "trials"
         ],
-        "title": "EvaluationReadV2Res"
+        "title": "EvaluationReadRes"
       },
-      "EvaluationRunCreateV2Body": {
+      "EvaluationRunCreateBody": {
         "properties": {
           "evaluation": {
             "type": "string",
@@ -6686,9 +6686,9 @@
           "evaluation",
           "model"
         ],
-        "title": "EvaluationRunCreateV2Body"
+        "title": "EvaluationRunCreateBody"
       },
-      "EvaluationRunCreateV2Res": {
+      "EvaluationRunCreateRes": {
         "properties": {
           "evaluation_run_id": {
             "type": "string",
@@ -6700,9 +6700,9 @@
         "required": [
           "evaluation_run_id"
         ],
-        "title": "EvaluationRunCreateV2Res"
+        "title": "EvaluationRunCreateRes"
       },
-      "EvaluationRunDeleteV2Res": {
+      "EvaluationRunDeleteRes": {
         "properties": {
           "num_deleted": {
             "type": "integer",
@@ -6714,9 +6714,9 @@
         "required": [
           "num_deleted"
         ],
-        "title": "EvaluationRunDeleteV2Res"
+        "title": "EvaluationRunDeleteRes"
       },
-      "EvaluationRunFinishV2Body": {
+      "EvaluationRunFinishBody": {
         "properties": {
           "summary": {
             "anyOf": [
@@ -6733,10 +6733,10 @@
           }
         },
         "type": "object",
-        "title": "EvaluationRunFinishV2Body",
+        "title": "EvaluationRunFinishBody",
         "description": "Request body for finishing an evaluation run via REST API.\n\nThis model excludes project_id and evaluation_run_id since they come from the URL path in RESTful endpoints."
       },
-      "EvaluationRunFinishV2Res": {
+      "EvaluationRunFinishRes": {
         "properties": {
           "success": {
             "type": "boolean",
@@ -6748,9 +6748,9 @@
         "required": [
           "success"
         ],
-        "title": "EvaluationRunFinishV2Res"
+        "title": "EvaluationRunFinishRes"
       },
-      "EvaluationRunReadV2Res": {
+      "EvaluationRunReadRes": {
         "properties": {
           "evaluation_run_id": {
             "type": "string",
@@ -6825,7 +6825,7 @@
           "evaluation",
           "model"
         ],
-        "title": "EvaluationRunReadV2Res"
+        "title": "EvaluationRunReadRes"
       },
       "ExportTracePartialSuccess": {
         "properties": {
@@ -7732,6 +7732,7 @@
             "title": "Total Tokens"
           }
         },
+        "additionalProperties": true,
         "type": "object",
         "title": "LLMUsageSchema"
       },
@@ -7777,7 +7778,7 @@
         "title": "LiteralOperation",
         "description": "Represents a constant value in the query language.\n\nThis can be any standard JSON-serializable value.\n\nExample:\n    ```\n    {\"$literal\": \"predict\"}\n    ```"
       },
-      "ModelCreateV2Body": {
+      "ModelCreateBody": {
         "properties": {
           "name": {
             "type": "string",
@@ -7820,9 +7821,9 @@
           "name",
           "source_code"
         ],
-        "title": "ModelCreateV2Body"
+        "title": "ModelCreateBody"
       },
-      "ModelCreateV2Res": {
+      "ModelCreateRes": {
         "properties": {
           "digest": {
             "type": "string",
@@ -7852,9 +7853,9 @@
           "version_index",
           "model_ref"
         ],
-        "title": "ModelCreateV2Res"
+        "title": "ModelCreateRes"
       },
-      "ModelDeleteV2Res": {
+      "ModelDeleteRes": {
         "properties": {
           "num_deleted": {
             "type": "integer",
@@ -7866,9 +7867,9 @@
         "required": [
           "num_deleted"
         ],
-        "title": "ModelDeleteV2Res"
+        "title": "ModelDeleteRes"
       },
-      "ModelReadV2Res": {
+      "ModelReadRes": {
         "properties": {
           "object_id": {
             "type": "string",
@@ -7936,7 +7937,7 @@
           "name",
           "source_code"
         ],
-        "title": "ModelReadV2Res"
+        "title": "ModelReadRes"
       },
       "NotOperation": {
         "properties": {
@@ -8013,14 +8014,20 @@
             "title": "Digest"
           },
           "object_id": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Object Id"
           }
         },
         "type": "object",
         "required": [
-          "digest",
-          "object_id"
+          "digest"
         ],
         "title": "ObjCreateRes"
       },
@@ -8546,7 +8553,7 @@
         "type": "object",
         "title": "ObjectVersionFilter"
       },
-      "OpCreateV2Body": {
+      "OpCreateBody": {
         "properties": {
           "name": {
             "anyOf": [
@@ -8574,10 +8581,10 @@
           }
         },
         "type": "object",
-        "title": "OpCreateV2Body",
+        "title": "OpCreateBody",
         "description": "Request body for creating an Op object via REST API.\n\nThis model excludes project_id since it comes from the URL path in RESTful endpoints."
       },
-      "OpCreateV2Res": {
+      "OpCreateRes": {
         "properties": {
           "digest": {
             "type": "string",
@@ -8601,10 +8608,10 @@
           "object_id",
           "version_index"
         ],
-        "title": "OpCreateV2Res",
+        "title": "OpCreateRes",
         "description": "Response model for creating an Op object."
       },
-      "OpDeleteV2Res": {
+      "OpDeleteRes": {
         "properties": {
           "num_deleted": {
             "type": "integer",
@@ -8616,9 +8623,9 @@
         "required": [
           "num_deleted"
         ],
-        "title": "OpDeleteV2Res"
+        "title": "OpDeleteRes"
       },
-      "OpReadV2Res": {
+      "OpReadRes": {
         "properties": {
           "object_id": {
             "type": "string",
@@ -8655,7 +8662,7 @@
           "created_at",
           "code"
         ],
-        "title": "OpReadV2Res",
+        "title": "OpReadRes",
         "description": "Response model for reading an Op object.\n\nThe code field contains the actual source code of the op."
       },
       "OrOperation": {
@@ -8766,7 +8773,7 @@
         "type": "object",
         "title": "OtelExportRes"
       },
-      "PredictionCreateV2Body": {
+      "PredictionCreateBody": {
         "properties": {
           "model": {
             "type": "string",
@@ -8802,10 +8809,10 @@
           "inputs",
           "output"
         ],
-        "title": "PredictionCreateV2Body",
+        "title": "PredictionCreateBody",
         "description": "Request body for creating a Prediction via REST API.\n\nThis model excludes project_id since it comes from the URL path in RESTful endpoints."
       },
-      "PredictionCreateV2Res": {
+      "PredictionCreateRes": {
         "properties": {
           "prediction_id": {
             "type": "string",
@@ -8817,9 +8824,9 @@
         "required": [
           "prediction_id"
         ],
-        "title": "PredictionCreateV2Res"
+        "title": "PredictionCreateRes"
       },
-      "PredictionDeleteV2Res": {
+      "PredictionDeleteRes": {
         "properties": {
           "num_deleted": {
             "type": "integer",
@@ -8831,9 +8838,9 @@
         "required": [
           "num_deleted"
         ],
-        "title": "PredictionDeleteV2Res"
+        "title": "PredictionDeleteRes"
       },
-      "PredictionFinishV2Res": {
+      "PredictionFinishRes": {
         "properties": {
           "success": {
             "type": "boolean",
@@ -8845,9 +8852,9 @@
         "required": [
           "success"
         ],
-        "title": "PredictionFinishV2Res"
+        "title": "PredictionFinishRes"
       },
-      "PredictionReadV2Res": {
+      "PredictionReadRes": {
         "properties": {
           "prediction_id": {
             "type": "string",
@@ -8901,7 +8908,7 @@
           "inputs",
           "output"
         ],
-        "title": "PredictionReadV2Res"
+        "title": "PredictionReadRes"
       },
       "Query": {
         "properties": {
@@ -8973,7 +8980,7 @@
         ],
         "title": "RefsReadBatchRes"
       },
-      "ScoreCreateV2Body": {
+      "ScoreCreateBody": {
         "properties": {
           "prediction_id": {
             "type": "string",
@@ -9009,10 +9016,10 @@
           "scorer",
           "value"
         ],
-        "title": "ScoreCreateV2Body",
+        "title": "ScoreCreateBody",
         "description": "Request body for creating a Score via REST API.\n\nThis model excludes project_id since it comes from the URL path in RESTful endpoints."
       },
-      "ScoreCreateV2Res": {
+      "ScoreCreateRes": {
         "properties": {
           "score_id": {
             "type": "string",
@@ -9024,9 +9031,9 @@
         "required": [
           "score_id"
         ],
-        "title": "ScoreCreateV2Res"
+        "title": "ScoreCreateRes"
       },
-      "ScoreDeleteV2Res": {
+      "ScoreDeleteRes": {
         "properties": {
           "num_deleted": {
             "type": "integer",
@@ -9038,9 +9045,9 @@
         "required": [
           "num_deleted"
         ],
-        "title": "ScoreDeleteV2Res"
+        "title": "ScoreDeleteRes"
       },
-      "ScoreReadV2Res": {
+      "ScoreReadRes": {
         "properties": {
           "score_id": {
             "type": "string",
@@ -9088,9 +9095,9 @@
           "scorer",
           "value"
         ],
-        "title": "ScoreReadV2Res"
+        "title": "ScoreReadRes"
       },
-      "ScorerCreateV2Body": {
+      "ScorerCreateBody": {
         "properties": {
           "name": {
             "type": "string",
@@ -9120,9 +9127,9 @@
           "name",
           "op_source_code"
         ],
-        "title": "ScorerCreateV2Body"
+        "title": "ScorerCreateBody"
       },
-      "ScorerCreateV2Res": {
+      "ScorerCreateRes": {
         "properties": {
           "digest": {
             "type": "string",
@@ -9152,9 +9159,9 @@
           "version_index",
           "scorer"
         ],
-        "title": "ScorerCreateV2Res"
+        "title": "ScorerCreateRes"
       },
-      "ScorerDeleteV2Res": {
+      "ScorerDeleteRes": {
         "properties": {
           "num_deleted": {
             "type": "integer",
@@ -9166,9 +9173,9 @@
         "required": [
           "num_deleted"
         ],
-        "title": "ScorerDeleteV2Res"
+        "title": "ScorerDeleteRes"
       },
-      "ScorerReadV2Res": {
+      "ScorerReadRes": {
         "properties": {
           "object_id": {
             "type": "string",
@@ -9223,7 +9230,7 @@
           "name",
           "score_op"
         ],
-        "title": "ScorerReadV2Res"
+        "title": "ScorerReadRes"
       },
       "ServerInfoRes": {
         "properties": {
