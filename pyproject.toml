@@ -66,7 +66,7 @@ rich = ["rich"]           # Optional dependency for enhanced console output
 # 2. For deploys, pin to a specific version and remove allow-direct-references.  This will look like:
 #    weave_server_sdk==0.0.1
 stainless = [
-  "weave_server_sdk @ git+https://github.com/stainless-sdks/weave-python@ba248651c0b59669dab5fa929000a4bf15cb755b",
+  "weave_server_sdk @ git+https://github.com/wandb/weave-stainless.git@9ce4f0792a54f05fba22531faee0c439ae9d70fa",
 ]
 
 # `trace_server` is the dependency list of the trace server itself. We eventually will extract
