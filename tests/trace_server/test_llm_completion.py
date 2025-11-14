@@ -651,66 +651,6 @@ class TestPromptResolution(unittest.TestCase):
     def tearDown(self):
         _secret_fetcher_context.reset(self.token)
 
-    def test_replace_template_vars_in_messages(self):
-        """Test template variable replacement in messages."""
-        from weave.trace_server.llm_completion import replace_template_vars_in_messages
-
-        messages = [
-            {"role": "system", "content": "You are {assistant_name}."},
-            {"role": "user", "content": "My name is {user_name}."},
-        ]
-
-        template_vars = {"assistant_name": "Claude", "user_name": "Alice"}
-
-        result = replace_template_vars_in_messages(messages, template_vars)
-
-        self.assertEqual(len(result), 2)
-        self.assertEqual(result[0]["content"], "You are Claude.")
-        self.assertEqual(result[1]["content"], "My name is Alice.")
-
-    def test_replace_template_vars_with_missing_variable(self):
-        """Test template variable replacement when a variable is missing."""
-        from weave.trace_server.errors import InvalidRequest
-        from weave.trace_server.llm_completion import replace_template_vars_in_messages
-
-        messages = [
-            {"role": "system", "content": "You are {assistant_name}."},
-        ]
-
-        template_vars = {}  # Missing assistant_name
-
-        # Should raise InvalidRequest when variable is missing
-        with self.assertRaises(InvalidRequest) as context:
-            replace_template_vars_in_messages(messages, template_vars)
-
-        self.assertIn("assistant_name", str(context.exception))
-
-    def test_replace_template_vars_with_complex_content(self):
-        """Test template variable replacement with nested list content (e.g., multimodal messages)."""
-        from weave.trace_server.llm_completion import replace_template_vars_in_messages
-
-        messages = [
-            {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": "Hello {name}"},
-                    {"type": "image_url", "image_url": {"url": "https://example.com"}},
-                ],
-            }
-        ]
-
-        template_vars = {"name": "World"}
-
-        # Now supports nested structure replacement (uses shared logic from MessagesPrompt)
-        result = replace_template_vars_in_messages(messages, template_vars)
-
-        # Variables in nested dicts should be replaced
-        self.assertEqual(result[0]["content"][0]["text"], "Hello World")
-        # Non-string values should remain unchanged
-        self.assertEqual(
-            result[0]["content"][1]["image_url"]["url"], "https://example.com"
-        )
-
     def test_resolve_prompt_messages(self):
         """Test resolving prompt messages from a MessagesPrompt object."""
         from weave.trace_server.llm_completion import resolve_prompt_messages
@@ -755,56 +695,6 @@ class TestPromptResolution(unittest.TestCase):
         self.assertEqual(messages[0]["content"], "You are {assistant_name}.")
         self.assertEqual(messages[1]["role"], "user")
         self.assertEqual(messages[1]["content"], "Hello!")
-
-    def test_resolve_prompt_messages_with_template_vars(self):
-        """Test resolving prompt messages and then applying template variable substitution."""
-        from weave.trace_server.llm_completion import (
-            replace_template_vars_in_messages,
-            resolve_prompt_messages,
-        )
-
-        # Create a mock MessagesPrompt object
-        mock_prompt_obj = tsi.ObjSchema(
-            project_id=self.project_id,
-            object_id="test-prompt",
-            digest="digest-1",
-            base_object_class="MessagesPrompt",
-            leaf_object_class="MessagesPrompt",
-            val={
-                "messages": [
-                    {"role": "system", "content": "You are {assistant_name}."},
-                    {"role": "user", "content": "My topic is {topic}."},
-                ]
-            },
-            created_at=datetime.datetime.now(),
-            version_index=1,
-            is_latest=1,
-            kind="object",
-            deleted_at=None,
-        )
-
-        def mock_obj_read(req):
-            return tsi.ObjReadRes(obj=mock_prompt_obj)
-
-        prompt_uri = (
-            f"weave-trace-internal:///{self.project_id}/object/test-prompt:digest-1"
-        )
-        template_vars = {"assistant_name": "MathBot", "topic": "mathematics"}
-
-        # First resolve the prompt messages
-        messages = resolve_prompt_messages(
-            prompt=prompt_uri,
-            project_id=self.project_id,
-            obj_read_func=mock_obj_read,
-        )
-
-        # Then apply template variable substitution separately
-        messages = replace_template_vars_in_messages(messages, template_vars)
-
-        # Template vars should now be replaced
-        self.assertEqual(len(messages), 2)
-        self.assertEqual(messages[0]["content"], "You are MathBot.")
-        self.assertEqual(messages[1]["content"], "My topic is mathematics.")
 
     def test_resolve_prompt_messages_invalid_prompt(self):
         """Test error handling when prompt object is not a Prompt or MessagesPrompt."""
@@ -1094,7 +984,281 @@ class TestStreamingWithPrompts(unittest.TestCase):
             # Should have exactly one error chunk
             self.assertEqual(len(chunks), 1)
             self.assertIn("error", chunks[0])
-            self.assertIn("Failed to resolve prompt", chunks[0]["error"])
+            self.assertIn("Failed to resolve and apply prompt", chunks[0]["error"])
+
+
+class TestResolveAndApplyPrompt(unittest.TestCase):
+    """Tests for the resolve_and_apply_prompt helper function.
+
+    This test suite verifies the consolidated helper that:
+    1. Resolves prompt references to messages
+    2. Combines prompt messages with user messages
+    3. Applies template variable substitution to combined messages
+    """
+
+    def setUp(self):
+        """Set up test fixtures before each test."""
+        self.project_id = "test-project"
+
+    def test_resolve_and_apply_prompt_with_all_params(self):
+        """Test with prompt, messages, and template vars all provided."""
+        from weave.trace_server.llm_completion import resolve_and_apply_prompt
+
+        # Mock prompt object
+        mock_prompt_obj = tsi.ObjSchema(
+            project_id=self.project_id,
+            object_id="test-prompt",
+            digest="digest-1",
+            base_object_class="MessagesPrompt",
+            leaf_object_class="MessagesPrompt",
+            val={
+                "messages": [
+                    {"role": "system", "content": "You are {assistant_name}."},
+                    {"role": "user", "content": "Answer in {language}."},
+                ]
+            },
+            created_at=datetime.datetime.now(),
+            version_index=1,
+            is_latest=1,
+            kind="object",
+            deleted_at=None,
+        )
+
+        def mock_obj_read(req):
+            return tsi.ObjReadRes(obj=mock_prompt_obj)
+
+        prompt_uri = (
+            f"weave-trace-internal:///{self.project_id}/object/test-prompt:digest-1"
+        )
+        user_messages = [{"role": "user", "content": "My question: {question}"}]
+        template_vars = {
+            "assistant_name": "TestBot",
+            "language": "Spanish",
+            "question": "What is 2+2?",
+        }
+
+        combined, initial = resolve_and_apply_prompt(
+            prompt=prompt_uri,
+            messages=user_messages,
+            template_vars=template_vars,
+            project_id=self.project_id,
+            obj_read_func=mock_obj_read,
+        )
+
+        # Check combined messages (prompt + user, with template vars applied)
+        self.assertEqual(len(combined), 3)
+        self.assertEqual(combined[0]["role"], "system")
+        self.assertEqual(combined[0]["content"], "You are TestBot.")
+        self.assertEqual(combined[1]["role"], "user")
+        self.assertEqual(combined[1]["content"], "Answer in Spanish.")
+        self.assertEqual(combined[2]["role"], "user")
+        self.assertEqual(combined[2]["content"], "My question: What is 2+2?")
+
+        # Check initial messages (original user messages before template vars)
+        self.assertEqual(len(initial), 1)
+        self.assertEqual(initial[0]["content"], "My question: {question}")
+
+    def test_resolve_and_apply_prompt_only_prompt_no_template_vars(self):
+        """Test with only prompt, no user messages or template vars."""
+        from weave.trace_server.llm_completion import resolve_and_apply_prompt
+
+        mock_prompt_obj = tsi.ObjSchema(
+            project_id=self.project_id,
+            object_id="test-prompt",
+            digest="digest-1",
+            base_object_class="MessagesPrompt",
+            leaf_object_class="MessagesPrompt",
+            val={
+                "messages": [
+                    {"role": "system", "content": "You are a helpful assistant."},
+                ]
+            },
+            created_at=datetime.datetime.now(),
+            version_index=1,
+            is_latest=1,
+            kind="object",
+            deleted_at=None,
+        )
+
+        def mock_obj_read(req):
+            return tsi.ObjReadRes(obj=mock_prompt_obj)
+
+        prompt_uri = (
+            f"weave-trace-internal:///{self.project_id}/object/test-prompt:digest-1"
+        )
+
+        combined, initial = resolve_and_apply_prompt(
+            prompt=prompt_uri,
+            messages=None,
+            template_vars=None,
+            project_id=self.project_id,
+            obj_read_func=mock_obj_read,
+        )
+
+        # Should just have the prompt messages
+        self.assertEqual(len(combined), 1)
+        self.assertEqual(combined[0]["content"], "You are a helpful assistant.")
+
+        # No initial messages
+        self.assertEqual(len(initial), 0)
+
+    def test_resolve_and_apply_prompt_only_messages_and_template_vars(self):
+        """Test with only user messages and template vars, no prompt."""
+        from weave.trace_server.llm_completion import resolve_and_apply_prompt
+
+        def mock_obj_read(req):
+            raise NotImplementedError("Should not be called")
+
+        user_messages = [
+            {"role": "system", "content": "You are {assistant_name}."},
+            {"role": "user", "content": "Hello {user_name}!"},
+        ]
+        template_vars = {
+            "assistant_name": "ChatBot",
+            "user_name": "Alice",
+        }
+
+        combined, initial = resolve_and_apply_prompt(
+            prompt=None,
+            messages=user_messages,
+            template_vars=template_vars,
+            project_id=self.project_id,
+            obj_read_func=mock_obj_read,
+        )
+
+        # Should have messages with template vars applied
+        self.assertEqual(len(combined), 2)
+        self.assertEqual(combined[0]["content"], "You are ChatBot.")
+        self.assertEqual(combined[1]["content"], "Hello Alice!")
+
+        # Initial messages should be untouched
+        self.assertEqual(len(initial), 2)
+        self.assertEqual(initial[0]["content"], "You are {assistant_name}.")
+
+    def test_resolve_and_apply_prompt_only_messages_no_template_vars(self):
+        """Test with only user messages, no prompt or template vars."""
+        from weave.trace_server.llm_completion import resolve_and_apply_prompt
+
+        def mock_obj_read(req):
+            raise NotImplementedError("Should not be called")
+
+        user_messages = [
+            {"role": "user", "content": "Hello!"},
+        ]
+
+        combined, initial = resolve_and_apply_prompt(
+            prompt=None,
+            messages=user_messages,
+            template_vars=None,
+            project_id=self.project_id,
+            obj_read_func=mock_obj_read,
+        )
+
+        # Should just pass through the messages unchanged
+        self.assertEqual(len(combined), 1)
+        self.assertEqual(combined[0]["content"], "Hello!")
+        self.assertEqual(initial, user_messages)
+
+    def test_resolve_and_apply_prompt_empty_inputs(self):
+        """Test with all inputs empty/None."""
+        from weave.trace_server.llm_completion import resolve_and_apply_prompt
+
+        def mock_obj_read(req):
+            raise NotImplementedError("Should not be called")
+
+        combined, initial = resolve_and_apply_prompt(
+            prompt=None,
+            messages=None,
+            template_vars=None,
+            project_id=self.project_id,
+            obj_read_func=mock_obj_read,
+        )
+
+        # Should return empty lists
+        self.assertEqual(len(combined), 0)
+        self.assertEqual(len(initial), 0)
+
+    def test_resolve_and_apply_prompt_prompt_not_found(self):
+        """Test error handling when prompt reference cannot be found."""
+        from weave.trace_server.llm_completion import resolve_and_apply_prompt
+
+        def mock_obj_read(req):
+            # Raise NotFoundError directly (simulating obj_read behavior when object doesn't exist)
+            raise NotFoundError(f"Object not found: {req.object_id}")
+
+        prompt_uri = (
+            f"weave-trace-internal:///{self.project_id}/object/missing-prompt:digest-1"
+        )
+
+        with self.assertRaises(NotFoundError) as context:
+            resolve_and_apply_prompt(
+                prompt=prompt_uri,
+                messages=None,
+                template_vars=None,
+                project_id=self.project_id,
+                obj_read_func=mock_obj_read,
+            )
+
+        self.assertIn("Object not found", str(context.exception))
+
+    def test_resolve_and_apply_prompt_invalid_prompt_type(self):
+        """Test error handling when prompt reference is not a Prompt object."""
+        from weave.trace_server.llm_completion import resolve_and_apply_prompt
+
+        # Mock an object that's not a MessagesPrompt
+        mock_obj = tsi.ObjSchema(
+            project_id=self.project_id,
+            object_id="test-obj",
+            digest="digest-1",
+            base_object_class="Model",
+            leaf_object_class="Model",
+            val={"name": "test"},
+            created_at=datetime.datetime.now(),
+            version_index=1,
+            is_latest=1,
+            kind="object",
+            deleted_at=None,
+        )
+
+        def mock_obj_read(req):
+            return tsi.ObjReadRes(obj=mock_obj)
+
+        prompt_uri = (
+            f"weave-trace-internal:///{self.project_id}/object/test-obj:digest-1"
+        )
+
+        with self.assertRaises(InvalidRequest) as context:
+            resolve_and_apply_prompt(
+                prompt=prompt_uri,
+                messages=None,
+                template_vars=None,
+                project_id=self.project_id,
+                obj_read_func=mock_obj_read,
+            )
+
+        self.assertIn("is not a Prompt or MessagesPrompt", str(context.exception))
+
+    def test_resolve_and_apply_prompt_template_vars_with_empty_messages(self):
+        """Test that template vars are skipped when there are no messages."""
+        from weave.trace_server.llm_completion import resolve_and_apply_prompt
+
+        def mock_obj_read(req):
+            raise NotImplementedError("Should not be called")
+
+        # Template vars provided but no messages
+        template_vars = {"name": "Alice"}
+
+        combined, initial = resolve_and_apply_prompt(
+            prompt=None,
+            messages=None,
+            template_vars=template_vars,
+            project_id=self.project_id,
+            obj_read_func=mock_obj_read,
+        )
+
+        # Should return empty lists (template vars skipped when no messages)
+        self.assertEqual(len(combined), 0)
+        self.assertEqual(len(initial), 0)
 
 
 if __name__ == "__main__":

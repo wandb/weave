@@ -822,4 +822,4 @@ def test_completions_create_stream_prompt_not_found_error():
         # Should have exactly one error chunk
         assert len(chunks) == 1
         assert "error" in chunks[0]
-        assert "Failed to resolve prompt" in chunks[0]["error"]
+        assert "Failed to resolve and apply prompt" in chunks[0]["error"]

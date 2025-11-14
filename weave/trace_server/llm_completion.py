@@ -3,6 +3,7 @@ from typing import Any, Callable, Optional
 
 from pydantic import BaseModel
 
+from weave.prompt.prompt import format_message_with_template_vars
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import (
     InvalidRequest,
@@ -143,6 +144,79 @@ def resolve_prompt_messages(
         ) from e
 
 
+def resolve_and_apply_prompt(
+    prompt: Optional[str],
+    messages: Optional[list[dict[str, Any]]],
+    template_vars: Optional[dict[str, Any]],
+    project_id: str,
+    obj_read_func: Callable[[tsi.ObjReadReq], tsi.ObjReadRes],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Resolve prompt reference and apply template variables to combined messages.
+
+    This helper consolidates the logic for:
+    1. Resolving a prompt reference to its messages (if provided)
+    2. Combining prompt messages with user-provided messages
+    3. Applying template variable substitution to the combined messages
+
+    Args:
+        prompt: Optional prompt reference (e.g., "weave:///entity/project/object/prompt:digest")
+        messages: Optional list of user-provided message dictionaries
+        template_vars: Optional dictionary of template variables to replace
+        project_id: The project ID for resolving the prompt
+        obj_read_func: Function to read objects from the database
+
+    Returns:
+        Tuple of (combined_templated_messages, initial_messages):
+        - combined_templated_messages: The final messages with prompt + user messages + template vars applied
+        - initial_messages: The original user-provided messages (before template vars)
+
+    Raises:
+        NotFoundError: If the prompt reference cannot be found
+        InvalidRequest: If the prompt format is invalid or required template variables are missing
+
+    Examples:
+        >>> # With prompt and template vars
+        >>> combined, initial = resolve_and_apply_prompt(
+        ...     prompt="weave:///entity/project/object/my_prompt:v1",
+        ...     messages=[{"role": "user", "content": "Hello"}],
+        ...     template_vars={"name": "World"},
+        ...     project_id="entity/project",
+        ...     obj_read_func=obj_read
+        ... )
+
+        >>> # Without prompt (just user messages)
+        >>> combined, initial = resolve_and_apply_prompt(
+        ...     prompt=None,
+        ...     messages=[{"role": "user", "content": "Hello {name}"}],
+        ...     template_vars={"name": "World"},
+        ...     project_id="entity/project",
+        ...     obj_read_func=obj_read
+        ... )
+    """
+    initial_messages = messages or []
+    prompt_messages = []
+
+    # Step 1: Resolve prompt reference to messages (if provided)
+    if prompt:
+        prompt_messages = resolve_prompt_messages(
+            prompt=prompt,
+            project_id=project_id,
+            obj_read_func=obj_read_func,
+        )
+
+    # Step 2: Combine prompt messages with user messages
+    combined_messages = prompt_messages + initial_messages
+
+    # Step 3: Apply template variable substitution (if provided)
+    if template_vars and combined_messages:
+        combined_messages = [
+            format_message_with_template_vars(msg, **template_vars)
+            for msg in combined_messages
+        ]
+
+    return combined_messages, initial_messages
+
+
 def lite_llm_completion(
     api_key: Optional[str],
     inputs: tsi.CompletionsCreateRequestInputs,
@@ -165,6 +239,11 @@ def lite_llm_completion(
     # This allows us to drop params that are not supported by the LLM provider
     litellm.drop_params = True
 
+    # Exclude weave-specific fields that litellm doesn't understand
+    inputs_dict = inputs.model_dump(
+        exclude_none=True, exclude={"prompt", "template_vars"}
+    )
+
     # Handle custom provider
     if provider == "custom" and base_url:
         try:
@@ -173,7 +252,7 @@ def lite_llm_completion(
 
             # Make the API call using litellm
             res = litellm.completion(
-                **inputs.model_dump(exclude_none=True),
+                **inputs_dict,
                 api_key=api_key,
                 api_base=base_url,
                 extra_headers=headers,
@@ -200,7 +279,7 @@ def lite_llm_completion(
 
     try:
         res = litellm.completion(
-            **inputs.model_dump(exclude_none=True),
+            **inputs_dict,
             api_key=api_key,
             aws_access_key_id=aws_access_key_id,
             aws_secret_access_key=aws_secret_access_key,

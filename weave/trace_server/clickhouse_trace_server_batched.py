@@ -110,7 +110,7 @@ from weave.trace_server.llm_completion import (
     get_custom_provider_info,
     lite_llm_completion,
     lite_llm_completion_stream,
-    resolve_prompt_messages,
+    resolve_and_apply_prompt,
 )
 from weave.trace_server.methods.evaluation_status import evaluation_status
 from weave.trace_server.model_providers.model_providers import (
@@ -4036,6 +4036,28 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def completions_create(
         self, req: tsi.CompletionsCreateReq
     ) -> tsi.CompletionsCreateRes:
+        # --- Resolve prompt if provided and set messages
+        prompt = getattr(req.inputs, "prompt", None)
+        template_vars = getattr(req.inputs, "template_vars", None)
+
+        if prompt:
+            try:
+                # Use helper to resolve prompt, combine messages, and apply template vars
+                combined_messages, _ = resolve_and_apply_prompt(
+                    prompt=prompt,
+                    messages=getattr(req.inputs, "messages", None),
+                    template_vars=template_vars,
+                    project_id=req.project_id,
+                    obj_read_func=self.obj_read,
+                )
+                req.inputs.messages = combined_messages
+
+            except Exception as e:
+                logger.error(f"Failed to resolve prompt: {e}", exc_info=True)
+                return tsi.CompletionsCreateRes(
+                    response={"error": f"Failed to resolve prompt: {e!s}"}
+                )
+
         # Use shared setup logic
         model_info = self._model_to_provider_info_map.get(req.inputs.model)
         try:
@@ -4119,47 +4141,24 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # --- Resolve prompt if provided and prepend messages
         prompt = getattr(req.inputs, "prompt", None)
         template_vars = getattr(req.inputs, "template_vars", None)
-        prompt_messages = []
-        # Store original messages before template var replacement (for tracking)
-        initial_messages = getattr(req.inputs, "messages", None) or []
 
-        if prompt:
-            try:
-                # Fetch prompt messages
-                prompt_messages = resolve_prompt_messages(
-                    prompt=prompt,
-                    project_id=req.project_id,
-                    obj_read_func=self.obj_read,
-                )
-            except Exception as e:
-                logger.error(f"Failed to resolve prompt: {e}", exc_info=True)
+        try:
+            # Use helper to resolve prompt, combine messages, and apply template vars
+            combined_messages, initial_messages = resolve_and_apply_prompt(
+                prompt=prompt,
+                messages=getattr(req.inputs, "messages", None),
+                template_vars=template_vars,
+                project_id=req.project_id,
+                obj_read_func=self.obj_read,
+            )
+        except Exception as e:
+            logger.error(f"Failed to resolve and apply prompt: {e}", exc_info=True)
 
-                # Yield error as single chunk then stop.
-                def _single_error_iter(err: Exception) -> Iterator[dict[str, str]]:
-                    yield {"error": f"Failed to resolve prompt: {err!s}"}
+            # Yield error as single chunk then stop.
+            def _single_error_iter(err: Exception) -> Iterator[dict[str, str]]:
+                yield {"error": f"Failed to resolve and apply prompt: {err!s}"}
 
-                return _single_error_iter(e)
-
-        # Concatenate prompt messages with user messages
-        combined_messages = prompt_messages + initial_messages
-
-        # Apply template variable replacement to ALL messages (prompt + user) if template_vars provided
-        if template_vars and combined_messages:
-            try:
-                from weave.prompt.prompt import format_message_with_template_vars
-
-                combined_messages = [
-                    format_message_with_template_vars(msg, **template_vars)
-                    for msg in combined_messages
-                ]
-            except Exception as e:
-                logger.error(f"Failed to replace template vars: {e}", exc_info=True)
-
-                # Yield error as single chunk then stop.
-                def _single_error_iter(err: Exception) -> Iterator[dict[str, str]]:
-                    yield {"error": f"Failed to replace template vars: {err!s}"}
-
-                return _single_error_iter(e)
+            return _single_error_iter(e)
 
         # --- Shared setup logic (copy of completions_create up to litellm call)
         model_info = self._model_to_provider_info_map.get(req.inputs.model)

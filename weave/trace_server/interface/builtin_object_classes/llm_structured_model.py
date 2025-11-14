@@ -185,16 +185,15 @@ class LLMStructuredCompletionModel(Model):
         template_msgs = None
         if self.default_params and self.default_params.messages_template:
             template_msgs = self.default_params.messages_template
-            # Apply template variable substitution if variables are provided
             if template_vars:
-                formatted_msgs = []
-                for msg in template_msgs:
-                    msg_dict = msg.model_dump()
-                    formatted_dict = format_message_with_template_vars(
-                        msg_dict, **template_vars
+                # Convert Message objects to dicts, apply template vars, convert back
+                formatted_dicts = [
+                    format_message_with_template_vars(
+                        msg.model_dump(exclude_none=True), **template_vars
                     )
-                    formatted_msgs.append(Message.model_validate(formatted_dict))
-                template_msgs = formatted_msgs
+                    for msg in template_msgs
+                ]
+                template_msgs = [Message.model_validate(d) for d in formatted_dicts]
 
         prepared_messages_dicts = _prepare_llm_messages(template_msgs, user_input)
 
