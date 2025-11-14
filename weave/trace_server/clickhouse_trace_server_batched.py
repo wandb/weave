@@ -67,6 +67,11 @@ from weave.trace_server.clickhouse_schema import (
     ObjRefListType,
     SelectableCHObjSchema,
 )
+from weave.trace_server.client_server_common.digest_builder import (
+    bytes_digest,
+    ref_stable_json_digest,
+    table_digest_from_row_digests,
+)
 from weave.trace_server.constants import (
     COMPLETIONS_CREATE_OP_NAME,
     IMAGE_GENERATION_CREATE_OP_NAME,
@@ -153,9 +158,7 @@ from weave.trace_server.trace_server_common import (
 )
 from weave.trace_server.trace_server_interface_util import (
     assert_non_null_wb_user_id,
-    bytes_digest,
     extract_refs_from_values,
-    str_digest,
 )
 from weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker import (
     EvaluateModelArgs,
@@ -786,7 +789,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
         processed_val = processed_result["val"]
         json_val = json.dumps(processed_val)
-        digest = str_digest(json_val)
+        digest = ref_stable_json_digest(processed_val)
 
         ch_obj = ObjCHInsertable(
             project_id=req.obj.project_id,
@@ -848,7 +851,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             )
             processed_val = processed_result["val"]
             json_val = json.dumps(processed_val)
-            digest = str_digest(json_val)
+            digest = ref_stable_json_digest(processed_val)
             ch_obj = ObjCHInsertable(
                 project_id=obj.project_id,
                 object_id=obj.object_id,
@@ -1014,7 +1017,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     f"""Validation Error: Encountered a non-dictionary row when creating a table. Please ensure that all rows are dictionaries. Violating row:\n{r}."""
                 )
             row_json = json.dumps(r)
-            row_digest = str_digest(row_json)
+            row_digest = ref_stable_json_digest(r)
             insert_rows.append(
                 (
                     req.table.project_id,
@@ -1032,10 +1035,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         row_digests = [r[1] for r in insert_rows]
 
-        table_hasher = hashlib.sha256()
-        for row_digest in row_digests:
-            table_hasher.update(row_digest.encode())
-        digest = table_hasher.hexdigest()
+        digest = table_digest_from_row_digests(row_digests)
 
         self._insert(
             "tables",
@@ -1076,7 +1076,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             if not isinstance(row_data, dict):
                 raise TypeError("All rows must be dictionaries")
             row_json = json.dumps(row_data)
-            row_digest = str_digest(row_json)
+            row_digest = ref_stable_json_digest(row_data)
             if row_digest not in known_digests:
                 new_rows_needed_to_insert.append(
                     (
@@ -1119,10 +1119,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 column_names=["project_id", "digest", "refs", "val_dump"],
             )
 
-        table_hasher = hashlib.sha256()
-        for row_digest in final_row_digests:
-            table_hasher.update(row_digest.encode())
-        digest = table_hasher.hexdigest()
+        digest = table_digest_from_row_digests(final_row_digests)
 
         self._insert(
             "tables",
@@ -1135,11 +1132,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self, req: tsi.TableCreateFromDigestsReq
     ) -> tsi.TableCreateFromDigestsRes:
         """Create a table by specifying row digests, instead actual rows."""
-        # Calculate table digest from row digests
-        table_hasher = hashlib.sha256()
-        for row_digest in req.row_digests:
-            table_hasher.update(row_digest.encode())
-        digest = table_hasher.hexdigest()
+        digest = table_digest_from_row_digests(req.row_digests)
 
         # Insert into tables table
         self._insert(
