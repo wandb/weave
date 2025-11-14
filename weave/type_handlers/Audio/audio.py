@@ -8,6 +8,8 @@ import wave
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Generic, Literal, TypeVar, cast, get_args
 
+from typing_extensions import Self
+
 from weave.trace.serialization import serializer
 
 if TYPE_CHECKING:
@@ -117,7 +119,7 @@ class Audio(Generic[T]):
         self.format = format
 
     @classmethod
-    def from_data(cls, data: str | bytes, format: str) -> Audio:
+    def from_data(cls, data: str | bytes, format: str) -> Self:
         """Create an Audio object from raw data and specified format.
 
         Args:
@@ -142,7 +144,7 @@ class Audio(Generic[T]):
         )
 
     @classmethod
-    def from_path(cls, path: str | bytes | Path | os.PathLike) -> Audio:
+    def from_path(cls, path: str | bytes | Path | os.PathLike) -> Self:
         """Create an Audio object from a file path.
 
         Args:
