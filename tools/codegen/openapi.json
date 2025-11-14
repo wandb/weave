@@ -1542,7 +1542,7 @@
         ]
       }
     },
-    "/object/{entity}/{project}/ops": {
+    "/v2/{entity}/{project}/ops": {
       "post": {
         "tags": [
           "Ops"
@@ -1699,7 +1699,7 @@
         }
       }
     },
-    "/object/{entity}/{project}/ops/{object_id}/versions/{digest}": {
+    "/v2/{entity}/{project}/ops/{object_id}/versions/{digest}": {
       "get": {
         "tags": [
           "Ops"
@@ -1774,7 +1774,7 @@
         }
       }
     },
-    "/object/{entity}/{project}/ops/{object_id}": {
+    "/v2/{entity}/{project}/ops/{object_id}": {
       "delete": {
         "tags": [
           "Ops"
@@ -1860,7 +1860,7 @@
         }
       }
     },
-    "/object/{entity}/{project}/datasets": {
+    "/v2/{entity}/{project}/datasets": {
       "post": {
         "tags": [
           "Datasets"
@@ -2017,7 +2017,7 @@
         }
       }
     },
-    "/object/{entity}/{project}/datasets/{object_id}/versions/{digest}": {
+    "/v2/{entity}/{project}/datasets/{object_id}/versions/{digest}": {
       "get": {
         "tags": [
           "Datasets"
@@ -2092,7 +2092,7 @@
         }
       }
     },
-    "/object/{entity}/{project}/datasets/{object_id}": {
+    "/v2/{entity}/{project}/datasets/{object_id}": {
       "delete": {
         "tags": [
           "Datasets"
@@ -2178,7 +2178,7 @@
         }
       }
     },
-    "/object/{entity}/{project}/scorers": {
+    "/v2/{entity}/{project}/scorers": {
       "post": {
         "tags": [
           "Scorers"
@@ -2335,7 +2335,7 @@
         }
       }
     },
-    "/object/{entity}/{project}/scorers/{object_id}/versions/{digest}": {
+    "/v2/{entity}/{project}/scorers/{object_id}/versions/{digest}": {
       "get": {
         "tags": [
           "Scorers"
@@ -2410,7 +2410,7 @@
         }
       }
     },
-    "/object/{entity}/{project}/scorers/{object_id}": {
+    "/v2/{entity}/{project}/scorers/{object_id}": {
       "delete": {
         "tags": [
           "Scorers"
@@ -2496,7 +2496,7 @@
         }
       }
     },
-    "/object/{entity}/{project}/evaluations": {
+    "/v2/{entity}/{project}/evaluations": {
       "post": {
         "tags": [
           "Evaluations"
@@ -2633,7 +2633,7 @@
         }
       }
     },
-    "/object/{entity}/{project}/evaluations/{object_id}/versions/{digest}": {
+    "/v2/{entity}/{project}/evaluations/{object_id}/versions/{digest}": {
       "get": {
         "tags": [
           "Evaluations"
@@ -2708,7 +2708,7 @@
         }
       }
     },
-    "/object/{entity}/{project}/evaluations/{object_id}": {
+    "/v2/{entity}/{project}/evaluations/{object_id}": {
       "delete": {
         "tags": [
           "Evaluations"
@@ -2794,7 +2794,7 @@
         }
       }
     },
-    "/object/{entity}/{project}/evaluation_runs": {
+    "/v2/{entity}/{project}/evaluation_runs": {
       "post": {
         "tags": [
           "Evaluation Runs"
@@ -3020,7 +3020,7 @@
         }
       }
     },
-    "/object/{entity}/{project}/evaluation_runs/{evaluation_run_id}": {
+    "/v2/{entity}/{project}/evaluation_runs/{evaluation_run_id}": {
       "get": {
         "tags": [
           "Evaluation Runs"
@@ -3086,7 +3086,7 @@
         }
       }
     },
-    "/object/{entity}/{project}/evaluation_runs/{evaluation_run_id}/finish": {
+    "/v2/{entity}/{project}/evaluation_runs/{evaluation_run_id}/finish": {
       "post": {
         "tags": [
           "Evaluation Runs"
@@ -3162,7 +3162,7 @@
         }
       }
     },
-    "/object/{entity}/{project}/models": {
+    "/v2/{entity}/{project}/models": {
       "post": {
         "tags": [
           "Models"
@@ -3319,7 +3319,7 @@
         }
       }
     },
-    "/object/{entity}/{project}/models/{object_id}/versions/{digest}": {
+    "/v2/{entity}/{project}/models/{object_id}/versions/{digest}": {
       "get": {
         "tags": [
           "Models"
@@ -3394,7 +3394,7 @@
         }
       }
     },
-    "/object/{entity}/{project}/models/{object_id}": {
+    "/v2/{entity}/{project}/models/{object_id}": {
       "delete": {
         "tags": [
           "Models"
@@ -3480,7 +3480,7 @@
         }
       }
     },
-    "/object/{entity}/{project}/predictions": {
+    "/v2/{entity}/{project}/predictions": {
       "post": {
         "tags": [
           "Predictions"
@@ -3722,7 +3722,7 @@
         }
       }
     },
-    "/object/{entity}/{project}/predictions/{prediction_id}": {
+    "/v2/{entity}/{project}/predictions/{prediction_id}": {
       "get": {
         "tags": [
           "Predictions"
@@ -3788,7 +3788,7 @@
         }
       }
     },
-    "/object/{entity}/{project}/predictions/{prediction_id}/finish": {
+    "/v2/{entity}/{project}/predictions/{prediction_id}/finish": {
       "post": {
         "tags": [
           "Predictions"
@@ -3854,7 +3854,7 @@
         }
       }
     },
-    "/object/{entity}/{project}/scores": {
+    "/v2/{entity}/{project}/scores": {
       "post": {
         "tags": [
           "Scores"
@@ -4096,7 +4096,7 @@
         }
       }
     },
-    "/object/{entity}/{project}/scores/{score_id}": {
+    "/v2/{entity}/{project}/scores/{score_id}": {
       "get": {
         "tags": [
           "Scores"
