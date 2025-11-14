@@ -93,7 +93,6 @@ def server(request):
         server_.feedback_processor.stop_accepting_new_work_and_flush_queue()
 
 
-@pytest.mark.stainless_only
 @pytest.mark.parametrize("server", ["small_limit"], indirect=True)
 def test_large_batch_is_split_into_multiple_smaller_batches(server):
     # Create a large batch with many items to exceed the size limit
@@ -123,7 +122,6 @@ def test_large_batch_is_split_into_multiple_smaller_batches(server):
     assert total_items_sent == len(batch)
 
 
-@pytest.mark.stainless_only
 @pytest.mark.parametrize("server", ["normal"], indirect=True)
 def test_small_batch_is_sent_in_one_request(server):
     """Test that a small batch is sent without splitting."""
@@ -139,7 +137,6 @@ def test_small_batch_is_sent_in_one_request(server):
     assert len(decoded_batch["batch"]) == 1
 
 
-@pytest.mark.stainless_only
 @pytest.mark.parametrize("server", ["normal"], indirect=True)
 def test_empty_batch_is_noop(server):
     batch = []
@@ -149,7 +146,6 @@ def test_empty_batch_is_noop(server):
     assert server._send_batch_to_server.call_count == 0
 
 
-@pytest.mark.stainless_only
 @pytest.mark.disable_logging_error_check
 @pytest.mark.parametrize("server", ["small_limit"], indirect=True)
 def test_oversized_item_will_log_warning_and_send(server, caplog):
@@ -180,7 +176,6 @@ def test_oversized_item_will_log_warning_and_send(server, caplog):
     assert server._send_batch_to_server.call_count == 1
 
 
-@pytest.mark.stainless_only
 @pytest.mark.parametrize("server", ["small_limit"], indirect=True)
 def test_multi_level_recursive_splitting(server):
     """Test that a very large batch is recursively split multiple times."""
@@ -212,7 +207,6 @@ def test_multi_level_recursive_splitting(server):
     assert total_items_sent == len(batch)
 
 
-@pytest.mark.stainless_only
 @pytest.mark.parametrize("server", ["normal"], indirect=True)
 def test_dynamic_batch_size_adjustment(server):
     """Test that max_batch_size is dynamically adjusted based on item sizes."""
@@ -243,7 +237,6 @@ def test_dynamic_batch_size_adjustment(server):
     assert new_max_batch_size == expected_max_batch_size
 
 
-@pytest.mark.stainless_only
 @pytest.mark.parametrize("server", ["small_limit"], indirect=True)
 def test_non_uniform_batch_items(server):
     """Test batch with extremely non-uniform item sizes."""
@@ -283,7 +276,6 @@ def test_non_uniform_batch_items(server):
     assert total_items_sent == len(batch)
 
 
-@pytest.mark.stainless_only
 @patch("weave_server_sdk._http_client.httpx.Client.post")
 def test_timeout_retry_mechanism(mock_post, success_response):
     """Test that timeouts trigger the retry mechanism."""
@@ -306,7 +298,6 @@ def test_timeout_retry_mechanism(mock_post, success_response):
     assert mock_post.call_count == 3
 
 
-@pytest.mark.stainless_only
 @pytest.mark.disable_logging_error_check
 @pytest.mark.parametrize("server", ["fast_retrying"], indirect=True)
 @patch("weave_server_sdk._http_client.httpx.Client.post")
@@ -362,7 +353,6 @@ def test_post_timeout(mock_post, success_response, server, log_collector):
     assert response.trace_id == "test_trace_id"
 
 
-@pytest.mark.stainless_only
 @pytest.mark.disable_logging_error_check
 @pytest.mark.parametrize("server", ["normal"], indirect=True)
 @pytest.mark.parametrize("log_collector", ["warning"], indirect=True)
@@ -385,7 +375,6 @@ def test_drop_data_when_queue_is_full(server, log_collector):
     assert "Dropping item" in logs[0].msg
 
 
-@pytest.mark.stainless_only
 @pytest.mark.disable_logging_error_check
 @pytest.mark.parametrize("server", ["normal"], indirect=True)
 def test_requeue_after_max_retries(server, caplog):

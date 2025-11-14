@@ -100,9 +100,6 @@ nox --no-install -e "tests-3.12(shard='trace_server_bindings')" -- tests/trace_s
 **Important Notes:**
 - The `--trace-server` flag is for **backend selection** (SQLite vs ClickHouse)
 - The `--remote-http-trace-server` flag is for **trace server binding implementation** (RemoteHTTPTraceServer vs StainlessRemoteHTTPTraceServer)
-- These flags are independent and serve different purposes
-- Tests marked with `@pytest.mark.skip_stainless` will be skipped when using `--remote-http-trace-server=stainless`
-- Tests marked with `@pytest.mark.stainless_only` will only run when using `--remote-http-trace-server=stainless`
 
 #### Environment Issues
 
