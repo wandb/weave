@@ -237,7 +237,7 @@ jobs:
         with:
           channel-id: "C09CE03J867"
           slack-message: |
-            :x: Nightly Tests failed!
+            <!subteam^S06HYJNN7SL> :x: Nightly Tests failed!
             *Repository:* ${{ github.repository }}
             *Commit:* ${{ github.sha }}
             *Failed Jobs:* ${{ steps.result.outputs.failed_jobs }}
