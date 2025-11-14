@@ -17,10 +17,10 @@ import weave
 import weave.trace.call
 import weave.trace_server.trace_server_interface as tsi
 from tests.conftest import TestOnlyFlushingWeaveClient
-from tests.trace.testutil import ObjectRefStrMatcher
 from tests.trace.util import (
     AnyIntMatcher,
     DatetimeMatcher,
+    ObjectRefStrMatcher,
     RegexStringMatcher,
     client_is_sqlite,
 )

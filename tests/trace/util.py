@@ -7,7 +7,9 @@ import re
 import time
 from collections.abc import Callable
 from contextlib import contextmanager
+from typing import Any
 
+from weave.trace.refs import ObjectRef, OpRef, Ref
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer
 
 
@@ -70,6 +72,49 @@ class FuzzyDateTimeMatcher:
 class DatetimeMatcher:
     def __eq__(self, other):
         return isinstance(other, datetime.datetime)
+
+
+class ObjectRefStrMatcher:
+    def __init__(
+        self,
+        entity: str | None = None,
+        project: str | None = None,
+        kind: str | None = None,
+        name: str | None = None,
+        digest: str | None = None,
+        extra: list[str] | None = None,
+    ) -> None:
+        self.entity = entity
+        self.project = project
+        self.kind = kind
+        self.name = name
+        self.digest = digest
+        self.extra = extra
+
+    def __eq__(self, other: Any) -> bool:
+        other_ref = Ref.parse_uri(other)
+        if not isinstance(other_ref, ObjectRef):
+            return False
+        if self.entity is not None and self.entity != other_ref.entity:
+            return False
+        if self.project is not None and self.project != other_ref.project:
+            return False
+        if self.kind is not None:
+            if isinstance(other_ref, ObjectRef):
+                other_kind = "object"
+            elif isinstance(other_ref, OpRef):
+                other_kind = "op"
+            else:
+                raise ValueError(f"Unknown kind: {other_ref}")
+            if self.kind != other_kind:
+                return False
+        if self.name is not None and self.name != other_ref.name:
+            return False
+        if self.digest is not None and self.digest != other_ref.digest:
+            return False
+        if self.extra is not None and self.extra != other_ref.extra:
+            return False
+        return True
 
 
 class DummyTestException(Exception):
