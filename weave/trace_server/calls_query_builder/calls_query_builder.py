@@ -31,6 +31,7 @@ from collections.abc import Callable, KeysView
 from typing import Literal, cast
 
 from pydantic import BaseModel, Field
+from typing_extensions import Self
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.calls_query_builder.cte import CTECollection
@@ -194,7 +195,7 @@ class CallsMergedFeedbackPayloadField(CallsMergedField):
     extra_path: list[str]
 
     @classmethod
-    def from_path(cls, path: str) -> "CallsMergedFeedbackPayloadField":
+    def from_path(cls, path: str) -> Self:
         """Expected format: `[feedback.type].dot.path`.
 
         feedback.type can be '*' to select all feedback types.

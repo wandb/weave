@@ -6,6 +6,8 @@ from collections.abc import Collection, Iterator
 from functools import cmp_to_key
 from typing import Any, overload
 
+from typing_extensions import Self
+
 # String indicates object key access, number indicates array index access
 # This structure allows us to handle corner cases like periods or brackets
 # in object keys.
@@ -93,7 +95,7 @@ class ObjectPath:
         return result
 
     @classmethod
-    def parse_str(cls, path_string: str) -> ObjectPath:
+    def parse_str(cls, path_string: str) -> Self:
         """Parse a string representation of a path into a ObjectPath object.
 
         Handles dot notation for object access and square brackets for array indices.

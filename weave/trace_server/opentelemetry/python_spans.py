@@ -29,6 +29,7 @@ from opentelemetry.proto.trace.v1.trace_pb2 import (
 from opentelemetry.proto.trace.v1.trace_pb2 import (
     TracesData as PbTracesData,
 )
+from typing_extensions import Self
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.constants import MAX_DISPLAY_NAME_LENGTH, MAX_OP_NAME_LENGTH
@@ -59,7 +60,7 @@ class SpanKind(Enum):
     CONSUMER = 5
 
     @classmethod
-    def from_proto(cls, proto_kind: int) -> "SpanKind":
+    def from_proto(cls, proto_kind: int) -> Self:
         return cls(proto_kind)
 
 
@@ -71,7 +72,7 @@ class StatusCode(Enum):
     ERROR = 2
 
     @classmethod
-    def from_proto(cls, proto_code: int) -> "StatusCode":
+    def from_proto(cls, proto_code: int) -> Self:
         """Convert from protobuf enum value to StatusCode."""
         return cls(proto_code)
 
@@ -84,7 +85,7 @@ class Status:
     message: str = ""
 
     @classmethod
-    def from_proto(cls, proto_status: PbStatus) -> "Status":
+    def from_proto(cls, proto_status: PbStatus) -> Self:
         """Create a Status from a protobuf Status."""
         return cls(
             code=StatusCode.from_proto(proto_status.code), message=proto_status.message
@@ -122,7 +123,7 @@ class Event:
         return datetime.datetime.fromtimestamp(self.timestamp / 1_000_000_000)
 
     @classmethod
-    def from_proto(cls, proto_event: PbSpan.Event) -> "Event":
+    def from_proto(cls, proto_event: PbSpan.Event) -> Self:
         """Create an Event from a protobuf Event."""
         return cls(
             name=proto_event.name,
@@ -152,7 +153,7 @@ class Link:
     flags: int = 0
 
     @classmethod
-    def from_proto(cls, proto_link: PbSpan.Link) -> "Link":
+    def from_proto(cls, proto_link: PbSpan.Link) -> Self:
         """Create a Link from a protobuf Link."""
         return cls(
             trace_id=hexlify(proto_link.trace_id).decode("ascii"),
@@ -170,7 +171,7 @@ class Resource:
     dropped_attributes_count: int = 0
 
     @classmethod
-    def from_proto(cls, proto_resource: PbResource) -> "Resource":
+    def from_proto(cls, proto_resource: PbResource) -> Self:
         attributes = {}
         if proto_resource.attributes:
             attributes = unflatten_key_values(proto_resource.attributes)
@@ -231,7 +232,7 @@ class Span:
         return self.duration_ns / 1_000_000
 
     @classmethod
-    def from_proto(cls, proto_span: PbSpan, resource: Resource | None = None) -> "Span":
+    def from_proto(cls, proto_span: PbSpan, resource: Resource | None = None) -> Self:
         """Create a Span from a protobuf Span."""
         parent_id = None
         if proto_span.parent_span_id:
@@ -442,7 +443,7 @@ class ScopeSpans:
     @classmethod
     def from_proto(
         cls, proto_scope_spans: PbScopeSpans, resource: Resource | None = None
-    ) -> "ScopeSpans":
+    ) -> Self:
         """Create a ScopeSpans from a protobuf ScopeSpans."""
         return cls(
             scope=proto_scope_spans.scope,
@@ -463,7 +464,7 @@ class ResourceSpans:
         yield from self.scope_spans
 
     @classmethod
-    def from_proto(cls, proto_resource_spans: PbResourceSpans) -> "ResourceSpans":
+    def from_proto(cls, proto_resource_spans: PbResourceSpans) -> Self:
         """Create a ResourceSpans from a protobuf ResourceSpans."""
         resource = Resource.from_proto(proto_resource_spans.resource)
         return cls(
@@ -486,7 +487,7 @@ class TracesData:
         yield from self.resource_spans
 
     @classmethod
-    def from_proto(cls, proto_traces_data: PbTracesData) -> "TracesData":
+    def from_proto(cls, proto_traces_data: PbTracesData) -> Self:
         """Create a TracesData from a protobuf TracesData."""
         return cls(
             resource_spans=[
