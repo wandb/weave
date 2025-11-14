@@ -34,8 +34,6 @@ class Op(Protocol[P, R]):
     Some of the attributes are carry-overs from when Op was a class.  We should
     consider removing the unnecessary ones where possible.
     - resolve_fn (I think you can just use the func itself?)
-    - _set_on_output_handler (does this have to be on the op?)
-    - _on_output_handler (does this have to be on the op?)
     """
 
     name: str
@@ -51,14 +49,8 @@ class Op(Protocol[P, R]):
 
     _accumulator: Callable[[Any | None, Any], Any] | None
 
-    _set_on_input_handler: Callable[[OnInputHandlerType], None]
     _on_input_handler: OnInputHandlerType | None
-
-    # not sure if this is the best place for this, but kept for compat
-    _set_on_output_handler: Callable[[OnOutputHandlerType], None]
     _on_output_handler: OnOutputHandlerType | None
-
-    _set_on_finish_handler: Callable[[OnFinishHandlerType], None]
     _on_finish_handler: OnFinishHandlerType | None
     _on_finish_post_processor: Callable[[Any], Any] | None
 

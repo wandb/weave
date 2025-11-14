@@ -68,7 +68,7 @@ def google_genai_imagen_wrapper_sync(
             op_kwargs["postprocess_output"] = google_genai_gemini_postprocess_outputs
 
         op = weave.op(fn, **op_kwargs)
-        op._set_on_finish_handler(google_genai_imagen_on_finish)
+        op._on_finish_handler = google_genai_imagen_on_finish
         return op
 
     return wrapper
@@ -94,7 +94,7 @@ def google_genai_imagen_wrapper_async(
             op_kwargs["postprocess_output"] = google_genai_gemini_postprocess_outputs
 
         op = weave.op(_fn_wrapper(fn), **op_kwargs)
-        op._set_on_finish_handler(google_genai_imagen_on_finish)
+        op._on_finish_handler = google_genai_imagen_on_finish
         return op
 
     return wrapper

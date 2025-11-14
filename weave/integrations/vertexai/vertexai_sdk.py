@@ -94,7 +94,7 @@ def vertexai_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable
             op_kwargs["postprocess_inputs"] = vertexai_postprocess_inputs
 
         op = weave.op(fn, **op_kwargs)
-        op._set_on_finish_handler(vertexai_on_finish)
+        op._on_finish_handler = vertexai_on_finish
         return _add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: vertexai_accumulator,
@@ -119,7 +119,7 @@ def vertexai_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callabl
             op_kwargs["postprocess_inputs"] = vertexai_postprocess_inputs
 
         op = weave.op(_fn_wrapper(fn), **op_kwargs)
-        op._set_on_finish_handler(vertexai_on_finish)
+        op._on_finish_handler = vertexai_on_finish
         return _add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: vertexai_accumulator,

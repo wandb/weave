@@ -411,7 +411,7 @@ def create_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable]:
         op_kwargs = settings.model_dump()
         op = weave.op(_add_stream_options(fn), **op_kwargs)
 
-        op._set_on_input_handler(openai_on_input_handler)
+        op._on_input_handler = openai_on_input_handler
         return _add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: lambda acc, value: openai_accumulator(
@@ -455,7 +455,7 @@ def create_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callable]
 
         op_kwargs = settings.model_dump()
         op = weave.op(_add_stream_options(fn), **op_kwargs)
-        op._set_on_input_handler(openai_on_input_handler)
+        op._on_input_handler = openai_on_input_handler
         return _add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: lambda acc, value: openai_accumulator(
@@ -674,7 +674,7 @@ def create_wrapper_responses_sync(
             return fn(*args, **kwargs)
 
         op = weave.op(_inner, **op_kwargs)
-        op._set_on_input_handler(openai_on_input_handler)
+        op._on_input_handler = openai_on_input_handler
         return _add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: lambda acc, value: responses_accumulator(
@@ -698,7 +698,7 @@ def create_wrapper_responses_async(
             return await fn(*args, **kwargs)
 
         op = weave.op(_inner, **op_kwargs)
-        op._set_on_input_handler(openai_on_input_handler)
+        op._on_input_handler = openai_on_input_handler
         return _add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: lambda acc, value: responses_accumulator(

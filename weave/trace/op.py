@@ -220,24 +220,6 @@ def setup_dunder_weave_dict(d: WeaveKwargs | None = None) -> WeaveKwargs:
     return cast(WeaveKwargs, res)
 
 
-def _set_on_input_handler(func: Op, on_input: OnInputHandlerType) -> None:
-    if func._on_input_handler is not None:
-        raise ValueError("Cannot set on_input_handler multiple times")
-    func._on_input_handler = on_input
-
-
-def _set_on_output_handler(func: Op, on_output: OnOutputHandlerType) -> None:
-    if func._on_output_handler is not None:
-        raise ValueError("Cannot set on_output_handler multiple times")
-    func._on_output_handler = on_output
-
-
-def _set_on_finish_handler(func: Op, on_finish: OnFinishHandlerType) -> None:
-    if func._on_finish_handler is not None:
-        raise ValueError("Cannot set on_finish_handler multiple times")
-    func._on_finish_handler = on_finish
-
-
 def _is_unbound_method(func: Callable) -> bool:
     """Check if a function is a function defined on a class (an "unbound" method).
 
@@ -1260,13 +1242,8 @@ def op(
             wrapper.__call__ = wrapper  # type: ignore
             wrapper.__self__ = wrapper  # type: ignore
 
-            wrapper._set_on_input_handler = partial(_set_on_input_handler, wrapper)  # type: ignore
             wrapper._on_input_handler = None  # type: ignore
-
-            wrapper._set_on_output_handler = partial(_set_on_output_handler, wrapper)  # type: ignore
             wrapper._on_output_handler = None  # type: ignore
-
-            wrapper._set_on_finish_handler = partial(_set_on_finish_handler, wrapper)  # type: ignore
             wrapper._on_finish_handler = None  # type: ignore
             wrapper._on_finish_post_processor = None  # type: ignore
 
@@ -1675,6 +1652,6 @@ def _add_accumulator(
             on_finish(value, None)
             return value
 
-    op._set_on_output_handler(on_output)
+    op._on_output_handler = on_output
     op._on_finish_post_processor = on_finish_post_processor
     return op

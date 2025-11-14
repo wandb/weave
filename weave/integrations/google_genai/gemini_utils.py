@@ -111,7 +111,7 @@ def google_genai_gemini_wrapper_sync(
 
         op = weave.op(fn, **op_kwargs)
         if op.name not in SKIP_TRACING_FUNCTIONS:
-            op._set_on_finish_handler(google_genai_gemini_on_finish)
+            op._on_finish_handler = google_genai_gemini_on_finish
         return _add_accumulator(
             op,
             make_accumulator=lambda inputs: google_genai_gemini_accumulator,
@@ -138,7 +138,7 @@ def google_genai_gemini_wrapper_async(
 
         op = weave.op(_fn_wrapper(fn), **op_kwargs)
         if op.name not in SKIP_TRACING_FUNCTIONS:
-            op._set_on_finish_handler(google_genai_gemini_on_finish)
+            op._on_finish_handler = google_genai_gemini_on_finish
         return _add_accumulator(
             op,
             make_accumulator=lambda inputs: google_genai_gemini_accumulator,

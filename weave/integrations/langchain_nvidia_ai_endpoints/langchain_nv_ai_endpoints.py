@@ -159,7 +159,7 @@ def nvidia_ai_endpoints_wrapper(settings: OpSettings) -> Callable[[Callable], Ca
     def wrapper(fn: Callable) -> Callable:
         op_kwargs = settings.model_dump()
         op = weave.op(fn, **op_kwargs)
-        op._set_on_input_handler(postprocess_inputs_to_openai_format)
+        op._on_input_handler = postprocess_inputs_to_openai_format
         return _add_accumulator(
             op,
             make_accumulator=lambda inputs: nvidia_accumulator,

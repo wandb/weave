@@ -88,7 +88,7 @@ def test_resilience_to_output_handler_errors(client, log_collector):
         def on_output_handler(*args, **kwargs):
             raise DummyTestException("FAILURE!")
 
-        simple_op._set_on_output_handler(on_output_handler)
+        simple_op._on_output_handler = on_output_handler
 
         return simple_op()
 
@@ -119,7 +119,7 @@ async def test_resilience_to_output_handler_errors_async(client, log_collector):
         def on_output_handler(*args, **kwargs):
             raise DummyTestException("FAILURE!")
 
-        simple_op._set_on_output_handler(on_output_handler)
+        simple_op._on_output_handler = on_output_handler
 
         return await simple_op()
 

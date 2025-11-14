@@ -175,7 +175,7 @@ def _setup_op_wrapper(
     updated_kwargs = op_kwargs.copy()
     updated_kwargs["name"] = op_name
     op = weave.op(fn, **updated_kwargs)
-    op._set_on_input_handler(_on_input_handler)
+    op._on_input_handler = _on_input_handler
 
     # Extract inputs from args and kwargs for tracing
     inputs = {}
