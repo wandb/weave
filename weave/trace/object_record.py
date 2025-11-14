@@ -12,29 +12,40 @@ from weave.trace_server.client_server_common.pydantic_util import (
     pydantic_asdict_one_level,
 )
 
+# Attributes to exclude when unwrapping ObjectRecord
+_UNWRAP_EXCLUDED = {
+    "_class_name",
+    "_bases",
+    "map_values",
+    "unwrap",
+    "__repr__",
+    "__eq__",
+}
+
 
 class ObjectRecord:
     _class_name: str
     _bases: list[str]
 
     def __init__(self, attrs: dict[str, Any]) -> None:
-        for k, v in attrs.items():
-            setattr(self, k, v)
+        self.__dict__.update(attrs)
 
     def __repr__(self) -> str:
         return f"ObjectRecord({self.__dict__})"
 
     def __eq__(self, other: Any) -> bool:
         if isinstance(other, ObjectRecord):
-            if self._class_name != other._class_name:
-                return False
+            other_class_name = other._class_name
         else:
-            if other.__class__.__name__ != self._class_name:
-                return False
+            other_class_name = other.__class__.__name__
+
+        if self._class_name != other_class_name:
+            return False
+
         for k, v in self.__dict__.items():
-            if k == "_class_name" or k == "_bases":
+            if k in ("_class_name", "_bases"):
                 continue
-            if getattr(other, k) != v:
+            if getattr(other, k, None) != v:
                 return False
         return True
 
@@ -46,50 +57,49 @@ class ObjectRecord:
         from weave.trace.vals import unwrap
 
         unwrapped_one_level = {
-            k: v
-            for k, v in self.__dict__.items()
-            if k
-            not in [
-                "_class_name",
-                "_bases",
-                "map_values",
-                "unwrap",
-                "__repr__",
-                "__eq__",
-            ]
+            k: v for k, v in self.__dict__.items() if k not in _UNWRAP_EXCLUDED
         }
         return unwrap(unwrapped_one_level)
 
 
 def class_all_bases_names(cls: type) -> list[str]:
-    # Don't include cls and don't include object
+    """Get all base class names, excluding cls itself and object."""
     return [c.__name__ for c in cls.mro()[1:-1]]
 
 
-def pydantic_object_record(obj: BaseModel) -> ObjectRecord:
-    attrs = pydantic_asdict_one_level(obj)
+def _add_op_methods(obj: Any, attrs: dict[str, Any]) -> None:
+    """Add op methods from object to attrs dict."""
     for k, v in getmembers(obj, lambda x: is_op(x), lambda e: None):
         attrs[k] = types.MethodType(v, obj)
+
+
+def _make_object_record(obj: Any, attrs: dict[str, Any]) -> ObjectRecord:
+    """Create ObjectRecord with class metadata."""
+    _add_op_methods(obj, attrs)
     attrs["_class_name"] = obj.__class__.__name__
     attrs["_bases"] = class_all_bases_names(obj.__class__)
     return ObjectRecord(attrs)
 
 
+def pydantic_object_record(obj: BaseModel) -> ObjectRecord:
+    """Convert a Pydantic BaseModel to ObjectRecord."""
+    attrs = pydantic_asdict_one_level(obj)
+    return _make_object_record(obj, attrs)
+
+
 def dataclass_asdict_one_level(obj: Any) -> dict[str, Any]:
+    """Get dataclass attributes as a dict (one level only)."""
     if not dataclasses.is_dataclass(obj):
         raise ValueError(f"{obj} is not a dataclass")
     return {k: getattr(obj, k) for k in obj.__dataclass_fields__}
 
 
 def dataclass_object_record(obj: Any) -> ObjectRecord:
+    """Convert a dataclass to ObjectRecord."""
     if not dataclasses.is_dataclass(obj):
         raise ValueError(f"{obj} is not a dataclass")
     attrs = dataclass_asdict_one_level(obj)
-    for k, v in getmembers(obj, lambda x: is_op(x), lambda e: None):
-        attrs[k] = types.MethodType(v, obj)
-    attrs["_class_name"] = obj.__class__.__name__
-    attrs["_bases"] = class_all_bases_names(obj.__class__)  # type: ignore[arg-type]
-    return ObjectRecord(attrs)
+    return _make_object_record(obj, attrs)
 
 
 # This is an exact copy of the getmembers function from the inspect module
