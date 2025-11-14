@@ -10,6 +10,7 @@ from weave.trace_server.trace_server_interface import (
     CompletionsCreateReq,
     CompletionsCreateRequestInputs,
 )
+from weave.utils.project_id import to_project_id
 
 ResponseFormat = Literal["json_object", "json_schema", "text"]
 
@@ -157,7 +158,7 @@ class LLMStructuredCompletionModel(Model):
             )
 
         req = self.prepare_completion_request(
-            project_id=f"{current_client.entity}/{current_client.project}",
+            project_id=to_project_id(current_client.entity, current_client.project),
             user_input=user_input,
             config=config,
             **template_vars,

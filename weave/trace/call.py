@@ -28,6 +28,7 @@ from weave.trace_server.trace_server_interface import (
 )
 from weave.utils.attributes_dict import AttributesDict
 from weave.utils.paginated_iterator import PaginatedIterator
+from weave.utils.project_id import from_project_id
 
 if TYPE_CHECKING:
     from weave.flow.scorer import ApplyScorerResult, Scorer
@@ -114,7 +115,7 @@ class Call:
 
         if self._feedback is None:
             try:
-                entity, project = self.project_id.split("/")
+                entity, project = from_project_id(self.project_id)
             except ValueError:
                 raise ValueError(f"Invalid project_id: {self.project_id}") from None
             weave_ref = CallRef(entity, project, self.id)
@@ -129,14 +130,14 @@ class Call:
             )
 
         try:
-            entity, project = self.project_id.split("/")
+            entity, project = from_project_id(self.project_id)
         except ValueError:
             raise ValueError(f"Invalid project_id: {self.project_id}") from None
         return urls.redirect_call(entity, project, self.id)
 
     @property
     def ref(self) -> CallRef:
-        entity, project = self.project_id.split("/")
+        entity, project = from_project_id(self.project_id)
         if not self.id:
             raise ValueError(
                 "Can't get ref for call without ID, was `weave.init` called?"
@@ -362,7 +363,7 @@ def _make_calls_iterator(
 
     # TODO: Should be Call, not WeaveObject
     def transform_func(call: CallSchema) -> WeaveObject:
-        entity, project = project_id.split("/")
+        entity, project = from_project_id(project_id)
         return make_client_call(entity, project, call, server)
 
     def size_func() -> int:

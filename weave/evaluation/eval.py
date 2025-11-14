@@ -37,6 +37,7 @@ from weave.trace.table import Table
 from weave.trace.vals import WeaveObject
 from weave.trace.weave_client import get_ref
 from weave.trace_server.trace_server_interface import CallsFilter
+from weave.utils.project_id import from_project_id
 
 logger = logging.getLogger(__name__)
 
@@ -145,7 +146,7 @@ class Evaluation(Object):
         # End mega-hack
 
         if not field_values.get("ref"):
-            entity, project = obj.project_id.split("/")
+            entity, project = from_project_id(obj.project_id)
             field_values["ref"] = ObjectRef(
                 entity=entity,
                 project=project,
