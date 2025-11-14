@@ -702,6 +702,11 @@ class CachingMiddlewareTraceServer(TraceServerClientInterface):
     def score_delete(self, req: tsi.ScoreDeleteReq) -> tsi.ScoreDeleteRes:
         return self._next_trace_server.score_delete(req)
 
+    def calls_upsert_batch_v2(
+        self, req: tsi.CallsUpsertBatchV2Req
+    ) -> tsi.CallsUpsertBatchV2Res:
+        return self._next_trace_server.calls_upsert_batch_v2(req)
+
 
 def pydantic_bytes_safe_dump(obj: BaseModel) -> str:
     raw_dict = obj.model_dump()

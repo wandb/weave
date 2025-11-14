@@ -25,6 +25,7 @@ from weave.trace_server_bindings.http_utils import (
 )
 from weave.trace_server_bindings.models import (
     Batch,
+    CompleteBatchItem,
     EndBatchItem,
     ServerInfoRes,
     StartBatchItem,
@@ -136,16 +137,33 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         """Send a batch of data to the server with retry logic.
 
         This method is separated from _flush_calls to avoid recursive retries.
+        First tries the v2 endpoint, falls back to legacy on 404.
         """
-        r = self.post(
-            "/call/upsert_batch",
-            data=encoded_data,  # type: ignore
-        )
-        handle_response_error(r, "/call/upsert_batch")
+        # Try v2 endpoint first
+        try:
+            r = self.post(
+                "/v2/calls/upsert/batch",
+                data=encoded_data,  # type: ignore
+            )
+            handle_response_error(r, "/v2/calls/upsert/batch")
+        except requests.HTTPError as e:
+            # If v2 endpoint doesn't exist (404), fall back to legacy upsert_batch
+            if e.response.status_code == 404:
+                logger.debug(
+                    "V2 upsert batch endpoint not available, falling back to legacy upsert_batch"
+                )
+                r = self.post(
+                    "/call/upsert_batch",
+                    data=encoded_data,  # type: ignore
+                )
+                handle_response_error(r, "/call/upsert_batch")
+            else:
+                # Re-raise non-404 errors
+                raise
 
     def _flush_calls(
         self,
-        batch: list[StartBatchItem | EndBatchItem],
+        batch: list[StartBatchItem | EndBatchItem | CompleteBatchItem],
         *,
         _should_update_batch_size: bool = True,
     ) -> None:
@@ -159,14 +177,16 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         if len(batch) == 0:
             return
 
-        def get_item_id(item: StartBatchItem | EndBatchItem) -> str:
+        def get_item_id(item: StartBatchItem | EndBatchItem | CompleteBatchItem | dict[str, Any]) -> str:
             if isinstance(item, StartBatchItem):
                 return f"{item.req.start.id}-start"
             elif isinstance(item, EndBatchItem):
                 return f"{item.req.end.id}-end"
+            elif isinstance(item, CompleteBatchItem):
+                return f"{item.req.complete.id}-complete"
             return "unknown"
 
-        def encode_batch(batch: list[StartBatchItem | EndBatchItem]) -> bytes:
+        def encode_batch(batch: list[StartBatchItem | EndBatchItem | CompleteBatchItem]) -> bytes:
             data = Batch(batch=batch).model_dump_json()
             return data.encode("utf-8")
 
@@ -404,8 +424,49 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
             return tsi.CallEndRes()
         return self._generic_request("/call/end", req, tsi.CallEndReq, tsi.CallEndRes)
 
+    def _call_complete(
+        self, req: Union[tsi.CallCompleteReq, dict[str, Any]]
+    ) -> tsi.CallUpsertRes:
+        """Internal method to handle complete calls for batching.
+
+        This accumulates complete calls into the batch processor when batching is enabled.
+        When batching is disabled, it sends as a single-item batch to calls_upsert_batch_v2.
+        """
+        req_as_obj: tsi.CallCompleteReq
+        if isinstance(req, dict):
+            req_as_obj = tsi.CallCompleteReq.model_validate(req)
+        else:
+            req_as_obj = req
+
+        if req_as_obj.complete.id is None or req_as_obj.complete.trace_id is None:
+            raise ValueError("CallCompleteReq must have id and trace_id.")
+
+        if self.should_batch:
+            assert self.call_processor is not None
+            # Enqueue to batch processor for batching with other calls
+            self.call_processor.enqueue([CompleteBatchItem(req=req_as_obj)])
+            return tsi.CallUpsertRes(
+                id=req_as_obj.complete.id, trace_id=req_as_obj.complete.trace_id
+            )
+        else:
+            # When batching is disabled, send as a single-item batch directly
+            batch_req = tsi.CallsUpsertBatchV2Req(
+                batch=[tsi.CallBatchCompleteMode(req=req_as_obj)]
+            )
+            batch_res = self.calls_upsert_batch_v2(batch_req)
+            # Extract the result for the single item
+            if batch_res.res and len(batch_res.res) > 0:
+                return tsi.CallUpsertRes(
+                    id=batch_res.res[0].id, trace_id=batch_res.res[0].trace_id
+                )
+            else:
+                # Fallback to returning from the original request
+                return tsi.CallUpsertRes(
+                    id=req_as_obj.complete.id, trace_id=req_as_obj.complete.trace_id
+                )
+
     @validate_call
-    def call_read(self, req: tsi.CallReadReq) -> tsi.CallReadRes:
+    def call_read(self, req: Union[tsi.CallReadReq, dict[str, Any]]) -> tsi.CallReadRes:
         return self._generic_request(
             "/call/read", req, tsi.CallReadReq, tsi.CallReadRes
         )
@@ -1331,4 +1392,44 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
             tsi.ScoreDeleteRes,
             method="DELETE",
             params=params,
+        )
+
+    def calls_upsert_batch_v2(
+        self, req: tsi.CallsUpsertBatchV2Req | dict[str, Any]
+    ) -> tsi.CallsUpsertBatchV2Res:
+        """V2 batch call upsert endpoint - handles starts, ends, and completes.
+
+        This endpoint automatically routes calls to the appropriate tables based on
+        whether they have ended_at set (complete) or not (start).
+        """
+        # Validate dict to object first to avoid type errors
+        req_obj: tsi.CallsUpsertBatchV2Req
+        if isinstance(req, dict):
+            req_obj = tsi.CallsUpsertBatchV2Req.model_validate(req)
+        else:
+            req_obj = req
+
+        # Extract project_id from the first item in the batch
+        # All items in a batch should have the same project_id
+        if not req_obj.batch:
+            return tsi.CallsUpsertBatchV2Res(res=[])
+
+        # Get project_id from the first batch item
+        first_item = req_obj.batch[0]
+        if first_item.mode == "start":
+            project_id = first_item.req.start.project_id
+        elif first_item.mode == "end":
+            project_id = first_item.req.end.project_id
+        elif first_item.mode == "complete":
+            project_id = first_item.req.complete.project_id
+        else:
+            raise ValueError(f"Unknown batch item mode: {first_item.mode}")
+
+        entity, project = project_id.split("/", 1)
+        url = f"/v2/{entity}/{project}/calls/upsert/batch"
+        return self._generic_request(
+            url,
+            req_obj,
+            tsi.CallsUpsertBatchV2Req,
+            tsi.CallsUpsertBatchV2Res,
         )
