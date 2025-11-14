@@ -233,7 +233,7 @@ def tests(session, shard):
 
     # Set trace-server flag for stainless shard
     if shard == "stainless":
-        pytest_args.extend(["--trace-server=stainless"])
+        pytest_args.extend(["--remote-http-trace-server=stainless"])
 
     if shard == "verifiers_test":
         # Pinning to this commit because the latest version of the gsm8k environment is broken.
