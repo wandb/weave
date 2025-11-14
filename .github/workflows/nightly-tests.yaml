@@ -30,7 +30,7 @@ jobs:
           ]
         shard:
           [
-            "trace123",
+            "trace",
             "flow",
             "trace_server",
             "trace_server_bindings",
