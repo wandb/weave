@@ -143,7 +143,6 @@ def test_empty_batch_is_noop(server):
     assert server._send_batch_to_server.call_count == 0
 
 
-@pytest.mark.skip_stainless(reason="Test behavior differs between implementations")
 @pytest.mark.disable_logging_error_check
 @pytest.mark.parametrize("server", ["small_limit"], indirect=True)
 def test_oversized_item_will_log_warning_and_send(server, caplog):
@@ -274,7 +273,6 @@ def test_non_uniform_batch_items(server):
     assert total_items_sent == len(batch)
 
 
-@pytest.mark.skip_stainless(reason="Test patches http_requests.post which stainless doesn't use")
 @patch("weave.utils.http_requests.post")
 def test_timeout_retry_mechanism(mock_post, success_response, remote_http_trace_server):
     """Test that timeouts trigger the retry mechanism."""
@@ -295,7 +293,6 @@ def test_timeout_retry_mechanism(mock_post, success_response, remote_http_trace_
     assert mock_post.call_count == 3
 
 
-@pytest.mark.skip_stainless(reason="Test patches http_requests.post which stainless doesn't use")
 @pytest.mark.disable_logging_error_check
 @pytest.mark.parametrize("server", ["fast_retrying"], indirect=True)
 @patch("weave.utils.http_requests.post")
@@ -348,7 +345,6 @@ def test_post_timeout(
     assert response.trace_id == "test_trace_id"
 
 
-@pytest.mark.skip_stainless(reason="Test directly manipulates queue internals")
 @pytest.mark.disable_logging_error_check
 @pytest.mark.parametrize("server", ["normal"], indirect=True)
 @pytest.mark.parametrize("log_collector", ["warning"], indirect=True)
