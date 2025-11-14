@@ -96,6 +96,24 @@ def pytest_sessionfinish(session, exitstatus):
         session.exitstatus = 0
 
 
+def pytest_collection_modifyitems(config, items):
+    """Handle stainless-specific test markers."""
+    trace_server_flag = config.getoption("--trace-server", default="clickhouse")
+    
+    skip_stainless = pytest.mark.skip(reason="Test not compatible with stainless implementation")
+    skip_non_stainless = pytest.mark.skip(reason="Test only runs with stainless implementation")
+    
+    for item in items:
+        if trace_server_flag == "stainless":
+            # Skip tests marked with skip_stainless
+            if "skip_stainless" in item.keywords:
+                item.add_marker(skip_stainless)
+        else:
+            # Skip tests marked with stainless_only when NOT using stainless
+            if "stainless_only" in item.keywords:
+                item.add_marker(skip_non_stainless)
+
+
 class ThrowingServer(tsi.TraceServerInterface):
     # Call API
     def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:

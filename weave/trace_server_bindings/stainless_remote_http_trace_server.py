@@ -288,6 +288,33 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         for item in response:
             yield res_type.model_validate(item)
 
+    def _send_batch_to_server(self, encoded_data: bytes) -> None:
+        """Send an encoded batch of calls to the server using the stainless client.
+
+        Args:
+            encoded_data: Encoded batch data to send.
+        """
+        self._update_client_headers()
+        # Parse the batch and convert to stainless format
+        batch_data = Batch.model_validate_json(encoded_data.decode("utf-8"))
+        stainless_batch = []
+        for item in batch_data.batch:
+            if isinstance(item, StartBatchItem):
+                stainless_batch.append(
+                    {
+                        "mode": "start",
+                        "req": item.req.model_dump(by_alias=True),
+                    }
+                )
+            elif isinstance(item, EndBatchItem):
+                stainless_batch.append(
+                    {
+                        "mode": "end",
+                        "req": item.req.model_dump(by_alias=True),
+                    }
+                )
+        self._stainless_client.calls.upsert_batch(batch=stainless_batch)
+
     def _flush_calls(
         self,
         batch: list[StartBatchItem | EndBatchItem],
@@ -315,33 +342,11 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             data = Batch(batch=batch).model_dump_json()
             return data.encode("utf-8")
 
-        def send_batch_fn(encoded_data: bytes) -> None:
-            self._update_client_headers()
-            # Parse the batch and convert to stainless format
-            batch_data = Batch.model_validate_json(encoded_data.decode("utf-8"))
-            stainless_batch = []
-            for item in batch_data.batch:
-                if isinstance(item, StartBatchItem):
-                    stainless_batch.append(
-                        {
-                            "mode": "start",
-                            "req": item.req.model_dump(by_alias=True),
-                        }
-                    )
-                elif isinstance(item, EndBatchItem):
-                    stainless_batch.append(
-                        {
-                            "mode": "end",
-                            "req": item.req.model_dump(by_alias=True),
-                        }
-                    )
-            self._stainless_client.calls.upsert_batch(batch=stainless_batch)
-
         process_batch_with_retry(
             batch_name="calls",
             batch=batch,
             remote_request_bytes_limit=self.remote_request_bytes_limit,
-            send_batch_fn=send_batch_fn,
+            send_batch_fn=self._send_batch_to_server,
             processor_obj=self.call_processor,
             should_update_batch_size=_should_update_batch_size,
             get_item_id_fn=get_item_id,
