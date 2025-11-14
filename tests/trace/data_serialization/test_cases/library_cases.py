@@ -81,7 +81,7 @@ library_cases = [
             "dataset": "weave:///shawn/test-project/object/Dataset:N0VKaX8wr9kF9QQzM7mSQz3yKrJJjTiJi4c9Bt7RSTA",
             "scorers": [
                 "weave:///shawn/test-project/object/MyScorer:K1OwZ5OGLRYNboUzGHPhnyR0W6PqWj431ieXWISYiyA",
-                "weave:///shawn/test-project/object/LLMAsAJudgeScorer:vXqDKUgLwZOzkucuvh1U2Sj7u9zbedVhRAlZ03bJTwQ",
+                "weave:///shawn/test-project/object/LLMAsAJudgeScorer:YsHTOw7igXPx9EdNjULw85YnFVQXZtlocW2EBEFqdHQ",
             ],
             "preprocess_model_input": None,
             "trials": 1,
@@ -140,13 +140,13 @@ library_cases = [
             },
             {
                 "object_id": "LLMAsAJudgeScorer",
-                "digest": "vXqDKUgLwZOzkucuvh1U2Sj7u9zbedVhRAlZ03bJTwQ",
+                "digest": "YsHTOw7igXPx9EdNjULw85YnFVQXZtlocW2EBEFqdHQ",
                 "exp_val": {
                     "_type": "LLMAsAJudgeScorer",
                     "name": None,
                     "description": None,
                     "column_map": None,
-                    "model": "weave:///shawn/test-project/object/LLMStructuredCompletionModel:2R1OHt00gXIlXGF1Gt06RESqZYJnXlFauj9oypDx0cs",
+                    "model": "weave:///shawn/test-project/object/LLMStructuredCompletionModel:4zsdRxw3S6o4FU6YNwASCkTjvPGE3FQ60WwqYIR5BPU",
                     "scoring_prompt": "Here are the inputs: {inputs}. Here is the output: {output}. Is the output correct?",
                     "score": "weave:///shawn/test-project/op/LLMAsAJudgeScorer.score:3DXMPEFwP04oJ362x6sxQIqQmVYYX2jB4Kg5EF2SF60",
                     "summarize": "weave:///shawn/test-project/op/Scorer.summarize:lMo39TTtMo50nRj7gWzUJUXXbuX3D3VXkRRMuOTdCHU",
@@ -165,7 +165,7 @@ library_cases = [
             },
             {
                 "object_id": "LLMStructuredCompletionModel",
-                "digest": "2R1OHt00gXIlXGF1Gt06RESqZYJnXlFauj9oypDx0cs",
+                "digest": "4zsdRxw3S6o4FU6YNwASCkTjvPGE3FQ60WwqYIR5BPU",
                 "exp_val": {
                     "_type": "LLMStructuredCompletionModel",
                     "name": None,
@@ -197,18 +197,18 @@ library_cases = [
                         "_class_name": "LLMStructuredCompletionModelDefaultParams",
                         "_bases": ["BaseModel"],
                     },
-                    "predict": "weave:///shawn/test-project/op/LLMStructuredCompletionModel.predict:QRNR2dNZxSOepeXF6uVYm9vh2nPsaLtyHfQNH6WPnDU",
+                    "predict": "weave:///shawn/test-project/op/LLMStructuredCompletionModel.predict:r9oz4otRLeZEs09UpI6XvjiHKwyKaKfNr3w2vHrtGYw",
                     "_class_name": "LLMStructuredCompletionModel",
                     "_bases": ["Model", "Object", "BaseModel"],
                 },
             },
             {
                 "object_id": "LLMStructuredCompletionModel.predict",
-                "digest": "QRNR2dNZxSOepeXF6uVYm9vh2nPsaLtyHfQNH6WPnDU",
+                "digest": "r9oz4otRLeZEs09UpI6XvjiHKwyKaKfNr3w2vHrtGYw",
                 "exp_val": {
                     "_type": "CustomWeaveType",
                     "weave_type": {"type": "Op"},
-                    "files": {"obj.py": "20afElBH5qHzA71fqJe4EJHY751CHcew11zC31MF9mk"},
+                    "files": {"obj.py": "dfDO60tU0OHzTX4oGXgm67Kpy2QO2EXCf0SleOCTMVY"},
                 },
             },
             {
@@ -265,7 +265,7 @@ library_cases = [
                 "exp_content": b'import weave\nfrom typing import Any\nfrom weave.trace.op import op\n\n@weave.op()\n@op\ndef score(self, *, output: str, **kwargs: Any) -> Any:\n    scoring_prompt = self.scoring_prompt.format(output=output, **kwargs)\n    model_input = [\n        {"role": "user", "content": scoring_prompt},\n    ]\n    return self.model.predict(model_input)\n',
             },
             {
-                "digest": "20afElBH5qHzA71fqJe4EJHY751CHcew11zC31MF9mk",
+                "digest": "dfDO60tU0OHzTX4oGXgm67Kpy2QO2EXCf0SleOCTMVY",
                 "exp_content": b'import weave\nfrom typing import Optional\nfrom typing import Annotated as MessageListLike\nfrom typing import Annotated as LLMStructuredModelParamsLike\nfrom typing import Any\nfrom weave.trace.context.weave_client_context import get_weave_client\nfrom weave.trace.context.weave_client_context import WeaveInitError\nfrom typing import Literal as ResponseFormat\nimport json\nfrom typing import Union\nfrom pydantic.main import BaseModel\nfrom weave.trace.op import op\nfrom weave.utils.project_id import to_project_id\n\nclass Message(BaseModel):\n    """A message in a conversation with an LLM.\n\n    Attributes:\n        role: The role of the message\'s author. Can be: system, user, assistant, function or tool.\n        content: The contents of the message. Required for all messages, but may be null for assistant messages with function calls.\n        name: The name of the author of the message. Required if role is "function". Must match the name of the function represented in content.\n              Can contain characters (a-z, A-Z, 0-9), and underscores, with a maximum length of 64 characters.\n        function_call: The name and arguments of a function that should be called, as generated by the model.\n        tool_call_id: Tool call that this message is responding to.\n    """\n\n    role: str\n    content: Optional[Union[str, list[dict]]] = None\n    name: Optional[str] = None\n    function_call: Optional[dict] = None\n    tool_call_id: Optional[str] = None\n\ndef parse_response(\n    response_payload: dict, response_format: Optional[ResponseFormat]\n) -> Union[Message, str, dict[str, Any]]:\n    if response_payload.get("error"):\n        # Or handle more gracefully depending on desired behavior\n        raise RuntimeError(f"LLM API returned an error: {response_payload[\'error\']}")\n\n    # Assuming OpenAI-like structure: a list of choices, first choice has the message\n    output_message_dict = response_payload["choices"][0]["message"]\n\n    if response_format == "text":\n        return output_message_dict["content"]\n    elif response_format == "json_object":\n        return json.loads(output_message_dict["content"])\n    else:\n        raise ValueError(f"Invalid response_format: {response_format}")\n\n@weave.op()\n@op\ndef predict(\n    self,\n    user_input: Optional[MessageListLike] = None,\n    config: Optional[LLMStructuredModelParamsLike] = None,\n    **template_vars: Any,\n) -> Union[Message, str, dict[str, Any]]:\n    """Generates a prediction by preparing messages (template + user_input)\n    and calling the LLM completions endpoint with overridden config, using the provided client.\n\n    Args:\n        user_input: The user input messages\n        config: Optional configuration to override default parameters\n        **template_vars: Variables to substitute in the messages template using {variable_name} syntax\n    """\n    if user_input is None:\n        user_input = []\n\n    current_client = get_weave_client()\n    if current_client is None:\n        raise WeaveInitError(\n            "You must call `weave.init(<project_name>)` first, to predict with a LLMStructuredCompletionModel"\n        )\n\n    req = self.prepare_completion_request(\n        project_id=to_project_id(current_client.entity, current_client.project),\n        user_input=user_input,\n        config=config,\n        **template_vars,\n    )\n\n    # 5. Call the LLM API\n    try:\n        api_response = current_client.server.completions_create(req=req)\n    except Exception as e:\n        raise RuntimeError("Failed to call LLM completions endpoint.") from e\n\n    # 6. Extract the message from the API response\n    try:\n        # The \'response\' attribute of CompletionsCreateRes is a dict\n        response_payload = api_response.response\n        response_format = (\n            req.inputs.response_format.get("type")\n            if req.inputs.response_format is not None\n            else None\n        )\n        return parse_response(response_payload, response_format)\n    except (\n        KeyError,\n        IndexError,\n        TypeError,\n        AttributeError,\n        json.JSONDecodeError,\n    ) as e:\n        raise RuntimeError(\n            f"Failed to extract message from LLM response payload. Response: {api_response.response}"\n        ) from e\n',
             },
         ],
