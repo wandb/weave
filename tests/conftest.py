@@ -15,21 +15,15 @@ from fastapi.testclient import TestClient
 import weave
 from tests.trace.util import DummyTestException
 from tests.trace_server.conftest import *
-from tests.trace_server.conftest import (
-    TEST_ENTITY,
-    get_remote_http_trace_server_flag,
-    get_trace_server_flag,
-)
+from tests.trace_server.conftest import TEST_ENTITY, get_trace_server_flag
 from weave.trace import weave_client, weave_init
 from weave.trace.context import weave_client_context
 from weave.trace.context.call_context import set_call_stack
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server_bindings import (
-    remote_http_trace_server as remote_http_trace_server_module,
-)
 from weave.trace_server_bindings.caching_middleware_trace_server import (
     CachingMiddlewareTraceServer,
 )
+from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
 
 # Force testing to never report wandb sentry events
 os.environ["WANDB_ERROR_REPORTING"] = "false"
@@ -351,38 +345,6 @@ def make_server_recorder(server: tsi.TraceServerInterface):  # type: ignore
     return ServerRecorder(server)
 
 
-@pytest.fixture
-def remote_http_trace_server(request):
-    """Fixture that provides a factory for RemoteHTTPTraceServer or StainlessRemoteHTTPTraceServer.
-
-    When remote_http_trace_server_flag is "stainless", this fixture returns StainlessRemoteHTTPTraceServer.
-    Otherwise, it returns RemoteHTTPTraceServer.
-
-    Returns:
-        A callable (class) that can be instantiated like RemoteHTTPTraceServer.
-        Usage: server = remote_http_trace_server("http://example.com", should_batch=True)
-
-    Examples:
-        >>> def test_something(remote_http_trace_server):
-        ...     server = remote_http_trace_server("http://example.com")
-        ...     # Use server...
-    """
-    remote_http_trace_server_flag = get_remote_http_trace_server_flag(request)
-    # Check if we're using stainless
-    if remote_http_trace_server_flag == "stainless":
-        try:
-            from weave.trace_server_bindings.stainless_remote_http_trace_server import (
-                StainlessRemoteHTTPTraceServer,
-            )
-
-        except ImportError:
-            pytest.skip("StainlessRemoteHTTPTraceServer not available")
-        else:
-            return StainlessRemoteHTTPTraceServer
-
-    return remote_http_trace_server_module.RemoteHTTPTraceServer
-
-
 def create_client(
     request,
     trace_server,
@@ -394,9 +356,7 @@ def create_client(
         return weave_init.init_weave("dev_testing")
     elif trace_server_flag == "http":
         # Use RemoteHTTPTraceServer directly here since this is for the http flag
-        server = remote_http_trace_server_module.RemoteHTTPTraceServer(
-            trace_server_flag
-        )
+        server = RemoteHTTPTraceServer(trace_server_flag)
     else:
         server = trace_server
 
@@ -575,7 +535,7 @@ def network_proxy_client(client):
         orig_post = weave.utils.http_requests.post
         weave.utils.http_requests.post = post
 
-        remote_client = remote_http_trace_server_module.RemoteHTTPTraceServer(
+        remote_client = RemoteHTTPTraceServer(
             trace_server_url="",
             should_batch=True,
         )
