@@ -13,8 +13,8 @@ from weave.trace.display.rich import pydantic_util
 from weave.trace.display.rich.container import AbstractRichContainer
 from weave.trace.display.rich.refs import Refs
 from weave.trace.refs import ObjectRef, Ref
-from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.interface.query import Query
+from weave.trace_server import trace_server_interface as tsi  # noqa: TID251
+from weave.trace_server.interface.query import Query  # noqa: TID251
 
 
 class Feedbacks(AbstractRichContainer[tsi.Feedback]):

@@ -4,8 +4,10 @@ from pydantic import BaseModel
 
 from weave.trace.refs import OpRef
 from weave.trace.weave_client import WeaveClient, get_ref
-from weave.trace_server.interface.builtin_object_classes import leaderboard
-from weave.trace_server.trace_server_interface import CallsFilter
+from weave.trace_server.interface.builtin_object_classes import (  # noqa: TID251
+    leaderboard,
+)
+from weave.trace_server.trace_server_interface import CallsFilter  # noqa: TID251
 
 
 class LeaderboardModelEvaluationResult(BaseModel):

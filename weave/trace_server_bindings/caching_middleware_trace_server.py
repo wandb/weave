@@ -18,7 +18,7 @@ from weave.trace.settings import (
     server_cache_size_limit,
     use_server_cache,
 )
-from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server import trace_server_interface as tsi  # noqa: TID251
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
 from weave.trace_server_bindings.caches import DiskCache, LRUCache, StackedCache
 

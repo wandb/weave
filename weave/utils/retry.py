@@ -10,7 +10,7 @@ import tenacity
 from pydantic import ValidationError
 
 from weave.trace.settings import retry_max_attempts, retry_max_interval
-from weave.trace_server.ids import generate_id
+from weave.trace_server.ids import generate_id  # noqa: TID251
 
 logger = logging.getLogger(__name__)
 

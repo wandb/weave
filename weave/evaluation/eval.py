@@ -36,7 +36,7 @@ from weave.trace.refs import ObjectRef
 from weave.trace.table import Table
 from weave.trace.vals import WeaveObject
 from weave.trace.weave_client import get_ref
-from weave.trace_server.trace_server_interface import CallsFilter
+from weave.trace_server.trace_server_interface import CallsFilter  # noqa: TID251
 
 logger = logging.getLogger(__name__)
 

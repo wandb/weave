@@ -1,6 +1,6 @@
 from typing import Any
 
-from weave.trace_server.interface.query import (
+from weave.trace_server.interface.query import (  # noqa: TID251
     GetFieldOperator,
     LiteralOperation,
     NotOperation,

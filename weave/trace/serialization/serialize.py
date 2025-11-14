@@ -11,12 +11,12 @@ from weave.trace.object_record import ObjectRecord
 from weave.trace.refs import ObjectRef, Ref, TableRef
 from weave.trace.serialization import custom_objs
 from weave.trace.serialization.dictifiable import try_to_dict
-from weave.trace_server.trace_server_interface import (
+from weave.trace_server.trace_server_interface import (  # noqa: TID251
     FileContentReadReq,
     FileCreateReq,
     TraceServerInterface,
 )
-from weave.trace_server.trace_server_interface_util import bytes_digest
+from weave.trace_server.trace_server_interface_util import bytes_digest  # noqa: TID251
 from weave.utils.sanitize import REDACTED_VALUE, should_redact
 
 if TYPE_CHECKING:
@@ -323,7 +323,7 @@ def from_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
 
             return custom_objs.decode_custom_obj(encoded)
         elif isinstance(val_type, str) and obj.get("_class_name") == val_type:
-            from weave.trace_server.interface.builtin_object_classes.builtin_object_registry import (
+            from weave.trace_server.interface.builtin_object_classes.builtin_object_registry import (  # noqa: TID251
                 BUILTIN_OBJECT_REGISTRY,
             )
 
