@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any, Literal, TypedDict, Union
+from typing import Any, Literal, TypedDict
 
 from pydantic import BaseModel, Field
 from typing_extensions import NotRequired
@@ -10,7 +10,7 @@ DataUrlContentType = Literal[
 
 ContentType = Literal["bytes", "text", "base64", "file", "url", DataUrlContentType]
 
-ValidContentInputs = Union[bytes, str, Path]
+ValidContentInputs = bytes | str | Path
 
 
 # This is what is saved to the 'metadata.json' file by serialization layer

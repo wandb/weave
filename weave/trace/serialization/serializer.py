@@ -38,7 +38,7 @@ from __future__ import annotations
 import inspect
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Union
+from typing import TYPE_CHECKING, Any
 
 from typing_extensions import TypeIs
 
@@ -53,7 +53,7 @@ SerializeLoadCallable = Callable[["MemTraceFilesArtifact", str, Any], Any]
 LegacyInlineLoad = Callable[[Any], Any]
 LegacyFileLoad = Callable[["MemTraceFilesArtifact", str], Any]
 
-AllLoadCallables = Union[SerializeLoadCallable, LegacyInlineLoad, LegacyFileLoad]
+AllLoadCallables = SerializeLoadCallable | LegacyInlineLoad | LegacyFileLoad
 
 
 def is_probably_legacy_inline_load(fn: Callable) -> TypeIs[LegacyInlineLoad]:

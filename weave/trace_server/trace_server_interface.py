@@ -1,7 +1,7 @@
 import datetime
 from collections.abc import Iterator
 from enum import Enum
-from typing import Any, Literal, Protocol, Union
+from typing import Any, Literal, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field, field_serializer
 from typing_extensions import TypedDict
@@ -716,7 +716,7 @@ class TableInsertSpec(BaseModel):
     insert: TableInsertSpecPayload
 
 
-TableUpdateSpec = Union[TableAppendSpec, TablePopSpec, TableInsertSpec]
+TableUpdateSpec = TableAppendSpec | TablePopSpec | TableInsertSpec
 
 
 class TableUpdateReq(BaseModelStrict):

@@ -5,7 +5,7 @@ import operator
 import typing
 from collections.abc import Generator, Iterator, Sequence
 from copy import deepcopy
-from typing import Any, Literal, Optional, SupportsIndex, Union
+from typing import Any, Literal, Optional, SupportsIndex
 
 from pydantic import BaseModel
 
@@ -73,8 +73,8 @@ class MutationAppend:
     args: tuple[Any]
 
 
-Mutation = Union[MutationSetattr, MutationSetitem, MutationAppend]
-MutationOperation = Union[Literal["setitem"], Literal["setattr"], Literal["append"]]
+Mutation = MutationSetattr | MutationSetitem | MutationAppend
+MutationOperation = Literal["setitem"] | Literal["setattr"] | Literal["append"]
 
 
 def make_mutation(

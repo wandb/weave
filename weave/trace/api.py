@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import contextlib
 import logging
-import sys
-import warnings
 from collections.abc import Iterator
 from typing import Any, cast
 
@@ -81,13 +79,6 @@ def init(
         raise ValueError("project_name must be non-empty")
 
     configure_logger()
-
-    if sys.version_info < (3, 10):
-        warnings.warn(
-            "Python 3.9 will reach end of life in October 2025, after which weave will drop support for it.  Please upgrade to Python 3.10 or later!",
-            DeprecationWarning,
-            stacklevel=2,
-        )
 
     # Check if deprecated autopatch_settings is used
     if autopatch_settings is not None:

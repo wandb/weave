@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Annotated, Any, Literal, Union
+from typing import Annotated, Any, Literal
 
 from pydantic import AfterValidator, AliasChoices, BaseModel, Field
 from pydantic_core import ValidationError
@@ -116,7 +116,7 @@ class FunctionToolChoice(BaseModel):
     function: str
 
 
-ToolChoice = Union[Literal["auto", "none", "required"], FunctionToolChoice]
+ToolChoice = Literal["auto", "none", "required"] | FunctionToolChoice
 
 MessageRole = Literal["system", "assistant", "user"]
 
@@ -202,8 +202,8 @@ class OutputTextContentPart(BaseModel):
 
 
 SystemContentPart = InputTextContentPart
-UserContentPart = Union[
-    Annotated[InputTextContentPart | InputAudioContentPart, Field(discriminator="type")]
+UserContentPart = Annotated[
+    InputTextContentPart | InputAudioContentPart, Field(discriminator="type")
 ]
 AssistantContentPart = OutputTextContentPart
 
@@ -866,7 +866,7 @@ SERVER_MESSAGE_CLASSES: dict[str, type[ServerMessageType]] = {
     "rate_limits.updated": RateLimitsUpdatedMessage,
 }
 
-MessageType = Union[UserMessageType, ServerMessageType]
+MessageType = UserMessageType | ServerMessageType
 
 
 def create_user_message_from_dict(data: dict) -> UserMessageType | None:

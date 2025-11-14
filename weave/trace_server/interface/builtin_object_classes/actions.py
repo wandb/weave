@@ -1,4 +1,4 @@
-from typing import Any, Literal, Union
+from typing import Any, Literal
 
 import jsonschema
 from pydantic import BaseModel, Field, field_validator
@@ -31,10 +31,7 @@ class ContainsWordsActionConfig(BaseModel):
     target_words: list[str]
 
 
-ActionConfigType = Union[
-    LlmJudgeActionConfig,
-    ContainsWordsActionConfig,
-]
+ActionConfigType = LlmJudgeActionConfig | ContainsWordsActionConfig
 
 
 class ActionSpec(base_object_def.BaseObject):
