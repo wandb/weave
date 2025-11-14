@@ -10,6 +10,7 @@ nox.options.stop_on_first_error = True
 SUPPORTED_PYTHON_VERSIONS = ["3.10", "3.11", "3.12", "3.13"]
 INCOMPATIBLE_SHARDS = {
     "3.10": [
+        "notdiamond",
         "verifiers_test",
     ],
     "3.13": [
