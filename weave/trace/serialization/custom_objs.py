@@ -27,6 +27,10 @@ from weave.trace_server.trace_server_interface import (
 logger = logging.getLogger(__name__)
 
 
+class DecodeCustomObjectError(Exception):
+    """An error that occurs while decoding a custom object."""
+
+
 class WeaveTypeDict(TypedDict):
     type: str
 
@@ -46,10 +50,6 @@ class EncodedCustomObjDict(
     _EncodedCustomObjDictRequired, _EncodedCustomObjDictOptional
 ):
     pass
-
-
-class DecodeCustomObjectError(Exception):
-    """An error that occurs while decoding a custom object."""
 
 
 # in future, could generalize as

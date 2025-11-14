@@ -66,6 +66,19 @@ SIGNAL_STOP = "STOP"
 SIGNAL_EXEC = "EXEC"
 
 # =============================================================================
+# Exceptions
+# =============================================================================
+
+
+class IsolatedClientExecutorError(Exception):
+    """Base exception for IsolatedClientExecutor errors."""
+
+
+class IsolatedClientExecutorTimeoutError(IsolatedClientExecutorError):
+    """Exception for function execution timeouts."""
+
+
+# =============================================================================
 # Type Definitions
 # =============================================================================
 
@@ -83,19 +96,6 @@ ResponseTuple = tuple[Any, Optional[Exception]]
 if TYPE_CHECKING:
     RequestQueue = Queue[tuple[str, Any, Any]]
     ResponseQueue = Queue[ResponseTuple]
-
-
-# =============================================================================
-# Exceptions
-# =============================================================================
-
-
-class IsolatedClientExecutorError(Exception):
-    """Base exception for IsolatedClientExecutor errors."""
-
-
-class IsolatedClientExecutorTimeoutError(IsolatedClientExecutorError):
-    """Exception for function execution timeouts."""
 
 
 # =============================================================================

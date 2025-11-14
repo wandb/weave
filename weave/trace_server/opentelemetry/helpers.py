@@ -12,6 +12,28 @@ from uuid import UUID
 from opentelemetry.proto.common.v1.common_pb2 import AnyValue, KeyValue
 
 
+class AttributePathConflictError(TypeError):
+    def __init__(
+        self,
+        *,
+        parent_key: str,
+        attempted_subkey: str,
+        existing_type: type,
+        message: Optional[str] = None,
+    ) -> None:
+        if message is None:
+            message = (
+                "Invalid attribute structure: cannot set subkey '"
+                f"{attempted_subkey}' under parent key '{parent_key}' because it "
+                f"is already a {existing_type.__name__}. "
+                "Attributes must form a valid tree structure."
+            )
+        super().__init__(message)
+        self.parent_key = parent_key
+        self.attempted_subkey = attempted_subkey
+        self.existing_type = existing_type
+
+
 def to_json_serializable(value: Any) -> Any:
     # Transform common data types into JSON-serializable values.
     if value is None:
@@ -121,30 +143,6 @@ def _get_value_from_nested_dict(d: dict[str, Any], key: str) -> Any:
                 return None
         current = current[part]
     return current
-
-
-class AttributePathConflictError(TypeError):
-    def __init__(
-        self,
-        *,
-        parent_key: str,
-        attempted_subkey: str,
-        existing_type: type,
-        message: Optional[str] = None,
-    ) -> None:
-        if message is None:
-            message = (
-                "Invalid attribute structure: cannot set subkey '"
-                f"{attempted_subkey}' under parent key '{parent_key}' because it "
-                f"is already a {existing_type.__name__}. "
-                "Do not mix a primitive value and nested keys for the same path. "
-                "Either send only nested keys (e.g. '"
-                f"{parent_key}.…') or rename the parent (e.g. '{parent_key}_value')."
-            )
-        super().__init__(message)
-        self.parent_key = parent_key
-        self.attempted_subkey = attempted_subkey
-        self.existing_type = existing_type
 
 
 def _validate_structure(d: dict[str, Any], key: str, value: Any) -> None:

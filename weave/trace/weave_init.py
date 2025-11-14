@@ -26,15 +26,15 @@ from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTrace
 logger = logging.getLogger(__name__)
 
 
+class WeaveWandbAuthenticationException(Exception): ...
+
+
 def get_username() -> str | None:
     api = wandb.Api()
     try:
         return api.username()
     except AttributeError:
         return None
-
-
-class WeaveWandbAuthenticationException(Exception): ...
 
 
 def get_entity_project_from_project_name(project_name: str) -> tuple[str, str]:

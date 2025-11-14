@@ -87,6 +87,19 @@ RETRY_MAX_ATTEMPTS = 3
 RETRY_MIN_WAIT = 1  # seconds
 RETRY_MAX_WAIT = 10  # seconds
 
+
+class FileStorageWriteError(Exception):
+    """Exception for failed file writes."""
+
+    pass
+
+
+class FileStorageReadError(Exception):
+    """Exception for failed file reads."""
+
+    pass
+
+
 # Publicly exposed methods:
 
 
@@ -110,18 +123,6 @@ class FileStorageClient:
     def read(self, uri: FileStorageURI) -> bytes:
         """Read data from the specified URI location in cloud storage."""
         pass
-
-
-class FileStorageWriteError(Exception):
-    """Exception for failed file writes."""
-
-    pass
-
-
-class FileStorageReadError(Exception):
-    """Exception for failed file reads."""
-
-    pass
 
 
 def store_in_bucket(
