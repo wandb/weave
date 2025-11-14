@@ -79,7 +79,7 @@ def get_trace_server_flag(request):
 
 def get_remote_http_trace_server_flag(request):
     """Get the remote HTTP trace server implementation to use.
-    
+
     Returns:
         str: Either 'remote' for RemoteHTTPTraceServer or 'stainless' for StainlessRemoteHTTPTraceServer
     """
