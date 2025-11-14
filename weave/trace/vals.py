@@ -38,10 +38,18 @@ from weave.trace_server.trace_server_interface import (
     TraceServerInterface,
 )
 from weave.utils.iterators import ThreadSafeLazyList
+from weave.utils.project_id import to_project_id
 
 logger = logging.getLogger(__name__)
 
 REMOTE_ITER_PAGE_SIZE = 100
+
+
+class InternalError(Exception): ...
+
+
+class MissingSelfInstanceError(ValueError):
+    pass
 
 
 @dataclasses.dataclass
@@ -738,9 +746,6 @@ class WeaveDict(Traceable, dict):
         return unwrap(dict(self.items()))
 
 
-class InternalError(Exception): ...
-
-
 def make_trace_obj(
     val: Any,
     new_ref: Optional[RefWithExtra],  # Can this actually be None?
@@ -766,7 +771,7 @@ def make_trace_obj(
         new_ref = val
         extra = val.extra
         try:
-            project_id = f"{val.entity}/{val.project}"
+            project_id = to_project_id(val.entity, val.project)
             read_res = server.obj_read(
                 ObjReadReq(
                     project_id=project_id,
@@ -899,7 +904,3 @@ def make_trace_obj(
         if hasattr(box_val, "ref") and not isinstance(box_val, DeletedRef):
             box_val.ref = new_ref
     return box_val
-
-
-class MissingSelfInstanceError(ValueError):
-    pass
