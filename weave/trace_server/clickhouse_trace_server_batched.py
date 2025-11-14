@@ -4370,20 +4370,18 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     )
                 }
             )
-        if batch:
-            settings = {}
-            if self._use_async_insert:
-                settings["async_insert"] = 1
-                # https://clickhouse.com/docs/en/optimize/asynchronous-inserts#enabling-asynchronous-inserts
-                # Setting wait_for_async_insert = 0 does not guarantee that insert errors
-                # are caught, reverting to default behavior.
-                settings["wait_for_async_insert"] = 1
-            self._insert(
-                "call_parts",
-                data=batch,
-                column_names=ALL_CALL_INSERT_COLUMNS,
-                settings=settings,
-            )
+        if not batch:
+            return
+
+        settings = {}
+        if self._use_async_insert:
+            settings = ch_settings.CLICKHOUSE_ASYNC_INSERT_SETTINGS.copy()
+        self._insert(
+            "call_parts",
+            data=batch,
+            column_names=ALL_CALL_INSERT_COLUMNS,
+            settings=settings,
+        )
 
     def _select_objs_query(
         self,
