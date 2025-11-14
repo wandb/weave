@@ -333,8 +333,8 @@ def test_post_timeout(mock_post, success_response, server, log_collector):
         reraise=True,
     )
     unwrapped_send_batch_to_server = MethodType(
-        new_server._send_batch_to_server.__wrapped__,
-        new_server,  # type: ignore
+        new_server._send_batch_to_server.__wrapped__,  # type: ignore
+        new_server,
     )
     new_server._send_batch_to_server = fast_retry(unwrapped_send_batch_to_server)
 
