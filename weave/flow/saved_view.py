@@ -62,6 +62,12 @@ class Filter(BaseModel):
 Filters = list[Filter]
 
 
+class QueryTranslationException(Exception):
+    """Exception raised when a query cannot be translated to or from filters."""
+
+    pass
+
+
 class TableColumn(TypedDict):
     """A column in a table view."""
 
@@ -281,12 +287,6 @@ def filters_to_query(filters: Filters | None) -> tsi.Query | None:
     filter_clauses = [filter_to_clause(f) for f in filters]
     expr = {"$and": filter_clauses}
     return tsi.Query(**{"$expr": expr})
-
-
-class QueryTranslationException(Exception):
-    """Exception raised when a query cannot be translated to or from filters."""
-
-    pass
 
 
 def operand_to_filter_eq(operand: tsi_query.EqOperation) -> Filter:
