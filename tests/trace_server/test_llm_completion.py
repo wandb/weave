@@ -686,7 +686,7 @@ class TestPromptResolution(unittest.TestCase):
         self.assertIn("assistant_name", str(context.exception))
 
     def test_replace_template_vars_with_complex_content(self):
-        """Test template variable replacement with list content (not currently supported)."""
+        """Test template variable replacement with nested list content (e.g., multimodal messages)."""
         from weave.trace_server.llm_completion import replace_template_vars_in_messages
 
         messages = [
@@ -701,11 +701,12 @@ class TestPromptResolution(unittest.TestCase):
 
         template_vars = {"name": "World"}
 
-        # Current implementation doesn't replace variables in list content, it just passes through
+        # Now supports nested structure replacement (uses shared logic from MessagesPrompt)
         result = replace_template_vars_in_messages(messages, template_vars)
 
-        # Content should remain unchanged (list content replacement not implemented)
-        self.assertEqual(result[0]["content"][0]["text"], "Hello {name}")
+        # Variables in nested dicts should be replaced
+        self.assertEqual(result[0]["content"][0]["text"], "Hello World")
+        # Non-string values should remain unchanged
         self.assertEqual(
             result[0]["content"][1]["image_url"]["url"], "https://example.com"
         )
@@ -741,14 +742,14 @@ class TestPromptResolution(unittest.TestCase):
             f"weave-trace-internal:///{self.project_id}/object/test-prompt:digest-1"
         )
 
-        # Test without template vars
+        # Test resolving messages (without template var substitution)
         messages = resolve_prompt_messages(
             prompt=prompt_uri,
             project_id=self.project_id,
             obj_read_func=mock_obj_read,
-            template_vars=None,
         )
 
+        # Template variables should NOT be substituted (that's handled separately)
         self.assertEqual(len(messages), 2)
         self.assertEqual(messages[0]["role"], "system")
         self.assertEqual(messages[0]["content"], "You are {assistant_name}.")
@@ -756,8 +757,11 @@ class TestPromptResolution(unittest.TestCase):
         self.assertEqual(messages[1]["content"], "Hello!")
 
     def test_resolve_prompt_messages_with_template_vars(self):
-        """Test resolving prompt messages with template variable substitution."""
-        from weave.trace_server.llm_completion import resolve_prompt_messages
+        """Test resolving prompt messages and then applying template variable substitution."""
+        from weave.trace_server.llm_completion import (
+            replace_template_vars_in_messages,
+            resolve_prompt_messages,
+        )
 
         # Create a mock MessagesPrompt object
         mock_prompt_obj = tsi.ObjSchema(
@@ -787,14 +791,17 @@ class TestPromptResolution(unittest.TestCase):
         )
         template_vars = {"assistant_name": "MathBot", "topic": "mathematics"}
 
-        # Test with template vars
+        # First resolve the prompt messages
         messages = resolve_prompt_messages(
             prompt=prompt_uri,
             project_id=self.project_id,
             obj_read_func=mock_obj_read,
-            template_vars=template_vars,
         )
 
+        # Then apply template variable substitution separately
+        messages = replace_template_vars_in_messages(messages, template_vars)
+
+        # Template vars should now be replaced
         self.assertEqual(len(messages), 2)
         self.assertEqual(messages[0]["content"], "You are MathBot.")
         self.assertEqual(messages[1]["content"], "My topic is mathematics.")
@@ -832,7 +839,6 @@ class TestPromptResolution(unittest.TestCase):
                 prompt=prompt_uri,
                 project_id=self.project_id,
                 obj_read_func=mock_obj_read,
-                template_vars=None,
             )
 
         self.assertIn("is not a Prompt or MessagesPrompt", str(context.exception))

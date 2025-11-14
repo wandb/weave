@@ -18,93 +18,91 @@ from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 NOVA_MODELS = ("nova-pro-v1", "nova-lite-v1", "nova-micro-v1")
 
 
-def replace_template_vars_in_messages(
-    messages: list[dict[str, Any]],
-    template_vars: dict[str, Any],
-) -> list[dict[str, Any]]:
-    """Replace template variables in messages using single bracket syntax {var}.
+def parse_prompt_reference(prompt: str) -> tuple[str, str, Optional[str]]:
+    """Parse a prompt reference into its components.
+
+    Supports multiple reference formats:
+    1. Internal URI: "weave-trace-internal:///project_id/object/name:digest"
+    2. Full weave URI: "weave:///entity/project/object/name:digest"
+    3. Simple format: "object_id:digest" or "object_id:vN"
+    4. Name only: "object_id" (assumes latest version)
 
     Args:
-        messages: List of message dictionaries
-        template_vars: Template variables to substitute
+        prompt: The prompt reference string to parse
 
     Returns:
-        List of messages with variables replaced
+        Tuple of (object_id, version, project_id_from_uri)
+        - object_id: The name/ID of the prompt object
+        - version: The version/digest (or "latest" if not specified)
+        - project_id_from_uri: The project_id extracted from URI (None for simple format)
+
+    Raises:
+        InvalidRequest: If the prompt reference format is invalid
+
+    Examples:
+        >>> parse_prompt_reference("my_prompt:v1")
+        ("my_prompt", "v1", None)
+
+        >>> parse_prompt_reference("my_prompt")
+        ("my_prompt", "latest", None)
+
+        >>> parse_prompt_reference("weave:///entity/project/object/my_prompt:abc123")
+        ("my_prompt", "abc123", "project_id")
     """
-    formatted_messages = []
-    for message in messages:
-        if not isinstance(message, dict):
-            formatted_messages.append(message)
-            continue
+    from weave.trace_server import refs_internal as ri
 
-        # Create a copy to avoid mutating the original
-        formatted_message = message.copy()
-
-        # Format the content if it's a string
-        if isinstance(formatted_message.get("content"), str):
-            try:
-                # Use .format() to replace {var} syntax
-                formatted_message["content"] = formatted_message["content"].format(
-                    **template_vars
-                )
-            except KeyError as e:
+    # Handle Weave URI formats (internal and external)
+    if prompt.startswith(("weave-trace-internal:///", "weave:///")):
+        try:
+            parsed_ref = ri.parse_internal_uri(prompt)
+            if not isinstance(parsed_ref, ri.InternalObjectRef):
                 raise InvalidRequest(
-                    f"Template variable {e} not found in template_vars"
-                ) from e
+                    f"Prompt reference must be an object reference, got: {type(parsed_ref).__name__}"
+                )
+            else:
+                return (
+                    parsed_ref.name,
+                    parsed_ref.version,
+                    parsed_ref.project_id or None,
+                )
+        except InvalidRequest:
+            # Re-raise InvalidRequest as-is
+            raise
+        except Exception as e:
+            raise InvalidRequest(
+                f"Failed to parse prompt reference '{prompt}': {e!s}"
+            ) from e
 
-        formatted_messages.append(formatted_message)
+    # Handle simple formats
+    if ":" in prompt:
+        # Format: "object_id:version"
+        object_id, version = prompt.rsplit(":", 1)
+        return object_id, version, None
 
-    return formatted_messages
+    # Format: "object_id" (no version specified)
+    return prompt, "latest", None
 
 
 def resolve_prompt_messages(
     prompt: str,
     project_id: str,
     obj_read_func: Callable[[tsi.ObjReadReq], tsi.ObjReadRes],
-    template_vars: Optional[dict[str, Any]] = None,
 ) -> list[dict[str, Any]]:
     """Resolve a prompt reference to its messages.
 
     Args:
-        prompt: The prompt reference (e.g., "prompt-name:v2")
-        project_id: The project ID
+        prompt: The prompt reference (e.g., "weave:///entity/project/object/prompt_name:version")
+        project_id: The project ID (can be overridden if prompt contains a full URI with project_id)
         obj_read_func: Function to read objects from the database
-        template_vars: Optional template variables to substitute in messages
 
     Returns:
-        List of messages from the prompt (with template variables substituted if provided)
+        List of messages from the prompt
     """
-    # Parse the prompt to extract object_id and digest
-    # Format can be:
-    # 1. Internal URI: "weave-trace-internal:///project_id/object/name:digest"
-    # 2. Full weave URI: "weave:///entity/project/object/name:digest"
-    # 3. Simple format: "object_id:digest" or "object_id:vN"
+    object_id, version, uri_project_id = parse_prompt_reference(prompt)
 
-    if prompt.startswith("weave-trace-internal:///") or prompt.startswith("weave:///"):
-        # Parse using internal URI parser
-        from weave.trace_server import refs_internal as ri
-
-        try:
-            parsed_ref = ri.parse_internal_uri(prompt)
-            if isinstance(parsed_ref, ri.InternalObjectRef):
-                object_id = parsed_ref.name
-                version = parsed_ref.version
-                # Override project_id from the URI if provided
-                if parsed_ref.project_id:
-                    project_id = parsed_ref.project_id
-            else:
-                raise InvalidRequest(
-                    f"Prompt reference must be an object reference, got: {type(parsed_ref)}"
-                )
-        except Exception as e:
-            raise InvalidRequest(
-                f"Failed to parse prompt reference {prompt}: {e!s}"
-            ) from e
-    elif ":" in prompt:
-        object_id, version = prompt.rsplit(":", 1)
-    else:
-        object_id = prompt
-        version = "latest"
+    # Use project_id from URI if available, otherwise use the provided one
+    if uri_project_id:
+        project_id = uri_project_id
 
     # Fetch the prompt object
     try:
@@ -135,10 +133,6 @@ def resolve_prompt_messages(
 
         if not isinstance(messages, list):
             raise InvalidRequest(f"Prompt {prompt} messages field is not a list")
-
-        # Apply template variable substitution if provided
-        if template_vars:
-            return replace_template_vars_in_messages(messages, template_vars)
         else:
             return messages
     except NotFoundError:

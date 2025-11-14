@@ -357,8 +357,18 @@ class CompletionsCreateRequestInputs(BaseModel):
     function_call: Optional[str] = None
     api_version: Optional[str] = None
     # Weave-specific params
-    prompt: Optional[str] = None
-    template_vars: Optional[dict[str, Any]] = None
+    prompt: Optional[str] = Field(
+        None,
+        description="Reference to a Weave Prompt object (e.g., 'weave:///entity/project/object/prompt_name:version'). "
+        "If provided, the messages from this prompt will be prepended to the messages in this request. "
+        "Template variables in the prompt messages can be substituted using the template_vars parameter.",
+    )
+    template_vars: Optional[dict[str, Any]] = Field(
+        None,
+        description="Dictionary of template variables to substitute in prompt messages. "
+        "Variables in messages like '{variable_name}' will be replaced with the corresponding values. "
+        "Applied to both prompt messages (if prompt is provided) and regular messages.",
+    )
 
 
 class CompletionsCreateReq(BaseModelStrict):

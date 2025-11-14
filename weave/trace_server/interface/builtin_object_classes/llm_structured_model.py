@@ -4,6 +4,7 @@ from typing import Annotated, Any, Literal, Optional, Union
 from pydantic import BaseModel, BeforeValidator, Field
 
 from weave import Model, op
+from weave.prompt.prompt import format_message_with_template_vars
 from weave.trace.context.weave_client_context import WeaveInitError, get_weave_client
 from weave.trace_server.interface.builtin_object_classes import base_object_def
 from weave.trace_server.trace_server_interface import (
@@ -35,30 +36,6 @@ class Message(BaseModel):
     name: Optional[str] = None
     function_call: Optional[dict] = None
     tool_call_id: Optional[str] = None
-
-
-def _substitute_template_variables(
-    messages: list[Message], template_vars: dict[str, Any]
-) -> list[Message]:
-    """Substitute template variables using Python's .format()."""
-    substituted_messages = []
-
-    for message in messages:
-        message_dict = message.model_dump()
-
-        if isinstance(message_dict.get("content"), str):
-            try:
-                message_dict["content"] = message_dict["content"].format(
-                    **template_vars
-                )
-            except KeyError as e:
-                raise ValueError(
-                    f"Template variable {e} not found in template_vars"
-                ) from e
-
-        substituted_messages.append(Message.model_validate(message_dict))
-
-    return substituted_messages
 
 
 class LLMStructuredCompletionModelDefaultParams(BaseModel):
@@ -210,9 +187,14 @@ class LLMStructuredCompletionModel(Model):
             template_msgs = self.default_params.messages_template
             # Apply template variable substitution if variables are provided
             if template_vars:
-                template_msgs = _substitute_template_variables(
-                    template_msgs, template_vars
-                )
+                formatted_msgs = []
+                for msg in template_msgs:
+                    msg_dict = msg.model_dump()
+                    formatted_dict = format_message_with_template_vars(
+                        msg_dict, **template_vars
+                    )
+                    formatted_msgs.append(Message.model_validate(formatted_dict))
+                template_msgs = formatted_msgs
 
         prepared_messages_dicts = _prepare_llm_messages(template_msgs, user_input)
 

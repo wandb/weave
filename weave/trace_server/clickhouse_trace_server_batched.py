@@ -4125,12 +4125,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         if prompt:
             try:
-                # Fetch prompt messages WITHOUT replacing template vars yet
+                # Fetch prompt messages
                 prompt_messages = resolve_prompt_messages(
                     prompt=prompt,
                     project_id=req.project_id,
                     obj_read_func=self.obj_read,
-                    template_vars=None,  # Don't replace vars yet
                 )
             except Exception as e:
                 logger.error(f"Failed to resolve prompt: {e}", exc_info=True)
@@ -4147,13 +4146,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # Apply template variable replacement to ALL messages (prompt + user) if template_vars provided
         if template_vars and combined_messages:
             try:
-                from weave.trace_server.llm_completion import (
-                    replace_template_vars_in_messages,
-                )
+                from weave.prompt.prompt import format_message_with_template_vars
 
-                combined_messages = replace_template_vars_in_messages(
-                    combined_messages, template_vars
-                )
+                combined_messages = [
+                    format_message_with_template_vars(msg, **template_vars)
+                    for msg in combined_messages
+                ]
             except Exception as e:
                 logger.error(f"Failed to replace template vars: {e}", exc_info=True)
 
