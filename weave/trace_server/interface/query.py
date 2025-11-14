@@ -47,15 +47,15 @@ class LiteralOperation(BaseModel):
 
     model_config = ConfigDict(populate_by_name=True)
 
-    literal_: typing.Union[
-        str,
-        int,
-        float,
-        bool,
-        dict[str, "LiteralOperation"],
-        list["LiteralOperation"],
-        None,
-    ] = Field(alias="$literal")
+    literal_: (
+        str
+        | int
+        | float
+        | bool
+        | dict[str, "LiteralOperation"]
+        | list["LiteralOperation"]
+        | None
+    ) = Field(alias="$literal")
 
 
 # https://www.mongodb.com/docs/manual/reference/operator/aggregation/getField/
@@ -297,7 +297,7 @@ class ContainsSpec(BaseModel):
 
     input: "Operand"
     substr: "Operand"
-    case_insensitive: typing.Optional[bool] = False
+    case_insensitive: bool | None = False
 
 
 # Convenience type for all Operands and Operations

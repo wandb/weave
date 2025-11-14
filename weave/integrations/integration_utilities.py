@@ -2,7 +2,7 @@ import hashlib
 import re
 from collections.abc import Iterable
 from concurrent.futures import Future
-from typing import Any, Union
+from typing import Any
 
 from weave.trace.call import Call, CallsIter
 from weave.trace.refs import OpRef
@@ -72,7 +72,7 @@ def _hash_str(s: str, hash_len: int) -> str:
     return hashlib.md5(s.encode()).hexdigest()[:hash_len]
 
 
-def flatten_calls(calls: Union[Iterable[Call], CallsIter], *, depth: int = 0) -> list:
+def flatten_calls(calls: Iterable[Call] | CallsIter, *, depth: int = 0) -> list:
     lst = []
     for call in calls:
         lst.append((call, depth))

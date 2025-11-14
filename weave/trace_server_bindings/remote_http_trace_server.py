@@ -2,7 +2,7 @@ import datetime
 import io
 import logging
 from collections.abc import Iterator
-from typing import Any, Optional, Union
+from typing import Any
 from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, Field, validate_call
@@ -49,8 +49,8 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
         should_batch: bool = False,
         *,
         remote_request_bytes_limit: int = REMOTE_REQUEST_BYTES_LIMIT,
-        auth: Optional[tuple[str, str]] = None,
-        extra_headers: Optional[dict[str, str]] = None,
+        auth: tuple[str, str] | None = None,
+        extra_headers: dict[str, str] | None = None,
     ):
         super().__init__()
         self.trace_server_url = trace_server_url
@@ -68,8 +68,8 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
                 max_queue_size=max_calls_queue_size(),
                 enable_disk_fallback=should_enable_disk_fallback(),
             )
-        self._auth: Optional[tuple[str, str]] = auth
-        self._extra_headers: Optional[dict[str, str]] = extra_headers
+        self._auth: tuple[str, str] | None = auth
+        self._extra_headers: dict[str, str] | None = extra_headers
         self.remote_request_bytes_limit = remote_request_bytes_limit
 
     def ensure_project_exists(
@@ -144,7 +144,7 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
 
     def _flush_calls(
         self,
-        batch: list[Union[StartBatchItem, EndBatchItem]],
+        batch: list[StartBatchItem | EndBatchItem],
         *,
         _should_update_batch_size: bool = True,
     ) -> None:
@@ -158,14 +158,14 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
         if len(batch) == 0:
             return
 
-        def get_item_id(item: Union[StartBatchItem, EndBatchItem]) -> str:
+        def get_item_id(item: StartBatchItem | EndBatchItem) -> str:
             if isinstance(item, StartBatchItem):
                 return f"{item.req.start.id}-start"
             elif isinstance(item, EndBatchItem):
                 return f"{item.req.end.id}-end"
             return "unknown"
 
-        def encode_batch(batch: list[Union[StartBatchItem, EndBatchItem]]) -> bytes:
+        def encode_batch(batch: list[StartBatchItem | EndBatchItem]) -> bytes:
             data = Batch(batch=batch).model_dump_json()
             return data.encode("utf-8")
 
@@ -181,7 +181,7 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
             encode_batch_fn=encode_batch,
         )
 
-    def get_call_processor(self) -> Union[AsyncBatchProcessor, None]:
+    def get_call_processor(self) -> AsyncBatchProcessor | None:
         """Custom method not defined on the formal TraceServerInterface to expose
         the underlying call processor. Should be formalized in a client-side interface.
         """
@@ -233,7 +233,7 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
                     # Feedback endpoint doesn't support id, created_at, so we need to strip them
                     class FeedbackCreateReqStripped(tsi.FeedbackCreateReq):
                         id: SkipJsonSchema[str] = Field(exclude=True)
-                        created_at: SkipJsonSchema[Optional[datetime.datetime]] = Field(
+                        created_at: SkipJsonSchema[datetime.datetime | None] = Field(
                             exclude=True, default=None
                         )
 
@@ -267,7 +267,7 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
             encode_batch_fn=encode_batch,
         )
 
-    def get_feedback_processor(self) -> Union[AsyncBatchProcessor, None]:
+    def get_feedback_processor(self) -> AsyncBatchProcessor | None:
         """Custom method not defined on the formal TraceServerInterface to expose
         the underlying feedback processor. Should be formalized in a client-side interface.
         """
@@ -296,7 +296,7 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
     def _get_request_executor(
         self,
         url: str,
-        params: Optional[dict[str, Any]] = None,
+        params: dict[str, Any] | None = None,
         stream: bool = False,
     ) -> requests.Response:
         r = self.get(url, params=params or {}, stream=stream)
@@ -307,7 +307,7 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
     def _delete_request_executor(
         self,
         url: str,
-        params: Optional[dict[str, Any]] = None,
+        params: dict[str, Any] | None = None,
         stream: bool = False,
     ) -> requests.Response:
         r = self.delete(url, params=params or {}, stream=stream)
@@ -321,7 +321,7 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
         req_model: type[BaseModel],
         res_model: type[BaseModel],
         method: str = "POST",
-        params: Optional[dict[str, Any]] = None,
+        params: dict[str, Any] | None = None,
     ) -> BaseModel:
         if method == "POST":
             r = self._post_request_executor(url, req)
@@ -341,7 +341,7 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
         req_model: type[BaseModel],
         res_model: type[BaseModel],
         method: str = "POST",
-        params: Optional[dict[str, Any]] = None,
+        params: dict[str, Any] | None = None,
     ) -> Iterator[BaseModel]:
         if method == "POST":
             r = self._post_request_executor(url, req, stream=True)

@@ -7,7 +7,7 @@ import logging
 import sys
 import warnings
 from collections.abc import Iterator
-from typing import Any, Union, cast
+from typing import Any, cast
 
 # TODO: type_handlers is imported here to trigger registration of the image serializer.
 # There is probably a better place for this, but including here for now to get the fix in.
@@ -372,7 +372,7 @@ def thread(thread_id: str | None | object = _AUTO_GENERATE) -> Iterator[ThreadCo
         actual_thread_id = generate_id()
     else:
         # Explicit thread_id (string or None)
-        actual_thread_id = cast(Union[str, None], thread_id)
+        actual_thread_id = cast(str | None, thread_id)
 
     # Create context object
     context = ThreadContext(actual_thread_id)

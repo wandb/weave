@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 
 from weave.trace.env import is_mtsaas
 from weave.trace.serialization import serializer
@@ -25,7 +25,7 @@ except ImportError:
 
 def save(
     obj: Markdown, artifact: "MemTraceFilesArtifact", name: str
-) -> Optional[dict[str, Any]]:
+) -> dict[str, Any] | None:
     """Save markdown content as file, return metadata."""
     use_file = len(obj.markup) >= INLINE_MARKDOWN_THRESHOLD
 

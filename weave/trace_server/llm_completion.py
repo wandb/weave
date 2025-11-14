@@ -1,5 +1,5 @@
-from collections.abc import Iterator
-from typing import Any, Callable, Optional
+from collections.abc import Callable, Iterator
+from typing import Any
 
 from pydantic import BaseModel
 
@@ -18,12 +18,12 @@ NOVA_MODELS = ("nova-pro-v1", "nova-lite-v1", "nova-micro-v1")
 
 
 def lite_llm_completion(
-    api_key: Optional[str],
+    api_key: str | None,
     inputs: tsi.CompletionsCreateRequestInputs,
-    provider: Optional[str] = None,
-    base_url: Optional[str] = None,
-    extra_headers: Optional[dict[str, str]] = None,
-    return_type: Optional[str] = None,
+    provider: str | None = None,
+    base_url: str | None = None,
+    extra_headers: dict[str, str] | None = None,
+    return_type: str | None = None,
 ) -> tsi.CompletionsCreateRes:
     # Setup provider-specific credentials and model modifications
     (
@@ -164,8 +164,8 @@ def get_azure_credentials(model_name: str) -> tuple[str, str]:
 
 def _setup_provider_credentials_and_model(
     inputs: tsi.CompletionsCreateRequestInputs,
-    provider: Optional[str] = None,
-) -> tuple[Optional[str], Optional[str], Optional[str], Optional[str], Optional[str]]:
+    provider: str | None = None,
+) -> tuple[str | None, str | None, str | None, str | None, str | None]:
     """Setup provider-specific credentials and model modifications.
 
     Returns: (aws_access_key_id, aws_secret_access_key, aws_region_name, azure_api_base, azure_api_version)
@@ -309,12 +309,12 @@ def get_custom_provider_info(
 
 
 def lite_llm_completion_stream(
-    api_key: Optional[str],
+    api_key: str | None,
     inputs: tsi.CompletionsCreateRequestInputs,
-    provider: Optional[str] = None,
-    base_url: Optional[str] = None,
-    extra_headers: Optional[dict[str, str]] = None,
-    return_type: Optional[str] = None,
+    provider: str | None = None,
+    base_url: str | None = None,
+    extra_headers: dict[str, str] | None = None,
+    return_type: str | None = None,
 ) -> Iterator[dict[str, Any]]:
     """Stream completion chunks from the underlying LLM provider using litellm.
 
@@ -389,17 +389,17 @@ def lite_llm_completion_stream(
 class ChoiceMessage(BaseModel):
     """Typed representation of a choice message."""
 
-    content: Optional[str] = None
+    content: str | None = None
     role: str
-    tool_calls: Optional[list[dict[str, Any]]] = None
-    function_call: Optional[dict[str, Any]] = None
-    reasoning_content: Optional[str] = None
+    tool_calls: list[dict[str, Any]] | None = None
+    function_call: dict[str, Any] | None = None
+    reasoning_content: str | None = None
 
 
 class CompletionChoice(BaseModel):
     """Typed representation of a completion choice."""
 
-    finish_reason: Optional[str] = None
+    finish_reason: str | None = None
     index: int
     message: ChoiceMessage
 
@@ -411,20 +411,20 @@ class CompletionResponse(BaseModel):
     created: int
     model: str
     object: str
-    system_fingerprint: Optional[str] = None
+    system_fingerprint: str | None = None
     choices: list[dict[str, Any]]
     usage: dict[str, Any]
-    service_tier: Optional[str] = None
+    service_tier: str | None = None
 
 
-def _build_choice_content(content_parts: list[str]) -> Optional[str]:
+def _build_choice_content(content_parts: list[str]) -> str | None:
     """Build content string from accumulated parts."""
     if not content_parts:
         return None
     return "".join(content_parts)
 
 
-def _build_choice_reasoning(reasoning_parts: list[str]) -> Optional[str]:
+def _build_choice_reasoning(reasoning_parts: list[str]) -> str | None:
     """Build reasoning content string from accumulated parts."""
     if not reasoning_parts:
         return None
@@ -436,7 +436,7 @@ def _create_completion_choice(
     content_parts: list[str],
     tool_calls: list[dict[str, Any]],
     reasoning_parts: list[str],
-    finish_reason: Optional[str],
+    finish_reason: str | None,
 ) -> CompletionChoice:
     """Create a properly structured completion choice."""
     cleaned_tool_calls = _clean_tool_calls(tool_calls)
@@ -467,7 +467,7 @@ def _build_choices_array(
     choice_contents: dict[int, list[str]],
     choice_tool_calls: dict[int, list[dict[str, Any]]],
     choice_reasoning_content: dict[int, list[str]],
-    choice_finish_reasons: dict[int, Optional[str]],
+    choice_finish_reasons: dict[int, str | None],
 ) -> list[dict[str, Any]]:
     """Build the choices array from accumulated choice data."""
     # Get all choice indexes that have any data

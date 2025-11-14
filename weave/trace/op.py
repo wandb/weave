@@ -13,6 +13,7 @@ from collections import defaultdict
 from collections.abc import (
     AsyncGenerator,
     AsyncIterator,
+    Callable,
     Coroutine,
     Generator,
     Iterator,
@@ -24,7 +25,6 @@ from types import MethodType
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
     Generic,
     TypedDict,
     TypeVar,

@@ -2,7 +2,7 @@ import copy
 import datetime
 from collections import OrderedDict, defaultdict
 from collections.abc import Iterator
-from typing import Any, Literal, Optional, cast
+from typing import Any, Literal, cast
 
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
@@ -74,10 +74,10 @@ def hydrate_calls_with_feedback(
 def make_derived_summary_fields(
     summary: dict[str, Any],
     op_name: str,
-    started_at: Optional[datetime.datetime] = None,
-    ended_at: Optional[datetime.datetime] = None,
-    exception: Optional[str] = None,
-    display_name: Optional[str] = None,
+    started_at: datetime.datetime | None = None,
+    ended_at: datetime.datetime | None = None,
+    exception: str | None = None,
+    display_name: str | None = None,
 ) -> tsi.SummaryMap:
     """Make derived summary fields for a call.
 
@@ -117,11 +117,11 @@ def make_derived_summary_fields(
     return cast(tsi.SummaryMap, summary)
 
 
-def empty_str_to_none(val: Optional[str]) -> Optional[str]:
+def empty_str_to_none(val: str | None) -> str | None:
     return val if val != "" else None
 
 
-def get_nested_key(d: dict[str, Any], col: str) -> Optional[Any]:
+def get_nested_key(d: dict[str, Any], col: str) -> Any | None:
     """Get a nested key from a dict. None if not found.
 
     Example:
@@ -130,13 +130,13 @@ def get_nested_key(d: dict[str, Any], col: str) -> Optional[Any]:
     get_nested_key({"a": {"b": {"c": "d"}}}, "foobar") -> None
     """
 
-    def _get(data: Optional[Any], key: str) -> Optional[Any]:
+    def _get(data: Any | None, key: str) -> Any | None:
         if not data or not isinstance(data, dict):
             return None
         return data.get(key)
 
     keys = col.split(".")
-    curr: Optional[Any] = d
+    curr: Any | None = d
     for key in keys[:-1]:
         curr = _get(curr, key)
     return _get(curr, keys[-1])
@@ -243,7 +243,7 @@ def determine_call_status(call: tsi.CallSchema) -> CallStatus:
     return "failed"
 
 
-def op_name_matches(op_name: Optional[str], expected_name: str) -> bool:
+def op_name_matches(op_name: str | None, expected_name: str) -> bool:
     """Check if an op_name URI matches the expected op name.
 
     Args:

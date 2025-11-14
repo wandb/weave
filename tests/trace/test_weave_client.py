@@ -483,7 +483,7 @@ def test_get_calls_complete(client):
             )
         ).calls
     )
-    for call1, call2 in zip(client_result, server_result):
+    for call1, call2 in zip(client_result, server_result, strict=False):
         assert call1.id == call2.id
         assert call1.op_name == call2.op_name
         assert call1.project_id == call2.project_id
@@ -518,7 +518,7 @@ def test_get_calls_complete(client):
             )
         ).calls
     )
-    for call1, call2 in zip(client_result, server_result):
+    for call1, call2 in zip(client_result, server_result, strict=False):
         assert call1.id == call2.id
         assert call1.op_name == call2.op_name
         assert call1.project_id == call2.project_id
