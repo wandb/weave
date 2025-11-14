@@ -18,8 +18,8 @@ class IdConverter(Protocol):
     def int_to_ext_user_id(self, user_id: str) -> str: ...
 
 
-A = TypeVar("A")
-B = TypeVar("B")
+TReq = TypeVar("TReq")
+TRes = TypeVar("TRes")
 
 
 class ExternalTraceServer(tsi.FullTraceServerInterface):
@@ -47,7 +47,7 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
     def __getattr__(self, name: str) -> typing.Any:
         return getattr(self._internal_trace_server, name)
 
-    def _ref_apply(self, method: Callable[[A], B], req: A) -> B:
+    def _ref_apply(self, method: Callable[[TReq], TRes], req: TReq) -> TRes:
         req_conv = universal_ext_to_int_ref_converter(
             req, self._idc.ext_to_int_project_id
         )
@@ -58,8 +58,8 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         return res_conv
 
     def _stream_ref_apply(
-        self, method: Callable[[A], Iterator[B]], req: A
-    ) -> Iterator[B]:
+        self, method: Callable[[TReq], Iterator[TRes]], req: TReq
+    ) -> Iterator[TRes]:
         req_conv = universal_ext_to_int_ref_converter(
             req, self._idc.ext_to_int_project_id
         )
