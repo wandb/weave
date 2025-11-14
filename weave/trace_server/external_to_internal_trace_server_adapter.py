@@ -1,7 +1,6 @@
-import abc
 import typing
 from collections.abc import Iterator
-from typing import Callable, TypeVar
+from typing import Callable, Protocol, TypeVar
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.trace_server_converter import (
@@ -10,30 +9,13 @@ from weave.trace_server.trace_server_converter import (
 )
 
 
-class IdConverter:
-    @abc.abstractmethod
-    def ext_to_int_project_id(self, project_id: str) -> str:
-        raise NotImplementedError()
-
-    @abc.abstractmethod
-    def int_to_ext_project_id(self, project_id: str) -> typing.Optional[str]:
-        raise NotImplementedError()
-
-    @abc.abstractmethod
-    def ext_to_int_run_id(self, run_id: str) -> str:
-        raise NotImplementedError()
-
-    @abc.abstractmethod
-    def int_to_ext_run_id(self, run_id: str) -> str:
-        raise NotImplementedError()
-
-    @abc.abstractmethod
-    def ext_to_int_user_id(self, user_id: str) -> str:
-        raise NotImplementedError()
-
-    @abc.abstractmethod
-    def int_to_ext_user_id(self, user_id: str) -> str:
-        raise NotImplementedError()
+class IdConverter(Protocol):
+    def ext_to_int_project_id(self, project_id: str) -> str: ...
+    def int_to_ext_project_id(self, project_id: str) -> str | None: ...
+    def ext_to_int_run_id(self, run_id: str) -> str: ...
+    def int_to_ext_run_id(self, run_id: str) -> str: ...
+    def ext_to_int_user_id(self, user_id: str) -> str: ...
+    def int_to_ext_user_id(self, user_id: str) -> str: ...
 
 
 A = TypeVar("A")
