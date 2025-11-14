@@ -60,8 +60,6 @@ class Op(Protocol[P, R]):
     @overload
     def __call__(self, *args: Any, **kwargs: Any) -> Any: ...  # pyright: ignore[reportOverlappingOverload]
 
-    __self__: Any
-
     # `_tracing_enabled` is a runtime-only flag that can be used to disable
     # call tracing for an op. It is not persisted as a property of the op, but is
     # respected by the current execution context. It is an underscore property
