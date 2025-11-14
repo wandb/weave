@@ -153,6 +153,7 @@ scorers = [
 ]
 notdiamond = [
   "notdiamond>=0.4.9; platform_python_implementation != 'PyPy' and python_version > '3.10' and python_version < '3.13'",
+  "pandas>=2.0.0",
 ]
 openai = ["openai>=1.99.9,<1.100.0"]
 openai_agents = ["openai-agents>=0.0.4"]
