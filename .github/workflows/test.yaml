@@ -184,7 +184,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install nox uv==0.8.6
+          pip install nox uv
       - name: Run nox
         run: nox -e lint
 
@@ -213,7 +213,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install nox uv==0.8.6
+          pip install nox uv
       - name: Run nox (Non Trace Server)
         run: |
           nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- \
@@ -229,8 +229,8 @@ jobs:
 
   trace-tests:
     name: Trace nox tests
-    timeout-minutes: 30
-    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    runs-on: ${{ matrix.nox-shard == 'trace' && 'ubuntu-latest-8-cores' || 'ubuntu-latest' }}
     strategy:
       matrix:
         python-version-major: ["3"]
@@ -240,11 +240,9 @@ jobs:
             "13",
             #
           ]
-        nox-shard: [
-            "trace1",
-            "trace2",
-            "trace3",
-            "trace4",
+        nox-shard:
+          [
+            "trace",
             "flow",
             "trace_server",
             "trace_server_bindings",
@@ -265,7 +263,7 @@ jobs:
             "openai",
             "verifiers_test",
             "vertexai",
-            "pandas-test",
+            "pandas_test",
             "mcp",
             "smolagents",
             "autogen_tests",
@@ -318,7 +316,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install nox uv==0.8.6
+          pip install nox uv
       - name: Run nox (Sqlite Trace Server)
         env:
           WEAVE_SENTRY_ENV: ci
@@ -374,7 +372,7 @@ jobs:
   # ==== Windows Jobs ====
   windows_trace_no_server:
     name: Windows Trace non-trace server tests
-    timeout-minutes: 15
+    timeout-minutes: 10
     runs-on: windows-latest
     strategy:
       matrix:
@@ -397,7 +395,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install nox uv==0.8.6
+          pip install nox uv
       - name: Run nox (Non Trace Server)
         run: |
           nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- -m "not trace_server"
@@ -412,7 +410,7 @@ jobs:
 
   windows_trace_tests:
     name: Windows Trace nox tests
-    timeout-minutes: 45
+    timeout-minutes: 15
     runs-on: windows-latest
     strategy:
       matrix:
@@ -423,11 +421,9 @@ jobs:
             "13",
             #
           ]
-        nox-shard: [
-            "trace1",
-            "trace2",
-            "trace3",
-            "trace4",
+        nox-shard:
+          [
+            "trace",
             "flow",
             "trace_server",
             "trace_server_bindings",
@@ -448,7 +444,7 @@ jobs:
             "openai",
             "verifiers_test",
             "vertexai",
-            "pandas-test",
+            "pandas_test",
             "mcp",
             "smolagents",
             "autogen_tests",
@@ -464,7 +460,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install nox uv==0.8.6
+          pip install nox uv
       - name: Run nox (Sqlite Trace Server)
         env:
           WEAVE_SENTRY_ENV: ci

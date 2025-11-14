@@ -13111,6 +13111,12 @@
       "input": 1e-06,
       "output": 5e-06,
       "created_at": "2025-10-23 06:49:10"
+    },
+    {
+      "provider": "bedrock_converse",
+      "input": 1.1e-06,
+      "output": 5.5e-06,
+      "created_at": "2025-11-10 09:16:32"
     }
   ],
   "lemonade/gpt-oss-20b-mxfp4-GGUF": [
@@ -13215,6 +13221,134 @@
       "input": 1e-07,
       "output": 3e-07,
       "created_at": "2025-10-23 06:49:10"
+    }
+  ],
+  "azure/gpt-5-pro": [
+    {
+      "provider": "azure",
+      "input": 1.5e-05,
+      "output": 0.00012,
+      "created_at": "2025-11-10 09:16:32"
+    }
+  ],
+  "cohere/embed-v4.0": [
+    {
+      "provider": "cohere",
+      "input": 1.2e-07,
+      "output": 0.0,
+      "created_at": "2025-11-10 09:16:32"
+    }
+  ],
+  "gemini-live-2.5-flash-preview-native-audio-09-2025": [
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 3e-07,
+      "output": 2e-06,
+      "created_at": "2025-11-10 09:16:32"
+    }
+  ],
+  "gemini/gemini-live-2.5-flash-preview-native-audio-09-2025": [
+    {
+      "provider": "gemini",
+      "input": 3e-07,
+      "output": 2e-06,
+      "created_at": "2025-11-10 09:16:32"
+    }
+  ],
+  "gemini/gemini-embedding-001": [
+    {
+      "provider": "gemini",
+      "input": 1.5e-07,
+      "output": 0.0,
+      "created_at": "2025-11-10 09:16:32"
+    }
+  ],
+  "openrouter/anthropic/claude-haiku-4.5": [
+    {
+      "provider": "openrouter",
+      "input": 1e-06,
+      "output": 5e-06,
+      "created_at": "2025-11-10 09:16:32"
+    }
+  ],
+  "vercel_ai_gateway/zai/glm-4.6": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 4.5e-07,
+      "output": 1.8e-06,
+      "created_at": "2025-11-10 09:16:32"
+    }
+  ],
+  "vertex_ai/mistralai/codestral-2@001": [
+    {
+      "provider": "vertex_ai-mistral_models",
+      "input": 3e-07,
+      "output": 9e-07,
+      "created_at": "2025-11-10 09:16:32"
+    }
+  ],
+  "vertex_ai/codestral-2": [
+    {
+      "provider": "vertex_ai-mistral_models",
+      "input": 3e-07,
+      "output": 9e-07,
+      "created_at": "2025-11-10 09:16:32"
+    }
+  ],
+  "vertex_ai/codestral-2@001": [
+    {
+      "provider": "vertex_ai-mistral_models",
+      "input": 3e-07,
+      "output": 9e-07,
+      "created_at": "2025-11-10 09:16:32"
+    }
+  ],
+  "vertex_ai/mistralai/codestral-2": [
+    {
+      "provider": "vertex_ai-mistral_models",
+      "input": 3e-07,
+      "output": 9e-07,
+      "created_at": "2025-11-10 09:16:32"
+    }
+  ],
+  "vertex_ai/minimaxai/minimax-m2-maas": [
+    {
+      "provider": "vertex_ai-minimax_models",
+      "input": 3e-07,
+      "output": 1.2e-06,
+      "created_at": "2025-11-10 09:16:32"
+    }
+  ],
+  "vertex_ai/mistral-medium-3": [
+    {
+      "provider": "vertex_ai-mistral_models",
+      "input": 4e-07,
+      "output": 2e-06,
+      "created_at": "2025-11-10 09:16:32"
+    }
+  ],
+  "vertex_ai/mistral-medium-3@001": [
+    {
+      "provider": "vertex_ai-mistral_models",
+      "input": 4e-07,
+      "output": 2e-06,
+      "created_at": "2025-11-10 09:16:32"
+    }
+  ],
+  "vertex_ai/mistralai/mistral-medium-3": [
+    {
+      "provider": "vertex_ai-mistral_models",
+      "input": 4e-07,
+      "output": 2e-06,
+      "created_at": "2025-11-10 09:16:32"
+    }
+  ],
+  "vertex_ai/mistralai/mistral-medium-3@001": [
+    {
+      "provider": "vertex_ai-mistral_models",
+      "input": 4e-07,
+      "output": 2e-06,
+      "created_at": "2025-11-10 09:16:32"
     }
   ]
 }

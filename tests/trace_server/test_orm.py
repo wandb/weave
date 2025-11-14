@@ -7,6 +7,7 @@ from weave.trace_server.orm import (
     Table,
     _transform_external_field_to_internal_field,
     combine_conditions,
+    split_escaped_field_path,
 )
 
 
@@ -287,3 +288,45 @@ def test_group_by():
 FROM users
 GROUP BY id, creator"""
     )
+
+
+def test_split_escaped_field_path() -> None:
+    """Test that split_escaped_field_path correctly handles escaped dots in field names."""
+    # Normal case - no escaping
+    assert split_escaped_field_path("output.metrics.run") == [
+        "output",
+        "metrics",
+        "run",
+    ]
+
+    # Single escaped dot in middle segment
+    assert split_escaped_field_path("output.metrics\\.run.actor") == [
+        "output",
+        "metrics.run",
+        "actor",
+    ]
+
+    # Multiple escaped dots in one segment
+    assert split_escaped_field_path("output.a\\.b\\.c.d") == ["output", "a.b.c", "d"]
+
+    # Escaped dot at start of segment
+    assert split_escaped_field_path("output.\\.hidden") == ["output", ".hidden"]
+
+    # Multiple segments with escaping
+    assert split_escaped_field_path("output.metrics\\.scorer\\.run.actor\\.phase") == [
+        "output",
+        "metrics.scorer.run",
+        "actor.phase",
+    ]
+
+    # Single field (no dots)
+    assert split_escaped_field_path("output") == ["output"]
+
+    # All dots escaped (single field with dots in name)
+    assert split_escaped_field_path("output\\.metrics\\.run") == ["output.metrics.run"]
+
+    # Edge case: trailing dot (unescaped)
+    assert split_escaped_field_path("output.metrics.") == ["output", "metrics", ""]
+
+    # Edge case: leading dot (unescaped)
+    assert split_escaped_field_path(".output") == ["", "output"]

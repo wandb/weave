@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Any, Literal, TypedDict
 
 from pydantic import BaseModel
+from typing_extensions import Self
 
 from weave.trace import urls
 from weave.trace.api import publish as weave_publish
@@ -60,6 +61,12 @@ class Filter(BaseModel):
 
 
 Filters = list[Filter]
+
+
+class QueryTranslationException(Exception):
+    """Exception raised when a query cannot be translated to or from filters."""
+
+    pass
 
 
 class TableColumn(TypedDict):
@@ -281,12 +288,6 @@ def filters_to_query(filters: Filters | None) -> tsi.Query | None:
     filter_clauses = [filter_to_clause(f) for f in filters]
     expr = {"$and": filter_clauses}
     return tsi.Query(**{"$expr": expr})
-
-
-class QueryTranslationException(Exception):
-    """Exception raised when a query cannot be translated to or from filters."""
-
-    pass
 
 
 def operand_to_filter_eq(operand: tsi_query.EqOperation) -> Filter:
@@ -972,7 +973,7 @@ class SavedView:
         return default_columns
 
     @classmethod
-    def load(cls, ref: str) -> SavedView:
+    def load(cls, ref: str) -> Self:
         obj_ref = weave_ref(ref)
         base = obj_ref.get()
         instance = cls.__new__(cls)

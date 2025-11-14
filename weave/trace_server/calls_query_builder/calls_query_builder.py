@@ -31,6 +31,7 @@ from collections.abc import KeysView
 from typing import Callable, Literal, Optional, cast
 
 from pydantic import BaseModel, Field
+from typing_extensions import Self
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.calls_query_builder.cte import CTECollection
@@ -59,6 +60,7 @@ from weave.trace_server.orm import (
     clickhouse_cast,
     combine_conditions,
     python_value_to_ch_type,
+    split_escaped_field_path,
 )
 from weave.trace_server.token_costs import build_cost_ctes, get_cost_final_select
 from weave.trace_server.trace_server_common import assert_parameter_length_less_than_max
@@ -193,7 +195,7 @@ class CallsMergedFeedbackPayloadField(CallsMergedField):
     extra_path: list[str]
 
     @classmethod
-    def from_path(cls, path: str) -> "CallsMergedFeedbackPayloadField":
+    def from_path(cls, path: str) -> Self:
         """Expected format: `[feedback.type].dot.path`.
 
         feedback.type can be '*' to select all feedback types.
@@ -205,7 +207,7 @@ class CallsMergedFeedbackPayloadField(CallsMergedField):
         feedback_type, path = match.groups()
         if feedback_type[0] != "[" or feedback_type[-1] != "]":
             raise InvalidFieldError(f"Invalid feedback type: {feedback_type}")
-        extra_path = path.split(".")
+        extra_path = split_escaped_field_path(path)
         feedback_type = feedback_type[1:-1]
         if extra_path[0] == "payload":
             return CallsMergedFeedbackPayloadField(
@@ -817,6 +819,31 @@ class CallsQuery(BaseModel):
         # SUPER IMPORTANT: still need to re-sort the final query
         select_query.order_fields = self.order_fields
 
+        # When using the CTE pattern, ensure all fields used in ordering
+        # are selected in select_query so they're available in the final query's ORDER BY.
+        if self.include_costs:
+            for order_field in self.order_fields:
+                field_obj = order_field.field
+                # Skip feedback fields - they're handled via LEFT JOIN and don't need to be selected
+                if isinstance(field_obj, CallsMergedFeedbackPayloadField):
+                    continue
+
+                if isinstance(
+                    field_obj, (CallsMergedDynamicField, QueryBuilderDynamicField)
+                ):
+                    # we need to add the base field, not the dynamic one
+                    base_field = get_field_by_name(field_obj.field)
+                    if base_field not in select_query.select_fields:
+                        select_query.select_fields.append(base_field)
+                else:
+                    # For non-dynamic fields (like started_at, op_name, etc.),
+                    # add the field directly to ensure it's available in CTEs
+                    if field_obj not in select_query.select_fields:
+                        assert isinstance(field_obj, CallsMergedField), (
+                            "Field must be a CallsMergedField"
+                        )
+                        select_query.select_fields.append(field_obj)
+
         filtered_calls_sql = filter_query._as_sql_base_format(
             pb,
             table_alias,
@@ -840,9 +867,10 @@ class CallsQuery(BaseModel):
         ctes.add_cte(CTE_ALL_CALLS, base_sql)
         self._add_cost_ctes_to_builder(ctes, pb)
 
-        order_by_fields = self._convert_to_orm_sort_fields()
         select_fields = [field.field for field in self.select_fields]
-        final_select = get_cost_final_select(pb, select_fields, order_by_fields)
+        final_select = get_cost_final_select(
+            pb, select_fields, self.order_fields, self.project_id
+        )
 
         raw_sql = ctes.to_sql() + "\n" + final_select
         return safely_format_sql(raw_sql, logger)
@@ -1242,7 +1270,7 @@ def get_field_by_name(name: str) -> CallsMergedField:
             summary_field = name[len("summary.weave.") :]
             return CallsMergedSummaryField(field=name, summary_field=summary_field)
         else:
-            field_parts = name.split(".")
+            field_parts = split_escaped_field_path(name)
             start_part = field_parts[0]
             dumped_start_part = start_part + "_dump"
             if dumped_start_part in ALLOWED_CALL_FIELDS:

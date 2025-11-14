@@ -18,6 +18,7 @@ from weave.chat.types.chat_completion_stream_options_param import (
 from weave.trace.env import weave_trace_server_url
 from weave.trace.op import op
 from weave.trace_server.constants import COMPLETIONS_CREATE_OP_NAME, INFERENCE_HOST
+from weave.utils.project_id import to_project_id
 from weave.wandb_interface.context import get_wandb_api_context
 
 if TYPE_CHECKING:
@@ -193,7 +194,7 @@ class Completions:
         headers = {
             "Content-Type": "application/json",
         }
-        project_id = f"{self._client.entity}/{self._client.project}"
+        project_id = to_project_id(self._client.entity, self._client.project)
         data: dict[str, Any] = {
             "messages": messages,
         }

@@ -18,7 +18,7 @@ from weave.trace.constants import TRACE_OBJECT_EMOJI
 from weave.trace.context import call_context
 from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace.context.call_context import get_current_call, require_current_call
-from weave.trace.display.term import configure_logger
+from weave.trace.display.term import configure_logger, update_logger_level
 from weave.trace.op import PostprocessInputsFunc, PostprocessOutputFunc, as_op, op
 from weave.trace.refs import ObjectRef, Ref
 from weave.trace.settings import (
@@ -172,6 +172,8 @@ def publish(obj: Any, name: str | None = None) -> ObjectRef:
                 ref.name,
                 ref.digest,
             )
+        # Ensure logger level is up to date before logging
+        update_logger_level()
         logger.info(f"{TRACE_OBJECT_EMOJI} Published to {url}")
     return ref
 

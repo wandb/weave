@@ -30,10 +30,7 @@ jobs:
           ]
         shard:
           [
-            "trace1",
-            "trace2",
-            "trace3",
-            "trace4",
+            "trace",
             "flow",
             "trace_server",
             "trace_server_bindings",
@@ -54,7 +51,7 @@ jobs:
             "openai",
             "verifiers_test",
             "vertexai",
-            "pandas-test",
+            "pandas_test",
             "mcp",
             "smolagents",
             "autogen_tests",
@@ -125,13 +122,13 @@ jobs:
         if: steps.filter_shards.outputs.skip != 'true'
         run: |
           python -m pip install --upgrade pip
-          pip install nox uv==0.8.6
+          pip install nox uv
       - name: Check if shard needs trace_server markers
         id: check_trace_markers
         if: steps.filter_shards.outputs.skip != 'true'
         run: |
           # Shards that are in the regular test matrix and need trace_server markers
-          TRACE_SERVER_SHARDS="flow trace_server trace_server_bindings anthropic cerebras cohere crewai dspy groq google_genai google_ai_studio instructor langchain litellm llamaindex mistral notdiamond openai openai_agents vertexai bedrock scorers pandas-test huggingface smolagents mcp autogen_tests trace trace1 trace2 trace3 trace4 trace_no_server"
+          TRACE_SERVER_SHARDS="flow trace_server trace_server_bindings anthropic cerebras cohere crewai dspy groq google_genai google_ai_studio instructor langchain litellm llamaindex mistral notdiamond openai openai_agents vertexai bedrock scorers pandas_test huggingface smolagents mcp autogen_tests trace trace_no_server"
           if [[ " $TRACE_SERVER_SHARDS " =~ " ${{ matrix.shard }} " ]]; then
             echo "needs_markers=true" >> $GITHUB_OUTPUT
           else
@@ -240,7 +237,7 @@ jobs:
         with:
           channel-id: "C09CE03J867"
           slack-message: |
-            :x: Nightly Tests failed!
+            <!subteam^S06HYJNN7SL> :x: Nightly Tests failed!
             *Repository:* ${{ github.repository }}
             *Commit:* ${{ github.sha }}
             *Failed Jobs:* ${{ steps.result.outputs.failed_jobs }}
