@@ -264,6 +264,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
         return self.file_create(source_file_req).digest
 
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.otel_export")
     def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
         assert_non_null_wb_user_id(req)
 
@@ -393,6 +394,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             )
         return tsi.OtelExportRes()
 
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.kafka_producer.flush")
+    def _flush_kafka_producer(self) -> None:
+        self.kafka_producer.flush()
+
     @contextmanager
     def call_batch(self) -> Iterator[None]:
         # Not thread safe - do not use across threads
@@ -402,7 +407,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             self._flush_immediately = True
             self._flush_file_chunks()
             self._flush_calls()
-            self.kafka_producer.flush()
+            self._flush_kafka_producer()
         finally:
             self._file_batch = []
             self._call_batch = []
@@ -490,6 +495,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         stream = self.calls_query_stream(req)
         return tsi.CallsQueryRes(calls=list(stream))
 
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.calls_query_stats")
     def calls_query_stats(self, req: tsi.CallsQueryStatsReq) -> tsi.CallsQueryStatsRes:
         """Returns a stats object for the given query. This is useful for counts or other
         aggregate statistics that are not directly queryable from the calls themselves.
@@ -509,6 +515,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             total_storage_size_bytes=res_dict.get("total_storage_size_bytes"),
         )
 
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.calls_query_stream")
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
         """Returns a stream of calls that match the given query."""
         cq = CallsQuery(
@@ -771,6 +778,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             f"One of [{', '.join(valid_update_fields)}] is required for call update"
         )
 
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.call_update")
     def call_update(self, req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
         assert_non_null_wb_user_id(req)
         self._ensure_valid_update_field(req)
@@ -784,6 +792,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         return tsi.CallUpdateRes()
 
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.obj_create")
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
         processed_result = process_incoming_object_val(
             req.obj.val, req.obj.builtin_object_class
@@ -4370,7 +4379,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert_call_batch")
     def _insert_call_batch(self, batch: list) -> None:
-        if root_span := ddtrace.tracer.current_span():
+        root_span = ddtrace.tracer.current_span()
+        if root_span is not None:
             root_span.set_tags(
                 {
                     "clickhouse_trace_server_batched._insert_call_batch.count": str(
@@ -4378,20 +4388,24 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     )
                 }
             )
-        if batch:
-            settings = {}
-            if self._use_async_insert:
-                settings["async_insert"] = 1
-                # https://clickhouse.com/docs/en/optimize/asynchronous-inserts#enabling-asynchronous-inserts
-                # Setting wait_for_async_insert = 0 does not guarantee that insert errors
-                # are caught, reverting to default behavior.
-                settings["wait_for_async_insert"] = 1
-            self._insert(
-                "call_parts",
-                data=batch,
-                column_names=ALL_CALL_INSERT_COLUMNS,
-                settings=settings,
-            )
+        if not batch:
+            return
+
+        settings = {}
+        if self._use_async_insert:
+            settings = ch_settings.CLICKHOUSE_ASYNC_INSERT_SETTINGS.copy()
+            if root_span is not None:
+                root_span.set_tags(
+                    {
+                        "clickhouse_trace_server_batched._insert_call_batch.async_insert": True,
+                    }
+                )
+        self._insert(
+            "call_parts",
+            data=batch,
+            column_names=ALL_CALL_INSERT_COLUMNS,
+            settings=settings,
+        )
 
     def _select_objs_query(
         self,
@@ -4540,6 +4554,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         column_names: list[str],
         settings: dict[str, Any] | None = None,
     ) -> QuerySummary:
+        ddtrace.tracer.current_span().set_tags(
+            {
+                "clickhouse_trace_server_batched._insert.table": table,
+            }
+        )
         try:
             return self.ch_client.insert(
                 table, data=data, column_names=column_names, settings=settings
