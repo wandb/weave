@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import contextlib
-import contextvars
 import copy
 import logging
 from collections.abc import Iterator
+from contextvars import ContextVar
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -14,24 +14,17 @@ if TYPE_CHECKING:
 class NoCurrentCallError(Exception): ...
 
 
-_call_stack: contextvars.ContextVar[list[Call]] = contextvars.ContextVar(
-    "call",
-    default=[],  # noqa: B039
-)
+_call_stack: ContextVar[list[Call]] = ContextVar("call", default=[])  # noqa: B039
 
 logger = logging.getLogger(__name__)
 
-_tracing_enabled = contextvars.ContextVar("tracing_enabled", default=True)
+_tracing_enabled = ContextVar("tracing_enabled", default=True)
 
 # Thread ID context variable for tracking execution threads
-_thread_id: contextvars.ContextVar[str | None] = contextvars.ContextVar(
-    "thread_id", default=None
-)
+_thread_id: ContextVar[str | None] = ContextVar("thread_id", default=None)
 
 # Turn ID context variable for tracking turns within threads
-_turn_id: contextvars.ContextVar[str | None] = contextvars.ContextVar(
-    "turn_id", default=None
-)
+_turn_id: ContextVar[str | None] = ContextVar("turn_id", default=None)
 
 
 def push_call(call: Call) -> None:
@@ -153,9 +146,9 @@ def set_call_stack(stack: list[Call]) -> Iterator[list[Call]]:
         _call_stack.reset(token)
 
 
-call_attributes: contextvars.ContextVar[dict[str, Any]] = contextvars.ContextVar(
+call_attributes: ContextVar[dict[str, Any]] = ContextVar(
     "call_attributes",
-    default={},  # noqa: B039
+    default={},
 )
 
 

@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import contextvars
 import logging
 from collections.abc import Callable
+from contextvars import ContextVar
 from functools import wraps
 from typing import Any, TypeVar
 
@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 T = TypeVar("T")
 
 # Context variable to store retry ID for correlation
-_retry_id: contextvars.ContextVar[str] = contextvars.ContextVar("retry_id")
+_retry_id: ContextVar[str] = ContextVar("retry_id")
 
 
 def with_retry(func: Callable[..., T]) -> Callable[..., T]:
