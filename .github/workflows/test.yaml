@@ -230,7 +230,7 @@ jobs:
   trace-tests:
     name: Trace nox tests
     timeout-minutes: 15
-    runs-on: ${{ matrix.nox-shard == 'trace' && 'ubuntu-latest-8-cores' || 'ubuntu-latest' }}
+    runs-on: ${{ matrix.nox-shard == 'trace' && 'ubuntu-latest-16-cores' || 'ubuntu-latest' }}
     strategy:
       matrix:
         python-version-major: ["3"]
