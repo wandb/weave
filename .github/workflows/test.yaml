@@ -181,7 +181,8 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.10"
-      - name: Enable caching
+          cache: ""
+      - name: Set up uv
         uses: astral-sh/setup-uv@v6
         with:
           enable-cache: true
@@ -215,7 +216,8 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
-      - name: Enable caching
+          cache: ""
+      - name: Set up uv
         uses: astral-sh/setup-uv@v6
         with:
           enable-cache: true
@@ -323,7 +325,8 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
-      - name: Enable caching
+          cache: ""
+      - name: Set up uv
         uses: astral-sh/setup-uv@v6
         with:
           enable-cache: true
@@ -407,7 +410,8 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
-      - name: Enable caching
+          cache: ""
+      - name: Set up uv
         uses: astral-sh/setup-uv@v6
         with:
           enable-cache: true
@@ -477,7 +481,8 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
-      - name: Enable caching
+          cache: ""
+      - name: Set up uv
         uses: astral-sh/setup-uv@v6
         with:
           enable-cache: true
