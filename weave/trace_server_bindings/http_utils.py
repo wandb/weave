@@ -1,7 +1,7 @@
 import json
 import logging
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, TypeVar, Union
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
@@ -27,7 +27,7 @@ BatchProcessor = AsyncBatchProcessor
 
 
 def log_dropped_call_batch(
-    batch: list[Union["StartBatchItem", "EndBatchItem"]], e: Exception
+    batch: list["StartBatchItem | EndBatchItem"], e: Exception
 ) -> None:
     """Log details about a dropped call batch for debugging purposes."""
     logger.error(f"Error sending batch of {len(batch)} call events to server")

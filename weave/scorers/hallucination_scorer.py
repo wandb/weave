@@ -286,7 +286,7 @@ class WeaveHallucinationScorerV1(HuggingFacePipelineScorer):
 
         Args:
             query: str, The query to score, must be a string
-            context: Union[str, list[str]], The context to score, must be a string or list of strings
+            context: str | list[str], The context to score, must be a string or list of strings
             output: str, The output string to score for hallucination given the query and context, must be a string
         """
         score = self._predict(query, context, output)

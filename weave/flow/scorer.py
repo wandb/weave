@@ -83,7 +83,7 @@ def variance(data: Sequence[int | float]) -> float:
     """Calculate the variance of a sequence of numeric values.
 
     Args:
-        data (Sequence[Union[int, float]]): A sequence of numeric values.
+        data (Sequence[int | float]): A sequence of numeric values.
 
     Returns:
         float: The variance of the data. Returns 0 if data has length <= 1.
@@ -107,7 +107,7 @@ def stderr(data: Sequence[int | float]) -> float:
     """Calculate the standard error of the mean for a sequence of numeric values.
 
     Args:
-        data (Sequence[Union[int, float]]): A sequence of numeric values.
+        data (Sequence[int | float]): A sequence of numeric values.
 
     Returns:
         float: The standard error of the mean. Returns 0 if data has length <= 1.

@@ -1,7 +1,7 @@
 import importlib
 from collections.abc import Callable
 from functools import wraps
-from typing import TYPE_CHECKING, Any, Union
+from typing import TYPE_CHECKING, Any
 
 import weave
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
@@ -25,7 +25,7 @@ def huggingface_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
 
 
 def huggingface_accumulator(
-    acc: Union["ChatCompletionStreamOutput", "ChatCompletionOutput"] | None,
+    acc: "ChatCompletionStreamOutput | ChatCompletionOutput" | None,
     value: "ChatCompletionStreamOutput",
 ) -> "ChatCompletionOutput":
     from huggingface_hub.inference._generated.types.chat_completion import (
