@@ -181,10 +181,16 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.10"
+          cache: pip
+      - name: Enable caching
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
       - name: Install dependencies
+        env:
+          UV_SYSTEM_PYTHON: 1
         run: |
-          python -m pip install --upgrade pip
-          pip install nox uv
+          uv pip install nox
       - name: Run nox
         run: nox -e lint
 
@@ -210,10 +216,16 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
+          cache: pip
+      - name: Enable caching
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
       - name: Install dependencies
+        env:
+          UV_SYSTEM_PYTHON: 1
         run: |
-          python -m pip install --upgrade pip
-          pip install nox uv
+          uv pip install nox
       - name: Run nox (Non Trace Server)
         run: |
           nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- \
@@ -313,10 +325,16 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
+          cache: pip
+      - name: Enable caching
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
       - name: Install dependencies
+        env:
+          UV_SYSTEM_PYTHON: 1
         run: |
-          python -m pip install --upgrade pip
-          pip install nox uv
+          uv pip install nox
       - name: Run nox (Sqlite Trace Server)
         env:
           WEAVE_SENTRY_ENV: ci
@@ -392,10 +410,16 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
+          cache: pip
+      - name: Enable caching
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
       - name: Install dependencies
+        env:
+          UV_SYSTEM_PYTHON: 1
         run: |
-          python -m pip install --upgrade pip
-          pip install nox uv
+          uv pip install nox
       - name: Run nox (Non Trace Server)
         run: |
           nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- -m "not trace_server"
@@ -457,10 +481,16 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
+          cache: pip
+      - name: Enable caching
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
       - name: Install dependencies
+        env:
+          UV_SYSTEM_PYTHON: 1
         run: |
-          python -m pip install --upgrade pip
-          pip install nox uv
+          uv pip install nox
       - name: Run nox (Sqlite Trace Server)
         env:
           WEAVE_SENTRY_ENV: ci
