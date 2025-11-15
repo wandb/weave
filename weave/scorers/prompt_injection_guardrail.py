@@ -1,5 +1,5 @@
 import warnings
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -17,8 +17,8 @@ from weave.scorers.scorer_types import LLMScorer
 class LLMGuardrailReasoning(BaseModel):
     injection_prompt: bool
     is_direct_attack: bool
-    attack_type: Optional[str]
-    explanation: Optional[str]
+    attack_type: str | None
+    explanation: str | None
 
 
 SUPPORTED_MODELS = ["gpt-4o", "gpt-4o-mini", "o1-preview", "o1-mini", "o1", "o3-mini"]

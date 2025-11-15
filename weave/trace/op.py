@@ -13,6 +13,7 @@ from collections import defaultdict
 from collections.abc import (
     AsyncGenerator,
     AsyncIterator,
+    Callable,
     Coroutine,
     Generator,
     Iterator,
@@ -24,7 +25,6 @@ from types import MethodType
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
     Generic,
     TypedDict,
     TypeVar,
@@ -64,21 +64,6 @@ V = TypeVar("V")
 
 P = ParamSpec("P")
 R = TypeVar("R")
-
-
-if sys.version_info < (3, 10):
-
-    def aiter(obj: AsyncIterator[V]) -> AsyncIterator[V]:
-        return obj.__aiter__()
-
-    async def anext(obj: AsyncIterator[V], default: V | None = None) -> V:
-        try:
-            return await obj.__anext__()
-        except StopAsyncIteration:
-            if default is not None:
-                return default
-            else:
-                raise
 
 
 logger = logging.getLogger(__name__)

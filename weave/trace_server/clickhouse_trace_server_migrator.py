@@ -2,7 +2,6 @@
 import logging
 import os
 import re
-from typing import Optional
 
 from clickhouse_connect.driver.client import Client as CHClient
 
@@ -30,9 +29,9 @@ class ClickHouseTraceServerMigrator:
     def __init__(
         self,
         ch_client: CHClient,
-        replicated: Optional[bool] = None,
-        replicated_path: Optional[str] = None,
-        replicated_cluster: Optional[str] = None,
+        replicated: bool | None = None,
+        replicated_path: str | None = None,
+        replicated_cluster: str | None = None,
         management_db: str = "db_management",
     ):
         super().__init__()
@@ -97,7 +96,7 @@ class ClickHouseTraceServerMigrator:
         return create_db_sql
 
     def apply_migrations(
-        self, target_db: str, target_version: Optional[int] = None
+        self, target_db: str, target_version: int | None = None
     ) -> None:
         status = self._get_migration_status(target_db)
         logger.info(f"""`{target_db}` migration status: {status}""")
@@ -156,14 +155,14 @@ class ClickHouseTraceServerMigrator:
         if res is None or len(result_rows) == 0:
             raise MigrationError("Migration table not found")
 
-        return dict(zip(column_names, result_rows[0]))
+        return dict(zip(column_names, result_rows[0], strict=False))
 
     def _get_migrations(
         self,
-    ) -> dict[int, dict[str, Optional[str]]]:
+    ) -> dict[int, dict[str, str | None]]:
         migration_dir = os.path.join(os.path.dirname(__file__), "migrations")
         migration_files = os.listdir(migration_dir)
-        migration_map: dict[int, dict[str, Optional[str]]] = {}
+        migration_map: dict[int, dict[str, str | None]] = {}
         max_version = 0
         for file in migration_files:
             if not file.endswith(".up.sql") and not file.endswith(".down.sql"):
@@ -220,7 +219,7 @@ class ClickHouseTraceServerMigrator:
         self,
         current_version: int,
         migration_map: dict,
-        target_version: Optional[int] = None,
+        target_version: int | None = None,
     ) -> list[tuple[int, str]]:
         if target_version is None:
             target_version = len(migration_map)

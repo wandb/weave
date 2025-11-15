@@ -4,10 +4,8 @@ from __future__ import annotations
 
 import contextlib
 import logging
-import sys
-import warnings
 from collections.abc import Iterator
-from typing import Any, Union, cast
+from typing import Any, cast
 
 # TODO: type_handlers is imported here to trigger registration of the image serializer.
 # There is probably a better place for this, but including here for now to get the fix in.
@@ -81,13 +79,6 @@ def init(
         raise ValueError("project_name must be non-empty")
 
     configure_logger()
-
-    if sys.version_info < (3, 10):
-        warnings.warn(
-            "Python 3.9 will reach end of life in October 2025, after which weave will drop support for it.  Please upgrade to Python 3.10 or later!",
-            DeprecationWarning,
-            stacklevel=2,
-        )
 
     # Check if deprecated autopatch_settings is used
     if autopatch_settings is not None:
@@ -372,7 +363,7 @@ def thread(thread_id: str | None | object = _AUTO_GENERATE) -> Iterator[ThreadCo
         actual_thread_id = generate_id()
     else:
         # Explicit thread_id (string or None)
-        actual_thread_id = cast(Union[str, None], thread_id)
+        actual_thread_id = cast(str | None, thread_id)
 
     # Create context object
     context = ThreadContext(actual_thread_id)

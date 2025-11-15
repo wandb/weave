@@ -1,7 +1,7 @@
 import asyncio
 import sys
 from contextlib import AsyncExitStack
-from typing import Any, Optional
+from typing import Any
 
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
@@ -17,7 +17,7 @@ weave_client = weave.init("mcp_example")
 class MCPClient:
     def __init__(self):
         # Initialize session and client objects
-        self.session: Optional[ClientSession] = None
+        self.session: ClientSession | None = None
         self.exit_stack = AsyncExitStack()
 
     @weave.op
