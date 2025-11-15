@@ -186,6 +186,13 @@ jobs:
         uses: astral-sh/setup-uv@v6
         with:
           enable-cache: true
+      - name: Cache nox virtual environments
+        uses: actions/cache@v4
+        with:
+          path: .nox
+          key: nox-lint-${{ hashFiles('pyproject.toml', 'uv.lock') }}
+          restore-keys: |
+            nox-lint-
       - name: Install dependencies
         env:
           UV_SYSTEM_PYTHON: 1
@@ -221,6 +228,13 @@ jobs:
         uses: astral-sh/setup-uv@v6
         with:
           enable-cache: true
+      - name: Cache nox virtual environments
+        uses: actions/cache@v4
+        with:
+          path: .nox
+          key: nox-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}-${{ matrix.nox-shard }}-${{ hashFiles('pyproject.toml', 'uv.lock') }}
+          restore-keys: |
+            nox-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}-${{ matrix.nox-shard }}-
       - name: Install dependencies
         env:
           UV_SYSTEM_PYTHON: 1
@@ -330,6 +344,13 @@ jobs:
         uses: astral-sh/setup-uv@v6
         with:
           enable-cache: true
+      - name: Cache nox virtual environments
+        uses: actions/cache@v4
+        with:
+          path: .nox
+          key: nox-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}-${{ matrix.nox-shard }}-${{ hashFiles('pyproject.toml', 'uv.lock') }}
+          restore-keys: |
+            nox-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}-${{ matrix.nox-shard }}-
       - name: Install dependencies
         env:
           UV_SYSTEM_PYTHON: 1
@@ -415,6 +436,13 @@ jobs:
         uses: astral-sh/setup-uv@v6
         with:
           enable-cache: true
+      - name: Cache nox virtual environments
+        uses: actions/cache@v4
+        with:
+          path: .nox
+          key: nox-windows-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}-${{ matrix.nox-shard }}-${{ hashFiles('pyproject.toml', 'uv.lock') }}
+          restore-keys: |
+            nox-windows-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}-${{ matrix.nox-shard }}-
       - name: Install dependencies
         env:
           UV_SYSTEM_PYTHON: 1
@@ -486,6 +514,13 @@ jobs:
         uses: astral-sh/setup-uv@v6
         with:
           enable-cache: true
+      - name: Cache nox virtual environments
+        uses: actions/cache@v4
+        with:
+          path: .nox
+          key: nox-windows-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}-${{ matrix.nox-shard }}-${{ hashFiles('pyproject.toml', 'uv.lock') }}
+          restore-keys: |
+            nox-windows-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}-${{ matrix.nox-shard }}-
       - name: Install dependencies
         env:
           UV_SYSTEM_PYTHON: 1
