@@ -663,12 +663,11 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Object delete response.
         """
-        self._stainless_request(
+        return self._stainless_request(
             req,
             tsi.ObjDeleteRes,
             self._stainless_client.objects.delete,
         )
-        return tsi.ObjDeleteRes()
 
     # Table API
     @validate_call
