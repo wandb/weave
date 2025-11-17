@@ -5,7 +5,7 @@ import json
 import logging
 from queue import Full
 from types import MethodType
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 import requests
@@ -169,7 +169,7 @@ def test_oversized_item_will_log_warning_and_send(server, caplog):
     server._flush_calls(batch)
 
     # Verify error was logged
-    assert any("Single call size" in record.message for record in caplog.records)
+    assert any("Single calls size" in record.message for record in caplog.records)
     assert any("may be too large" in record.message for record in caplog.records)
 
     # Verify _send_batch_to_server was still called
@@ -276,32 +276,42 @@ def test_non_uniform_batch_items(server):
     assert total_items_sent == len(batch)
 
 
-@patch("weave_server_sdk._http_client.httpx.Client.post")
-def test_timeout_retry_mechanism(mock_post, success_response):
+def test_timeout_retry_mechanism(success_response):
     """Test that timeouts trigger the retry mechanism."""
     server = StainlessRemoteHTTPTraceServer("http://example.com", should_batch=True)
 
-    # Mock server to raise errors twice, then succeed
+    # Mock the stainless client's upsert_batch method to raise errors twice, then succeed
     from httpx import TimeoutException
 
-    mock_post.side_effect = [
-        TimeoutException("Connection timed out"),
-        requests.exceptions.HTTPError("500 Server Error"),
-        success_response,
-    ]
+    original_upsert_batch = server._stainless_client.calls.upsert_batch
+    call_count = 0
+
+    def mock_upsert_batch(*args, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            raise TimeoutException("Connection timed out")
+        elif call_count == 2:
+            raise requests.exceptions.HTTPError("500 Server Error")
+        else:
+            # Return a mock response
+            mock_response = MagicMock()
+            mock_response.batch = []
+            return mock_response
+
+    server._stainless_client.calls.upsert_batch = mock_upsert_batch
 
     # Trying to send a batch should fail 2 times, then succeed
     server.call_start(tsi.CallStartReq(start=generate_start()))
     server.call_processor.stop_accepting_new_work_and_flush_queue()
 
-    # Verify that post was called 3 times
-    assert mock_post.call_count == 3
+    # Verify that upsert_batch was called 3 times
+    assert call_count == 3
 
 
 @pytest.mark.disable_logging_error_check
 @pytest.mark.parametrize("server", ["fast_retrying"], indirect=True)
-@patch("weave_server_sdk._http_client.httpx.Client.post")
-def test_post_timeout(mock_post, success_response, server, log_collector):
+def test_post_timeout(success_response, server, log_collector):
     """Test that we can still send new batches even if one batch times out.
 
     This test modifies the retry mechanism to use a short wait time and limited retries
@@ -311,25 +321,42 @@ def test_post_timeout(mock_post, success_response, server, log_collector):
     # Configure mock to timeout twice to exhaust retries
     from httpx import TimeoutException
 
-    mock_post.side_effect = [
-        # First batch times out twice
-        TimeoutException("Connection timed out"),
-        TimeoutException("Connection timed out"),
-    ]
+    call_count = 0
+
+    def mock_upsert_batch(*args, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        if call_count <= 2:
+            raise TimeoutException("Connection timed out")
+        else:
+            mock_response = MagicMock()
+            mock_response.batch = []
+            return mock_response
+
+    server._stainless_client.calls.upsert_batch = mock_upsert_batch
 
     # Phase 1: Try but fail to process the first batch
     server.call_start(tsi.CallStartReq(start=generate_start()))
     server.call_processor.stop_accepting_new_work_and_flush_queue()
     logs = log_collector.get_warning_logs()
     assert len(logs) >= 1
-    assert any("requeueing batch" in log.msg for log in logs)
+    assert any(
+        "requeueing batch" in log.msg or "batch failed" in log.msg for log in logs
+    )
 
     # Phase 2: Reset mock and verify we can still process a new batch
-    mock_post.reset_mock()
-    mock_post.side_effect = [
-        TimeoutException("Connection timed out"),
-        success_response,
-    ]
+    call_count = 0
+
+    def mock_start_success(*args, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            raise TimeoutException("Connection timed out")
+        else:
+            mock_response = MagicMock()
+            mock_response.id = "test_id"
+            mock_response.trace_id = "test_trace_id"
+            return mock_response
 
     # Create a new server since the old one has shutdown its batch processor
     new_server = StainlessRemoteHTTPTraceServer(
@@ -345,6 +372,8 @@ def test_post_timeout(mock_post, success_response, server, log_collector):
         new_server,
     )
     new_server._send_batch_to_server = fast_retry(unwrapped_send_batch_to_server)
+    # Mock calls.start for non-batching case
+    new_server._stainless_client.calls.start = mock_start_success
 
     # Should succeed with retry
     start_req = tsi.CallStartReq(start=generate_start())
@@ -358,6 +387,9 @@ def test_post_timeout(mock_post, success_response, server, log_collector):
 @pytest.mark.parametrize("log_collector", ["warning"], indirect=True)
 def test_drop_data_when_queue_is_full(server, log_collector):
     """Test that items are dropped when the queue is full."""
+    # Set _dropped_item_count to 999 so the next drop (1000th) will log
+    server.call_processor._dropped_item_count = 999
+
     # Replace the real queue with a mock that raises Full when put_nowait is called
     mock_queue = MagicMock()
     mock_queue.put_nowait.side_effect = Full

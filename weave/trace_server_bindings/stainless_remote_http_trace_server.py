@@ -30,7 +30,7 @@ from weave.trace_server_bindings.models import (
     StartBatchItem,
 )
 from weave.utils.project_id import from_project_id
-from weave.utils.retry import get_current_retry_id
+from weave.utils.retry import get_current_retry_id, with_retry
 from weave.wandb_interface import project_creator
 
 TReq = TypeVar("TReq", bound=BaseModel)
@@ -263,6 +263,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         for item in response:
             yield res_type.model_validate(item)
 
+    @with_retry
     def _send_batch_to_server(self, encoded_data: bytes) -> None:
         """Send an encoded batch of calls to the server using the stainless client.
 
