@@ -7,7 +7,7 @@ nox.options.reuse_existing_virtualenvs = True
 nox.options.stop_on_first_error = True
 
 
-SUPPORTED_PYTHON_VERSIONS = ["3.10", "3.11", "3.12", "3.13"]
+SUPPORTED_PYTHON_VERSIONS = ["3.10", "3.11", "3.12", "3.13", "3.14"]
 INCOMPATIBLE_SHARDS = {
     "3.10": [
         "notdiamond",
@@ -17,6 +17,15 @@ INCOMPATIBLE_SHARDS = {
         "cohere",
         "notdiamond",
         "verifiers_test",
+    ],
+    "3.14": [
+        "cohere",
+        "crewai",
+        "notdiamond",
+        "presidio",
+        "verifiers_test",
+        "vertexai",
+        "verdict",
     ],
 }
 NUM_TRACE_SERVER_SHARDS = 4
