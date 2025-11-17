@@ -56,16 +56,42 @@ def pytest_addoption(parser):
 
 
 def pytest_collection_modifyitems(config, items):
+    # Get the remote HTTP trace server flag
+    remote_http_trace_server_flag = config.getoption(
+        "--remote-http-trace-server", default="remote"
+    )
+
     # Add the trace_server marker to:
     # 1. All tests in the trace_server directory (regardless of fixture usage)
     # 2. All tests that use the trace_server fixture (for tests outside this directory)
+    # Also filter tests based on the remote-http-trace-server flag
+    items_to_remove = []
     for item in items:
         # Check if the test is in the trace_server directory by checking parent directories
         if "trace_server" in item.path.parts:
             item.add_marker(pytest.mark.trace_server)
+
+            # Filter tests based on remote-http-trace-server flag
+            # Check if test is in stainless_remote_http_trace_server directory
+            is_stainless_test = "stainless_remote_http_trace_server" in item.path.parts
+            # Check if test is in remote_http_trace_server directory (but not stainless)
+            is_remote_test = (
+                "remote_http_trace_server" in item.path.parts and not is_stainless_test
+            )
+
+            # Skip stainless tests when flag is not "stainless"
+            if is_stainless_test and remote_http_trace_server_flag != "stainless":
+                items_to_remove.append(item)
+            # Skip remote tests when flag is not "remote"
+            elif is_remote_test and remote_http_trace_server_flag != "remote":
+                items_to_remove.append(item)
         # Also mark tests that use the trace_server fixture (for tests outside this dir)
         elif "trace_server" in item.fixturenames:
             item.add_marker(pytest.mark.trace_server)
+
+    # Remove filtered items
+    for item in items_to_remove:
+        items.remove(item)
 
 
 def get_trace_server_flag(request):
