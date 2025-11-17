@@ -4586,7 +4586,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             if root_span is not None:
                 root_span.set_tags(
                     {
-                        "clickhouse_trace_server_batched._insert_call_batch.async_insert": True,
+                        "clickhouse_trace_server_batched._insert.async_insert": True,
                     }
                 )
         try:
