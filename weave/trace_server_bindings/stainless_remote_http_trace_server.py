@@ -29,6 +29,7 @@ from weave.trace_server_bindings.models import (
     ServerInfoRes,
     StartBatchItem,
 )
+from weave.utils.project_id import from_project_id
 from weave.utils.retry import get_current_retry_id
 from weave.wandb_interface import project_creator
 
@@ -36,32 +37,6 @@ TReq = TypeVar("TReq", bound=BaseModel)
 TRes = TypeVar("TRes", bound=BaseModel)
 
 logger = logging.getLogger(__name__)
-
-
-def split_project_id(project_id: str) -> tuple[str, str]:
-    """Split project_id into entity and project.
-
-    Args:
-        project_id: Project ID in format "entity/project".
-
-    Returns:
-        Tuple of (entity, project).
-
-    Raises:
-        ValueError: If project_id is not in the expected format.
-
-    Examples:
-        >>> split_project_id("my-entity/my-project")
-        ('my-entity', 'my-project')
-    """
-    try:
-        entity, project = project_id.split("/", 1)
-    except ValueError as e:
-        raise ValueError(
-            f"Invalid project_id format: {project_id}. Expected 'entity/project'"
-        ) from e
-    else:
-        return entity, project
 
 
 class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
@@ -216,7 +191,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             Validated response model instance.
         """
         self._update_client_headers()
-        entity, project = split_project_id(req.project_id)
+        entity, project = from_project_id(req.project_id)
 
         exclude_set = {"project_id"}
         if exclude:
@@ -246,7 +221,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             >>> entity, project = self._prepare_v2_request(req)
         """
         self._update_client_headers()
-        return split_project_id(req.project_id)
+        return from_project_id(req.project_id)
 
     def _stainless_list_object(
         self,
@@ -270,7 +245,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             Validated response model instances of type res_type.
         """
         self._update_client_headers()
-        entity, project = split_project_id(req.project_id)
+        entity, project = from_project_id(req.project_id)
 
         exclude_set = {"project_id"}
         if exclude:
@@ -537,8 +512,9 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             self.call_processor.enqueue([EndBatchItem(req=req)])
             return tsi.CallEndRes()
 
-        self._stainless_request(req, tsi.CallEndRes, self._stainless_client.calls.end)
-        return tsi.CallEndRes()
+        return self._stainless_request(
+            req, tsi.CallEndRes, self._stainless_client.calls.end
+        )
 
     @validate_call
     def call_read(self, req: tsi.CallReadReq) -> tsi.CallReadRes:
@@ -625,12 +601,11 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Call update response.
         """
-        self._stainless_request(
+        return self._stainless_request(
             req,
             tsi.CallUpdateRes,
             self._stainless_client.calls.update,
         )
-        return tsi.CallUpdateRes()
 
     # Obj API
     @validate_call
