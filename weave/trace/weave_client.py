@@ -13,6 +13,7 @@ import time
 from collections.abc import Callable, Sequence
 from concurrent.futures import Future
 from functools import cached_property
+from threading import Event
 from typing import TYPE_CHECKING, Any, TypedDict, cast
 
 import pydantic
@@ -349,6 +350,9 @@ class WeaveClient:
         if hasattr(self.server, "get_feedback_processor"):
             self._server_feedback_processor = self.server.get_feedback_processor()
         self.send_file_cache = WeaveClientSendFileCache()
+        # Cache to ensure call_end never enqueues before call_start
+        # Maps call_id -> Event that is set when start is enqueued to batch
+        self._call_start_enqueued: dict[str, Event] = {}
 
     ################ High Level Convenience Methods ################
 
@@ -771,6 +775,10 @@ class WeaveClient:
         should_print_call_link_ = should_print_call_link()
         current_call = call_context.get_current_call()
 
+        # Create event to track when start is enqueued - BEFORE any async work
+        start_enqueued_event = Event()
+        self._call_start_enqueued[call_id] = start_enqueued_event
+
         def send_start_call() -> bool:
             maybe_redacted_inputs_with_refs = inputs_with_refs
             if should_redact_pii():
@@ -807,6 +815,8 @@ class WeaveClient:
                 )
 
             self.server.call_start(call_start_req)
+            start_enqueued_event.set()
+
             return True
 
         def on_complete(f: Future) -> None:
@@ -934,6 +944,12 @@ class WeaveClient:
             op._on_finish_handler(call, original_output, exception)
 
         def send_end_call() -> None:
+            # Wait for start to be enqueued before we enqueue end
+            assert isinstance(call.id, str)
+            start_event = self._call_start_enqueued.pop(call.id, None)
+            if start_event is not None:
+                start_event.wait()
+
             maybe_redacted_output_as_refs = output_as_refs
             if should_redact_pii():
                 from weave.utils.pii_redaction import redact_pii
@@ -950,52 +966,18 @@ class WeaveClient:
                 wb_run_context_end.step if wb_run_context_end else None
             )
 
-            # Check if we have a cached start for this call
-            assert isinstance(call.id, str)
-            call_start_req = self._call_starts.pop(call.id, None)
-
-            if call_start_req is not None:
-                # Combine start and end into a complete call
-                complete_call = CompletedCallSchemaForInsert(
-                    project_id=call_start_req.start.project_id,
-                    id=call_start_req.start.id,
-                    trace_id=call_start_req.start.trace_id,
-                    op_name=call_start_req.start.op_name,
-                    display_name=call_start_req.start.display_name,
-                    parent_id=call_start_req.start.parent_id,
-                    thread_id=call_start_req.start.thread_id,
-                    turn_id=call_start_req.start.turn_id,
-                    started_at=call_start_req.start.started_at,
-                    attributes=call_start_req.start.attributes,
-                    inputs=call_start_req.start.inputs,
+            # Always send end only - consolidate_batch will reconcile start/end pairs
+            call_end_req = CallEndReq(
+                end=EndedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=call.id,
                     ended_at=ended_at,
                     output=output_json,
                     summary=merged_summary,
                     exception=exception_str,
                     wb_run_step_end=current_wb_run_step_end,
                 )
-
-                call_complete_req = CallCompleteReq(complete=complete_call)
-                bytes_size = len(call_complete_req.model_dump_json())
-                if bytes_size > MAX_TRACE_PAYLOAD_SIZE:
-                    logger.warning(
-                        f"Trace complete size ({bytes_size} bytes) exceeds the maximum allowed size of {MAX_TRACE_PAYLOAD_SIZE} bytes. "
-                        "Data may be dropped."
-                    )
-                self.server._call_complete(call_complete_req)  # type: ignore[attr-defined]
-            else:
-                # No cached start, send end only
-                call_end_req = CallEndReq(
-                    end=EndedCallSchemaForInsert(
-                        project_id=project_id,
-                        id=call.id,
-                        ended_at=ended_at,
-                        output=output_json,
-                        summary=merged_summary,
-                        exception=exception_str,
-                        wb_run_step_end=current_wb_run_step_end,
-                    )
-                )
+            )
             self.server.call_end(call_end_req)
 
         self.future_executor.defer(send_end_call)
