@@ -633,11 +633,12 @@ def mock_wandb_context():
 
 
 def pytest_collection_modifyitems(config, items):
-    """Filter tests based on remote-http-trace-server flag.
+    """Filter tests based on remote-http-trace-server flag and add trace_server marker.
 
     This ensures that:
     - When --remote-http-trace-server=stainless, only stainless tests run
     - When --remote-http-trace-server=remote (default), only remote tests run
+    - Tests in trace_server_bindings directories get the trace_server marker
     """
     # Get the remote HTTP trace server flag
     remote_http_trace_server_flag = config.getoption(
@@ -653,6 +654,11 @@ def pytest_collection_modifyitems(config, items):
         is_remote_test = (
             "remote_http_trace_server" in item.path.parts and not is_stainless_test
         )
+
+        # Add trace_server marker to trace_server_bindings tests
+        # (tests/trace_server/conftest.py handles tests/trace_server/ directory)
+        if is_stainless_test or is_remote_test:
+            item.add_marker(pytest.mark.trace_server)
 
         # Skip stainless tests when flag is not "stainless"
         if is_stainless_test and remote_http_trace_server_flag != "stainless":
