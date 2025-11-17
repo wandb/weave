@@ -170,8 +170,8 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
         handle_response_error(r, "/call/upsert_batch")
 
     def _consolidate_batch(
-        self, batch: list[Union[StartBatchItem, EndBatchItem, CompleteBatchItem]]
-    ) -> list[Union[StartBatchItem, EndBatchItem, CompleteBatchItem]]:
+        self, batch: list[StartBatchItem | EndBatchItem | CompleteBatchItem]
+    ) -> list[StartBatchItem | EndBatchItem | CompleteBatchItem]:
         """Consolidate start/end pairs in a batch into complete items.
 
         Looks for pairs of start and end items with matching IDs and combines them
@@ -192,7 +192,7 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
                 completes.append(item)
 
         # Second pass: match starts with ends and create completes
-        consolidated: list[Union[StartBatchItem, EndBatchItem, CompleteBatchItem]] = []
+        consolidated: list[StartBatchItem | EndBatchItem | CompleteBatchItem] = []
         paired_ids: set[str] = set()
 
         for call_id, start_item in starts.items():
@@ -526,7 +526,7 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
         return self._generic_request("/call/end", req, tsi.CallEndReq, tsi.CallEndRes)
 
     def _call_complete(
-        self, req: Union[tsi.CallCompleteReq, dict[str, Any]]
+        self, req: tsi.CallCompleteReq | dict[str, Any]
     ) -> tsi.CallUpsertRes:
         """Internal method to handle complete calls for batching.
 
@@ -567,7 +567,7 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
                 )
 
     @validate_call
-    def call_read(self, req: Union[tsi.CallReadReq, dict[str, Any]]) -> tsi.CallReadRes:
+    def call_read(self, req: tsi.CallReadReq | dict[str, Any]) -> tsi.CallReadRes:
         return self._generic_request(
             "/call/read", req, tsi.CallReadReq, tsi.CallReadRes
         )
@@ -1435,7 +1435,7 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
         )
 
     def calls_upsert_batch_v2(
-        self, req: Union[tsi.CallsUpsertBatchV2Req, dict[str, Any]]
+        self, req: tsi.CallsUpsertBatchV2Req | dict[str, Any]
     ) -> tsi.CallsUpsertBatchV2Res:
         """V2 batch call upsert endpoint - handles starts, ends, and completes.
 
