@@ -280,32 +280,30 @@ def test_timeout_retry_mechanism(success_response):
     """Test that timeouts trigger the retry mechanism."""
     server = StainlessRemoteHTTPTraceServer("http://example.com", should_batch=True)
 
-    # Mock the stainless client's upsert_batch method to raise errors twice, then succeed
-    from httpx import TimeoutException
-
-    original_upsert_batch = server._stainless_client.calls.upsert_batch
+    # Mock _send_batch_to_server to raise errors twice, then succeed
+    # This tests the retry mechanism at the _send_batch_to_server level
     call_count = 0
 
-    def mock_upsert_batch(*args, **kwargs):
+    original_send_batch = server._send_batch_to_server
+
+    def mock_send_batch(encoded_data: bytes) -> None:
         nonlocal call_count
         call_count += 1
         if call_count == 1:
-            raise TimeoutException("Connection timed out")
+            raise requests.exceptions.Timeout("Connection timed out")
         elif call_count == 2:
             raise requests.exceptions.HTTPError("500 Server Error")
         else:
-            # Return a mock response
-            mock_response = MagicMock()
-            mock_response.batch = []
-            return mock_response
+            # Success - call the original function
+            original_send_batch(encoded_data)
 
-    server._stainless_client.calls.upsert_batch = mock_upsert_batch
+    server._send_batch_to_server = mock_send_batch
 
     # Trying to send a batch should fail 2 times, then succeed
     server.call_start(tsi.CallStartReq(start=generate_start()))
     server.call_processor.stop_accepting_new_work_and_flush_queue()
 
-    # Verify that upsert_batch was called 3 times
+    # Verify that _send_batch_to_server was called 3 times (2 failures + 1 success)
     assert call_count == 3
 
 
@@ -319,21 +317,17 @@ def test_post_timeout(success_response, server, log_collector):
     """
     configure_logger()
     # Configure mock to timeout twice to exhaust retries
-    from httpx import TimeoutException
-
     call_count = 0
 
-    def mock_upsert_batch(*args, **kwargs):
+    original_send_batch = server._send_batch_to_server
+
+    def mock_send_batch_timeout(encoded_data: bytes) -> None:
         nonlocal call_count
         call_count += 1
-        if call_count <= 2:
-            raise TimeoutException("Connection timed out")
-        else:
-            mock_response = MagicMock()
-            mock_response.batch = []
-            return mock_response
+        # Always raise timeout to exhaust retries
+        raise requests.exceptions.Timeout("Connection timed out")
 
-    server._stainless_client.calls.upsert_batch = mock_upsert_batch
+    server._send_batch_to_server = mock_send_batch_timeout
 
     # Phase 1: Try but fail to process the first batch
     server.call_start(tsi.CallStartReq(start=generate_start()))
@@ -351,7 +345,7 @@ def test_post_timeout(success_response, server, log_collector):
         nonlocal call_count
         call_count += 1
         if call_count == 1:
-            raise TimeoutException("Connection timed out")
+            raise requests.exceptions.Timeout("Connection timed out")
         else:
             mock_response = MagicMock()
             mock_response.id = "test_id"
