@@ -7,7 +7,7 @@ torch>=1.13.1
 torchvision>=0.14.1
 bertviz>=1.4.0
 datasets>=2.9.0
-transformers<4.21
+transformers<4.58
 plotly>=5.13.0
 sqlalchemy>=2.0.1
 faiss-cpu>=1.7.4
