@@ -13,7 +13,7 @@ on:
 jobs:
   build-assets:
     name: Bump and Tag Python SDK Patch Version
-    runs-on: ubuntu-8core
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     environment:
       name: release
