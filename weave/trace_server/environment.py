@@ -38,6 +38,16 @@ def kafka_producer_max_buffer_size() -> int | None:
         return None
 
 
+def kafka_partition_by_project_id() -> bool:
+    """Whether to partition Kafka messages by project_id.
+
+    When enabled, messages are partitioned by project_id to ensure all messages
+    for a given project go to the same partition. When disabled, messages are
+    distributed round-robin across partitions.
+    """
+    return os.environ.get("KAFKA_PARTITION_BY_PROJECT_ID", "false").lower() == "true"
+
+
 # Scoring worker settings
 
 
