@@ -638,6 +638,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             req, tsi.ObjReadRes, self._stainless_client.objects.read
         )
 
+    @validate_call
     def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
         """Query objects.
 
