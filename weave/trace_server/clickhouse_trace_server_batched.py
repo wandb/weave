@@ -1014,11 +1014,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         data = [list(obj.model_dump().values()) for obj in delete_insertables]
         column_names = list(delete_insertables[0].model_fields.keys())
 
-        self._insert(
-            "object_versions",
-            data=data,
-            column_names=column_names,
-        )
+        self._insert("object_versions", data=data, column_names=column_names)
         num_deleted = len(delete_insertables)
 
         return tsi.ObjDeleteRes(num_deleted=num_deleted)
@@ -3950,11 +3946,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         processed_payload = process_feedback_payload(req)
         row = format_feedback_to_row(req, processed_payload)
         prepared = TABLE_FEEDBACK.insert(row).prepare(database_type="clickhouse")
-        self._insert(
-            TABLE_FEEDBACK.name,
-            prepared.data,
-            prepared.column_names,
-        )
+        self._insert(TABLE_FEEDBACK.name, prepared.data, prepared.column_names)
 
         return format_feedback_to_res(row)
 
@@ -3983,11 +3975,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             for row in rows_to_insert:
                 insert_query.row(row)
             prepared = insert_query.prepare(database_type="clickhouse")
-            self._insert(
-                TABLE_FEEDBACK.name,
-                prepared.data,
-                prepared.column_names,
-            )
+            self._insert(TABLE_FEEDBACK.name, prepared.data, prepared.column_names)
 
         return tsi.FeedbackCreateBatchRes(res=results)
 
