@@ -24,8 +24,8 @@ def pytest_addoption(parser):
         parser.addoption(
             "--trace-server",
             action="store",
-            default="clickhouse",
-            help="Specify the client object to use: sqlite or clickhouse",
+            default="mock",
+            help="Specify the client object to use: mock, sqlite or clickhouse",
         )
         parser.addoption(
             "--ch",
@@ -38,6 +38,11 @@ def pytest_addoption(parser):
             "--sqlite",
             action="store_true",
             help="Use sqlite server (shorthand for --trace-server=sqlite)",
+        )
+        parser.addoption(
+            "--mock",
+            action="store_true",
+            help="Use mock server (shorthand for --trace-server=mock)",
         )
         parser.addoption(
             "--clickhouse-process",
@@ -67,6 +72,8 @@ def get_trace_server_flag(request):
         return "clickhouse"
     if request.config.getoption("--sqlite"):
         return "sqlite"
+    if request.config.getoption("--mock"):
+        return "mock"
     weave_server_flag = request.config.getoption("--trace-server")
     return weave_server_flag
 
@@ -189,8 +196,11 @@ def trace_server(
         return get_ch_trace_server()
     elif trace_server_flag == "sqlite":
         return get_sqlite_trace_server()
+    elif trace_server_flag == "mock":
+        # Import here to avoid circular dependency
+        from tests.mock_trace_server import MockTraceServer
+        return MockTraceServer()
     else:
-        # Once we split the trace server and client code, we can raise here.
-        # For now, just return the sqlite trace server so we don't break existing tests.
-        # raise ValueError(f"Invalid trace server: {trace_server_flag}")
-        return get_sqlite_trace_server()
+        # Default to mock for unknown options
+        from tests.mock_trace_server import MockTraceServer
+        return MockTraceServer()

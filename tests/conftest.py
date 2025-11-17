@@ -13,6 +13,7 @@ from fastapi.responses import StreamingResponse
 from fastapi.testclient import TestClient
 
 import weave
+from tests.mock_trace_server import MockTraceServer
 from tests.trace.util import DummyTestException
 from tests.trace_server.conftest import *
 from tests.trace_server.conftest import TEST_ENTITY, get_trace_server_flag
@@ -377,6 +378,30 @@ def create_client(
 def zero_stack():
     with set_call_stack([]):
         yield
+
+
+@pytest.fixture
+def mock_trace_server():
+    """Fixture that provides a mock in-memory trace server for testing without database dependencies."""
+    return MockTraceServer()
+
+
+@pytest.fixture
+def mock_client(zero_stack, mock_trace_server):
+    """Fixture that provides a WeaveClient using the mock trace server.
+
+    Use this fixture in tests that should not depend on ClickHouse or SQLite.
+    This is faster and more isolated than using the real trace_server fixture.
+    """
+    caching_server = CachingMiddlewareTraceServer.from_env(mock_trace_server)
+    client = TestOnlyFlushingWeaveClient(
+        TEST_ENTITY, "test-project", make_server_recorder(caching_server)
+    )
+    weave_client_context.set_weave_client_global(client)
+    try:
+        yield client
+    finally:
+        weave_client_context.set_weave_client_global(None)
 
 
 @pytest.fixture
