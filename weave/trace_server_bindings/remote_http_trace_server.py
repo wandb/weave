@@ -2,11 +2,12 @@ import datetime
 import io
 import logging
 from collections.abc import Iterator
-from typing import Any, Optional, Union
+from typing import Any
 from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, Field, validate_call
 from pydantic.json_schema import SkipJsonSchema
+from typing_extensions import Self
 
 from weave.trace.env import weave_trace_server_url
 from weave.trace.settings import max_calls_queue_size, should_enable_disk_fallback
@@ -27,6 +28,7 @@ from weave.trace_server_bindings.models import (
     StartBatchItem,
 )
 from weave.utils import http_requests as requests
+from weave.utils.project_id import from_project_id
 from weave.utils.retry import get_current_retry_id, with_retry
 from weave.wandb_interface import project_creator
 
@@ -48,8 +50,8 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
         should_batch: bool = False,
         *,
         remote_request_bytes_limit: int = REMOTE_REQUEST_BYTES_LIMIT,
-        auth: Optional[tuple[str, str]] = None,
-        extra_headers: Optional[dict[str, str]] = None,
+        auth: tuple[str, str] | None = None,
+        extra_headers: dict[str, str] | None = None,
     ):
         super().__init__()
         self.trace_server_url = trace_server_url
@@ -67,8 +69,8 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
                 max_queue_size=max_calls_queue_size(),
                 enable_disk_fallback=should_enable_disk_fallback(),
             )
-        self._auth: Optional[tuple[str, str]] = auth
-        self._extra_headers: Optional[dict[str, str]] = extra_headers
+        self._auth: tuple[str, str] | None = auth
+        self._extra_headers: dict[str, str] | None = extra_headers
         self.remote_request_bytes_limit = remote_request_bytes_limit
 
     def ensure_project_exists(
@@ -81,10 +83,10 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
         )
 
     @classmethod
-    def from_env(cls, should_batch: bool = False) -> "RemoteHTTPTraceServer":
+    def from_env(cls, should_batch: bool = False) -> Self:
         # Explicitly calling `RemoteHTTPTraceServer` constructor here to ensure
         # that type checking is applied to the constructor.
-        return RemoteHTTPTraceServer(weave_trace_server_url(), should_batch)
+        return cls(weave_trace_server_url(), should_batch)
 
     def set_auth(self, auth: tuple[str, str]) -> None:
         self._auth = auth
@@ -143,7 +145,7 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
 
     def _flush_calls(
         self,
-        batch: list[Union[StartBatchItem, EndBatchItem]],
+        batch: list[StartBatchItem | EndBatchItem],
         *,
         _should_update_batch_size: bool = True,
     ) -> None:
@@ -157,14 +159,14 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
         if len(batch) == 0:
             return
 
-        def get_item_id(item: Union[StartBatchItem, EndBatchItem]) -> str:
+        def get_item_id(item: StartBatchItem | EndBatchItem) -> str:
             if isinstance(item, StartBatchItem):
                 return f"{item.req.start.id}-start"
             elif isinstance(item, EndBatchItem):
                 return f"{item.req.end.id}-end"
             return "unknown"
 
-        def encode_batch(batch: list[Union[StartBatchItem, EndBatchItem]]) -> bytes:
+        def encode_batch(batch: list[StartBatchItem | EndBatchItem]) -> bytes:
             data = Batch(batch=batch).model_dump_json()
             return data.encode("utf-8")
 
@@ -180,7 +182,7 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
             encode_batch_fn=encode_batch,
         )
 
-    def get_call_processor(self) -> Union[AsyncBatchProcessor, None]:
+    def get_call_processor(self) -> AsyncBatchProcessor | None:
         """Custom method not defined on the formal TraceServerInterface to expose
         the underlying call processor. Should be formalized in a client-side interface.
         """
@@ -232,7 +234,7 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
                     # Feedback endpoint doesn't support id, created_at, so we need to strip them
                     class FeedbackCreateReqStripped(tsi.FeedbackCreateReq):
                         id: SkipJsonSchema[str] = Field(exclude=True)
-                        created_at: SkipJsonSchema[Optional[datetime.datetime]] = Field(
+                        created_at: SkipJsonSchema[datetime.datetime | None] = Field(
                             exclude=True, default=None
                         )
 
@@ -266,7 +268,7 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
             encode_batch_fn=encode_batch,
         )
 
-    def get_feedback_processor(self) -> Union[AsyncBatchProcessor, None]:
+    def get_feedback_processor(self) -> AsyncBatchProcessor | None:
         """Custom method not defined on the formal TraceServerInterface to expose
         the underlying feedback processor. Should be formalized in a client-side interface.
         """
@@ -295,7 +297,7 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
     def _get_request_executor(
         self,
         url: str,
-        params: Optional[dict[str, Any]] = None,
+        params: dict[str, Any] | None = None,
         stream: bool = False,
     ) -> requests.Response:
         r = self.get(url, params=params or {}, stream=stream)
@@ -306,7 +308,7 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
     def _delete_request_executor(
         self,
         url: str,
-        params: Optional[dict[str, Any]] = None,
+        params: dict[str, Any] | None = None,
         stream: bool = False,
     ) -> requests.Response:
         r = self.delete(url, params=params or {}, stream=stream)
@@ -320,7 +322,7 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
         req_model: type[BaseModel],
         res_model: type[BaseModel],
         method: str = "POST",
-        params: Optional[dict[str, Any]] = None,
+        params: dict[str, Any] | None = None,
     ) -> BaseModel:
         if method == "POST":
             r = self._post_request_executor(url, req)
@@ -340,7 +342,7 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
         req_model: type[BaseModel],
         res_model: type[BaseModel],
         method: str = "POST",
-        params: Optional[dict[str, Any]] = None,
+        params: dict[str, Any] | None = None,
     ) -> Iterator[BaseModel]:
         if method == "POST":
             r = self._post_request_executor(url, req, stream=True)
@@ -701,7 +703,7 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
 
     @validate_call
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
-        entity, project = req.project_id.split("/", 1)
+        entity, project = from_project_id(req.project_id)
         url = f"/v2/{entity}/{project}/ops"
         # For create, we need to send the body without project_id (OpCreateBody)
         body_data = req.model_dump(exclude={"project_id"})
@@ -716,7 +718,7 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
 
     @validate_call
     def op_read(self, req: tsi.OpReadReq) -> tsi.OpReadRes:
-        entity, project = req.project_id.split("/", 1)
+        entity, project = from_project_id(req.project_id)
         url = f"/v2/{entity}/{project}/ops/{req.object_id}/versions/{req.digest}"
         return self._generic_request(
             url,
@@ -728,7 +730,7 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
 
     @validate_call
     def op_list(self, req: tsi.OpListReq) -> Iterator[tsi.OpReadRes]:
-        entity, project = req.project_id.split("/", 1)
+        entity, project = from_project_id(req.project_id)
         url = f"/v2/{entity}/{project}/ops"
         # Build query params
         params: dict[str, Any] = {}
@@ -749,7 +751,7 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
 
     @validate_call
     def op_delete(self, req: tsi.OpDeleteReq) -> tsi.OpDeleteRes:
-        entity, project = req.project_id.split("/", 1)
+        entity, project = from_project_id(req.project_id)
         url = f"/v2/{entity}/{project}/ops/{req.object_id}"
         # Build query params
         params = {}
@@ -766,7 +768,7 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
 
     @validate_call
     def dataset_create(self, req: tsi.DatasetCreateReq) -> tsi.DatasetCreateRes:
-        entity, project = req.project_id.split("/", 1)
+        entity, project = from_project_id(req.project_id)
         url = f"/v2/{entity}/{project}/datasets"
         # For create, we need to send the body without project_id (DatasetCreateBody)
         body_data = req.model_dump(exclude={"project_id"})
@@ -781,7 +783,7 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
 
     @validate_call
     def dataset_read(self, req: tsi.DatasetReadReq) -> tsi.DatasetReadRes:
-        entity, project = req.project_id.split("/", 1)
+        entity, project = from_project_id(req.project_id)
         url = f"/v2/{entity}/{project}/datasets/{req.object_id}/versions/{req.digest}"
         return self._generic_request(
             url,
@@ -793,7 +795,7 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
 
     @validate_call
     def dataset_list(self, req: tsi.DatasetListReq) -> Iterator[tsi.DatasetReadRes]:
-        entity, project = req.project_id.split("/", 1)
+        entity, project = from_project_id(req.project_id)
         url = f"/v2/{entity}/{project}/datasets"
         # Build query params
         params: dict[str, Any] = {}
@@ -812,7 +814,7 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
 
     @validate_call
     def dataset_delete(self, req: tsi.DatasetDeleteReq) -> tsi.DatasetDeleteRes:
-        entity, project = req.project_id.split("/", 1)
+        entity, project = from_project_id(req.project_id)
         url = f"/v2/{entity}/{project}/datasets/{req.object_id}"
         # Build query params
         params = {}
@@ -829,7 +831,7 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
 
     @validate_call
     def scorer_create(self, req: tsi.ScorerCreateReq) -> tsi.ScorerCreateRes:
-        entity, project = req.project_id.split("/", 1)
+        entity, project = from_project_id(req.project_id)
         url = f"/v2/{entity}/{project}/scorers"
         # For create, we need to send the body without project_id (ScorerCreateBody)
         body_data = req.model_dump(exclude={"project_id"})
@@ -844,7 +846,7 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
 
     @validate_call
     def scorer_read(self, req: tsi.ScorerReadReq) -> tsi.ScorerReadRes:
-        entity, project = req.project_id.split("/", 1)
+        entity, project = from_project_id(req.project_id)
         url = f"/v2/{entity}/{project}/scorers/{req.object_id}/versions/{req.digest}"
         return self._generic_request(
             url,
@@ -856,7 +858,7 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
 
     @validate_call
     def scorer_list(self, req: tsi.ScorerListReq) -> Iterator[tsi.ScorerReadRes]:
-        entity, project = req.project_id.split("/", 1)
+        entity, project = from_project_id(req.project_id)
         url = f"/v2/{entity}/{project}/scorers"
         # Build query params
         params = {}
@@ -875,7 +877,7 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
 
     @validate_call
     def scorer_delete(self, req: tsi.ScorerDeleteReq) -> tsi.ScorerDeleteRes:
-        entity, project = req.project_id.split("/", 1)
+        entity, project = from_project_id(req.project_id)
         url = f"/v2/{entity}/{project}/scorers/{req.object_id}"
         # Build query params
         params = {}
@@ -894,7 +896,7 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
     def evaluation_create(
         self, req: tsi.EvaluationCreateReq
     ) -> tsi.EvaluationCreateRes:
-        entity, project = req.project_id.split("/", 1)
+        entity, project = from_project_id(req.project_id)
         url = f"/v2/{entity}/{project}/evaluations"
         # For create, we need to send the body without project_id (EvaluationCreateBody)
         body_data = req.model_dump(exclude={"project_id"})
@@ -909,7 +911,7 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
 
     @validate_call
     def evaluation_read(self, req: tsi.EvaluationReadReq) -> tsi.EvaluationReadRes:
-        entity, project = req.project_id.split("/", 1)
+        entity, project = from_project_id(req.project_id)
         url = (
             f"/v2/{entity}/{project}/evaluations/{req.object_id}/versions/{req.digest}"
         )
@@ -925,7 +927,7 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
     def evaluation_list(
         self, req: tsi.EvaluationListReq
     ) -> Iterator[tsi.EvaluationReadRes]:
-        entity, project = req.project_id.split("/", 1)
+        entity, project = from_project_id(req.project_id)
         url = f"/v2/{entity}/{project}/evaluations"
         # Build query params
         params = {}
@@ -946,7 +948,7 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
     def evaluation_delete(
         self, req: tsi.EvaluationDeleteReq
     ) -> tsi.EvaluationDeleteRes:
-        entity, project = req.project_id.split("/", 1)
+        entity, project = from_project_id(req.project_id)
         url = f"/v2/{entity}/{project}/evaluations/{req.object_id}"
         # Build query params
         params = {}
@@ -965,7 +967,7 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
 
     @validate_call
     def model_create(self, req: tsi.ModelCreateReq) -> tsi.ModelCreateRes:
-        entity, project = req.project_id.split("/", 1)
+        entity, project = from_project_id(req.project_id)
         url = f"/v2/{entity}/{project}/models"
         body = tsi.ModelCreateBody.model_validate(
             req.model_dump(exclude={"project_id"})
@@ -980,7 +982,7 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
 
     @validate_call
     def model_read(self, req: tsi.ModelReadReq) -> tsi.ModelReadRes:
-        entity, project = req.project_id.split("/", 1)
+        entity, project = from_project_id(req.project_id)
         url = f"/v2/{entity}/{project}/models/{req.object_id}/versions/{req.digest}"
         return self._generic_request(
             url,
@@ -992,7 +994,7 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
 
     @validate_call
     def model_list(self, req: tsi.ModelListReq) -> Iterator[tsi.ModelReadRes]:
-        entity, project = req.project_id.split("/", 1)
+        entity, project = from_project_id(req.project_id)
         url = f"/v2/{entity}/{project}/models"
         # Build query params
         params = {}
@@ -1011,7 +1013,7 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
 
     @validate_call
     def model_delete(self, req: tsi.ModelDeleteReq) -> tsi.ModelDeleteRes:
-        entity, project = req.project_id.split("/", 1)
+        entity, project = from_project_id(req.project_id)
         url = f"/v2/{entity}/{project}/models/{req.object_id}"
         # Build query params
         params = {}
@@ -1030,7 +1032,7 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
     def evaluation_run_create(
         self, req: tsi.EvaluationRunCreateReq
     ) -> tsi.EvaluationRunCreateRes:
-        entity, project = req.project_id.split("/", 1)
+        entity, project = from_project_id(req.project_id)
         url = f"/v2/{entity}/{project}/evaluation_runs"
         # For create, we need to send the body without project_id (EvaluationRunCreateBody)
         body_data = req.model_dump(exclude={"project_id"})
@@ -1046,7 +1048,7 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
     def evaluation_run_read(
         self, req: tsi.EvaluationRunReadReq
     ) -> tsi.EvaluationRunReadRes:
-        entity, project = req.project_id.split("/", 1)
+        entity, project = from_project_id(req.project_id)
         url = f"/v2/{entity}/{project}/evaluation_runs/{req.evaluation_run_id}"
         return self._generic_request(
             url,
@@ -1060,7 +1062,7 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
     def evaluation_run_list(
         self, req: tsi.EvaluationRunListReq
     ) -> Iterator[tsi.EvaluationRunReadRes]:
-        entity, project = req.project_id.split("/", 1)
+        entity, project = from_project_id(req.project_id)
         url = f"/v2/{entity}/{project}/evaluation_runs"
         # Build query params
         params: dict[str, Any] = {}
@@ -1088,7 +1090,7 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
     def evaluation_run_delete(
         self, req: tsi.EvaluationRunDeleteReq
     ) -> tsi.EvaluationRunDeleteRes:
-        entity, project = req.project_id.split("/", 1)
+        entity, project = from_project_id(req.project_id)
         url = f"/v2/{entity}/{project}/evaluation_runs"
         # Build query params - evaluation_run_ids are passed as a query param
         params = {"evaluation_run_ids": req.evaluation_run_ids}
@@ -1105,7 +1107,7 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
     def evaluation_run_finish(
         self, req: tsi.EvaluationRunFinishReq
     ) -> tsi.EvaluationRunFinishRes:
-        entity, project = req.project_id.split("/", 1)
+        entity, project = from_project_id(req.project_id)
         url = f"/v2/{entity}/{project}/evaluation_runs/{req.evaluation_run_id}/finish"
         return self._generic_request(
             url,
@@ -1121,7 +1123,7 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
     def prediction_create(
         self, req: tsi.PredictionCreateReq
     ) -> tsi.PredictionCreateRes:
-        entity, project = req.project_id.split("/", 1)
+        entity, project = from_project_id(req.project_id)
         url = f"/v2/{entity}/{project}/predictions"
         body = tsi.PredictionCreateBody.model_validate(
             req.model_dump(exclude={"project_id"})
@@ -1136,7 +1138,7 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
 
     @validate_call
     def prediction_read(self, req: tsi.PredictionReadReq) -> tsi.PredictionReadRes:
-        entity, project = req.project_id.split("/", 1)
+        entity, project = from_project_id(req.project_id)
         url = f"/v2/{entity}/{project}/predictions/{req.prediction_id}"
         return self._generic_request(
             url,
@@ -1150,7 +1152,7 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
     def prediction_list(
         self, req: tsi.PredictionListReq
     ) -> Iterator[tsi.PredictionReadRes]:
-        entity, project = req.project_id.split("/", 1)
+        entity, project = from_project_id(req.project_id)
         url = f"/v2/{entity}/{project}/predictions"
         # Build query params
         params: dict[str, Any] = {}
@@ -1173,7 +1175,7 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
     def prediction_delete(
         self, req: tsi.PredictionDeleteReq
     ) -> tsi.PredictionDeleteRes:
-        entity, project = req.project_id.split("/", 1)
+        entity, project = from_project_id(req.project_id)
         url = f"/v2/{entity}/{project}/predictions"
         # Build query params - prediction_ids are passed as a query param
         params = {"prediction_ids": req.prediction_ids}
@@ -1190,7 +1192,7 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
     def prediction_finish(
         self, req: tsi.PredictionFinishReq
     ) -> tsi.PredictionFinishRes:
-        entity, project = req.project_id.split("/", 1)
+        entity, project = from_project_id(req.project_id)
         url = f"/v2/{entity}/{project}/predictions/{req.prediction_id}/finish"
         return self._generic_request(
             url,
@@ -1204,7 +1206,7 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
 
     @validate_call
     def score_create(self, req: tsi.ScoreCreateReq) -> tsi.ScoreCreateRes:
-        entity, project = req.project_id.split("/", 1)
+        entity, project = from_project_id(req.project_id)
         url = f"/v2/{entity}/{project}/scores"
         body = tsi.ScoreCreateBody.model_validate(
             req.model_dump(exclude={"project_id"})
@@ -1219,7 +1221,7 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
 
     @validate_call
     def score_read(self, req: tsi.ScoreReadReq) -> tsi.ScoreReadRes:
-        entity, project = req.project_id.split("/", 1)
+        entity, project = from_project_id(req.project_id)
         url = f"/v2/{entity}/{project}/scores/{req.score_id}"
         return self._generic_request(
             url,
@@ -1231,7 +1233,7 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
 
     @validate_call
     def score_list(self, req: tsi.ScoreListReq) -> Iterator[tsi.ScoreReadRes]:
-        entity, project = req.project_id.split("/", 1)
+        entity, project = from_project_id(req.project_id)
         url = f"/v2/{entity}/{project}/scores"
         # Build query params
         params: dict[str, Any] = {}
@@ -1252,7 +1254,7 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
 
     @validate_call
     def score_delete(self, req: tsi.ScoreDeleteReq) -> tsi.ScoreDeleteRes:
-        entity, project = req.project_id.split("/", 1)
+        entity, project = from_project_id(req.project_id)
         url = f"/v2/{entity}/{project}/scores"
         # Build query params - score_ids are passed as a query param
         params = {"score_ids": req.score_ids}

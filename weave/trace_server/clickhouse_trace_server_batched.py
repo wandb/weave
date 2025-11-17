@@ -7,10 +7,10 @@ import json
 import logging
 import threading
 from collections import defaultdict
-from collections.abc import Iterator, Sequence
+from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
 from re import sub
-from typing import Any, Callable, Optional, Union, cast
+from typing import Any, cast
 from zoneinfo import ZoneInfo
 
 import clickhouse_connect
@@ -182,7 +182,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         password: str = "",
         database: str = "default",
         use_async_insert: bool = False,
-        evaluate_model_dispatcher: Optional[EvaluateModelDispatcher] = None,
+        evaluate_model_dispatcher: EvaluateModelDispatcher | None = None,
     ):
         super().__init__()
         self._thread_local = threading.local()
@@ -196,8 +196,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self._file_batch: list[FileChunkCreateCHInsertable] = []
         self._use_async_insert = use_async_insert
         self._model_to_provider_info_map = read_model_to_provider_info_map()
-        self._file_storage_client: Optional[FileStorageClient] = None
-        self._kafka_producer: Optional[KafkaProducer] = None
+        self._file_storage_client: FileStorageClient | None = None
+        self._kafka_producer: KafkaProducer | None = None
         self._evaluate_model_dispatcher = evaluate_model_dispatcher
 
     @classmethod
@@ -217,7 +217,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
 
     @property
-    def file_storage_client(self) -> Optional[FileStorageClient]:
+    def file_storage_client(self) -> FileStorageClient | None:
         if self._file_storage_client is not None:
             return self._file_storage_client
         self._file_storage_client = maybe_get_storage_client_from_env()
@@ -231,7 +231,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         return self._kafka_producer
 
     def _get_existing_ops_from_spans(
-        self, seen_ids: set[str], project_id: str, limit: Optional[int] = None
+        self, seen_ids: set[str], project_id: str, limit: int | None = None
     ) -> list[tsi.ObjSchema]:
         obj_version_filter = tsi.ObjectVersionFilter(
             object_ids=list(seen_ids),
@@ -264,6 +264,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
         return self.file_create(source_file_req).digest
 
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.otel_export")
     def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
         assert_non_null_wb_user_id(req)
 
@@ -393,6 +394,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             )
         return tsi.OtelExportRes()
 
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.kafka_producer.flush")
+    def _flush_kafka_producer(self) -> None:
+        self.kafka_producer.flush()
+
     @contextmanager
     def call_batch(self) -> Iterator[None]:
         # Not thread safe - do not use across threads
@@ -402,7 +407,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             self._flush_immediately = True
             self._flush_file_chunks()
             self._flush_calls()
-            self.kafka_producer.flush()
+            self._flush_kafka_producer()
         finally:
             self._file_batch = []
             self._call_batch = []
@@ -490,6 +495,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         stream = self.calls_query_stream(req)
         return tsi.CallsQueryRes(calls=list(stream))
 
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.calls_query_stats")
     def calls_query_stats(self, req: tsi.CallsQueryStatsReq) -> tsi.CallsQueryStatsRes:
         """Returns a stats object for the given query. This is useful for counts or other
         aggregate statistics that are not directly queryable from the calls themselves.
@@ -499,7 +505,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         raw_res = self._query(query, pb.get_params())
 
         res_dict = (
-            dict(zip(columns, raw_res.result_rows[0])) if raw_res.result_rows else {}
+            dict(zip(columns, raw_res.result_rows[0], strict=False))
+            if raw_res.result_rows
+            else {}
         )
 
         return tsi.CallsQueryStatsRes(
@@ -507,6 +515,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             total_storage_size_bytes=res_dict.get("total_storage_size_bytes"),
         )
 
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.calls_query_stream")
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
         """Returns a stream of calls that match the given query."""
         cq = CallsQuery(
@@ -583,7 +592,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         include_feedback = req.include_feedback or False
 
         def row_to_call_schema_dict(row: tuple[Any, ...]) -> dict[str, Any]:
-            return _ch_call_dict_to_call_schema_dict(dict(zip(select_columns, row)))
+            return _ch_call_dict_to_call_schema_dict(
+                dict(zip(select_columns, row, strict=False))
+            )
 
         if not expand_columns and not include_feedback:
             for row in raw_res:
@@ -681,7 +692,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
                 # update the ref map with the fetched values
                 ref_val_map = {}
-                for ref, val in zip(unique_ref_map.values(), vals):
+                for ref, val in zip(unique_ref_map.values(), vals, strict=False):
                     ref_val_map[ref.uri()] = val
 
                 # Replace the refs with values and add ref key
@@ -767,6 +778,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             f"One of [{', '.join(valid_update_fields)}] is required for call update"
         )
 
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.call_update")
     def call_update(self, req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
         assert_non_null_wb_user_id(req)
         self._ensure_valid_update_field(req)
@@ -780,6 +792,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         return tsi.CallUpdateRes()
 
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.obj_create")
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
         processed_result = process_incoming_object_val(
             req.obj.val, req.obj.builtin_object_class
@@ -1218,10 +1231,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         *,
         # using the `sql_safe_*` prefix is a way to signal to the caller
         # that these strings should have been sanitized by the caller.
-        sql_safe_conditions: Optional[list[str]] = None,
-        sort_fields: Optional[list[OrderField]] = None,
-        limit: Optional[int] = None,
-        offset: Optional[int] = None,
+        sql_safe_conditions: list[str] | None = None,
+        sort_fields: list[OrderField] | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
     ) -> Iterator[tsi.TableRowSchema]:
         if not sort_fields:
             sort_fields = [
@@ -1341,7 +1354,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         return tsi.RefsReadBatchRes(vals=vals)
 
     def project_stats(self, req: tsi.ProjectStatsReq) -> tsi.ProjectStatsRes:
-        def _default_true(val: Union[bool, None]) -> bool:
+        def _default_true(val: bool | None) -> bool:
             return True if val is None else val
 
         pb = ParamBuilder()
@@ -1358,7 +1371,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if len(query_result.result_rows) != 1:
             raise RuntimeError("Unexpected number of results", query_result)
 
-        return tsi.ProjectStatsRes(**dict(zip(columns, query_result.result_rows[0])))
+        return tsi.ProjectStatsRes(
+            **dict(zip(columns, query_result.result_rows[0], strict=False))
+        )
 
     def threads_query_stream(
         self, req: tsi.ThreadsQueryReq
@@ -3333,7 +3348,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def _parsed_refs_read_batch(
         self,
         parsed_refs: ObjRefListType,
-        root_val_cache: Optional[dict[str, Any]] = None,
+        root_val_cache: dict[str, Any] | None = None,
     ) -> list[Any]:
         # Next, group the refs by project_id
         refs_by_project_id: dict[str, ObjRefListType] = defaultdict(list)
@@ -3353,7 +3368,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 refs_by_project_id[project],
                 root_val_cache,
             )
-            for ref, result in zip(project_refs, project_results):
+            for ref, result in zip(project_refs, project_results, strict=False):
                 final_result_cache[make_ref_cache_key(ref)] = result
 
         # Return the final data payload
@@ -3366,7 +3381,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self,
         project_id_scope: str,
         parsed_refs: ObjRefListType,
-        root_val_cache: Optional[dict[str, Any]],
+        root_val_cache: dict[str, Any] | None,
     ) -> list[Any]:
         if root_val_cache is None:
             root_val_cache = {}
@@ -3382,7 +3397,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         ) -> Any:
             conds: list[str] = []
             object_id_conds: list[str] = []
-            parameters: dict[str, Union[str, int]] = {}
+            parameters: dict[str, str | int] = {}
             ref_digests: set[str] = set()
 
             for ref_index, ref in enumerate(refs):
@@ -3440,8 +3455,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         class PartialRefResult:
             remaining_extra: list[str]
             # unresolved_obj_ref and unresolved_table_ref are mutually exclusive
-            unresolved_obj_ref: Optional[ri.InternalObjectRef]
-            unresolved_table_ref: Optional[ri.InternalTableRef]
+            unresolved_obj_ref: ri.InternalObjectRef | None
+            unresolved_table_ref: ri.InternalTableRef | None
             val: Any
 
         def resolve_extra(extra: list[str], val: Any) -> PartialRefResult:
@@ -3535,7 +3550,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                         raise ValueError("Expected unresolved obj ref")
                     refs.append(extra_result.unresolved_obj_ref)
                 obj_roots = get_object_refs_root_val(refs)
-                for (i, extra_result), obj_root in zip(needed_extra_results, obj_roots):
+                for (i, extra_result), obj_root in zip(
+                    needed_extra_results, obj_roots, strict=False
+                ):
                     if extra_result.unresolved_obj_ref is None:
                         raise ValueError("Expected unresolved obj ref")
                     extra_results[i] = PartialRefResult(
@@ -4084,7 +4101,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if "error" in res.response:
             end.exception = res.response["error"]
         end_call = _end_call_for_insert_to_ch_insertable_end_call(end, self)
-        calls: list[Union[CallStartCHInsertable, CallEndCHInsertable]] = [
+        calls: list[CallStartCHInsertable | CallEndCHInsertable] = [
             start_call,
             end_call,
         ]
@@ -4134,7 +4151,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             return _single_error_iter(e)
 
         # Track start call if requested
-        start_call: Optional[CallStartCHInsertable] = None
+        start_call: CallStartCHInsertable | None = None
         if req.track_llm_call:
             inputs = req.inputs.model_dump(exclude_none=True)
             inputs["model"] = model_name
@@ -4270,7 +4287,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             end.exception = res.response["error"]
 
         end_call = _end_call_for_insert_to_ch_insertable_end_call(end)
-        calls: list[Union[CallStartCHInsertable, CallEndCHInsertable]] = [
+        calls: list[CallStartCHInsertable | CallEndCHInsertable] = [
             start_call,
             end_call,
         ]
@@ -4362,7 +4379,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert_call_batch")
     def _insert_call_batch(self, batch: list) -> None:
-        if root_span := ddtrace.tracer.current_span():
+        root_span = ddtrace.tracer.current_span()
+        if root_span is not None:
             root_span.set_tags(
                 {
                     "clickhouse_trace_server_batched._insert_call_batch.count": str(
@@ -4370,20 +4388,24 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     )
                 }
             )
-        if batch:
-            settings = {}
-            if self._use_async_insert:
-                settings["async_insert"] = 1
-                # https://clickhouse.com/docs/en/optimize/asynchronous-inserts#enabling-asynchronous-inserts
-                # Setting wait_for_async_insert = 0 does not guarantee that insert errors
-                # are caught, reverting to default behavior.
-                settings["wait_for_async_insert"] = 1
-            self._insert(
-                "call_parts",
-                data=batch,
-                column_names=ALL_CALL_INSERT_COLUMNS,
-                settings=settings,
-            )
+        if not batch:
+            return
+
+        settings = {}
+        if self._use_async_insert:
+            settings = ch_settings.CLICKHOUSE_ASYNC_INSERT_SETTINGS.copy()
+            if root_span is not None:
+                root_span.set_tags(
+                    {
+                        "clickhouse_trace_server_batched._insert_call_batch.async_insert": True,
+                    }
+                )
+        self._insert(
+            "call_parts",
+            data=batch,
+            column_names=ALL_CALL_INSERT_COLUMNS,
+            settings=settings,
+        )
 
     def _select_objs_query(
         self,
@@ -4443,8 +4465,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self,
         query: str,
         parameters: dict[str, Any],
-        column_formats: Optional[dict[str, Any]] = None,
-        settings: Optional[dict[str, Any]] = None,
+        column_formats: dict[str, Any] | None = None,
+        settings: dict[str, Any] | None = None,
     ) -> Iterator[tuple]:
         """Streams the results of a query from the database."""
         if not settings:
@@ -4489,8 +4511,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self,
         query: str,
         parameters: dict[str, Any],
-        column_formats: Optional[dict[str, Any]] = None,
-        settings: Optional[dict[str, Any]] = None,
+        column_formats: dict[str, Any] | None = None,
+        settings: dict[str, Any] | None = None,
     ) -> QueryResult:
         """Directly queries the database and returns the result."""
         if not settings:
@@ -4530,8 +4552,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         table: str,
         data: Sequence[Sequence[Any]],
         column_names: list[str],
-        settings: Optional[dict[str, Any]] = None,
+        settings: dict[str, Any] | None = None,
     ) -> QuerySummary:
+        ddtrace.tracer.current_span().set_tags(
+            {
+                "clickhouse_trace_server_batched._insert.table": table,
+            }
+        )
         try:
             return self.ch_client.insert(
                 table, data=data, column_names=column_names, settings=settings
@@ -4721,8 +4748,8 @@ def _any_dump_to_any(val: str) -> Any:
 
 
 def _ensure_datetimes_have_tz(
-    dt: Optional[datetime.datetime] = None,
-) -> Optional[datetime.datetime]:
+    dt: datetime.datetime | None = None,
+) -> datetime.datetime | None:
     # https://github.com/ClickHouse/clickhouse-connect/issues/210
     # Clickhouse does not support timezone-aware datetimes. You can specify the
     # desired timezone at query time. However according to the issue above,
@@ -4749,8 +4776,8 @@ def _ensure_datetimes_have_tz_strict(
 
 
 def _nullable_any_dump_to_any(
-    val: Optional[str],
-) -> Optional[Any]:
+    val: str | None,
+) -> Any | None:
     return _any_dump_to_any(val) if val else None
 
 
@@ -4835,7 +4862,7 @@ def _ch_table_stats_to_table_stats_schema(
 
 def _start_call_for_insert_to_ch_insertable_start_call(
     start_call: tsi.StartedCallSchemaForInsert,
-    trace_server: Optional[tsi.TraceServerInterface] = None,
+    trace_server: tsi.TraceServerInterface | None = None,
 ) -> CallStartCHInsertable:
     # Note: it is technically possible for the user to mess up and provide the
     # wrong trace id (one that does not match the parent_id)!
@@ -4871,7 +4898,7 @@ def _start_call_for_insert_to_ch_insertable_start_call(
 
 def _end_call_for_insert_to_ch_insertable_end_call(
     end_call: tsi.EndedCallSchemaForInsert,
-    trace_server: Optional[tsi.TraceServerInterface] = None,
+    trace_server: tsi.TraceServerInterface | None = None,
 ) -> CallEndCHInsertable:
     # Note: it is technically possible for the user to mess up and provide the
     # wrong trace id (one that does not match the parent_id)!
@@ -4997,7 +5024,7 @@ def _string_to_int_in_range(input_string: str, range_max: int) -> int:
     return hash_int % range_max
 
 
-def set_root_span_dd_tags(tags: dict[str, Union[str, float, int]]) -> None:
+def set_root_span_dd_tags(tags: dict[str, str | float | int]) -> None:
     root_span = ddtrace.tracer.current_root_span()
     if root_span is None:
         logger.debug("No root span")
@@ -5099,7 +5126,7 @@ def _create_tracked_stream_wrapper(
         yield {"_meta": {"weave_call_id": start_call.id}}
 
         # Initialize accumulation variables for all choices
-        aggregated_output: Optional[dict[str, Any]] = None
+        aggregated_output: dict[str, Any] | None = None
         choice_contents: dict[int, list[str]] = {}  # Track content by choice index
         choice_tool_calls: dict[
             int, list[dict[str, Any]]
@@ -5108,7 +5135,7 @@ def _create_tracked_stream_wrapper(
             int, list[str]
         ] = {}  # Track reasoning by choice index
         choice_finish_reasons: dict[
-            int, Optional[str]
+            int, str | None
         ] = {}  # Track finish reasons by choice index
         aggregated_metadata: dict[str, Any] = {}
 
@@ -5200,21 +5227,21 @@ def _create_tracked_stream_wrapper(
 
 
 def _setup_completion_model_info(
-    model_info: Optional[LLMModelProviderInfo],
+    model_info: LLMModelProviderInfo | None,
     req: tsi.CompletionsCreateReq,
     obj_read: Callable[[tsi.ObjReadReq], tsi.ObjReadRes],
-) -> tuple[str, Optional[str], str, Optional[str], dict[str, str], Optional[str]]:
+) -> tuple[str, str | None, str, str | None, dict[str, str], str | None]:
     """Extract model setup logic shared between completions_create and completions_create_stream.
 
     Returns: (model_name, api_key, provider, base_url, extra_headers, return_type)
     Note: api_key can be None for bedrock providers since they use AWS credentials instead.
     """
     model_name = req.inputs.model
-    api_key: Optional[str] = None
+    api_key: str | None = None
     provider: str = "openai"  # Default provider
-    base_url: Optional[str] = None
+    base_url: str | None = None
     extra_headers: dict[str, str] = {}
-    return_type: Optional[str] = None
+    return_type: str | None = None
 
     # Check for explicit custom provider prefix
     is_explicit_custom = model_name.startswith("custom::")

@@ -1,4 +1,4 @@
-from typing import Optional, TypeVar, Union, overload
+from typing import TypeVar, overload
 
 from weave.trace_server import refs_internal as ri
 from weave.trace_server.errors import InvalidRequest
@@ -11,7 +11,7 @@ T = TypeVar(
 @overload
 def ensure_ref_is_valid(
     ref: str, expected_type: None = None
-) -> Union[ri.InternalObjectRef, ri.InternalTableRef, ri.InternalCallRef]: ...
+) -> ri.InternalObjectRef | ri.InternalTableRef | ri.InternalCallRef: ...
 
 
 @overload
@@ -22,7 +22,7 @@ def ensure_ref_is_valid(
 
 
 def ensure_ref_is_valid(
-    ref: str, expected_type: Optional[tuple[type, ...]] = None
+    ref: str, expected_type: tuple[type, ...] | None = None
 ) -> ri.InternalRef:
     """Validates and parses an internal URI reference.
 

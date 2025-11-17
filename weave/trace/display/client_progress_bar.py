@@ -5,7 +5,7 @@ tasks in the WeaveClient.
 """
 
 import logging
-from typing import Callable
+from collections.abc import Callable
 
 from weave.trace.display import display
 from weave.trace.weave_client import FlushStatus

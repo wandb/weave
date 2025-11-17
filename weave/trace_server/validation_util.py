@@ -1,6 +1,5 @@
 import base64
 import uuid
-from typing import Optional
 
 from weave.trace_server import refs_internal
 
@@ -61,7 +60,7 @@ def require_base64(s: str) -> str:
     return s
 
 
-def require_internal_ref_uri(s: str, ref_class: Optional[type] = None) -> str:
+def require_internal_ref_uri(s: str, ref_class: type | None = None) -> str:
     if not s.startswith(
         f"{refs_internal.WEAVE_INTERNAL_SCHEME}:///"
     ) and not s.startswith(f"{refs_internal.ARTIFACT_REF_SCHEME}:///"):

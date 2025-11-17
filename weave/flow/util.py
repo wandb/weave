@@ -5,8 +5,8 @@ import logging
 import multiprocessing
 import random
 from collections import defaultdict
-from collections.abc import AsyncIterator, Awaitable, Iterable
-from typing import Any, Callable, TypeVar
+from collections.abc import AsyncIterator, Awaitable, Callable, Iterable
+from typing import Any, TypeVar
 
 logger = logging.getLogger(__name__)
 

@@ -10,10 +10,10 @@ import platform
 import re
 import sys
 import time
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from concurrent.futures import Future
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, Callable, TypedDict, cast
+from typing import TYPE_CHECKING, Any, TypedDict, cast
 
 import pydantic
 from requests import HTTPError
@@ -143,6 +143,7 @@ from weave.trace_server_bindings.http_utils import (
 from weave.utils.attributes_dict import AttributesDict
 from weave.utils.dict_utils import sum_dict_leaves, zip_dicts
 from weave.utils.exception import exception_to_json_str
+from weave.utils.project_id import from_project_id, to_project_id
 from weave.utils.sanitize import REDACTED_VALUE, redact_dataclass_fields, should_redact
 
 if TYPE_CHECKING:
@@ -382,7 +383,7 @@ class WeaveClient:
 
     @trace_sentry.global_trace_sentry.watch()
     def get(self, ref: ObjectRef, *, objectify: bool = True) -> Any:
-        project_id = f"{ref.entity}/{ref.project}"
+        project_id = to_project_id(ref.entity, ref.project)
         try:
             read_res = self.server.obj_read(
                 ObjReadReq(
@@ -501,7 +502,7 @@ class WeaveClient:
         for obj in eval_objs:
             # It's unfortunate we have to do this, but it's currently the easiest
             # way get the correct behaviour given our serialization layer...
-            entity, project = obj.project_id.split("/")
+            entity, project = from_project_id(obj.project_id)
             ref = ObjectRef(
                 entity=entity,
                 project=project,

@@ -819,8 +819,8 @@ async def test_agent_with_memory(
 async def test_workflows_singlethreaded_runtime(
     client: weave.trace.weave_client.WeaveClient,
 ) -> None:
+    from collections.abc import Callable
     from dataclasses import dataclass
-    from typing import Callable
 
     from autogen_core import (
         AgentId,
