@@ -2396,7 +2396,7 @@ def _build_field_assignment(
 
     # CASE statement needed
     cases = []
-    for call_id, value in zip(call_ids, values):
+    for call_id, value in zip(call_ids, values, strict=False):
         id_param = pb.add_param(call_id)
         value_sql = _format_value_to_sql(value, pb, clickhouse_type, format_value_fn)
         cases.append(f"WHEN id = {param_slot(id_param, 'String')} THEN {value_sql}")
