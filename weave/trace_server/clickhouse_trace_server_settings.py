@@ -52,5 +52,5 @@ CLICKHOUSE_ASYNC_INSERT_SETTINGS = {
     # Max number of queries to batch together, this is the default
     "async_insert_max_query_number": 450,
     # Busy timeout in milliseconds (used when adaptive timeout is disabled)
-    "async_insert_busy_timeout_ms": 2000,
+    "async_insert_busy_timeout_ms": 1000,
 }
