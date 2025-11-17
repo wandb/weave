@@ -369,7 +369,6 @@ class CompletionsCreateRequestInputs(BaseModel):
         "Variables in messages like '{variable_name}' will be replaced with the corresponding values. "
         "Applied to both prompt messages (if prompt is provided) and regular messages.",
     )
-    
 
 
 class CompletionsCreateReq(BaseModelStrict):

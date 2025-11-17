@@ -19,7 +19,7 @@ from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 NOVA_MODELS = ("nova-pro-v1", "nova-lite-v1", "nova-micro-v1")
 
 
-def parse_prompt_reference(prompt: str) -> tuple[str, str, Optional[str]]:
+def parse_prompt_reference(prompt: str) -> tuple[str, str, str | None]:
     """Parse a prompt reference into its components.
 
     Supports multiple reference formats:
@@ -145,9 +145,9 @@ def resolve_prompt_messages(
 
 
 def resolve_and_apply_prompt(
-    prompt: Optional[str],
-    messages: Optional[list[dict[str, Any]]],
-    template_vars: Optional[dict[str, Any]],
+    prompt: str | None,
+    messages: list[dict[str, Any]] | None,
+    template_vars: dict[str, Any] | None,
     project_id: str,
     obj_read_func: Callable[[tsi.ObjReadReq], tsi.ObjReadRes],
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
