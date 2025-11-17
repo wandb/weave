@@ -169,8 +169,8 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         handle_response_error(r, "/call/upsert_batch")
 
     def _consolidate_batch(
-        self, batch: list[Union[StartBatchItem, EndBatchItem, CompleteBatchItem]]
-    ) -> list[Union[StartBatchItem, EndBatchItem, CompleteBatchItem]]:
+        self, batch: list[StartBatchItem | EndBatchItem | CompleteBatchItem]
+    ) -> list[StartBatchItem | EndBatchItem | CompleteBatchItem]:
         """Consolidate start/end pairs in a batch into complete items.
 
         Looks for pairs of start and end items with matching IDs and combines them
@@ -191,7 +191,7 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
                 completes.append(item)
 
         # Second pass: match starts with ends and create completes
-        consolidated: list[Union[StartBatchItem, EndBatchItem, CompleteBatchItem]] = []
+        consolidated: list[StartBatchItem | EndBatchItem | CompleteBatchItem] = []
         paired_ids: set[str] = set()
 
         for call_id, start_item in starts.items():
@@ -525,7 +525,7 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         return self._generic_request("/call/end", req, tsi.CallEndReq, tsi.CallEndRes)
 
     def _call_complete(
-        self, req: Union[tsi.CallCompleteReq, dict[str, Any]]
+        self, req: tsi.CallCompleteReq | dict[str, Any]
     ) -> tsi.CallUpsertRes:
         """Internal method to handle complete calls for batching.
 
@@ -566,7 +566,7 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
                 )
 
     @validate_call
-    def call_read(self, req: Union[tsi.CallReadReq, dict[str, Any]]) -> tsi.CallReadRes:
+    def call_read(self, req: tsi.CallReadReq | dict[str, Any]) -> tsi.CallReadRes:
         return self._generic_request(
             "/call/read", req, tsi.CallReadReq, tsi.CallReadRes
         )
