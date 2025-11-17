@@ -630,3 +630,39 @@ def mock_wandb_context():
             "get": mock_get_context,
             "set": mock_set_context,
         }
+
+
+def pytest_collection_modifyitems(config, items):
+    """Filter tests based on remote-http-trace-server flag.
+
+    This ensures that:
+    - When --remote-http-trace-server=stainless, only stainless tests run
+    - When --remote-http-trace-server=remote (default), only remote tests run
+    """
+    # Get the remote HTTP trace server flag
+    remote_http_trace_server_flag = config.getoption(
+        "--remote-http-trace-server", default="remote"
+    )
+
+    # Filter tests based on the remote-http-trace-server flag
+    filtered_items = []
+    for item in items:
+        # Check if test is in stainless_remote_http_trace_server directory
+        is_stainless_test = "stainless_remote_http_trace_server" in item.path.parts
+        # Check if test is in remote_http_trace_server directory (but not stainless)
+        is_remote_test = (
+            "remote_http_trace_server" in item.path.parts and not is_stainless_test
+        )
+
+        # Skip stainless tests when flag is not "stainless"
+        if is_stainless_test and remote_http_trace_server_flag != "stainless":
+            continue
+        # Skip remote tests when flag is not "remote"
+        elif is_remote_test and remote_http_trace_server_flag != "remote":
+            continue
+
+        # Keep this item
+        filtered_items.append(item)
+
+    # Replace items list with filtered items
+    items[:] = filtered_items
