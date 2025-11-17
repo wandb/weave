@@ -29,7 +29,7 @@ Our documentation site can be found [here](https://wandb.me/weave).
 
 ## Prerequisites
 
-- Python 3.9 or higher
+- Python 3.10 or higher
 - A [Weights & Biases account](https://wandb.ai/signup) (free tier available)
 
 
