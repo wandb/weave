@@ -28,15 +28,15 @@ from weave.trace_server_bindings.caching_middleware_trace_server import (
 logger = logging.getLogger(__name__)
 
 
+class WeaveWandbAuthenticationException(Exception): ...
+
+
 def get_username() -> str | None:
     api = wandb.Api()
     try:
         return api.username()
     except AttributeError:
         return None
-
-
-class WeaveWandbAuthenticationException(Exception): ...
 
 
 def get_entity_project_from_project_name(project_name: str) -> tuple[str, str]:

@@ -1,6 +1,6 @@
 # File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-from typing import Literal, Optional
+from typing import Literal
 
 from weave.chat.types._models import BaseModel
 from weave.chat.types.chat_completion_message import ChatCompletionMessage
@@ -11,10 +11,10 @@ __all__ = ["ChatCompletion", "Choice", "ChoiceLogprobs"]
 
 
 class ChoiceLogprobs(BaseModel):
-    content: Optional[list[ChatCompletionTokenLogprob]] = None
+    content: list[ChatCompletionTokenLogprob] | None = None
     """A list of message content tokens with log probability information."""
 
-    refusal: Optional[list[ChatCompletionTokenLogprob]] = None
+    refusal: list[ChatCompletionTokenLogprob] | None = None
     """A list of message refusal tokens with log probability information."""
 
 
@@ -34,7 +34,7 @@ class Choice(BaseModel):
     index: int
     """The index of the choice in the list of choices."""
 
-    logprobs: Optional[ChoiceLogprobs] = None
+    logprobs: ChoiceLogprobs | None = None
     """Log probability information for the choice."""
 
     message: ChatCompletionMessage
@@ -60,7 +60,7 @@ class ChatCompletion(BaseModel):
     object: Literal["chat.completion"]
     """The object type, which is always `chat.completion`."""
 
-    service_tier: Optional[Literal["auto", "default", "flex"]] = None
+    service_tier: Literal["auto", "default", "flex"] | None = None
     """Specifies the latency tier to use for processing the request.
 
     This parameter is relevant for customers subscribed to the scale tier service:
@@ -81,12 +81,12 @@ class ChatCompletion(BaseModel):
     utilized.
     """
 
-    system_fingerprint: Optional[str] = None
+    system_fingerprint: str | None = None
     """This fingerprint represents the backend configuration that the model runs with.
 
     Can be used in conjunction with the `seed` request parameter to understand when
     backend changes have been made that might impact determinism.
     """
 
-    usage: Optional[CompletionUsage] = None
+    usage: CompletionUsage | None = None
     """Usage statistics for the completion request."""

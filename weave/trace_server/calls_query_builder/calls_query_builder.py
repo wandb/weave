@@ -27,10 +27,11 @@ Outstanding Optimizations/Work:
 
 import logging
 import re
-from collections.abc import KeysView
-from typing import Callable, Literal, Optional, cast
+from collections.abc import Callable, KeysView
+from typing import Literal, cast
 
 from pydantic import BaseModel, Field
+from typing_extensions import Self
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.calls_query_builder.cte import CTECollection
@@ -80,7 +81,7 @@ class QueryBuilderField(BaseModel):
         self,
         pb: ParamBuilder,
         table_alias: str,
-        cast: Optional[tsi_query.CastTo] = None,
+        cast: tsi_query.CastTo | None = None,
     ) -> str:
         return clickhouse_cast(f"{table_alias}.{self.field}", cast)
 
@@ -100,7 +101,7 @@ class CallsMergedAggField(CallsMergedField):
         self,
         pb: ParamBuilder,
         table_alias: str,
-        cast: Optional[tsi_query.CastTo] = None,
+        cast: tsi_query.CastTo | None = None,
         use_agg_fn: bool = True,
     ) -> str:
         inner = super().as_sql(pb, table_alias)
@@ -118,20 +119,20 @@ class AggFieldWithTableOverrides(CallsMergedAggField):
         self,
         pb: ParamBuilder,
         table_alias: str,
-        cast: Optional[tsi_query.CastTo] = None,
+        cast: tsi_query.CastTo | None = None,
         use_agg_fn: bool = True,
     ) -> str:
         return super().as_sql(pb, self.table_name, cast, use_agg_fn)
 
 
 class CallsMergedDynamicField(CallsMergedAggField):
-    extra_path: Optional[list[str]] = None
+    extra_path: list[str] | None = None
 
     def as_sql(
         self,
         pb: ParamBuilder,
         table_alias: str,
-        cast: Optional[tsi_query.CastTo] = None,
+        cast: tsi_query.CastTo | None = None,
         use_agg_fn: bool = True,
     ) -> str:
         res = super().as_sql(pb, table_alias, use_agg_fn=use_agg_fn)
@@ -165,7 +166,7 @@ class CallsMergedSummaryField(CallsMergedField):
         self,
         pb: ParamBuilder,
         table_alias: str,
-        cast: Optional[tsi_query.CastTo] = None,
+        cast: tsi_query.CastTo | None = None,
     ) -> str:
         # Look up handler for the requested summary field
         handler = get_summary_field_handler(self.summary_field)
@@ -194,7 +195,7 @@ class CallsMergedFeedbackPayloadField(CallsMergedField):
     extra_path: list[str]
 
     @classmethod
-    def from_path(cls, path: str) -> "CallsMergedFeedbackPayloadField":
+    def from_path(cls, path: str) -> Self:
         """Expected format: `[feedback.type].dot.path`.
 
         feedback.type can be '*' to select all feedback types.
@@ -231,7 +232,7 @@ class CallsMergedFeedbackPayloadField(CallsMergedField):
         self,
         pb: ParamBuilder,
         table_alias: str,
-        cast: Optional[tsi_query.CastTo] = None,
+        cast: tsi_query.CastTo | None = None,
     ) -> str:
         inner = super().as_sql(pb, "feedback")
         if self.feedback_type == "*":
@@ -260,7 +261,7 @@ class AggregatedDataSizeField(CallsMergedField):
         self,
         pb: ParamBuilder,
         table_alias: str,
-        cast: Optional[tsi_query.CastTo] = None,
+        cast: tsi_query.CastTo | None = None,
     ) -> str:
         # This field is not supposed to be called yet. For now, we just take the parent class's
         # implementation. Consider re-implementation for future use.
@@ -295,13 +296,13 @@ class QueryBuilderDynamicField(QueryBuilderField):
     # the needed functionality with minimal refactoring. In the future, we should
     # consider a more elegant solution that reduces code duplication.
 
-    extra_path: Optional[list[str]] = None
+    extra_path: list[str] | None = None
 
     def as_sql(
         self,
         pb: ParamBuilder,
         table_alias: str,
-        cast: Optional[tsi_query.CastTo] = None,
+        cast: tsi_query.CastTo | None = None,
     ) -> str:
         res = super().as_sql(pb, table_alias)
         return json_dump_field_as_sql(pb, table_alias, res, self.extra_path, cast)
@@ -388,10 +389,10 @@ class OrderField(BaseModel):
         self,
         pb: ParamBuilder,
         table_alias: str,
-        expand_columns: Optional[list[str]] = None,
-        field_to_object_join_alias_map: Optional[dict[str, str]] = None,
+        expand_columns: list[str] | None = None,
+        field_to_object_join_alias_map: dict[str, str] | None = None,
     ) -> str:
-        options: list[tuple[Optional[tsi_query.CastTo], str]]
+        options: list[tuple[tsi_query.CastTo | None, str]]
         if isinstance(
             self.field,
             (
@@ -461,14 +462,14 @@ class OrderField(BaseModel):
 
 class Condition(BaseModel):
     operand: "tsi_query.Operand"
-    _consumed_fields: Optional[list[CallsMergedField]] = None
+    _consumed_fields: list[CallsMergedField] | None = None
 
     def as_sql(
         self,
         pb: ParamBuilder,
         table_alias: str,
-        expand_columns: Optional[list[str]] = None,
-        field_to_object_join_alias_map: Optional[dict[str, str]] = None,
+        expand_columns: list[str] | None = None,
+        field_to_object_join_alias_map: dict[str, str] | None = None,
     ) -> str:
         # Check if this condition involves object references
         if (
@@ -517,7 +518,7 @@ class Condition(BaseModel):
         return False
 
     def get_object_ref_conditions(
-        self, expand_columns: Optional[list[str]] = None
+        self, expand_columns: list[str] | None = None
     ) -> list[ObjectRefCondition]:
         """Get any object ref conditions for CTE building."""
         expand_cols = expand_columns or []
@@ -566,10 +567,10 @@ class CallsQuery(BaseModel):
     project_id: str
     select_fields: list[CallsMergedField] = Field(default_factory=list)
     query_conditions: list[Condition] = Field(default_factory=list)
-    hardcoded_filter: Optional[HardCodedFilter] = None
+    hardcoded_filter: HardCodedFilter | None = None
     order_fields: list[OrderField] = Field(default_factory=list)
-    limit: Optional[int] = None
-    offset: Optional[int] = None
+    limit: int | None = None
+    offset: int | None = None
     expand_columns: list[str] = Field(default_factory=list)
     include_costs: bool = False
     include_storage_size: bool = False
@@ -823,6 +824,10 @@ class CallsQuery(BaseModel):
         if self.include_costs:
             for order_field in self.order_fields:
                 field_obj = order_field.field
+                # Skip feedback fields - they're handled via LEFT JOIN and don't need to be selected
+                if isinstance(field_obj, CallsMergedFeedbackPayloadField):
+                    continue
+
                 if isinstance(
                     field_obj, (CallsMergedDynamicField, QueryBuilderDynamicField)
                 ):
@@ -830,6 +835,14 @@ class CallsQuery(BaseModel):
                     base_field = get_field_by_name(field_obj.field)
                     if base_field not in select_query.select_fields:
                         select_query.select_fields.append(base_field)
+                else:
+                    # For non-dynamic fields (like started_at, op_name, etc.),
+                    # add the field directly to ensure it's available in CTEs
+                    if field_obj not in select_query.select_fields:
+                        assert isinstance(field_obj, CallsMergedField), (
+                            "Field must be a CallsMergedField"
+                        )
+                        select_query.select_fields.append(field_obj)
 
         filtered_calls_sql = filter_query._as_sql_base_format(
             pb,
@@ -854,9 +867,10 @@ class CallsQuery(BaseModel):
         ctes.add_cte(CTE_ALL_CALLS, base_sql)
         self._add_cost_ctes_to_builder(ctes, pb)
 
-        order_by_fields = self._convert_to_orm_sort_fields()
         select_fields = [field.field for field in self.select_fields]
-        final_select = get_cost_final_select(pb, select_fields, order_by_fields)
+        final_select = get_cost_final_select(
+            pb, select_fields, self.order_fields, self.project_id
+        )
 
         raw_sql = ctes.to_sql() + "\n" + final_select
         return safely_format_sql(raw_sql, logger)
@@ -879,8 +893,8 @@ class CallsQuery(BaseModel):
         self,
         pb: ParamBuilder,
         table_alias: str,
-        expand_columns: Optional[list[str]],
-        id_subquery_name: Optional[str] = None,
+        expand_columns: list[str] | None,
+        id_subquery_name: str | None = None,
     ) -> WhereFilters:
         """Build all WHERE clause optimization filters.
 
@@ -977,8 +991,8 @@ class CallsQuery(BaseModel):
         table_alias: str,
         project_param: str,
         needs_feedback: bool,
-        expand_columns: Optional[list[str]],
-        field_to_object_join_alias_map: Optional[dict[str, str]],
+        expand_columns: list[str] | None,
+        field_to_object_join_alias_map: dict[str, str] | None,
     ) -> QueryJoins:
         """Build all JOIN clauses for the query.
 
@@ -1064,8 +1078,8 @@ class CallsQuery(BaseModel):
         self,
         pb: ParamBuilder,
         table_alias: str,
-        expand_columns: Optional[list[str]],
-        field_to_object_join_alias_map: Optional[dict[str, str]],
+        expand_columns: list[str] | None,
+        field_to_object_join_alias_map: dict[str, str] | None,
     ) -> tuple[str, bool]:
         """Build the HAVING clause for post-aggregation filtering.
 
@@ -1108,8 +1122,8 @@ class CallsQuery(BaseModel):
         self,
         pb: ParamBuilder,
         table_alias: str,
-        expand_columns: Optional[list[str]],
-        field_to_object_join_alias_map: Optional[dict[str, str]],
+        expand_columns: list[str] | None,
+        field_to_object_join_alias_map: dict[str, str] | None,
     ) -> tuple[str, str, str, bool]:
         """Build ORDER BY, LIMIT, and OFFSET clauses.
 
@@ -1146,9 +1160,9 @@ class CallsQuery(BaseModel):
         self,
         pb: ParamBuilder,
         table_alias: str,
-        id_subquery_name: Optional[str] = None,
-        field_to_object_join_alias_map: Optional[dict[str, str]] = None,
-        expand_columns: Optional[list[str]] = None,
+        id_subquery_name: str | None = None,
+        field_to_object_join_alias_map: dict[str, str] | None = None,
+        expand_columns: list[str] | None = None,
     ) -> str:
         """Build the base SQL query format.
 
@@ -1340,7 +1354,7 @@ SUMMARY_FIELD_HANDLERS = {
 # Helper function to get a summary field handler by name
 def get_summary_field_handler(
     summary_field: str,
-) -> Optional[Callable[[ParamBuilder, str], str]]:
+) -> Callable[[ParamBuilder, str], str] | None:
     """Returns the handler function for a given summary field name."""
     return SUMMARY_FIELD_HANDLERS.get(summary_field)
 
@@ -1465,7 +1479,7 @@ def process_query_to_conditions(
 
 
 def process_op_name_filter_to_sql(
-    hardcoded_filter: Optional[HardCodedFilter],
+    hardcoded_filter: HardCodedFilter | None,
     param_builder: ParamBuilder,
     table_alias: str,
 ) -> str:
@@ -1516,7 +1530,7 @@ def process_op_name_filter_to_sql(
 
 
 def process_trace_id_filter_to_sql(
-    hardcoded_filter: Optional[HardCodedFilter],
+    hardcoded_filter: HardCodedFilter | None,
     param_builder: ParamBuilder,
     table_alias: str,
 ) -> str:
@@ -1547,7 +1561,7 @@ def process_trace_id_filter_to_sql(
 
 
 def process_thread_id_filter_to_sql(
-    hardcoded_filter: Optional[HardCodedFilter],
+    hardcoded_filter: HardCodedFilter | None,
     param_builder: ParamBuilder,
     table_alias: str,
 ) -> str:
@@ -1582,7 +1596,7 @@ def process_thread_id_filter_to_sql(
 
 
 def process_turn_id_filter_to_sql(
-    hardcoded_filter: Optional[HardCodedFilter],
+    hardcoded_filter: HardCodedFilter | None,
     param_builder: ParamBuilder,
     table_alias: str,
 ) -> str:
@@ -1617,7 +1631,7 @@ def process_turn_id_filter_to_sql(
 
 
 def process_trace_roots_only_filter_to_sql(
-    hardcoded_filter: Optional[HardCodedFilter],
+    hardcoded_filter: HardCodedFilter | None,
     param_builder: ParamBuilder,
     table_alias: str,
 ) -> str:
@@ -1637,7 +1651,7 @@ def process_trace_roots_only_filter_to_sql(
 
 
 def process_parent_ids_filter_to_sql(
-    hardcoded_filter: Optional[HardCodedFilter],
+    hardcoded_filter: HardCodedFilter | None,
     param_builder: ParamBuilder,
     table_alias: str,
 ) -> str:
@@ -1659,7 +1673,7 @@ def process_parent_ids_filter_to_sql(
 
 
 def process_ref_filters_to_sql(
-    hardcoded_filter: Optional[HardCodedFilter],
+    hardcoded_filter: HardCodedFilter | None,
     param_builder: ParamBuilder,
     table_alias: str,
 ) -> str:
@@ -1725,7 +1739,7 @@ def process_object_refs_filter_to_opt_sql(
 
 
 def process_wb_run_ids_filter_to_sql(
-    hardcoded_filter: Optional[HardCodedFilter],
+    hardcoded_filter: HardCodedFilter | None,
     param_builder: ParamBuilder,
     table_alias: str,
 ) -> str:
@@ -1865,7 +1879,7 @@ def build_calls_stats_query(
 
 def _try_optimized_stats_query(
     req: tsi.CallsQueryStatsReq, param_builder: ParamBuilder
-) -> Optional[str]:
+) -> str | None:
     """Try to match request to an optimized special-case query.
 
     Returns optimized query string if a pattern matches, None otherwise.
@@ -1934,7 +1948,7 @@ def _optimized_wb_run_id_not_null_query(
     """
 
 
-def _is_minimal_filter(filter: Optional[tsi.CallsFilter]) -> bool:
+def _is_minimal_filter(filter: tsi.CallsFilter | None) -> bool:
     """Check if filter has no specific filtering criteria set."""
     if filter is None:
         return True

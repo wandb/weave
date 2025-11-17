@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import copy
 import importlib
+from collections.abc import Callable
 from functools import wraps
-from typing import Any, Callable
+from typing import Any
 
 from openai.types.chat.chat_completion import ChatCompletion
 from openai.types.completion import Completion
