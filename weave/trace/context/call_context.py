@@ -148,7 +148,7 @@ def set_call_stack(stack: list[Call]) -> Iterator[list[Call]]:
 
 call_attributes: ContextVar[dict[str, Any]] = ContextVar(
     "call_attributes",
-    default={},
+    default={},  # noqa: B039
 )
 
 
