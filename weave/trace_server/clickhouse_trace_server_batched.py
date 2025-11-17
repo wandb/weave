@@ -817,6 +817,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             "object_versions",
             data=[list(ch_obj.model_dump().values())],
             column_names=list(ch_obj.model_fields.keys()),
+            project_id=req.obj.project_id,
         )
 
         return tsi.ObjCreateRes(
@@ -889,6 +890,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             "object_versions",
             data=ch_insert_batch,
             column_names=ALL_OBJ_INSERT_COLUMNS,
+            project_id=unique_projects.pop(),
         )
 
         return obj_results
@@ -1014,7 +1016,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         data = [list(obj.model_dump().values()) for obj in delete_insertables]
         column_names = list(delete_insertables[0].model_fields.keys())
 
-        self._insert("object_versions", data=data, column_names=column_names)
+        self._insert(
+            "object_versions",
+            data=data,
+            column_names=column_names,
+            project_id=req.project_id,
+        )
         num_deleted = len(delete_insertables)
 
         return tsi.ObjDeleteRes(num_deleted=num_deleted)
@@ -1041,6 +1048,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             "table_rows",
             data=insert_rows,
             column_names=["project_id", "digest", "refs", "val_dump"],
+            project_id=req.table.project_id,
         )
 
         row_digests = [r[1] for r in insert_rows]
@@ -1054,6 +1062,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             "tables",
             data=[(req.table.project_id, digest, row_digests)],
             column_names=["project_id", "digest", "row_digests"],
+            project_id=req.table.project_id,
         )
         return tsi.TableCreateRes(digest=digest, row_digests=row_digests)
 
@@ -1130,6 +1139,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 "table_rows",
                 data=new_rows_needed_to_insert,
                 column_names=["project_id", "digest", "refs", "val_dump"],
+                project_id=req.project_id,
             )
 
         table_hasher = hashlib.sha256()
@@ -1141,6 +1151,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             "tables",
             data=[(req.project_id, digest, final_row_digests)],
             column_names=["project_id", "digest", "row_digests"],
+            project_id=req.project_id,
         )
         return tsi.TableUpdateRes(digest=digest, updated_row_digests=updated_digests)
 
@@ -1159,6 +1170,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             "tables",
             data=[(req.project_id, digest, req.row_digests)],
             column_names=["project_id", "digest", "row_digests"],
+            project_id=req.project_id,
         )
 
         return tsi.TableCreateFromDigestsRes(digest=digest)
@@ -3946,7 +3958,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         processed_payload = process_feedback_payload(req)
         row = format_feedback_to_row(req, processed_payload)
         prepared = TABLE_FEEDBACK.insert(row).prepare(database_type="clickhouse")
-        self._insert(TABLE_FEEDBACK.name, prepared.data, prepared.column_names)
+        self._insert(
+            TABLE_FEEDBACK.name,
+            prepared.data,
+            prepared.column_names,
+            project_id=req.project_id,
+        )
 
         return format_feedback_to_res(row)
 
@@ -3975,7 +3992,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             for row in rows_to_insert:
                 insert_query.row(row)
             prepared = insert_query.prepare(database_type="clickhouse")
-            self._insert(TABLE_FEEDBACK.name, prepared.data, prepared.column_names)
+            self._insert(
+                TABLE_FEEDBACK.name,
+                prepared.data,
+                prepared.column_names,
+            )
 
         return tsi.FeedbackCreateBatchRes(res=results)
 
@@ -4391,20 +4412,14 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if not batch:
             return
 
-        settings = {}
-        if self._use_async_insert:
-            settings = ch_settings.CLICKHOUSE_ASYNC_INSERT_SETTINGS.copy()
-            if root_span is not None:
-                root_span.set_tags(
-                    {
-                        "clickhouse_trace_server_batched._insert_call_batch.async_insert": True,
-                    }
-                )
+        project_id_idx = ALL_CALL_INSERT_COLUMNS.index("project_id")
+        project_id_for_logging = batch[0][project_id_idx]
+
         self._insert(
             "call_parts",
             data=batch,
             column_names=ALL_CALL_INSERT_COLUMNS,
-            settings=settings,
+            project_id=project_id_for_logging,
         )
 
     def _select_objs_query(
@@ -4553,12 +4568,27 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         data: Sequence[Sequence[Any]],
         column_names: list[str],
         settings: dict[str, Any] | None = None,
+        project_id: str | None = None,
     ) -> QuerySummary:
-        ddtrace.tracer.current_span().set_tags(
-            {
-                "clickhouse_trace_server_batched._insert.table": table,
-            }
-        )
+        root_span = ddtrace.tracer.current_span()
+        if root_span is not None:
+            root_span.set_tags(
+                {
+                    "clickhouse_trace_server_batched._insert.table": table,
+                    "clickhouse_trace_server_batched._insert.project_id": project_id,
+                }
+            )
+
+        if self._use_async_insert:
+            if settings is None:
+                settings = {}
+            settings.update(ch_settings.CLICKHOUSE_ASYNC_INSERT_SETTINGS)
+            if root_span is not None:
+                root_span.set_tags(
+                    {
+                        "clickhouse_trace_server_batched._insert_call_batch.async_insert": True,
+                    }
+                )
         try:
             return self.ch_client.insert(
                 table, data=data, column_names=column_names, settings=settings
