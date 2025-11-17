@@ -4618,6 +4618,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     "table": table,
                     "data_len": len(data),
                     "data_bytes": data_bytes,
+                    "project_id": project_id,
                 },
             )
             raise
