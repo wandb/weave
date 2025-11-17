@@ -210,7 +210,7 @@ class CallsCompleteSummaryField(CallsCompleteField):
         self,
         pb: ParamBuilder,
         table_alias: str,
-        cast: Optional[tsi_query.CastTo] = None,
+        cast: tsi_query.CastTo | None = None,
     ) -> str:
         # Look up handler for the requested summary field
         handler = get_summary_field_handler(self.summary_field)
@@ -337,7 +337,7 @@ class AggregatedDataSizeFieldComplete(CallsMergedField):
         self,
         pb: ParamBuilder,
         table_alias: str,
-        cast: Optional[tsi_query.CastTo] = None,
+        cast: tsi_query.CastTo | None = None,
     ) -> str:
         # This field is not supposed to be called yet. For now, we just take the parent class's
         # implementation. Consider re-implementation for future use.
@@ -1309,9 +1309,9 @@ class CallsQuery(BaseModel):
         self,
         pb: ParamBuilder,
         table_alias: str,
-        id_subquery_name: Optional[str] = None,
-        field_to_object_join_alias_map: Optional[dict[str, str]] = None,
-        expand_columns: Optional[list[str]] = None,
+        id_subquery_name: str | None = None,
+        field_to_object_join_alias_map: dict[str, str] | None = None,
+        expand_columns: list[str] | None = None,
     ) -> str:
         """Build SQL query for calls_merged table (with GROUP BY aggregation).
 
@@ -1372,9 +1372,9 @@ class CallsQuery(BaseModel):
         self,
         pb: ParamBuilder,
         table_alias: str,
-        id_subquery_name: Optional[str] = None,
-        field_to_object_join_alias_map: Optional[dict[str, str]] = None,
-        expand_columns: Optional[list[str]] = None,
+        id_subquery_name: str | None = None,
+        field_to_object_join_alias_map: dict[str, str] | None = None,
+        expand_columns: list[str] | None = None,
     ) -> str:
         """Build SQL query for calls_complete table (no GROUP BY needed).
 
