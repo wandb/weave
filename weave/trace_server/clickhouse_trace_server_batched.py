@@ -817,7 +817,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             "object_versions",
             data=[list(ch_obj.model_dump().values())],
             column_names=list(ch_obj.model_fields.keys()),
-            project_id=req.obj.project_id,
         )
 
         return tsi.ObjCreateRes(
@@ -890,7 +889,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             "object_versions",
             data=ch_insert_batch,
             column_names=ALL_OBJ_INSERT_COLUMNS,
-            project_id=unique_projects.pop(),
         )
 
         return obj_results
@@ -1020,7 +1018,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             "object_versions",
             data=data,
             column_names=column_names,
-            project_id=req.project_id,
         )
         num_deleted = len(delete_insertables)
 
@@ -1048,7 +1045,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             "table_rows",
             data=insert_rows,
             column_names=["project_id", "digest", "refs", "val_dump"],
-            project_id=req.table.project_id,
         )
 
         row_digests = [r[1] for r in insert_rows]
@@ -1062,7 +1058,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             "tables",
             data=[(req.table.project_id, digest, row_digests)],
             column_names=["project_id", "digest", "row_digests"],
-            project_id=req.table.project_id,
         )
         return tsi.TableCreateRes(digest=digest, row_digests=row_digests)
 
@@ -1139,7 +1134,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 "table_rows",
                 data=new_rows_needed_to_insert,
                 column_names=["project_id", "digest", "refs", "val_dump"],
-                project_id=req.project_id,
             )
 
         table_hasher = hashlib.sha256()
@@ -1151,7 +1145,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             "tables",
             data=[(req.project_id, digest, final_row_digests)],
             column_names=["project_id", "digest", "row_digests"],
-            project_id=req.project_id,
         )
         return tsi.TableUpdateRes(digest=digest, updated_row_digests=updated_digests)
 
@@ -1170,7 +1163,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             "tables",
             data=[(req.project_id, digest, req.row_digests)],
             column_names=["project_id", "digest", "row_digests"],
-            project_id=req.project_id,
         )
 
         return tsi.TableCreateFromDigestsRes(digest=digest)
@@ -3962,7 +3954,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             TABLE_FEEDBACK.name,
             prepared.data,
             prepared.column_names,
-            project_id=req.project_id,
         )
 
         return format_feedback_to_res(row)
@@ -4412,14 +4403,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if not batch:
             return
 
-        project_id_idx = ALL_CALL_INSERT_COLUMNS.index("project_id")
-        project_id_for_logging = batch[0][project_id_idx]
-
         self._insert(
             "call_parts",
             data=batch,
             column_names=ALL_CALL_INSERT_COLUMNS,
-            project_id=project_id_for_logging,
         )
 
     def _select_objs_query(
@@ -4568,14 +4555,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         data: Sequence[Sequence[Any]],
         column_names: list[str],
         settings: dict[str, Any] | None = None,
-        project_id: str | None = None,
     ) -> QuerySummary:
         root_span = ddtrace.tracer.current_span()
         if root_span is not None:
             root_span.set_tags(
                 {
                     "clickhouse_trace_server_batched._insert.table": table,
-                    "clickhouse_trace_server_batched._insert.project_id": project_id,
                 }
             )
 
@@ -4618,7 +4603,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     "table": table,
                     "data_len": len(data),
                     "data_bytes": data_bytes,
-                    "project_id": project_id,
                 },
             )
             raise
