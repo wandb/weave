@@ -36,9 +36,9 @@ CREATE TABLE calls_complete (
     INDEX idx_trace_id trace_id TYPE bloom_filter GRANULARITY 1,
     -- Full-text indices for larger JSON dump fields, default granularity is 64 Granules
     -- which seems like a lot, but is what they reccomend.
-    INDEX idx_inputs_dump inputs_dump TYPE text(tokenizer = 'default'),
-    INDEX idx_output_dump output_dump TYPE text(tokenizer = 'default'),
-    INDEX idx_attributes_dump attributes_dump TYPE text(tokenizer = 'default'),
+    INDEX idx_inputs_dump inputs_dump TYPE text(tokenizer = 'splitByString'),
+    INDEX idx_output_dump output_dump TYPE text(tokenizer = 'splitByString'),
+    INDEX idx_attributes_dump attributes_dump TYPE text(tokenizer = 'splitByString'),
     -- Set for equality searches with low cardinality ids, high granularity for
     -- smaller index memory size
     INDEX idx_wb_run_id wb_run_id TYPE set(100) GRANULARITY 4,
