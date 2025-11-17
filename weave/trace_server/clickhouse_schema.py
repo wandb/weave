@@ -66,28 +66,28 @@ class CallCompleteCHInsertable(BaseModel):
     project_id: str
     id: str
     trace_id: str
-    parent_id: Optional[str] = None
-    thread_id: Optional[str] = None
-    turn_id: Optional[str] = None
+    parent_id: str | None = None
+    thread_id: str | None = None
+    turn_id: str | None = None
     op_name: str
     started_at: datetime.datetime
     attributes_dump: str
     inputs_dump: str
     input_refs: list[str]
-    display_name: Optional[str] = None
-    otel_dump: Optional[str] = None
+    display_name: str | None = None
+    otel_dump: str | None = None
 
-    wb_user_id: Optional[str] = None
-    wb_run_id: Optional[str] = None
-    wb_run_step: Optional[int] = None
+    wb_user_id: str | None = None
+    wb_run_id: str | None = None
+    wb_run_step: int | None = None
 
     # End fields
-    ended_at: Optional[datetime.datetime] = None
-    exception: Optional[str] = None
+    ended_at: datetime.datetime | None = None
+    exception: str | None = None
     summary_dump: str
     output_dump: str
     output_refs: list[str]
-    wb_run_step_end: Optional[int] = None
+    wb_run_step_end: int | None = None
 
     _project_id_v = field_validator("project_id")(validation.project_id_validator)
     _id_v = field_validator("id")(validation.call_id_validator)

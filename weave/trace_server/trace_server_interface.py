@@ -219,29 +219,29 @@ class CompletedCallSchemaForInsert(BaseModel):
     op_name: str
     started_at: datetime.datetime
 
-    updated_at: Optional[datetime.datetime] = None
+    updated_at: datetime.datetime | None = None
 
-    display_name: Optional[str] = None
-    parent_id: Optional[str] = None
-    thread_id: Optional[str] = None
-    turn_id: Optional[str] = None
+    display_name: str | None = None
+    parent_id: str | None = None
+    thread_id: str | None = None
+    turn_id: str | None = None
 
-    ended_at: Optional[datetime.datetime] = None
+    ended_at: datetime.datetime | None = None
 
     # Dump fields
     attributes: dict[str, Any]
     inputs: dict[str, Any]
-    output: Optional[Any] = None
+    output: Any | None = None
     summary: SummaryInsertMap
     # OTEL span data
-    otel_dump: Optional[dict[str, Any]] = None
+    otel_dump: dict[str, Any] | None = None
 
-    exception: Optional[str] = None
+    exception: str | None = None
 
-    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
-    wb_run_id: Optional[str] = None
-    wb_run_step: Optional[int] = None
-    wb_run_step_end: Optional[int] = None
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
+    wb_run_id: str | None = None
+    wb_run_step: int | None = None
+    wb_run_step_end: int | None = None
 
     @field_serializer("attributes", "summary", when_used="unless-none")
     def serialize_typed_dicts(self, v: dict[str, Any]) -> dict[str, Any]:
