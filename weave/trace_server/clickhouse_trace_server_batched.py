@@ -548,7 +548,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             for col in ALL_CALL_INSERT_COLUMNS:
                 row.append(call_dict.get(col, column_defaults.get(col)))
             batch_data.append(row)
-        self._insert_call_batch(batch_data, "calls_complete")
+        self._insert(
+            "calls_complete",
+            data=batch_data,
+            column_names=ALL_CALL_INSERT_COLUMNS,
+        )
 
         res = [
             tsi.CallUpsertRes(id=c.id, trace_id=c.trace_id) for c in starts + completes
