@@ -200,11 +200,11 @@
     "api_key_name": "BEDROCK_API_KEY"
   },
   "anthropic.claude-haiku-4-5-20251001-v1:0": {
-    "litellm_provider": "bedrock",
+    "litellm_provider": "bedrock_converse",
     "api_key_name": "BEDROCK_API_KEY"
   },
   "anthropic.claude-haiku-4-5@20251001": {
-    "litellm_provider": "bedrock",
+    "litellm_provider": "bedrock_converse",
     "api_key_name": "BEDROCK_API_KEY"
   },
   "anthropic.claude-3-5-sonnet-20240620-v1:0": {
@@ -284,7 +284,7 @@
     "api_key_name": "BEDROCK_API_KEY"
   },
   "apac.anthropic.claude-haiku-4-5-20251001-v1:0": {
-    "litellm_provider": "bedrock",
+    "litellm_provider": "bedrock_converse",
     "api_key_name": "BEDROCK_API_KEY"
   },
   "apac.anthropic.claude-3-sonnet-20240229-v1:0": {
@@ -340,6 +340,18 @@
     "api_key_name": "AZURE_API_KEY"
   },
   "azure/eu/gpt-4o-realtime-preview-2024-12-17": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/eu/gpt-5-2025-08-07": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/eu/gpt-5-mini-2025-08-07": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/eu/gpt-5-nano-2025-08-07": {
     "litellm_provider": "azure",
     "api_key_name": "AZURE_API_KEY"
   },
@@ -779,6 +791,18 @@
     "litellm_provider": "azure",
     "api_key_name": "AZURE_API_KEY"
   },
+  "azure/us/gpt-4.1-2025-04-14": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/us/gpt-4.1-mini-2025-04-14": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/us/gpt-4.1-nano-2025-04-14": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
   "azure/us/gpt-4o-2024-08-06": {
     "litellm_provider": "azure",
     "api_key_name": "AZURE_API_KEY"
@@ -803,6 +827,18 @@
     "litellm_provider": "azure",
     "api_key_name": "AZURE_API_KEY"
   },
+  "azure/us/gpt-5-2025-08-07": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/us/gpt-5-mini-2025-08-07": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/us/gpt-5-nano-2025-08-07": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
   "azure/us/o1-2024-12-17": {
     "litellm_provider": "azure",
     "api_key_name": "AZURE_API_KEY"
@@ -815,7 +851,15 @@
     "litellm_provider": "azure",
     "api_key_name": "AZURE_API_KEY"
   },
+  "azure/us/o3-2025-04-16": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
   "azure/us/o3-mini-2025-01-31": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/us/o4-mini-2025-04-16": {
     "litellm_provider": "azure",
     "api_key_name": "AZURE_API_KEY"
   },
@@ -1568,7 +1612,7 @@
     "api_key_name": "BEDROCK_API_KEY"
   },
   "eu.anthropic.claude-haiku-4-5-20251001-v1:0": {
-    "litellm_provider": "bedrock",
+    "litellm_provider": "bedrock_converse",
     "api_key_name": "BEDROCK_API_KEY"
   },
   "eu.anthropic.claude-3-5-sonnet-20240620-v1:0": {
@@ -1804,6 +1848,10 @@
     "api_key_name": "GEMINI_API_KEY"
   },
   "gemini/gemini-2.5-pro": {
+    "litellm_provider": "gemini",
+    "api_key_name": "GEMINI_API_KEY"
+  },
+  "gemini/gemini-3-pro-preview": {
     "litellm_provider": "gemini",
     "api_key_name": "GEMINI_API_KEY"
   },
@@ -2364,7 +2412,7 @@
     "api_key_name": "BEDROCK_API_KEY"
   },
   "jp.anthropic.claude-haiku-4-5-20251001-v1:0": {
-    "litellm_provider": "bedrock",
+    "litellm_provider": "bedrock_converse",
     "api_key_name": "BEDROCK_API_KEY"
   },
   "low/1024-x-1024/gpt-image-1": {
@@ -2807,10 +2855,6 @@
     "litellm_provider": "openai",
     "api_key_name": "OPENAI_API_KEY"
   },
-  "text-embedding-ada-002-v2": {
-    "litellm_provider": "openai",
-    "api_key_name": "OPENAI_API_KEY"
-  },
   "text-moderation-007": {
     "litellm_provider": "openai",
     "api_key_name": "OPENAI_API_KEY"
@@ -2852,7 +2896,7 @@
     "api_key_name": "BEDROCK_API_KEY"
   },
   "us.anthropic.claude-haiku-4-5-20251001-v1:0": {
-    "litellm_provider": "bedrock",
+    "litellm_provider": "bedrock_converse",
     "api_key_name": "BEDROCK_API_KEY"
   },
   "us.anthropic.claude-3-5-sonnet-20240620-v1:0": {
