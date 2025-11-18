@@ -2015,12 +2015,28 @@ class ScoreDeleteRes(BaseModel):
     num_deleted: int = Field(..., description="Number of scores deleted")
 
 
-class CallsUpsertBatchV2Req(BaseModel):
-    batch: list[CallBatchStartMode | CallBatchEndMode | CallBatchCompleteMode]
+class CallsStartBatchReq(BaseModel):
+    """Request for batch starting/completing calls. Accepts start or complete call types."""
+
+    batch: list[CallBatchStartMode | CallBatchCompleteMode]
 
 
-class CallsUpsertBatchV2Res(BaseModel):
+class CallsStartBatchRes(BaseModel):
+    """Response for batch starting/completing calls."""
+
     res: list[CallUpsertRes]
+
+
+class CallsEndBatchReq(BaseModel):
+    """Request for batch ending calls. Accepts only end call types."""
+
+    batch: list[CallBatchEndMode]
+
+
+class CallsEndBatchRes(BaseModel):
+    """Response for batch ending calls. Returns empty list since ends don't return IDs."""
+
+    res: list[CallUpsertRes] = []
 
 
 class TraceServerInterface(Protocol):
@@ -2189,6 +2205,10 @@ class ObjectInterface(Protocol):
     def score_read(self, req: ScoreReadReq) -> ScoreReadRes: ...
     def score_list(self, req: ScoreListReq) -> Iterator[ScoreReadRes]: ...
     def score_delete(self, req: ScoreDeleteReq) -> ScoreDeleteRes: ...
+
+    # Calls V2 - Batch Endpoints
+    def calls_start_batch(self, req: CallsStartBatchReq) -> CallsStartBatchRes: ...
+    def calls_end_batch(self, req: CallsEndBatchReq) -> CallsEndBatchRes: ...
 
 
 class FullTraceServerInterface(TraceServerInterface, ObjectInterface, Protocol):

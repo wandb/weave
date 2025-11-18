@@ -504,37 +504,23 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # Returns the id of the newly created call
         return tsi.CallEndRes()
 
-    def _split_call_batch_v2(
-        self,
-        batch: list[
-            tsi.CallBatchStartMode | tsi.CallBatchEndMode | tsi.CallBatchCompleteMode
-        ],
-    ) -> tuple[
-        list[tsi.StartedCallSchemaForInsert],
-        list[tsi.EndedCallSchemaForInsert],
-        list[tsi.CompletedCallSchemaForInsert],
-    ]:
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.calls_start_batch_v2")
+    def calls_start_batch(self, req: tsi.CallsStartBatchReq) -> tsi.CallsStartBatchRes:
+        """Batch insert call starts and completes directly into calls_complete table.
+
+        Accepts start or complete call types and writes them directly to the
+        calls_complete table without needing to split the batch.
+        """
+        # Extract starts and completes from batch
         starts = []
-        ends = []
         completes = []
-        for item in batch:
+        for item in req.batch:
             if item.mode == "start":
                 starts.append(item.req.start)
-            elif item.mode == "end":
-                ends.append(item.req.end)
             elif item.mode == "complete":
                 completes.append(item.req.complete)
-        return starts, ends, completes
 
-    def calls_upsert_batch_v2(
-        self, req: tsi.CallsUpsertBatchV2Req
-    ) -> tsi.CallsUpsertBatchV2Res:
-        # First organize the batch into starts, ends and completes.
-        # Starts and completes get inserted directly into the `calls_complete` table
-        # Ends hit a special UPDATE path
-        starts, ends, completes = self._split_call_batch_v2(req.batch)
-
-        # Convert API-level schemas to CH-insertable schemas and track converted calls
+        # Convert API-level schemas to CH-insertable schemas
         ch_insertable_starts = [
             _start_call_for_insert_to_ch_insertable_start_call(start, self)
             for start in starts
@@ -564,34 +550,28 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             batch_data.append(row)
         self._insert_call_batch(batch_data, "calls_complete")
 
-        self._calls_complete_update_end_batch(ends)
-
         res = [
             tsi.CallUpsertRes(id=c.id, trace_id=c.trace_id) for c in starts + completes
         ]
 
-        return tsi.CallsUpsertBatchV2Res(res=res)
+        return tsi.CallsStartBatchRes(res=res)
 
-    def _calls_complete_update_end_batch(
-        self, end_calls: list[tsi.EndedCallSchemaForInsert]
-    ) -> None:
-        """Batch update multiple call ends using ClickHouse lightweight UPDATE.
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.calls_end_batch_v2")
+    def calls_end_batch(self, req: tsi.CallsEndBatchReq) -> tsi.CallsEndBatchRes:
+        """Batch update call ends in calls_complete table.
 
-        This uses a single UPDATE statement with CASE expressions to update different
-        values for different call IDs.
-        - Creates 1 patch part instead of N (reduces read overhead)
-        - 1 network round trip instead of N
-
-        Args:
-            end_calls: List of ended call schemas to update
+        Accepts only end call types and updates existing records in the
+        calls_complete table without needing to split the batch.
         """
-        if not end_calls:
-            return
+        # Extract ends from batch
+        end_calls = [item.req.end for item in req.batch]
 
         pb = ParamBuilder()
         command = build_calls_complete_batch_update_query(end_calls, pb)
 
         self._command(command, pb.get_params())
+
+        return tsi.CallsEndBatchRes()
 
     def call_read(self, req: tsi.CallReadReq) -> tsi.CallReadRes:
         res = self.calls_query_stream(
