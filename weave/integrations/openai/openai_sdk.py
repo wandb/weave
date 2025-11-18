@@ -664,26 +664,9 @@ def should_use_responses_accumulator(inputs: dict) -> bool:
     return isinstance(inputs, dict) and inputs.get("stream") is True
 
 
-def responses_on_finish_post_processor(value: Any) -> dict | None:
-    """Post-processor for Responses API that extracts request_id and converts to dict.
-
-    Args:
-        value: The Response object from the accumulator, or None.
-
-    Returns:
-        A dictionary representation of the response with request_id included if available,
-        or None if value is None.
-    """
+def responses_on_finish_post_processor(value: Response | None) -> dict | None:
     if value is None:
         return None
-
-    # Convert Response object to dict if it has model_dump method
-    if not hasattr(value, "model_dump"):
-        # If it doesn't have model_dump, return as dict with request_id if available
-        result: dict[str, Any] = {}
-        if hasattr(value, "_request_id"):
-            result["request_id"] = value._request_id
-        return result if result else None
 
     dump = value.model_dump(exclude_unset=True, exclude_none=True)
 
