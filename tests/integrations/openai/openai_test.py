@@ -1033,7 +1033,10 @@ def test_openai_responses_quickstart(client: WeaveClient) -> None:
     assert output["model"] == "gpt-4o-2024-08-06"
     assert output["object"] == "response"
     assert isinstance(output["output"][0]["content"][0]["text"], str)
-    assert output["output"][0]["content"][0]["text"] == "Under a moonlit sky, the gentle unicorn whispered dreams of stardust to sleepy children, guiding them to restful slumber."
+    assert (
+        output["output"][0]["content"][0]["text"]
+        == "Under a moonlit sky, the gentle unicorn whispered dreams of stardust to sleepy children, guiding them to restful slumber."
+    )
 
     usage = call.summary["usage"][output["model"]]  # type: ignore
     assert usage["requests"] == 1
@@ -1075,7 +1078,10 @@ def test_openai_responses_quickstart_stream(client: WeaveClient) -> None:
     assert output["model"] == "gpt-4o-2024-08-06"
     assert output["object"] == "response"
     assert isinstance(output["output"][0]["content"][0]["text"], str)
-    assert output["output"][0]["content"][0]["text"] == "Under the shimmering glow of the moon, a gentle unicorn danced across a field of twinkling flowers, leaving trails of stardust as every dreamer peacefully drifted to sleep."
+    assert (
+        output["output"][0]["content"][0]["text"]
+        == "Under the shimmering glow of the moon, a gentle unicorn danced across a field of twinkling flowers, leaving trails of stardust as every dreamer peacefully drifted to sleep."
+    )
 
     usage = call.summary["usage"][output["model"]]  # type: ignore
     assert usage["requests"] == 1
@@ -1116,7 +1122,10 @@ async def test_openai_responses_quickstart_async(client: WeaveClient) -> None:
     assert output["model"] == "gpt-4o-2024-08-06"
     assert output["object"] == "response"
     assert isinstance(output["output"][0]["content"][0]["text"], str)
-    assert output["output"][0]["content"][0]["text"] == "Under the twinkling starlit sky, Luna the unicorn gently sang lullabies to the moon, casting dreams of shimmering rainbows across the sleeping world."
+    assert (
+        output["output"][0]["content"][0]["text"]
+        == "Under the twinkling starlit sky, Luna the unicorn gently sang lullabies to the moon, casting dreams of shimmering rainbows across the sleeping world."
+    )
 
     usage = call.summary["usage"][output["model"]]  # type: ignore
     assert usage["requests"] == 1
@@ -1160,7 +1169,10 @@ async def test_openai_responses_quickstart_async_stream(client: WeaveClient) -> 
     assert output["model"] == "gpt-4o-2024-08-06"
     assert output["object"] == "response"
     assert isinstance(output["output"][0]["content"][0]["text"], str)
-    assert output["output"][0]["content"][0]["text"] == "Under the silver glow of the moon, a gentle unicorn softly treaded through the starlit meadow, where dreams blossomed like the flowers beneath her hooves."
+    assert (
+        output["output"][0]["content"][0]["text"]
+        == "Under the silver glow of the moon, a gentle unicorn softly treaded through the starlit meadow, where dreams blossomed like the flowers beneath her hooves."
+    )
 
     usage = call.summary["usage"][output["model"]]  # type: ignore
     assert usage["requests"] == 1
