@@ -3947,7 +3947,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         processed_payload = process_feedback_payload(req)
         row = format_feedback_to_row(req, processed_payload)
         prepared = TABLE_FEEDBACK.insert(row).prepare(database_type="clickhouse")
-        self._insert(TABLE_FEEDBACK.name, prepared.data, prepared.column_names)
+        self._insert(
+            TABLE_FEEDBACK.name,
+            prepared.data,
+            prepared.column_names,
+            # Always do sync inserts, we want speedy response times for this endpoint
+            do_sync_insert=True,
+        )
 
         return format_feedback_to_res(row)
 
@@ -4454,20 +4460,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if not batch:
             return
 
-        settings = {}
-        if self._use_async_insert:
-            settings = ch_settings.CLICKHOUSE_ASYNC_INSERT_SETTINGS.copy()
-            if root_span is not None:
-                root_span.set_tags(
-                    {
-                        "clickhouse_trace_server_batched._insert_call_batch.async_insert": True,
-                    }
-                )
         self._insert(
             "call_parts",
             data=batch,
             column_names=ALL_CALL_INSERT_COLUMNS,
-            settings=settings,
         )
 
     def _select_objs_query(
@@ -4616,12 +4612,24 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         data: Sequence[Sequence[Any]],
         column_names: list[str],
         settings: dict[str, Any] | None = None,
+        do_sync_insert: bool = False,  # overrides _use_async_insert
     ) -> QuerySummary:
-        ddtrace.tracer.current_span().set_tags(
-            {
-                "clickhouse_trace_server_batched._insert.table": table,
-            }
-        )
+        root_span = ddtrace.tracer.current_span()
+        if root_span is not None:
+            root_span.set_tags(
+                {
+                    "clickhouse_trace_server_batched._insert.table": table,
+                }
+            )
+
+        if self._use_async_insert and not do_sync_insert:
+            settings = ch_settings.update_settings_for_async_insert(settings)
+            if root_span is not None:
+                root_span.set_tags(
+                    {
+                        "clickhouse_trace_server_batched._insert.async_insert": True,
+                    }
+                )
         try:
             return self.ch_client.insert(
                 table, data=data, column_names=column_names, settings=settings
