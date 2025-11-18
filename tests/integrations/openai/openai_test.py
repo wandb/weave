@@ -1077,7 +1077,7 @@ def test_openai_responses_quickstart_stream(client: WeaveClient) -> None:
     assert isinstance(output["output"][0]["content"][0]["text"], str)
     assert output["output"][0]["content"][0]["text"] == "Under the shimmering glow of the moon, a gentle unicorn danced across a field of twinkling flowers, leaving trails of stardust as every dreamer peacefully drifted to sleep."
 
-    usage = call.summary["usage"]["output"]["model"]  # type: ignore
+    usage = call.summary["usage"][output["model"]]  # type: ignore
     assert usage["requests"] == 1
     assert usage["input_tokens"] == 36
     assert usage["output_tokens"] == 38
@@ -1285,7 +1285,7 @@ async def test_openai_responses_tool_calling_async(client: WeaveClient) -> None:
     assert output["model"] == "gpt-4o-2024-08-06"
     assert output["object"] == "response"
 
-    usage = call.summary["usage"]["output"]["model"]  # type: ignore
+    usage = call.summary["usage"][output["model"]]  # type: ignore
     assert usage["input_tokens"] == 328
     assert usage["output_tokens"] == 379
     assert usage["requests"] == 1
@@ -1330,7 +1330,7 @@ async def test_openai_responses_tool_calling_async_stream(client: WeaveClient) -
     assert output["model"] == "gpt-4o-2024-08-06"
     assert output["object"] == "response"
 
-    usage = call.summary["usage"]["output"]["model"]  # type: ignore
+    usage = call.summary["usage"][output["model"]]  # type: ignore
     assert usage["input_tokens"] == 328
     assert usage["output_tokens"] == 209
     assert usage["requests"] == 1
