@@ -1989,7 +1989,7 @@ def build_calls_complete_batch_update_query(
     if not end_calls:
         return ""
 
-    # All calls should be from the same project (validated assumption)
+    # All calls should be from the same project
     project_id = end_calls[0].project_id
 
     # Build parameterized CASE statements for each field
