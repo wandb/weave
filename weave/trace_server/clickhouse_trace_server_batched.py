@@ -3947,7 +3947,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         processed_payload = process_feedback_payload(req)
         row = format_feedback_to_row(req, processed_payload)
         prepared = TABLE_FEEDBACK.insert(row).prepare(database_type="clickhouse")
-        self._insert(TABLE_FEEDBACK.name, prepared.data, prepared.column_names)
+        self._insert(
+            TABLE_FEEDBACK.name,
+            prepared.data,
+            prepared.column_names,
+            # Always do sync inserts, we want speedy response times for this endpoint
+            do_sync_insert=True,
+        )
 
         return format_feedback_to_res(row)
 
@@ -4606,6 +4612,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         data: Sequence[Sequence[Any]],
         column_names: list[str],
         settings: dict[str, Any] | None = None,
+        do_sync_insert: bool = False,  # overrides _use_async_insert
     ) -> QuerySummary:
         root_span = ddtrace.tracer.current_span()
         if root_span is not None:
@@ -4615,10 +4622,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 }
             )
 
-        if self._use_async_insert:
-            if settings is None:
-                settings = {}
-            settings.update(ch_settings.CLICKHOUSE_ASYNC_INSERT_SETTINGS)
+        if self._use_async_insert and not do_sync_insert:
+            settings = ch_settings.update_settings_for_async_insert(settings)
             if root_span is not None:
                 root_span.set_tags(
                     {
