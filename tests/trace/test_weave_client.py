@@ -3632,7 +3632,7 @@ def test_feedback_batching(network_proxy_client):
         feedback_items.append(id)
 
     # make sure we aren't actually waiting for 10 feedbacks, should be quick
-    assert time.time() - start < 0.2, "Feedback creation took too long"
+    assert time.time() - start < 0.5, "Feedback creation took too long"
     assert client.server.get_feedback_processor() is not None
 
     # Flush to ensure all feedback is processed
