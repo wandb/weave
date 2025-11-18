@@ -6,13 +6,13 @@ CREATE TABLE calls_complete (
     trace_id        String,
     op_name         String,
     started_at      DateTime64(6),
-    ended_at        Nullable(DateTime64(6)) DEFAULT NULL,
+    ended_at        Nullable(DateTime64(6)),
 
-    updated_at      Nullable(DateTime64(3)) DEFAULT NULL,
-    deleted_at      Nullable(DateTime64(3)) DEFAULT NULL,
+    updated_at      Nullable(DateTime64(3)),
+    deleted_at      Nullable(DateTime64(3)),
 
     parent_id       Nullable(String),
-    display_name    Nullable(String) DEFAULT NULL,
+    display_name    Nullable(String),
 
     attributes_dump String,
     inputs_dump     String,
@@ -25,11 +25,11 @@ CREATE TABLE calls_complete (
 
     wb_user_id      Nullable(String),
     wb_run_id       Nullable(String),
-    wb_run_step     Nullable(UInt64) DEFAULT NULL,
-    wb_run_step_end Nullable(UInt64) DEFAULT NULL,
+    wb_run_step     Nullable(UInt64),
+    wb_run_step_end Nullable(UInt64),
 
-    thread_id       Nullable(String) DEFAULT NULL,
-    turn_id         Nullable(String) DEFAULT NULL,
+    thread_id       Nullable(String),
+    turn_id         Nullable(String),
 
     -- Bloom filter for needle in the haystack searches
     INDEX idx_parent_id parent_id TYPE bloom_filter GRANULARITY 1,
