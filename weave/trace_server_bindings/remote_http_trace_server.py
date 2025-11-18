@@ -269,7 +269,14 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
             def encode_start_batch(
                 batch: list[StartBatchItem | CompleteBatchItem],
             ) -> bytes:
-                req = tsi.CallsStartBatchReq(batch=batch)
+                # Convert internal batch items to API types
+                api_batch = []
+                for item in batch:
+                    if isinstance(item, StartBatchItem):
+                        api_batch.append(tsi.CallBatchStartMode(req=item.req))
+                    elif isinstance(item, CompleteBatchItem):
+                        api_batch.append(tsi.CallBatchCompleteMode(req=item.req))
+                req = tsi.CallsStartBatchReq(batch=api_batch)
                 return req.model_dump_json().encode("utf-8")
 
             def send_start_batch_fn(encoded_data: bytes) -> None:
@@ -295,7 +302,9 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         if ends:
 
             def encode_end_batch(batch: list[EndBatchItem]) -> bytes:
-                req = tsi.CallsEndBatchReq(batch=batch)
+                # Convert internal batch items to API types
+                api_batch = [tsi.CallBatchEndMode(req=item.req) for item in batch]
+                req = tsi.CallsEndBatchReq(batch=api_batch)
                 return req.model_dump_json().encode("utf-8")
 
             def send_end_batch_fn(encoded_data: bytes) -> None:
