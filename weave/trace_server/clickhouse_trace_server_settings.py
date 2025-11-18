@@ -4,6 +4,8 @@ This module contains all configuration constants, type definitions, and column
 specifications used by the ClickHouse trace server implementation.
 """
 
+from typing import Any
+
 from weave.trace_server import environment as wf_env
 
 # File and batch processing settings
@@ -51,6 +53,15 @@ CLICKHOUSE_ASYNC_INSERT_SETTINGS = {
     "async_insert_max_data_size": 10_485_760,
     # Max number of queries to batch together, this is the default
     "async_insert_max_query_number": 450,
-    # Busy timeout in milliseconds (used when adaptive timeout is disabled)
-    "async_insert_busy_timeout_ms": 2000,
+    # Max time between buffer flushes
+    "async_insert_busy_timeout_ms": 1000,
 }
+
+
+def update_settings_for_async_insert(
+    settings: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    merged_settings = CLICKHOUSE_ASYNC_INSERT_SETTINGS.copy()
+    if settings is not None:
+        merged_settings.update(settings)
+    return merged_settings
