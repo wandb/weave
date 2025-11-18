@@ -637,6 +637,7 @@ class Condition(BaseModel):
 
 class HardCodedFilter(BaseModel):
     filter: tsi.CallsFilter
+    project_version: ProjectVersion = ProjectVersion.CALLS_MERGED_VERSION
 
     def is_useful(self) -> bool:
         """Returns True if the filter is useful - i.e. it has any non-null fields
@@ -659,7 +660,7 @@ class HardCodedFilter(BaseModel):
 
     def as_sql(self, pb: ParamBuilder, table_alias: str) -> str:
         return combine_conditions(
-            process_calls_filter_to_conditions(self.filter, pb, table_alias),
+            process_calls_filter_to_conditions(self.filter, pb, table_alias, project_version=self.project_version),
             "AND",
         )
 
@@ -801,7 +802,7 @@ class CallsQuery(BaseModel):
         # No predicate pushdown possible
         return False
 
-    def as_sql(self, pb: ParamBuilder, table_alias: str = "calls_merged") -> str:
+    def as_sql(self, pb: ParamBuilder, table_alias: str | None = None) -> str:
         """This is the main entry point for building the query. This method will
         determine the optimal query to build based on the fields and conditions
         that have been set.
@@ -872,6 +873,10 @@ class CallsQuery(BaseModel):
         ```
 
         """
+        # Set table_alias based on project version if not provided
+        if table_alias is None:
+            table_alias = self._get_table_name()
+
         if not self.select_fields:
             raise ValueError("Missing select columns")
 
@@ -903,7 +908,7 @@ class CallsQuery(BaseModel):
 
         # If we should not optimize, then just build the base query
         if not should_optimize and not self.include_costs and not object_ref_conditions:
-            return self._as_sql_base_format(pb, table_alias)
+            return self._as_sql_base_format(pb)
 
         # Build two queries, first filter query CTE, then select the columns
         filter_query = CallsQuery(
@@ -911,6 +916,7 @@ class CallsQuery(BaseModel):
         )
         select_query = CallsQuery(
             project_id=self.project_id,
+            project_version=self.project_version,
             include_storage_size=self.include_storage_size,
             include_total_storage_size=self.include_total_storage_size,
         )
@@ -965,7 +971,6 @@ class CallsQuery(BaseModel):
 
         filtered_calls_sql = filter_query._as_sql_base_format(
             pb,
-            table_alias,
             field_to_object_join_alias_map=field_to_object_join_alias_map,
             expand_columns=self.expand_columns,
         )
@@ -973,7 +978,6 @@ class CallsQuery(BaseModel):
 
         base_sql = select_query._as_sql_base_format(
             pb,
-            table_alias,
             id_subquery_name=CTE_FILTERED_CALLS,
             field_to_object_join_alias_map=field_to_object_join_alias_map,
             expand_columns=self.expand_columns,
@@ -1279,7 +1283,6 @@ class CallsQuery(BaseModel):
     def _as_sql_base_format(
         self,
         pb: ParamBuilder,
-        table_alias: str,
         id_subquery_name: str | None = None,
         field_to_object_join_alias_map: dict[str, str] | None = None,
         expand_columns: list[str] | None = None,
@@ -1291,7 +1294,6 @@ class CallsQuery(BaseModel):
         if self.project_version == ProjectVersion.CALLS_COMPLETE_VERSION:
             return self._as_sql_complete_format(
                 pb,
-                table_alias,
                 id_subquery_name,
                 field_to_object_join_alias_map,
                 expand_columns,
@@ -1299,7 +1301,6 @@ class CallsQuery(BaseModel):
         else:
             return self._as_sql_merged_format(
                 pb,
-                table_alias,
                 id_subquery_name,
                 field_to_object_join_alias_map,
                 expand_columns,
@@ -1308,7 +1309,6 @@ class CallsQuery(BaseModel):
     def _as_sql_merged_format(
         self,
         pb: ParamBuilder,
-        table_alias: str,
         id_subquery_name: str | None = None,
         field_to_object_join_alias_map: dict[str, str] | None = None,
         expand_columns: list[str] | None = None,
@@ -1328,6 +1328,8 @@ class CallsQuery(BaseModel):
         Returns:
             Complete SQL query string
         """
+        table_alias = "calls_merged"
+
         select_fields_sql = ", ".join(
             field.as_select_sql(pb, table_alias) for field in self.select_fields
         )
@@ -1371,7 +1373,6 @@ class CallsQuery(BaseModel):
     def _as_sql_complete_format(
         self,
         pb: ParamBuilder,
-        table_alias: str,
         id_subquery_name: str | None = None,
         field_to_object_join_alias_map: dict[str, str] | None = None,
         expand_columns: list[str] | None = None,
@@ -1383,7 +1384,6 @@ class CallsQuery(BaseModel):
 
         Args:
             pb: Parameter builder for query parameterization
-            table_alias: The table alias to use in SQL
             id_subquery_name: Optional name of a CTE containing filtered IDs
             field_to_object_join_alias_map: Mapping of field paths to CTE aliases for object refs
             expand_columns: List of columns that should be expanded for object refs
@@ -1391,6 +1391,7 @@ class CallsQuery(BaseModel):
         Returns:
             Complete SQL query string
         """
+        table_alias = "calls_complete"
         select_fields_sql = ", ".join(
             field.as_select_sql(pb, table_alias) for field in self.select_fields
         )
@@ -1418,13 +1419,13 @@ class CallsQuery(BaseModel):
             else ""
         )
         op_name_sql = process_op_name_filter_to_sql(
-            self.hardcoded_filter, pb, table_alias
+            self.hardcoded_filter, pb, table_alias, project_version=self.project_version
         )
         trace_id_sql = process_trace_id_filter_to_sql(
-            self.hardcoded_filter, pb, table_alias
+            self.hardcoded_filter, pb, table_alias, project_version=self.project_version
         )
         trace_roots_sql = process_trace_roots_only_filter_to_sql(
-            self.hardcoded_filter, pb, table_alias
+            self.hardcoded_filter, pb, table_alias, project_version=self.project_version
         )
 
         # Add the rest of the hardcoded filters
@@ -1520,6 +1521,7 @@ ALLOWED_CALL_FIELDS_COMPLETE = {
     "inputs_dump": CallsCompleteDynamicField(field="inputs_dump"),
     "input_refs": CallsCompleteField(field="input_refs"),
     "ended_at": CallsCompleteField(field="ended_at"),
+    "deleted_at": CallsCompleteField(field="deleted_at"),
     "output_dump": CallsCompleteDynamicField(field="output_dump"),
     "output_refs": CallsCompleteField(field="output_refs"),
     "summary_dump": CallsCompleteDynamicField(field="summary_dump"),
@@ -1822,6 +1824,7 @@ def process_op_name_filter_to_sql(
     hardcoded_filter: HardCodedFilter | None,
     param_builder: ParamBuilder,
     table_alias: str,
+    project_version: ProjectVersion = ProjectVersion.CALLS_MERGED_VERSION,
 ) -> str:
     """Pulls out the op_name and returns a sql string if there are any op_names."""
     if hardcoded_filter is None or not hardcoded_filter.filter.op_names:
@@ -1838,11 +1841,14 @@ def process_op_name_filter_to_sql(
     non_wildcarded_names: list[str] = []
     wildcarded_names: list[str] = []
 
-    op_field = get_field_by_name("op_name")
-    if not isinstance(op_field, CallsMergedAggField):
-        raise TypeError("op_name is not an aggregate field")
+    op_field = get_field_by_name("op_name", project_version)
+    if not isinstance(op_field, (CallsMergedAggField, CallsCompleteField)):
+        raise TypeError("op_name is not a valid field type")
 
-    op_field_sql = op_field.as_sql(param_builder, table_alias, use_agg_fn=False)
+    if isinstance(op_field, CallsMergedAggField):
+        op_field_sql = op_field.as_sql(param_builder, table_alias, use_agg_fn=False)
+    else:
+        op_field_sql = op_field.as_sql(param_builder, table_alias)
     for name in op_names:
         if name.endswith(WILDCARD_ARTIFACT_VERSION_AND_PATH):
             wildcarded_names.append(name)
@@ -1873,6 +1879,7 @@ def process_trace_id_filter_to_sql(
     hardcoded_filter: HardCodedFilter | None,
     param_builder: ParamBuilder,
     table_alias: str,
+    project_version: ProjectVersion = ProjectVersion.CALLS_MERGED_VERSION,
 ) -> str:
     """Pulls out the trace_id and returns a sql string if there are any trace_ids."""
     if hardcoded_filter is None or not hardcoded_filter.filter.trace_ids:
@@ -1882,12 +1889,16 @@ def process_trace_id_filter_to_sql(
 
     assert_parameter_length_less_than_max("trace_ids", len(trace_ids))
 
-    trace_id_field = get_field_by_name("trace_id")
-    if not isinstance(trace_id_field, CallsMergedAggField):
-        raise TypeError("trace_id is not an aggregate field")
-    trace_id_field_sql = trace_id_field.as_sql(
-        param_builder, table_alias, use_agg_fn=False
-    )
+    trace_id_field = get_field_by_name("trace_id", project_version)
+    if not isinstance(trace_id_field, (CallsMergedAggField, CallsCompleteField)):
+        raise TypeError("trace_id is not a valid field type")
+
+    if isinstance(trace_id_field, CallsMergedAggField):
+        trace_id_field_sql = trace_id_field.as_sql(
+            param_builder, table_alias, use_agg_fn=False
+        )
+    else:
+        trace_id_field_sql = trace_id_field.as_sql(param_builder, table_alias)
 
     # If there's only one trace_id, use an equality condition for performance
     if len(trace_ids) == 1:
@@ -1904,6 +1915,7 @@ def process_thread_id_filter_to_sql(
     hardcoded_filter: HardCodedFilter | None,
     param_builder: ParamBuilder,
     table_alias: str,
+    project_version: ProjectVersion = ProjectVersion.CALLS_MERGED_VERSION,
 ) -> str:
     """Pulls out the thread_id and returns a sql string if there are any thread_ids."""
     if (
@@ -1917,12 +1929,16 @@ def process_thread_id_filter_to_sql(
 
     assert_parameter_length_less_than_max("thread_ids", len(thread_ids))
 
-    thread_id_field = get_field_by_name("thread_id")
-    if not isinstance(thread_id_field, CallsMergedAggField):
-        raise TypeError("thread_id is not an aggregate field")
-    thread_id_field_sql = thread_id_field.as_sql(
-        param_builder, table_alias, use_agg_fn=False
-    )
+    thread_id_field = get_field_by_name("thread_id", project_version)
+    if not isinstance(thread_id_field, (CallsMergedAggField, CallsCompleteField)):
+        raise TypeError("thread_id is not a valid field type")
+
+    if isinstance(thread_id_field, CallsMergedAggField):
+        thread_id_field_sql = thread_id_field.as_sql(
+            param_builder, table_alias, use_agg_fn=False
+        )
+    else:
+        thread_id_field_sql = thread_id_field.as_sql(param_builder, table_alias)
 
     # If there's only one thread_id, use an equality condition for performance
     if len(thread_ids) == 1:
@@ -1939,6 +1955,7 @@ def process_turn_id_filter_to_sql(
     hardcoded_filter: HardCodedFilter | None,
     param_builder: ParamBuilder,
     table_alias: str,
+    project_version: ProjectVersion = ProjectVersion.CALLS_MERGED_VERSION,
 ) -> str:
     """Pulls out the turn_id and returns a sql string if there are any turn_ids."""
     if (
@@ -1952,12 +1969,13 @@ def process_turn_id_filter_to_sql(
 
     assert_parameter_length_less_than_max("turn_ids", len(turn_ids))
 
-    turn_id_field = get_field_by_name("turn_id")
-    if not isinstance(turn_id_field, CallsMergedAggField):
-        raise TypeError("turn_id is not an aggregate field")
-    turn_id_field_sql = turn_id_field.as_sql(
-        param_builder, table_alias, use_agg_fn=False
-    )
+    turn_id_field = get_field_by_name("turn_id", project_version)
+    if isinstance(turn_id_field, CallsMergedAggField):
+        turn_id_field_sql = turn_id_field.as_sql(
+            param_builder, table_alias, use_agg_fn=False
+        )
+    else:
+        turn_id_field_sql = turn_id_field.as_sql(param_builder, table_alias)
 
     # If there's only one turn_id, use an equality condition for performance
     if len(turn_ids) == 1:
@@ -1974,18 +1992,19 @@ def process_trace_roots_only_filter_to_sql(
     hardcoded_filter: HardCodedFilter | None,
     param_builder: ParamBuilder,
     table_alias: str,
+    project_version: ProjectVersion = ProjectVersion.CALLS_MERGED_VERSION,
 ) -> str:
     """Pulls out the trace_roots_only and returns a sql string if there are any trace_roots_only."""
     if hardcoded_filter is None or not hardcoded_filter.filter.trace_roots_only:
         return ""
 
-    parent_id_field = get_field_by_name("parent_id")
-    if not isinstance(parent_id_field, CallsMergedAggField):
-        raise TypeError("parent_id is not an aggregate field")
-
-    parent_id_field_sql = parent_id_field.as_sql(
-        param_builder, table_alias, use_agg_fn=False
-    )
+    parent_id_field = get_field_by_name("parent_id", project_version)
+    if isinstance(parent_id_field, CallsMergedAggField):
+        parent_id_field_sql = parent_id_field.as_sql(
+            param_builder, table_alias, use_agg_fn=False
+        )
+    else:
+        parent_id_field_sql = parent_id_field.as_sql(param_builder, table_alias)
 
     return f"AND ({parent_id_field_sql} IS NULL)"
 
@@ -2105,6 +2124,7 @@ def process_calls_filter_to_conditions(
     filter: tsi.CallsFilter,
     param_builder: ParamBuilder,
     table_alias: str,
+    project_version: ProjectVersion = ProjectVersion.CALLS_MERGED_VERSION,
 ) -> list[str]:
     """Converts a CallsFilter to a list of conditions for a clickhouse query.
 
@@ -2118,47 +2138,47 @@ def process_calls_filter_to_conditions(
     if filter.input_refs:
         assert_parameter_length_less_than_max("input_refs", len(filter.input_refs))
         conditions.append(
-            f"hasAny({get_field_by_name('input_refs').as_sql(param_builder, table_alias)}, {param_slot(param_builder.add_param(filter.input_refs), 'Array(String)')})"
+            f"hasAny({get_field_by_name('input_refs', project_version).as_sql(param_builder, table_alias)}, {param_slot(param_builder.add_param(filter.input_refs), 'Array(String)')})"
         )
 
     if filter.output_refs:
         assert_parameter_length_less_than_max("output_refs", len(filter.output_refs))
         conditions.append(
-            f"hasAny({get_field_by_name('output_refs').as_sql(param_builder, table_alias)}, {param_slot(param_builder.add_param(filter.output_refs), 'Array(String)')})"
+            f"hasAny({get_field_by_name('output_refs', project_version).as_sql(param_builder, table_alias)}, {param_slot(param_builder.add_param(filter.output_refs), 'Array(String)')})"
         )
 
     if filter.parent_ids:
         assert_parameter_length_less_than_max("parent_ids", len(filter.parent_ids))
         conditions.append(
-            f"{get_field_by_name('parent_id').as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.parent_ids), 'Array(String)')}"
+            f"{get_field_by_name('parent_id', project_version).as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.parent_ids), 'Array(String)')}"
         )
 
     if filter.call_ids:
         assert_parameter_length_less_than_max("call_ids", len(filter.call_ids))
         conditions.append(
-            f"{get_field_by_name('id').as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.call_ids), 'Array(String)')}"
+            f"{get_field_by_name('id', project_version).as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.call_ids), 'Array(String)')}"
         )
 
     if filter.thread_ids is not None:
         assert_parameter_length_less_than_max("thread_ids", len(filter.thread_ids))
         conditions.append(
-            f"{get_field_by_name('thread_id').as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.thread_ids), 'Array(String)')}"
+            f"{get_field_by_name('thread_id', project_version).as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.thread_ids), 'Array(String)')}"
         )
 
     if filter.turn_ids is not None:
         assert_parameter_length_less_than_max("turn_ids", len(filter.turn_ids))
         conditions.append(
-            f"{get_field_by_name('turn_id').as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.turn_ids), 'Array(String)')}"
+            f"{get_field_by_name('turn_id', project_version).as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.turn_ids), 'Array(String)')}"
         )
 
     if filter.wb_user_ids:
         conditions.append(
-            f"{get_field_by_name('wb_user_id').as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.wb_user_ids), 'Array(String)')}"
+            f"{get_field_by_name('wb_user_id', project_version).as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.wb_user_ids), 'Array(String)')}"
         )
 
     if filter.wb_run_ids:
         conditions.append(
-            f"{get_field_by_name('wb_run_id').as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.wb_run_ids), 'Array(String)')}"
+            f"{get_field_by_name('wb_run_id', project_version).as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.wb_run_ids), 'Array(String)')}"
         )
 
     return conditions
