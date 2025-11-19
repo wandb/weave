@@ -267,7 +267,7 @@ def branch_exists(repo_path: Path, branch: str, remote: bool = False) -> bool:
 
 
 def manage_git_branch(config: Config) -> RepoInfo:
-    """Create or update git branch with generated code."""
+    """Create or update git branch from detached HEAD after code generation."""
     header("Managing git branch")
 
     current_branch = run_git(
@@ -282,22 +282,12 @@ def manage_git_branch(config: Config) -> RepoInfo:
         error(f"Python output directory does not exist: {repo_path}")
 
     run_git(repo_path, ["rev-parse", "--git-dir"])  # Verify git repo
-    run_git(repo_path, ["fetch", "origin", "main"], check=False)
 
-    # Ensure main branch exists
-    if not branch_exists(repo_path, "main"):
-        if not branch_exists(repo_path, "main", remote=True):
-            error("origin/main not available")
-        run_git(repo_path, ["checkout", "-b", "main", "origin/main"])
-    else:
-        run_git(repo_path, ["checkout", "main"])
-
-    # Create/update mirror branch
+    # Create/update mirror branch from current detached HEAD
     if branch_exists(repo_path, mirror_branch):
         run_git(repo_path, ["branch", "-D", mirror_branch])
 
-    run_git(repo_path, ["checkout", "-b", mirror_branch, "origin/main"])
-    run_git(repo_path, ["checkout", "main", "--", "."])
+    run_git(repo_path, ["checkout", "-b", mirror_branch])
 
     # Commit if there are changes
     status = run_git(repo_path, ["status", "--porcelain"]).stdout.strip()
