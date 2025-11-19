@@ -8,7 +8,6 @@ from time import time
 from typing import Any
 
 import httpx
-from httpx import HTTPError as HTTPError
 from httpx import Request, Response
 
 from weave.trace.display.display import Console, Text
@@ -189,7 +188,7 @@ def get(
 
 def post(
     url: str,
-    data: dict[str, Any] | str | None = None,
+    data: dict[str, Any] | str | bytes | None = None,
     json: dict[str, Any] | None = None,
     *,
     stream: bool = False,

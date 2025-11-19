@@ -3,9 +3,10 @@ import logging
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, TypeVar, Union
 
+import httpx
+
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
-from weave.utils import http_requests as requests
 
 if TYPE_CHECKING:
     from weave.trace_server_bindings.models import EndBatchItem, StartBatchItem
@@ -46,11 +47,11 @@ def log_dropped_call_batch(
     if dropped_end_ids:
         logger.error(f"dropped call end ids: {dropped_end_ids}")
     if (
-        isinstance(e, (requests.HTTPError, requests.HTTPStatusError))
+        isinstance(e, (httpx.HTTPError, httpx.HTTPStatusError))
         and (response := getattr(e, "response", None)) is not None
     ):
         logger.error(f"status code: {response.status_code}")
-        logger.error(f"reason: {response.reason}")
+        logger.error(f"reason: {response.reason_phrase}")
         logger.error(f"text: {response.text}")
     else:
         logger.error(f"error: {e}")
@@ -69,11 +70,11 @@ def log_dropped_feedback_batch(
     if dropped_feedback_types:
         logger.error(f"dropped feedback types: {dropped_feedback_types}")
     if (
-        isinstance(e, (requests.HTTPError, requests.HTTPStatusError))
+        isinstance(e, (httpx.HTTPError, httpx.HTTPStatusError))
         and (response := getattr(e, "response", None)) is not None
     ):
         logger.error(f"status code: {response.status_code}")
-        logger.error(f"reason: {response.reason}")
+        logger.error(f"reason: {response.reason_phrase}")
         logger.error(f"text: {response.text}")
     else:
         logger.error(f"error: {e}")
@@ -198,7 +199,7 @@ def process_batch_with_retry(
                 )
 
 
-def handle_response_error(response: requests.Response, url: str) -> None:
+def handle_response_error(response: httpx.Response, url: str) -> None:
     """Handle HTTP response errors with user-friendly messages.
 
     Args:
@@ -206,7 +207,7 @@ def handle_response_error(response: requests.Response, url: str) -> None:
         url: The endpoint URL that was called
 
     Raises:
-        requests.HTTPError: With a well-formatted error message
+        httpx.HTTPStatusError: With a well-formatted error message
     """
     if 200 <= response.status_code < 300:
         return
@@ -215,7 +216,7 @@ def handle_response_error(response: requests.Response, url: str) -> None:
     default_message = None
     try:
         response.raise_for_status()
-    except (requests.HTTPError, requests.HTTPStatusError) as e:
+    except (httpx.HTTPError, httpx.HTTPStatusError) as e:
         default_message = str(e)
 
     # Try to extract custom error message from JSON response
@@ -243,13 +244,8 @@ def handle_response_error(response: requests.Response, url: str) -> None:
         message = f"{response.status_code} Error for url {url}: Request failed"
 
     # For httpx, we need to use HTTPStatusError with request and response
-    if hasattr(response, "request"):
-        raise requests.HTTPStatusError(
-            message, request=response.request, response=response
-        )
-    else:
-        # Fallback for cases where request is not available
-        raise requests.HTTPError(message)
+    # httpx Response objects always have a request attribute
+    raise httpx.HTTPStatusError(message, request=response.request, response=response)
 
 
 def check_endpoint_exists(

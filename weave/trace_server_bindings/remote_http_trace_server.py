@@ -5,6 +5,7 @@ from collections.abc import Iterator
 from typing import Any
 from zoneinfo import ZoneInfo
 
+import httpx
 from pydantic import BaseModel, Field, validate_call
 from pydantic.json_schema import SkipJsonSchema
 from typing_extensions import Self
@@ -27,7 +28,7 @@ from weave.trace_server_bindings.models import (
     ServerInfoRes,
     StartBatchItem,
 )
-from weave.utils import http_requests as requests
+from weave.utils import http_requests
 from weave.utils.project_id import from_project_id
 from weave.utils.retry import get_current_retry_id, with_retry
 from weave.wandb_interface import project_creator
@@ -98,10 +99,10 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
             headers["X-Weave-Retry-Id"] = retry_id
         return headers
 
-    def get(self, url: str, *args: Any, **kwargs: Any) -> requests.Response:
+    def get(self, url: str, *args: Any, **kwargs: Any) -> httpx.Response:
         headers = self._build_dynamic_request_headers()
 
-        return requests.get(
+        return http_requests.get(
             self.trace_server_url + url,
             *args,
             auth=self._auth,
@@ -109,10 +110,10 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
             **kwargs,
         )
 
-    def post(self, url: str, *args: Any, **kwargs: Any) -> requests.Response:
+    def post(self, url: str, *args: Any, **kwargs: Any) -> httpx.Response:
         headers = self._build_dynamic_request_headers()
 
-        return requests.post(
+        return http_requests.post(
             self.trace_server_url + url,
             *args,
             auth=self._auth,
@@ -120,10 +121,10 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
             **kwargs,
         )
 
-    def delete(self, url: str, *args: Any, **kwargs: Any) -> requests.Response:
+    def delete(self, url: str, *args: Any, **kwargs: Any) -> httpx.Response:
         headers = self._build_dynamic_request_headers()
 
-        return requests.delete(
+        return http_requests.delete(
             self.trace_server_url + url,
             *args,
             auth=self._auth,
@@ -224,7 +225,7 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
         def send_feedback_batch(encoded_data: bytes) -> None:
             try:
                 self._send_feedback_batch_to_server(encoded_data)
-            except (requests.HTTPError, requests.HTTPStatusError) as e:
+            except (httpx.HTTPError, httpx.HTTPStatusError) as e:
                 # If batching endpoint doesn't exist (404) fall back to individual calls
                 if (
                     response := getattr(e, "response", None)
@@ -282,7 +283,7 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
         url: str,
         req: BaseModel,
         stream: bool = False,
-    ) -> requests.Response:
+    ) -> httpx.Response:
         r = self.post(
             url,
             # `by_alias` is required since we have Mongo-style properties in the
@@ -301,7 +302,7 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
         url: str,
         params: dict[str, Any] | None = None,
         stream: bool = False,
-    ) -> requests.Response:
+    ) -> httpx.Response:
         r = self.get(url, params=params or {}, stream=stream)
         handle_response_error(r, url)
         return r
@@ -312,7 +313,7 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
         url: str,
         params: dict[str, Any] | None = None,
         stream: bool = False,
-    ) -> requests.Response:
+    ) -> httpx.Response:
         r = self.delete(url, params=params or {}, stream=stream)
         handle_response_error(r, url)
         return r
