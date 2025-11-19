@@ -206,7 +206,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         user: str = "default",
         password: str = "",
         database: str = "default",
-        use_async_insert: bool = False,
+        use_async_insert: bool = True,
         evaluate_model_dispatcher: EvaluateModelDispatcher | None = None,
     ):
         super().__init__()
