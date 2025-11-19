@@ -165,28 +165,102 @@ client = httpx.Client(
 session = client
 
 
-def get(url: str, params: dict[str, str] | None = None, **kwargs: Any) -> Response:
+class StreamingResponseWrapper:
+    """Wrap httpx streaming responses to mimic requests.Response API."""
+
+    def __init__(self, response: httpx.Response):
+        self._response = response
+
+    @property
+    def status_code(self) -> int:
+        return self._response.status_code
+
+    @property
+    def headers(self) -> httpx.Headers:
+        return self._response.headers
+
+    @property
+    def reason(self) -> str:
+        return self._response.reason_phrase
+
+    @property
+    def text(self) -> str:
+        content = self._response.read()
+        self._response.close()
+        return content.decode()
+
+    def json(self) -> Any:
+        data = self._response.json()
+        self._response.close()
+        return data
+
+    def iter_lines(self):
+        try:
+            yield from self._response.iter_lines()
+        finally:
+            self._response.close()
+
+    def raise_for_status(self) -> None:
+        self._response.raise_for_status()
+
+    def close(self) -> None:
+        self._response.close()
+
+
+def _request(
+    method: str,
+    url: str,
+    *,
+    stream: bool = False,
+    **kwargs: Any,
+) -> Response:
+    if not stream:
+        return client.request(method, url, **kwargs)
+
+    request = client.build_request(method, url, **kwargs)
+    response = client.send(request, stream=True)
+    return StreamingResponseWrapper(response)
+
+
+def get(
+    url: str,
+    params: dict[str, str] | None = None,
+    *,
+    stream: bool = False,
+    **kwargs: Any,
+) -> Response:
     """Send a GET request with optional logging."""
-    return client.get(url, params=params, **kwargs)
+    return _request("GET", url, params=params, stream=stream, **kwargs)
 
 
 def post(
     url: str,
     data: dict[str, Any] | str | None = None,
     json: dict[str, Any] | None = None,
+    *,
+    stream: bool = False,
     **kwargs: Any,
 ) -> Response:
     """Send a POST request with optional logging."""
-    return client.post(url, data=data, json=json, **kwargs)  # type: ignore[arg-type]
+    return _request(
+        "POST",
+        url,
+        data=data,
+        json=json,
+        stream=stream,
+        **kwargs,
+    )
 
 
 def delete(
     url: str,
     params: dict[str, Any] | None = None,
+    *,
+    stream: bool = False,
     **kwargs: Any,
 ) -> Response:
     """Send a DELETE request with optional logging."""
-    return client.delete(url, params=params, **kwargs)
+    return _request("DELETE", url, params=params, stream=stream, **kwargs)
 
 
 # Export these for compatibility with code expecting requests module
