@@ -1,9 +1,10 @@
 import json
-from typing import Annotated, Any, Literal, Optional, Union
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, BeforeValidator, Field
 
 from weave import Model, op
+from weave.prompt.prompt import format_message_with_template_vars
 from weave.trace.context.weave_client_context import WeaveInitError, get_weave_client
 from weave.trace_server.interface.builtin_object_classes import base_object_def
 from weave.trace_server.trace_server_interface import (
@@ -32,53 +33,29 @@ class Message(BaseModel):
     """
 
     role: str
-    content: Optional[Union[str, list[dict]]] = None
-    name: Optional[str] = None
-    function_call: Optional[dict] = None
-    tool_call_id: Optional[str] = None
-
-
-def _substitute_template_variables(
-    messages: list[Message], template_vars: dict[str, Any]
-) -> list[Message]:
-    """Substitute template variables using Python's .format()."""
-    substituted_messages = []
-
-    for message in messages:
-        message_dict = message.model_dump()
-
-        if isinstance(message_dict.get("content"), str):
-            try:
-                message_dict["content"] = message_dict["content"].format(
-                    **template_vars
-                )
-            except KeyError as e:
-                raise ValueError(
-                    f"Template variable {e} not found in template_vars"
-                ) from e
-
-        substituted_messages.append(Message.model_validate(message_dict))
-
-    return substituted_messages
+    content: str | list[dict] | None = None
+    name: str | None = None
+    function_call: dict | None = None
+    tool_call_id: str | None = None
 
 
 class LLMStructuredCompletionModelDefaultParams(BaseModel):
     # Could use Prompt objects for the message template
     # This is a list of Messages, loosely following litellm's message format
     # https://docs.litellm.ai/docs/completion/input#properties-of-messages
-    messages_template: Optional[list[Message]] = None
+    messages_template: list[Message] | None = None
 
-    temperature: Optional[float] = None
-    top_p: Optional[float] = None
-    max_tokens: Optional[int] = None
-    presence_penalty: Optional[float] = None
-    frequency_penalty: Optional[float] = None
-    stop: Optional[list[str]] = None
-    n_times: Optional[int] = None
-    functions: Optional[list[dict]] = None
+    temperature: float | None = None
+    top_p: float | None = None
+    max_tokens: int | None = None
+    presence_penalty: float | None = None
+    frequency_penalty: float | None = None
+    stop: list[str] | None = None
+    n_times: int | None = None
+    functions: list[dict] | None = None
 
     # Either json, text, or json_schema
-    response_format: Optional[ResponseFormat] = None
+    response_format: ResponseFormat | None = None
 
     # TODO: Currently not used. Fast follow up with json_schema
     # if default_params.response_format is set to JSON_SCHEMA, this will be used
@@ -127,7 +104,7 @@ LLMStructuredModelParamsLike = Annotated[
 
 class LLMStructuredCompletionModel(Model):
     # <provider>/<model> or ref to a provider model
-    llm_model_id: Union[str, base_object_def.RefStr]
+    llm_model_id: str | base_object_def.RefStr
 
     default_params: LLMStructuredCompletionModelDefaultParams = Field(
         default_factory=LLMStructuredCompletionModelDefaultParams
@@ -136,10 +113,10 @@ class LLMStructuredCompletionModel(Model):
     @op
     def predict(
         self,
-        user_input: Optional[MessageListLike] = None,
-        config: Optional[LLMStructuredModelParamsLike] = None,
+        user_input: MessageListLike | None = None,
+        config: LLMStructuredModelParamsLike | None = None,
         **template_vars: Any,
-    ) -> Union[Message, str, dict[str, Any]]:
+    ) -> Message | str | dict[str, Any]:
         """Generates a prediction by preparing messages (template + user_input)
         and calling the LLM completions endpoint with overridden config, using the provided client.
 
@@ -195,7 +172,7 @@ class LLMStructuredCompletionModel(Model):
         self,
         project_id: str,
         user_input: MessageListLike,
-        config: Optional[LLMStructuredModelParamsLike],
+        config: LLMStructuredModelParamsLike | None,
         **template_vars: Any,
     ) -> CompletionsCreateReq:
         # Ensure user_input is properly converted to a list of Message objects
@@ -209,11 +186,15 @@ class LLMStructuredCompletionModel(Model):
         template_msgs = None
         if self.default_params and self.default_params.messages_template:
             template_msgs = self.default_params.messages_template
-            # Apply template variable substitution if variables are provided
             if template_vars:
-                template_msgs = _substitute_template_variables(
-                    template_msgs, template_vars
-                )
+                # Convert Message objects to dicts, apply template vars, convert back
+                formatted_dicts = [
+                    format_message_with_template_vars(
+                        msg.model_dump(exclude_none=True), **template_vars
+                    )
+                    for msg in template_msgs
+                ]
+                template_msgs = [Message.model_validate(d) for d in formatted_dicts]
 
         prepared_messages_dicts = _prepare_llm_messages(template_msgs, user_input)
 
@@ -244,8 +225,8 @@ class LLMStructuredCompletionModel(Model):
 
 
 def parse_response(
-    response_payload: dict, response_format: Optional[ResponseFormat]
-) -> Union[Message, str, dict[str, Any]]:
+    response_payload: dict, response_format: ResponseFormat | None
+) -> Message | str | dict[str, Any]:
     if response_payload.get("error"):
         # Or handle more gracefully depending on desired behavior
         raise RuntimeError(f"LLM API returned an error: {response_payload['error']}")
@@ -262,7 +243,7 @@ def parse_response(
 
 
 def _prepare_llm_messages(
-    template_messages: Optional[list[Message]],
+    template_messages: list[Message] | None,
     user_input: list[Message],
 ) -> list[dict[str, Any]]:
     """Prepares a list of message dictionaries for the LLM API from a message template and user input.

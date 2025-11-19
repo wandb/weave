@@ -5,8 +5,8 @@ import json
 import logging
 import os
 import tempfile
-from collections.abc import Iterator
-from typing import Any, Callable, TypedDict, TypeVar
+from collections.abc import Callable, Iterator
+from typing import Any, TypedDict, TypeVar
 
 from pydantic import BaseModel
 from typing_extensions import Self
@@ -372,7 +372,7 @@ class CachingMiddlewareTraceServer(tsi.FullTraceServerInterface):
             new_req = tsi.RefsReadBatchReq(refs=needed_refs)
             needed_results = self._next_trace_server.refs_read_batch(new_req)
             for needed_ndx, needed_ref, needed_val in zip(
-                needed_indices, needed_refs, needed_results.vals
+                needed_indices, needed_refs, needed_results.vals, strict=False
             ):
                 final_results[needed_ndx] = needed_val
 

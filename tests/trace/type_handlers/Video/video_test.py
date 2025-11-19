@@ -345,7 +345,7 @@ def test_videos_in_load_of_dataset(client):
     ref = weave.publish(dataset)
 
     dataset = ref.get()
-    for i, (gotten_row, local_row) in enumerate(zip(dataset.rows, rows)):
+    for i, (gotten_row, local_row) in enumerate(zip(dataset.rows, rows, strict=False)):
         assert isinstance(gotten_row["video"], VideoClip), (
             f"Row {i} video is not a VideoClip"
         )

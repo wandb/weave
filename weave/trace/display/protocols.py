@@ -5,7 +5,7 @@ must follow. Using protocols provides better type checking and documentation
 of the expected interface.
 """
 
-from typing import Any, Optional, Protocol, Union, runtime_checkable
+from typing import Any, Optional, Protocol, runtime_checkable
 
 from typing_extensions import Self
 
@@ -55,7 +55,7 @@ class TableProtocol(Protocol):
         self,
         header: str,
         justify: str = "left",
-        style: Optional[str] = None,
+        style: str | None = None,
         **kwargs: Any,
     ) -> None:
         """Add a column to the table."""
@@ -75,7 +75,7 @@ class ProgressProtocol(Protocol):
     """Protocol for progress bar objects."""
 
     def add_task(
-        self, description: str, total: Optional[float] = None, **kwargs: Any
+        self, description: str, total: float | None = None, **kwargs: Any
     ) -> int:
         """Add a task to the progress bar."""
         ...
@@ -83,9 +83,9 @@ class ProgressProtocol(Protocol):
     def update(
         self,
         task_id: int,
-        advance: Optional[float] = None,
-        completed: Optional[float] = None,
-        total: Optional[float] = None,
+        advance: float | None = None,
+        completed: float | None = None,
+        total: float | None = None,
         **kwargs: Any,
     ) -> None:
         """Update a task's progress."""
@@ -121,13 +121,13 @@ class ViewerProtocol(Protocol):
         *objects: Any,
         sep: str = " ",
         end: str = "\n",
-        style: Optional[Union[str, Style]] = None,
+        style: str | Style | None = None,
         **kwargs: Any,
     ) -> None:
         """Print to the output with optional styling."""
         ...
 
-    def rule(self, title: str = "", style: Optional[Union[str, Style]] = None) -> None:
+    def rule(self, title: str = "", style: str | Style | None = None) -> None:
         """Print a horizontal rule."""
         ...
 
@@ -137,9 +137,9 @@ class ViewerProtocol(Protocol):
 
     def create_table(
         self,
-        title: Optional[str] = None,
+        title: str | None = None,
         show_header: bool = True,
-        header_style: Optional[str] = None,
+        header_style: str | None = None,
         **kwargs: Any,
     ) -> TableProtocol:
         """Create a table object."""
@@ -162,7 +162,7 @@ class ViewerProtocol(Protocol):
         ...
 
     def create_text(
-        self, text: str = "", style: Optional[Union[str, Style]] = None
+        self, text: str = "", style: str | Style | None = None
     ) -> TextProtocol:
         """Create a styled text object."""
         ...
@@ -187,13 +187,13 @@ class ConsoleProtocol(Protocol):
         *objects: Any,
         sep: str = " ",
         end: str = "\n",
-        style: Optional[Union[str, Style]] = None,
+        style: str | Style | None = None,
         **kwargs: Any,
     ) -> None:
         """Print to the console with optional styling."""
         ...
 
-    def rule(self, title: str = "", style: Optional[Union[str, Style]] = None) -> None:
+    def rule(self, title: str = "", style: str | Style | None = None) -> None:
         """Print a horizontal rule."""
         ...
 

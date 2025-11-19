@@ -3,8 +3,9 @@ from __future__ import annotations
 import dataclasses
 import datetime
 import logging
+from collections.abc import Callable
 from concurrent.futures import Future
-from typing import TYPE_CHECKING, Any, Callable, TypedDict
+from typing import TYPE_CHECKING, Any, TypedDict
 
 from weave.trace import urls
 from weave.trace.context import weave_client_context as weave_client_context
