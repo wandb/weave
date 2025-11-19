@@ -1213,6 +1213,21 @@ def test_openai_responses_tool_calling(client: WeaveClient) -> None:
     assert output["model"] == "gpt-4o-2024-08-06"
     assert output["object"] == "response"
 
+    web_search_call = output["output"][0]
+    assert web_search_call.status == "completed"
+    assert web_search_call.type == "web_search_call"
+
+    response_output_message = output["output"][1]
+    search_results = response_output_message["content"][0]["annotations"]
+    assert len(search_results) > 0
+
+    tools = call.output["tools"]
+    web_search_tool = tools[0]
+    assert web_search_tool["type"] == "web_search_preview"
+    assert web_search_tool["search_context_size"] == "medium"
+    assert web_search_tool["user_location"]["type"] == "approximate"
+    assert web_search_tool["user_location"]["country"] == "US"
+
     usage = call.summary["usage"][output["model"]]  # type: ignore
     assert usage["input_tokens"] == 328
     assert usage["output_tokens"] == 201
@@ -1255,6 +1270,21 @@ def test_openai_responses_tool_calling_stream(client: WeaveClient) -> None:
     assert output["model"] == "gpt-4o-2024-08-06"
     assert output["object"] == "response"
 
+    web_search_call = output["output"][0]
+    assert web_search_call["status"] == "completed"
+    assert web_search_call["type"] == "web_search_call"
+
+    response_output_message = output["output"][1]
+    search_results = response_output_message["content"][0]["annotations"]
+    assert len(search_results) > 0
+
+    tools = call.output["tools"]
+    web_search_tool = tools[0]
+    assert web_search_tool["type"] == "web_search_preview"
+    assert web_search_tool["search_context_size"] == "medium"
+    assert web_search_tool["user_location"]["type"] == "approximate"
+    assert web_search_tool["user_location"]["country"] == "US"
+
     usage = call.summary["usage"][output["model"]]  # type: ignore
     assert usage["input_tokens"] == 328
     assert usage["output_tokens"] == 461
@@ -1296,6 +1326,21 @@ async def test_openai_responses_tool_calling_async(client: WeaveClient) -> None:
     print(f"{output=}")
     assert output["model"] == "gpt-4o-2024-08-06"
     assert output["object"] == "response"
+
+    web_search_call = output["output"][0]
+    assert web_search_call["status"] == "completed"
+    assert web_search_call["type"] == "web_search_call"
+
+    response_output_message = output["output"][1]
+    search_results = response_output_message["content"][0]["annotations"]
+    assert len(search_results) > 0
+
+    tools = call.output["tools"]
+    web_search_tool = tools[0]
+    assert web_search_tool["type"] == "web_search_preview"
+    assert web_search_tool["search_context_size"] == "medium"
+    assert web_search_tool["user_location"]["type"] == "approximate"
+    assert web_search_tool["user_location"]["country"] == "US"
 
     usage = call.summary["usage"][output["model"]]  # type: ignore
     assert usage["input_tokens"] == 328
@@ -1341,6 +1386,21 @@ async def test_openai_responses_tool_calling_async_stream(client: WeaveClient) -
     print(f"{output=}")
     assert output["model"] == "gpt-4o-2024-08-06"
     assert output["object"] == "response"
+
+    web_search_call = output["output"][0]
+    assert web_search_call["status"] == "completed"
+    assert web_search_call["type"] == "web_search_call"
+
+    response_output_message = output["output"][1]
+    search_results = response_output_message["content"][0]["annotations"]
+    assert len(search_results) > 0
+
+    tools = call.output["tools"]
+    web_search_tool = tools[0]
+    assert web_search_tool["type"] == "web_search_preview"
+    assert web_search_tool["search_context_size"] == "medium"
+    assert web_search_tool["user_location"]["type"] == "approximate"
+    assert web_search_tool["user_location"]["country"] == "US"
 
     usage = call.summary["usage"][output["model"]]  # type: ignore
     assert usage["input_tokens"] == 328
