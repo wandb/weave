@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 import os
 from collections.abc import Callable
+from dataclasses import dataclass
 
 import pytest
 
@@ -17,6 +20,15 @@ from weave.trace_server.secret_fetcher_context import secret_fetcher_context
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer
 
 TEST_ENTITY = "shawn"
+
+
+@dataclass(frozen=True)
+class ClickHouseServerCleanup:
+    """Tracks ClickHouse server resources that need cleanup after tests."""
+
+    server: clickhouse_trace_server_batched.ClickHouseTraceServer
+    management_db: str
+    unique_db: str
 
 
 def pytest_addoption(parser):
@@ -85,9 +97,7 @@ def get_ch_trace_server(
     ensure_clickhouse_db,
     request,
 ) -> Callable[[], TestOnlyUserInjectingExternalTraceServer]:
-    servers_to_cleanup: list[
-        tuple[clickhouse_trace_server_batched.ClickHouseTraceServer, str, str]
-    ] = []
+    servers_to_cleanup: list[ClickHouseServerCleanup] = []
 
     def ch_trace_server_inner() -> TestOnlyUserInjectingExternalTraceServer:
         host, port = next(ensure_clickhouse_db())
@@ -114,7 +124,13 @@ def get_ch_trace_server(
             )
 
             # Track server for cleanup
-            servers_to_cleanup.append((ch_server, management_db, unique_db))
+            servers_to_cleanup.append(
+                ClickHouseServerCleanup(
+                    server=ch_server,
+                    management_db=management_db,
+                    unique_db=unique_db,
+                )
+            )
 
             # Clean up any existing worker-specific databases
             ch_server.ch_client.command(f"DROP DATABASE IF EXISTS {management_db}")
@@ -146,24 +162,27 @@ def get_ch_trace_server(
     yield ch_trace_server_inner
 
     # Cleanup after all tests using this fixture complete
-    for ch_server, management_db, unique_db in servers_to_cleanup:
+    for server_config in servers_to_cleanup:
+        ch_client = getattr(server_config.server, "ch_client", None)
+        if not ch_client:
+            continue
+
+        # Drop test databases (best effort)
         try:
-            # Close any pending batches/connections
-            if hasattr(ch_server, "ch_client") and ch_server.ch_client:
-                try:
-                    # Drop test databases
-                    ch_server.ch_client.command(
-                        f"DROP DATABASE IF EXISTS {management_db}"
-                    )
-                    ch_server.ch_client.command(f"DROP DATABASE IF EXISTS {unique_db}")
-                except Exception:
-                    pass  # Best effort cleanup
-                try:
-                    ch_server.ch_client.close()
-                except Exception:
-                    pass  # Best effort cleanup
+            ch_client.command(f"DROP DATABASE IF EXISTS {server_config.management_db}")
         except Exception:
-            pass  # Best effort cleanup
+            pass
+
+        try:
+            ch_client.command(f"DROP DATABASE IF EXISTS {server_config.unique_db}")
+        except Exception:
+            pass
+
+        # Close client connection (best effort)
+        try:
+            ch_client.close()
+        except Exception:
+            pass
 
 
 @pytest.fixture
