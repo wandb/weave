@@ -161,20 +161,6 @@ client = httpx.Client(
 )
 
 
-def _request(
-    method: str,
-    url: str,
-    *,
-    stream: bool = False,
-    **kwargs: Any,
-) -> Response:
-    if not stream:
-        return client.request(method, url, **kwargs)
-
-    request = client.build_request(method, url, **kwargs)
-    return client.send(request, stream=True)
-
-
 def get(
     url: str,
     params: dict[str, str] | None = None,
@@ -183,7 +169,10 @@ def get(
     **kwargs: Any,
 ) -> Response:
     """Send a GET request with optional logging."""
-    return _request("GET", url, params=params, stream=stream, **kwargs)
+    if stream:
+        request = client.build_request("GET", url, params=params, **kwargs)
+        return client.send(request, stream=True)
+    return client.get(url, params=params, **kwargs)
 
 
 def post(
@@ -195,14 +184,10 @@ def post(
     **kwargs: Any,
 ) -> Response:
     """Send a POST request with optional logging."""
-    return _request(
-        "POST",
-        url,
-        data=data,
-        json=json,
-        stream=stream,
-        **kwargs,
-    )
+    if stream:
+        request = client.build_request("POST", url, data=data, json=json, **kwargs)
+        return client.send(request, stream=True)
+    return client.post(url, data=data, json=json, **kwargs)
 
 
 def delete(
@@ -213,4 +198,7 @@ def delete(
     **kwargs: Any,
 ) -> Response:
     """Send a DELETE request with optional logging."""
-    return _request("DELETE", url, params=params, stream=stream, **kwargs)
+    if stream:
+        request = client.build_request("DELETE", url, params=params, **kwargs)
+        return client.send(request, stream=True)
+    return client.delete(url, params=params, **kwargs)
