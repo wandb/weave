@@ -895,11 +895,16 @@ class CallsQuery(BaseModel):
         # when such occurrence happens and the client terminates early.
         # Additionally: This condition is also REQUIRED for proper functioning
         # when using pre-group by (WHERE) optimizations
-        self.add_condition(
-            tsi_query.NotOperation.model_validate(
-                {"$not": [{"$eq": [{"$getField": "started_at"}, {"$literal": None}]}]}
+        if self.project_version == ProjectVersion.CALLS_MERGED_VERSION:
+            self.add_condition(
+                tsi_query.NotOperation.model_validate(
+                    {
+                        "$not": [
+                            {"$eq": [{"$getField": "started_at"}, {"$literal": None}]}
+                        ]
+                    }
+                )
             )
-        )
 
         object_ref_conditions = get_all_object_ref_conditions(
             self.query_conditions, self.order_fields, self.expand_columns
@@ -2424,7 +2429,7 @@ def build_calls_complete_batch_update_query(
         if call.exception is not None:
             exception_param = pb.add_param(call.exception)
             exception_cases.append(
-                f"WHEN id = {param_slot(id_param, 'String')} THEN {param_slot(exception_param, 'String')}"
+                f"WHEN id = {param_slot(id_param, 'String')} THEN {param_slot(exception_param, 'Nullable(String)')}"
             )
         else:
             exception_cases.append(
@@ -2435,7 +2440,7 @@ def build_calls_complete_batch_update_query(
         if call.wb_run_step_end is not None:
             wb_run_step_end_param = pb.add_param(call.wb_run_step_end)
             wb_run_step_end_cases.append(
-                f"WHEN id = {param_slot(id_param, 'String')} THEN {param_slot(wb_run_step_end_param, 'UInt64')}"
+                f"WHEN id = {param_slot(id_param, 'String')} THEN {param_slot(wb_run_step_end_param, 'Nullable(UInt64)')}"
             )
         else:
             wb_run_step_end_cases.append(
