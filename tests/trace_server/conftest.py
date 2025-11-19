@@ -1,3 +1,4 @@
+import contextlib
 import os
 from collections.abc import Callable
 
@@ -84,12 +85,15 @@ def _get_worker_db_suffix(request) -> str:
 def get_ch_trace_server(
     ensure_clickhouse_db,
     request,
-) -> Callable[[], TestOnlyUserInjectingExternalTraceServer]:
-    servers_to_cleanup: list[
-        tuple[clickhouse_trace_server_batched.ClickHouseTraceServer, str, str]
-    ] = []
+):
+    """Fixture that returns a context manager factory for ClickHouse trace servers.
 
-    def ch_trace_server_inner() -> TestOnlyUserInjectingExternalTraceServer:
+    Each call to the returned function creates a new context manager that properly
+    cleans up resources when exited.
+    """
+
+    @contextlib.contextmanager
+    def ch_trace_server_context_manager():
         host, port = next(ensure_clickhouse_db())
         db_suffix = _get_worker_db_suffix(request)
 
@@ -102,6 +106,7 @@ def get_ch_trace_server(
         # Set worker-specific database name
         os.environ["WF_CLICKHOUSE_DATABASE"] = unique_db
 
+        ch_server = None
         try:
             id_converter = DummyIdConverter()
             ch_server = clickhouse_trace_server_batched.ClickHouseTraceServer(
@@ -112,9 +117,6 @@ def get_ch_trace_server(
                     id_converter=id_converter
                 ),
             )
-
-            # Track server for cleanup
-            servers_to_cleanup.append((ch_server, management_db, unique_db))
 
             # Clean up any existing worker-specific databases
             ch_server.ch_client.command(f"DROP DATABASE IF EXISTS {management_db}")
@@ -135,44 +137,50 @@ def get_ch_trace_server(
             result = externalize_trace_server(
                 ch_server, TEST_ENTITY, id_converter=id_converter
             )
-            return result
+            yield result
         finally:
+            # Clean up resources immediately after test completes
+            if ch_server is not None:
+                try:
+                    if hasattr(ch_server, "ch_client") and ch_server.ch_client:
+                        try:
+                            # Drop test databases
+                            ch_server.ch_client.command(
+                                f"DROP DATABASE IF EXISTS {management_db}"
+                            )
+                            ch_server.ch_client.command(
+                                f"DROP DATABASE IF EXISTS {unique_db}"
+                            )
+                        except Exception:
+                            pass  # Best effort cleanup
+                        try:
+                            ch_server.ch_client.close()
+                        except Exception:
+                            pass  # Best effort cleanup
+                except Exception:
+                    pass  # Best effort cleanup
+
             # Restore original database name
             if original_db is None:
                 os.environ.pop("WF_CLICKHOUSE_DATABASE", None)
             else:
                 os.environ["WF_CLICKHOUSE_DATABASE"] = original_db
 
-    yield ch_trace_server_inner
-
-    # Cleanup after all tests using this fixture complete
-    for ch_server, management_db, unique_db in servers_to_cleanup:
-        try:
-            # Close any pending batches/connections
-            if hasattr(ch_server, "ch_client") and ch_server.ch_client:
-                try:
-                    # Drop test databases
-                    ch_server.ch_client.command(
-                        f"DROP DATABASE IF EXISTS {management_db}"
-                    )
-                    ch_server.ch_client.command(f"DROP DATABASE IF EXISTS {unique_db}")
-                except Exception:
-                    pass  # Best effort cleanup
-                try:
-                    ch_server.ch_client.close()
-                except Exception:
-                    pass  # Best effort cleanup
-        except Exception:
-            pass  # Best effort cleanup
+    return ch_trace_server_context_manager
 
 
 @pytest.fixture
 def get_sqlite_trace_server(
     request,
-) -> Callable[[], TestOnlyUserInjectingExternalTraceServer]:
-    servers_to_cleanup: list[SqliteTraceServer] = []
+):
+    """Fixture that returns a context manager factory for SQLite trace servers.
 
-    def sqlite_trace_server_inner() -> TestOnlyUserInjectingExternalTraceServer:
+    Each call to the returned function creates a new context manager that properly
+    cleans up resources when exited.
+    """
+
+    @contextlib.contextmanager
+    def sqlite_trace_server_context_manager():
         id_converter = DummyIdConverter()
         # Use worker-specific database for pytest-xdist isolation
         # Each worker gets its own isolated database
@@ -183,30 +191,31 @@ def get_sqlite_trace_server(
         else:
             # Single worker or sequential execution - use default shared memory
             db_path = "file::memory:?cache=shared"
-        sqlite_server = SqliteTraceServer(
-            db_path,
-            evaluate_model_dispatcher=EvaluateModelTestDispatcher(
-                id_converter=id_converter
-            ),
-        )
-        # Track server for cleanup
-        servers_to_cleanup.append(sqlite_server)
 
-        sqlite_server.drop_tables()
-        sqlite_server.setup_tables()
-        return externalize_trace_server(
-            sqlite_server, TEST_ENTITY, id_converter=id_converter
-        )
-
-    yield sqlite_trace_server_inner
-
-    # Cleanup after all tests using this fixture complete
-    for sqlite_server in servers_to_cleanup:
+        sqlite_server = None
         try:
-            # Drop tables to ensure clean shutdown
+            sqlite_server = SqliteTraceServer(
+                db_path,
+                evaluate_model_dispatcher=EvaluateModelTestDispatcher(
+                    id_converter=id_converter
+                ),
+            )
+
             sqlite_server.drop_tables()
-        except Exception:
-            pass  # Best effort cleanup
+            sqlite_server.setup_tables()
+            yield externalize_trace_server(
+                sqlite_server, TEST_ENTITY, id_converter=id_converter
+            )
+        finally:
+            # Clean up resources immediately after test completes
+            if sqlite_server is not None:
+                try:
+                    # Drop tables to ensure clean shutdown
+                    sqlite_server.drop_tables()
+                except Exception:
+                    pass  # Best effort cleanup
+
+    return sqlite_trace_server_context_manager
 
 
 class LocalSecretFetcher:
@@ -223,14 +232,23 @@ def local_secret_fetcher():
 @pytest.fixture
 def trace_server(
     request, local_secret_fetcher, get_ch_trace_server, get_sqlite_trace_server
-) -> TestOnlyUserInjectingExternalTraceServer:
+):
+    """Fixture that provides a trace server instance with proper cleanup.
+
+    This fixture uses context managers from get_ch_trace_server or get_sqlite_trace_server
+    to ensure resources are properly cleaned up after each test.
+    """
     trace_server_flag = get_trace_server_flag(request)
     if trace_server_flag == "clickhouse":
-        return get_ch_trace_server()
+        context_manager = get_ch_trace_server()
     elif trace_server_flag == "sqlite":
-        return get_sqlite_trace_server()
+        context_manager = get_sqlite_trace_server()
     else:
         # Once we split the trace server and client code, we can raise here.
         # For now, just return the sqlite trace server so we don't break existing tests.
         # raise ValueError(f"Invalid trace server: {trace_server_flag}")
-        return get_sqlite_trace_server()
+        context_manager = get_sqlite_trace_server()
+
+    # Use the context manager to ensure proper cleanup
+    with context_manager as server:
+        yield server
