@@ -2051,10 +2051,14 @@ class ScoreDeleteRes(BaseModel):
 
 class CallsStartBatchReq(BaseModel):
     """Request for batch starting/completing calls. Accepts start or complete call types."""
+<<<<<<< HEAD
 
     project_id: str = Field(
         ..., description="The `entity/project` where these calls are saved"
     )
+=======
+    # TODO: do we want to add project_id here
+>>>>>>> 76b96a07e9 (wip)
     batch: list[CallBatchStartMode | CallBatchCompleteMode]
 
 
