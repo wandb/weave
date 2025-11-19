@@ -1,7 +1,7 @@
 import json
 import logging
 import os
-from typing import Literal, Optional, TypedDict
+from typing import Literal, TypedDict
 
 import httpx
 
@@ -70,7 +70,7 @@ class LLMModelDetails(TypedDict):
     idPlayground: str
     idHuggingFace: str
     label: str
-    labelOpenRouter: Optional[str]
+    labelOpenRouter: str | None
     status: str
     descriptionShort: str
     descriptionMedium: str

@@ -6,9 +6,7 @@
 # the trace interface should only ever operate on internal refs.
 import dataclasses
 import urllib
-from typing import Any, Union
-
-from weave.utils.project_id import to_project_id
+from typing import Any
 
 WEAVE_INTERNAL_SCHEME = "weave-trace-internal"
 WEAVE_SCHEME = "weave"
@@ -160,9 +158,9 @@ class InternalArtifactRef:
         return u
 
 
-InternalRef = Union[
-    InternalObjectRef, InternalTableRef, InternalCallRef, InternalArtifactRef
-]
+InternalRef = (
+    InternalObjectRef | InternalTableRef | InternalCallRef | InternalArtifactRef
+)
 
 
 def parse_internal_uri(
@@ -181,7 +179,7 @@ def parse_internal_uri(
         if len(parts) < 3:
             raise InvalidInternalRef(f"Invalid URI: {uri}. Must have at least 3 parts")
         entity, project = parts[:2]
-        project_id = to_project_id(entity, project)
+        project_id = f"{entity}/{project}"
         kind = "artifact"
         remaining = parts[2:]
     else:

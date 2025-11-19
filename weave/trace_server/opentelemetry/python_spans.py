@@ -10,7 +10,7 @@ from binascii import hexlify
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
 from opentelemetry.proto.common.v1.common_pb2 import InstrumentationScope
 from opentelemetry.proto.resource.v1.resource_pb2 import Resource as PbResource
@@ -91,7 +91,7 @@ class Status:
             code=StatusCode.from_proto(proto_status.code), message=proto_status.message
         )
 
-    def as_weave_status(self) -> Optional[tsi.TraceStatus]:
+    def as_weave_status(self) -> tsi.TraceStatus | None:
         """Convert from protobuf enum value to StatusCode."""
         if self.code == StatusCode.ERROR:
             return tsi.TraceStatus.ERROR
@@ -191,7 +191,7 @@ class Resource:
 class Span:
     """Represents a span in a trace."""
 
-    resource: Optional[Resource]
+    resource: Resource | None
     name: str
     trace_id: str
     span_id: str
@@ -199,7 +199,7 @@ class Span:
     end_time_unix_nano: int
     attributes: dict[str, Any] = field(default_factory=dict)
     kind: SpanKind = SpanKind.UNSPECIFIED
-    parent_id: Optional[str] = None
+    parent_id: str | None = None
     trace_state: str = ""
     flags: int = 0
     dropped_attributes_count: int = 0
@@ -232,9 +232,7 @@ class Span:
         return self.duration_ns / 1_000_000
 
     @classmethod
-    def from_proto(
-        cls, proto_span: PbSpan, resource: Optional[Resource] = None
-    ) -> Self:
+    def from_proto(cls, proto_span: PbSpan, resource: Resource | None = None) -> Self:
         """Create a Span from a protobuf Span."""
         parent_id = None
         if proto_span.parent_span_id:
@@ -285,8 +283,8 @@ class Span:
     def to_call(
         self,
         project_id: str,
-        wb_user_id: Optional[str] = None,
-        wb_run_id: Optional[str] = None,
+        wb_user_id: str | None = None,
+        wb_run_id: str | None = None,
     ) -> tuple[tsi.StartedCallSchemaForInsert, tsi.EndedCallSchemaForInsert]:
         events = [SpanEvent(e.as_dict()) for e in self.events]
         usage = get_weave_usage(self.attributes) or {}
@@ -444,7 +442,7 @@ class ScopeSpans:
 
     @classmethod
     def from_proto(
-        cls, proto_scope_spans: PbScopeSpans, resource: Optional[Resource] = None
+        cls, proto_scope_spans: PbScopeSpans, resource: Resource | None = None
     ) -> Self:
         """Create a ScopeSpans from a protobuf ScopeSpans."""
         return cls(
@@ -458,7 +456,7 @@ class ScopeSpans:
 class ResourceSpans:
     """Represents a collection of spans from a specific resource."""
 
-    resource: Optional[Resource]
+    resource: Resource | None
     scope_spans: list[ScopeSpans] = field(default_factory=list)
     schema_url: str = ""
 

@@ -1,6 +1,7 @@
 import json
 import logging
-from typing import TYPE_CHECKING, Any, Callable, Optional, TypeVar, Union
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any, TypeVar, Union
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
@@ -86,10 +87,10 @@ def process_batch_with_retry(
     batch_name: str,
     remote_request_bytes_limit: int,
     send_batch_fn: Callable[[bytes], None],
-    processor_obj: Optional[BatchProcessor[T]],
+    processor_obj: BatchProcessor[T] | None,
     should_update_batch_size: bool = True,
-    get_item_id_fn: Optional[Callable[[T], str]] = None,
-    log_dropped_fn: Optional[Callable[[list[T], Exception], None]] = None,
+    get_item_id_fn: Callable[[T], str] | None = None,
+    log_dropped_fn: Callable[[list[T], Exception], None] | None = None,
     encode_batch_fn: Callable[[list[T]], bytes],
 ) -> None:
     """Process a batch with common retry and error handling logic.
@@ -254,7 +255,7 @@ def handle_response_error(response: requests.Response, url: str) -> None:
 
 
 def check_endpoint_exists(
-    func: Callable, test_req: Any, cache_key: Union[str, None] = None
+    func: Callable, test_req: Any, cache_key: str | None = None
 ) -> bool:
     """Check if a function/endpoint exists and works by calling it with a test request.
 

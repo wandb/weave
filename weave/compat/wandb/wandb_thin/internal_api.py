@@ -5,7 +5,7 @@
 # NOTE: This was copied from the query service and contains way more than it needs to.
 
 import logging
-from typing import Any, Optional
+from typing import Any
 
 import gql
 import graphql
@@ -88,7 +88,7 @@ class Api:
 
     def artifact_manifest_url(
         self, entity_name: str, project_name: str, name: str
-    ) -> Optional[str]:
+    ) -> str | None:
         try:
             result = self.query(
                 self.ARTIFACT_MANIFEST_QUERY,
@@ -129,7 +129,7 @@ class Api:
         """
     )
 
-    def artifact_manifest_url_from_id(self, art_id: str) -> Optional[str]:
+    def artifact_manifest_url_from_id(self, art_id: str) -> str | None:
         try:
             result = self.query(self.ARTIFACT_MANIFEST_FROM_ID_QUERY, artifactID=art_id)
         except gql.transport.exceptions.TransportQueryError as e:
@@ -158,7 +158,7 @@ class Api:
         """
     )
 
-    def default_entity_name(self) -> Optional[str]:
+    def default_entity_name(self) -> str | None:
         try:
             result = self.query(self.VIEWER_DEFAULT_ENTITY_QUERY)
         except gql.transport.exceptions.TransportQueryError as e:
@@ -168,7 +168,7 @@ class Api:
         except AttributeError:
             return None
 
-    def username(self) -> Optional[str]:
+    def username(self) -> str | None:
         try:
             result = self.query(self.VIEWER_DEFAULT_ENTITY_QUERY)
         except gql.transport.exceptions.TransportQueryError as e:
@@ -192,8 +192,8 @@ class Api:
     def upsert_project(
         self,
         project: str,
-        description: Optional[str] = None,
-        entity: Optional[str] = None,
+        description: str | None = None,
+        entity: str | None = None,
     ) -> dict[str, Any]:
         """Create a new project.
 
@@ -306,7 +306,7 @@ class ApiAsync:
 
     async def artifact_manifest_url(
         self, entity_name: str, project_name: str, name: str
-    ) -> Optional[str]:
+    ) -> str | None:
         try:
             result = await self.query(
                 self.ARTIFACT_MANIFEST_QUERY,
@@ -347,7 +347,7 @@ class ApiAsync:
         """
     )
 
-    async def artifact_manifest_url_from_id(self, art_id: str) -> Optional[str]:
+    async def artifact_manifest_url_from_id(self, art_id: str) -> str | None:
         try:
             result = await self.query(
                 self.ARTIFACT_MANIFEST_FROM_ID_QUERY, artifactID=art_id
@@ -377,7 +377,7 @@ class ApiAsync:
         """
     )
 
-    async def default_entity_name(self) -> Optional[str]:
+    async def default_entity_name(self) -> str | None:
         try:
             result = await self.query(self.VIEWER_DEFAULT_ENTITY_QUERY)
         except gql.transport.exceptions.TransportQueryError as e:
@@ -396,7 +396,7 @@ class ApiAsync:
         """
     )
 
-    async def can_access_entity(self, entity: str, api_key: Optional[str]) -> bool:
+    async def can_access_entity(self, entity: str, api_key: str | None) -> bool:
         try:
             result = await self.query(
                 self.ENTITY_ACCESS_QUERY, entityName=entity, api_key=api_key

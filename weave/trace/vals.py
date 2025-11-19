@@ -5,7 +5,7 @@ import operator
 import typing
 from collections.abc import Generator, Iterator, Sequence
 from copy import deepcopy
-from typing import Any, Literal, Optional, SupportsIndex, Union
+from typing import Any, Literal, Optional, SupportsIndex
 
 from pydantic import BaseModel
 
@@ -73,8 +73,8 @@ class MutationAppend:
     args: tuple[Any]
 
 
-Mutation = Union[MutationSetattr, MutationSetitem, MutationAppend]
-MutationOperation = Union[Literal["setitem"], Literal["setattr"], Literal["append"]]
+Mutation = MutationSetattr | MutationSetitem | MutationAppend
+MutationOperation = Literal["setitem"] | Literal["setattr"] | Literal["append"]
 
 
 def make_mutation(
@@ -115,8 +115,8 @@ def unwrap(val: Any) -> Any:
 
 
 class Traceable:
-    ref: Optional[RefWithExtra]
-    mutations: Optional[list[Mutation]] = None
+    ref: RefWithExtra | None
+    mutations: list[Mutation] | None = None
     root: "Traceable"
     parent: Optional["Traceable"] = None
     server: TraceServerInterface
@@ -189,7 +189,7 @@ def attribute_access_result(
     val_attr_val: Any,
     attr_name: str,
     *,
-    server: Optional[TraceServerInterface],
+    server: TraceServerInterface | None,
 ) -> Any:
     # Not ideal, what about properties?
     if callable(val_attr_val):
@@ -224,10 +224,10 @@ class WeaveObject(Traceable):
     def __init__(
         self,
         val: Any,
-        ref: Optional[RefWithExtra],
+        ref: RefWithExtra | None,
         server: TraceServerInterface,
-        root: typing.Optional[Traceable],
-        parent: Optional[Traceable] = None,
+        root: Traceable | None,
+        parent: Traceable | None = None,
     ) -> None:
         self._val = val
         self.ref = ref
@@ -295,21 +295,21 @@ class WeaveObject(Traceable):
 
 
 class WeaveTable(Traceable):
-    filter: Optional[TableRowFilter] = None
-    _known_length: Optional[int] = None
-    _rows: Optional[Sequence[dict]] = None
+    filter: TableRowFilter | None = None
+    _known_length: int | None = None
+    _rows: Sequence[dict] | None = None
     # _prefetched_rows is a local cache of rows that can be used to
     # avoid a remote call. Should only be used by internal code.
-    _prefetched_rows: Optional[list[dict]] = None
+    _prefetched_rows: list[dict] | None = None
 
     def __init__(
         self,
         server: TraceServerInterface,
-        table_ref: Optional[TableRef] = None,
-        ref: Optional[RefWithExtra] = None,
-        filter: Optional[TableRowFilter] = None,
-        root: Optional[Traceable] = None,
-        parent: Optional[Traceable] = None,
+        table_ref: TableRef | None = None,
+        ref: RefWithExtra | None = None,
+        filter: TableRowFilter | None = None,
+        root: Traceable | None = None,
+        parent: Traceable | None = None,
     ) -> None:
         self.table_ref = table_ref
         self.filter = filter
@@ -548,7 +548,7 @@ class WeaveTable(Traceable):
 
             page_index += 1
 
-    def __getitem__(self, key: Union[int, slice, str]) -> Any:
+    def __getitem__(self, key: int | slice | str) -> Any:
         # TODO: ideally we would have some sort of intelligent
         # LRU style caching that allows us to minimize materialization
         # of the rows as a list.
@@ -587,9 +587,9 @@ class WeaveList(Traceable, list):
         self,
         *args: Any,
         server: TraceServerInterface,
-        ref: Optional[RefWithExtra] = None,
-        root: Optional[Traceable] = None,
-        parent: Optional[Traceable] = None,
+        ref: RefWithExtra | None = None,
+        root: Traceable | None = None,
+        parent: Traceable | None = None,
     ) -> None:
         self.server = server
 
@@ -610,7 +610,7 @@ class WeaveList(Traceable, list):
         memo[id(self)] = res
         return res
 
-    def __getitem__(self, i: Union[SupportsIndex, slice]) -> Any:
+    def __getitem__(self, i: SupportsIndex | slice) -> Any:
         if isinstance(i, slice):
             raise TypeError("Slices not yet supported")
         index = operator.index(i)
@@ -618,7 +618,7 @@ class WeaveList(Traceable, list):
         index_val = super().__getitem__(index)
         return make_trace_obj(index_val, new_ref, self.server, self.root)
 
-    def __setitem__(self, i: Union[SupportsIndex, slice], value: Any) -> None:
+    def __setitem__(self, i: SupportsIndex | slice, value: Any) -> None:
         if isinstance(i, slice):
             raise TypeError("Slices not yet supported")
         if (index := operator.index(i)) >= len(self):
@@ -652,7 +652,7 @@ class WeaveList(Traceable, list):
             return False
         if len(self) != len(other):
             return False
-        for v1, v2 in zip(self, other):
+        for v1, v2 in zip(self, other, strict=False):
             if v1 != v2:
                 return False
         return True
@@ -666,9 +666,9 @@ class WeaveDict(Traceable, dict):
         self,
         *args: Any,
         server: TraceServerInterface,
-        ref: Optional[RefWithExtra] = None,
-        root: Optional[Traceable] = None,
-        parent: Optional[Traceable] = None,
+        ref: RefWithExtra | None = None,
+        root: Traceable | None = None,
+        parent: Traceable | None = None,
         **kwargs: Any,
     ) -> None:
         self.server = server
@@ -748,9 +748,9 @@ class WeaveDict(Traceable, dict):
 
 def make_trace_obj(
     val: Any,
-    new_ref: Optional[RefWithExtra],  # Can this actually be None?
+    new_ref: RefWithExtra | None,  # Can this actually be None?
     server: TraceServerInterface,
-    root: Optional[Traceable],
+    root: Traceable | None,
     parent: Any = None,
 ) -> Any:
     if isinstance(val, Traceable):

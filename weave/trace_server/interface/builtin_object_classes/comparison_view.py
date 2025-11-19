@@ -4,8 +4,6 @@ This allows users to save and restore comparison configurations including
 evaluation call IDs and selected metrics.
 """
 
-from typing import Optional
-
 from pydantic import BaseModel
 
 from weave.trace_server.interface.builtin_object_classes import base_object_def
@@ -26,7 +24,7 @@ class ComparisonViewDefinition(BaseModel):
     """
 
     evaluation_call_ids: list[str]
-    selected_metrics: Optional[list[str]] = None
+    selected_metrics: list[str] | None = None
 
 
 class ComparisonView(base_object_def.BaseObject):

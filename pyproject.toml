@@ -32,7 +32,7 @@ classifiers = [
   "Topic :: Software Development :: Libraries :: Application Frameworks",
   "Topic :: Software Development :: Widget Sets",
 ]
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dynamic = ["version"]
 dependencies = [
   "wandb>=0.17.1",
@@ -50,11 +50,6 @@ dependencies = [
   # Used for content type detection
   # Remove once license content filtering is upstreamed
   "polyfile-weave",
-
-  # This transforms X | Y into typing.Union[X, Y] and list[X] into typing.List[X] etc.
-  # It allows us to use those type annotations in Python 3.9 with Pydantic.
-  # See https://github.com/pydantic/pydantic/issues/7873
-  "eval-type-backport",
 ]
 
 [project.optional-dependencies]
@@ -115,8 +110,7 @@ smolagents = [
   "SQLAlchemy>=2.0.38",
 ]
 instructor = [
-  "instructor>=1.4.3,<1.7.0; python_version <= '3.9'",
-  "instructor>=1.4.3,<1.11.0; python_version > '3.9'",
+  "instructor>=1.4.3,<1.11.0",
   "google-genai>=1.5.0",
   "openai>=1.99.9,<1.100.0",
 ]
@@ -158,6 +152,7 @@ scorers = [
 ]
 notdiamond = [
   "notdiamond>=0.4.9; platform_python_implementation != 'PyPy' and python_version > '3.10' and python_version < '3.13'",
+  "pandas>=2.0.0",
 ]
 openai = ["openai>=1.99.9,<1.100.0"]
 openai_agents = ["openai-agents>=0.0.4"]
@@ -177,6 +172,7 @@ verdict = [
 ]
 autogen = ["autogen-agentchat>=0.5.7; python_version >= '3.10'"]
 verifiers = ["verifiers>=0.1.3.post0,<0.1.4; python_version >= '3.11'"]
+stainless = ["weave_server_sdk @ git+https://github.com/wandb/weave-stainless.git@0d1de4c51dc3819b9e177df3e10565b0dc33aec3"]
 
 
 [project.urls]
@@ -481,11 +477,6 @@ conflicts = [
   [
     { extra = "langchain" },
     { extra = "vertexai" },
-  ],
-  # instructor and verdict have incompatible requirements on Python < 3.10
-  [
-    { extra = "instructor" },
-    { extra = "verdict" },
   ],
   # crewai and langchain have incompatible litellm version requirements
   [

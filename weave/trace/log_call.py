@@ -8,7 +8,8 @@ outputs without using the decorator pattern.
 
 from __future__ import annotations
 
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from weave.trace.call import Call
 from weave.trace.context.weave_client_context import require_weave_client

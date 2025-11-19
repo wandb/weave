@@ -409,7 +409,7 @@ class Grid:
 
         # Check column types and coerce values if possible
         processed_values: RowValues = []
-        for _i, (value, column) in enumerate(zip(values, self.columns)):
+        for _i, (value, column) in enumerate(zip(values, self.columns, strict=False)):
             if column.type is not None:
                 try:
                     if column.type == "bool" and not isinstance(value, bool):
