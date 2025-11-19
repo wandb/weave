@@ -391,7 +391,7 @@ def test_auto_mode_start_batch_with_complete_mode(
             tsi.CallBatchCompleteMode(
                 mode="complete", req=tsi.CallCompleteReq(complete=complete)
             )
-        ],
+        ]
     )
     res = server.calls_start_batch(req)
 
@@ -535,7 +535,15 @@ def test_auto_mode_mixed_start_and_complete(
     )
 
     # Insert mixed batch
-    req = tsi.CallsStartBatchReq(project_id=project_id, batch=batch)
+    req = tsi.CallsStartBatchReq(
+        project_id=project_id,
+        batch=[
+            tsi.CallBatchStartMode(mode="start", req=tsi.CallStartReq(start=start)),
+            tsi.CallBatchCompleteMode(
+                mode="complete", req=tsi.CallCompleteReq(complete=complete)
+            ),
+        ]
+    )
     res = server.calls_start_batch(req)
 
     # Verify response
@@ -888,7 +896,7 @@ def test_auto_mode_metadata_fields(
             tsi.CallBatchStartMode(
                 mode="start", req=tsi.CallStartReq(start=start_thread)
             ),
-        ],
+        ]
     )
     server.calls_start_batch(req)
 
@@ -977,7 +985,7 @@ def test_auto_mode_batch_operations_multiple_calls(
         project_id=project_id,
         batch=[
             tsi.CallBatchEndMode(mode="end", req=tsi.CallEndReq(end=e)) for e in ends
-        ],
+        ]
     )
     server.calls_end_batch(end_req)
 

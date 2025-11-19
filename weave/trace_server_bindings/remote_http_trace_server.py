@@ -147,9 +147,11 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         # First pass: collect all items by type and ID
         for item in batch:
             if isinstance(item, StartBatchItem):
-                starts[item.req.start.id] = item
+                if item.req.start.id is not None:
+                    starts[item.req.start.id] = item
             elif isinstance(item, EndBatchItem):
-                ends[item.req.end.id] = item
+                if item.req.end.id is not None:
+                    ends[item.req.end.id] = item
             elif isinstance(item, CompleteBatchItem):
                 completes.append(item)
 

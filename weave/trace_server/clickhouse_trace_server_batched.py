@@ -445,7 +445,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self._insert_call_batch(batch_rows, settings=None, do_sync_insert=True)
 
         if completes:
-            self._insert_call_batch(completes, "calls_complete")
+            # Convert API-level schemas to CH-insertable schemas
+            ch_insertable_completes = [
+                _completed_call_for_insert_to_ch_insertable_completed_call(complete)
+                for complete in completes
+            ]
+            self._insert_ch_insertable_calls_to_complete_table(ch_insertable_completes)
 
         if rejected_spans > 0:
             # Join the first 20 errors and return them delimited by ';'
