@@ -757,7 +757,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             cq.set_offset(req.offset)
 
         pb = ParamBuilder()
-        raw_res = self._query_stream(cq.as_sql(pb), pb.get_params())
+        raw_res = self._query_stream(cq.as_sql(pb), pb.get_params(), project_version=project_version)
 
         select_columns = [c.field for c in cq.select_fields]
         expand_columns = req.expand_columns or []
@@ -4796,6 +4796,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         parameters: dict[str, Any],
         column_formats: dict[str, Any] | None = None,
         settings: dict[str, Any] | None = None,
+        project_version: ProjectVersion | None = None,
     ) -> Iterator[tuple]:
         """Streams the results of a query from the database."""
         if not settings:
@@ -4820,6 +4821,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                         "query": query,
                         "parameters": parameters,
                         "summary": summary,
+                        "project_version": project_version,
                     },
                 )
                 yield from stream
@@ -4830,6 +4832,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     "error_str": str(e),
                     "query": query,
                     "parameters": parameters,
+                    "project_version": project_version,
                 },
             )
             # always raises, optionally with custom error class
