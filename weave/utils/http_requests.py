@@ -202,4 +202,12 @@ def post(
     **kwargs: Any,
 ) -> Response:
     """Send a POST request with optional logging."""
+    # httpx.Client.post() doesn't support stream parameter, so we need to use
+    # the standalone httpx.post() function when streaming is requested.
+    stream = kwargs.pop("stream", False)
+    if stream:
+        # Use standalone httpx.post() for streaming requests
+        # Note: This bypasses the client's event hooks, but streaming requests
+        # need the standalone function.
+        return httpx.post(url, data=data, json=json, **kwargs)
     return client.post(url, data=data, json=json, **kwargs)
