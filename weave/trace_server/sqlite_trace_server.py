@@ -1,12 +1,12 @@
 # Sqlite Trace Server
 
-import contextvars
 import datetime
 import hashlib
 import json
 import sqlite3
 import threading
 from collections.abc import Iterator
+from contextvars import ContextVar
 from typing import Any, cast
 
 from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
@@ -63,9 +63,9 @@ from weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker impo
     EvaluateModelDispatcher,
 )
 
-_conn_cursor: contextvars.ContextVar[
-    tuple[sqlite3.Connection, sqlite3.Cursor] | None
-] = contextvars.ContextVar("conn_cursor", default=None)
+_conn_cursor: ContextVar[tuple[sqlite3.Connection, sqlite3.Cursor] | None] = ContextVar(
+    "conn_cursor", default=None
+)
 
 
 def get_conn_cursor(db_path: str) -> tuple[sqlite3.Connection, sqlite3.Cursor]:

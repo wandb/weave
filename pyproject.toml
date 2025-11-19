@@ -476,11 +476,6 @@ conflicts = [
     { extra = "langchain" },
     { extra = "vertexai" },
   ],
-  # instructor and verdict have incompatible requirements on Python < 3.10
-  [
-    { extra = "instructor" },
-    { extra = "verdict" },
-  ],
   # crewai and langchain have incompatible litellm version requirements
   [
     { extra = "crewai" },

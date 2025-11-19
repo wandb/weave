@@ -1,6 +1,7 @@
 import {requireGlobalClient} from './clientApi';
 import {isOp} from './op';
 import {getGlobalDomain} from './urls';
+import {parseWeaveUri} from './uriParser';
 
 export interface Callable {}
 
@@ -29,6 +30,29 @@ export class ObjectRef {
   ) {}
 
   // TODO: Add extra
+
+  /**
+   * Creates an ObjectRef from a Weave URI string.
+   *
+   * @param uri - A Weave URI in the format: weave:///entity/project/object/name:digest
+   * @returns A new ObjectRef instance
+   * @throws Error if the URI format is invalid or not an object ref
+   *
+   * @example
+   * const ref = ObjectRef.fromUri('weave:///my-entity/my-project/object/my-dataset:abc123');
+   */
+  public static fromUri(uri: string): ObjectRef {
+    const parsed = parseWeaveUri(uri);
+
+    if (!parsed || parsed.type !== 'object') {
+      throw new Error(
+        `Invalid object ref URI: ${uri}. Expected format: weave:///entity/project/object/name:digest`
+      );
+    }
+
+    const projectId = `${parsed.entity}/${parsed.project}`;
+    return new ObjectRef(projectId, parsed.name, parsed.digest);
+  }
 
   public uri() {
     return `weave:///${this.projectId}/object/${this.objectId}:${this.digest}`;

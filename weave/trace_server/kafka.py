@@ -12,6 +12,7 @@ from weave.trace_server.environment import (
     kafka_broker_port,
     kafka_client_password,
     kafka_client_user,
+    kafka_partition_by_project_id,
     kafka_producer_max_buffer_size,
 )
 
@@ -112,9 +113,14 @@ class KafkaProducer(ConfluentKafkaProducer):
                     }
                 )
 
+        publish_key = None
+        if kafka_partition_by_project_id():
+            publish_key = call_end.project_id
+
         self.produce(
             topic=CALL_ENDED_TOPIC,
             value=call_end.model_dump_json(),
+            key=publish_key,
         )
 
         if flush_immediately:
