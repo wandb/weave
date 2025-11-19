@@ -1211,7 +1211,7 @@ def test_openai_responses_tool_calling(client: WeaveClient) -> None:
 
     output = call.output
     assert output["model"] == "gpt-4o-2024-08-06"
-    assert output["object"] == "response" #
+    assert output["object"] == "response"
 
     web_search_call = output["output"][0]
     assert web_search_call["status"] == "completed"
