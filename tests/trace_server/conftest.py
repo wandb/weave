@@ -85,7 +85,9 @@ def get_ch_trace_server(
     ensure_clickhouse_db,
     request,
 ) -> Callable[[], TestOnlyUserInjectingExternalTraceServer]:
-    servers_to_cleanup: list[tuple[clickhouse_trace_server_batched.ClickHouseTraceServer, str, str]] = []
+    servers_to_cleanup: list[
+        tuple[clickhouse_trace_server_batched.ClickHouseTraceServer, str, str]
+    ] = []
 
     def ch_trace_server_inner() -> TestOnlyUserInjectingExternalTraceServer:
         host, port = next(ensure_clickhouse_db())
@@ -147,10 +149,12 @@ def get_ch_trace_server(
     for ch_server, management_db, unique_db in servers_to_cleanup:
         try:
             # Close any pending batches/connections
-            if hasattr(ch_server, 'ch_client') and ch_server.ch_client:
+            if hasattr(ch_server, "ch_client") and ch_server.ch_client:
                 try:
                     # Drop test databases
-                    ch_server.ch_client.command(f"DROP DATABASE IF EXISTS {management_db}")
+                    ch_server.ch_client.command(
+                        f"DROP DATABASE IF EXISTS {management_db}"
+                    )
                     ch_server.ch_client.command(f"DROP DATABASE IF EXISTS {unique_db}")
                 except Exception:
                     pass  # Best effort cleanup
