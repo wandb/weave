@@ -165,48 +165,6 @@ client = httpx.Client(
 session = client
 
 
-class StreamingResponseWrapper:
-    """Wrap httpx streaming responses to mimic requests.Response API."""
-
-    def __init__(self, response: httpx.Response):
-        self._response = response
-
-    @property
-    def status_code(self) -> int:
-        return self._response.status_code
-
-    @property
-    def headers(self) -> httpx.Headers:
-        return self._response.headers
-
-    @property
-    def reason(self) -> str:
-        return self._response.reason_phrase
-
-    @property
-    def text(self) -> str:
-        content = self._response.read()
-        self._response.close()
-        return content.decode()
-
-    def json(self) -> Any:
-        data = self._response.json()
-        self._response.close()
-        return data
-
-    def iter_lines(self):
-        try:
-            yield from self._response.iter_lines()
-        finally:
-            self._response.close()
-
-    def raise_for_status(self) -> None:
-        self._response.raise_for_status()
-
-    def close(self) -> None:
-        self._response.close()
-
-
 def _request(
     method: str,
     url: str,
@@ -218,8 +176,7 @@ def _request(
         return client.request(method, url, **kwargs)
 
     request = client.build_request(method, url, **kwargs)
-    response = client.send(request, stream=True)
-    return StreamingResponseWrapper(response)
+    return client.send(request, stream=True)
 
 
 def get(

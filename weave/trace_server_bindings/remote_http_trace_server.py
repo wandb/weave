@@ -357,9 +357,12 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
         else:
             raise ValueError(f"Unsupported HTTP method: {method}")
 
-        for line in r.iter_lines():
-            if line:
-                yield res_model.model_validate_json(line)
+        try:
+            for line in r.iter_lines():
+                if line:
+                    yield res_model.model_validate_json(line)
+        finally:
+            r.close()
 
     @with_retry
     def server_info(self) -> ServerInfoRes:
