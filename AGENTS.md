@@ -25,12 +25,6 @@ _Important:_ For OpenAI Codex agents (most likely you!), your environment does n
   - `weave/` - Python package implementation
   - `weave/trace_server` - Backend server implementation
 
-### Legacy Code
-
-- `weave_query/` - Legacy codebase (DO NOT EDIT)
-  - Marked for future refactoring
-  - Avoid making changes to this directory
-
 ## Python Testing Guidelines
 
 ### Test Framework

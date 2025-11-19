@@ -3,8 +3,6 @@ name: Check which tests to run
 on:
   workflow_call:
     outputs:
-      weave_query_tests:
-        value: ${{ jobs.check.outputs.weave_query_tests }}
       weave_js_tests:
         value: ${{ jobs.check.outputs.weave_js_tests }}
       trace_server_tests:
@@ -13,7 +11,6 @@ on:
         value: ${{ jobs.check.outputs.weave_ts_sdk_tests }}
 
 env:
-  WEAVE_QUERY_PATHS: "weave_query/"
   TRACE_SERVER_PATHS: "weave/trace_server/"
   WEAVE_TS_SDK_PATHS: "sdks/node/"
   # Everything else is implicitly trace SDK
@@ -22,7 +19,6 @@ jobs:
   check:
     runs-on: ubuntu-latest
     outputs:
-      weave_query_tests: ${{ steps.weave_query.outputs.run_tests }}
       trace_server_tests: ${{ steps.trace_server.outputs.run_tests }}
       weave_ts_sdk_tests: ${{ steps.weave_ts_sdk.outputs.run_tests }}
     steps:
@@ -58,16 +54,6 @@ jobs:
           echo "changed_files<<EOF" >> $GITHUB_ENV
           echo "$changed_files" >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
-      - id: weave_query
-        name: Weave Query Checks
-        run: |
-          for path in ${{ env.WEAVE_QUERY_PATHS }}; do
-            if echo "$changed_files" | grep -q "$path"; then
-              echo "run_tests=true" >> $GITHUB_OUTPUT
-              exit 0
-            fi
-          done
-          echo "run_tests=false" >> $GITHUB_OUTPUT
 
       - id: trace_server
         name: Weave Trace Server Checks
