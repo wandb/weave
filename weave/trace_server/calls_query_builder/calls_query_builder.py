@@ -553,7 +553,7 @@ class OrderField(BaseModel):
 
 class Condition(BaseModel):
     operand: "tsi_query.Operand"
-    _consumed_fields: list[CallsMergedField] | None = None
+    _consumed_fields: list[QueryBuilderField] | None = None
 
     def as_sql(
         self,
@@ -569,8 +569,10 @@ class Condition(BaseModel):
             and is_object_ref_operand(self.operand, expand_columns)
             and field_to_object_join_alias_map
         ):
+            # For calls_complete, don't use aggregate functions since it's not grouped
+            use_agg_fn = project_version != ProjectVersion.CALLS_COMPLETE_VERSION
             processor = ObjectRefQueryProcessor(
-                pb, table_alias, expand_columns, field_to_object_join_alias_map
+                pb, table_alias, expand_columns, field_to_object_join_alias_map, use_agg_fn=use_agg_fn
             )
             sql = processor.process_operand(self.operand)
             if self._consumed_fields is None:
@@ -595,7 +597,7 @@ class Condition(BaseModel):
 
     def _get_consumed_fields(
         self, read_table: ReadTable = ReadTable.CALLS_MERGED
-    ) -> list[CallsMergedField]:
+    ) -> list[QueryBuilderField]:
         if self._consumed_fields is None:
             self.as_sql(ParamBuilder(), read_table.value, read_table=read_table)
         if self._consumed_fields is None:
@@ -665,7 +667,7 @@ class CallsQuery(BaseModel):
     """Critical to be injection safe!"""
 
     project_id: str
-    select_fields: list[CallsMergedField] = Field(default_factory=list)
+    select_fields: list[QueryBuilderField] = Field(default_factory=list)
     query_conditions: list[Condition] = Field(default_factory=list)
     hardcoded_filter: HardCodedFilter | None = None
     order_fields: list[OrderField] = Field(default_factory=list)
@@ -1674,7 +1676,7 @@ def get_summary_field_handler(
 
 class FilterToConditions(BaseModel):
     conditions: list[str]
-    fields_used: list[CallsMergedField]
+    fields_used: list[QueryBuilderField]
 
 
 def process_query_to_conditions(
@@ -1686,7 +1688,7 @@ def process_query_to_conditions(
 ) -> FilterToConditions:
     """Converts a Query to a list of conditions for a clickhouse query."""
     conditions = []
-    raw_fields_used: dict[str, CallsMergedField] = {}
+    raw_fields_used: dict[str, QueryBuilderField] = {}
 
     # This is the mongo-style query
     def process_operation(operation: tsi_query.Operation) -> str:
