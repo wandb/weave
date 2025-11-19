@@ -688,7 +688,6 @@ class CallsQuery(BaseModel):
             read_table=self.read_table,
             include_storage_size=self.include_storage_size,
             include_total_storage_size=self.include_total_storage_size,
-            project_version=self.project_version,
         )
 
         # Select Fields:
