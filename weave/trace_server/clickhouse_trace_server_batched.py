@@ -341,19 +341,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                         )
                     )
                     # SHADOW otel inserts into calls_complete in new projects
-                    project_version = (
-                        self.project_version_resolver.get_project_version_sync(
-                            req.project_id
+                    completes.append(
+                        span.to_complete(
+                            req.project_id,
+                            wb_user_id=req.wb_user_id,
+                            wb_run_id=req.wb_run_id,
                         )
                     )
-                    if project_version == ProjectVersion.CALLS_COMPLETE_VERSION:
-                        completes.append(
-                            span.to_complete(
-                                req.project_id,
-                                wb_user_id=req.wb_user_id,
-                                wb_run_id=req.wb_run_id,
-                            )
-                        )
 
         obj_id_idx_map = defaultdict(list)
         for idx, (start_call, _) in enumerate(calls):
@@ -430,7 +424,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         # SHADOW write completes to calls_complete table
         if completes:
-            self._insert_call_batch(completes, "calls_complete")
+            # Convert API-level schemas to CH-insertable schemas
+            ch_insertable_completes = [
+                _completed_call_for_insert_to_ch_insertable_completed_call(complete)
+                for complete in completes
+            ]
+            self._insert_ch_insertable_calls_to_complete_table(ch_insertable_completes)
 
         if rejected_spans > 0:
             # Join the first 20 errors and return them delimited by ';'
@@ -761,7 +760,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         for col in columns:
             cq.add_field(col)
         if req.filter is not None:
-            cq.set_hardcoded_filter(HardCodedFilter(filter=req.filter, project_version=project_version))
+            cq.set_hardcoded_filter(
+                HardCodedFilter(filter=req.filter, project_version=project_version)
+            )
         if req.query is not None:
             cq.add_condition(req.query.expr_)
 

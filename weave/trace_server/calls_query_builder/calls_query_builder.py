@@ -924,7 +924,6 @@ class CallsQuery(BaseModel):
             project_version=self.project_version,
             include_storage_size=self.include_storage_size,
             include_total_storage_size=self.include_total_storage_size,
-            project_version=self.project_version,
         )
 
         # Select Fields:
@@ -1536,7 +1535,6 @@ ALLOWED_CALL_FIELDS_COMPLETE = {
     "wb_run_id": CallsCompleteField(field="wb_run_id"),
     "wb_run_step": CallsCompleteField(field="wb_run_step"),
     "wb_run_step_end": CallsCompleteField(field="wb_run_step_end"),
-    "deleted_at": CallsCompleteField(field="deleted_at"),
     "display_name": CallsCompleteField(field="display_name"),
     "storage_size_bytes": AggFieldWithTableOverrides(
         field="storage_size_bytes",
