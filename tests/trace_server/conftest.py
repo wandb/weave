@@ -1,13 +1,11 @@
 import contextlib
 import os
-from collections.abc import Callable
 
 import pytest
 
 from tests.trace_server.conftest_lib.clickhouse_server import *
 from tests.trace_server.conftest_lib.trace_server_external_adapter import (
     DummyIdConverter,
-    TestOnlyUserInjectingExternalTraceServer,
     externalize_trace_server,
 )
 from tests.trace_server.workers.evaluate_model_test_worker import (
