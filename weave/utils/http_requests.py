@@ -9,7 +9,7 @@ from typing import Any
 
 import httpx
 from httpx import HTTPError as HTTPError
-from httpx import HTTPStatusError, Request, Response
+from httpx import Request, Response
 
 from weave.trace.display.display import Console, Text
 
@@ -161,9 +161,6 @@ client = httpx.Client(
     limits=httpx.Limits(max_connections=None, max_keepalive_connections=None),
 )
 
-# For backward compatibility, alias client as session
-session = client
-
 
 def _request(
     method: str,
@@ -218,15 +215,3 @@ def delete(
 ) -> Response:
     """Send a DELETE request with optional logging."""
     return _request("DELETE", url, params=params, stream=stream, **kwargs)
-
-
-# Export these for compatibility with code expecting requests module
-__all__ = [
-    "HTTPError",
-    "HTTPStatusError",
-    "Response",
-    "client",
-    "get",
-    "post",
-    "session",
-]
