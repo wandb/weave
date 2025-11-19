@@ -896,11 +896,16 @@ class CallsQuery(BaseModel):
         # when such occurrence happens and the client terminates early.
         # Additionally: This condition is also REQUIRED for proper functioning
         # when using pre-group by (WHERE) optimizations
-        self.add_condition(
-            tsi_query.NotOperation.model_validate(
-                {"$not": [{"$eq": [{"$getField": "started_at"}, {"$literal": None}]}]}
+        if self.project_version == ProjectVersion.CALLS_MERGED_VERSION:
+            self.add_condition(
+                tsi_query.NotOperation.model_validate(
+                    {
+                        "$not": [
+                            {"$eq": [{"$getField": "started_at"}, {"$literal": None}]}
+                        ]
+                    }
+                )
             )
-        )
 
         object_ref_conditions = get_all_object_ref_conditions(
             self.query_conditions, self.order_fields, self.expand_columns
