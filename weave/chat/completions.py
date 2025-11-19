@@ -241,6 +241,16 @@ class Completions:
 
         request_stream = stream is True
 
+        def check_response(response: httpx.Response) -> None:
+            """Check response for errors and raise appropriate exceptions."""
+            if response.status_code == 401:
+                raise httpx.HTTPStatusError(
+                    f"{response.reason_phrase} - please make sure inference is enabled for entity {self._client.entity}",
+                    request=response.request,
+                    response=response,
+                )
+            response.raise_for_status()
+
         if request_stream:
             # For streaming, we need to keep the client and response context
             client = httpx.Client()
@@ -251,13 +261,7 @@ class Completions:
                 headers=headers,
                 json=data,
             ) as response:
-                if response.status_code == 401:
-                    raise httpx.HTTPStatusError(
-                        f"{response.reason_phrase} - please make sure inference is enabled for entity {self._client.entity}",
-                        request=response.request,
-                        response=response,
-                    )
-                response.raise_for_status()
+                check_response(response)
                 return ChatCompletionChunkStream(response)
         else:
             with httpx.Client() as client:
@@ -267,13 +271,7 @@ class Completions:
                     headers=headers,
                     json=data,
                 )
-                if response.status_code == 401:
-                    raise httpx.HTTPStatusError(
-                        f"{response.reason_phrase} - please make sure inference is enabled for entity {self._client.entity}",
-                        request=response.request,
-                        response=response,
-                    )
-                response.raise_for_status()
+                check_response(response)
 
         # Non-streaming case
         d = response.json()

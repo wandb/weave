@@ -47,12 +47,11 @@ def log_dropped_call_batch(
         logger.error(f"dropped call end ids: {dropped_end_ids}")
     if (
         isinstance(e, (requests.HTTPError, requests.HTTPStatusError))
-        and hasattr(e, "response")
-        and e.response is not None
+        and (response := getattr(e, "response", None)) is not None
     ):
-        logger.error(f"status code: {e.response.status_code}")
-        logger.error(f"reason: {e.response.reason}")
-        logger.error(f"text: {e.response.text}")
+        logger.error(f"status code: {response.status_code}")
+        logger.error(f"reason: {response.reason}")
+        logger.error(f"text: {response.text}")
     else:
         logger.error(f"error: {e}")
 
@@ -71,12 +70,11 @@ def log_dropped_feedback_batch(
         logger.error(f"dropped feedback types: {dropped_feedback_types}")
     if (
         isinstance(e, (requests.HTTPError, requests.HTTPStatusError))
-        and hasattr(e, "response")
-        and e.response is not None
+        and (response := getattr(e, "response", None)) is not None
     ):
-        logger.error(f"status code: {e.response.status_code}")
-        logger.error(f"reason: {e.response.reason}")
-        logger.error(f"text: {e.response.text}")
+        logger.error(f"status code: {response.status_code}")
+        logger.error(f"reason: {response.reason}")
+        logger.error(f"text: {response.text}")
     else:
         logger.error(f"error: {e}")
 

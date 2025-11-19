@@ -9,6 +9,7 @@ from typing import Any
 
 import gql
 import graphql
+import httpx
 
 from weave.trace import env
 from weave.wandb_interface.context import get_wandb_api_context
@@ -29,18 +30,13 @@ class Api:
                 headers.update(wandb_context.headers)
             cookies = wandb_context.cookies
             if wandb_context.api_key is not None:
-                # For httpx, we use headers for basic auth
-                import base64
-
-                auth_string = base64.b64encode(
-                    f"api:{wandb_context.api_key}".encode()
-                ).decode()
-                headers["Authorization"] = f"Basic {auth_string}"
+                auth = httpx.BasicAuth("api", wandb_context.api_key)
         url_base = env.wandb_base_url()
         transport = HTTPXTransport(
             url=url_base + "/graphql",
             headers=headers,
             cookies=cookies,
+            auth=auth,
         )
         # Warning: we do not use the recommended context manager pattern, because we're
         # using connector_owner to tell the session not to close our connection pool.
