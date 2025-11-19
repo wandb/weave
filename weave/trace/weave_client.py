@@ -13,7 +13,7 @@ import time
 from collections.abc import Callable, Sequence
 from concurrent.futures import Future
 from functools import cached_property
-from threading import Event
+from threading import Event, Lock, Timer
 from typing import TYPE_CHECKING, Any, TypedDict, cast
 
 import pydantic
@@ -353,6 +353,8 @@ class WeaveClient:
         # Cache to ensure call_end never enqueues before call_start
         # Maps call_id -> Event that is set when start is enqueued to batch
         self._call_start_enqueued: dict[str, Event] = {}
+        self._pending_starts: dict[str, Callable[[], None]] = {}
+        self._pending_starts_lock = Lock()
 
     ################ High Level Convenience Methods ################
 
@@ -813,16 +815,45 @@ class WeaveClient:
 
             return True
 
-        def on_complete(f: Future) -> None:
+        def execute_start_call() -> None:
             try:
-                root_call_did_not_error = f.result() and not current_call
+                result = send_start_call()
+                root_call_did_not_error = result and not current_call
                 if root_call_did_not_error and should_print_call_link_:
                     print_call_link(call)
             except Exception:
                 pass
 
-        fut = self.future_executor.defer(send_start_call)
-        fut.add_done_callback(on_complete)
+        call_start_delay = settings.call_start_delay()
+        is_eval_op =  op.name == "Evaluation.evaluate"
+
+        should_delay = (call_start_delay != 0) and (not is_eval_op)
+
+        if should_delay:
+            with self._pending_starts_lock:
+                self._pending_starts[call_id] = execute_start_call
+
+            if call_start_delay > 0:
+
+                def on_timeout() -> None:
+                    with self._pending_starts_lock:
+                        if call_id in self._pending_starts:
+                            func = self._pending_starts.pop(call_id)
+                            self.future_executor.defer(func)
+
+                Timer(call_start_delay, on_timeout).start()
+        else:
+
+            def on_complete(f: Future) -> None:
+                try:
+                    root_call_did_not_error = f.result() and not current_call
+                    if root_call_did_not_error and should_print_call_link_:
+                        print_call_link(call)
+                except Exception:
+                    pass
+
+            fut = self.future_executor.defer(send_start_call)
+            fut.add_done_callback(on_complete)
 
         if use_stack:
             call_context.push_call(call)
@@ -940,6 +971,12 @@ class WeaveClient:
         def send_end_call() -> None:
             # Wait for start to be enqueued before we enqueue end
             assert isinstance(call.id, str)
+
+            with self._pending_starts_lock:
+                if call.id in self._pending_starts:
+                    start_func = self._pending_starts.pop(call.id)
+                    start_func()
+
             start_event = self._call_start_enqueued.pop(call.id, None)
             if start_event is not None:
                 start_event.wait()
