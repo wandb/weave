@@ -46,10 +46,8 @@ def log_dropped_call_batch(
         logger.error(f"dropped call start ids: {dropped_start_ids}")
     if dropped_end_ids:
         logger.error(f"dropped call end ids: {dropped_end_ids}")
-    if (
-        isinstance(e, (httpx.HTTPError, httpx.HTTPStatusError))
-        and (response := getattr(e, "response", None)) is not None
-    ):
+    response = getattr(e, "response", None)
+    if isinstance(e, (httpx.HTTPError, httpx.HTTPStatusError)) and response:
         logger.error(f"status code: {response.status_code}")
         logger.error(f"reason: {response.reason_phrase}")
         logger.error(f"text: {response.text}")
@@ -69,10 +67,8 @@ def log_dropped_feedback_batch(
         dropped_feedback_types.append(item.feedback_type)
     if dropped_feedback_types:
         logger.error(f"dropped feedback types: {dropped_feedback_types}")
-    if (
-        isinstance(e, (httpx.HTTPError, httpx.HTTPStatusError))
-        and (response := getattr(e, "response", None)) is not None
-    ):
+    response = getattr(e, "response", None)
+    if isinstance(e, (httpx.HTTPError, httpx.HTTPStatusError)) and response:
         logger.error(f"status code: {response.status_code}")
         logger.error(f"reason: {response.reason_phrase}")
         logger.error(f"text: {response.text}")
