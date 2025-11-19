@@ -621,7 +621,7 @@ def test_auto_mode_start_batch_with_complete_mode(
             tsi.CallBatchCompleteMode(
                 mode="complete", req=tsi.CallCompleteReq(complete=complete)
             )
-        ],
+        ]
     )
     res = server.calls_start_batch(req)
 
@@ -762,7 +762,15 @@ def test_auto_mode_mixed_start_and_complete(
     )
 
     # Insert mixed batch
-    req = tsi.CallsStartBatchReq(project_id=project_id, batch=batch)
+    req = tsi.CallsStartBatchReq(
+        project_id=project_id,
+        batch=[
+            tsi.CallBatchStartMode(mode="start", req=tsi.CallStartReq(start=start)),
+            tsi.CallBatchCompleteMode(
+                mode="complete", req=tsi.CallCompleteReq(complete=complete)
+            ),
+        ]
+    )
     res = server.calls_start_batch(req)
 
     # Verify response
@@ -1019,6 +1027,121 @@ def test_auto_mode_call_update_display_name(
     assert rows_after[0]["display_name"] == "My Custom Name"
 
 
+def test_auto_mode_metadata_fields(clickhouse_client, server, project_id, auto_mode):
+    """Test calls with refs, W&B metadata, and thread/turn IDs in AUTO mode."""
+    if clickhouse_client is None:
+        pytest.skip("Skipping test for sqlite clients")
+    setup_project_residence(clickhouse_client, project_id, ProjectDataResidence.EMPTY)
+
+    # Test 1: Call with weave refs
+    call_id_refs = generate_id()
+    trace_id = generate_id()
+    ref_input = f"weave:///{project_id}/object/obj:v0"
+    ref_output = f"weave:///{project_id}/object/result:v1"
+    ref_input_encoded = (
+        f"weave-trace-internal:///{encode_project_id(project_id)}/object/obj:v0"
+    )
+    ref_output_encoded = (
+        f"weave-trace-internal:///{encode_project_id(project_id)}/object/result:v1"
+    )
+
+    complete_refs = tsi.CompletedCallSchemaForInsert(
+        project_id=project_id,
+        id=call_id_refs,
+        trace_id=trace_id,
+        op_name="op_with_refs",
+        started_at=datetime.datetime.now(),
+        ended_at=datetime.datetime.now() + datetime.timedelta(seconds=1),
+        attributes={},
+        inputs={"data": ref_input},
+        output={"result": ref_output},
+        summary={},
+    )
+
+    # Test 2: Call with W&B metadata
+    call_id_wb = generate_id()
+    wb_user_id = "user_123"
+    wb_run_id = "run_456"
+    wb_run_step = 10
+    wb_run_step_end = 20
+
+    complete_wb = tsi.CompletedCallSchemaForInsert(
+        project_id=project_id,
+        id=call_id_wb,
+        trace_id=trace_id,
+        op_name="wb_op",
+        started_at=datetime.datetime.now(),
+        ended_at=datetime.datetime.now() + datetime.timedelta(seconds=1),
+        attributes={},
+        inputs={},
+        output={},
+        summary={},
+        wb_user_id=wb_user_id,
+        wb_run_id=wb_run_id,
+        wb_run_step=wb_run_step,
+        wb_run_step_end=wb_run_step_end,
+    )
+
+    # Test 3: Call with thread_id and turn_id
+    call_id_thread = generate_id()
+    thread_id = generate_id()
+    turn_id = generate_id()
+
+    start_thread = tsi.StartedCallSchemaForInsert(
+        project_id=project_id,
+        id=call_id_thread,
+        trace_id=trace_id,
+        op_name="threaded_op",
+        started_at=datetime.datetime.now(),
+        attributes={},
+        inputs={},
+        thread_id=thread_id,
+        turn_id=turn_id,
+    )
+
+    # Insert all metadata test calls
+    req = tsi.CallsStartBatchReq(
+        project_id=project_id,
+        batch=[
+            tsi.CallBatchCompleteMode(
+                mode="complete", req=tsi.CallCompleteReq(complete=complete_refs)
+            ),
+            tsi.CallBatchCompleteMode(
+                mode="complete", req=tsi.CallCompleteReq(complete=complete_wb)
+            ),
+            tsi.CallBatchStartMode(
+                mode="start", req=tsi.CallStartReq(start=start_thread)
+            ),
+        ]
+    )
+    server.calls_start_batch(req)
+
+    # Verify refs
+    rows_refs = query_calls_raw(clickhouse_client, project_id, "calls_complete", call_id_refs)
+    assert len(rows_refs) == 1
+    call_refs = rows_refs[0]
+    assert ref_input_encoded in call_refs["input_refs"], (
+        f"Expected {ref_input_encoded} in {call_refs['input_refs']}"
+    )
+    assert ref_output_encoded in call_refs["output_refs"], (
+        f"Expected {ref_output_encoded} in {call_refs['output_refs']}"
+    )
+
+    # Verify W&B metadata
+    rows_wb = query_calls_raw(clickhouse_client, project_id, "calls_complete", call_id_wb)
+    assert len(rows_wb) == 1
+    call_wb = rows_wb[0]
+    assert call_wb["wb_run_step"] == wb_run_step
+    assert call_wb["wb_run_step_end"] == wb_run_step_end
+
+    # Verify thread and turn IDs
+    rows_thread = query_calls_raw(clickhouse_client, project_id, "calls_complete", call_id_thread)
+    assert len(rows_thread) == 1
+    call_thread = rows_thread[0]
+    assert call_thread["thread_id"] == thread_id
+    assert call_thread["turn_id"] == turn_id
+
+
 def test_auto_mode_batch_operations_multiple_calls(
     clickhouse_client, client, server, project_id, auto_mode
 ):
@@ -1073,7 +1196,7 @@ def test_auto_mode_batch_operations_multiple_calls(
         project_id=project_id,
         batch=[
             tsi.CallBatchEndMode(mode="end", req=tsi.CallEndReq(end=e)) for e in ends
-        ],
+        ]
     )
     server.calls_end_batch(end_req)
 
