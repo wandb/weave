@@ -407,6 +407,8 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         self, req: tsi.CompletionsCreateReq
     ) -> typing.Iterator[dict[str, typing.Any]]:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        # Convert any refs in the request (e.g., prompt) to internal format
+        req = universal_ext_to_int_ref_converter(req, self._idc.ext_to_int_project_id)
         # The streamed chunks contain no project-scoped references, so we can
         # forward directly without additional ref conversion.
         return self._internal_trace_server.completions_create_stream(req)

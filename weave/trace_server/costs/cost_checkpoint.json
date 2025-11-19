@@ -7077,6 +7077,12 @@
       "input": 1e-05,
       "output": 4e-05,
       "created_at": "2025-04-21 09:02:31"
+    },
+    {
+      "provider": "azure",
+      "input": 2e-06,
+      "output": 8e-06,
+      "created_at": "2025-11-18 13:58:30"
     }
   ],
   "azure/o4-mini": [
@@ -13459,6 +13465,150 @@
       "input": 8e-07,
       "output": 8e-07,
       "created_at": "2025-11-14 13:09:35"
+    }
+  ],
+  "azure/eu/gpt-5-2025-08-07": [
+    {
+      "provider": "azure",
+      "input": 1.375e-06,
+      "output": 1.1e-05,
+      "created_at": "2025-11-18 13:58:30"
+    }
+  ],
+  "azure/eu/gpt-5-mini-2025-08-07": [
+    {
+      "provider": "azure",
+      "input": 2.75e-07,
+      "output": 2.2e-06,
+      "created_at": "2025-11-18 13:58:30"
+    }
+  ],
+  "azure/eu/gpt-5-nano-2025-08-07": [
+    {
+      "provider": "azure",
+      "input": 5.5e-08,
+      "output": 4.4e-07,
+      "created_at": "2025-11-18 13:58:30"
+    }
+  ],
+  "azure/us/gpt-4.1-2025-04-14": [
+    {
+      "provider": "azure",
+      "input": 2.2e-06,
+      "output": 8.8e-06,
+      "created_at": "2025-11-18 13:58:30"
+    }
+  ],
+  "azure/us/gpt-4.1-mini-2025-04-14": [
+    {
+      "provider": "azure",
+      "input": 4.4e-07,
+      "output": 1.76e-06,
+      "created_at": "2025-11-18 13:58:30"
+    }
+  ],
+  "azure/us/gpt-4.1-nano-2025-04-14": [
+    {
+      "provider": "azure",
+      "input": 1.1e-07,
+      "output": 4.4e-07,
+      "created_at": "2025-11-18 13:58:30"
+    }
+  ],
+  "azure/us/gpt-5-2025-08-07": [
+    {
+      "provider": "azure",
+      "input": 1.375e-06,
+      "output": 1.1e-05,
+      "created_at": "2025-11-18 13:58:30"
+    }
+  ],
+  "azure/us/gpt-5-mini-2025-08-07": [
+    {
+      "provider": "azure",
+      "input": 2.75e-07,
+      "output": 2.2e-06,
+      "created_at": "2025-11-18 13:58:30"
+    }
+  ],
+  "azure/us/gpt-5-nano-2025-08-07": [
+    {
+      "provider": "azure",
+      "input": 5.5e-08,
+      "output": 4.4e-07,
+      "created_at": "2025-11-18 13:58:30"
+    }
+  ],
+  "azure/us/o3-2025-04-16": [
+    {
+      "provider": "azure",
+      "input": 2.2e-06,
+      "output": 8.8e-06,
+      "created_at": "2025-11-18 13:58:30"
+    }
+  ],
+  "azure/us/o4-mini-2025-04-16": [
+    {
+      "provider": "azure",
+      "input": 1.21e-06,
+      "output": 4.84e-06,
+      "created_at": "2025-11-18 13:58:30"
+    }
+  ],
+  "fireworks_ai/accounts/fireworks/models/deepseek-v3p1-terminus": [
+    {
+      "provider": "fireworks_ai",
+      "input": 5.6e-07,
+      "output": 1.68e-06,
+      "created_at": "2025-11-18 13:58:30"
+    }
+  ],
+  "fireworks_ai/accounts/fireworks/models/kimi-k2-thinking": [
+    {
+      "provider": "fireworks_ai",
+      "input": 6e-07,
+      "output": 2.5e-06,
+      "created_at": "2025-11-18 13:58:30"
+    }
+  ],
+  "gemini-3-pro-preview": [
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 2e-06,
+      "output": 1.2e-05,
+      "created_at": "2025-11-18 13:58:30"
+    }
+  ],
+  "gemini/gemini-3-pro-preview": [
+    {
+      "provider": "gemini",
+      "input": 2e-06,
+      "output": 1.2e-05,
+      "created_at": "2025-11-18 13:58:30"
+    }
+  ],
+  "vertex_ai/moonshotai/kimi-k2-thinking-maas": [
+    {
+      "provider": "vertex_ai-moonshot_models",
+      "input": 6e-07,
+      "output": 2.5e-06,
+      "created_at": "2025-11-18 13:58:30"
+    }
+  ],
+  "voyage/voyage-3.5": [
+    {
+      "provider": "voyage",
+      "input": 6e-08,
+      "output": 0.0,
+      "created_at": "2025-11-18 13:58:30"
+    }
+  ],
+  "voyage/voyage-3.5-lite": [
+    {
+      "provider": "voyage",
+      "input": 2e-08,
+      "output": 0.0,
+      "created_at": "2025-11-18 13:58:30"
     }
   ]
 }

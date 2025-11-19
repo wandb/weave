@@ -1,1 +1,0 @@
-weave deploy gcp <ref>
