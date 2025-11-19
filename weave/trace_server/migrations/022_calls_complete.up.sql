@@ -34,24 +34,23 @@ CREATE TABLE calls_complete (
     -- Bloom filter for needle in the haystack searches
     INDEX idx_parent_id parent_id TYPE bloom_filter GRANULARITY 1,
     INDEX idx_trace_id trace_id TYPE bloom_filter GRANULARITY 1,
-    -- Much more conservative bloom filter with explicit small tokenization for
-    -- larger JSON dump fields. ~250 MiB index size per 1B rows
-    INDEX idx_inputs_dump inputs_dump TYPE tokenbf_v1(1024, 2, 0) GRANULARITY 1,
-    INDEX idx_output_dump output_dump TYPE tokenbf_v1(1024, 2, 0) GRANULARITY 1,
-    INDEX idx_attributes_dump attributes_dump TYPE tokenbf_v1(1024, 2, 0) GRANULARITY 1,
+    -- More conservative bloom filter with explicit small tokenization for
+    -- larger JSON dump fields. 32KB per granule, ~4GB index size per 1B rows
+    INDEX idx_inputs_dump inputs_dump TYPE tokenbf_v1(32768, 3, 0) GRANULARITY 1,
+    INDEX idx_output_dump output_dump TYPE tokenbf_v1(32768, 3, 0) GRANULARITY 1,
+    INDEX idx_attributes_dump attributes_dump TYPE tokenbf_v1(32768, 3, 0) GRANULARITY 1,
     -- Set for equality searches with low cardinality ids, high granularity for
     -- smaller index memory size
     INDEX idx_wb_run_id wb_run_id TYPE set(100) GRANULARITY 4,
     INDEX idx_thread_id thread_id TYPE set(100) GRANULARITY 4,
     -- Use ngram so that we can take prefixes of the op_name
-    INDEX idx_op_name op_name TYPE ngrambf_v1(3, 10000, 3, 7) GRANULARITY 1,
+    INDEX idx_op_name op_name TYPE ngrambf_v1(8, 10000, 3, 0) GRANULARITY 1,
     -- Minmax for range searches
-    INDEX idx_ended_at ended_at TYPE minmax GRANULARITY 1
+    INDEX idx_ended_at ended_at TYPE minmax GRANULARITY 1,
+    INDEX idx_id id TYPE minmax GRANULARITY 1
 ) ENGINE = MergeTree
-ORDER BY (project_id, started_at DESC, id)
+ORDER BY (project_id, started_at, id)
 SETTINGS
-    -- Enable reverse key for faster range searches
-    allow_experimental_reverse_key=1,
     -- Required for lightweight updates
     enable_block_number_column=1,
     enable_block_offset_column=1;
