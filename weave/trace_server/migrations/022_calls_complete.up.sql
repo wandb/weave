@@ -107,7 +107,7 @@ SELECT
     anySimpleState(calls_complete.thread_id) as thread_id,
     anySimpleState(calls_complete.turn_id) as turn_id,
     minSimpleState(calls_complete.created_at) as created_at,
-    maxSimpleState(calls_complete.created_at) as updated_at,
+    maxSimpleState(calls_complete.updated_at) as updated_at,
     argMaxState(calls_complete.display_name, calls_complete.created_at) as display_name
 FROM calls_complete
 GROUP BY
