@@ -41,7 +41,7 @@ dependencies = [
   "packaging>=21.0",                      # For version parsing in integrations
   "tenacity>=8.3.0,!=8.4.0",              # Excluding 8.4.0 because it had a bug on import of AsyncRetrying
   "click",                                # Used for terminal/stdio printing
-  "gql[aiohttp,requests]>=3.0.0",         # Used exclusively in wandb_api.py
+  "gql[httpx]>=3.0.0",                    # Used exclusively in wandb_api.py; httpx is used for HTTP requests throughout the codebase
   "jsonschema>=4.23.0",                   # Used by scorers for field validation
   "diskcache==5.6.3",                     # Used for data caching
   "tzdata; platform_system == 'Windows'", # Required for timezone support on Windows
@@ -171,7 +171,9 @@ verdict = [
 ]
 autogen = ["autogen-agentchat>=0.5.7; python_version >= '3.10'"]
 verifiers = ["verifiers>=0.1.3.post0,<0.1.4; python_version >= '3.11'"]
-stainless = ["weave_server_sdk @ git+https://github.com/wandb/weave-stainless.git@0d1de4c51dc3819b9e177df3e10565b0dc33aec3"]
+stainless = [
+  "weave_server_sdk @ git+https://github.com/wandb/weave-stainless.git@0d1de4c51dc3819b9e177df3e10565b0dc33aec3",
+]
 
 
 [project.urls]
@@ -439,7 +441,6 @@ test = [
   "pillow",
   "moviepy<=1.0.3",
   "filelock",
-  "httpx",
 
   # Media Generation
   "opencv-python", # Video generation
@@ -449,6 +450,7 @@ test = [
 
   "weave[trace_server]",
   "moto[s3]>=5.0.0",
+  "respx",
 ]
 
 [tool.uv]
