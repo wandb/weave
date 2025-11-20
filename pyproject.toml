@@ -194,11 +194,9 @@ path = "weave/version.py"
 [tool.hatch.build]
 include = ["weave"]
 exclude = [
-  "weave_query",
   "examples",
   "tests",
   "dev_docs",
-  "weave/clear_cache.py",
   "weave/trace_server/model_providers",
 ]
 
@@ -287,10 +285,9 @@ ignore = [
   # This is a more involved change, so disabling for now.
   "C901", # https://docs.astral.sh/ruff/rules/complex-structure/
 ]
-exclude = ["weave_query"]
 
 [tool.ruff.lint.isort]
-known-third-party = ["wandb", "weave_query"]
+known-third-party = ["wandb"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
@@ -302,7 +299,7 @@ fixture-parentheses = false
 [tool.ruff]
 line-length = 88
 show-fixes = true
-exclude = ["weave_query", "rules"]
+exclude = ["rules"]
 
 [tool.ruff.lint.per-file-ignores]
 "!/weave/trace/**/*.py" = ["T201"]
@@ -310,7 +307,7 @@ exclude = ["weave_query", "rules"]
 
 [tool.pyright]
 include = ["weave"]
-exclude = ["weave_query", "tests", "examples", "docs", "noxfile.py"]
+exclude = ["tests", "examples", "docs", "noxfile.py"]
 # In cases where we support multiple versions of an integration, some imports can be missing
 reportMissingImports = false
 
@@ -324,17 +321,13 @@ reportCallIssue = false
 [tool.mypy]
 warn_unused_configs = true
 # Note: You have to update .pre-commit-config.yaml too!
-exclude = [".*pyi$", "weave_query", "tests", "examples"]
+exclude = [".*pyi$", "tests", "examples"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = "weave.*"
 disallow_untyped_defs = true
 disallow_untyped_calls = true
-
-[[tool.mypy.overrides]]
-module = "weave_query.*"
-ignore_errors = true
 
 [tool.bumpversion]
 current_version = "0.52.18-dev0"
@@ -497,4 +490,4 @@ conflicts = [
 
 [tool.coverage.report]
 exclude_also = ["if TYPE_CHECKING:", "@abstractmethod"]
-omit = ["weave_query/**", "weave/agent/**"]
+omit = ["weave/agent/**"]
