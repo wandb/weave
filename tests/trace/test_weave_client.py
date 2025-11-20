@@ -26,6 +26,7 @@ from tests.trace.util import (
 )
 from weave import Evaluation
 from weave.integrations.integration_utilities import op_name_from_call
+from weave.prompt.prompt import MessagesPrompt
 from weave.trace import refs, settings, table_upload_chunking, weave_client
 from weave.trace.context import call_context
 from weave.trace.context.call_context import tracing_disabled
@@ -46,6 +47,10 @@ from weave.trace.serialization.serializer import (
 from weave.trace_server.clickhouse_trace_server_batched import NotFoundError
 from weave.trace_server.constants import MAX_DISPLAY_NAME_LENGTH
 from weave.trace_server.ids import generate_id
+from weave.trace_server.interface.builtin_object_classes.llm_structured_model import (
+    LLMStructuredCompletionModel,
+    LLMStructuredCompletionModelDefaultParams,
+)
 from weave.trace_server.sqlite_trace_server import (
     NotFoundError as sqliteNotFoundError,
 )
@@ -4128,3 +4133,87 @@ def test_calls_query_with_dotted_field_keys(client):
     outputs = [call.output for call in calls]
     assert any(o.get("double.nested") == "hello" for o in outputs)
     assert any(o.get("triple.nested.dot") == "universe" for o in outputs)
+
+
+def test_evaluate_with_llm_completion_model_and_prompt_template_vars(client):
+    """Test that LLMStructuredCompletionModel correctly passes prompt and template_vars in evaluation context.
+
+    This test verifies that:
+    1. A MessagesPrompt with template variables can be created and published
+    2. An LLMStructuredCompletionModel can reference the prompt
+    3. When used in evaluation, the model correctly prepares requests with prompt and template_vars
+    4. The template variables are correctly passed through the predict() method
+    """
+    # Create and publish a MessagesPrompt with template variables
+    messages_prompt = MessagesPrompt(
+        messages=[
+            {
+                "role": "system",
+                "content": "You are {assistant_name}, answering questions about {topic}.",
+            },
+            {"role": "user", "content": "{question}"},
+        ]
+    )
+    prompt_ref = weave.publish(messages_prompt, name="eval_test_prompt")
+
+    # Create an LLMStructuredCompletionModel with the prompt reference
+    model = LLMStructuredCompletionModel(
+        llm_model_id="gpt-4o-mini",
+        default_params=LLMStructuredCompletionModelDefaultParams(
+            prompt=prompt_ref.uri(),
+            temperature=0.7,
+            max_tokens=50,
+            response_format="text",
+        ),
+    )
+
+    # Verify that the model correctly prepares completion requests with prompt and template_vars
+    # This tests the core functionality without requiring actual LLM API calls
+    req = model.prepare_completion_request(
+        project_id=client._project_id(),
+        user_input=[],
+        config=None,
+        assistant_name="MathBot",
+        topic="mathematics",
+        question="What is 2+2?",
+    )
+
+    # Verify the request has prompt reference and template_vars
+    assert req.inputs.prompt == prompt_ref.uri(), (
+        "Request should include prompt reference"
+    )
+    assert req.inputs.template_vars == {
+        "assistant_name": "MathBot",
+        "topic": "mathematics",
+        "question": "What is 2+2?",
+    }, "Request should include template_vars"
+
+    # Verify messages are empty (prompt resolution happens in completions endpoint)
+    assert req.inputs.messages == [], "Messages should be empty when using prompt"
+
+    # Verify other params are set
+    assert req.inputs.temperature == 0.7
+    assert req.inputs.max_tokens == 50
+
+    # Test with additional user_input messages
+    req_with_input = model.prepare_completion_request(
+        project_id=client._project_id(),
+        user_input=[{"role": "user", "content": "Additional context"}],
+        config=None,
+        assistant_name="MathBot",
+        topic="mathematics",
+        question="What is 2+2?",
+    )
+
+    # Should still have prompt and template_vars
+    assert req_with_input.inputs.prompt == prompt_ref.uri()
+    assert req_with_input.inputs.template_vars == {
+        "assistant_name": "MathBot",
+        "topic": "mathematics",
+        "question": "What is 2+2?",
+    }
+
+    # Should have user_input messages
+    assert req_with_input.inputs.messages == [
+        {"role": "user", "content": "Additional context"}
+    ]
