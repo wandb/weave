@@ -66,4 +66,4 @@ class ProjectVersionMode(str, Enum):
                 f"Invalid PROJECT_VERSION_MODE '{mode_str}', defaulting to 'auto'. "
                 f"Valid options: {', '.join([m.value for m in cls])}"
             )
-            return cls.AUTO
+            return cls(DEFAULT_PROJECT_VERSION_MODE)
