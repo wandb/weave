@@ -575,8 +575,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 for end in ends_from_completes
             ]
 
-            ch_insertable_calls = ch_insertable_starts + ch_insertable_ends
-            self._insert_call_batch(ch_insertable_calls, "call_parts")
+            # Convert insertable objects to row format for batch insert
+            batch_data = []
+            for call in ch_insertable_starts + ch_insertable_ends:
+                call_dict = call.model_dump()
+                row = []
+                for col in ALL_CALL_INSERT_COLUMNS:
+                    row.append(call_dict.get(col))
+                batch_data.append(row)
+            self._insert_call_batch(batch_data, "call_parts")
 
             # Return early, don't write to calls_complete table
             res = [
