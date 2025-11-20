@@ -825,7 +825,7 @@ class WeaveClient:
                 pass
 
         call_start_delay = settings.call_start_delay()
-        is_eval_op =  op.name == "Evaluation.evaluate"
+        is_eval_op = op.name == "Evaluation.evaluate"
 
         should_delay = (call_start_delay != 0) and (not is_eval_op)
 
