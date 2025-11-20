@@ -644,6 +644,7 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
     def calls_start_batch(self, req: tsi.CallsStartBatchReq) -> tsi.CallsStartBatchRes:
         """Batch start/complete calls, converting project_id and user_ids."""
         # Convert project_id and user_ids in all batch items
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         for item in req.batch:
             if item.mode == "start":
                 item.req.start.project_id = self._idc.ext_to_int_project_id(
@@ -675,6 +676,7 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
     def calls_end_batch(self, req: tsi.CallsEndBatchReq) -> tsi.CallsEndBatchRes:
         """Batch end calls, converting project_id."""
         # Convert project_id in all batch items
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         for item in req.batch:
             item.req.end.project_id = self._idc.ext_to_int_project_id(
                 item.req.end.project_id
