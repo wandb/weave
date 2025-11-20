@@ -78,7 +78,7 @@ CREATE TABLE calls_complete_stats
     thread_id SimpleAggregateFunction(any, Nullable(String)),
     turn_id SimpleAggregateFunction(any, Nullable(String)),
     created_at SimpleAggregateFunction(min, DateTime64(3)),
-    updated_at SimpleAggregateFunction(max, DateTime64(3)),
+    updated_at SimpleAggregateFunction(max, Nullable(DateTime64(3))),
     display_name AggregateFunction(argMax, Nullable(String), DateTime64(3))
 ) ENGINE = AggregatingMergeTree()
 ORDER BY (project_id, id);
