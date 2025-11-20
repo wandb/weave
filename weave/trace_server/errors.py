@@ -225,14 +225,12 @@ class ErrorRegistry:
         self.register(ValueError, 400)
         self.register(KeyError, 500, lambda exc: {"reason": "Internal backend error"})
 
-        # Requests specific errors
-        import requests
+        # HTTP client specific errors
+        import httpx
 
+        self.register(httpx.ReadTimeout, 504, lambda exc: {"reason": "Read timeout"})
         self.register(
-            requests.exceptions.ReadTimeout, 504, lambda exc: {"reason": "Read timeout"}
-        )
-        self.register(
-            requests.exceptions.ConnectTimeout,
+            httpx.ConnectTimeout,
             504,
             lambda exc: {"reason": "Connection timeout"},
         )

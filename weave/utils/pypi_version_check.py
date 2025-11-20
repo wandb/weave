@@ -9,13 +9,9 @@ over the version checking logic.
 
 from __future__ import annotations
 
-import queue
-import sys
-import threading
-from collections.abc import Callable
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
-import requests
+import httpx
 
 if TYPE_CHECKING:
     import packaging.version  # type: ignore[import-not-found]
@@ -78,39 +74,13 @@ def _parse_version(version: str) -> packaging.version.Version:
     return parse_version(version)
 
 
-def _async_call(target: Callable, timeout: int | float | None = None) -> Callable:
-    """Wrap a method to run in the background with an optional timeout.
-
-    Returns a new method that will call the original with any args, waiting for upto
-    timeout seconds. This new method blocks on the original and returns the result or
-    None if timeout was reached, along with the thread. You can check thread.is_alive()
-    to determine if a timeout was reached. If an exception is thrown in the thread, we
-    reraise it.
-    """
-    q: queue.Queue = queue.Queue()
-
-    def wrapped_target(q: queue.Queue, *args: Any, **kwargs: Any) -> Any:
-        try:
-            q.put(target(*args, **kwargs))
-        except Exception as e:
-            q.put(e)
-
-    def wrapper(*args: Any, **kwargs: Any) -> tuple[Exception | None, threading.Thread]:
-        thread = threading.Thread(
-            target=wrapped_target, args=(q,) + args, kwargs=kwargs
-        )
-        thread.daemon = True
-        thread.start()
-        try:
-            result = q.get(True, timeout)
-            if isinstance(result, Exception):
-                raise result.with_traceback(sys.exc_info()[2])
-        except queue.Empty:
-            return None, thread
-        else:
-            return result, thread
-
-    return wrapper
+def _sync_get_with_timeout(url: str, timeout: int | float) -> httpx.Response | None:
+    """Make a synchronous GET request with a timeout."""
+    try:
+        with httpx.Client() as client:
+            return client.get(url, timeout=timeout)
+    except (httpx.TimeoutException, httpx.RequestError):
+        return None
 
 
 def _find_available(
@@ -119,11 +89,10 @@ def _find_available(
     pypi_url = f"https://pypi.org/pypi/{module_name}/json"
     yanked_dict = {}
     try:
-        async_requests_get = _async_call(requests.get, timeout=5)
-        data, thread = async_requests_get(pypi_url, timeout=3)
-        if not data or isinstance(data, Exception):
+        response = _sync_get_with_timeout(pypi_url, timeout=3)
+        if not response:
             return None
-        data = data.json()
+        data = response.json()
         latest_version = data["info"]["version"]
         release_list = data["releases"].keys()
         for version, fields in data["releases"].items():
