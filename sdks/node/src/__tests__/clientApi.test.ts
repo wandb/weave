@@ -1,8 +1,9 @@
-import {init, requireGlobalClient, login} from '../clientApi';
+import {init, requireGlobalClient, login, attributes} from '../clientApi';
 import {getWandbConfigs} from '../wandb/settings';
 import {WandbServerApi} from '../wandb/wandbServerApi';
 import {Api as TraceServerApi} from '../generated/traceServerApi';
 import {Netrc} from '../utils/netrc';
+import {op} from '../op';
 
 jest.mock('../wandb/wandbServerApi');
 jest.mock('../wandb/settings');
@@ -146,6 +147,155 @@ describe('Client API', () => {
         login: 'user',
         password: 'test-api-key',
       });
+    });
+  });
+
+  describe('attributes', () => {
+    test('attributes context manager sets attributes on calls', async () => {
+      const client = await init('test-project');
+      let capturedAttributes: Record<string, any> | undefined;
+
+      // Mock createCall to capture attributes
+      const originalCreateCall = client.createCall.bind(client);
+      client.createCall = jest.fn(async (...args: any[]) => {
+        capturedAttributes = args[9]; // attributes is the 10th parameter (index 9)
+        return Promise.resolve();
+      });
+
+      const myOp = op(async (name: string) => {
+        return `Hello ${name}`;
+      });
+
+      // Call op with attributes
+      await attributes({env: 'production', user: 'alice'}, async () => {
+        await myOp('World');
+      });
+
+      expect(capturedAttributes).toBeDefined();
+      expect(capturedAttributes).toEqual({
+        env: 'production',
+        user: 'alice',
+      });
+    });
+
+    test('attributes merges with existing attributes', async () => {
+      const client = await init('test-project');
+      let capturedAttributes: Record<string, any> | undefined;
+
+      // Mock createCall to capture attributes
+      client.createCall = jest.fn(async (...args: any[]) => {
+        capturedAttributes = args[9]; // attributes is the 10th parameter (index 9)
+        return Promise.resolve();
+      });
+
+      const myOp = op(async (name: string) => {
+        return `Hello ${name}`;
+      });
+
+      // Nested attributes should merge
+      await attributes({env: 'production'}, async () => {
+        await attributes({user: 'alice'}, async () => {
+          await myOp('World');
+        });
+      });
+
+      expect(capturedAttributes).toBeDefined();
+      expect(capturedAttributes).toEqual({
+        env: 'production',
+        user: 'alice',
+      });
+    });
+
+    test('attributes overwrites values with same key', async () => {
+      const client = await init('test-project');
+      let capturedAttributes: Record<string, any> | undefined;
+
+      // Mock createCall to capture attributes
+      client.createCall = jest.fn(async (...args: any[]) => {
+        capturedAttributes = args[9]; // attributes is the 10th parameter (index 9)
+        return Promise.resolve();
+      });
+
+      const myOp = op(async (name: string) => {
+        return `Hello ${name}`;
+      });
+
+      // Inner attributes should overwrite outer ones
+      await attributes({env: 'production', user: 'alice'}, async () => {
+        await attributes({env: 'staging'}, async () => {
+          await myOp('World');
+        });
+      });
+
+      expect(capturedAttributes).toBeDefined();
+      expect(capturedAttributes).toEqual({
+        env: 'staging',
+        user: 'alice',
+      });
+    });
+
+    test('attributes are isolated across concurrent calls', async () => {
+      const client = await init('test-project');
+      const capturedAttributes: Record<string, any>[] = [];
+
+      // Mock createCall to capture all attributes
+      client.createCall = jest.fn(async (...args: any[]) => {
+        capturedAttributes.push({...args[9]}); // Copy attributes
+        return Promise.resolve();
+      });
+
+      const myOp = op(async (id: string) => {
+        // Add a small delay to simulate async work
+        await new Promise(resolve => setTimeout(resolve, 10));
+        return `Done ${id}`;
+      });
+
+      // Run multiple attribute contexts concurrently
+      await Promise.all([
+        attributes({user: 'alice', session: 'a1'}, async () => {
+          await myOp('1');
+        }),
+        attributes({user: 'bob', session: 'b2'}, async () => {
+          await myOp('2');
+        }),
+        attributes({user: 'charlie', session: 'c3'}, async () => {
+          await myOp('3');
+        }),
+      ]);
+
+      // Each call should have its correct attributes (not clobbered)
+      expect(capturedAttributes).toHaveLength(3);
+
+      // Extract all users and sessions
+      const users = capturedAttributes.map(a => a.user);
+      const sessions = capturedAttributes.map(a => a.session);
+
+      // All unique values should be present
+      expect(users).toContain('alice');
+      expect(users).toContain('bob');
+      expect(users).toContain('charlie');
+      expect(sessions).toContain('a1');
+      expect(sessions).toContain('b2');
+      expect(sessions).toContain('c3');
+
+      // Each should have matching pairs (alice with a1, bob with b2, etc)
+      const aliceAttrs = capturedAttributes.find(a => a.user === 'alice');
+      expect(aliceAttrs?.session).toBe('a1');
+
+      const bobAttrs = capturedAttributes.find(a => a.user === 'bob');
+      expect(bobAttrs?.session).toBe('b2');
+
+      const charlieAttrs = capturedAttributes.find(a => a.user === 'charlie');
+      expect(charlieAttrs?.session).toBe('c3');
+    });
+
+    test('attributes works without initialized client', async () => {
+      // Should not throw when client is not initialized
+      const result = await attributes({env: 'test'}, async () => {
+        return 'success';
+      });
+
+      expect(result).toBe('success');
     });
   });
 });

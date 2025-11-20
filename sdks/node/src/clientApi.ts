@@ -174,3 +174,55 @@ export function requireGlobalClient(): WeaveClient {
 export function setGlobalClient(client: WeaveClient) {
   globalClient = client;
 }
+
+/**
+ * Run a function with additional attributes that will be attached to all calls created within.
+ * 
+ * This is useful for setting metadata like environment, user IDs, or feature flags that should
+ * be attached to all operations within a scope.
+ * 
+ * Attributes are isolated per async execution context using AsyncLocalStorage, so concurrent
+ * operations won't interfere with each other.
+ * 
+ * @param attributes - Key-value pairs to attach to calls
+ * @param fn - Function to execute with the attributes
+ * @returns The return value of the function
+ * 
+ * @example
+ * ```typescript
+ * import * as weave from 'weave';
+ * 
+ * await weave.init('my-project');
+ * 
+ * const myOp = weave.op(async (name: string) => {
+ *   return `Hello ${name}`;
+ * });
+ * 
+ * // All calls within this function will have the 'env' and 'user' attributes
+ * await weave.attributes({env: 'production', user: 'alice'}, async () => {
+ *   await myOp('World');
+ * });
+ * 
+ * // Concurrent operations are safely isolated
+ * await Promise.all([
+ *   weave.attributes({user: 'alice'}, async () => await myOp('test1')),
+ *   weave.attributes({user: 'bob'}, async () => await myOp('test2')),
+ * ]);
+ * ```
+ */
+export async function attributes<T>(
+  attributes: Record<string, any>,
+  fn: () => T | Promise<T>
+): Promise<T> {
+  const client = getGlobalClient();
+  if (!client) {
+    // If no client is initialized, just run the function without attributes
+    return await fn();
+  }
+  
+  // Merge with existing attributes
+  const currentAttributes = client.getCallAttributes();
+  const mergedAttributes = {...currentAttributes, ...attributes};
+  
+  return await client.runWithAttributes(mergedAttributes, fn);
+}

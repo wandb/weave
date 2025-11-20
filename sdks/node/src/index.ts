@@ -3,6 +3,7 @@ export {
   login,
   requireCurrentCallStackEntry,
   requireCurrentChildSummary,
+  attributes,
 } from './clientApi';
 export {Dataset} from './dataset';
 export {Evaluation} from './evaluation';

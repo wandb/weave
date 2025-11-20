@@ -120,6 +120,56 @@ await testClassInstance.logImage(image);
 
 ```
 
+### Setting Call Attributes
+
+You can attach metadata to all operations within a scope using the `attributes` function. This is useful for setting contextual information like environment, user IDs, feature flags, or any other metadata that should be attached to all operations within a scope.
+
+```typescript
+import * as weave from 'weave';
+
+await weave.init('my-project');
+
+const myOp = weave.op(async (name: string) => {
+  return `Hello ${name}`;
+});
+
+// All calls within this function will have the 'env' and 'user' attributes
+await weave.attributes({env: 'production', user: 'alice'}, async () => {
+  await myOp('World');
+});
+```
+
+Attributes can be nested and merged:
+
+```typescript
+// Nested attributes merge together
+await weave.attributes({env: 'production'}, async () => {
+  await weave.attributes({user_id: '123'}, async () => {
+    // This call will have both env='production' and user_id='123'
+    await myOp('World');
+  });
+});
+
+// Inner attributes override outer ones with the same key
+await weave.attributes({env: 'production'}, async () => {
+  await weave.attributes({env: 'staging'}, async () => {
+    // This call will have env='staging'
+    await myOp('World');
+  });
+});
+```
+
+**Concurrent Safety**: Attributes are isolated per async execution context using Node.js's `AsyncLocalStorage`. Concurrent operations won't interfere with each other:
+
+```typescript
+// These run concurrently, each with isolated attributes
+await Promise.all([
+  weave.attributes({user: 'alice'}, async () => await myOp('test1')),
+  weave.attributes({user: 'bob'}, async () => await myOp('test2')),
+]);
+// Each call correctly receives its own user attribute
+```
+
 ### OpenAI Integration
 
 Weave provides an integration with OpenAI, allowing you to trace API calls made to OpenAI's services seamlessly.
