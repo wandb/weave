@@ -204,7 +204,7 @@ def test_project_version_mode_from_env():
             ("calls_merged", ProjectVersionMode.CALLS_MERGED),
             ("calls_merged_read", ProjectVersionMode.CALLS_MERGED_READ),
             ("auto", ProjectVersionMode.AUTO),
-            ("invalid_mode", ProjectVersionMode.AUTO),
+            ("invalid_mode", ProjectVersionMode.CALLS_MERGED),
         ]
 
         for env_val, expected_mode in test_cases:
@@ -215,7 +215,7 @@ def test_project_version_mode_from_env():
         if "PROJECT_VERSION_MODE" in os.environ:
             del os.environ["PROJECT_VERSION_MODE"]
         mode = ProjectVersionMode.from_env()
-        assert mode == ProjectVersionMode.AUTO
+        assert mode == ProjectVersionMode.CALLS_MERGED
 
     finally:
         if original_value is not None:
