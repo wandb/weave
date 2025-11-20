@@ -127,7 +127,10 @@ from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
 from weave.trace_server.opentelemetry.python_spans import Resource, Span
 from weave.trace_server.orm import ParamBuilder, Row
 from weave.trace_server.project_query_builder import make_project_stats_query
-from weave.trace_server.project_version.project_version import ProjectVersionResolver
+from weave.trace_server.project_version.project_version import (
+    ProjectVersionResolver,
+    init_resolver,
+)
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 from weave.trace_server.table_query_builder import (
     ROW_ORDER_COLUMN_NAME,
@@ -237,10 +240,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def project_version_resolver(self) -> ProjectVersionResolver:
         if self._project_version_resolver is not None:
             return self._project_version_resolver
-        # Pass a factory that returns the thread-local client
-        self._project_version_resolver = ProjectVersionResolver.get_global_instance(
-            ch_client_factory=lambda: self.ch_client
-        )
+
+        init_resolver(ch_client_factory=lambda: self.ch_client)
+        self._project_version_resolver = ProjectVersionResolver.get_instance()
         return self._project_version_resolver
 
     def _noop_project_version_latency_test(self, project_id: str) -> None:
