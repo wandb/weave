@@ -278,7 +278,7 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
                         api_batch.append(tsi.CallBatchStartMode(req=item.req))
                     elif isinstance(item, CompleteBatchItem):
                         api_batch.append(tsi.CallBatchCompleteMode(req=item.req))
-                req = tsi.CallsStartBatchReq(batch=api_batch)
+                req = tsi.CallsStartBatchReq(project_id=project_id, batch=api_batch)
                 return req.model_dump_json().encode("utf-8")
 
             def send_start_batch_fn(encoded_data: bytes) -> None:
@@ -306,7 +306,7 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
             def encode_end_batch(batch: list[EndBatchItem]) -> bytes:
                 # Convert internal batch items to API types
                 api_batch = [tsi.CallBatchEndMode(req=item.req) for item in batch]
-                req = tsi.CallsEndBatchReq(batch=api_batch)
+                req = tsi.CallsEndBatchReq(project_id=project_id, batch=api_batch)
                 return req.model_dump_json().encode("utf-8")
 
             def send_end_batch_fn(encoded_data: bytes) -> None:
@@ -577,7 +577,8 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         else:
             # When batching is disabled, send as a single-item batch directly
             batch_req = tsi.CallsStartBatchReq(
-                batch=[tsi.CallBatchCompleteMode(req=req_as_obj)]
+                project_id=req_as_obj.complete.project_id,
+                batch=[tsi.CallBatchCompleteMode(req=req_as_obj)],
             )
             batch_res = self.calls_start_batch(batch_req)
             # Extract the result for the single item
