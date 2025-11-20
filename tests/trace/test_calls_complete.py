@@ -34,14 +34,18 @@ def query_calls_complete(ch_client, project_id, call_id=None):
     """Query calls_complete table directly."""
     if call_id:
         query = "SELECT * FROM calls_complete WHERE project_id = {project_id:String} AND id = {call_id:String}"
-        result = ch_client.query(query, parameters={"project_id": project_id, "call_id": call_id})
+        result = ch_client.query(
+            query, parameters={"project_id": project_id, "call_id": call_id}
+        )
     else:
         query = "SELECT * FROM calls_complete WHERE project_id = {project_id:String} ORDER BY started_at DESC"
         result = ch_client.query(query, parameters={"project_id": project_id})
     return list(result.named_results())
 
 
-def test_calls_start_batch_with_starts_only(client, clickhouse_client, server, project_id):
+def test_calls_start_batch_with_starts_only(
+    client, clickhouse_client, server, project_id
+):
     """Test calls_start_batch with only start entries."""
     if client_is_sqlite(client):
         pytest.skip("Skipping test for sqlite clients")
@@ -74,10 +78,11 @@ def test_calls_start_batch_with_starts_only(client, clickhouse_client, server, p
 
     # Insert via calls_start_batch
     req = tsi.CallsStartBatchReq(
+        project_id=project_id,
         batch=[
             tsi.CallBatchStartMode(mode="start", req=tsi.CallStartReq(start=start_1)),
             tsi.CallBatchStartMode(mode="start", req=tsi.CallStartReq(start=start_2)),
-        ]
+        ],
     )
     res = server.calls_start_batch(req)
 
@@ -118,7 +123,9 @@ def test_calls_start_batch_with_starts_only(client, clickhouse_client, server, p
     assert call_2["ended_at"] is None
 
 
-def test_calls_start_batch_with_completes(client, clickhouse_client, server, project_id):
+def test_calls_start_batch_with_completes(
+    client, clickhouse_client, server, project_id
+):
     """Test calls_start_batch with complete entries."""
     if client_is_sqlite(client):
         pytest.skip("Skipping test for sqlite clients")
@@ -143,9 +150,12 @@ def test_calls_start_batch_with_completes(client, clickhouse_client, server, pro
 
     # Insert via calls_start_batch with complete mode
     req = tsi.CallsStartBatchReq(
+        project_id=project_id,
         batch=[
-            tsi.CallBatchCompleteMode(mode="complete", req=tsi.CallCompleteReq(complete=complete))
-        ]
+            tsi.CallBatchCompleteMode(
+                mode="complete", req=tsi.CallCompleteReq(complete=complete)
+            )
+        ],
     )
     res = server.calls_start_batch(req)
 
@@ -170,7 +180,9 @@ def test_calls_start_batch_with_completes(client, clickhouse_client, server, pro
     assert call["exception"] is None
 
 
-def test_calls_start_batch_mixed_starts_and_completes(client, clickhouse_client, server, project_id):
+def test_calls_start_batch_mixed_starts_and_completes(
+    client, clickhouse_client, server, project_id
+):
     """Test calls_start_batch with both starts and completes."""
     if client_is_sqlite(client):
         pytest.skip("Skipping test for sqlite clients")
@@ -205,10 +217,13 @@ def test_calls_start_batch_mixed_starts_and_completes(client, clickhouse_client,
 
     # Insert mixed batch
     req = tsi.CallsStartBatchReq(
+        project_id=project_id,
         batch=[
             tsi.CallBatchStartMode(mode="start", req=tsi.CallStartReq(start=start)),
-            tsi.CallBatchCompleteMode(mode="complete", req=tsi.CallCompleteReq(complete=complete)),
-        ]
+            tsi.CallBatchCompleteMode(
+                mode="complete", req=tsi.CallCompleteReq(complete=complete)
+            ),
+        ],
     )
     res = server.calls_start_batch(req)
 
@@ -233,7 +248,9 @@ def test_calls_start_batch_mixed_starts_and_completes(client, clickhouse_client,
     assert json.loads(complete_call["output_dump"]) == {"c": 3}
 
 
-def test_calls_end_batch_updates_existing(client, clickhouse_client, server, project_id):
+def test_calls_end_batch_updates_existing(
+    client, clickhouse_client, server, project_id
+):
     """Test calls_end_batch updates existing calls."""
     if client_is_sqlite(client):
         pytest.skip("Skipping test for sqlite clients")
@@ -266,10 +283,11 @@ def test_calls_end_batch_updates_existing(client, clickhouse_client, server, pro
 
     # Insert starts
     start_req = tsi.CallsStartBatchReq(
+        project_id=project_id,
         batch=[
             tsi.CallBatchStartMode(mode="start", req=tsi.CallStartReq(start=start_1)),
             tsi.CallBatchStartMode(mode="start", req=tsi.CallStartReq(start=start_2)),
-        ]
+        ],
     )
     server.calls_start_batch(start_req)
 
@@ -303,10 +321,11 @@ def test_calls_end_batch_updates_existing(client, clickhouse_client, server, pro
 
     # End calls
     end_req = tsi.CallsEndBatchReq(
+        project_id=project_id,
         batch=[
             tsi.CallBatchEndMode(mode="end", req=tsi.CallEndReq(end=end_1)),
             tsi.CallBatchEndMode(mode="end", req=tsi.CallEndReq(end=end_2)),
-        ]
+        ],
     )
     server.calls_end_batch(end_req)
 
@@ -401,11 +420,18 @@ def test_calls_with_metadata_fields(client, clickhouse_client, server, project_i
 
     # Insert all metadata test calls
     req = tsi.CallsStartBatchReq(
+        project_id=project_id,
         batch=[
-            tsi.CallBatchCompleteMode(mode="complete", req=tsi.CallCompleteReq(complete=complete_refs)),
-            tsi.CallBatchCompleteMode(mode="complete", req=tsi.CallCompleteReq(complete=complete_wb)),
-            tsi.CallBatchStartMode(mode="start", req=tsi.CallStartReq(start=start_thread)),
-        ]
+            tsi.CallBatchCompleteMode(
+                mode="complete", req=tsi.CallCompleteReq(complete=complete_refs)
+            ),
+            tsi.CallBatchCompleteMode(
+                mode="complete", req=tsi.CallCompleteReq(complete=complete_wb)
+            ),
+            tsi.CallBatchStartMode(
+                mode="start", req=tsi.CallStartReq(start=start_thread)
+            ),
+        ],
     )
     server.calls_start_batch(req)
 
@@ -413,8 +439,12 @@ def test_calls_with_metadata_fields(client, clickhouse_client, server, project_i
     rows_refs = query_calls_complete(clickhouse_client, project_id, call_id_refs)
     assert len(rows_refs) == 1
     call_refs = rows_refs[0]
-    assert ref_input in call_refs["input_refs"], f"Expected {ref_input} in {call_refs['input_refs']}"
-    assert ref_output in call_refs["output_refs"], f"Expected {ref_output} in {call_refs['output_refs']}"
+    assert ref_input in call_refs["input_refs"], (
+        f"Expected {ref_input} in {call_refs['input_refs']}"
+    )
+    assert ref_output in call_refs["output_refs"], (
+        f"Expected {ref_output} in {call_refs['output_refs']}"
+    )
 
     # Verify W&B metadata
     rows_wb = query_calls_complete(clickhouse_client, project_id, call_id_wb)
@@ -458,10 +488,11 @@ def test_batch_end_multiple_calls(client, clickhouse_client, server, project_id)
 
     # Insert starts
     start_req = tsi.CallsStartBatchReq(
+        project_id=project_id,
         batch=[
             tsi.CallBatchStartMode(mode="start", req=tsi.CallStartReq(start=s))
             for s in starts
-        ]
+        ],
     )
     server.calls_start_batch(start_req)
 
@@ -478,10 +509,10 @@ def test_batch_end_multiple_calls(client, clickhouse_client, server, project_id)
     ]
 
     end_req = tsi.CallsEndBatchReq(
+        project_id=project_id,
         batch=[
-            tsi.CallBatchEndMode(mode="end", req=tsi.CallEndReq(end=e))
-            for e in ends
-        ]
+            tsi.CallBatchEndMode(mode="end", req=tsi.CallEndReq(end=e)) for e in ends
+        ],
     )
     server.calls_end_batch(end_req)
 

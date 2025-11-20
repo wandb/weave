@@ -2018,6 +2018,9 @@ class ScoreDeleteRes(BaseModel):
 class CallsStartBatchReq(BaseModel):
     """Request for batch starting/completing calls. Accepts start or complete call types."""
 
+    project_id: str = Field(
+        ..., description="The `entity/project` where these calls are saved"
+    )
     batch: list[CallBatchStartMode | CallBatchCompleteMode]
 
 
@@ -2030,6 +2033,9 @@ class CallsStartBatchRes(BaseModel):
 class CallsEndBatchReq(BaseModel):
     """Request for batch ending calls. Accepts only end call types."""
 
+    project_id: str = Field(
+        ..., description="The `entity/project` where these calls are saved"
+    )
     batch: list[CallBatchEndMode]
 
 

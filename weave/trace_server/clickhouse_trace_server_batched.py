@@ -48,6 +48,7 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     QueryBuilderField,
     build_calls_complete_batch_delete_query,
     build_calls_complete_batch_update_query,
+    build_calls_complete_update_display_name_query,
     build_calls_stats_query,
     combine_conditions,
 )
@@ -511,6 +512,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         Accepts start or complete call types and writes them directly to the
         calls_complete table without needing to split the batch.
         """
+        if not req.batch:
+            return tsi.CallsStartBatchRes()
+
         # Extract starts and completes from batch
         starts = []
         completes = []
@@ -519,6 +523,67 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 starts.append(item.req.start)
             elif item.mode == "complete":
                 completes.append(item.req.complete)
+
+        project_version = self.project_version_resolver.get_project_version_sync(
+            req.project_id
+        )
+        if project_version == ProjectVersion.CALLS_MERGED_VERSION:
+            # Write to old call_parts table: break completes into start + end
+            # Convert completes to start/end pairs
+            starts_from_completes = []
+            ends_from_completes = []
+            for complete in completes:
+                # Create start part from complete
+                start = tsi.StartedCallSchemaForInsert(
+                    project_id=complete.project_id,
+                    id=complete.id,
+                    op_name=complete.op_name,
+                    display_name=complete.display_name,
+                    trace_id=complete.trace_id,
+                    parent_id=complete.parent_id,
+                    thread_id=complete.thread_id,
+                    turn_id=complete.turn_id,
+                    started_at=complete.started_at,
+                    attributes=complete.attributes,
+                    inputs=complete.inputs,
+                    otel_dump=complete.otel_dump,
+                    wb_user_id=complete.wb_user_id,
+                    wb_run_id=complete.wb_run_id,
+                    wb_run_step=complete.wb_run_step,
+                )
+                starts_from_completes.append(start)
+
+                # Create end part from complete
+                end = tsi.EndedCallSchemaForInsert(
+                    project_id=complete.project_id,
+                    id=complete.id,
+                    ended_at=complete.ended_at,
+                    exception=complete.exception,
+                    output=complete.output,
+                    summary=complete.summary,
+                    wb_run_step_end=complete.wb_run_step_end,
+                )
+                ends_from_completes.append(end)
+
+            # Convert all starts (original + from completes) to insertable types
+            ch_insertable_starts = [
+                _start_call_for_insert_to_ch_insertable_start_call(start, self)
+                for start in starts + starts_from_completes
+            ]
+            ch_insertable_ends = [
+                _end_call_for_insert_to_ch_insertable_end_call(end, self)
+                for end in ends_from_completes
+            ]
+
+            ch_insertable_calls = ch_insertable_starts + ch_insertable_ends
+            self._insert_call_batch(ch_insertable_calls, "call_parts")
+
+            # Return early, don't write to calls_complete table
+            res = [
+                tsi.CallUpsertRes(id=c.id, trace_id=c.trace_id)
+                for c in starts + completes
+            ]
+            return tsi.CallsStartBatchRes(res=res)
 
         # Convert API-level schemas to CH-insertable schemas
         ch_insertable_starts = [
@@ -531,28 +596,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         ]
         ch_insertable_calls = ch_insertable_starts + ch_insertable_completes
 
-        # Convert to batch data format
-        # For calls_complete table, we need proper defaults for non-nullable columns
-        # that don't exist in CallStartCHInsertable:
-        # - output_dump: String (not nullable) -> default to "{}"
-        # - summary_dump: String (not nullable) -> default to "{}"
-        column_defaults = {
-            "output_dump": "{}",
-            "summary_dump": "{}",
-        }
-
-        batch_data = []
-        for call in ch_insertable_calls:
-            call_dict = call.model_dump()
-            row = []
-            for col in ALL_CALL_INSERT_COLUMNS:
-                row.append(call_dict.get(col, column_defaults.get(col)))
-            batch_data.append(row)
-        self._insert(
-            "calls_complete",
-            data=batch_data,
-            column_names=ALL_CALL_INSERT_COLUMNS,
-        )
+        self._insert_ch_insertable_calls_to_complete_table(ch_insertable_calls)
 
         res = [
             tsi.CallUpsertRes(id=c.id, trace_id=c.trace_id) for c in starts + completes
@@ -567,12 +611,28 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         Accepts only end call types and updates existing records in the
         calls_complete table without needing to split the batch.
         """
+        project_version = self.project_version_resolver.get_project_version_sync(
+            req.project_id
+        )
+
         # Extract ends from batch
         end_calls = [item.req.end for item in req.batch]
 
+        if project_version == ProjectVersion.CALLS_MERGED_VERSION:
+            # New endpoint writing to old table
+            batch_data = []
+            for call in end_calls:
+                insertable = _end_call_for_insert_to_ch_insertable_end_call(call)
+                call_dict = insertable.model_dump()
+                row = []
+                for col in ALL_CALL_INSERT_COLUMNS:
+                    row.append(call_dict.get(col))
+                batch_data.append(row)
+            self._insert_call_batch(batch_data, "call_parts")
+            return tsi.CallsEndBatchRes()
+
         pb = ParamBuilder()
         command = build_calls_complete_batch_update_query(end_calls, pb)
-
         self._command(command, pb.get_params())
 
         return tsi.CallsEndBatchRes()
@@ -4616,22 +4676,57 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             self._thread_local.ch_client = original_client
             client.close()
 
+    def _insert_ch_insertable_calls_to_complete_table(
+        self,
+        ch_insertable_calls: list[CallStartCHInsertable | CallCompleteCHInsertable],
+    ) -> None:
+        """Helper to insert CH-insertable calls into calls_complete table.
+
+        Converts CH-insertable schemas to batch data format and inserts them.
+        Handles proper defaults for non-nullable columns.
+
+        Args:
+            ch_insertable_calls: List of CH-insertable call schemas (starts or completes)
+        """
+        if not ch_insertable_calls:
+            return
+
+        # For calls_complete table, we need proper defaults for non-nullable columns
+        # that don't exist in CallStartCHInsertable:
+        # - output_dump: String (not nullable) -> default to "{}"
+        # - summary_dump: String (not nullable) -> default to "{}"
+        column_defaults = {
+            "output_dump": "{}",
+            "summary_dump": "{}",
+        }
+
+        batch_data = []
+        for call in ch_insertable_calls:
+            call_dict = call.model_dump()
+            row = []
+            for col in ALL_CALL_INSERT_COLUMNS:
+                row.append(call_dict.get(col, column_defaults.get(col)))
+            batch_data.append(row)
+        self._insert_call_batch(batch_data, "calls_complete")
+
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert_call_batch")
-    def _insert_call_batch(self, batch: list) -> None:
+    def _insert_call_batch(self, batch: list, table_alias: str = "call_parts") -> None:
+        assert table_alias in ["call_parts", "calls_complete"]
         root_span = ddtrace.tracer.current_span()
         if root_span is not None:
             root_span.set_tags(
                 {
                     "clickhouse_trace_server_batched._insert_call_batch.count": str(
                         len(batch)
-                    )
+                    ),
+                    "clickhouse_trace_server_batched._insert_call_batch.table": table_alias,
                 }
             )
         if not batch:
             return
 
         self._insert(
-            "call_parts",
+            table_alias,
             data=batch,
             column_names=ALL_CALL_INSERT_COLUMNS,
         )
