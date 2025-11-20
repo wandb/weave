@@ -11,7 +11,10 @@ from tests.trace.util import client_is_sqlite
 from weave.trace_server.project_version.clickhouse_project_version import (
     get_project_version_from_clickhouse,
 )
-from weave.trace_server.project_version.project_version import ProjectVersionResolver
+from weave.trace_server.project_version.project_version import (
+    ProjectVersionResolver,
+    init_resolver,
+)
 from weave.trace_server.project_version.types import ProjectVersion, ProjectVersionMode
 
 
@@ -48,6 +51,8 @@ def test_version_resolution_by_table_contents(client, trace_server):
 
     ch_server = trace_server._internal_trace_server
     resolver = ProjectVersionResolver(ch_client_factory=lambda: ch_server.ch_client)
+    # manually set this to auto so we can test the switching
+    resolver._mode = ProjectVersionMode.AUTO
 
     empty_proj = make_project_id("empty_project")
     assert resolver.get_project_version_sync(empty_proj) == ProjectVersion.EMPTY_PROJECT
@@ -81,6 +86,7 @@ def test_caching_behavior(client, trace_server):
 
     ch_server = trace_server._internal_trace_server
     resolver = ProjectVersionResolver(ch_client_factory=lambda: ch_server.ch_client)
+    resolver._mode = ProjectVersionMode.AUTO
 
     cached_proj = make_project_id("cached_project")
     insert_call(ch_server.ch_client, "calls_complete", cached_proj)
@@ -105,7 +111,7 @@ def test_caching_behavior(client, trace_server):
         assert get_count() == 2
 
 
-def test_mode_off_and_calls_merged(client, trace_server):
+def test_mode_off_and_force_only_calls_merged(client, trace_server):
     if client_is_sqlite(client):
         pytest.skip("ClickHouse-only test")
 
@@ -121,33 +127,13 @@ def test_mode_off_and_calls_merged(client, trace_server):
         assert version == ProjectVersion.CALLS_MERGED_VERSION
         assert get_count() == 0
 
-    resolver._mode = ProjectVersionMode.CALLS_MERGED
+    resolver._mode = ProjectVersionMode.FORCE_ONLY_CALLS_MERGED
     version = resolver.get_project_version_sync(project_id)
     assert version == ProjectVersion.CALLS_MERGED_VERSION
 
     resolver._mode = ProjectVersionMode.AUTO
     version = resolver.get_project_version_sync(project_id)
     assert version == ProjectVersion.CALLS_COMPLETE_VERSION
-
-
-def test_mode_calls_merged_read(client, trace_server):
-    if client_is_sqlite(client):
-        pytest.skip("ClickHouse-only test")
-
-    ch_server = trace_server._internal_trace_server
-    resolver = ProjectVersionResolver(ch_client_factory=lambda: ch_server.ch_client)
-    resolver._mode = ProjectVersionMode.CALLS_MERGED_READ
-
-    project_id = make_project_id("mode_merged_read")
-    insert_call(ch_server.ch_client, "calls_complete", project_id)
-
-    with count_queries(ch_server.ch_client) as get_count:
-        read_version = resolver.get_project_version_sync(project_id, is_write=False)
-        assert read_version == ProjectVersion.CALLS_MERGED_VERSION
-        assert get_count() == 0
-
-    write_version = resolver.get_project_version_sync(project_id, is_write=True)
-    assert write_version == ProjectVersion.CALLS_COMPLETE_VERSION
 
 
 def test_clickhouse_provider_directly(client, trace_server):
@@ -171,6 +157,7 @@ def test_async_and_multiple_projects(client, trace_server):
 
     ch_server = trace_server._internal_trace_server
     resolver = ProjectVersionResolver(ch_client_factory=lambda: ch_server.ch_client)
+    resolver._mode = ProjectVersionMode.AUTO
 
     async_proj = make_project_id("async_test")
     insert_call(ch_server.ch_client, "calls_complete", async_proj)
@@ -201,10 +188,9 @@ def test_project_version_mode_from_env():
     try:
         test_cases = [
             ("off", ProjectVersionMode.OFF),
-            ("calls_merged", ProjectVersionMode.CALLS_MERGED),
-            ("calls_merged_read", ProjectVersionMode.CALLS_MERGED_READ),
+            ("force_only_calls_merged", ProjectVersionMode.FORCE_ONLY_CALLS_MERGED),
             ("auto", ProjectVersionMode.AUTO),
-            ("invalid_mode", ProjectVersionMode.CALLS_MERGED),
+            ("invalid_mode", ProjectVersionMode.FORCE_ONLY_CALLS_MERGED),
         ]
 
         for env_val, expected_mode in test_cases:
@@ -215,7 +201,7 @@ def test_project_version_mode_from_env():
         if "PROJECT_VERSION_MODE" in os.environ:
             del os.environ["PROJECT_VERSION_MODE"]
         mode = ProjectVersionMode.from_env()
-        assert mode == ProjectVersionMode.CALLS_MERGED
+        assert mode == ProjectVersionMode.FORCE_ONLY_CALLS_MERGED
 
     finally:
         if original_value is not None:
@@ -230,11 +216,16 @@ def test_global_singleton_resolver(client, trace_server):
 
     ch_server = trace_server._internal_trace_server
 
-    resolver1 = ProjectVersionResolver.get_global_instance(
-        ch_client_factory=lambda: ch_server.ch_client
-    )
-    resolver2 = ProjectVersionResolver.get_global_instance(
-        ch_client_factory=lambda: ch_server.ch_client
-    )
+    # Test that init_resolver is idempotent and creates singleton
+    init_resolver(ch_client_factory=lambda: ch_server.ch_client)
+
+    # Access internal resolver to verify singleton behavior
+    from weave.trace_server.project_version import project_version
+
+    resolver1 = project_version._resolver
+
+    # Call init again - should be no-op
+    init_resolver(ch_client_factory=lambda: ch_server.ch_client)
+    resolver2 = project_version._resolver
 
     assert resolver1 is resolver2

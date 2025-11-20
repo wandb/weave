@@ -63,6 +63,7 @@ def get_project_version_from_clickhouse(
                 "Project has traces in both calls_complete and calls_merged tables.",
                 extra={"project_id": project_id},
             )
+            return ProjectVersion.CALLS_MERGED_VERSION
 
         if has_merged:
             return ProjectVersion.CALLS_MERGED_VERSION

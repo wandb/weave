@@ -6,10 +6,19 @@ from enum import Enum, IntEnum
 
 logger = logging.getLogger(__name__)
 
-# Default should eventually be 'auto' but for added security during
-# rollout, the default should be 'calls_merged' which still queries
-# the db but always returns 'calls_merged' no matter what
-DEFAULT_PROJECT_VERSION_MODE = "calls_merged"
+# Project Version Mode Behavior Matrix
+# =====================================
+# ┌─────────────────────────┬────────────────────────┬─────────────────────────┬────────────────────────┐
+# │ Calls Present In        │ AUTO                   │ FORCE_ONLY_CALLS_MERGED │ OFF (no db query)      │
+# ├─────────────────────────┼────────────────────────┼─────────────────────────┼────────────────────────┤
+# │ Neither table (empty)   │ EMPTY_PROJECT          │ CALLS_MERGED_VERSION    │ CALLS_MERGED_VERSION   │
+# │ calls_merged only       │ CALLS_MERGED_VERSION   │ CALLS_MERGED_VERSION    │ CALLS_MERGED_VERSION   │
+# │ calls_complete only     │ CALLS_COMPLETE_VERSION │ CALLS_MERGED_VERSION    │ CALLS_MERGED_VERSION   │
+# │ Both tables             │ CALLS_MERGED_VERSION   │ CALLS_MERGED_VERSION    │ CALLS_MERGED_VERSION   │
+# └─────────────────────────┴────────────────────────┴─────────────────────────┴────────────────────────┘
+#
+# Rollout stage 1: do the db query for latency impact, always return `calls_merged` table
+DEFAULT_PROJECT_VERSION_MODE = "force_only_calls_merged"
 
 
 class ProjectVersion(IntEnum):
@@ -43,14 +52,12 @@ class ProjectVersionMode(str, Enum):
     """Modes for controlling project version resolution behavior.
 
     AUTO: Default behavior - uses table to determine project version.
-    CALLS_MERGED: Forces all reads/writes to calls_merged table (queries DB for perf measurement).
-    CALLS_MERGED_READ: Forces reads to calls_merged table, writes use determined version.
+    FORCE_ONLY_CALLS_MERGED: Forces all reads/writes to calls_merged table (queries DB for perf measurement).
     OFF: Skips DB queries entirely, returns CALLS_MERGED_VERSION immediately.
     """
 
     AUTO = "auto"
-    CALLS_MERGED = "calls_merged"
-    CALLS_MERGED_READ = "calls_merged_read"
+    FORCE_ONLY_CALLS_MERGED = "force_only_calls_merged"
     OFF = "off"
 
     @classmethod
