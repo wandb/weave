@@ -9,10 +9,12 @@ jest.mock('weave/clientApi', () => ({
   getGlobalClient: jest.fn(() => ({
     pushNewCall: () => ({currentCall: {}, parentCall: null, newStack: []}),
     createCall: (...args: any[]) => {
-      capturedDisplayName = args.length > 0 ? args[args.length - 1] : undefined;
+      // displayName is the 9th parameter (index 8), attributes is the 10th (index 9)
+      capturedDisplayName = args.length > 8 ? args[8] : undefined;
       return Promise.resolve();
     },
     runWithCallStack: async (stack: any, fn: () => any) => fn(),
+    getCallAttributes: () => ({}),
     finishCall: () => Promise.resolve(),
     finishCallWithException: () => Promise.resolve(),
     settings: {shouldPrintCallLink: false},
