@@ -174,3 +174,27 @@ export function requireGlobalClient(): WeaveClient {
 export function setGlobalClient(client: WeaveClient) {
   globalClient = client;
 }
+
+/**
+ * Attach attributes to the current execution context so that any calls created
+ * inside `fn` automatically inherit them. Attributes are written to the call
+ * record on the trace server and surface in the Weave UI/filtering, so they’re
+ * ideal for tagging runs with request IDs, tenants, experiments, etc.
+ *
+ * Example:
+ * ```ts
+ * await withAttributes({requestId: 'abc'}, async () => {
+ *   await myOp();
+ * });
+ * ```
+ */
+export function withAttributes<T>(
+  attrs: Record<string, any>,
+  fn: () => Promise<T> | T
+): Promise<T> | T {
+  const client = getGlobalClient();
+  if (!client) {
+    return fn();
+  }
+  return client.runWithAttributes(attrs, fn);
+}
