@@ -1,4 +1,4 @@
-from typing import Any, Literal, Optional, Union
+from typing import Any, Literal
 
 import jsonschema
 from pydantic import BaseModel, Field, field_validator
@@ -31,10 +31,7 @@ class ContainsWordsActionConfig(BaseModel):
     target_words: list[str]
 
 
-ActionConfigType = Union[
-    LlmJudgeActionConfig,
-    ContainsWordsActionConfig,
-]
+ActionConfigType = LlmJudgeActionConfig | ContainsWordsActionConfig
 
 
 class ActionSpec(base_object_def.BaseObject):
@@ -45,7 +42,7 @@ class ActionSpec(base_object_def.BaseObject):
     # `Variable is mutable so its type is invariant`: Override type "str" is not the same as base type "str | None".
     # Therefore, we just validate the name as a post-init method.
     @field_validator("name")
-    def name_must_be_set(cls, v: Optional[str]) -> Optional[str]:  # noqa: N805
+    def name_must_be_set(cls, v: str | None) -> str | None:  # noqa: N805
         if v is None:
             raise ValueError("name must be set")
         return v

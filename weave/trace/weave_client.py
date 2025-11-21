@@ -10,13 +10,13 @@ import platform
 import re
 import sys
 import time
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from concurrent.futures import Future
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, Callable, TypedDict, cast
+from typing import TYPE_CHECKING, Any, TypedDict, cast
 
 import pydantic
-from requests import HTTPError
+from httpx import HTTPStatusError as HTTPError
 
 from weave import version
 from weave.chat.chat import Chat

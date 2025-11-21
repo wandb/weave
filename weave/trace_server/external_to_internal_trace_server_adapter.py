@@ -1,7 +1,7 @@
 import abc
 import typing
-from collections.abc import Iterator
-from typing import Callable, TypeVar
+from collections.abc import Callable, Iterator
+from typing import TypeVar
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.trace_server_converter import (
@@ -16,7 +16,7 @@ class IdConverter:
         raise NotImplementedError()
 
     @abc.abstractmethod
-    def int_to_ext_project_id(self, project_id: str) -> typing.Optional[str]:
+    def int_to_ext_project_id(self, project_id: str) -> str | None:
         raise NotImplementedError()
 
     @abc.abstractmethod
@@ -85,7 +85,7 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
 
         int_to_ext_project_cache = {}
 
-        def cached_int_to_ext_project_id(project_id: str) -> typing.Optional[str]:
+        def cached_int_to_ext_project_id(project_id: str) -> str | None:
             if project_id not in int_to_ext_project_cache:
                 int_to_ext_project_cache[project_id] = self._idc.int_to_ext_project_id(
                     project_id
@@ -407,6 +407,8 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         self, req: tsi.CompletionsCreateReq
     ) -> typing.Iterator[dict[str, typing.Any]]:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        # Convert any refs in the request (e.g., prompt) to internal format
+        req = universal_ext_to_int_ref_converter(req, self._idc.ext_to_int_project_id)
         # The streamed chunks contain no project-scoped references, so we can
         # forward directly without additional ref conversion.
         return self._internal_trace_server.completions_create_stream(req)

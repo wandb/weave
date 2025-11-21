@@ -1,6 +1,7 @@
 # always use lowercase keys for the redact keys
 import dataclasses
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 _REDACT_KEYS = {
     "api_key",

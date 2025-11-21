@@ -26,7 +26,7 @@ def authenticate(
 
 server_dependency = ServiceDependency(service_factory=noop_trace_server_factory)
 trace_service_router = generate_routes(APIRouter(), server_dependency)
-v2_router = generate_v2_routes(APIRouter(prefix="/object"), server_dependency)
+v2_router = generate_v2_routes(APIRouter(prefix="/v2"), server_dependency)
 app = FastAPI()
 app.include_router(trace_service_router, dependencies=[Depends(authenticate)])
 app.include_router(v2_router, dependencies=[Depends(authenticate)])

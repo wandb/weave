@@ -32,7 +32,7 @@ classifiers = [
   "Topic :: Software Development :: Libraries :: Application Frameworks",
   "Topic :: Software Development :: Widget Sets",
 ]
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dynamic = ["version"]
 dependencies = [
   "wandb>=0.17.1",
@@ -41,7 +41,7 @@ dependencies = [
   "packaging>=21.0",                      # For version parsing in integrations
   "tenacity>=8.3.0,!=8.4.0",              # Excluding 8.4.0 because it had a bug on import of AsyncRetrying
   "click",                                # Used for terminal/stdio printing
-  "gql[aiohttp,requests]>=3.0.0",         # Used exclusively in wandb_api.py
+  "gql[httpx]>=3.0.0",                    # Used exclusively in wandb_api.py; httpx is used for HTTP requests throughout the codebase
   "jsonschema>=4.23.0",                   # Used by scorers for field validation
   "diskcache==5.6.3",                     # Used for data caching
   "tzdata; platform_system == 'Windows'", # Required for timezone support on Windows
@@ -49,11 +49,6 @@ dependencies = [
   # Used for content type detection
   # Remove once license content filtering is upstreamed
   "polyfile-weave",
-
-  # This transforms X | Y into typing.Union[X, Y] and list[X] into typing.List[X] etc.
-  # It allows us to use those type annotations in Python 3.9 with Pydantic.
-  # See https://github.com/pydantic/pydantic/issues/7873
-  "eval-type-backport",
 ]
 
 [project.optional-dependencies]
@@ -114,8 +109,7 @@ smolagents = [
   "SQLAlchemy>=2.0.38",
 ]
 instructor = [
-  "instructor>=1.4.3,<1.7.0; python_version <= '3.9'",
-  "instructor>=1.4.3,<1.11.0; python_version > '3.9'",
+  "instructor>=1.4.3,<1.11.0",
   "google-genai>=1.5.0",
   "openai>=1.99.9,<1.100.0",
 ]
@@ -157,6 +151,7 @@ scorers = [
 ]
 notdiamond = [
   "notdiamond>=0.4.9; platform_python_implementation != 'PyPy' and python_version > '3.10' and python_version < '3.13'",
+  "pandas>=2.0.0",
 ]
 openai = ["openai>=1.99.9,<1.100.0"]
 openai_agents = ["openai-agents>=0.0.4"]
@@ -196,11 +191,9 @@ path = "weave/version.py"
 [tool.hatch.build]
 include = ["weave"]
 exclude = [
-  "weave_query",
   "examples",
   "tests",
   "dev_docs",
-  "weave/clear_cache.py",
   "weave/trace_server/model_providers",
 ]
 
@@ -289,10 +282,9 @@ ignore = [
   # This is a more involved change, so disabling for now.
   "C901", # https://docs.astral.sh/ruff/rules/complex-structure/
 ]
-exclude = ["weave_query"]
 
 [tool.ruff.lint.isort]
-known-third-party = ["wandb", "weave_query"]
+known-third-party = ["wandb"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
@@ -304,7 +296,7 @@ fixture-parentheses = false
 [tool.ruff]
 line-length = 88
 show-fixes = true
-exclude = ["weave_query", "rules"]
+exclude = ["rules"]
 
 [tool.ruff.lint.per-file-ignores]
 "!/weave/trace/**/*.py" = ["T201"]
@@ -312,7 +304,7 @@ exclude = ["weave_query", "rules"]
 
 [tool.pyright]
 include = ["weave"]
-exclude = ["weave_query", "tests", "examples", "docs", "noxfile.py"]
+exclude = ["tests", "examples", "docs", "noxfile.py"]
 # In cases where we support multiple versions of an integration, some imports can be missing
 reportMissingImports = false
 
@@ -326,17 +318,13 @@ reportCallIssue = false
 [tool.mypy]
 warn_unused_configs = true
 # Note: You have to update .pre-commit-config.yaml too!
-exclude = [".*pyi$", "weave_query", "tests", "examples"]
+exclude = [".*pyi$", "tests", "examples"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = "weave.*"
 disallow_untyped_defs = true
 disallow_untyped_calls = true
-
-[[tool.mypy.overrides]]
-module = "weave_query.*"
-ignore_errors = true
 
 [tool.bumpversion]
 current_version = "0.52.18-dev0"
@@ -450,7 +438,6 @@ test = [
   "pillow",
   "moviepy<=1.0.3",
   "filelock",
-  "httpx",
 
   # Media Generation
   "opencv-python", # Video generation
@@ -481,11 +468,6 @@ conflicts = [
     { extra = "langchain" },
     { extra = "vertexai" },
   ],
-  # instructor and verdict have incompatible requirements on Python < 3.10
-  [
-    { extra = "instructor" },
-    { extra = "verdict" },
-  ],
   # crewai and langchain have incompatible litellm version requirements
   [
     { extra = "crewai" },
@@ -505,4 +487,4 @@ conflicts = [
 
 [tool.coverage.report]
 exclude_also = ["if TYPE_CHECKING:", "@abstractmethod"]
-omit = ["weave_query/**", "weave/agent/**"]
+omit = ["weave/agent/**"]

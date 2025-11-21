@@ -21,7 +21,6 @@ jobs:
       matrix:
         python-version-major: ["3"]
         python-version-minor: [
-            "9",
             "10",
             "11",
             "12",

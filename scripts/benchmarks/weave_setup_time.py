@@ -181,7 +181,7 @@ def write_results_to_csv(results: dict[str, list[float]], filename: str) -> None
     metric_labels = ["Mean", "Median", "Std Dev", "Min", "Max"]
 
     for timing_type in ["import", "init", "total"]:
-        for metric, label in zip(metrics, metric_labels):
+        for metric, label in zip(metrics, metric_labels, strict=False):
             value = stats[timing_type][metric]
             rows.append([timing_type.title(), label, f"{value:.6f}"])
 
@@ -206,7 +206,7 @@ def create_results_table(stats: dict[str, dict[str, float]]) -> Table:
     metric_labels = ["Mean", "Median", "Std Dev", "Min", "Max"]
 
     for timing_type in ["import", "init", "total"]:
-        for metric, label in zip(metrics, metric_labels):
+        for metric, label in zip(metrics, metric_labels, strict=False):
             value = stats[timing_type][metric]
             rows.append([timing_type.title(), label, utils.format_seconds(value)])
 

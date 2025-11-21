@@ -1,7 +1,6 @@
 import contextlib
 import logging
 from collections.abc import Generator
-from typing import Optional
 
 import sqlparse
 
@@ -60,8 +59,8 @@ def json_dump_field_as_sql(
     pb: ParamBuilder,
     table_alias: str,
     root_field_sanitized: str,
-    extra_path: Optional[list[str]] = None,
-    cast: Optional[tsi_query.CastTo] = None,
+    extra_path: list[str] | None = None,
+    cast: tsi_query.CastTo | None = None,
     use_agg_fn: bool = True,
 ) -> str:
     """Build SQL for JSON field access with optional type conversion.

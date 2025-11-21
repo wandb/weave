@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from functools import lru_cache
-from typing import TYPE_CHECKING, Callable, Generic, Protocol, overload
+from typing import TYPE_CHECKING, Generic, Protocol, overload
 
 from typing_extensions import TypeVar
 

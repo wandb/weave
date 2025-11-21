@@ -1,15 +1,15 @@
 import contextvars
 import importlib
 import time
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
-from typing import Any, Callable, Optional, Union
+from typing import Any
 
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings
 from weave.trace.context import weave_client_context
 
-_verdict_patcher: Union[MultiPatcher, None] = None
+_verdict_patcher: MultiPatcher | None = None
 
 
 try:
@@ -38,8 +38,8 @@ if not _import_failed:
             self,
             name: str,
             inputs: dict[str, Any],
-            trace_id: Optional[str] = None,
-            parent_id: Optional[str] = None,
+            trace_id: str | None = None,
+            parent_id: str | None = None,
         ) -> Iterator[Call]:
             # Use contextvars to get parent context if not provided
             parent_ctx = current_trace_context.get()
@@ -99,7 +99,7 @@ def create_pipeline_init_wrapper(
 
     def wrapper(original_init: Callable) -> Callable:
         def pipeline_init(
-            self: Any, name: str = "Pipeline", tracer_param: Optional[Any] = None
+            self: Any, name: str = "Pipeline", tracer_param: Any | None = None
         ) -> None:
             return original_init(
                 self, name, tracer_param if tracer_param is not None else tracer
@@ -111,8 +111,8 @@ def create_pipeline_init_wrapper(
 
 
 def get_verdict_patcher(
-    settings: Optional[IntegrationSettings] = None,
-) -> Union[MultiPatcher, NoOpPatcher]:
+    settings: IntegrationSettings | None = None,
+) -> MultiPatcher | NoOpPatcher:
     if settings is None:
         settings = IntegrationSettings()
 

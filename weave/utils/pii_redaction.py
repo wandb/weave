@@ -1,5 +1,5 @@
 import dataclasses
-from typing import Any, Union
+from typing import Any
 
 from presidio_analyzer import AnalyzerEngine
 from presidio_anonymizer import AnonymizerEngine
@@ -31,8 +31,8 @@ DEFAULT_REDACTED_FIELDS = [
 
 
 def redact_pii(
-    data: Union[dict[str, Any], str],
-) -> Union[dict[str, Any], str]:
+    data: dict[str, Any] | str,
+) -> dict[str, Any] | str:
     analyzer = AnalyzerEngine()
     anonymizer = AnonymizerEngine()
     fields = redact_pii_fields()

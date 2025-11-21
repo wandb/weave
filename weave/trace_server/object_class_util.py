@@ -1,4 +1,4 @@
-from typing import Any, Optional, TypedDict
+from typing import Any, TypedDict
 
 from pydantic import BaseModel
 
@@ -20,12 +20,12 @@ base_object_class_names = ["BaseObject", "Object"]
 
 class GetObjectClassesResult(TypedDict):
     # object_class is the "leaf" class of the val assuming it is a subclass of weave.Object or weave.BaseObject
-    object_class: Optional[str]
+    object_class: str | None
     # base_object_class is the first subclass of weave.Object or weave.BaseObject
-    base_object_class: Optional[str]
+    base_object_class: str | None
 
 
-def get_object_classes(val: Any) -> Optional[GetObjectClassesResult]:
+def get_object_classes(val: Any) -> GetObjectClassesResult | None:
     if (
         isinstance(val, dict)
         and "_bases" in val
@@ -47,12 +47,12 @@ def get_object_classes(val: Any) -> Optional[GetObjectClassesResult]:
 
 class ProcessIncomingObjectResult(TypedDict):
     val: Any
-    base_object_class: Optional[str]
-    leaf_object_class: Optional[str]
+    base_object_class: str | None
+    leaf_object_class: str | None
 
 
 def process_incoming_object_val(
-    val: Any, req_builtin_object_class: Optional[str] = None
+    val: Any, req_builtin_object_class: str | None = None
 ) -> ProcessIncomingObjectResult:
     """This method is responsible for accepting an incoming object from the user and validating it
     against the object class. It adds the _class_name and _bases keys correctly and returns the object

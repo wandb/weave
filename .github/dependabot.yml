@@ -208,18 +208,7 @@ updates:
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
-      # Exclude weave_query package and its dependencies from dependabot monitoring
-      - dependency-name: "weave_query*"
-      - dependency-name: "weave-query*"
     # Allow version requirements to be updated
     allow:
       - dependency-type: "direct"
       - dependency-type: "indirect"
-
-  # ignore all weave_query updates
-  - package-ecosystem: "pip"
-    directory: "/weave_query"
-    schedule:
-      interval: "daily"
-    ignore:
-      - dependency-name: "*"

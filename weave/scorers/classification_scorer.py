@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Any
 
 import weave
 from weave.flow.util import transpose
@@ -48,7 +48,7 @@ class MultiTaskBinaryClassificationF1(weave.Scorer):
     class_names: list[str]
 
     @weave.op
-    def summarize(self, score_rows: list) -> Optional[dict]:
+    def summarize(self, score_rows: list) -> dict | None:
         """Aggregate scoring results and compute precision, recall, and F1 score for each class.
 
         Args:
@@ -76,9 +76,7 @@ class MultiTaskBinaryClassificationF1(weave.Scorer):
     # backwards compatibility.  In the future, this behavior may change to use the newer `output` key.
     # You can still pass a `column_map` to map to the new `output` key if preferred.
     @weave.op
-    def score(
-        self, *, target: dict, model_output: Optional[dict], **kwargs: Any
-    ) -> dict:
+    def score(self, *, target: dict, model_output: dict | None, **kwargs: Any) -> dict:
         """Compare target labels with model outputs to determine correctness for each class.
 
         Args:

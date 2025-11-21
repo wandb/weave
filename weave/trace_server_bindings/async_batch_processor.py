@@ -2,10 +2,11 @@ import atexit
 import json
 import logging
 import time
+from collections.abc import Callable
 from pathlib import Path
 from queue import Empty, Full, Queue
 from threading import Event, Lock, Thread
-from typing import Callable, Generic, TypeVar
+from typing import Generic, TypeVar
 
 from weave.telemetry.trace_sentry import SENTRY_AVAILABLE, sentry_sdk
 from weave.trace.context.tests_context import get_raise_on_captured_errors

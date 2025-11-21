@@ -2,9 +2,10 @@ import datetime
 import io
 import logging
 from collections.abc import Iterator
-from typing import Any, Optional, Union
+from typing import Any
 from zoneinfo import ZoneInfo
 
+import httpx
 from pydantic import BaseModel, Field, validate_call
 from pydantic.json_schema import SkipJsonSchema
 from typing_extensions import Self
@@ -28,7 +29,7 @@ from weave.trace_server_bindings.models import (
     ServerInfoRes,
     StartBatchItem,
 )
-from weave.utils import http_requests as requests
+from weave.utils import http_requests
 from weave.utils.project_id import from_project_id
 from weave.utils.retry import get_current_retry_id, with_retry
 from weave.wandb_interface import project_creator
@@ -51,8 +52,8 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         should_batch: bool = False,
         *,
         remote_request_bytes_limit: int = REMOTE_REQUEST_BYTES_LIMIT,
-        auth: Optional[tuple[str, str]] = None,
-        extra_headers: Optional[dict[str, str]] = None,
+        auth: tuple[str, str] | None = None,
+        extra_headers: dict[str, str] | None = None,
     ):
         super().__init__()
         self.trace_server_url = trace_server_url
@@ -70,8 +71,8 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
                 max_queue_size=max_calls_queue_size(),
                 enable_disk_fallback=should_enable_disk_fallback(),
             )
-        self._auth: Optional[tuple[str, str]] = auth
-        self._extra_headers: Optional[dict[str, str]] = extra_headers
+        self._auth: tuple[str, str] | None = auth
+        self._extra_headers: dict[str, str] | None = extra_headers
         self.remote_request_bytes_limit = remote_request_bytes_limit
 
     def ensure_project_exists(
@@ -97,10 +98,10 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
             headers["X-Weave-Retry-Id"] = retry_id
         return headers
 
-    def get(self, url: str, *args: Any, **kwargs: Any) -> requests.Response:
+    def get(self, url: str, *args: Any, **kwargs: Any) -> httpx.Response:
         headers = self._build_dynamic_request_headers()
 
-        return requests.get(
+        return http_requests.get(
             self.trace_server_url + url,
             *args,
             auth=self._auth,
@@ -108,10 +109,10 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
             **kwargs,
         )
 
-    def post(self, url: str, *args: Any, **kwargs: Any) -> requests.Response:
+    def post(self, url: str, *args: Any, **kwargs: Any) -> httpx.Response:
         headers = self._build_dynamic_request_headers()
 
-        return requests.post(
+        return http_requests.post(
             self.trace_server_url + url,
             *args,
             auth=self._auth,
@@ -119,10 +120,10 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
             **kwargs,
         )
 
-    def delete(self, url: str, *args: Any, **kwargs: Any) -> requests.Response:
+    def delete(self, url: str, *args: Any, **kwargs: Any) -> httpx.Response:
         headers = self._build_dynamic_request_headers()
 
-        return requests.delete(
+        return http_requests.delete(
             self.trace_server_url + url,
             *args,
             auth=self._auth,
@@ -144,7 +145,7 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
 
     def _flush_calls(
         self,
-        batch: list[Union[StartBatchItem, EndBatchItem]],
+        batch: list[StartBatchItem | EndBatchItem],
         *,
         _should_update_batch_size: bool = True,
     ) -> None:
@@ -158,14 +159,14 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         if len(batch) == 0:
             return
 
-        def get_item_id(item: Union[StartBatchItem, EndBatchItem]) -> str:
+        def get_item_id(item: StartBatchItem | EndBatchItem) -> str:
             if isinstance(item, StartBatchItem):
                 return f"{item.req.start.id}-start"
             elif isinstance(item, EndBatchItem):
                 return f"{item.req.end.id}-end"
             return "unknown"
 
-        def encode_batch(batch: list[Union[StartBatchItem, EndBatchItem]]) -> bytes:
+        def encode_batch(batch: list[StartBatchItem | EndBatchItem]) -> bytes:
             data = Batch(batch=batch).model_dump_json()
             return data.encode("utf-8")
 
@@ -181,7 +182,7 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
             encode_batch_fn=encode_batch,
         )
 
-    def get_call_processor(self) -> Union[AsyncBatchProcessor, None]:
+    def get_call_processor(self) -> AsyncBatchProcessor | None:
         """Custom method not defined on the formal TraceServerInterface to expose
         the underlying call processor. Should be formalized in a client-side interface.
         """
@@ -223,9 +224,11 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         def send_feedback_batch(encoded_data: bytes) -> None:
             try:
                 self._send_feedback_batch_to_server(encoded_data)
-            except requests.HTTPError as e:
+            except (httpx.HTTPError, httpx.HTTPStatusError) as e:
                 # If batching endpoint doesn't exist (404) fall back to individual calls
-                if e.response.status_code == 404:
+                if (
+                    response := getattr(e, "response", None)
+                ) and response.status_code == 404:
                     logger.debug(
                         f"Batching endpoint not available, falling back to individual feedback creation: {e}"
                     )
@@ -233,7 +236,7 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
                     # Feedback endpoint doesn't support id, created_at, so we need to strip them
                     class FeedbackCreateReqStripped(tsi.FeedbackCreateReq):
                         id: SkipJsonSchema[str] = Field(exclude=True)
-                        created_at: SkipJsonSchema[Optional[datetime.datetime]] = Field(
+                        created_at: SkipJsonSchema[datetime.datetime | None] = Field(
                             exclude=True, default=None
                         )
 
@@ -267,7 +270,7 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
             encode_batch_fn=encode_batch,
         )
 
-    def get_feedback_processor(self) -> Union[AsyncBatchProcessor, None]:
+    def get_feedback_processor(self) -> AsyncBatchProcessor | None:
         """Custom method not defined on the formal TraceServerInterface to expose
         the underlying feedback processor. Should be formalized in a client-side interface.
         """
@@ -279,7 +282,7 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         url: str,
         req: BaseModel,
         stream: bool = False,
-    ) -> requests.Response:
+    ) -> httpx.Response:
         r = self.post(
             url,
             # `by_alias` is required since we have Mongo-style properties in the
@@ -296,9 +299,9 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
     def _get_request_executor(
         self,
         url: str,
-        params: Optional[dict[str, Any]] = None,
+        params: dict[str, Any] | None = None,
         stream: bool = False,
-    ) -> requests.Response:
+    ) -> httpx.Response:
         r = self.get(url, params=params or {}, stream=stream)
         handle_response_error(r, url)
         return r
@@ -307,9 +310,9 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
     def _delete_request_executor(
         self,
         url: str,
-        params: Optional[dict[str, Any]] = None,
+        params: dict[str, Any] | None = None,
         stream: bool = False,
-    ) -> requests.Response:
+    ) -> httpx.Response:
         r = self.delete(url, params=params or {}, stream=stream)
         handle_response_error(r, url)
         return r
@@ -321,7 +324,7 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         req_model: type[BaseModel],
         res_model: type[BaseModel],
         method: str = "POST",
-        params: Optional[dict[str, Any]] = None,
+        params: dict[str, Any] | None = None,
     ) -> BaseModel:
         if method == "POST":
             r = self._post_request_executor(url, req)
@@ -341,7 +344,7 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         req_model: type[BaseModel],
         res_model: type[BaseModel],
         method: str = "POST",
-        params: Optional[dict[str, Any]] = None,
+        params: dict[str, Any] | None = None,
     ) -> Iterator[BaseModel]:
         if method == "POST":
             r = self._post_request_executor(url, req, stream=True)
@@ -352,9 +355,12 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         else:
             raise ValueError(f"Unsupported HTTP method: {method}")
 
-        for line in r.iter_lines():
-            if line:
-                yield res_model.model_validate_json(line)
+        try:
+            for line in r.iter_lines():
+                if line:
+                    yield res_model.model_validate_json(line)
+        finally:
+            r.close()
 
     @with_retry
     def server_info(self) -> ServerInfoRes:

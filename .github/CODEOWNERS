@@ -1,4 +1,3 @@
 * @wandb/weave-team
 /docs/ @wandb/docs-team @wandb/weave-team
-/weave_query/ @wandb/query-engine-reviewers @wandb/weave-team
 /weave/trace_server/migrations @tssweeney @gtarpenning

@@ -156,7 +156,7 @@ class ThreadSafeLazyList(Sequence[T]):
         if len(self) != len(other):
             return False
         self._seek_to_end()
-        for a, b in zip(self._list, other):
+        for a, b in zip(self._list, other, strict=False):
             if a != b:
                 return False
         return True

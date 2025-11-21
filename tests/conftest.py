@@ -348,7 +348,7 @@ def make_server_recorder(server: tsi.TraceServerInterface):  # type: ignore
 def create_client(
     request,
     trace_server,
-    global_attributes: typing.Optional[dict[str, typing.Any]] = None,
+    global_attributes: dict[str, typing.Any] | None = None,
 ) -> weave_client.WeaveClient:
     trace_server_flag = get_trace_server_flag(request)
     if trace_server_flag == "prod":
@@ -397,8 +397,8 @@ def client_creator(zero_stack, request, trace_server):
 
     @contextlib.contextmanager
     def client(
-        global_attributes: typing.Optional[dict[str, typing.Any]] = None,
-        settings: typing.Optional[weave.trace.settings.UserSettings] = None,
+        global_attributes: dict[str, typing.Any] | None = None,
+        settings: weave.trace.settings.UserSettings | None = None,
     ):
         if settings is not None:
             weave.trace.settings.parse_and_apply_settings(settings)

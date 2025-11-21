@@ -1,7 +1,8 @@
 import asyncio
 import inspect
 import json
-from typing import Callable, TypedDict
+from collections.abc import Callable
+from typing import TypedDict
 
 import pytest
 
@@ -77,7 +78,7 @@ def test_basic_evaluation(
     }
 
     for i, (inputs, output_val, score1, score2) in enumerate(
-        zip(user_dataset, outputs, score1_results, score2_results)
+        zip(user_dataset, outputs, score1_results, score2_results, strict=False)
     ):
         predict_index = 1 + i * 4
 

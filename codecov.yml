@@ -35,7 +35,6 @@ ignore:
   - "tests/"
   - "examples/"
   - "scripts/"
-  - "weave_query/tests/"
   - "sdks/node/"
   - "**/*_test.py"
   - "**/*_tests.py"

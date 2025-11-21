@@ -1,4 +1,4 @@
-from typing import Any, Union
+from typing import Any
 
 import numpy as np
 from pydantic import Field, validate_call
@@ -141,7 +141,7 @@ class WeaveContextRelevanceScorerV1(HuggingFaceScorer):
         spans_with_probs = []
         token_ids = model_inputs["input_ids"].cpu().numpy()[0]
 
-        for start, end in zip(starts, ends):
+        for start, end in zip(starts, ends, strict=False):
             span_text = self._tokenizer.decode(token_ids[start:end])
             span_prob = positive_probs[start:end].mean()
             spans_with_probs.append({"text": span_text, "score": float(span_prob)})
@@ -153,7 +153,7 @@ class WeaveContextRelevanceScorerV1(HuggingFaceScorer):
     def score(
         self,
         query: str,
-        output: Union[str, list[str]],  # Pass the context to the `output` parameter
+        output: str | list[str],  # Pass the context to the `output` parameter
         **kwargs: Any,
     ) -> WeaveScorerResult:
         all_spans: list[dict[str, Any]] = []

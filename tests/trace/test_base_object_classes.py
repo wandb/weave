@@ -11,7 +11,7 @@
 4. We ensure that invalid schemas are properly rejected from the server.
 """
 
-from typing import Literal, Optional
+from typing import Literal
 
 import pytest
 from pydantic import ValidationError
@@ -29,7 +29,7 @@ from weave.trace_server.interface.builtin_object_classes.test_only_example impor
 def with_base_object_class_annotations(
     val: dict,
     class_name: str,
-    base_object_name: Optional[Literal["Object", "BaseObject"]] = None,
+    base_object_name: Literal["Object", "BaseObject"] | None = None,
 ):
     """When serializing pydantic objects, add additional fields to indicate the class information. This is
     a utlity to perform that mapping for the purposes of testing. We want to ensure that both the client

@@ -1,5 +1,6 @@
+from collections.abc import Callable
 from datetime import datetime
-from typing import Any, Callable, Union
+from typing import Any
 
 from weave.trace_server.opentelemetry.constants import (
     ATTRIBUTE_KEYS,
@@ -25,12 +26,10 @@ class SpanEvent(dict):
 
 def parse_weave_values(
     attributes: dict[str, Any],
-    key_mapping: Union[
-        list[str],
-        dict[str, list[str]],
-        list[tuple[str, Callable[..., Any]]],
-        dict[str, list[tuple[str, Callable[..., Any]]]],
-    ],
+    key_mapping: list[str]
+    | dict[str, list[str]]
+    | list[tuple[str, Callable[..., Any]]]
+    | dict[str, list[tuple[str, Callable[..., Any]]]],
 ) -> dict[str, Any]:
     result = {}
     # If list use the attribute as the key - Prevents synthetic attributes under input and output

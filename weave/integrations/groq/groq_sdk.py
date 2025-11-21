@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import importlib
-from typing import TYPE_CHECKING, Callable
+from collections.abc import Callable
+from typing import TYPE_CHECKING
 
 from groq.types.chat import ChatCompletion, ChatCompletionChunk, ChatCompletionMessage
 from groq.types.chat.chat_completion import Choice

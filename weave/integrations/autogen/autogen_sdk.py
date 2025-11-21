@@ -3,9 +3,9 @@ from __future__ import annotations
 import importlib
 import inspect
 import logging
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from functools import wraps
-from typing import Any, Callable, TypeVar
+from typing import Any, TypeVar
 
 import weave
 from weave.integrations.patcher import (

@@ -1,6 +1,6 @@
 import dataclasses
 import random
-from typing import Any, Optional
+from typing import Any
 
 import pydantic
 import pytest
@@ -15,7 +15,7 @@ from weave.trace_server import trace_server_interface as tsi
 
 
 def flatten_calls(
-    calls: list[tsi.CallSchema], parent_id: Optional[str] = None, depth: int = 0
+    calls: list[tsi.CallSchema], parent_id: str | None = None, depth: int = 0
 ) -> list[tuple[tsi.CallSchema, int]]:
     """Flatten calls is a technique we use in the integration tests to assert the correct
     ordering of calls. This is used to assert that the calls are in the correct order
@@ -23,7 +23,7 @@ def flatten_calls(
     with the depth of each call.
     """
 
-    def children_of_parent_id(id: Optional[str]) -> list[tsi.CallSchema]:
+    def children_of_parent_id(id: str | None) -> list[tsi.CallSchema]:
         return [call for call in calls if call.parent_id == id]
 
     children = children_of_parent_id(parent_id)
@@ -279,7 +279,7 @@ class MyDictScorerWithCustomFloatSummary(weave.Scorer):
         return score_dict(expected, output)
 
     @weave.op
-    def summarize(self, score_rows: list) -> Optional[dict]:
+    def summarize(self, score_rows: list) -> dict | None:
         float_avg = sum(row["d_float"] for row in score_rows) / len(score_rows)
         return float_avg
 
@@ -290,7 +290,7 @@ class MyDictScorerWithCustomBoolSummary(weave.Scorer):
         return score_dict(expected, output)
 
     @weave.op
-    def summarize(self, score_rows: list) -> Optional[dict]:
+    def summarize(self, score_rows: list) -> dict | None:
         float_avg = sum(row["d_float"] for row in score_rows) / len(score_rows)
         return float_avg > 0.5
 
@@ -301,7 +301,7 @@ class MyDictScorerWithCustomDictSummary(weave.Scorer):
         return score_dict(expected, output)
 
     @weave.op
-    def summarize(self, score_rows: list) -> Optional[dict]:
+    def summarize(self, score_rows: list) -> dict | None:
         float_avg = sum(row["d_float"] for row in score_rows) / len(score_rows)
         bool_avg = sum(1 if row["d_bool"] else 0 for row in score_rows) / len(
             score_rows

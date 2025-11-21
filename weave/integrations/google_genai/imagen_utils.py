@@ -1,6 +1,7 @@
 import logging
+from collections.abc import Callable
 from functools import wraps
-from typing import Any, Callable, Optional
+from typing import Any
 
 import weave
 from weave.integrations.google_genai.gemini_utils import (
@@ -45,7 +46,7 @@ def google_genai_gemini_postprocess_outputs(
 
 
 def google_genai_imagen_on_finish(
-    call: Call, output: Any, exception: Optional[BaseException] = None
+    call: Call, output: Any, exception: BaseException | None = None
 ) -> None:
     if not (model_name := call.inputs.get("model")):
         raise ValueError("Unknown model type")

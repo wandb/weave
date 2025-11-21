@@ -5,11 +5,10 @@ import json
 import os
 import threading
 from time import time
-from typing import Any, Optional, Union
+from typing import Any
 
-from requests import HTTPError as HTTPError
-from requests import PreparedRequest, Response, Session
-from requests.adapters import HTTPAdapter
+import httpx
+from httpx import Request, Response
 
 from weave.trace.display.display import Console, Text
 
@@ -33,28 +32,30 @@ STYLE_DIVIDER_RESPONSE = "bright_black"
 THEME_JSON = "ansi_dark"
 
 
-def decode_str(string: Union[str, bytes]) -> str:
+def decode_str(string: str | bytes) -> str:
     """Decode a bytes object to a string."""
     return string if isinstance(string, str) else string.decode("utf-8")
 
 
-def pprint_header(header: tuple[str, str]) -> None:
+def pprint_header(header: tuple[bytes | str, bytes | str]) -> None:
     """Pretty print a header, redacting Authorization headers."""
     key, value = header
+    key = decode_str(key)
+    value = decode_str(value)
     if key == "Authorization":
         value = "<Redacted>"
     console.print(f"  {key}: ", end="", style=STYLE_HEADER_KEY)
     console.print(Text(value, style=STYLE_HEADER_VALUE))
 
 
-def guess_content_type(request: PreparedRequest) -> str:
+def guess_content_type(request: Request) -> str:
     """Guess the content type of a request."""
     content_type = request.headers.get("Content-Type")
     if content_type:
         return content_type
     # TODO: This is based on knowledge of our client.
     #       We should probably be sending a Content-Type header and also doing something more correct here
-    if request.body:
+    if request.content:
         return "application/json"
     return "text/plain"
 
@@ -73,35 +74,35 @@ def pprint_json(text: str) -> None:
         console.print(Text(text, style=STYLE_ERROR))
 
 
-def pprint_prepared_request(prepared_request: PreparedRequest) -> None:
-    """Pretty print a PreparedRequest."""
+def pprint_request(request: Request) -> None:
+    """Pretty print a Request."""
     time_text = Text(
         datetime.datetime.now().strftime("%H:%M:%S.%f"), style=STYLE_METADATA
     )
     thread_text = Text(str(threading.get_ident()), style=STYLE_METADATA)
-    method_text = Text(f"{prepared_request.method}", style=STYLE_METHOD)
-    url_text = Text(f"{prepared_request.url}", style=STYLE_URL)
+    method_text = Text(f"{request.method}", style=STYLE_METHOD)
+    url_text = Text(f"{request.url}", style=STYLE_URL)
     console.print(Text("Time: ", style=STYLE_LABEL), time_text, sep="")
     console.print(Text("Thread ID: ", style=STYLE_LABEL), thread_text, sep="")
     console.print(Text("Method: ", style=STYLE_LABEL), method_text, sep="")
     console.print(Text("URL: ", style=STYLE_LABEL), url_text, sep="")
 
     console.print(Text("Headers:", style=STYLE_LABEL))
-    for header in prepared_request.headers.items():
+    for header in request.headers.raw:
         pprint_header(header)
 
     console.print(Text("Body:", style=STYLE_LABEL))
-    if prepared_request.body:
-        content_type = guess_content_type(prepared_request)
+    if request.content:
+        content_type = guess_content_type(request)
         if content_type == "application/json":
-            pprint_json(decode_str(prepared_request.body))
+            pprint_json(decode_str(request.content))
         elif content_type and content_type.startswith("multipart/form-data"):
-            console.print(Text(decode_str(prepared_request.body), style=STYLE_BODY))
-        elif isinstance(prepared_request.body, str):
-            console.print(f"{prepared_request.body}", style=STYLE_BODY)
+            console.print(Text(decode_str(request.content), style=STYLE_BODY))
+        elif isinstance(request.content, str):
+            console.print(f"{request.content}", style=STYLE_BODY)
         else:
             # TODO: Can we do something safer?
-            console.print(Text(decode_str(prepared_request.body), style=STYLE_BODY))
+            console.print(Text(decode_str(request.content), style=STYLE_BODY))
     else:
         console.print(Text("  None", style=STYLE_NONE))
 
@@ -114,12 +115,12 @@ def pprint_response(response: Response) -> None:
     elif response.status_code >= 400:
         status_style = STYLE_STATUS_ERROR
     status_code_text = Text(f"{response.status_code}", style=status_style)
-    reason_text = Text(f"{response.reason}", style=status_style)
+    reason_text = Text(f"{response.reason_phrase}", style=status_style)
     console.print(Text("Status Code: ", style=STYLE_LABEL), status_code_text, sep="")
     console.print(Text("Reason: ", style=STYLE_LABEL), reason_text, sep="")
     console.print(Text("Headers:", style=STYLE_LABEL))
-    for header in response.headers.items():
-        pprint_header(header)
+    for key, value in response.headers.items():
+        pprint_header((key, value))
 
     console.print(Text("Body:", style=STYLE_LABEL))
     if response.headers.get("Content-Type") == "application/json":
@@ -130,17 +131,18 @@ def pprint_response(response: Response) -> None:
         console.print("  None", style=STYLE_NONE)
 
 
-class LoggingHTTPAdapter(HTTPAdapter):
-    # Actual signature is:
-    # self, request, stream=False, timeout=None, verify=True, cert=None, proxies=None
-    def send(self, request: PreparedRequest, **kwargs: Any) -> Response:  # type: ignore
+class LoggingHTTPTransport(httpx.HTTPTransport):
+    def handle_request(
+        self,
+        request: httpx.Request,
+    ) -> httpx.Response:
         if os.environ.get("WEAVE_DEBUG_HTTP") != "1":
-            return super().send(request, **kwargs)
+            return super().handle_request(request)
 
         console.print(Text("-" * 21, style=STYLE_DIVIDER_REQUEST))
-        pprint_prepared_request(request)
+        pprint_request(request)
         start_time = time()
-        response = super().send(request, **kwargs)
+        response = super().handle_request(request)
         elapsed_time = time() - start_time
         console.print(Text("----- Response below -----", style=STYLE_DIVIDER_RESPONSE))
         console.print(
@@ -152,31 +154,51 @@ class LoggingHTTPAdapter(HTTPAdapter):
         return response
 
 
-session = Session()
-adapter = LoggingHTTPAdapter()
-session.mount("http://", adapter)
-session.mount("https://", adapter)
+client = httpx.Client(
+    transport=LoggingHTTPTransport(),
+    timeout=None,
+    limits=httpx.Limits(max_connections=None, max_keepalive_connections=None),
+)
 
 
-def get(url: str, params: Optional[dict[str, str]] = None, **kwargs: Any) -> Response:
+def get(
+    url: str,
+    params: dict[str, str] | None = None,
+    *,
+    stream: bool = False,
+    **kwargs: Any,
+) -> Response:
     """Send a GET request with optional logging."""
-    return session.get(url, params=params, **kwargs)
+    if stream:
+        request = client.build_request("GET", url, params=params, **kwargs)
+        return client.send(request, stream=True)
+    return client.get(url, params=params, **kwargs)
 
 
 def post(
     url: str,
-    data: Optional[Union[dict[str, Any], str]] = None,
-    json: Optional[dict[str, Any]] = None,
+    data: dict[str, Any] | str | bytes | None = None,
+    json: dict[str, Any] | None = None,
+    *,
+    stream: bool = False,
     **kwargs: Any,
 ) -> Response:
     """Send a POST request with optional logging."""
-    return session.post(url, data=data, json=json, **kwargs)
+    if stream:
+        request = client.build_request("POST", url, data=data, json=json, **kwargs)
+        return client.send(request, stream=True)
+    return client.post(url, data=data, json=json, **kwargs)
 
 
 def delete(
     url: str,
-    params: Optional[dict[str, Any]] = None,
+    params: dict[str, Any] | None = None,
+    *,
+    stream: bool = False,
     **kwargs: Any,
 ) -> Response:
     """Send a DELETE request with optional logging."""
-    return session.delete(url, params=params, **kwargs)
+    if stream:
+        request = client.build_request("DELETE", url, params=params, **kwargs)
+        return client.send(request, stream=True)
+    return client.delete(url, params=params, **kwargs)

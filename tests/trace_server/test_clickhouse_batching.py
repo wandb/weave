@@ -258,7 +258,7 @@ def test_obj_batch_four_versions_and_read_path(trace_server, client):
     assert sum(o.is_latest for o in res.objs) == 1
 
     # Each digest can be read specifically
-    for d, v in zip(digests, vals):
+    for d, v in zip(digests, vals, strict=False):
         read = server.obj_read(
             tsi.ObjReadReq(project_id=pid, object_id=obj_id, digest=d)
         )

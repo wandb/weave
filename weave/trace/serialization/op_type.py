@@ -12,7 +12,8 @@ import sys
 import textwrap
 import types as py_types
 from _ast import AsyncFunctionDef, ExceptHandler
-from typing import Any, Callable, TypedDict, get_args, get_origin
+from collections.abc import Callable
+from typing import Any, TypedDict, get_args, get_origin
 
 from weave.trace import settings
 from weave.trace.context.weave_client_context import get_weave_client
@@ -151,7 +152,9 @@ def resolve_var(fn: Callable, var_name: str) -> Any:
     if fn.__closure__:
         closure_vars = {}
         # __code__.co_freevars is the closure variable names in order
-        for vn, closure_cell in zip(fn.__code__.co_freevars, fn.__closure__):
+        for vn, closure_cell in zip(
+            fn.__code__.co_freevars, fn.__closure__, strict=False
+        ):
             closure_vars[vn] = closure_cell.cell_contents
         if var_name in closure_vars:
             return closure_vars[var_name]

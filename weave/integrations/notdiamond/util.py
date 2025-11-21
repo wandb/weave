@@ -1,5 +1,4 @@
 from pathlib import Path
-from typing import Optional
 
 import pandas as pd
 
@@ -8,7 +7,7 @@ from weave.evaluation.eval import EvaluationResults
 
 
 def get_model_evals(
-    file_path: Optional[str] = None,
+    file_path: str | None = None,
 ) -> dict[str, EvaluationResults]:
     if file_path is None:
         # Get path relative to this module file

@@ -12,7 +12,6 @@ import os
 import time
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from typing import Optional
 
 import pytest
 from pydantic import BaseModel
@@ -36,21 +35,21 @@ class TestResponse(BaseModel):
     """Simple response model for tests."""
 
     result: str
-    process_id: Optional[int] = None
+    process_id: int | None = None
 
 
 class TestRequest(BaseModel):
     """Simple request model for tests."""
 
     value: str
-    sleep_time: Optional[float] = None
-    exit_code: Optional[int] = None
-    expected_project: Optional[str] = None
-    expected_entity: Optional[str] = None
+    sleep_time: float | None = None
+    exit_code: int | None = None
+    expected_project: str | None = None
+    expected_entity: str | None = None
     # For multi-arg test
-    arg_a: Optional[str] = None
-    arg_b: Optional[int] = None
-    arg_c: Optional[str] = "default"
+    arg_a: str | None = None
+    arg_b: int | None = None
+    arg_c: str | None = "default"
 
 
 @dataclass

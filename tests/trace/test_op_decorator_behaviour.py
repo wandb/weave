@@ -1,5 +1,5 @@
 import inspect
-from typing import Any, Optional, get_type_hints
+from typing import Any, get_type_hints
 
 import pytest
 
@@ -427,7 +427,7 @@ def test_op_preserves_type_information():
     def typed_func(
         a: int,
         b: str,
-        c: Optional[float],
+        c: float | None,
         d: list[int],
         e: dict[str, float],
         f: tuple[str, int],

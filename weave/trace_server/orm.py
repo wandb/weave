@@ -7,9 +7,9 @@ import json
 import re
 import typing
 from dataclasses import dataclass
+from typing import TypeAlias
 
 from pydantic import BaseModel
-from typing_extensions import TypeAlias
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.interface import query as tsi_query
@@ -41,7 +41,7 @@ class ParamBuilder:
 
     def __init__(
         self,
-        prefix: typing.Optional[str] = None,
+        prefix: str | None = None,
         database_type: DatabaseType = "clickhouse",
     ):
         global param_builder_count
@@ -67,8 +67,8 @@ class ParamBuilder:
     def add(
         self,
         param_value: typing.Any,
-        param_name: typing.Optional[str] = None,
-        param_type: typing.Optional[str] = None,
+        param_name: str | None = None,
+        param_type: str | None = None,
     ) -> str:
         """Returns the placeholder for the target database type.
 
@@ -86,11 +86,15 @@ class ParamBuilder:
         return {**self._params}
 
 
-Value: TypeAlias = typing.Optional[
-    typing.Union[
-        str, float, datetime.datetime, list[str], list[float], dict[str, typing.Any]
-    ]
-]
+Value: TypeAlias = (
+    str
+    | float
+    | datetime.datetime
+    | list[str]
+    | list[float]
+    | dict[str, typing.Any]
+    | None
+)
 Row: TypeAlias = dict[str, Value]
 Rows: TypeAlias = list[Row]
 
@@ -110,7 +114,7 @@ class Column:
     # If specified, this is the name of the column in the database.
     # Normally we just use name, but sometimes we have an internal convention like
     # a "_dump" suffix that we don't want to expose in the API.
-    db_name: typing.Optional[str]
+    db_name: str | None
     type: ColumnType
     nullable: bool
     # TODO: Description?
@@ -121,7 +125,7 @@ class Column:
         name: str,
         type: ColumnType,
         nullable: bool = False,
-        db_name: typing.Optional[str] = None,
+        db_name: str | None = None,
     ) -> None:
         self.name = name
         self.db_name = db_name
@@ -148,7 +152,7 @@ class Table:
     col_types: dict[str, ColumnType]
     json_cols: list[str]
 
-    def __init__(self, name: str, cols: typing.Optional[Columns] = None):
+    def __init__(self, name: str, cols: Columns | None = None):
         self.name = name
         self.cols = cols or []
         self.col_types = {c.name: c.type for c in self.cols}
@@ -166,7 +170,7 @@ class Table:
     def select(self) -> "Select":
         return Select(self)
 
-    def insert(self, row: typing.Optional[Row] = None) -> "Insert":
+    def insert(self, row: Row | None = None) -> "Insert":
         ins = Insert(self)
         if row:
             ins.row(row)
@@ -213,7 +217,7 @@ class PreparedSelect(BaseModel):
 class Join:
     table: Table
     query: tsi.Query
-    join_type: typing.Optional[str]
+    join_type: str | None
 
 
 class Select:
@@ -223,17 +227,17 @@ class Select:
 
     action: Action
 
-    _project_id: typing.Optional[str]
+    _project_id: str | None
     # Fields from the user that must be transformed to internal field names
     # like "inputs.my_field" or "payload.value"
-    _fields: typing.Optional[list[str]]
+    _fields: list[str] | None
     # Fields that we have constructed internally, like cost query fields
-    _raw_sql_fields: typing.Optional[list[str]]
-    _query: typing.Optional[tsi.Query]
-    _order_by: typing.Optional[list[tsi.SortBy]]
-    _limit: typing.Optional[int]
-    _offset: typing.Optional[int]
-    _group_by: typing.Optional[list[str]]
+    _raw_sql_fields: list[str] | None
+    _query: tsi.Query | None
+    _order_by: list[tsi.SortBy] | None
+    _limit: int | None
+    _offset: int | None
+    _group_by: list[str] | None
 
     def __init__(self, table: Table, action: Action = "SELECT"):
         self.table = table
@@ -251,22 +255,22 @@ class Select:
         self._group_by = None
 
     def join(
-        self, table: Table, query: tsi.Query, join_type: typing.Optional[str] = None
+        self, table: Table, query: tsi.Query, join_type: str | None = None
     ) -> "Select":
         self.joins.append(Join(table, query, join_type))
         for col in table.cols:
             self.all_columns.append(col.dbname())
         return self
 
-    def project_id(self, project_id: typing.Optional[str]) -> "Select":
+    def project_id(self, project_id: str | None) -> "Select":
         self._project_id = project_id
         return self
 
-    def fields(self, fields: typing.Optional[list[str]]) -> "Select":
+    def fields(self, fields: list[str] | None) -> "Select":
         self._fields = fields
         return self
 
-    def raw_sql_fields(self, raw_fields: typing.Optional[list[str]]) -> "Select":
+    def raw_sql_fields(self, raw_fields: list[str] | None) -> "Select":
         """Add raw SQL expressions that don't need external-to-internal field transformation.
 
         Example: fields like cost query fields that are aggregations and custom-defined
@@ -277,11 +281,11 @@ class Select:
         self._raw_sql_fields = raw_fields or []
         return self
 
-    def where(self, query: typing.Optional[tsi.Query]) -> "Select":
+    def where(self, query: tsi.Query | None) -> "Select":
         self._query = query
         return self
 
-    def order_by(self, order_by: typing.Optional[list[tsi.SortBy]]) -> "Select":
+    def order_by(self, order_by: list[tsi.SortBy] | None) -> "Select":
         if order_by:
             for o in order_by:
                 assert o.direction in (
@@ -293,26 +297,26 @@ class Select:
         self._order_by = order_by
         return self
 
-    def limit(self, limit: typing.Optional[int]) -> "Select":
+    def limit(self, limit: int | None) -> "Select":
         if limit is not None and limit < 0:
             raise ValueError("Limit must be non-negative")
         self._limit = limit
         return self
 
-    def offset(self, offset: typing.Optional[int]) -> "Select":
+    def offset(self, offset: int | None) -> "Select":
         if offset is not None and offset < 0:
             raise ValueError("Offset must be non-negative")
         self._offset = offset
         return self
 
-    def group_by(self, fields: typing.Optional[list[str]]) -> "Select":
+    def group_by(self, fields: list[str] | None) -> "Select":
         self._group_by = fields
         return self
 
     def prepare(
         self,
         database_type: DatabaseType,
-        param_builder: typing.Optional[ParamBuilder] = None,
+        param_builder: ParamBuilder | None = None,
     ) -> PreparedSelect:
         param_builder = param_builder or ParamBuilder(None, database_type)
         assert database_type == param_builder._database_type
@@ -509,9 +513,7 @@ def python_value_to_ch_type(value: typing.Any) -> str:
         raise ValueError(f"Unknown value type: {value}")
 
 
-def clickhouse_cast(
-    inner_sql: str, cast: typing.Optional[tsi_query.CastTo] = None
-) -> str:
+def clickhouse_cast(inner_sql: str, cast: tsi_query.CastTo | None = None) -> str:
     """Helper function to cast a sql expression to a clickhouse type."""
     if cast is None:
         return inner_sql
@@ -582,8 +584,8 @@ def _transform_external_field_to_internal_field(
     field: str,
     all_columns: typing.Sequence[str],
     json_columns: typing.Sequence[str],
-    cast: typing.Optional[str] = None,
-    param_builder: typing.Optional[ParamBuilder] = None,
+    cast: str | None = None,
+    param_builder: ParamBuilder | None = None,
 ) -> tuple[str, ParamBuilder, set[str]]:
     """Transforms a request for a dot-notation field to a clickhouse field."""
     param_builder = param_builder or ParamBuilder()
@@ -641,7 +643,7 @@ def _process_query_to_conditions(
     query: tsi.Query,
     all_columns: typing.Sequence[str],
     json_columns: typing.Sequence[str],
-    param_builder: typing.Optional[ParamBuilder] = None,
+    param_builder: ParamBuilder | None = None,
 ) -> tuple[list[str], set[str]]:
     """Converts a Query to a list of conditions for a clickhouse query."""
     pb = param_builder or ParamBuilder()

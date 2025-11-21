@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-import contextvars
 import logging
+from collections.abc import Callable
+from contextvars import ContextVar
 from functools import wraps
-from typing import Any, Callable, TypeVar
+from typing import Any, TypeVar
 
-import requests
+import httpx
 import tenacity
 from pydantic import ValidationError
 
@@ -17,7 +18,7 @@ logger = logging.getLogger(__name__)
 T = TypeVar("T")
 
 # Context variable to store retry ID for correlation
-_retry_id: contextvars.ContextVar[str] = contextvars.ContextVar("retry_id")
+_retry_id: ContextVar[str] = ContextVar("retry_id")
 
 
 def with_retry(func: Callable[..., T]) -> Callable[..., T]:
@@ -67,7 +68,7 @@ def _is_retryable_exception(e: BaseException) -> bool:
         return False
 
     # Don't retry on HTTP 4xx (except 429)
-    if isinstance(e, requests.HTTPError) and e.response is not None:
+    if isinstance(e, httpx.HTTPStatusError) and e.response is not None:
         code_class = e.response.status_code // 100
 
         # Bad request, not rate-limiting

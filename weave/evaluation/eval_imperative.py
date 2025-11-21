@@ -13,7 +13,7 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from threading import Lock
 from types import MethodType
-from typing import TYPE_CHECKING, Annotated, Any, TypeVar, Union, cast, overload
+from typing import TYPE_CHECKING, Annotated, Any, TypeVar, cast, overload
 
 if TYPE_CHECKING:
     from weave.trace.call import Call
@@ -46,7 +46,7 @@ from weave.utils.sentinel import NOT_SET, _NotSetType
 
 T = TypeVar("T")
 ID = str
-ScoreType = Union[float, bool, dict]
+ScoreType = float | bool | dict
 
 logger = logging.getLogger(__name__)
 

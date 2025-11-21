@@ -1,7 +1,7 @@
 """Utilities for working with IPython/Jupyter notebooks."""
 
 import ast
-from typing import Callable
+from collections.abc import Callable
 
 
 class NotInteractiveEnvironmentError(Exception): ...

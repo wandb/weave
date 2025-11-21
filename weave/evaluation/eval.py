@@ -2,9 +2,10 @@ import asyncio
 import json
 import logging
 import traceback
+from collections.abc import Callable
 from datetime import datetime
 from itertools import chain, repeat
-from typing import Any, Callable, Literal, Optional, Union
+from typing import Any, Literal
 
 from pydantic import PrivateAttr
 from typing_extensions import Self
@@ -102,15 +103,15 @@ class Evaluation(Object):
     """
 
     dataset: DatasetLike
-    scorers: Optional[list[ScorerLike]] = None
-    preprocess_model_input: Optional[PreprocessModelInput] = None
+    scorers: list[ScorerLike] | None = None
+    preprocess_model_input: PreprocessModelInput | None = None
     trials: int = 1
 
-    metadata: Optional[dict[str, Any]] = None
+    metadata: dict[str, Any] | None = None
 
     # Custom evaluation name for display in the UI.  This is the same API as passing a
     # custom `call_display_name` to `weave.op` (see that for more details).
-    evaluation_name: Optional[Union[str, CallDisplayNameFunc]] = None
+    evaluation_name: str | CallDisplayNameFunc | None = None
 
     # internal attr to track whether to use the new `output` or old `model_output` key for outputs
     _output_key: Literal["output", "model_output"] = PrivateAttr("output")
@@ -174,7 +175,7 @@ class Evaluation(Object):
             self.name = self.dataset.name + "-evaluation"  # type: ignore
 
     @op
-    async def predict_and_score(self, model: Union[Op, Model], example: dict) -> dict:
+    async def predict_and_score(self, model: Op | Model, example: dict) -> dict:
         apply_model_result = await apply_model_async(
             model, example, self.preprocess_model_input
         )
@@ -199,7 +200,9 @@ class Evaluation(Object):
             apply_scorer_results = await asyncio.gather(*scorer_tasks)
 
             # Process results and build scores dict
-            for scorer, apply_scorer_result in zip(scorers, apply_scorer_results):
+            for scorer, apply_scorer_result in zip(
+                scorers, apply_scorer_results, strict=False
+            ):
                 result = apply_scorer_result.result
                 scorer_attributes = get_scorer_attributes(scorer)
                 scorer_name = scorer_attributes.scorer_name
@@ -234,7 +237,7 @@ class Evaluation(Object):
                     summary[name] = model_output_summary
         return summary
 
-    async def get_eval_results(self, model: Union[Op, Model]) -> EvaluationResults:
+    async def get_eval_results(self, model: Op | Model) -> EvaluationResults:
         if not is_valid_model(model):
             raise ValueError(INVALID_MODEL_ERROR)
         eval_rows: list[tuple[int, dict]] = []
@@ -277,7 +280,7 @@ class Evaluation(Object):
         return EvaluationResults(rows=Table(table_rows))
 
     @op(call_display_name=default_evaluation_display_name)
-    async def evaluate(self, model: Union[Op, Model]) -> dict:
+    async def evaluate(self, model: Op | Model) -> dict:
         eval_results = await self.get_eval_results(model)
         summary = await self.summarize(eval_results)
 
@@ -421,10 +424,10 @@ def _safe_summarize_to_str(summary: dict) -> str:
 
 
 def evaluate(
-    dataset: Union[Dataset, list],
-    model: Union[Op, Model],
-    scorers: Optional[list[Union[Callable, Scorer]]] = None,
-    preprocess_model_input: Optional[PreprocessModelInput] = None,
+    dataset: Dataset | list,
+    model: Op | Model,
+    scorers: list[Callable | Scorer] | None = None,
+    preprocess_model_input: PreprocessModelInput | None = None,
 ) -> dict:
     eval = Evaluation(
         dataset=dataset, scorers=scorers, preprocess_model_input=preprocess_model_input
