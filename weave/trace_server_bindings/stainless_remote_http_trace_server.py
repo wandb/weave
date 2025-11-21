@@ -3,8 +3,8 @@ from __future__ import annotations
 import datetime
 import io
 import logging
-from collections.abc import Iterator
-from typing import Any, Callable, TypeVar
+from collections.abc import Callable, Iterator
+from typing import Any, TypeVar
 from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, validate_call
