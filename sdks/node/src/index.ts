@@ -1,6 +1,7 @@
 export {
   init,
   login,
+  withAttributes,
   requireCurrentCallStackEntry,
   requireCurrentChildSummary,
 } from './clientApi';
