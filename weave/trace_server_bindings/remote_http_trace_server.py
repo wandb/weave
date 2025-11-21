@@ -1272,3 +1272,8 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
             method="DELETE",
             params=params,
         )
+
+    def calls_upsert_batch_v2(
+        self, req: tsi.CallsUpsertBatchV2Req
+    ) -> tsi.CallsUpsertBatchV2Res:
+        raise NotImplementedError("calls_upsert_batch_v2 is not implemented")

@@ -220,13 +220,13 @@ class CompletedCallSchemaForInsert(BaseModel):
     started_at: datetime.datetime
 
     updated_at: datetime.datetime | None = None
+    ended_at: datetime.datetime | None = None
+    deleted_at: datetime.datetime | None = None
 
     display_name: str | None = None
     parent_id: str | None = None
     thread_id: str | None = None
     turn_id: str | None = None
-
-    ended_at: datetime.datetime | None = None
 
     # Dump fields
     attributes: dict[str, Any]
@@ -2057,6 +2057,7 @@ class TraceServerInterface(Protocol):
     # Call API
     def call_start(self, req: CallStartReq) -> CallStartRes: ...
     def call_end(self, req: CallEndReq) -> CallEndRes: ...
+
     def call_read(self, req: CallReadReq) -> CallReadRes: ...
     def calls_query(self, req: CallsQueryReq) -> CallsQueryRes: ...
     def calls_query_stream(self, req: CallsQueryReq) -> Iterator[CallSchema]: ...
