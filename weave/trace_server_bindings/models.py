@@ -13,8 +13,13 @@ class EndBatchItem(BaseModel):
     req: tsi.CallEndReq
 
 
+class CompleteBatchItem(BaseModel):
+    mode: str = "complete"
+    req: tsi.CallCompleteReq
+
+
 class Batch(BaseModel):
-    batch: list[StartBatchItem | EndBatchItem]
+    batch: list[StartBatchItem | EndBatchItem | CompleteBatchItem]
 
 
 class ServerInfoRes(BaseModel):

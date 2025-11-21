@@ -154,7 +154,7 @@ def test_calls_start_batch_with_completes(client, ch_client_auto, server, projec
             tsi.CallBatchCompleteMode(
                 mode="complete", req=tsi.CallCompleteReq(complete=complete)
             )
-        ],
+        ]
     )
     res = server.calls_start_batch(req)
 
@@ -222,7 +222,7 @@ def test_calls_start_batch_mixed_starts_and_completes(
             tsi.CallBatchCompleteMode(
                 mode="complete", req=tsi.CallCompleteReq(complete=complete)
             ),
-        ],
+        ]
     )
     res = server.calls_start_batch(req)
 
@@ -428,7 +428,7 @@ def test_calls_with_metadata_fields(client, ch_client_auto, server, project_id):
             tsi.CallBatchStartMode(
                 mode="start", req=tsi.CallStartReq(start=start_thread)
             ),
-        ],
+        ]
     )
     server.calls_start_batch(req)
 
@@ -509,7 +509,7 @@ def test_batch_end_multiple_calls(client, ch_client_auto, server, project_id):
         project_id=project_id,
         batch=[
             tsi.CallBatchEndMode(mode="end", req=tsi.CallEndReq(end=e)) for e in ends
-        ],
+        ]
     )
     server.calls_end_batch(end_req)
 
