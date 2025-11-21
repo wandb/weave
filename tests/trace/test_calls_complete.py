@@ -8,16 +8,17 @@ import pytest
 from tests.trace.util import client_is_sqlite
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ids import generate_id
-from weave.trace_server.project_version.project_version import ProjectVersionResolver
 from weave.trace_server.project_version.types import ProjectVersionMode
 
 
 @pytest.fixture
-def clickhouse_client(client):
+def ch_client_auto(client):
     """Get direct ClickHouse client for table queries."""
     if client_is_sqlite(client):
         return None
-    return client.server._next_trace_server.ch_client
+    ch_client = client.server._next_trace_server.ch_client
+    ch_client._project_version_resolver._mode = ProjectVersionMode.AUTO
+    return ch_client
 
 
 @pytest.fixture
@@ -87,23 +88,8 @@ def query_calls_complete(ch_client, project_id, call_id=None):
     return list(result.named_results())
 
 
-def query_calls_merged(ch_client, project_id, call_id=None):
-    """Query calls_merged table directly."""
-    if call_id:
-        query = "SELECT * FROM calls_merged WHERE project_id = {project_id:String} AND id = {call_id:String}"
-        result = ch_client.query(
-            query, parameters={"project_id": project_id, "call_id": call_id}
-        )
-    else:
-        query = "SELECT * FROM calls_merged WHERE project_id = {project_id:String} ORDER BY started_at DESC"
-        result = ch_client.query(query, parameters={"project_id": project_id})
-    return list(result.named_results())
-
-
-def test_calls_start_batch_with_starts_only(
-    client, clickhouse_client, server, project_id, auto_mode
-):
-    """Test calls_start_batch with only start entries (AUTO mode - calls_complete only)."""
+def test_calls_start_batch_with_starts_only(client, ch_client_auto, server, project_id):
+    """Test calls_start_batch with only start entries."""
     if client_is_sqlite(client):
         pytest.skip("Skipping test for sqlite clients")
 
@@ -151,7 +137,7 @@ def test_calls_start_batch_with_starts_only(
     assert res.res[1].trace_id == trace_id
 
     # Query calls_complete table directly
-    rows = query_calls_complete(clickhouse_client, project_id)
+    rows = query_calls_complete(ch_client_auto, project_id)
     assert len(rows) >= 2
 
     call_1 = next(r for r in rows if r["id"] == call_id_1)
@@ -180,10 +166,8 @@ def test_calls_start_batch_with_starts_only(
     assert call_2["ended_at"] is None
 
 
-def test_calls_start_batch_with_completes(
-    client, clickhouse_client, server, project_id, auto_mode
-):
-    """Test calls_start_batch with complete entries (AUTO mode - calls_complete only)."""
+def test_calls_start_batch_with_completes(client, ch_client_auto, server, project_id):
+    """Test calls_start_batch with complete entries."""
     if client_is_sqlite(client):
         pytest.skip("Skipping test for sqlite clients")
 
@@ -222,7 +206,7 @@ def test_calls_start_batch_with_completes(
     assert res.res[0].trace_id == trace_id
 
     # Query calls_complete table
-    rows = query_calls_complete(clickhouse_client, project_id, call_id)
+    rows = query_calls_complete(ch_client_auto, project_id, call_id)
     assert len(rows) == 1
 
     call = rows[0]
@@ -238,7 +222,7 @@ def test_calls_start_batch_with_completes(
 
 
 def test_calls_start_batch_mixed_starts_and_completes(
-    client, clickhouse_client, server, project_id, auto_mode
+    client, ch_client_auto, server, project_id
 ):
     """Test calls_start_batch with both starts and completes (AUTO mode - calls_complete only)."""
     if client_is_sqlite(client):
@@ -288,7 +272,7 @@ def test_calls_start_batch_mixed_starts_and_completes(
     assert len(res.res) == 2
 
     # Query both calls
-    rows = query_calls_complete(clickhouse_client, project_id)
+    rows = query_calls_complete(ch_client_auto, project_id)
     start_call = next((r for r in rows if r["id"] == call_id_start), None)
     complete_call = next((r for r in rows if r["id"] == call_id_complete), None)
 
@@ -305,10 +289,8 @@ def test_calls_start_batch_mixed_starts_and_completes(
     assert json.loads(complete_call["output_dump"]) == {"c": 3}
 
 
-def test_calls_end_batch_updates_existing(
-    client, clickhouse_client, server, project_id, auto_mode
-):
-    """Test calls_end_batch updates existing calls (AUTO mode - calls_complete only)."""
+def test_calls_end_batch_updates_existing(client, ch_client_auto, server, project_id):
+    """Test calls_end_batch updates existing calls."""
     if client_is_sqlite(client):
         pytest.skip("Skipping test for sqlite clients")
 
@@ -349,7 +331,7 @@ def test_calls_end_batch_updates_existing(
     server.calls_start_batch(start_req)
 
     # Verify starts exist without end data
-    rows = query_calls_complete(clickhouse_client, project_id)
+    rows = query_calls_complete(ch_client_auto, project_id)
     call_1_before = next(r for r in rows if r["id"] == call_id_1)
     call_2_before = next(r for r in rows if r["id"] == call_id_2)
     assert call_1_before["ended_at"] is None
@@ -387,7 +369,7 @@ def test_calls_end_batch_updates_existing(
     server.calls_end_batch(end_req)
 
     # Verify calls were updated
-    rows_after = query_calls_complete(clickhouse_client, project_id)
+    rows_after = query_calls_complete(ch_client_auto, project_id)
     call_1_after = next(r for r in rows_after if r["id"] == call_id_1)
     call_2_after = next(r for r in rows_after if r["id"] == call_id_2)
 
@@ -410,10 +392,8 @@ def test_calls_end_batch_updates_existing(
     assert json.loads(call_2_after["inputs_dump"]) == {"y": 20}
 
 
-def test_calls_with_metadata_fields(
-    client, clickhouse_client, server, project_id, auto_mode
-):
-    """Test calls with refs, W&B metadata, and thread/turn IDs (AUTO mode - calls_complete only)."""
+def test_calls_with_metadata_fields(client, ch_client_auto, server, project_id):
+    """Test calls with refs, W&B metadata, and thread/turn IDs."""
     if client_is_sqlite(client):
         pytest.skip("Skipping test for sqlite clients")
 
@@ -495,7 +475,7 @@ def test_calls_with_metadata_fields(
     server.calls_start_batch(req)
 
     # Verify refs
-    rows_refs = query_calls_complete(clickhouse_client, project_id, call_id_refs)
+    rows_refs = query_calls_complete(ch_client_auto, project_id, call_id_refs)
     assert len(rows_refs) == 1
     call_refs = rows_refs[0]
     assert ref_input in call_refs["input_refs"], (
@@ -506,7 +486,7 @@ def test_calls_with_metadata_fields(
     )
 
     # Verify W&B metadata
-    rows_wb = query_calls_complete(clickhouse_client, project_id, call_id_wb)
+    rows_wb = query_calls_complete(ch_client_auto, project_id, call_id_wb)
     assert len(rows_wb) == 1
     call_wb = rows_wb[0]
     assert call_wb["wb_user_id"] == wb_user_id
@@ -515,17 +495,15 @@ def test_calls_with_metadata_fields(
     assert call_wb["wb_run_step_end"] == wb_run_step_end
 
     # Verify thread and turn IDs
-    rows_thread = query_calls_complete(clickhouse_client, project_id, call_id_thread)
+    rows_thread = query_calls_complete(ch_client_auto, project_id, call_id_thread)
     assert len(rows_thread) == 1
     call_thread = rows_thread[0]
     assert call_thread["thread_id"] == thread_id
     assert call_thread["turn_id"] == turn_id
 
 
-def test_batch_end_multiple_calls(
-    client, clickhouse_client, server, project_id, auto_mode
-):
-    """Test ending multiple calls in one batch (AUTO mode - calls_complete only)."""
+def test_batch_end_multiple_calls(client, ch_client_auto, server, project_id):
+    """Test ending multiple calls in one batch."""
     if client_is_sqlite(client):
         pytest.skip("Skipping test for sqlite clients")
 
@@ -578,7 +556,7 @@ def test_batch_end_multiple_calls(
     server.calls_end_batch(end_req)
 
     # Verify all calls were updated
-    rows = query_calls_complete(clickhouse_client, project_id)
+    rows = query_calls_complete(ch_client_auto, project_id)
     updated_calls = [r for r in rows if r["id"] in call_ids]
     assert len(updated_calls) == 5
 
