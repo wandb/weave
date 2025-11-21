@@ -609,7 +609,7 @@ def test_bedrock_agent_invoke_agent(
         assert response["sessionId"] == "test-session"
 
     # Check that a trace was captured
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1, "Expected exactly one trace call for invoke_agent"
     call = calls[0]
 
