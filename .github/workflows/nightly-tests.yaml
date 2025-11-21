@@ -41,13 +41,19 @@ jobs:
             "dspy",
             "groq",
             "google_genai",
+            "huggingface",
             "instructor",
             "langchain",
+            "langchain_nvidia_ai_endpoints",
             "litellm",
             "llamaindex",
             "mistral",
             "notdiamond",
             "openai",
+            "openai_agents",
+            "openai_realtime",
+            "scorers",
+            "verdict",
             "verifiers_test",
             "vertexai",
             "pandas_test",
@@ -127,7 +133,7 @@ jobs:
         if: steps.filter_shards.outputs.skip != 'true'
         run: |
           # Shards that are in the regular test matrix and need trace_server markers
-          TRACE_SERVER_SHARDS="flow trace_server trace_server_bindings anthropic cerebras cohere crewai dspy groq google_genai google_ai_studio instructor langchain litellm llamaindex mistral notdiamond openai openai_agents vertexai bedrock scorers pandas_test huggingface smolagents mcp autogen_tests trace trace_no_server"
+          TRACE_SERVER_SHARDS="flow trace_server trace_server_bindings anthropic cerebras cohere crewai dspy groq google_genai google_ai_studio instructor langchain langchain_nvidia_ai_endpoints litellm llamaindex mistral notdiamond openai openai_agents openai_realtime vertexai bedrock scorers pandas_test huggingface smolagents mcp verdict autogen_tests trace trace_no_server"
           if [[ " $TRACE_SERVER_SHARDS " =~ " ${{ matrix.shard }} " ]]; then
             echo "needs_markers=true" >> $GITHUB_OUTPUT
           else
@@ -148,6 +154,7 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
           DD_TRACE_ENABLED: false
         run: |
           nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.shard }}')" -- \
@@ -182,6 +189,7 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
           DD_TRACE_ENABLED: false
         run: |
           nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.shard }}')"
