@@ -219,7 +219,7 @@ def tests(session: nox.Session, shard: str):
         pytest_args.extend(["-m", "trace_server"])
 
     if shard == "trace_no_server":
-        pytest_args.extend(["-m", "not trace_server"])
+        pytest_args.extend(["-m", "not trace_server", "--trace-server=sqlite"])
 
     # Set trace-server flag for stainless shard
     if shard == "stainless":

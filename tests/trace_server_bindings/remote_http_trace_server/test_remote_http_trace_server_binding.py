@@ -167,7 +167,7 @@ def test_oversized_item_will_log_warning_and_send(server, caplog):
     server._flush_calls(batch)
 
     # Verify error was logged
-    assert any("Single call size" in record.message for record in caplog.records)
+    assert any("Single calls size" in record.message for record in caplog.records)
     assert any("may be too large" in record.message for record in caplog.records)
 
     # Verify _send_batch_to_server was still called
@@ -318,7 +318,7 @@ def test_post_timeout(mock_post, success_response, server, log_collector):
     server.call_processor.stop_accepting_new_work_and_flush_queue()
     logs = log_collector.get_warning_logs()
     assert len(logs) >= 1
-    assert any("requeueing batch" in log.msg for log in logs)
+    assert any("requeuing batch" in log.msg for log in logs)
 
     # Phase 2: Reset mock and verify we can still process a new batch
     mock_post.reset_mock()
