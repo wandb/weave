@@ -59,7 +59,7 @@ def bedrock_on_finish_invoke(
 def bedrock_agent_on_finish_invoke_agent(
     call: Call,
     output: Any,
-    exception: Optional[BaseException],
+    exception: BaseException | None,
 ) -> None:
     # Extract foundation model name from stored info, fallback to agent ID
     model_name = "unknown"
@@ -187,8 +187,8 @@ def postprocess_output_invoke(
 
 
 def postprocess_output_invoke_agent(
-    outputs: Optional[dict[str, Any]],
-) -> Optional[dict[str, Any]]:
+    outputs: dict[str, Any] | None,
+) -> dict[str, Any] | None:
     """Process the outputs for invoke_agent, extracting essential info from EventStream while preserving it for user."""
     if outputs is None:
         return None
