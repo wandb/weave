@@ -5,26 +5,28 @@ import json
 import logging
 from queue import Full
 from types import MethodType
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
-import httpx
 import pytest
+import requests
 import tenacity
 
 from weave.trace.display.term import configure_logger
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ids import generate_id
-from weave.trace_server_bindings.remote_http_trace_server import (
+from weave.trace_server_bindings.models import (
     Batch,
     EndBatchItem,
-    RemoteHTTPTraceServer,
     StartBatchItem,
+)
+from weave.trace_server_bindings.stainless_remote_http_trace_server import (
+    StainlessRemoteHTTPTraceServer,
 )
 
 
 def generate_start(id: str | None = None) -> tsi.StartedCallSchemaForInsert:
     return tsi.StartedCallSchemaForInsert(
-        project_id="test",
+        project_id="test/test",
         id=id or generate_id(),
         op_name="test_name",
         trace_id="test_trace_id",
@@ -37,7 +39,7 @@ def generate_start(id: str | None = None) -> tsi.StartedCallSchemaForInsert:
 
 def generate_end(id: str | None = None) -> tsi.EndedCallSchemaForInsert:
     return tsi.EndedCallSchemaForInsert(
-        project_id="test",
+        project_id="test/test",
         id=id or generate_id(),
         ended_at=datetime.datetime.now(tz=datetime.timezone.utc)
         + datetime.timedelta(seconds=1),
@@ -65,7 +67,7 @@ def success_response():
 
 @pytest.fixture
 def server(request):
-    server_ = RemoteHTTPTraceServer("http://example.com", should_batch=True)
+    server_ = StainlessRemoteHTTPTraceServer("http://example.com", should_batch=True)
 
     if request.param == "normal":
         server_._send_batch_to_server = MagicMock()
@@ -167,7 +169,7 @@ def test_oversized_item_will_log_warning_and_send(server, caplog):
     server._flush_calls(batch)
 
     # Verify error was logged
-    assert any("Single call size" in record.message for record in caplog.records)
+    assert any("Single calls size" in record.message for record in caplog.records)
     assert any("may be too large" in record.message for record in caplog.records)
 
     # Verify _send_batch_to_server was still called
@@ -274,32 +276,40 @@ def test_non_uniform_batch_items(server):
     assert total_items_sent == len(batch)
 
 
-@patch("weave.utils.http_requests.post")
-def test_timeout_retry_mechanism(mock_post, success_response):
+def test_timeout_retry_mechanism(success_response):
     """Test that timeouts trigger the retry mechanism."""
-    server = RemoteHTTPTraceServer("http://example.com", should_batch=True)
+    server = StainlessRemoteHTTPTraceServer("http://example.com", should_batch=True)
 
-    # Mock server to raise errors twice, then succeed
-    mock_post.side_effect = [
-        httpx.TimeoutException("Connection timed out"),
-        httpx.HTTPStatusError(
-            "500 Server Error", request=MagicMock(), response=MagicMock(status_code=500)
-        ),
-        success_response,
-    ]
+    # Mock _send_batch_to_server to raise errors twice, then succeed
+    # This tests the retry mechanism at the _send_batch_to_server level
+    call_count = 0
+
+    original_send_batch = server._send_batch_to_server
+
+    def mock_send_batch(encoded_data: bytes) -> None:
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            raise requests.exceptions.Timeout("Connection timed out")
+        elif call_count == 2:
+            raise requests.exceptions.HTTPError("500 Server Error")
+        else:
+            # Success - call the original function
+            original_send_batch(encoded_data)
+
+    server._send_batch_to_server = mock_send_batch
 
     # Trying to send a batch should fail 2 times, then succeed
     server.call_start(tsi.CallStartReq(start=generate_start()))
     server.call_processor.stop_accepting_new_work_and_flush_queue()
 
-    # Verify that requests.post was called 3 times
-    assert mock_post.call_count == 3
+    # Verify that _send_batch_to_server was called 3 times (2 failures + 1 success)
+    assert call_count == 3
 
 
 @pytest.mark.disable_logging_error_check
 @pytest.mark.parametrize("server", ["fast_retrying"], indirect=True)
-@patch("weave.utils.http_requests.post")
-def test_post_timeout(mock_post, success_response, server, log_collector):
+def test_post_timeout(success_response, server, log_collector):
     """Test that we can still send new batches even if one batch times out.
 
     This test modifies the retry mechanism to use a short wait time and limited retries
@@ -307,37 +317,57 @@ def test_post_timeout(mock_post, success_response, server, log_collector):
     """
     configure_logger()
     # Configure mock to timeout twice to exhaust retries
-    mock_post.side_effect = [
-        # First batch times out twice
-        httpx.TimeoutException("Connection timed out"),
-        httpx.TimeoutException("Connection timed out"),
-    ]
+    call_count = 0
+
+    original_send_batch = server._send_batch_to_server
+
+    def mock_send_batch_timeout(encoded_data: bytes) -> None:
+        nonlocal call_count
+        call_count += 1
+        # Always raise timeout to exhaust retries
+        raise requests.exceptions.Timeout("Connection timed out")
+
+    server._send_batch_to_server = mock_send_batch_timeout
 
     # Phase 1: Try but fail to process the first batch
     server.call_start(tsi.CallStartReq(start=generate_start()))
     server.call_processor.stop_accepting_new_work_and_flush_queue()
     logs = log_collector.get_warning_logs()
     assert len(logs) >= 1
-    assert any("requeueing batch" in log.msg for log in logs)
+    assert any(
+        "requeueing batch" in log.msg or "batch failed" in log.msg for log in logs
+    )
 
     # Phase 2: Reset mock and verify we can still process a new batch
-    mock_post.reset_mock()
-    mock_post.side_effect = [
-        httpx.TimeoutException("Connection timed out"),
-        success_response,
-    ]
+    call_count = 0
+
+    def mock_start_success(*args, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            raise requests.exceptions.Timeout("Connection timed out")
+        else:
+            mock_response = MagicMock()
+            mock_response.id = "test_id"
+            mock_response.trace_id = "test_trace_id"
+            return mock_response
 
     # Create a new server since the old one has shutdown its batch processor
-    new_server = RemoteHTTPTraceServer("http://example.com", should_batch=False)
+    new_server = StainlessRemoteHTTPTraceServer(
+        "http://example.com", should_batch=False
+    )
     fast_retry = tenacity.retry(
         wait=tenacity.wait_fixed(0.1),
         stop=tenacity.stop_after_attempt(2),
         reraise=True,
     )
     unwrapped_send_batch_to_server = MethodType(
-        new_server._send_batch_to_server.__wrapped__, new_server
+        new_server._send_batch_to_server.__wrapped__,  # type: ignore
+        new_server,
     )
     new_server._send_batch_to_server = fast_retry(unwrapped_send_batch_to_server)
+    # Mock calls.start for non-batching case
+    new_server._stainless_client.calls.start = mock_start_success
 
     # Should succeed with retry
     start_req = tsi.CallStartReq(start=generate_start())
@@ -351,6 +381,9 @@ def test_post_timeout(mock_post, success_response, server, log_collector):
 @pytest.mark.parametrize("log_collector", ["warning"], indirect=True)
 def test_drop_data_when_queue_is_full(server, log_collector):
     """Test that items are dropped when the queue is full."""
+    # Set _dropped_item_count to 999 so the next drop (1000th) will log
+    server.call_processor._dropped_item_count = 999
+
     # Replace the real queue with a mock that raises Full when put_nowait is called
     mock_queue = MagicMock()
     mock_queue.put_nowait.side_effect = Full
@@ -380,7 +413,7 @@ def test_requeue_after_max_retries(server, caplog):
     # Mock enqueue to verify it gets called, and _send_batch_to_server to throw an exception
     server.call_processor.enqueue = MagicMock()
     server._send_batch_to_server = MagicMock(
-        side_effect=httpx.ConnectError("Connection error")
+        side_effect=requests.ConnectionError("Connection error")
     )
 
     # Create a batch
@@ -395,4 +428,4 @@ def test_requeue_after_max_retries(server, caplog):
     assert len(caplog.records) == 1
     msg = caplog.records[0].message
     # Match exact message format from the implementation
-    assert "Batch failed after max retries, requeueing batch with" in msg
+    assert "batch failed after max retries, requeuing batch with" in msg

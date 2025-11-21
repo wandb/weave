@@ -20,10 +20,10 @@ from weave.trace import weave_client, weave_init
 from weave.trace.context import weave_client_context
 from weave.trace.context.call_context import set_call_stack
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server_bindings import remote_http_trace_server
 from weave.trace_server_bindings.caching_middleware_trace_server import (
     CachingMiddlewareTraceServer,
 )
+from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
 
 # Force testing to never report wandb sentry events
 os.environ["WANDB_ERROR_REPORTING"] = "false"
@@ -355,7 +355,7 @@ def create_client(
         # Note: this is only for local dev testing and should be removed
         return weave_init.init_weave("dev_testing")
     elif trace_server_flag == "http":
-        server = remote_http_trace_server.RemoteHTTPTraceServer(trace_server_flag)
+        server = RemoteHTTPTraceServer(trace_server_flag)
     else:
         server = trace_server
 
@@ -534,7 +534,7 @@ def network_proxy_client(client):
         orig_post = weave.utils.http_requests.post
         weave.utils.http_requests.post = post
 
-        remote_client = remote_http_trace_server.RemoteHTTPTraceServer(
+        remote_client = RemoteHTTPTraceServer(
             trace_server_url="",
             should_batch=True,
         )
@@ -630,3 +630,45 @@ def mock_wandb_context():
             "get": mock_get_context,
             "set": mock_set_context,
         }
+
+
+def pytest_collection_modifyitems(config, items):
+    """Filter tests based on remote-http-trace-server flag and add trace_server marker.
+
+    This ensures that:
+    - When --remote-http-trace-server=stainless, only stainless tests run
+    - When --remote-http-trace-server=remote (default), only remote tests run
+    - Tests in trace_server_bindings directories get the trace_server marker
+    """
+    # Get the remote HTTP trace server flag
+    remote_http_trace_server_flag = config.getoption(
+        "--remote-http-trace-server", default="remote"
+    )
+
+    # Filter tests based on the remote-http-trace-server flag
+    filtered_items = []
+    for item in items:
+        # Check if test is in stainless_remote_http_trace_server directory
+        is_stainless_test = "stainless_remote_http_trace_server" in item.path.parts
+        # Check if test is in remote_http_trace_server directory (but not stainless)
+        is_remote_test = (
+            "remote_http_trace_server" in item.path.parts and not is_stainless_test
+        )
+
+        # Add trace_server marker to trace_server_bindings tests
+        # (tests/trace_server/conftest.py handles tests/trace_server/ directory)
+        if is_stainless_test or is_remote_test:
+            item.add_marker(pytest.mark.trace_server)
+
+        # Skip stainless tests when flag is not "stainless"
+        if is_stainless_test and remote_http_trace_server_flag != "stainless":
+            continue
+        # Skip remote tests when flag is not "remote"
+        elif is_remote_test and remote_http_trace_server_flag != "remote":
+            continue
+
+        # Keep this item
+        filtered_items.append(item)
+
+    # Replace items list with filtered items
+    items[:] = filtered_items
