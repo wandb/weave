@@ -56,6 +56,39 @@ def bedrock_on_finish_invoke(
         call.summary.update(summary_update)
 
 
+def bedrock_agent_on_finish_invoke_agent(
+    call: Call,
+    output: Any,
+    exception: BaseException | None,
+) -> None:
+    # Extract foundation model name from stored info, fallback to agent ID
+    model_name = "unknown"
+    if output and "_bedrock_agent_foundation_model" in output:
+        model_name = str(output["_bedrock_agent_foundation_model"])
+    else:
+        # Fallback to agent-based identifier
+        agent_id = str(call.inputs.get("agentId", "unknown"))
+        model_name = f"bedrock-agent:{agent_id}"
+
+    usage = {model_name: {"requests": 1}}
+
+    # Extract token usage from stored usage info if available
+    if output and "_bedrock_agent_usage" in output:
+        token_usage = output["_bedrock_agent_usage"]
+        usage[model_name].update(
+            {
+                "prompt_tokens": token_usage.get("inputTokens", 0),
+                "completion_tokens": token_usage.get("outputTokens", 0),
+                "total_tokens": token_usage.get("inputTokens", 0)
+                + token_usage.get("outputTokens", 0),
+            }
+        )
+
+    summary_update = {"usage": usage}
+    if call.summary is not None:
+        call.summary.update(summary_update)
+
+
 def extract_model_name_from_inference_profile_arn(profile_arn: str) -> str:
     """Extract the model name from an inference profile ARN.
 
@@ -85,7 +118,7 @@ def extract_model_name_from_inference_profile_arn(profile_arn: str) -> str:
         model_id = model_arn.split("/")[-1]
 
         return model_id  # noqa: TRY300
-    except Exception as e:
+    except Exception:
         # Fallback to simple inference profile if the application inference profile format fails
         model_part = profile_arn.split("/")[-1]
         model_name = re.sub(r"^[a-z]{2}\.", "", model_part)
@@ -107,6 +140,11 @@ def postprocess_inputs_converse(inputs: dict[str, Any]) -> dict[str, Any]:
 
 
 def postprocess_inputs_apply_guardrail(inputs: dict[str, Any]) -> dict[str, Any]:
+    return inputs.get("kwargs", {})
+
+
+def postprocess_inputs_invoke_agent(inputs: dict[str, Any]) -> dict[str, Any]:
+    """Unpack kwargs to render them in the UI."""
     return inputs.get("kwargs", {})
 
 
@@ -148,6 +186,104 @@ def postprocess_output_invoke(
     return outputs
 
 
+def postprocess_output_invoke_agent(
+    outputs: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    """Process the outputs for invoke_agent, extracting essential info from EventStream while preserving it for user."""
+    if outputs is None:
+        return None
+
+    if "completion" in outputs:
+        # Create a copy of outputs for logging
+        outputs_copy = {
+            k: copy.deepcopy(v) for k, v in outputs.items() if k != "completion"
+        }
+
+        # Process the EventStream to extract essential content for logging
+        all_events = []
+        extracted_text = ""
+        foundation_model = None
+        usage_info = None
+
+        try:
+            # Consume the completion EventStream to collect events
+            completion = outputs["completion"]
+            # Collect all events from the stream
+            for event in completion:
+                all_events.append(event)
+
+                # Extract text from chunk events
+                if (chunk := event.get("chunk")) is not None and (
+                    chunk_bytes := chunk.get("bytes")
+                ) is not None:
+                    text = chunk_bytes.decode("utf-8")
+                    extracted_text += text
+
+                # Extract only essential trace information (model and usage)
+                elif (
+                    (trace := event.get("trace")) is not None
+                    and (trace_inner := trace.get("trace")) is not None
+                    and (orchestration := trace_inner.get("orchestrationTrace"))
+                    is not None
+                ):
+                    # Get foundation model info (once)
+                    if (
+                        foundation_model is None
+                        and (model_input := orchestration.get("modelInvocationInput"))
+                        is not None
+                        and (foundation := model_input.get("foundationModel"))
+                        is not None
+                    ):
+                        foundation_model = foundation
+
+                    # Get usage info (replaces previous if multiple found)
+                    if (
+                        (model_output := orchestration.get("modelInvocationOutput"))
+                        is not None
+                        and (metadata := model_output.get("metadata")) is not None
+                        and (usage := metadata.get("usage")) is not None
+                    ):
+                        usage_info = usage
+
+            # Recreate an iterable for the original response so user can still consume it
+            def recreate_stream() -> Any:
+                """Recreate the stream from captured events."""
+                yield from all_events
+
+            outputs["completion"] = recreate_stream()
+
+            # Store usage and model info in the original output for the finish handler
+            if usage_info:
+                outputs["_bedrock_agent_usage"] = usage_info
+            if foundation_model:
+                outputs["_bedrock_agent_foundation_model"] = foundation_model
+
+        except Exception as e:
+            # If we can't iterate, just note that it's an EventStream
+            outputs_copy["completion"] = {
+                "_stream_error": f"Could not process EventStream: {e!s}"
+            }
+            return outputs_copy
+
+        # Store only essential completion data for logging
+        completion_summary = {
+            "extracted_text": extracted_text,
+            "event_count": len(all_events),
+        }
+
+        # Add optional metadata if found
+        if foundation_model:
+            completion_summary["foundation_model"] = foundation_model
+        if usage_info:
+            completion_summary["usage"] = usage_info
+
+        outputs_copy["completion"] = completion_summary
+
+        return outputs_copy
+
+    return outputs
+
+
 def _patch_converse(bedrock_client: "BaseClient") -> None:
     op = weave.op(
         bedrock_client.converse,
@@ -176,6 +312,18 @@ def _patch_apply_guardrail(bedrock_client: "BaseClient") -> None:
         postprocess_inputs=postprocess_inputs_apply_guardrail,
     )
     bedrock_client.apply_guardrail = op
+
+
+def _patch_invoke_agent(bedrock_agent_client: "BaseClient") -> None:
+    """Patch the invoke_agent method for bedrock-agent-runtime client."""
+    op = weave.op(
+        bedrock_agent_client.invoke_agent,
+        name="BedrockAgentRuntime.invoke_agent",
+        postprocess_inputs=postprocess_inputs_invoke_agent,
+        postprocess_output=postprocess_output_invoke_agent,
+    )
+    op._set_on_finish_handler(bedrock_agent_on_finish_invoke_agent)
+    bedrock_agent_client.invoke_agent = op
 
 
 def bedrock_stream_accumulator(
@@ -262,7 +410,23 @@ def _patch_converse_stream(bedrock_client: "BaseClient") -> None:
 
 
 def patch_client(bedrock_client: "BaseClient") -> None:
-    _patch_converse(bedrock_client)
-    _patch_invoke(bedrock_client)
-    _patch_apply_guardrail(bedrock_client)
-    _patch_converse_stream(bedrock_client)
+    if hasattr(bedrock_client, "invoke_agent"):
+        # Check if this is a bedrock-agent-runtime client
+        _patch_invoke_agent(bedrock_client)
+    elif hasattr(bedrock_client, "converse") or hasattr(bedrock_client, "invoke_model"):
+        # This is a standard bedrock-runtime client
+        _patch_converse(bedrock_client)
+        _patch_converse_stream(bedrock_client)
+        _patch_invoke(bedrock_client)
+    elif hasattr(bedrock_client, "apply_guardrail"):
+        # This is a standard bedrock-runtime client
+        _patch_apply_guardrail(bedrock_client)
+    else:
+        # Unsupported client type
+        client_type = getattr(bedrock_client, "_service_model", {}).get(
+            "service_name", str(type(bedrock_client))
+        )
+        raise ValueError(
+            f"This {client_type} client is not supported for patching. "
+            "Supported clients are: bedrock-agent-runtime (invoke_agent) and bedrock-runtime (converse, invoke_model)"
+        )
