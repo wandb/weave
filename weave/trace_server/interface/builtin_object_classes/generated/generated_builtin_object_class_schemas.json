@@ -129,7 +129,6 @@
           "title": "Description"
         },
         "field_schema": {
-          "additionalProperties": true,
           "default": {},
           "description": "Expected to be valid JSON Schema. Can be provided as a dict, a Pydantic model class, a tuple of a primitive type and a Pydantic Field, or primitive type",
           "examples": [
@@ -494,6 +493,80 @@
         }
       },
       "title": "Column",
+      "type": "object"
+    },
+    "ComparisonView": {
+      "description": "A saved comparison view configuration.\n\nArgs:\n    label (str): Human-readable name for the comparison view.\n    definition (ComparisonViewDefinition): The view's configuration.\n\nExamples:\n    >>> view = ComparisonView(\n    ...     label=\"My Comparison\",\n    ...     definition=ComparisonViewDefinition(\n    ...         evaluation_call_ids=[\"call_1\", \"call_2\"]\n    ...     )\n    ... )",
+      "properties": {
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "definition": {
+          "$ref": "#/$defs/ComparisonViewDefinition"
+        }
+      },
+      "required": [
+        "label",
+        "definition"
+      ],
+      "title": "ComparisonView",
+      "type": "object"
+    },
+    "ComparisonViewDefinition": {
+      "description": "Definition of a comparison view's configuration.\n\nArgs:\n    evaluation_call_ids (List[str]): List of evaluation call IDs being compared.\n    selected_metrics (Optional[List[str]]): List of metrics that are visible in plots.\n\nExamples:\n    >>> definition = ComparisonViewDefinition(\n    ...     evaluation_call_ids=[\"call_1\", \"call_2\"],\n    ...     selected_metrics=[\"accuracy\", \"f1_score\"]\n    ... )",
+      "properties": {
+        "evaluation_call_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evaluation Call Ids",
+          "type": "array"
+        },
+        "selected_metrics": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Selected Metrics"
+        }
+      },
+      "required": [
+        "evaluation_call_ids"
+      ],
+      "title": "ComparisonViewDefinition",
       "type": "object"
     },
     "ContainsOperation": {
@@ -1248,7 +1321,6 @@
           "anyOf": [
             {
               "items": {
-                "additionalProperties": true,
                 "type": "object"
               },
               "type": "array"
@@ -1419,7 +1491,6 @@
           "type": "string"
         },
         "response_schema": {
-          "additionalProperties": true,
           "title": "Response Schema",
           "type": "object"
         }
@@ -1446,7 +1517,6 @@
             },
             {
               "items": {
-                "additionalProperties": true,
                 "type": "object"
               },
               "type": "array"
@@ -1473,7 +1543,6 @@
         "function_call": {
           "anyOf": [
             {
-              "additionalProperties": true,
               "type": "object"
             },
             {
@@ -1909,6 +1978,18 @@
           "default": null,
           "title": "Columns"
         },
+        "header_depth": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Header Depth"
+        },
         "pin": {
           "anyOf": [
             {
@@ -2203,6 +2284,9 @@
     "SavedView": {
       "$ref": "#/$defs/SavedView"
     },
+    "ComparisonView": {
+      "$ref": "#/$defs/ComparisonView"
+    },
     "LLMStructuredCompletionModel": {
       "$ref": "#/$defs/LLMStructuredCompletionModel"
     },
@@ -2220,6 +2304,7 @@
     "Provider",
     "ProviderModel",
     "SavedView",
+    "ComparisonView",
     "LLMStructuredCompletionModel",
     "ChartConfig"
   ],

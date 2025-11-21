@@ -1,10 +1,12 @@
-from typing import Any, Union
+import dataclasses
+from typing import Any
 
 from presidio_analyzer import AnalyzerEngine
 from presidio_anonymizer import AnonymizerEngine
 
 from weave.telemetry import trace_sentry
 from weave.trace.settings import redact_pii_fields
+from weave.utils.sanitize import REDACTED_VALUE, redact_dataclass_fields, should_redact
 
 DEFAULT_REDACTED_FIELDS = [
     "CREDIT_CARD",
@@ -29,8 +31,8 @@ DEFAULT_REDACTED_FIELDS = [
 
 
 def redact_pii(
-    data: Union[dict[str, Any], str],
-) -> Union[dict[str, Any], str]:
+    data: dict[str, Any] | str,
+) -> dict[str, Any] | str:
     analyzer = AnalyzerEngine()
     anonymizer = AnonymizerEngine()
     fields = redact_pii_fields()
@@ -42,9 +44,18 @@ def redact_pii(
             redacted = anonymizer.anonymize(text=value, analyzer_results=results)
             return redacted.text
         elif isinstance(value, dict):
-            return {k: redact_recursive(v) for k, v in value.items()}
+            result = {}
+            for k, v in value.items():
+                # Check if this key should be redacted based on custom redact keys
+                if isinstance(k, str) and should_redact(k):
+                    result[k] = REDACTED_VALUE
+                else:
+                    result[k] = redact_recursive(v)
+            return result
         elif isinstance(value, list):
             return [redact_recursive(item) for item in value]
+        elif dataclasses.is_dataclass(value):
+            return redact_dataclass_fields(value, redact_recursive)
         else:
             return value
 

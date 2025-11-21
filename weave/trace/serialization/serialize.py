@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from types import CoroutineType
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal, TypedDict
 
 from pydantic import BaseModel
 
@@ -34,14 +34,6 @@ def is_pydantic_model_class(obj: Any) -> bool:
     except TypeError:
         # Might be something like Iterable[CalendarEvent]
         return False
-
-
-def _is_inline_custom_obj(encoded: dict) -> bool:
-    """Custom object values may be inline or backed by a file.
-
-    This separate function for readability checks which we are dealing with.
-    """
-    return "val" in encoded
 
 
 def to_json(
@@ -110,17 +102,23 @@ def to_json(
                 for k, v in as_dict.items()
             }
         return fallback_encode(obj)
-    if _is_inline_custom_obj(encoded):
-        return encoded
     result = _build_result_from_encoded(encoded, project_id, client)
     return result
 
 
+class EncodedCustomObjDictWithFilesAsDigests(TypedDict, total=False):
+    _type: Literal["CustomWeaveType"]
+    weave_type: custom_objs.WeaveTypeDict
+    load_op: str | None
+    val: Any
+    files: Mapping[str, str]
+
+
 def _build_result_from_encoded(
-    encoded: dict, project_id: str, client: WeaveClient
-) -> Any:
+    encoded: custom_objs.EncodedCustomObjDict, project_id: str, client: WeaveClient
+) -> EncodedCustomObjDictWithFilesAsDigests:
     file_digests = {}
-    for name, val in encoded["files"].items():
+    for name, val in encoded.get("files", {}).items():
         # Instead of waiting for the file to be created, we
         # calculate the digest directly. This makes sure that the
         # to_json procedure is not blocked on network requests.
@@ -134,11 +132,15 @@ def _build_result_from_encoded(
             contents_as_bytes = contents_as_bytes.encode("utf-8")
         digest = bytes_digest(contents_as_bytes)
         file_digests[name] = digest
-    result = {
+
+    result: EncodedCustomObjDictWithFilesAsDigests = {
         "_type": encoded["_type"],
         "weave_type": encoded["weave_type"],
-        "files": file_digests,
     }
+    if file_digests:
+        result["files"] = file_digests
+    if "val" in encoded:
+        result["val"] = encoded["val"]
     load_op_uri = encoded.get("load_op")
     if load_op_uri:
         result["load_op"] = load_op_uri
@@ -306,12 +308,20 @@ def from_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
                 {k: from_json(v, project_id, server) for k, v in obj.items()}
             )
         elif val_type == "CustomWeaveType":
-            if _is_inline_custom_obj(obj):
-                return custom_objs.decode_custom_inline_obj(obj)
-            files = _load_custom_obj_files(project_id, server, obj["files"])
-            return custom_objs.decode_custom_files_obj(
-                obj["weave_type"], files, obj.get("load_op")
-            )
+            encoded: custom_objs.EncodedCustomObjDict = {
+                "_type": "CustomWeaveType",
+                "weave_type": obj["weave_type"],
+                "load_op": obj.get("load_op"),
+            }
+            if "val" in obj:
+                encoded["val"] = obj["val"]
+            if "files" in obj:
+                file_spec = obj.get("files")
+                if file_spec:
+                    files = _load_custom_obj_files(project_id, server, file_spec)
+                    encoded["files"] = files
+
+            return custom_objs.decode_custom_obj(encoded)
         elif isinstance(val_type, str) and obj.get("_class_name") == val_type:
             from weave.trace_server.interface.builtin_object_classes.builtin_object_registry import (
                 BUILTIN_OBJECT_REGISTRY,

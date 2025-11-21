@@ -4,7 +4,6 @@ import sys
 from collections.abc import Sequence
 from importlib.abc import MetaPathFinder
 from importlib.machinery import ModuleSpec
-from typing import Optional
 
 
 class MoviePyImportHook(MetaPathFinder):
@@ -15,9 +14,9 @@ class MoviePyImportHook(MetaPathFinder):
     def find_spec(
         self,
         fullname: str,
-        path: Optional[Sequence[str]],
-        target: Optional[object] = None,
-    ) -> Optional[ModuleSpec]:
+        path: Sequence[str] | None,
+        target: object | None = None,
+    ) -> ModuleSpec | None:
         """Check if MoviePy is being imported and trigger registration."""
         if not (fullname == "moviepy" or fullname.startswith("moviepy.")):
             return None

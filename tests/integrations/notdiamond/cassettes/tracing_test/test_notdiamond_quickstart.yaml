@@ -16,19 +16,17 @@ interactions:
       Content-Length:
       - '445'
       User-Agent:
-      - Python-SDK/0.3.21
+      - Python-SDK/0.4.9
       content-type:
       - application/json
     method: POST
     uri: https://api.notdiamond.ai/v2/modelRouter/modelSelect
   response:
     body:
-      string: '{"providers":[{"provider":"openai","model":"gpt-4o-mini"}],"session_id":"d903d86b-c2aa-4aad-84d5-fc241454722c"}'
+      string: '{"providers":[{"provider":"openai","model":"gpt-4o-mini"}],"session_id":"b6e30613-2c5b-415e-be1a-d820d3f013c8"}'
     headers:
-      CF-Cache-Status:
-      - DYNAMIC
-      CF-Ray:
-      - 8d06ee068daab0c9-ATL
+      CF-RAY:
+      - 99a79b0ceca767a2-SJC
       Connection:
       - keep-alive
       Content-Encoding:
@@ -36,19 +34,23 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Thu, 10 Oct 2024 13:24:17 GMT
+      - Thu, 06 Nov 2025 21:15:21 GMT
       Server:
       - cloudflare
       Transfer-Encoding:
       - chunked
-      Vary:
-      - Accept-Encoding
       alt-svc:
       - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
       rndr-id:
-      - d26153cb-e5c1-4f8b
+      - 5bbec791-c29f-42ac
+      vary:
+      - Accept-Encoding
       x-render-origin-server:
       - uvicorn
+      x-request-id:
+      - 5bbec791-c29f-42ac
     status:
       code: 200
       message: OK

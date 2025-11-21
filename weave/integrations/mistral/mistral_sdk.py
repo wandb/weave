@@ -1,7 +1,16 @@
 from __future__ import annotations
 
 import importlib
-from typing import TYPE_CHECKING, Callable
+from collections.abc import Callable
+from typing import TYPE_CHECKING
+
+from mistralai.models import (
+    AssistantMessage,
+    ChatCompletionChoice,
+    ChatCompletionResponse,
+    CompletionEvent,
+    UsageInfo,
+)
 
 import weave
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
@@ -9,10 +18,7 @@ from weave.trace.autopatch import IntegrationSettings, OpSettings
 from weave.trace.op import _add_accumulator
 
 if TYPE_CHECKING:
-    from mistralai.models import (
-        ChatCompletionResponse,
-        CompletionEvent,
-    )
+    pass
 
 _mistral_patcher: MultiPatcher | None = None
 
@@ -21,14 +27,6 @@ def mistral_accumulator(
     acc: ChatCompletionResponse | None,
     value: CompletionEvent,
 ) -> ChatCompletionResponse:
-    # This import should be safe at this point
-    from mistralai.models import (
-        AssistantMessage,
-        ChatCompletionChoice,
-        ChatCompletionResponse,
-        UsageInfo,
-    )
-
     value = value.data
     if acc is None:
         acc = ChatCompletionResponse(

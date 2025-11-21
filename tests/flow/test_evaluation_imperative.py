@@ -1,7 +1,8 @@
 import asyncio
 import inspect
 import json
-from typing import Callable, TypedDict
+from collections.abc import Callable
+from typing import TypedDict
 
 import pytest
 
@@ -77,7 +78,7 @@ def test_basic_evaluation(
     }
 
     for i, (inputs, output_val, score1, score2) in enumerate(
-        zip(user_dataset, outputs, score1_results, score2_results)
+        zip(user_dataset, outputs, score1_results, score2_results, strict=False)
     ):
         predict_index = 1 + i * 4
 
@@ -272,10 +273,7 @@ def test_evaluation_version_reuse(
 
         for row in user_dataset:
             output = user_model(row["a"], row["b"])
-            # Convert TypedDict to dict to avoid type errors
-            inputs_dict = dict(row)
-            pred = ev.log_prediction(inputs=inputs_dict, output=output)
-
+            pred = ev.log_prediction(inputs=row, output=output)
             score_result = output > 2
             pred.log_score(scorer="greater_than_2_scorer", score=score_result)
             pred.finish()
@@ -740,3 +738,404 @@ def test_evaluation_logger_set_view_string(client):
     assert stored["_type"] == "CustomWeaveType"
     assert stored["weave_type"]["type"] == "weave.type_wrappers.Content.content.Content"
     assert stored["files"]["content"]
+
+
+def test_cost_propagation_with_child_calls(client):
+    """Test that cost data from child calls propagates to parent predict_and_score call."""
+
+    @weave.op
+    def mock_llm_call(prompt: str) -> dict:
+        return {
+            "model": "gpt-4",
+            "usage": {
+                "prompt_tokens": 10,
+                "completion_tokens": 20,
+                "total_tokens": 30,
+            },
+            "content": "response",
+        }
+
+    ev = EvaluationLogger()
+    pred = ev.log_prediction(inputs={"question": "Hello"}, output="Hi there!")
+
+    # Add a child call with usage/cost data to the predict_call
+    # This simulates calling an LLM within the prediction
+    with call_context.set_call_stack([pred.predict_call]):
+        mock_llm_call("test prompt")
+
+    pred.finish()
+    ev.log_summary({"test": "complete"})
+
+    client.flush()
+
+    # Get all calls and verify cost propagation
+    calls = client.get_calls()
+    predict_and_score_call = None
+    for call in calls:
+        if op_name_from_call(call) == "Evaluation.predict_and_score":
+            predict_and_score_call = call
+            break
+
+    assert predict_and_score_call is not None, "predict_and_score_call should exist"
+
+    # Verify that the usage data propagated to the predict_and_score_call
+    assert predict_and_score_call.summary is not None
+    assert "usage" in predict_and_score_call.summary
+    assert "gpt-4" in predict_and_score_call.summary["usage"]
+    assert predict_and_score_call.summary["usage"]["gpt-4"]["prompt_tokens"] == 10
+    assert predict_and_score_call.summary["usage"]["gpt-4"]["completion_tokens"] == 20
+    assert predict_and_score_call.summary["usage"]["gpt-4"]["total_tokens"] == 30
+    assert predict_and_score_call.summary["usage"]["gpt-4"]["requests"] == 1
+
+
+def test_log_prediction_context_manager(client):
+    """Test using PredictionContext as a context manager with automatic call stack management."""
+
+    @weave.op
+    def calculate_answer(question: str) -> dict:
+        return {
+            "model": "gpt-4",
+            "usage": {
+                "prompt_tokens": 5,
+                "completion_tokens": 3,
+                "total_tokens": 8,
+            },
+            "answer": 4,
+        }
+
+    ev = EvaluationLogger()
+
+    # When output is None, log_prediction returns PredictionContext
+    with ev.log_prediction(inputs={"question": "What is 2+2?"}) as pred:
+        # Operations here automatically become children of pred.predict_call
+        result = calculate_answer("What is 2+2?")
+
+        # Set the output
+        pred.output = result["answer"]
+
+        # Log scores
+        pred.log_score("correctness", 1.0)
+
+        # finish() is called automatically on exit and call stack is restored
+
+    ev.log_summary({"avg_score": 1.0})
+
+    # Verify everything was logged correctly
+    client.flush()
+    calls = client.get_calls()
+
+    predict_call = None
+    predict_and_score_call = None
+    for call in calls:
+        if op_name_from_call(call) == "Model.predict":
+            predict_call = call
+        elif op_name_from_call(call) == "Evaluation.predict_and_score":
+            predict_and_score_call = call
+
+    assert predict_call is not None
+    assert predict_and_score_call is not None
+
+    # Verify the output was set correctly
+    assert predict_call.output == 4
+    assert predict_and_score_call.output["output"] == 4
+
+    # Verify scores were logged
+    assert predict_and_score_call.output["scores"]["correctness"] == 1.0
+
+    # Verify cost data propagated
+    assert predict_and_score_call.summary is not None
+    assert "usage" in predict_and_score_call.summary
+    assert "gpt-4" in predict_and_score_call.summary["usage"]
+    assert predict_and_score_call.summary["usage"]["gpt-4"]["total_tokens"] == 8
+
+
+def test_log_score_context_manager(client):
+    """Test using log_score as a context manager for complex scoring."""
+
+    @weave.op
+    def analyze_quality(text: str) -> float:
+        """Mock quality analysis that returns a score."""
+        return 0.95
+
+    ev = EvaluationLogger()
+
+    with ev.log_prediction(inputs={"question": "What is AI?"}) as pred:
+        pred.output = "AI is artificial intelligence"
+
+        # Direct score logging
+        pred.log_score("correctness", 1.0)
+
+        # Context manager score logging
+        with pred.log_score("quality") as score:
+            # Operations here become children of the score call
+            quality_result = analyze_quality(pred.output)
+            score.value = quality_result
+
+    ev.log_summary({"avg_score": 0.975})
+    client.flush()
+
+    # Verify everything was logged correctly
+    calls = client.get_calls()
+
+    # Find the predict_and_score_call
+    predict_and_score_call = None
+    quality_scorer_call = None
+    for call in calls:
+        if op_name_from_call(call) == "Evaluation.predict_and_score":
+            predict_and_score_call = call
+        elif op_name_from_call(call) == "quality":
+            quality_scorer_call = call
+
+    assert predict_and_score_call is not None
+    assert quality_scorer_call is not None
+
+    # Verify both scores were logged
+    assert predict_and_score_call.output["scores"]["correctness"] == 1.0
+    assert predict_and_score_call.output["scores"]["quality"] == 0.95
+
+    # Verify the analyze_quality op was called
+    analyze_calls = [c for c in calls if op_name_from_call(c) == "analyze_quality"]
+    assert len(analyze_calls) == 1, (
+        f"Should have exactly one analyze_quality call, found {len(analyze_calls)}"
+    )
+    analyze_call = analyze_calls[0]
+
+    # The analyze_quality call's parent should be the quality scorer call
+    assert analyze_call.parent_id == quality_scorer_call.id, (
+        f"analyze_quality parent should be quality scorer, but got {analyze_call.parent_id}"
+    )
+
+
+def test_none_as_valid_score_value(client):
+    """Test that None can be used as a valid score value."""
+    ev = EvaluationLogger()
+
+    # Log prediction with None as output
+    pred = ev.log_prediction(inputs={"q": "test"}, output=None)
+
+    # Log a None score (e.g., scoring failed)
+    pred.log_score("correctness", None)
+    pred.log_score("quality", 0.5)
+
+    pred.finish()
+    ev.log_summary({})
+
+    client.flush()
+    calls = client.get_calls()
+
+    predict_and_score_call = None
+    for call in calls:
+        if op_name_from_call(call) == "Evaluation.predict_and_score":
+            predict_and_score_call = call
+            break
+
+    assert predict_and_score_call is not None
+    # Verify None score was recorded
+    assert predict_and_score_call.output["scores"]["correctness"] is None
+    assert predict_and_score_call.output["scores"]["quality"] == 0.5
+
+
+def test_log_score_context_manager_with_nested_ops(client):
+    """Test that log_score context manager works with nested operations and pred.output."""
+
+    @weave.op
+    def mock_completions_create(model: str, messages: list[dict[str, str]]):
+        return {"choices": [{"message": {"content": "I'm a mock response"}}]}
+
+    ev = EvaluationLogger()
+
+    user_prompt = "Tell me a joke"
+    with ev.log_prediction(inputs={"user_prompt": user_prompt}) as pred:
+        result = mock_completions_create(
+            model="gpt-5-mini",
+            messages=[{"role": "user", "content": user_prompt}],
+        )
+
+        # Set the output of the "predict" call
+        pred.output = result["choices"][0]["message"]["content"]
+
+        # Log scores using immediate syntax
+        pred.log_score("correctness", 1.0)
+        pred.log_score("ambiguity", 0.3)
+
+        # Test using .value property for score context
+        with pred.log_score("llm_judge") as score:
+            result = mock_completions_create(
+                model="gpt-4o-mini",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "Rate how funny the joke is from 1-5",
+                    },
+                    {"role": "user", "content": pred.output},
+                ],
+            )
+            score.value = result["choices"][0]["message"]["content"]
+
+        # Test another score using .value property
+        with pred.log_score("length_check") as score:
+            score.value = len(pred.output) > 10
+
+    ev.log_summary({"avg_score": 1.0})
+    client.flush()
+
+    # Verify everything was logged correctly
+    calls = client.get_calls()
+
+    predict_and_score_call = None
+    for call in calls:
+        if op_name_from_call(call) == "Evaluation.predict_and_score":
+            predict_and_score_call = call
+            break
+
+    assert predict_and_score_call is not None
+
+    # Verify all scores were logged
+    assert predict_and_score_call.output["scores"]["correctness"] == 1.0
+    assert predict_and_score_call.output["scores"]["ambiguity"] == 0.3
+    assert predict_and_score_call.output["scores"]["llm_judge"] == "I'm a mock response"
+    assert predict_and_score_call.output["scores"]["length_check"] is True
+
+
+def test_log_example_basic(client):
+    """Test basic functionality of log_example method."""
+    ev = EvaluationLogger()
+
+    # Log a complete example with inputs, output, and scores
+    ev.log_example(
+        inputs={"question": "What is 2+2?"},
+        output="4",
+        scores={"correctness": 1.0, "fluency": 0.9},
+    )
+
+    ev.log_summary({"avg_score": 0.95})
+    client.flush()
+
+    calls = client.get_calls()
+
+    # Find the predict_and_score call
+    predict_and_score_call = None
+    for call in calls:
+        if op_name_from_call(call) == "Evaluation.predict_and_score":
+            predict_and_score_call = call
+            break
+
+    assert predict_and_score_call is not None
+    assert predict_and_score_call.inputs["example"] == {"question": "What is 2+2?"}
+    assert predict_and_score_call.output["output"] == "4"
+    assert predict_and_score_call.output["scores"]["correctness"] == 1.0
+    assert predict_and_score_call.output["scores"]["fluency"] == 0.9
+
+
+def test_log_example_multiple_examples(client):
+    """Test logging multiple examples using log_example."""
+    ev = EvaluationLogger()
+
+    # Log multiple examples
+    examples = [
+        ({"q": "What is 1+1?"}, "2", {"correct": 1.0, "speed": 0.8}),
+        ({"q": "What is 2+2?"}, "4", {"correct": 1.0, "speed": 0.9}),
+        ({"q": "What is 3+3?"}, "6", {"correct": 1.0, "speed": 0.95}),
+    ]
+
+    for inputs, output, scores in examples:
+        ev.log_example(inputs=inputs, output=output, scores=scores)
+
+    ev.log_summary({"total": 3})
+    client.flush()
+
+    calls = client.get_calls()
+
+    # Should have 3 predict_and_score calls, one for each example
+    predict_and_score_calls = [
+        c for c in calls if op_name_from_call(c) == "Evaluation.predict_and_score"
+    ]
+    assert len(predict_and_score_calls) == 3
+
+    # Verify each example was logged correctly
+    for i, (inputs, output, scores) in enumerate(examples):
+        call = predict_and_score_calls[i]
+        assert call.inputs["example"] == inputs
+        assert call.output["output"] == output
+        for scorer_name, score_value in scores.items():
+            assert call.output["scores"][scorer_name] == score_value
+
+
+def test_log_example_with_empty_scores(client):
+    """Test log_example with empty scores dictionary."""
+    ev = EvaluationLogger()
+
+    # Log example with no scores
+    ev.log_example(
+        inputs={"input": "test"},
+        output="result",
+        scores={},
+    )
+
+    ev.finish()
+    client.flush()
+
+    calls = client.get_calls()
+    predict_and_score_call = None
+    for call in calls:
+        if op_name_from_call(call) == "Evaluation.predict_and_score":
+            predict_and_score_call = call
+            break
+
+    assert predict_and_score_call is not None
+    assert predict_and_score_call.inputs["example"] == {"input": "test"}
+    assert predict_and_score_call.output["output"] == "result"
+    # Scores should be empty
+    assert predict_and_score_call.output["scores"] == {}
+
+
+def test_log_example_after_finalization_raises_error(client):
+    """Test that log_example raises ValueError when called after finalization."""
+    ev = EvaluationLogger()
+
+    # Log one example successfully
+    ev.log_example(
+        inputs={"q": "test"},
+        output="answer",
+        scores={"score": 1.0},
+    )
+
+    # Finalize the evaluation
+    ev.finish()
+
+    # Attempting to log another example should raise an error
+    with pytest.raises(
+        ValueError,
+        match="Cannot log example after evaluation has been finalized",
+    ):
+        ev.log_example(
+            inputs={"q": "another test"},
+            output="another answer",
+            scores={"score": 0.5},
+        )
+
+
+def test_log_example_after_log_summary_raises_error(client):
+    """Test that log_example raises ValueError when called after log_summary."""
+    ev = EvaluationLogger()
+
+    # Log one example successfully
+    ev.log_example(
+        inputs={"q": "test"},
+        output="answer",
+        scores={"score": 1.0},
+    )
+
+    # Call log_summary (which also finalizes)
+    ev.log_summary({"total": 1})
+
+    # Attempting to log another example should raise an error
+    with pytest.raises(
+        ValueError,
+        match="Cannot log example after evaluation has been finalized",
+    ):
+        ev.log_example(
+            inputs={"q": "another test"},
+            output="another answer",
+            scores={"score": 0.5},
+        )

@@ -3,8 +3,9 @@ from __future__ import annotations
 import dataclasses
 import datetime
 import logging
+from collections.abc import Callable
 from concurrent.futures import Future
-from typing import TYPE_CHECKING, Any, Callable, TypedDict
+from typing import TYPE_CHECKING, Any, TypedDict
 
 from weave.trace import urls
 from weave.trace.context import weave_client_context as weave_client_context
@@ -28,6 +29,7 @@ from weave.trace_server.trace_server_interface import (
 )
 from weave.utils.attributes_dict import AttributesDict
 from weave.utils.paginated_iterator import PaginatedIterator
+from weave.utils.project_id import from_project_id
 
 if TYPE_CHECKING:
     from weave.flow.scorer import ApplyScorerResult, Scorer
@@ -35,6 +37,10 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 DEFAULT_CALLS_PAGE_SIZE = 1000
+
+
+class OpNameError(ValueError):
+    """Raised when an op name is invalid."""
 
 
 @dataclasses.dataclass
@@ -114,7 +120,7 @@ class Call:
 
         if self._feedback is None:
             try:
-                entity, project = self.project_id.split("/")
+                entity, project = from_project_id(self.project_id)
             except ValueError:
                 raise ValueError(f"Invalid project_id: {self.project_id}") from None
             weave_ref = CallRef(entity, project, self.id)
@@ -129,14 +135,14 @@ class Call:
             )
 
         try:
-            entity, project = self.project_id.split("/")
+            entity, project = from_project_id(self.project_id)
         except ValueError:
             raise ValueError(f"Invalid project_id: {self.project_id}") from None
         return urls.redirect_call(entity, project, self.id)
 
     @property
     def ref(self) -> CallRef:
-        entity, project = self.project_id.split("/")
+        entity, project = from_project_id(self.project_id)
         if not self.id:
             raise ValueError(
                 "Can't get ref for call without ID, was `weave.init` called?"
@@ -306,10 +312,6 @@ class CallDict(TypedDict):
 CallsIter = PaginatedIterator[CallSchema, WeaveObject]
 
 
-class OpNameError(ValueError):
-    """Raised when an op name is invalid."""
-
-
 def elide_display_name(name: str) -> str:
     if len(name) > MAX_DISPLAY_NAME_LENGTH:
         log_once(
@@ -362,7 +364,7 @@ def _make_calls_iterator(
 
     # TODO: Should be Call, not WeaveObject
     def transform_func(call: CallSchema) -> WeaveObject:
-        entity, project = project_id.split("/")
+        entity, project = from_project_id(project_id)
         return make_client_call(entity, project, call, server)
 
     def size_func() -> int:

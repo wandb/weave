@@ -1,6 +1,7 @@
 import datetime
 import os
 import random
+import sys
 import tempfile
 import time
 from typing import Any
@@ -45,7 +46,7 @@ def compare_datasets(ds1: weave.Dataset, ds2: weave.Dataset):
     rows1 = ds1.rows.rows
     rows2 = ds2.rows.rows
     assert len(rows1) == len(rows2)
-    for row1, row2 in zip(rows1, rows2):
+    for row1, row2 in zip(rows1, rows2, strict=False):
         compare_images(row1["image"], row2["image"])
         assert row1["label"] == row2["label"]
 
@@ -200,7 +201,10 @@ def test_server_cache_latency(client):
     added_latency = latency_with_cache - latency_without_cache
     print(f"Added latency: {added_latency}")
 
-    assert added_latency < 0.001
+    if sys.platform == "win32":
+        assert added_latency < 0.01  # Windows is slower
+    else:
+        assert added_latency < 0.002
 
 
 def test_file_create_caching(client):

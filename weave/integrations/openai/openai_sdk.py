@@ -3,9 +3,25 @@ from __future__ import annotations
 import importlib
 import logging
 import time
+from collections.abc import Callable
 from functools import wraps
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
+
+# Do not import this module directly, it should only be invoked
+from openai._legacy_response import LegacyAPIResponse
+from openai._response import APIResponse
+from openai.types.chat import ChatCompletion, ChatCompletionChunk
+from openai.types.chat.chat_completion_chunk import (
+    ChoiceDeltaFunctionCall,
+    ChoiceDeltaToolCall,
+    ChoiceDeltaToolCallFunction,
+)
+from openai.types.chat.chat_completion_message import FunctionCall
+from openai.types.chat.chat_completion_message_tool_call import (
+    ChatCompletionMessageToolCall,
+    Function,
+)
 
 import weave
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
@@ -24,7 +40,6 @@ from weave.utils.stream_metrics import (
 )
 
 if TYPE_CHECKING:
-    from openai.types.chat import ChatCompletionChunk
     from openai.types.responses import Response, ResponseStreamEvent
 
 _openai_patcher: MultiPatcher | None = None
@@ -37,45 +52,20 @@ def maybe_unwrap_api_response(value: Any) -> Any:
     We take a very conservative approach to only unwrap the types we know about.
     """
     maybe_value: Any = None
-    try:
-        from openai._legacy_response import LegacyAPIResponse
 
-        if isinstance(value, LegacyAPIResponse):
-            maybe_value = value.parse()
-    except:
-        pass
+    if isinstance(value, LegacyAPIResponse):
+        maybe_value = value.parse()
 
-    try:
-        from openai._response import APIResponse
+    if isinstance(value, APIResponse):
+        maybe_value = value.parse()
 
-        if isinstance(value, APIResponse):
-            maybe_value = value.parse()
-    except:
-        pass
-
-    try:
-        from openai.types.chat import ChatCompletion, ChatCompletionChunk
-
-        if isinstance(maybe_value, (ChatCompletion, ChatCompletionChunk)):
-            return maybe_value
-    except:
-        pass
+    if isinstance(maybe_value, (ChatCompletion, ChatCompletionChunk)):
+        return maybe_value
 
     return value
 
 
 def openai_on_finish_post_processor(value: ChatCompletionChunk | None) -> dict | None:
-    from openai.types.chat import ChatCompletion, ChatCompletionChunk
-    from openai.types.chat.chat_completion_chunk import (
-        ChoiceDeltaFunctionCall,
-        ChoiceDeltaToolCall,
-    )
-    from openai.types.chat.chat_completion_message import FunctionCall
-    from openai.types.chat.chat_completion_message_tool_call import (
-        ChatCompletionMessageToolCall,
-        Function,
-    )
-
     value = maybe_unwrap_api_response(value)
 
     def _get_function_call(
@@ -171,13 +161,6 @@ def openai_accumulator(
     skip_last: bool = False,
     stream_start_time: float | None = None,
 ) -> ChatCompletionChunk:
-    from openai.types.chat import ChatCompletionChunk
-    from openai.types.chat.chat_completion_chunk import (
-        ChoiceDeltaFunctionCall,
-        ChoiceDeltaToolCall,
-        ChoiceDeltaToolCallFunction,
-    )
-
     def _process_chunk(
         chunk: ChatCompletionChunk, acc_choices: list[dict] | None = None
     ) -> list[dict]:
@@ -681,6 +664,19 @@ def should_use_responses_accumulator(inputs: dict) -> bool:
     return isinstance(inputs, dict) and inputs.get("stream") is True
 
 
+def responses_on_finish_post_processor(value: Response | None) -> dict | None:
+    if value is None:
+        return None
+
+    dump = value.model_dump(exclude_unset=True, exclude_none=True)
+
+    # Extract request_id if available (similar to completions API)
+    if hasattr(value, "_request_id"):
+        dump["request_id"] = value._request_id
+
+    return dump
+
+
 def create_wrapper_responses_sync(
     settings: OpSettings,
 ) -> Callable[[Callable], Callable]:
@@ -699,7 +695,7 @@ def create_wrapper_responses_sync(
                 acc, value
             ),
             should_accumulate=should_use_responses_accumulator,
-            on_finish_post_processor=lambda value: value,
+            on_finish_post_processor=responses_on_finish_post_processor,
         )
 
     return wrapper
@@ -723,7 +719,7 @@ def create_wrapper_responses_async(
                 acc, value
             ),
             should_accumulate=should_use_responses_accumulator,
-            on_finish_post_processor=lambda value: value,
+            on_finish_post_processor=responses_on_finish_post_processor,
         )
 
     return wrapper

@@ -5,7 +5,7 @@ It tracks commits, pull requests, and categorizes changes across different areas
 
 Features:
 - Tracks recent commits and pull requests
-- Categorizes changes (docs, tests, server, UI, SDKs, etc.)
+- Categorizes changes (tests, server, UI, SDKs, etc.)
 - Formats output for both console and Slack
 - Handles GitHub API rate limiting
 - Supports parallel processing for better performance
@@ -43,11 +43,12 @@ import logging
 import os
 import re
 import time
+from collections.abc import Callable
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from re import Pattern
-from typing import Any, Callable, Protocol
+from typing import Any, Protocol
 
 import pytz
 import urllib3
@@ -91,8 +92,8 @@ class CategoryRule:
     """Rule for determining if a file belongs to a category.
 
     Attributes:
-        name: Display name (e.g., "Docs")
-        column_header: Short name for table header (e.g., "📚")
+        name: Display name (e.g., "Tests")
+        column_header: Short name for table header (e.g., "Tests")
         emoji: Emoji indicator for visual representation
         matcher: Rule can be either a regex pattern or a callback function
     """
@@ -105,12 +106,6 @@ class CategoryRule:
 
 # Define all categories with their rules
 CATEGORIES = [
-    CategoryRule(
-        name="Documentation",
-        column_header="Docs",
-        emoji="📚",
-        matcher=re.compile(r"^docs/"),
-    ),
     CategoryRule(
         name="Tests",
         column_header="Tests",

@@ -1,6 +1,8 @@
 import json
+import logging
 import sys
-from typing import Any, Callable, Union
+from collections.abc import Callable
+from typing import Any
 
 import pytest
 from spec import SerializationTestCase
@@ -15,6 +17,7 @@ from weave.trace_server.trace_server_interface import (
     ObjCreateReq,
     ObjReadReq,
 )
+from weave.utils.project_id import to_project_id
 
 """
 IMPORTANT RULES: Once a SerializationTestCase is created, it should never be modified.
@@ -32,12 +35,29 @@ independent of the actual code that is used to serialize the data.
 """
 
 
+@pytest.fixture
+def set_weave_logger_to_debug():
+    logger = logging.getLogger("weave")
+    current_level = logger.level
+    logger.setLevel(logging.DEBUG)
+    try:
+        yield
+    finally:
+        logger.setLevel(current_level)
+
+
 @pytest.mark.parametrize(
     "case",
     cases,
     ids=lambda case: case.id,
 )
-def test_serialization_correctness(client, case: SerializationTestCase):
+def test_serialization_correctness(
+    client, case: SerializationTestCase, set_weave_logger_to_debug
+):
+    # Skip image test on macOS - PIL/Pillow produces different PNG encoding on macOS vs Linux
+    # resulting in different file digests. This is expected behavior, not a bug.
+    if sys.platform == "darwin" and case.id == "image":
+        pytest.skip("Image encoding differs on macOS vs Linux")
     # Since code serialization changes pretty significantly between versions, we will assume
     # legacy for anything other than the latest python version
     is_legacy = case.is_legacy
@@ -55,15 +75,15 @@ def test_serialization_correctness(client, case: SerializationTestCase):
         found_refs = set()
         found_files = set()
 
-        def ref_visitor(path: list[Union[str, int]], obj: Any):
+        def ref_visitor(path: list[str | int], obj: Any):
             if isinstance(obj, str):
                 try:
                     ref = ObjectRef.parse_uri(obj)
                     found_refs.add(obj)
-                except ValueError:
+                except (ValueError, TypeError):
                     pass
 
-        def file_visitor(path: list[Union[str, int]], obj: Any):
+        def file_visitor(path: list[str | int], obj: Any):
             if isinstance(obj, dict) and "files" in obj:
                 files = obj["files"]
                 if isinstance(files, dict):
@@ -84,7 +104,7 @@ def test_serialization_correctness(client, case: SerializationTestCase):
             project = ref.project
             name = ref.name
             digest = ref.digest
-            found_project_id = f"{entity}/{project}"
+            found_project_id = to_project_id(entity, project)
             assert project_id == found_project_id
 
             for obj in case.exp_objects:
@@ -280,12 +300,12 @@ def test_serialization_correctness(client, case: SerializationTestCase):
 
 def json_visitor(
     obj: Any,
-    visitor: Callable[[list[Union[str, int]], Any], None],
+    visitor: Callable[[list[str | int], Any], None],
 ):
     def _json_visitor(
         obj: Any,
-        visitor: Callable[[list[Union[str, int]], Any], None],
-        path: list[Union[str, int]],
+        visitor: Callable[[list[str | int], Any], None],
+        path: list[str | int],
     ):
         visitor(path, obj)
 

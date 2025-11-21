@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import atexit
+import contextlib
 import datetime
 import json
 import keyword
@@ -12,7 +13,10 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from threading import Lock
 from types import MethodType
-from typing import Annotated, Any, TypeVar, Union, cast
+from typing import TYPE_CHECKING, Annotated, Any, TypeVar, cast, overload
+
+if TYPE_CHECKING:
+    from weave.trace.call import Call
 
 from pydantic import (
     BaseModel,
@@ -33,15 +37,16 @@ from weave.trace.api import attributes
 from weave.trace.call import Call
 from weave.trace.context import call_context
 from weave.trace.context.weave_client_context import require_weave_client
-from weave.trace.op import Op, op
+from weave.trace.op import Op, as_op, op
 from weave.trace.table import Table
 from weave.trace.util import Thread
 from weave.trace.view_utils import set_call_view
 from weave.type_wrappers.Content.content import Content
+from weave.utils.sentinel import NOT_SET, _NotSetType
 
 T = TypeVar("T")
 ID = str
-ScoreType = Union[float, bool, dict]
+ScoreType = float | bool | dict
 
 logger = logging.getLogger(__name__)
 
@@ -232,8 +237,114 @@ class ScorerCache:
 global_scorer_cache = ScorerCache()
 
 
+class _LogScoreContext:
+    """Context manager for logging scores with automatic call stack management.
+
+    ```python
+    with pred.log_score("correctness") as score_ctx:
+        # Operations here become children of the score call
+        result = calculate_correctness(...)
+        score_ctx.value = result
+    # Score is automatically logged on exit
+    ```
+    """
+
+    def __init__(
+        self, score_logger: ScoreLogger, scorer: Scorer | dict | str, score_call: Call
+    ):
+        self.score_logger = score_logger
+        self.scorer = scorer
+        self.score_call = score_call
+        self._score_value: ScoreType | None = None
+        self._call_stack_context: (
+            contextlib.AbstractContextManager[list[Call]] | None
+        ) = None
+
+    @property
+    def value(self) -> ScoreType | None:
+        """Get the current score value."""
+        return self._score_value
+
+    @value.setter
+    def value(self, val: ScoreType) -> None:
+        """Set the score value that will be logged on exit."""
+        self._score_value = val
+
+    def __enter__(self) -> _LogScoreContext:
+        """Enter context and set call stack to include the score call."""
+        # Set call stack to include the score call so operations become children
+        self._call_stack_context = call_context.set_call_stack(
+            [
+                self.score_logger.evaluate_call,
+                self.score_logger.predict_and_score_call,
+                self.score_call,
+            ]
+        )
+        self._call_stack_context.__enter__()
+        return self
+
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        """Exit context, restore call stack, and finish the score call."""
+        try:
+            # scorer is guaranteed to be a Scorer instance here because it was prepared in _create_score_call
+            if self._score_value is not None:
+                # Finish the score call with the value
+                self.score_logger._finish_score_call(
+                    self.score_call, cast(Scorer, self.scorer), self._score_value
+                )
+            elif exc_type is not None:
+                # If there was an exception and no value was set, finish with the exception
+                self.score_logger._finish_score_call(
+                    self.score_call, cast(Scorer, self.scorer), exception=exc_val
+                )
+            else:
+                # If no exception occurred but no value was set, raise an error
+                raise ValueError(
+                    f"Score value was not set for scorer '{cast(Scorer, self.scorer).name}'. "
+                    "Please set score_ctx.value within the context manager."
+                )
+        finally:
+            # Restore call stack - always happens even if finish fails
+            if self._call_stack_context is not None:
+                self._call_stack_context.__exit__(exc_type, exc_val, exc_tb)
+
+
 class ScoreLogger(BaseModel):
-    """This class provides an imperative interface for logging scores."""
+    """Interface for logging scores and managing prediction outputs.
+
+    This class is returned by `EvaluationLogger.log_prediction()` and can be used
+    either directly or as a context manager.
+
+    Direct usage - when output is known upfront:
+
+    ```python
+    ev = EvaluationLogger()
+    pred = ev.log_prediction(inputs={'q': 'Hello'}, output='Hi there!')
+    pred.log_score("correctness", 0.9)
+    pred.finish()
+    ```
+
+    Context manager usage - for dynamic outputs and automatic call stack management:
+
+    ```python
+    ev = EvaluationLogger()
+
+    # Works whether output is provided or not
+    with ev.log_prediction(inputs={'q': 'Hello'}) as pred:
+        # Operations here automatically become children of the predict call
+        response = your_llm_call(...)
+        pred.output = response.content
+
+        # Log scores directly
+        pred.log_score("correctness", 0.9)
+
+        # Or use log_score as a context manager for complex scoring
+        with pred.log_score("reasoning_quality") as score:
+            analysis = analyze_response(...)
+            score.value = analysis.score
+    # Automatically calls finish() on exit and restores call stack
+    ```
+    """
 
     # model_id: ID
     predict_and_score_call: Call
@@ -243,21 +354,42 @@ class ScoreLogger(BaseModel):
 
     _captured_scores: dict[str, ScoreType] = PrivateAttr(default_factory=dict)
     _has_finished: bool = PrivateAttr(False)
+    _predict_output: Any = PrivateAttr(None)
+    _call_stack_context: contextlib.AbstractContextManager[list[Call]] | None = (
+        PrivateAttr(None)
+    )
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    def finish(self) -> None:
+    def finish(self, output: Any | None = None) -> None:
+        """Finish the prediction and log all scores.
+
+        Args:
+            output: Optional output to override the prediction output. If not provided,
+                uses the output passed to log_prediction.
+        """
         if self._has_finished:
             logger.warning("(NO-OP): Already called finish, returning.")
             return
 
         scores = self._captured_scores
 
+        # Use the provided output or fall back to the stored output
+        final_output = output if output is not None else self._predict_output
+
         wc = require_weave_client()
+
+        # First, finish the predict_call to compute its summary (including child costs)
+        wc.finish_call(
+            self.predict_call,
+            output=final_output,
+        )
+
+        # Then finish the predict_and_score_call with the scores
         wc.finish_call(
             self.predict_and_score_call,
             output={
-                "output": self.predict_call.output,
+                "output": final_output,
                 "scores": scores,
                 "model_latency": None,
             },
@@ -265,15 +397,119 @@ class ScoreLogger(BaseModel):
 
         self._has_finished = True
 
-    def log_score(self, scorer: Scorer | dict | str, score: ScoreType) -> None:
-        """Log a score synchronously."""
+    def _prepare_scorer(self, scorer: Scorer | dict | str) -> Scorer:
+        """Prepare and validate a scorer."""
+        if not isinstance(scorer, Scorer):
+            scorer_id = json.dumps(scorer)
+            scorer = global_scorer_cache.get_scorer(
+                scorer_id, lambda: _cast_to_cls(Scorer)(scorer)
+            )
+        scorer = cast(Scorer, scorer)
+
+        # Check if scorer is in predefined list
+        if self.predefined_scorers:
+            scorer_name = cast(str, scorer.name)
+            if scorer_name not in self.predefined_scorers:
+                logger.warning(
+                    f"Scorer '{scorer_name}' is not in the predefined scorers list. "
+                    f"Expected one of: {sorted(self.predefined_scorers)}"
+                )
+
+        return scorer
+
+    def _create_score_call(self, scorer: Scorer | dict | str) -> tuple[Call, Scorer]:
+        """Create a score call but don't finish it yet."""
+        scorer = self._prepare_scorer(scorer)
+
+        # Create a placeholder score method
+        @op(name=scorer.name, enable_code_capture=False)
+        def score_method(self: Scorer, *, output: Any, inputs: Any) -> ScoreType:
+            raise NotImplementedError("Score method should not be called directly")
+
+        scorer.__dict__["score"] = MethodType(score_method, scorer)
+
+        # Create the score call with predict_and_score as parent
+        with attributes(IMPERATIVE_SCORE_MARKER):
+            wc = require_weave_client()
+            score_call = wc.create_call(
+                as_op(scorer.score),
+                inputs={
+                    "self": scorer,
+                    "output": self._predict_output,
+                    "inputs": self.predict_call.inputs,
+                },
+                parent=self.predict_and_score_call,
+                use_stack=False,
+            )
+
+        return score_call, scorer
+
+    def _finish_score_call(
+        self,
+        score_call: Call,
+        scorer: Scorer,
+        score_value: ScoreType | None = None,
+        exception: BaseException | None = None,
+    ) -> None:
+        """Finish a score call and record the score."""
+        wc = require_weave_client()
+        wc.finish_call(score_call, output=score_value, exception=exception)
+        if exception is None and score_value is not None:
+            self._captured_scores[cast(str, scorer.name)] = score_value
+
+    @overload
+    def log_score(
+        self,
+        scorer: Scorer | dict | str,
+        score: ScoreType,
+    ) -> None: ...
+
+    @overload
+    def log_score(
+        self,
+        scorer: Scorer | dict | str,
+        score: _NotSetType = NOT_SET,
+    ) -> _LogScoreContext: ...
+
+    def log_score(
+        self,
+        scorer: Scorer | dict | str,
+        score: ScoreType | _NotSetType = NOT_SET,
+    ) -> _LogScoreContext | None:
+        """Log a score synchronously or return a context manager for deferred scoring.
+
+        Can be used in two ways:
+
+        1. Direct scoring (immediate):
+        ```python
+        pred.log_score("correctness", 0.9)
+        pred.log_score("failed_check", None)  # None is a valid score value
+        ```
+
+        2. Context manager (deferred with automatic call stack):
+        ```python
+        with pred.log_score("correctness") as score_ctx:
+            result = calculate_score(...)
+            score_ctx.value = result
+        ```
+        """
+        # If no score provided, return a context manager for deferred scoring
+        if score is NOT_SET:
+            score_call, prepared_scorer = self._create_score_call(scorer)
+            return _LogScoreContext(self, prepared_scorer, score_call)
+
+        # Type narrowing: score is now guaranteed to be ScoreType
+        assert not isinstance(score, _NotSetType), "score should not be NOT_SET here"
+        score_value: ScoreType = score
+
+        # Otherwise, log the score immediately
         # When in an active asyncio test environment (like pytest.mark.asyncio),
         # we need special handling to avoid "already running" errors
         try:
             loop = asyncio.get_running_loop()
             if asyncio.current_task() is None:
                 # We're not in an async context, but a loop exists
-                return loop.run_until_complete(self.alog_score(scorer, score))
+                return loop.run_until_complete(self.alog_score(scorer, score_value))
 
             # We're in an async context, we need to handle this differently
             result = None
@@ -287,7 +523,7 @@ class ScoreLogger(BaseModel):
                     asyncio.set_event_loop(new_loop)
                     try:
                         result = new_loop.run_until_complete(
-                            self.alog_score(scorer, score)
+                            self.alog_score(scorer, score_value)
                         )
                     finally:
                         new_loop.close()
@@ -300,9 +536,11 @@ class ScoreLogger(BaseModel):
 
             if exception:
                 raise exception
+            else:
+                return result
         except RuntimeError:
             # No event loop exists, create one with asyncio.run
-            return asyncio.run(self.alog_score(scorer, score))
+            return asyncio.run(self.alog_score(scorer, score_value))
 
     async def alog_score(
         self,
@@ -316,26 +554,10 @@ class ScoreLogger(BaseModel):
         ],
         score: ScoreType,
     ) -> None:
-        if not isinstance(scorer, Scorer):
-            scorer_id = json.dumps(scorer)
-            scorer = global_scorer_cache.get_scorer(
-                scorer_id, lambda: _cast_to_cls(Scorer)(scorer)
-            )
         if self._has_finished:
             raise ValueError("Cannot log score after finish has been called")
 
-        # this is safe; pydantic casting is done in validator above
-        scorer = cast(Scorer, scorer)
-
-        # Check if scorer is in predefined list
-        if self.predefined_scorers:
-            predefined_names = self.predefined_scorers
-            scorer_name = cast(str, scorer.name)
-            if scorer_name not in predefined_names:
-                logger.warning(
-                    f"Scorer '{scorer_name}' is not in the predefined scorers list. "
-                    f"Expected one of: {sorted(predefined_names)}"
-                )
+        scorer = self._prepare_scorer(scorer)
 
         @op(name=scorer.name, enable_code_capture=False)
         def score_method(self: Scorer, *, output: Any, inputs: Any) -> ScoreType:
@@ -357,6 +579,31 @@ class ScoreLogger(BaseModel):
         scorer_name = cast(str, scorer.name)
         self._captured_scores[scorer_name] = score
 
+    @property
+    def output(self) -> Any:
+        """Get the current output value."""
+        return self._predict_output
+
+    @output.setter
+    def output(self, value: Any) -> None:
+        """Set the output value that will be used when finishing."""
+        self._predict_output = value
+
+    def __enter__(self) -> ScoreLogger:
+        """Enter context manager and set call stack to predict_call."""
+        self._call_stack_context = call_context.set_call_stack([self.predict_call])
+        self._call_stack_context.__enter__()
+        return self
+
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        """Exit context manager, restore call stack, and automatically finish."""
+        try:
+            if not self._has_finished:
+                self.finish()
+        finally:
+            if self._call_stack_context is not None:
+                self._call_stack_context.__exit__(exc_type, exc_val, exc_tb)
+
 
 class EvaluationLogger(BaseModel):
     """This class provides an imperative interface for logging evaluations.
@@ -369,13 +616,35 @@ class EvaluationLogger(BaseModel):
     You can use this object to log scores and metadata for that specific
     prediction. For more information, see the `ScoreLogger` class.
 
-    Example:
-        ```python
-        ev = EvaluationLogger()
-        pred = ev.log_prediction(inputs, output)
-        pred.log_score(scorer_name, score)
-        ev.log_summary(summary)
-        ```
+    Basic usage - log predictions with inputs and outputs directly:
+
+    ```python
+    ev = EvaluationLogger()
+
+    # Log predictions with known inputs/outputs
+    pred = ev.log_prediction(inputs={'q': 'Hello'}, outputs={'a': 'Hi there!'})
+    pred.log_score("correctness", 0.9)
+
+    # Finish the evaluation
+    ev.log_summary({"avg_score": 0.9})
+    ```
+
+    Advanced usage - use context manager for dynamic outputs and nested operations:
+
+    ```python
+    ev = EvaluationLogger()
+
+    # Use context manager when you need to capture nested operations
+    with ev.log_prediction(inputs={'q': 'Hello'}) as pred:
+        # Any operations here (like LLM calls) automatically become
+        # children of the predict call
+        response = your_llm_call(...)
+        pred.output = response.content
+        pred.log_score("correctness", 0.9)
+
+    # Finish the evaluation
+    ev.log_summary({"avg_score": 0.9})
+    ```
     """
 
     name: Annotated[
@@ -496,7 +765,9 @@ class EvaluationLogger(BaseModel):
         def predict_and_score(self: Evaluation, model: Model, example: dict) -> dict:
             predict_method = cast(Op, model.get_infer_method())
             with attributes(IMPERATIVE_EVAL_MARKER):
-                output, predict_call = predict_method.call(model, example)
+                output, predict_call = predict_method.call(
+                    model, example, __require_explicit_finish=True
+                )
                 current_predict_call.set(predict_call)
 
             # This data is just a placeholder to give a sense of the data shape.
@@ -576,11 +847,29 @@ class EvaluationLogger(BaseModel):
 
         self._is_finalized = True
 
-    def log_prediction(self, inputs: dict, output: Any) -> ScoreLogger:
-        """Log a prediction to the Evaluation, and return a reference.
+    def log_prediction(self, inputs: dict[str, Any], output: Any = None) -> ScoreLogger:
+        """Log a prediction to the Evaluation.
 
-        The reference can be used to log scores which are attached to the specific
-        prediction instance.
+        Returns a ScoreLogger that can be used directly or as a context manager.
+
+        Args:
+            inputs: The input data for the prediction
+            output: The output value. Defaults to None. Can be set later using pred.output.
+
+        Returns:
+            ScoreLogger for logging scores and optionally finishing the prediction.
+
+        Example (direct):
+            pred = ev.log_prediction({'q': '...'}, output="answer")
+            pred.log_score("correctness", 0.9)
+            pred.finish()
+
+        Example (context manager):
+            with ev.log_prediction({'q': '...'}) as pred:
+                response = model(...)
+                pred.output = response
+                pred.log_score("correctness", 0.9)
+            # Automatically calls finish() on exit
         """
         # Use set_call_stack to temporarily set the evaluation as the parent
         assert self._evaluate_call is not None
@@ -615,14 +904,59 @@ class EvaluationLogger(BaseModel):
         if predict_call is None:
             raise ValueError("predict_call should not be None")
 
+        # Set the output on the predict_call now so it's available for apply_scorer
+        predict_call.output = output
+
         pred = ScoreLogger(
             predict_and_score_call=predict_and_score_call,
             evaluate_call=self._evaluate_call,
             predict_call=predict_call,
             predefined_scorers=self.scorers,
         )
+        # Store the output so we can use it when finishing the predict_call
+        pred._predict_output = output
         self._accumulated_predictions.append(pred)
+
         return pred
+
+    def log_example(
+        self, inputs: dict[str, Any], output: Any, scores: dict[str, ScoreType]
+    ) -> None:
+        """Log a complete example with inputs, output, and scores.
+
+        This is a convenience method that combines log_prediction and log_score
+        for when you have all the data upfront.
+
+        Args:
+            inputs: The input data for the prediction
+            output: The output value
+            scores: Dictionary mapping scorer names to score values
+
+        Example:
+        ```python
+        ev = EvaluationLogger()
+        ev.log_example(
+            inputs={'q': 'What is 2+2?'},
+            output='4',
+            scores={'correctness': 1.0, 'fluency': 0.9}
+        )
+        ```
+        """
+        if self._is_finalized:
+            raise ValueError(
+                "Cannot log example after evaluation has been finalized. "
+                "Call log_example before calling finish() or log_summary()."
+            )
+
+        # Log the prediction with the output
+        pred = self.log_prediction(inputs=inputs, output=output)
+
+        # Log all the scores
+        for scorer_name, score_value in scores.items():
+            pred.log_score(scorer_name, score_value)
+
+        # Finish the prediction
+        pred.finish()
 
     def log_summary(
         self,

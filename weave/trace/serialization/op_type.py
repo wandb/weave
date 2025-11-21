@@ -12,7 +12,8 @@ import sys
 import textwrap
 import types as py_types
 from _ast import AsyncFunctionDef, ExceptHandler
-from typing import Any, Callable, TypedDict, get_args, get_origin
+from collections.abc import Callable
+from typing import Any, TypedDict, get_args, get_origin
 
 from weave.trace import settings
 from weave.trace.context.weave_client_context import get_weave_client
@@ -151,7 +152,9 @@ def resolve_var(fn: Callable, var_name: str) -> Any:
     if fn.__closure__:
         closure_vars = {}
         # __code__.co_freevars is the closure variable names in order
-        for vn, closure_cell in zip(fn.__code__.co_freevars, fn.__closure__):
+        for vn, closure_cell in zip(
+            fn.__code__.co_freevars, fn.__closure__, strict=False
+        ):
             closure_vars[vn] = closure_cell.cell_contents
         if var_name in closure_vars:
             return closure_vars[var_name]
@@ -603,6 +606,7 @@ def save_instance(obj: Op, artifact: MemTraceFilesArtifact, name: str) -> None:
 def load_instance(
     artifact: MemTraceFilesArtifact,
     name: str,
+    val: Any,
 ) -> Op | None:
     file_name = f"{name}.py"
     module_path = artifact.path(file_name)
@@ -612,11 +616,11 @@ def load_instance(
     # the version in the module name to avoid this. Since version names
     # are content hashes, this is correct.
     #
-    art_and_version_dir = module_path[: -(1 + len(file_name))]
-    art_dir, version_subdir = art_and_version_dir.rsplit("/", 1)
+    art_and_version_dir = os.path.dirname(module_path)
+    art_dir, version_subdir = os.path.split(art_and_version_dir)
     module_dir = art_dir
     import_name = (
-        version_subdir + "." + ".".join(os.path.splitext(file_name)[0].split("/"))
+        version_subdir + "." + ".".join(os.path.splitext(file_name)[0].split(os.sep))
     )
 
     sys.path.insert(0, os.path.abspath(module_dir))

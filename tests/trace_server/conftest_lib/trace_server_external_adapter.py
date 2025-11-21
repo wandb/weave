@@ -1,6 +1,4 @@
 import base64
-import typing
-from typing import Optional
 
 from weave.trace_server import (
     external_to_internal_trace_server_adapter,
@@ -66,7 +64,7 @@ class DummyIdConverter(external_to_internal_trace_server_adapter.IdConverter):
     def ext_to_int_project_id(self, project_id: str) -> str:
         return self._project_map.ext_to_int(project_id, b64(project_id))
 
-    def int_to_ext_project_id(self, project_id: str) -> typing.Optional[str]:
+    def int_to_ext_project_id(self, project_id: str) -> str | None:
         return self._project_map.int_to_ext(project_id, b64(project_id))
 
     def ext_to_int_run_id(self, run_id: str) -> str:
@@ -136,13 +134,33 @@ class TestOnlyUserInjectingExternalTraceServer(
         req.wb_user_id = self._user_id
         return super().evaluate_model(req)
 
+    def evaluation_run_delete(
+        self, req: tsi.EvaluationRunDeleteReq
+    ) -> tsi.EvaluationRunDeleteRes:
+        req.wb_user_id = self._user_id
+        return super().evaluation_run_delete(req)
+
+    def evaluation_run_finish(
+        self, req: tsi.EvaluationRunFinishReq
+    ) -> tsi.EvaluationRunFinishRes:
+        req.wb_user_id = self._user_id
+        return super().evaluation_run_finish(req)
+
+    def prediction_delete(
+        self, req: tsi.PredictionDeleteReq
+    ) -> tsi.PredictionDeleteRes:
+        req.wb_user_id = self._user_id
+        return super().prediction_delete(req)
+
+    def score_delete(self, req: tsi.ScoreDeleteReq) -> tsi.ScoreDeleteRes:
+        req.wb_user_id = self._user_id
+        return super().score_delete(req)
+
 
 def externalize_trace_server(
     trace_server: tsi.TraceServerInterface,
     user_id: str = "test_user",
-    id_converter: Optional[
-        external_to_internal_trace_server_adapter.IdConverter
-    ] = None,
+    id_converter: external_to_internal_trace_server_adapter.IdConverter | None = None,
 ) -> TestOnlyUserInjectingExternalTraceServer:
     return TestOnlyUserInjectingExternalTraceServer(
         trace_server,

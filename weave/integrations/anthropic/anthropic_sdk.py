@@ -1,9 +1,24 @@
 from __future__ import annotations
 
 import importlib
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncIterator, Callable, Iterator
 from functools import wraps
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any
+
+from anthropic.lib.streaming._types import MessageStopEvent
+from anthropic.types import (
+    Message,
+    MessageStreamEvent,
+    RawContentBlockDeltaEvent,
+    RawMessageDeltaEvent,
+    TextBlock,
+    Usage,
+)
+from anthropic.types.beta import (
+    BetaRawContentBlockDeltaEvent,
+    BetaRawMessageDeltaEvent,
+    BetaRawMessageStopEvent,
+)
 
 import weave
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
@@ -12,7 +27,6 @@ from weave.trace.op import _add_accumulator, _IteratorWrapper
 
 if TYPE_CHECKING:
     from anthropic.lib.streaming import MessageStream
-    from anthropic.types import Message, MessageStreamEvent
 
 _anthropic_patcher: MultiPatcher | None = None
 
@@ -21,18 +35,6 @@ def anthropic_accumulator(
     acc: Message | None,
     value: MessageStreamEvent,
 ) -> Message:
-    from anthropic.types import (
-        Message,
-        RawContentBlockDeltaEvent,
-        RawMessageDeltaEvent,
-        TextBlock,
-        Usage,
-    )
-    from anthropic.types.beta import (
-        BetaRawContentBlockDeltaEvent,
-        BetaRawMessageDeltaEvent,
-    )
-
     if acc is None:
         if hasattr(value, "message"):
             acc = Message(
@@ -127,9 +129,6 @@ def anthropic_stream_accumulator(
     acc: Message | None,
     value: MessageStream,
 ) -> Message:
-    from anthropic.lib.streaming._types import MessageStopEvent
-    from anthropic.types.beta import BetaRawMessageStopEvent
-
     if acc is None:
         acc = ""
     if isinstance(value, (MessageStopEvent, BetaRawMessageStopEvent)):

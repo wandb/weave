@@ -491,7 +491,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/Schema"
+                    "$ref": "#/components/schemas/CallSchema"
                   }
                 }
               }
@@ -871,7 +871,8 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/Schema"
+                    "type": "object",
+                    "additionalProperties": true
                   }
                 }
               }
@@ -1465,7 +1466,8 @@
               "application/jsonl": {
                 "schema": {
                   "items": {
-                    "$ref": "#/components/schemas/Schema"
+                    "additionalProperties": true,
+                    "type": "object"
                   },
                   "type": "array"
                 }
@@ -1514,7 +1516,8 @@
               "application/jsonl": {
                 "schema": {
                   "items": {
-                    "$ref": "#/components/schemas/Schema"
+                    "additionalProperties": true,
+                    "type": "object"
                   },
                   "type": "array"
                 }
@@ -1537,6 +1540,2626 @@
             "HTTPBasic": []
           }
         ]
+      }
+    },
+    "/v2/{entity}/{project}/ops": {
+      "post": {
+        "tags": [
+          "Ops"
+        ],
+        "summary": "Op Create",
+        "description": "Create an op object.",
+        "operationId": "op_create",
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "entity",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Entity"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OpCreateBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpCreateRes"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Ops"
+        ],
+        "summary": "Op List",
+        "description": "List op objects.",
+        "operationId": "op_list",
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "entity",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Entity"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stream of data in JSONL format",
+            "content": {
+              "application/jsonl": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OpReadRes"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/{entity}/{project}/ops/{object_id}/versions/{digest}": {
+      "get": {
+        "tags": [
+          "Ops"
+        ],
+        "summary": "Op Read",
+        "description": "Get an op object.",
+        "operationId": "op_read",
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "entity",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Entity"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project"
+            }
+          },
+          {
+            "name": "object_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Object Id"
+            }
+          },
+          {
+            "name": "digest",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Digest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpReadRes"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/{entity}/{project}/ops/{object_id}": {
+      "delete": {
+        "tags": [
+          "Ops"
+        ],
+        "summary": "Op Delete",
+        "description": "Delete an op object. If digests are provided, only those versions are deleted. Otherwise, all versions are deleted.",
+        "operationId": "op_delete",
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "entity",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Entity"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project"
+            }
+          },
+          {
+            "name": "object_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Object Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Digests"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpDeleteRes"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/{entity}/{project}/datasets": {
+      "post": {
+        "tags": [
+          "Datasets"
+        ],
+        "summary": "Dataset Create",
+        "description": "Create a dataset object.",
+        "operationId": "dataset_create",
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "entity",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Entity"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DatasetCreateBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DatasetCreateRes"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Datasets"
+        ],
+        "summary": "Dataset List",
+        "description": "List dataset objects.",
+        "operationId": "dataset_list",
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "entity",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Entity"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stream of data in JSONL format",
+            "content": {
+              "application/jsonl": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DatasetReadRes"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/{entity}/{project}/datasets/{object_id}/versions/{digest}": {
+      "get": {
+        "tags": [
+          "Datasets"
+        ],
+        "summary": "Dataset Read",
+        "description": "Get a dataset object.",
+        "operationId": "dataset_read",
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "entity",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Entity"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project"
+            }
+          },
+          {
+            "name": "object_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Object Id"
+            }
+          },
+          {
+            "name": "digest",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Digest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DatasetReadRes"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/{entity}/{project}/datasets/{object_id}": {
+      "delete": {
+        "tags": [
+          "Datasets"
+        ],
+        "summary": "Dataset Delete",
+        "description": "Delete a dataset object.",
+        "operationId": "dataset_delete",
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "entity",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Entity"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project"
+            }
+          },
+          {
+            "name": "object_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Object Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Digests"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DatasetDeleteRes"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/{entity}/{project}/scorers": {
+      "post": {
+        "tags": [
+          "Scorers"
+        ],
+        "summary": "Scorer Create",
+        "description": "Create a scorer object.",
+        "operationId": "scorer_create",
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "entity",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Entity"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScorerCreateBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScorerCreateRes"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Scorers"
+        ],
+        "summary": "Scorer List",
+        "description": "List scorer objects.",
+        "operationId": "scorer_list",
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "entity",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Entity"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stream of data in JSONL format",
+            "content": {
+              "application/jsonl": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ScorerReadRes"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/{entity}/{project}/scorers/{object_id}/versions/{digest}": {
+      "get": {
+        "tags": [
+          "Scorers"
+        ],
+        "summary": "Scorer Read",
+        "description": "Get a scorer object.",
+        "operationId": "scorer_read",
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "entity",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Entity"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project"
+            }
+          },
+          {
+            "name": "object_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Object Id"
+            }
+          },
+          {
+            "name": "digest",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Digest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScorerReadRes"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/{entity}/{project}/scorers/{object_id}": {
+      "delete": {
+        "tags": [
+          "Scorers"
+        ],
+        "summary": "Scorer Delete",
+        "description": "Delete a scorer object.",
+        "operationId": "scorer_delete",
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "entity",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Entity"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project"
+            }
+          },
+          {
+            "name": "object_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Object Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Digests"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScorerDeleteRes"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/{entity}/{project}/evaluations": {
+      "post": {
+        "tags": [
+          "Evaluations"
+        ],
+        "summary": "Evaluation Create",
+        "description": "Create an evaluation object.",
+        "operationId": "evaluation_create",
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EvaluationCreateReq"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvaluationCreateRes"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Evaluations"
+        ],
+        "summary": "Evaluation List",
+        "description": "List evaluation objects.",
+        "operationId": "evaluation_list",
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "entity",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Entity"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stream of data in JSONL format",
+            "content": {
+              "application/jsonl": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EvaluationReadRes"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/{entity}/{project}/evaluations/{object_id}/versions/{digest}": {
+      "get": {
+        "tags": [
+          "Evaluations"
+        ],
+        "summary": "Evaluation Read",
+        "description": "Get an evaluation object.",
+        "operationId": "evaluation_read",
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "entity",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Entity"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project"
+            }
+          },
+          {
+            "name": "object_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Object Id"
+            }
+          },
+          {
+            "name": "digest",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Digest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvaluationReadRes"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/{entity}/{project}/evaluations/{object_id}": {
+      "delete": {
+        "tags": [
+          "Evaluations"
+        ],
+        "summary": "Evaluation Delete",
+        "description": "Delete an evaluation object.",
+        "operationId": "evaluation_delete",
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "entity",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Entity"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project"
+            }
+          },
+          {
+            "name": "object_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Object Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Digests"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvaluationDeleteRes"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/{entity}/{project}/evaluation_runs": {
+      "post": {
+        "tags": [
+          "Evaluation Runs"
+        ],
+        "summary": "Evaluation Run Create",
+        "description": "Create an evaluation run.",
+        "operationId": "evaluation_run_create",
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "entity",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Entity"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EvaluationRunCreateBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvaluationRunCreateRes"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Evaluation Runs"
+        ],
+        "summary": "Evaluation Run List",
+        "description": "List evaluation runs.",
+        "operationId": "evaluation_run_list",
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "entity",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Entity"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stream of data in JSONL format",
+            "content": {
+              "application/jsonl": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EvaluationRunReadRes"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Evaluation Runs"
+        ],
+        "summary": "Evaluation Run Delete",
+        "description": "Delete evaluation runs.",
+        "operationId": "evaluation_run_delete",
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "entity",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Entity"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "title": "Evaluation Run Ids"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvaluationRunDeleteRes"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/{entity}/{project}/evaluation_runs/{evaluation_run_id}": {
+      "get": {
+        "tags": [
+          "Evaluation Runs"
+        ],
+        "summary": "Evaluation Run Read",
+        "description": "Get an evaluation run.",
+        "operationId": "evaluation_run_read",
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "entity",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Entity"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project"
+            }
+          },
+          {
+            "name": "evaluation_run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Evaluation Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvaluationRunReadRes"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/{entity}/{project}/evaluation_runs/{evaluation_run_id}/finish": {
+      "post": {
+        "tags": [
+          "Evaluation Runs"
+        ],
+        "summary": "Evaluation Run Finish",
+        "description": "Finish an evaluation run.",
+        "operationId": "evaluation_run_finish",
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "entity",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Entity"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project"
+            }
+          },
+          {
+            "name": "evaluation_run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Evaluation Run Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EvaluationRunFinishBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvaluationRunFinishRes"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/{entity}/{project}/models": {
+      "post": {
+        "tags": [
+          "Models"
+        ],
+        "summary": "Model Create",
+        "description": "Create a model object.",
+        "operationId": "model_create",
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "entity",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Entity"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModelCreateBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelCreateRes"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Models"
+        ],
+        "summary": "Model List",
+        "description": "List model objects.",
+        "operationId": "model_list",
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "entity",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Entity"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stream of data in JSONL format",
+            "content": {
+              "application/jsonl": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ModelReadRes"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/{entity}/{project}/models/{object_id}/versions/{digest}": {
+      "get": {
+        "tags": [
+          "Models"
+        ],
+        "summary": "Model Read",
+        "description": "Get a model object.",
+        "operationId": "model_read",
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "entity",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Entity"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project"
+            }
+          },
+          {
+            "name": "object_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Object Id"
+            }
+          },
+          {
+            "name": "digest",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Digest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelReadRes"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/{entity}/{project}/models/{object_id}": {
+      "delete": {
+        "tags": [
+          "Models"
+        ],
+        "summary": "Model Delete",
+        "description": "Delete a model object. If digests are provided, only those versions are deleted. Otherwise, all versions are deleted.",
+        "operationId": "model_delete",
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "entity",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Entity"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project"
+            }
+          },
+          {
+            "name": "object_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Object Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Digests"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelDeleteRes"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/{entity}/{project}/predictions": {
+      "post": {
+        "tags": [
+          "Predictions"
+        ],
+        "summary": "Prediction Create",
+        "description": "Create a prediction.",
+        "operationId": "prediction_create",
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "entity",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Entity"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PredictionCreateBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PredictionCreateRes"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Predictions"
+        ],
+        "summary": "Prediction List",
+        "description": "List predictions.",
+        "operationId": "prediction_list",
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "entity",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Entity"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project"
+            }
+          },
+          {
+            "name": "evaluation_run_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Evaluation Run Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stream of data in JSONL format",
+            "content": {
+              "application/jsonl": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PredictionReadRes"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Predictions"
+        ],
+        "summary": "Prediction Delete",
+        "description": "Delete predictions.",
+        "operationId": "prediction_delete",
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "entity",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Entity"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "title": "Prediction Ids"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PredictionDeleteRes"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/{entity}/{project}/predictions/{prediction_id}": {
+      "get": {
+        "tags": [
+          "Predictions"
+        ],
+        "summary": "Prediction Read",
+        "description": "Get a prediction.",
+        "operationId": "prediction_read",
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "entity",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Entity"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project"
+            }
+          },
+          {
+            "name": "prediction_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Prediction Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PredictionReadRes"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/{entity}/{project}/predictions/{prediction_id}/finish": {
+      "post": {
+        "tags": [
+          "Predictions"
+        ],
+        "summary": "Prediction Finish",
+        "description": "Finish a prediction.",
+        "operationId": "prediction_finish",
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "entity",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Entity"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project"
+            }
+          },
+          {
+            "name": "prediction_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Prediction Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PredictionFinishRes"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/{entity}/{project}/scores": {
+      "post": {
+        "tags": [
+          "Scores"
+        ],
+        "summary": "Score Create",
+        "description": "Create a score.",
+        "operationId": "score_create",
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "entity",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Entity"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScoreCreateBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScoreCreateRes"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Scores"
+        ],
+        "summary": "Score List",
+        "description": "List scores.",
+        "operationId": "score_list",
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "entity",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Entity"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project"
+            }
+          },
+          {
+            "name": "evaluation_run_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Evaluation Run Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stream of data in JSONL format",
+            "content": {
+              "application/jsonl": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ScoreReadRes"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Scores"
+        ],
+        "summary": "Score Delete",
+        "description": "Delete scores.",
+        "operationId": "score_delete",
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "entity",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Entity"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "title": "Score Ids"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScoreDeleteRes"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/{entity}/{project}/scores/{score_id}": {
+      "get": {
+        "tags": [
+          "Scores"
+        ],
+        "summary": "Score Read",
+        "description": "Get a score.",
+        "operationId": "score_read",
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "entity",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Entity"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project"
+            }
+          },
+          {
+            "name": "score_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Score Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScoreReadRes"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     }
   },
@@ -1592,6 +4215,11 @@
         ],
         "title": "AndOperation",
         "description": "Logical AND. All conditions must evaluate to true.\n\nExample:\n    ```\n    {\n        \"$and\": [\n            {\"$eq\": [{\"$getField\": \"op_name\"}, {\"$literal\": \"predict\"}]},\n            {\"$gt\": [{\"$getField\": \"summary.usage.tokens\"}, {\"$literal\": 1000}]}\n        ]\n    }\n    ```"
+      },
+      "BaseModel": {
+        "properties": {},
+        "type": "object",
+        "title": "BaseModel"
       },
       "Body_file_create_file_create_post": {
         "properties": {
@@ -1931,6 +4559,17 @@
             ],
             "title": "Wb Run Step"
           },
+          "wb_run_step_end": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wb Run Step End"
+          },
           "deleted_at": {
             "anyOf": [
               {
@@ -2091,8 +4730,17 @@
         "title": "CallsDeleteReq"
       },
       "CallsDeleteRes": {
-        "properties": {},
+        "properties": {
+          "num_deleted": {
+            "type": "integer",
+            "title": "Num Deleted",
+            "description": "The number of calls deleted"
+          }
+        },
         "type": "object",
+        "required": [
+          "num_deleted"
+        ],
         "title": "CallsDeleteRes"
       },
       "CallsFilter": {
@@ -3468,6 +6116,145 @@
         ],
         "title": "CostQueryRes"
       },
+      "DatasetCreateBody": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "The name of this dataset.  Datasets with the same name will be versioned together."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "A description of this dataset"
+          },
+          "rows": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Rows",
+            "description": "Dataset rows"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rows"
+        ],
+        "title": "DatasetCreateBody"
+      },
+      "DatasetCreateRes": {
+        "properties": {
+          "digest": {
+            "type": "string",
+            "title": "Digest",
+            "description": "The digest of the created dataset"
+          },
+          "object_id": {
+            "type": "string",
+            "title": "Object Id",
+            "description": "The ID of the created dataset"
+          },
+          "version_index": {
+            "type": "integer",
+            "title": "Version Index",
+            "description": "The version index of the created dataset"
+          }
+        },
+        "type": "object",
+        "required": [
+          "digest",
+          "object_id",
+          "version_index"
+        ],
+        "title": "DatasetCreateRes"
+      },
+      "DatasetDeleteRes": {
+        "properties": {
+          "num_deleted": {
+            "type": "integer",
+            "title": "Num Deleted",
+            "description": "Number of dataset versions deleted"
+          }
+        },
+        "type": "object",
+        "required": [
+          "num_deleted"
+        ],
+        "title": "DatasetDeleteRes"
+      },
+      "DatasetReadRes": {
+        "properties": {
+          "object_id": {
+            "type": "string",
+            "title": "Object Id",
+            "description": "The dataset ID"
+          },
+          "digest": {
+            "type": "string",
+            "title": "Digest",
+            "description": "The digest of the dataset object"
+          },
+          "version_index": {
+            "type": "integer",
+            "title": "Version Index",
+            "description": "The version index of the object"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "description": "When the object was created"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "The name of the dataset"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Description of the dataset"
+          },
+          "rows": {
+            "type": "string",
+            "title": "Rows",
+            "description": "Reference to the dataset rows data"
+          }
+        },
+        "type": "object",
+        "required": [
+          "object_id",
+          "digest",
+          "version_index",
+          "created_at",
+          "name",
+          "rows"
+        ],
+        "title": "DatasetReadRes"
+      },
       "EndedCallSchemaForInsert": {
         "properties": {
           "project_id": {
@@ -3505,6 +6292,17 @@
           },
           "summary": {
             "$ref": "#/components/schemas/SummaryInsertMap"
+          },
+          "wb_run_step_end": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wb Run Step End"
           }
         },
         "type": "object",
@@ -3608,6 +6406,427 @@
         "title": "EqOperation",
         "description": "Equality check between two operands.\n\nExample:\n    ```\n    {\n        \"$eq\": [{\"$getField\": \"op_name\"}, {\"$literal\": \"predict\"}]\n    }\n    ```"
       },
+      "EvaluationCreateReq": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "The name of this evaluation.  Evaluations with the same name will be versioned together."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "A description of this evaluation"
+          },
+          "dataset": {
+            "type": "string",
+            "title": "Dataset",
+            "description": "Reference to the dataset (weave:// URI)"
+          },
+          "scorers": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scorers",
+            "description": "List of scorer references (weave:// URIs)"
+          },
+          "trials": {
+            "type": "integer",
+            "title": "Trials",
+            "description": "Number of trials to run",
+            "default": 1
+          },
+          "evaluation_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evaluation Name",
+            "description": "Name for the evaluation run"
+          },
+          "eval_attributes": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eval Attributes",
+            "description": "Optional attributes for the evaluation"
+          },
+          "project_id": {
+            "type": "string",
+            "title": "Project Id",
+            "description": "The `entity/project` where this evaluation will be saved"
+          },
+          "wb_user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wb User Id",
+            "description": "Do not set directly. Server will automatically populate this field."
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "dataset",
+          "project_id"
+        ],
+        "title": "EvaluationCreateReq"
+      },
+      "EvaluationCreateRes": {
+        "properties": {
+          "digest": {
+            "type": "string",
+            "title": "Digest",
+            "description": "The digest of the created evaluation"
+          },
+          "object_id": {
+            "type": "string",
+            "title": "Object Id",
+            "description": "The ID of the created evaluation"
+          },
+          "version_index": {
+            "type": "integer",
+            "title": "Version Index",
+            "description": "The version index of the created evaluation"
+          },
+          "evaluation_ref": {
+            "type": "string",
+            "title": "Evaluation Ref",
+            "description": "Full reference to the created evaluation"
+          }
+        },
+        "type": "object",
+        "required": [
+          "digest",
+          "object_id",
+          "version_index",
+          "evaluation_ref"
+        ],
+        "title": "EvaluationCreateRes"
+      },
+      "EvaluationDeleteRes": {
+        "properties": {
+          "num_deleted": {
+            "type": "integer",
+            "title": "Num Deleted",
+            "description": "Number of evaluation versions deleted"
+          }
+        },
+        "type": "object",
+        "required": [
+          "num_deleted"
+        ],
+        "title": "EvaluationDeleteRes"
+      },
+      "EvaluationReadRes": {
+        "properties": {
+          "object_id": {
+            "type": "string",
+            "title": "Object Id",
+            "description": "The evaluation ID"
+          },
+          "digest": {
+            "type": "string",
+            "title": "Digest",
+            "description": "The digest of the evaluation"
+          },
+          "version_index": {
+            "type": "integer",
+            "title": "Version Index",
+            "description": "The version index of the evaluation"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "description": "When the evaluation was created"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "The name of the evaluation"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "A description of the evaluation"
+          },
+          "dataset": {
+            "type": "string",
+            "title": "Dataset",
+            "description": "Dataset reference (weave:// URI)"
+          },
+          "scorers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Scorers",
+            "description": "List of scorer references (weave:// URIs)"
+          },
+          "trials": {
+            "type": "integer",
+            "title": "Trials",
+            "description": "Number of trials"
+          },
+          "evaluation_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evaluation Name",
+            "description": "Name for the evaluation run"
+          },
+          "evaluate_op": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evaluate Op",
+            "description": "Evaluate op reference (weave:// URI)"
+          },
+          "predict_and_score_op": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Predict And Score Op",
+            "description": "Predict and score op reference (weave:// URI)"
+          },
+          "summarize_op": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summarize Op",
+            "description": "Summarize op reference (weave:// URI)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "object_id",
+          "digest",
+          "version_index",
+          "created_at",
+          "name",
+          "dataset",
+          "scorers",
+          "trials"
+        ],
+        "title": "EvaluationReadRes"
+      },
+      "EvaluationRunCreateBody": {
+        "properties": {
+          "evaluation": {
+            "type": "string",
+            "title": "Evaluation",
+            "description": "Reference to the evaluation (weave:// URI)"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model",
+            "description": "Reference to the model (weave:// URI)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "evaluation",
+          "model"
+        ],
+        "title": "EvaluationRunCreateBody"
+      },
+      "EvaluationRunCreateRes": {
+        "properties": {
+          "evaluation_run_id": {
+            "type": "string",
+            "title": "Evaluation Run Id",
+            "description": "The ID of the created evaluation run"
+          }
+        },
+        "type": "object",
+        "required": [
+          "evaluation_run_id"
+        ],
+        "title": "EvaluationRunCreateRes"
+      },
+      "EvaluationRunDeleteRes": {
+        "properties": {
+          "num_deleted": {
+            "type": "integer",
+            "title": "Num Deleted",
+            "description": "Number of evaluation runs deleted"
+          }
+        },
+        "type": "object",
+        "required": [
+          "num_deleted"
+        ],
+        "title": "EvaluationRunDeleteRes"
+      },
+      "EvaluationRunFinishBody": {
+        "properties": {
+          "summary": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary",
+            "description": "Optional summary dictionary for the evaluation run"
+          }
+        },
+        "type": "object",
+        "title": "EvaluationRunFinishBody",
+        "description": "Request body for finishing an evaluation run via REST API.\n\nThis model excludes project_id and evaluation_run_id since they come from the URL path in RESTful endpoints."
+      },
+      "EvaluationRunFinishRes": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "description": "Whether the evaluation run was finished successfully"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "title": "EvaluationRunFinishRes"
+      },
+      "EvaluationRunReadRes": {
+        "properties": {
+          "evaluation_run_id": {
+            "type": "string",
+            "title": "Evaluation Run Id",
+            "description": "The evaluation run ID"
+          },
+          "evaluation": {
+            "type": "string",
+            "title": "Evaluation",
+            "description": "Reference to the evaluation (weave:// URI)"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model",
+            "description": "Reference to the model (weave:// URI)"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status",
+            "description": "Status of the evaluation run"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At",
+            "description": "When the evaluation run started"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At",
+            "description": "When the evaluation run finished"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary",
+            "description": "Summary data for the evaluation run"
+          }
+        },
+        "type": "object",
+        "required": [
+          "evaluation_run_id",
+          "evaluation",
+          "model"
+        ],
+        "title": "EvaluationRunReadRes"
+      },
       "ExportTracePartialSuccess": {
         "properties": {
           "rejected_spans": {
@@ -3628,6 +6847,21 @@
       },
       "FeedbackCreateReq": {
         "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id",
+            "description": "If provided by the client, this ID will be used for the feedback row instead of a server-generated one.",
+            "examples": [
+              "018f1f2a-9c2b-7d3e-b5a1-8c9d2e4f6a7b"
+            ]
+          },
           "project_id": {
             "type": "string",
             "title": "Project Id",
@@ -3917,6 +7151,21 @@
       },
       "FeedbackReplaceReq": {
         "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id",
+            "description": "If provided by the client, this ID will be used for the feedback row instead of a server-generated one.",
+            "examples": [
+              "018f1f2a-9c2b-7d3e-b5a1-8c9d2e4f6a7b"
+            ]
+          },
           "project_id": {
             "type": "string",
             "title": "Project Id",
@@ -4483,6 +7732,7 @@
             "title": "Total Tokens"
           }
         },
+        "additionalProperties": true,
         "type": "object",
         "title": "LLMUsageSchema"
       },
@@ -4527,6 +7777,167 @@
         ],
         "title": "LiteralOperation",
         "description": "Represents a constant value in the query language.\n\nThis can be any standard JSON-serializable value.\n\nExample:\n    ```\n    {\"$literal\": \"predict\"}\n    ```"
+      },
+      "ModelCreateBody": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "The name of this model. Models with the same name will be versioned together."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "A description of this model"
+          },
+          "source_code": {
+            "type": "string",
+            "title": "Source Code",
+            "description": "Complete source code for the Model class including imports"
+          },
+          "attributes": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attributes",
+            "description": "Additional attributes to be stored with the model"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "source_code"
+        ],
+        "title": "ModelCreateBody"
+      },
+      "ModelCreateRes": {
+        "properties": {
+          "digest": {
+            "type": "string",
+            "title": "Digest",
+            "description": "The digest of the created model"
+          },
+          "object_id": {
+            "type": "string",
+            "title": "Object Id",
+            "description": "The ID of the created model"
+          },
+          "version_index": {
+            "type": "integer",
+            "title": "Version Index",
+            "description": "The version index of the created model"
+          },
+          "model_ref": {
+            "type": "string",
+            "title": "Model Ref",
+            "description": "Full reference to the created model"
+          }
+        },
+        "type": "object",
+        "required": [
+          "digest",
+          "object_id",
+          "version_index",
+          "model_ref"
+        ],
+        "title": "ModelCreateRes"
+      },
+      "ModelDeleteRes": {
+        "properties": {
+          "num_deleted": {
+            "type": "integer",
+            "title": "Num Deleted",
+            "description": "Number of model versions deleted"
+          }
+        },
+        "type": "object",
+        "required": [
+          "num_deleted"
+        ],
+        "title": "ModelDeleteRes"
+      },
+      "ModelReadRes": {
+        "properties": {
+          "object_id": {
+            "type": "string",
+            "title": "Object Id",
+            "description": "The model ID"
+          },
+          "digest": {
+            "type": "string",
+            "title": "Digest",
+            "description": "The digest of the model"
+          },
+          "version_index": {
+            "type": "integer",
+            "title": "Version Index",
+            "description": "The version index of the object"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "description": "When the model was created"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "The name of the model"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Description of the model"
+          },
+          "source_code": {
+            "type": "string",
+            "title": "Source Code",
+            "description": "The source code of the model"
+          },
+          "attributes": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attributes",
+            "description": "Additional attributes stored with the model"
+          }
+        },
+        "type": "object",
+        "required": [
+          "object_id",
+          "digest",
+          "version_index",
+          "created_at",
+          "name",
+          "source_code"
+        ],
+        "title": "ModelReadRes"
       },
       "NotOperation": {
         "properties": {
@@ -4601,6 +8012,17 @@
           "digest": {
             "type": "string",
             "title": "Digest"
+          },
+          "object_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Object Id"
           }
         },
         "type": "object",
@@ -5025,6 +8447,29 @@
               ]
             ]
           },
+          "exclude_base_object_classes": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exclude Base Object Classes",
+            "description": "Exclude objects by their base classes",
+            "examples": [
+              [
+                "Model"
+              ],
+              [
+                "Dataset"
+              ]
+            ]
+          },
           "leaf_object_classes": {
             "anyOf": [
               {
@@ -5108,6 +8553,118 @@
         "type": "object",
         "title": "ObjectVersionFilter"
       },
+      "OpCreateBody": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "The name of this op. Ops with the same name will be versioned together."
+          },
+          "source_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Code",
+            "description": "Complete source code for this op, including imports"
+          }
+        },
+        "type": "object",
+        "title": "OpCreateBody",
+        "description": "Request body for creating an Op object via REST API.\n\nThis model excludes project_id since it comes from the URL path in RESTful endpoints."
+      },
+      "OpCreateRes": {
+        "properties": {
+          "digest": {
+            "type": "string",
+            "title": "Digest",
+            "description": "The digest of the created op"
+          },
+          "object_id": {
+            "type": "string",
+            "title": "Object Id",
+            "description": "The ID of the created op"
+          },
+          "version_index": {
+            "type": "integer",
+            "title": "Version Index",
+            "description": "The version index of the created op"
+          }
+        },
+        "type": "object",
+        "required": [
+          "digest",
+          "object_id",
+          "version_index"
+        ],
+        "title": "OpCreateRes",
+        "description": "Response model for creating an Op object."
+      },
+      "OpDeleteRes": {
+        "properties": {
+          "num_deleted": {
+            "type": "integer",
+            "title": "Num Deleted",
+            "description": "Number of op versions deleted from this op"
+          }
+        },
+        "type": "object",
+        "required": [
+          "num_deleted"
+        ],
+        "title": "OpDeleteRes"
+      },
+      "OpReadRes": {
+        "properties": {
+          "object_id": {
+            "type": "string",
+            "title": "Object Id",
+            "description": "The op ID"
+          },
+          "digest": {
+            "type": "string",
+            "title": "Digest",
+            "description": "The digest of the op"
+          },
+          "version_index": {
+            "type": "integer",
+            "title": "Version Index",
+            "description": "The version index of this op"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "description": "When this op was created"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code",
+            "description": "The actual op source code"
+          }
+        },
+        "type": "object",
+        "required": [
+          "object_id",
+          "digest",
+          "version_index",
+          "created_at",
+          "code"
+        ],
+        "title": "OpReadRes",
+        "description": "Response model for reading an Op object.\n\nThe code field contains the actual source code of the op."
+      },
       "OrOperation": {
         "properties": {
           "$or": {
@@ -5168,6 +8725,17 @@
           "traces": {
             "title": "Traces"
           },
+          "wb_run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wb Run Id"
+          },
           "wb_user_id": {
             "anyOf": [
               {
@@ -5204,6 +8772,143 @@
         },
         "type": "object",
         "title": "OtelExportRes"
+      },
+      "PredictionCreateBody": {
+        "properties": {
+          "model": {
+            "type": "string",
+            "title": "Model",
+            "description": "The model reference (weave:// URI)"
+          },
+          "inputs": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Inputs",
+            "description": "The inputs to the prediction"
+          },
+          "output": {
+            "title": "Output",
+            "description": "The output of the prediction"
+          },
+          "evaluation_run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evaluation Run Id",
+            "description": "Optional evaluation run ID to link this prediction as a child call"
+          }
+        },
+        "type": "object",
+        "required": [
+          "model",
+          "inputs",
+          "output"
+        ],
+        "title": "PredictionCreateBody",
+        "description": "Request body for creating a Prediction via REST API.\n\nThis model excludes project_id since it comes from the URL path in RESTful endpoints."
+      },
+      "PredictionCreateRes": {
+        "properties": {
+          "prediction_id": {
+            "type": "string",
+            "title": "Prediction Id",
+            "description": "The prediction ID"
+          }
+        },
+        "type": "object",
+        "required": [
+          "prediction_id"
+        ],
+        "title": "PredictionCreateRes"
+      },
+      "PredictionDeleteRes": {
+        "properties": {
+          "num_deleted": {
+            "type": "integer",
+            "title": "Num Deleted",
+            "description": "Number of predictions deleted"
+          }
+        },
+        "type": "object",
+        "required": [
+          "num_deleted"
+        ],
+        "title": "PredictionDeleteRes"
+      },
+      "PredictionFinishRes": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "description": "Whether the prediction was finished successfully"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "title": "PredictionFinishRes"
+      },
+      "PredictionReadRes": {
+        "properties": {
+          "prediction_id": {
+            "type": "string",
+            "title": "Prediction Id",
+            "description": "The prediction ID"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model",
+            "description": "The model reference (weave:// URI)"
+          },
+          "inputs": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Inputs",
+            "description": "The inputs to the prediction"
+          },
+          "output": {
+            "title": "Output",
+            "description": "The output of the prediction"
+          },
+          "evaluation_run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evaluation Run Id",
+            "description": "Evaluation run ID if this prediction is linked to one"
+          },
+          "wb_user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wb User Id",
+            "description": "Do not set directly. Server will automatically populate this field."
+          }
+        },
+        "type": "object",
+        "required": [
+          "prediction_id",
+          "model",
+          "inputs",
+          "output"
+        ],
+        "title": "PredictionReadRes"
       },
       "Query": {
         "properties": {
@@ -5274,6 +8979,258 @@
           "vals"
         ],
         "title": "RefsReadBatchRes"
+      },
+      "ScoreCreateBody": {
+        "properties": {
+          "prediction_id": {
+            "type": "string",
+            "title": "Prediction Id",
+            "description": "The prediction ID"
+          },
+          "scorer": {
+            "type": "string",
+            "title": "Scorer",
+            "description": "The scorer reference (weave:// URI)"
+          },
+          "value": {
+            "type": "number",
+            "title": "Value",
+            "description": "The value of the score"
+          },
+          "evaluation_run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evaluation Run Id",
+            "description": "Optional evaluation run ID to link this score as a child call"
+          }
+        },
+        "type": "object",
+        "required": [
+          "prediction_id",
+          "scorer",
+          "value"
+        ],
+        "title": "ScoreCreateBody",
+        "description": "Request body for creating a Score via REST API.\n\nThis model excludes project_id since it comes from the URL path in RESTful endpoints."
+      },
+      "ScoreCreateRes": {
+        "properties": {
+          "score_id": {
+            "type": "string",
+            "title": "Score Id",
+            "description": "The score ID"
+          }
+        },
+        "type": "object",
+        "required": [
+          "score_id"
+        ],
+        "title": "ScoreCreateRes"
+      },
+      "ScoreDeleteRes": {
+        "properties": {
+          "num_deleted": {
+            "type": "integer",
+            "title": "Num Deleted",
+            "description": "Number of scores deleted"
+          }
+        },
+        "type": "object",
+        "required": [
+          "num_deleted"
+        ],
+        "title": "ScoreDeleteRes"
+      },
+      "ScoreReadRes": {
+        "properties": {
+          "score_id": {
+            "type": "string",
+            "title": "Score Id",
+            "description": "The score ID"
+          },
+          "scorer": {
+            "type": "string",
+            "title": "Scorer",
+            "description": "The scorer reference (weave:// URI)"
+          },
+          "value": {
+            "type": "number",
+            "title": "Value",
+            "description": "The value of the score"
+          },
+          "evaluation_run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evaluation Run Id",
+            "description": "Evaluation run ID if this score is linked to one"
+          },
+          "wb_user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wb User Id",
+            "description": "Do not set directly. Server will automatically populate this field."
+          }
+        },
+        "type": "object",
+        "required": [
+          "score_id",
+          "scorer",
+          "value"
+        ],
+        "title": "ScoreReadRes"
+      },
+      "ScorerCreateBody": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "The name of this scorer.  Scorers with the same name will be versioned together."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "A description of this scorer"
+          },
+          "op_source_code": {
+            "type": "string",
+            "title": "Op Source Code",
+            "description": "Complete source code for the Scorer.score op including imports"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "op_source_code"
+        ],
+        "title": "ScorerCreateBody"
+      },
+      "ScorerCreateRes": {
+        "properties": {
+          "digest": {
+            "type": "string",
+            "title": "Digest",
+            "description": "The digest of the created scorer"
+          },
+          "object_id": {
+            "type": "string",
+            "title": "Object Id",
+            "description": "The ID of the created scorer"
+          },
+          "version_index": {
+            "type": "integer",
+            "title": "Version Index",
+            "description": "The version index of the created scorer"
+          },
+          "scorer": {
+            "type": "string",
+            "title": "Scorer",
+            "description": "Full reference to the created scorer"
+          }
+        },
+        "type": "object",
+        "required": [
+          "digest",
+          "object_id",
+          "version_index",
+          "scorer"
+        ],
+        "title": "ScorerCreateRes"
+      },
+      "ScorerDeleteRes": {
+        "properties": {
+          "num_deleted": {
+            "type": "integer",
+            "title": "Num Deleted",
+            "description": "Number of scorer versions deleted"
+          }
+        },
+        "type": "object",
+        "required": [
+          "num_deleted"
+        ],
+        "title": "ScorerDeleteRes"
+      },
+      "ScorerReadRes": {
+        "properties": {
+          "object_id": {
+            "type": "string",
+            "title": "Object Id",
+            "description": "The scorer ID"
+          },
+          "digest": {
+            "type": "string",
+            "title": "Digest",
+            "description": "The digest of the scorer"
+          },
+          "version_index": {
+            "type": "integer",
+            "title": "Version Index",
+            "description": "The version index of the object"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At",
+            "description": "When the scorer was created"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "The name of the scorer"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Description of the scorer"
+          },
+          "score_op": {
+            "type": "string",
+            "title": "Score Op",
+            "description": "The Scorer.score op reference"
+          }
+        },
+        "type": "object",
+        "required": [
+          "object_id",
+          "digest",
+          "version_index",
+          "created_at",
+          "name",
+          "score_op"
+        ],
+        "title": "ScorerReadRes"
       },
       "ServerInfoRes": {
         "properties": {
@@ -5401,6 +9358,18 @@
             "additionalProperties": true,
             "type": "object",
             "title": "Inputs"
+          },
+          "otel_dump": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Otel Dump"
           },
           "wb_user_id": {
             "anyOf": [

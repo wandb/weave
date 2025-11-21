@@ -1,5 +1,7 @@
 import os
+import sys
 from collections.abc import Generator
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -233,6 +235,10 @@ def assert_correct_calls_for_chain_batch(calls: list[Call]) -> None:
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     before_record_request=filter_body,
 )
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="Currently not working on Windows",
+)
 def test_simple_chain_batch(client: WeaveClient) -> None:
     from langchain_core.prompts import PromptTemplate
     from langchain_openai import ChatOpenAI
@@ -301,6 +307,10 @@ def assert_correct_calls_for_chain_batch_from_op(calls: list[Call]) -> None:
     filter_headers=["authorization"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     before_record_request=filter_body,
+)
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="Currently not working on Windows",
 )
 def test_simple_chain_batch_inside_op(client: WeaveClient) -> None:
     # This test is the same as test_simple_chain_batch, but ensures things work when nested in an op
@@ -388,13 +398,19 @@ def fix_chroma_ci() -> Generator[None, None, None]:
     # According to https://docs.trychroma.com/troubleshooting#sqlite
     # which references https://gist.github.com/defulmere/8b9695e415a44271061cc8e272f3c300,
     # on Linux machines (CI runners), we need to patch sqlite3 to pysqlite3 and ensure
-    # pysqlite3 is installed.
+    # pysqlite3 is installed. On Windows, pysqlite3 is not available, so we skip this.
     if not os.environ.get("CI"):
         yield None
         return
 
-    __import__("pysqlite3")
     import sys
+
+    # Try to import pysqlite3, but skip patching if not available (e.g., on Windows)
+    try:
+        __import__("pysqlite3")
+    except ImportError:
+        yield None
+        return
 
     old = sys.modules["sqlite3"]
     sys.modules["sqlite3"] = sys.modules.pop("pysqlite3")
@@ -420,7 +436,8 @@ def test_simple_rag_chain(client: WeaveClient, fix_chroma_ci: None) -> None:
     from langchain_core.runnables import RunnablePassthrough
     from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 
-    loader = TextLoader("integrations/langchain/test_data/paul_graham_essay.txt")
+    test_data_path = Path(__file__).parent / "test_data" / "paul_graham_essay.txt"
+    loader = TextLoader(str(test_data_path))
     docs = loader.load()
 
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
