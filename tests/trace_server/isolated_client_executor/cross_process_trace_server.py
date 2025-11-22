@@ -457,6 +457,12 @@ class CrossProcessTraceServerSender(tsi.TraceServerInterface):
         """Add calls to an annotation queue."""
         return self._send_request("annotation_queue_add_calls", req)
 
+    def annotation_queues_stats(
+        self, req: tsi.AnnotationQueuesStatsReq
+    ) -> tsi.AnnotationQueuesStatsRes:
+        """Get stats for multiple annotation queues."""
+        return self._send_request("annotation_queues_stats", req)
+
 
 class CrossProcessTraceServerReceiver:
     """Receives requests from a child process and executes them on a local trace server.
