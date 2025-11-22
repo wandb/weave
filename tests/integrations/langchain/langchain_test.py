@@ -782,7 +782,7 @@ def test_langchain_google_vertexai_usage(client: WeaveClient) -> None:
 
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
-    filter_headers=["authorization", "x-api-key"],
+    filter_headers=["authorization", "x-api-key", "x-goog-api-key"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     before_record_request=filter_body,
     match_on=["method", "scheme", "path", "query"],
@@ -814,7 +814,7 @@ def test_langchain_google_genai_usage(client: WeaveClient) -> None:
 
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
-    filter_headers=["authorization", "x-api-key"],
+    filter_headers=["authorization", "x-api-key", "x-goog-api-key"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     before_record_request=filter_body,
     match_on=["method", "scheme", "path", "query"],
