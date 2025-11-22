@@ -8,6 +8,7 @@ import logging
 import random
 import sys
 import traceback
+import warnings
 import weakref
 from collections import defaultdict
 from collections.abc import (
@@ -32,7 +33,7 @@ from typing import (
     overload,
 )
 
-from typing_extensions import ParamSpec, TypeIs, Unpack
+from typing_extensions import ParamSpec, TypeIs
 
 from weave.trace import box, settings
 from weave.trace.context import call_context
@@ -97,10 +98,6 @@ class Sentinel:
 
 _sentinels_to_check = [
     Sentinel(package="openai", path="openai._types", name="NOT_GIVEN"),
-    Sentinel(package="openai", path="openai._types", name="omit"),
-    Sentinel(
-        package="openai", path="openai._types", name="Omit"
-    ),  # Class, not instance
     Sentinel(package="cohere", path="cohere.base_client", name="COHERE_NOT_GIVEN"),
     Sentinel(package="anthropic", path="anthropic._types", name="NOT_GIVEN"),
     Sentinel(package="cerebras", path="cerebras.cloud.sdk._types", name="NOT_GIVEN"),
@@ -145,13 +142,8 @@ def _value_is_sentinel(param: inspect.Parameter) -> bool:
 
     # Check cached sentinels first
     for sentinel in _SENTINEL_CACHE.values():
-        if sentinel is not None:
-            # Check for identity (singleton instances)
-            if param.default is sentinel:
-                return True
-            # Check for isinstance (e.g., openai.Omit class instances)
-            if isinstance(sentinel, type) and isinstance(param.default, sentinel):
-                return True
+        if sentinel is not None and param.default is sentinel:
+            return True
 
     for sentinel in _sentinels_to_check:
         if _check_param_is_sentinel(param, sentinel):
@@ -181,18 +173,6 @@ class WeaveKwargs(TypedDict):
     display_name: str | None
     attributes: dict[str, Any]
     call_id: str | None
-
-
-class OpKwargs(TypedDict, total=False):
-    """TypedDict for op() keyword arguments."""
-
-    name: str | None
-    call_display_name: str | CallDisplayNameFunc | None
-    postprocess_inputs: PostprocessInputsFunc | None
-    postprocess_output: PostprocessOutputFunc | None
-    tracing_sample_rate: float
-    enable_code_capture: bool
-    accumulator: Callable[[Any | None, Any], Any] | None
 
 
 def setup_dunder_weave_dict(d: WeaveKwargs | None = None) -> WeaveKwargs:
@@ -388,7 +368,7 @@ def _call_sync_func(
     op: Op,
     *args: Any,
     __weave: WeaveKwargs | None = None,
-    __should_raise: bool = False,
+    raise_on_exception: bool | None = None,
     # When this param is True, calls do not automatically "finish" when the function
     # returns.  The user must explicitly call `finish` on the call object.  This is
     # included to support the imperative evaluation logging interface.
@@ -502,11 +482,26 @@ def _call_sync_func(
         finish(output)
         return output
 
+    # Use global setting if raise_on_exception is not explicitly set
+    was_explicitly_set = raise_on_exception is not None
+    if raise_on_exception is None:
+        raise_on_exception = settings.should_call_raise_on_exception()
+
+    # Warn if raise_on_exception is False and wasn't explicitly set (default behavior that will change)
+    if not raise_on_exception and not was_explicitly_set:
+        warnings.warn(
+            "The default behavior of op.call() will change to raise exceptions "
+            "in a future version. Set raise_on_exception=True to opt-in to the new behavior, "
+            "or set weave.trace.settings.call_raise_on_exception=True globally.",
+            FutureWarning,
+            stacklevel=3,
+        )
+
     try:
         res = func(*args, **kwargs)
     except Exception as e:
         finish(exception=e)
-        if __should_raise:
+        if raise_on_exception:
             raise
         return None, call
     except (SystemExit, KeyboardInterrupt) as e:
@@ -536,7 +531,7 @@ async def _call_async_func(
     op: Op,
     *args: Any,
     __weave: WeaveKwargs | None = None,
-    __should_raise: bool = False,
+    raise_on_exception: bool | None = None,
     __require_explicit_finish: bool = False,
     **kwargs: Any,
 ) -> tuple[Any, Call]:
@@ -633,11 +628,26 @@ async def _call_async_func(
             finish(output)
             return output
 
+    # Use global setting if raise_on_exception is not explicitly set
+    was_explicitly_set = raise_on_exception is not None
+    if raise_on_exception is None:
+        raise_on_exception = settings.should_call_raise_on_exception()
+
+    # Warn if raise_on_exception is False and wasn't explicitly set (default behavior that will change)
+    if not raise_on_exception and not was_explicitly_set:
+        warnings.warn(
+            "The default behavior of op.call() will change to raise exceptions "
+            "in a future version. Set raise_on_exception=True to opt-in to the new behavior, "
+            "or set weave.trace.settings.call_raise_on_exception=True globally.",
+            FutureWarning,
+            stacklevel=3,
+        )
+
     try:
         res = await func(*args, **kwargs)
     except Exception as e:
         finish(exception=e)
-        if __should_raise:
+        if raise_on_exception:
             raise
         return None, call
     except (SystemExit, KeyboardInterrupt) as e:
@@ -667,7 +677,7 @@ def _call_sync_gen(
     op: Op,
     *args: Any,
     __weave: WeaveKwargs | None = None,
-    __should_raise: bool = False,
+    raise_on_exception: bool | None = None,
     __require_explicit_finish: bool = False,
     **kwargs: Any,
 ) -> tuple[Generator[Any], Call]:
@@ -858,11 +868,27 @@ def _call_sync_gen(
     except Exception as e:
         # Handle exceptions from initial generator creation
         finish(exception=e)
-        if __should_raise:
+
+        # Use global setting if raise_on_exception is not explicitly set
+        was_explicitly_set = raise_on_exception is not None
+        if raise_on_exception is None:
+            raise_on_exception = settings.should_call_raise_on_exception()
+
+        # Warn if raise_on_exception is False and wasn't explicitly set (default behavior that will change)
+        if not raise_on_exception and not was_explicitly_set:
+            warnings.warn(
+                "The default behavior of op.call() will change to raise exceptions "
+                "in a future version. Set raise_on_exception=True to opt-in to the new behavior, "
+                "or set weave.trace.settings.call_raise_on_exception=True globally.",
+                FutureWarning,
+                stacklevel=3,
+            )
+
+        if raise_on_exception:
             raise
 
         def empty_sync_gen() -> Generator[Any]:
-            # Re-raise the original exception if __should_raise is False
+            # Re-raise the original exception if raise_on_exception is False
             # but we're evaluating the generator, to maintain expected behavior
             if not has_finished:
                 nonlocal e
@@ -877,7 +903,7 @@ async def _call_async_gen(
     op: Op,
     *args: Any,
     __weave: WeaveKwargs | None = None,
-    __should_raise: bool = False,
+    raise_on_exception: bool | None = None,
     __require_explicit_finish: bool = False,
     **kwargs: Any,
 ) -> tuple[AsyncIterator, Call]:
@@ -1073,11 +1099,27 @@ async def _call_async_gen(
     except Exception as e:
         # Handle exceptions from initial generator creation
         finish(exception=e)
-        if __should_raise:
+
+        # Use global setting if raise_on_exception is not explicitly set
+        was_explicitly_set = raise_on_exception is not None
+        if raise_on_exception is None:
+            raise_on_exception = settings.should_call_raise_on_exception()
+
+        # Warn if raise_on_exception is False and wasn't explicitly set (default behavior that will change)
+        if not raise_on_exception and not was_explicitly_set:
+            warnings.warn(
+                "The default behavior of op.call() will change to raise exceptions "
+                "in a future version. Set raise_on_exception=True to opt-in to the new behavior, "
+                "or set weave.trace.settings.call_raise_on_exception=True globally.",
+                FutureWarning,
+                stacklevel=3,
+            )
+
+        if raise_on_exception:
             raise
 
         async def empty_async_gen() -> AsyncIterator[Any]:
-            # Re-raise the original exception if __should_raise is False
+            # Re-raise the original exception if raise_on_exception is False
             # but we're evaluating the generator, to maintain expected behavior
             if not has_finished:
                 nonlocal e
@@ -1093,7 +1135,7 @@ def call(
     op: Op,
     *args: Any,
     __weave: WeaveKwargs | None = None,
-    __should_raise: bool = False,
+    raise_on_exception: bool | None = None,
     # When this param is True, calls do not automatically "finish" when the function
     # returns.  The user must explicitly call `finish` on the call object.  This is
     # included to support the imperative evaluation logging interface.
@@ -1102,7 +1144,9 @@ def call(
 ) -> tuple[Any, Call] | Coroutine[Any, Any, tuple[Any, Call]]:
     """Executes the op and returns both the result and a Call representing the execution.
 
-    This function will never raise.  Any errors are captured in the Call object.
+    By default, this function will not raise exceptions. Any errors are captured in the Call object.
+    Set raise_on_exception=True to re-raise exceptions, or set the global setting
+    weave.trace.settings.call_raise_on_exception=True.
 
     This method is automatically bound to any function decorated with `@weave.op`,
     allowing for usage like:
@@ -1120,7 +1164,7 @@ def call(
             op,
             *args,
             __weave=__weave,
-            __should_raise=__should_raise,
+            raise_on_exception=raise_on_exception,
             __require_explicit_finish=__require_explicit_finish,
             **kwargs,
         )
@@ -1129,7 +1173,7 @@ def call(
             op,
             *args,
             __weave=__weave,
-            __should_raise=__should_raise,
+            raise_on_exception=raise_on_exception,
             __require_explicit_finish=__require_explicit_finish,
             **kwargs,
         )
@@ -1156,9 +1200,37 @@ def calls(op: Op) -> CallsIter:
 
 
 @overload
-def op(func: Callable[P, R], **kwargs: Unpack[OpKwargs]) -> Op[P, R]: ...
+def op(
+    func: Callable[P, R],
+    *,
+    name: str | None = None,
+    call_display_name: str | CallDisplayNameFunc | None = None,
+    postprocess_inputs: PostprocessInputsFunc | None = None,
+    postprocess_output: PostprocessOutputFunc | None = None,
+    accumulator: Callable[[Any | None, Any], Any] | None = None,
+) -> Op[P, R]: ...
+
+
 @overload
-def op(**kwargs: Unpack[OpKwargs]) -> Callable[[Callable[P, R]], Op[P, R]]: ...
+def op(
+    *,
+    name: str | None = None,
+    call_display_name: str | CallDisplayNameFunc | None = None,
+    postprocess_inputs: PostprocessInputsFunc | None = None,
+    postprocess_output: PostprocessOutputFunc | None = None,
+    accumulator: Callable[[Any | None, Any], Any] | None = None,
+) -> Callable[[Callable[P, R]], Op[P, R]]: ...
+
+
+@overload
+def op(
+    *,
+    name: str | None = None,
+    enable_code_capture: bool = True,
+    accumulator: Callable[[Any | None, Any], Any] | None = None,
+) -> Callable[[Callable[P, R]], Op[P, R]]: ...
+
+
 def op(
     func: Callable[P, R] | None = None,
     *,
@@ -1192,7 +1264,10 @@ def op(
                 @wraps(func)
                 async def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:  # pyright: ignore[reportRedeclaration]
                     res, _ = await _call_async_func(
-                        cast(Op[P, R], wrapper), *args, __should_raise=True, **kwargs
+                        cast(Op[P, R], wrapper),
+                        *args,
+                        raise_on_exception=True,
+                        **kwargs,
                     )
                     return cast(R, res)
             elif is_sync_generator:
@@ -1200,7 +1275,10 @@ def op(
                 @wraps(func)
                 def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:  # pyright: ignore[reportRedeclaration]
                     res, _ = _call_sync_gen(
-                        cast(Op[P, R], wrapper), *args, __should_raise=True, **kwargs
+                        cast(Op[P, R], wrapper),
+                        *args,
+                        raise_on_exception=True,
+                        **kwargs,
                     )
                     return cast(R, res)
             elif is_async_generator:
@@ -1210,7 +1288,10 @@ def op(
                     *args: P.args, **kwargs: P.kwargs
                 ) -> AsyncGenerator[R]:
                     res, _ = await _call_async_gen(
-                        cast(Op[P, R], wrapper), *args, __should_raise=True, **kwargs
+                        cast(Op[P, R], wrapper),
+                        *args,
+                        raise_on_exception=True,
+                        **kwargs,
                     )
                     async for item in res:
                         yield item
@@ -1219,7 +1300,10 @@ def op(
                 @wraps(func)
                 def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
                     res, _ = _call_sync_func(
-                        cast(Op[P, R], wrapper), *args, __should_raise=True, **kwargs
+                        cast(Op[P, R], wrapper),
+                        *args,
+                        raise_on_exception=True,
+                        **kwargs,
                     )
                     return cast(R, res)
 
@@ -1253,7 +1337,6 @@ def op(
 
             wrapper._set_on_finish_handler = partial(_set_on_finish_handler, wrapper)  # type: ignore
             wrapper._on_finish_handler = None  # type: ignore
-            wrapper._on_finish_post_processor = None  # type: ignore
 
             wrapper._tracing_enabled = True  # type: ignore
             wrapper.tracing_sample_rate = tracing_sample_rate  # type: ignore
@@ -1589,7 +1672,7 @@ class _Accumulator(Generic[S, V]):
 
 
 def _build_iterator_from_accumulator_for_op(
-    value: Iterator[V] | AsyncIterator[V],
+    value: Iterator[V],
     accumulator: Callable,
     on_finish: FinishCallbackType,
     iterator_wrapper: type[_IteratorWrapper] = _IteratorWrapper,
@@ -1643,23 +1726,28 @@ def _add_accumulator(
     """
 
     def on_output(
-        value: Iterator[V] | AsyncIterator[V],
-        on_finish: FinishCallbackType,
-        inputs: dict,
-    ) -> Iterator | AsyncIterator:
+        value: Iterator[V], on_finish: FinishCallbackType, inputs: dict
+    ) -> Iterator:
+        def wrapped_on_finish(value: Any, e: BaseException | None = None) -> None:
+            if on_finish_post_processor is not None:
+                value = on_finish_post_processor(value)
+            on_finish(value, e)
+
         if should_accumulate is None or should_accumulate(inputs):
             # we build the accumulator here dependent on the inputs (optional)
             accumulator = make_accumulator(inputs)
             return _build_iterator_from_accumulator_for_op(
                 value,
                 accumulator,
-                on_finish,
+                wrapped_on_finish,
                 iterator_wrapper,
             )
         else:
-            on_finish(value, None)
+            wrapped_on_finish(value)
             return value
 
     op._set_on_output_handler(on_output)
-    op._on_finish_post_processor = on_finish_post_processor
     return op
+
+
+__docspec__ = [call, calls]
