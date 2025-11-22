@@ -183,12 +183,26 @@ def load(artifact: MemTraceFilesArtifact, name: str, val: Any) -> VideoClip:
     """
     _ensure_registered()
     from moviepy.editor import VideoFileClip
+    import tempfile
+    import os
 
     # Assume there can only be 1 video in the artifact
     for filename in artifact.path_contents:
-        path = artifact.path(filename)
         if filename.startswith("video."):
-            return VideoFileClip(path)
+            # Create a persistent temporary file that won't be cleaned up
+            # until the Python process exits. This avoids Windows file handle
+            # issues where VideoFileClip keeps the file open and prevents
+            # the artifact's TemporaryDirectory from being cleaned up.
+            video_data = artifact.path_contents[filename]
+            # Use delete=False to keep the file around after closing
+            # The OS will clean it up when the process exits
+            fd, temp_path = tempfile.mkstemp(suffix=f".{filename.split('.')[-1]}")
+            try:
+                os.write(fd, video_data)
+            finally:
+                os.close(fd)
+
+            return VideoFileClip(temp_path)
 
     raise ValueError("No video or found for artifact")
 
