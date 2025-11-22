@@ -198,6 +198,9 @@ def tests(session: nox.Session, shard: str):
     if shard == "trace":
         cpu_count = os.cpu_count()
         if cpu_count is not None and cpu_count > 1:
+            # Use loadscope to group tests by fixture scope, reducing fixture overhead
+            # This is critical for proper parallelization with shared fixtures
+            session.posargs.insert(0, "--dist=loadscope")
             session.posargs.insert(0, f"-n{cpu_count}")
 
     # Add sharding logic for trace1, trace2, trace3

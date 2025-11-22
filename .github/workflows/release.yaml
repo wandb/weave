@@ -12,7 +12,7 @@ on:
 jobs:
   build-release:
     name: Build and publish to pypi
-    runs-on: ubuntu-8core
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     environment:
       name: release
