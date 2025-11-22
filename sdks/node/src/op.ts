@@ -148,6 +148,9 @@ function createOpWrapper<T extends (...args: any[]) => any>(
 
     const opRefForCall: Op<any> | OpRef = opWrapper as Op<any>;
 
+    // Get attributes from context
+    const attributes = client.getCallAttributes();
+
     const startCallPromise = client.createCall(
       call,
       opRefForCall,
@@ -157,7 +160,8 @@ function createOpWrapper<T extends (...args: any[]) => any>(
       currentCall,
       parentCall,
       startTime,
-      displayName
+      displayName,
+      attributes
     );
 
     try {

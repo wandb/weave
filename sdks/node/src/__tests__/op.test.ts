@@ -18,6 +18,7 @@ const createFreshMockClient = () => ({
     return Promise.resolve();
   }),
   runWithCallStack: jest.fn(async (stack: any, fn: () => any) => fn()),
+  getCallAttributes: jest.fn(() => ({})),
   finishCall: jest.fn(() => Promise.resolve()),
   finishCallWithException: jest.fn(() => Promise.resolve()),
   settings: {shouldPrintCallLink: false},

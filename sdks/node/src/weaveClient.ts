@@ -81,6 +81,7 @@ const MAX_BATCH_SIZE_CHARS = 10 * 1024 * 1024;
 
 export class WeaveClient {
   private stackContext = new AsyncLocalStorage<CallStack>();
+  private attributesContext = new AsyncLocalStorage<Record<string, any>>();
   private callQueue: Array<{mode: 'start' | 'end'; data: any}> = [];
   private batchProcessTimeout: NodeJS.Timeout | null = null;
   private isBatchProcessing: boolean = false;
@@ -642,6 +643,14 @@ export class WeaveClient {
 
   public runWithCallStack<T>(callStack: CallStack, fn: () => T): T {
     return this.stackContext.run(callStack, fn);
+  }
+
+  public getCallAttributes(): Record<string, any> {
+    return this.attributesContext.getStore() ?? {};
+  }
+
+  public runWithAttributes<T>(attributes: Record<string, any>, fn: () => T): T {
+    return this.attributesContext.run(attributes, fn);
   }
 
   private async paramsToCallInputs(
