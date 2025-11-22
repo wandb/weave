@@ -1241,6 +1241,42 @@ class AnnotationQueueAddCallsRes(BaseModel):
     duplicates: int  # Number of calls already in queue (skipped)
 
 
+class AnnotationQueueStatsSchema(BaseModel):
+    """Statistics for a single annotation queue."""
+
+    queue_id: str = Field(
+        examples=["550e8400-e29b-41d4-a716-446655440000"],
+        description="The queue ID",
+    )
+    total_items: int = Field(
+        description="Total number of items in the queue",
+    )
+    completed_items: int = Field(
+        description="Number of items completed or skipped by at least one annotator",
+    )
+
+
+class AnnotationQueuesStatsReq(BaseModelStrict):
+    """Request to get stats for multiple annotation queues."""
+
+    project_id: str = Field(examples=["entity/project"])
+    queue_ids: list[str] = Field(
+        examples=[
+            [
+                "550e8400-e29b-41d4-a716-446655440000",
+                "550e8400-e29b-41d4-a716-446655440001",
+            ]
+        ],
+        description="List of queue IDs to get stats for",
+    )
+
+
+class AnnotationQueuesStatsRes(BaseModel):
+    """Response with stats for multiple annotation queues."""
+
+    stats: list[AnnotationQueueStatsSchema]
+
+
 # Thread API
 
 
