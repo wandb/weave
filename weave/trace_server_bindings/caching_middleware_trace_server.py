@@ -536,6 +536,11 @@ class CachingMiddlewareTraceServer(TraceServerClientInterface):
     ) -> tsi.AnnotationQueueAddCallsRes:
         return self._next_trace_server.annotation_queue_add_calls(req)
 
+    def annotation_queues_stats(
+        self, req: tsi.AnnotationQueuesStatsReq
+    ) -> tsi.AnnotationQueuesStatsRes:
+        return self._next_trace_server.annotation_queues_stats(req)
+
     def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
         return self._next_trace_server.evaluate_model(req)
 
