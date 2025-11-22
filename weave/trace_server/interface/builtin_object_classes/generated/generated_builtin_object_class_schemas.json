@@ -686,6 +686,9 @@
         "action_type": {
           "const": "contains_words",
           "default": "contains_words",
+          "enum": [
+            "contains_words"
+          ],
           "title": "Action Type",
           "type": "string"
         },
@@ -1214,6 +1217,7 @@
       "type": "object"
     },
     "LLMStructuredCompletionModelDefaultParams": {
+      "description": "Default parameters for LLMStructuredCompletionModel.\n\nAttributes:\n    messages_template: A list of Messages to use as a template. Messages can contain\n        template variables using {variable_name} syntax. These will be substituted\n        when predict() is called with template_vars.\n    prompt: A reference string to a MessagesPrompt object. If provided, this takes\n        precedence over messages_template. The referenced prompt's format() method will\n        be used to generate messages with template variable substitution.\n        Example: \"weave:///entity/project/object/my_prompt:latest\"",
       "properties": {
         "messages_template": {
           "anyOf": [
@@ -1229,6 +1233,18 @@
           ],
           "default": null,
           "title": "Messages Template"
+        },
+        "prompt": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Prompt"
         },
         "temperature": {
           "anyOf": [
@@ -1475,6 +1491,9 @@
         "action_type": {
           "const": "llm_judge",
           "default": "llm_judge",
+          "enum": [
+            "llm_judge"
+          ],
           "title": "Action Type",
           "type": "string"
         },
@@ -1641,7 +1660,7 @@
           "type": "string"
         },
         "_digest": {
-          "title": "Digest",
+          "title": " Digest",
           "type": "string"
         },
         "_extra": {
@@ -1649,7 +1668,7 @@
           "items": {
             "type": "string"
           },
-          "title": "Extra",
+          "title": " Extra",
           "type": "array"
         }
       },
@@ -1833,6 +1852,7 @@
       "type": "object"
     },
     "ProviderReturnType": {
+      "const": "openai",
       "enum": [
         "openai"
       ],
