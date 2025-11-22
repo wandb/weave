@@ -143,6 +143,14 @@ from weave.trace_server.table_query_builder import (
     make_standard_table_query,
     make_table_stats_query_with_storage_size,
 )
+from weave.trace_server.annotation_queues_query_builder import (
+    make_queue_add_calls_check_duplicates_query,
+    make_queue_add_calls_fetch_calls_query,
+    make_queue_create_query,
+    make_queue_read_query,
+    make_queues_query,
+    make_queues_stats_query,
+)
 from weave.trace_server.threads_query_builder import make_threads_query
 from weave.trace_server.token_costs import (
     LLM_TOKEN_PRICES_TABLE,
@@ -1681,6 +1689,38 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         return tsi.AnnotationQueueAddCallsRes(
             added_count=len(calls_data), duplicates=len(existing_call_ids)
         )
+
+    def annotation_queues_stats(
+        self, req: tsi.AnnotationQueuesStatsReq
+    ) -> tsi.AnnotationQueuesStatsRes:
+        """Get stats for multiple annotation queues."""
+        if not req.queue_ids:
+            # Return empty stats if no queue IDs provided
+            return tsi.AnnotationQueuesStatsRes(stats=[])
+
+        pb = ParamBuilder()
+
+        query = make_queues_stats_query(
+            project_id=req.project_id,
+            queue_ids=req.queue_ids,
+            pb=pb,
+        )
+
+        result = self.ch_client.query(query, parameters=pb.get_params())
+
+        stats = []
+        for row in result.result_rows:
+            # Row order: queue_id, total_items, completed_items
+            queue_id, total_items, completed_items = row
+            stats.append(
+                tsi.AnnotationQueueStatsSchema(
+                    queue_id=str(queue_id),
+                    total_items=int(total_items),
+                    completed_items=int(completed_items),
+                )
+            )
+
+        return tsi.AnnotationQueuesStatsRes(stats=stats)
 
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
         """Create an op object by delegating to obj_create.
