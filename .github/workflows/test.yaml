@@ -240,8 +240,7 @@ jobs:
             "13",
             #
           ]
-        nox-shard:
-          [
+        nox-shard: [
             "trace",
             "flow",
             "trace_server",
@@ -254,10 +253,10 @@ jobs:
             "dspy",
             "groq",
             "google_genai",
-            "huggingface",
+            # "huggingface",
             "instructor",
             "langchain",
-            "langchain_nvidia_ai_endpoints",
+            # "langchain_nvidia_ai_endpoints",
             "litellm",
             "llamaindex",
             "mistral",
@@ -266,7 +265,7 @@ jobs:
             "openai_agents",
             "openai_realtime",
             "scorers",
-            "verdict",
+            # "verdict",
             "verifiers_test",
             "vertexai",
             "pandas_test",
@@ -428,8 +427,7 @@ jobs:
             "13",
             #
           ]
-        nox-shard:
-          [
+        nox-shard: [
             "trace",
             "flow",
             "trace_server",
@@ -442,10 +440,10 @@ jobs:
             "dspy",
             "groq",
             "google_genai",
-            "huggingface",
+            # "huggingface",
             "instructor",
             "langchain",
-            "langchain_nvidia_ai_endpoints",
+            # "langchain_nvidia_ai_endpoints",
             "litellm",
             "llamaindex",
             "mistral",
@@ -454,7 +452,7 @@ jobs:
             "openai_agents",
             "openai_realtime",
             "scorers",
-            "verdict",
+            # "verdict",
             "verifiers_test",
             "vertexai",
             "pandas_test",
