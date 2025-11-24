@@ -17,7 +17,7 @@ import pytest
                 import weave
 
 
-                @weave.op()
+                @weave.op
                 def add(a: int, b: float) -> str:
                     return str(a + b)
 
@@ -30,7 +30,7 @@ import pytest
                 import weave
 
 
-                @weave.op()
+                @weave.op
                 def add(a: int, b: float) -> str:
                     ... # Code-capture unavailable for this op
                 """
@@ -43,7 +43,7 @@ import pytest
                 import weave
                 import numpy as np
 
-                @weave.op()
+                @weave.op
                 def softmax(x: np.ndarray) -> np.ndarray:
                     e_x = np.exp(x - np.max(x))
                     return e_x / e_x.sum()
@@ -57,7 +57,7 @@ import pytest
                 import weave
                 import numpy as np
 
-                @weave.op()
+                @weave.op
                 def softmax(x: np.ndarray) -> np.ndarray:
                     ... # Code-capture unavailable for this op
                 """
@@ -71,7 +71,7 @@ import pytest
                 import numpy as np
                 import typing
 
-                @weave.op()
+                @weave.op
                 def func(x: np.ndarray, y: int, greeting: str = "Hello friend!") -> dict[str, typing.Union[np.float64, str]]:
                     return {"mean": mean(x + y), "greeting": greeting}
 
@@ -85,7 +85,7 @@ import pytest
                 import numpy as np
                 import typing
 
-                @weave.op()
+                @weave.op
                 def func(x: np.ndarray, y: int, greeting: str = "Hello friend!") -> dict[str, typing.Union[np.float64, str]]:
                     ... # Code-capture unavailable for this op
                 """

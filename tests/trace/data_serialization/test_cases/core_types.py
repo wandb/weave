@@ -25,7 +25,7 @@ core_cases = [
         exp_files=[
             {
                 "digest": "ym1sFGCB3X8RiBI14G1B6fGQn8RGrho3P1mwSIX6nEg",
-                "exp_content": b'import weave\n\n@weave.op()\ndef say_hello(name: str):\n    return "hello " + name\n',
+                "exp_content": b'import weave\n\n@weave.op\ndef say_hello(name: str):\n    return "hello " + name\n',
             }
         ],
         equality_check=lambda a, b: a("john") == b("john"),
@@ -58,7 +58,7 @@ core_cases = [
         exp_files=[
             {
                 "digest": "fTr7ufRfQWDWrxOudDm1XwvezsWEXM1uiFJWNA2iQxA",
-                "exp_content": b'import weave\n\n@weave.op()\ndef say_hello(self):\n    return "hello " + self.my_name\n',
+                "exp_content": b'import weave\n\n@weave.op\ndef say_hello(self):\n    return "hello " + self.my_name\n',
             }
         ],
         equality_check=lambda a, b: (
