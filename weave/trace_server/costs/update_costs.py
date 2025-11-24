@@ -7,7 +7,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import TypedDict
 
-import requests
+import httpx
 
 # The file that stores the costs
 COST_FILE = "cost_checkpoint.json"
@@ -49,9 +49,10 @@ def get_current_costs(file_name: str = COST_FILE) -> dict[str, list[CostDetails]
 # Fetches the latest costs from the file(litellm)
 def fetch_new_costs() -> dict[str, CostDetails]:
     try:
-        req = requests.get(url)
-        req.raise_for_status()
-    except requests.exceptions.RequestException as e:
+        with httpx.Client() as client:
+            req = client.get(url)
+            req.raise_for_status()
+    except httpx.RequestError as e:
         print("Failed to fetch new costs:", e)
         raise
 

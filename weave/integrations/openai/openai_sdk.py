@@ -664,6 +664,19 @@ def should_use_responses_accumulator(inputs: dict) -> bool:
     return isinstance(inputs, dict) and inputs.get("stream") is True
 
 
+def responses_on_finish_post_processor(value: Response | None) -> dict | None:
+    if value is None:
+        return None
+
+    dump = value.model_dump(exclude_unset=True, exclude_none=True)
+
+    # Extract request_id if available (similar to completions API)
+    if hasattr(value, "_request_id"):
+        dump["request_id"] = value._request_id
+
+    return dump
+
+
 def create_wrapper_responses_sync(
     settings: OpSettings,
 ) -> Callable[[Callable], Callable]:
@@ -682,7 +695,7 @@ def create_wrapper_responses_sync(
                 acc, value
             ),
             should_accumulate=should_use_responses_accumulator,
-            on_finish_post_processor=lambda value: value,
+            on_finish_post_processor=responses_on_finish_post_processor,
         )
 
     return wrapper
@@ -706,7 +719,7 @@ def create_wrapper_responses_async(
                 acc, value
             ),
             should_accumulate=should_use_responses_accumulator,
-            on_finish_post_processor=lambda value: value,
+            on_finish_post_processor=responses_on_finish_post_processor,
         )
 
     return wrapper
