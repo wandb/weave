@@ -1,5 +1,5 @@
 import {Api as TraceServerApi} from './generated/traceServerApi';
-import {Settings} from './settings';
+import {Settings, SettingsInit} from './settings';
 import {defaultHost, getUrls, setGlobalDomain} from './urls';
 import {ConcurrencyLimiter} from './utils/concurrencyLimit';
 import {Netrc} from './utils/netrc';
@@ -82,11 +82,19 @@ export async function login(apiKey: string, host?: string) {
  */
 export async function init(
   project: string,
-  settings?: Settings
+  settings?: SettingsInit
 ): Promise<WeaveClient> {
   const {apiKey, baseUrl, traceBaseUrl, domain} = getWandbConfigs();
   try {
     const wandbServerApi = new WandbServerApi(baseUrl, apiKey);
+
+    const resolvedSettings =
+      settings instanceof Settings
+        ? settings
+        : new Settings(
+            settings?.printCallLink ?? true,
+            settings?.globalAttributes ?? {}
+          );
 
     let entityName: string | undefined;
     let projectName: string;
@@ -130,7 +138,7 @@ export async function init(
       traceServerApi,
       wandbServerApi,
       projectId,
-      settings
+      resolvedSettings
     );
     setGlobalClient(client);
     setGlobalDomain(domain);

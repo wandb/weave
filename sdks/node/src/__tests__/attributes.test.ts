@@ -2,6 +2,7 @@ import {withAttributes, op} from 'weave';
 
 import {initWithCustomTraceServer} from './clientMock';
 import {InMemoryTraceServer} from '../inMemoryTraceServer';
+import {Settings} from '../settings';
 
 describe('attributes context', () => {
   const projectId = 'test-project';
@@ -65,5 +66,30 @@ describe('attributes context', () => {
     expect(parentCall?.attributes?.merged).toBe('parent');
     expect(childCall?.attributes?.scope).toBe('inner');
     expect(childCall?.attributes?.merged).toBe('child');
+  });
+
+  test('applies global attributes from init settings', async () => {
+    traceServer = new InMemoryTraceServer();
+    initWithCustomTraceServer(
+      projectId,
+      traceServer,
+      new Settings(true, {tenant: 'acme', base: 'global'})
+    );
+
+    const leafOp = op(async function leafOp() {
+      return 'leaf';
+    });
+
+    await withAttributes({base: 'local'}, async () => {
+      await leafOp();
+    });
+
+    await traceServer.waitForPendingOperations();
+    const result = await traceServer.calls.callsStreamQueryPost({
+      project_id: projectId,
+    });
+    const leafCall = result.calls.find(c => c.op_name?.includes('leafOp'));
+    expect(leafCall?.attributes?.tenant).toBe('acme');
+    expect(leafCall?.attributes?.base).toBe('local'); // local overrides global
   });
 });

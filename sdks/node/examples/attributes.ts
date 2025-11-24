@@ -12,16 +12,18 @@ const parentOp = op(async function parentOp(input: string) {
 
 async function main() {
   // Replace with your entity/project
-  await init('your-entity/your-project');
+  await init('shawn/weave-js-attributes1', {
+    globalAttributes: {tenant: 'acme-co', env: 'prod'},
+  });
 
   const result = await withAttributes(
-    {requestId: 'req-123', env: 'prod'},
+    {requestId: 'req-123', env: 'prod-override'},
     async () => parentOp('weave attribute context example')
   );
 
   console.log('Result:', result);
   console.log(
-    'Calls in the UI will have requestId/env on both parent and child.'
+    'Calls in the UI will have tenant/requestId/env on both parent and child.'
   );
 }
 
