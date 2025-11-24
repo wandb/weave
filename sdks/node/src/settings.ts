@@ -1,11 +1,7 @@
-export type SettingsInit =
-  | Settings
-  | {
-      printCallLink?: boolean;
-      globalAttributes?: Record<string, any>;
-    }
-  | undefined;
-
+export interface SettingsInit {
+  printCallLink?: boolean;
+  globalAttributes?: Record<string, any>;
+}
 export class Settings {
   constructor(
     private printCallLink: boolean = true,
@@ -26,4 +22,14 @@ export class Settings {
   get attributes(): Record<string, any> {
     return this.globalAttributes;
   }
+}
+
+export function makeSettings(settings?: SettingsInit): Settings {
+  if (!settings) {
+    return new Settings();
+  }
+  return new Settings(
+    settings.printCallLink ?? true,
+    settings.globalAttributes ?? {}
+  );
 }

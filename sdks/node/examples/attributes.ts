@@ -12,7 +12,7 @@ const parentOp = op(async function parentOp(input: string) {
 
 async function main() {
   // Replace with your entity/project
-  await init('shawn/weave-js-attributes1', {
+  await init('your-entity/your-project', {
     globalAttributes: {tenant: 'acme-co', env: 'prod'},
   });
 

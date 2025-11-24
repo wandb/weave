@@ -1,5 +1,5 @@
 import {Api as TraceServerApi} from './generated/traceServerApi';
-import {Settings, SettingsInit} from './settings';
+import {makeSettings, SettingsInit} from './settings';
 import {defaultHost, getUrls, setGlobalDomain} from './urls';
 import {ConcurrencyLimiter} from './utils/concurrencyLimit';
 import {Netrc} from './utils/netrc';
@@ -88,13 +88,7 @@ export async function init(
   try {
     const wandbServerApi = new WandbServerApi(baseUrl, apiKey);
 
-    const resolvedSettings =
-      settings instanceof Settings
-        ? settings
-        : new Settings(
-            settings?.printCallLink ?? true,
-            settings?.globalAttributes ?? {}
-          );
+    const resolvedSettings = makeSettings(settings);
 
     let entityName: string | undefined;
     let projectName: string;
