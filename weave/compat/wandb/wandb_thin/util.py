@@ -1,8 +1,7 @@
 import os
-from typing import Optional
 
 
-def get_app_url() -> Optional[str]:
+def get_app_url() -> str | None:
     return os.getenv("WANDB_APP_URL")
 
 

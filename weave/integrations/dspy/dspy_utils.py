@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import importlib
 import os
-from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any, Callable
+from collections.abc import Callable, Sequence
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel
 
@@ -18,6 +18,15 @@ if TYPE_CHECKING:
     from dspy.primitives.prediction import Example
 
 MAX_STR_LEN = 1000
+
+
+def pop_history(dictifed_inputs: dict[str, Any]) -> None:
+    if os.getenv("WEAVE_DSPY_HIDE_HISTORY", "false").lower() in (
+        "true",
+        "1",
+        "yes",
+    ):
+        dictifed_inputs.pop("history", None)
 
 
 def get_symbol_patcher(
@@ -46,13 +55,7 @@ def dspy_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
         if dictified_inputs_self["__class__"]["module"] == "__main__":
             dictified_inputs_self["__class__"]["module"] = ""
 
-        # Optionally hide history to reduce trace size
-        if os.getenv("WEAVE_DSPY_HIDE_HISTORY", "false").lower() in (
-            "true",
-            "1",
-            "yes",
-        ):
-            dictified_inputs_self.pop("history", None)
+        pop_history(dictified_inputs_self)
 
         # Serialize the signature of the object if it is a Predict or Adapter
         if isinstance(inputs["self"], (Predict, Adapter)) and hasattr(
@@ -82,6 +85,11 @@ def dspy_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
                 )
 
         inputs["self"] = dictified_inputs_self
+
+    if "lm" in inputs:
+        dictified_inputs_lm = dictify(inputs["lm"])
+        pop_history(dictified_inputs_lm)
+        inputs["lm"] = dictified_inputs_lm
 
     return dictify(inputs)
 

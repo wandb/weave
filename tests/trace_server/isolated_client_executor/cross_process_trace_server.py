@@ -13,7 +13,7 @@ import uuid
 from collections.abc import Generator, Iterator
 from contextlib import contextmanager
 from queue import Empty
-from typing import Any, Optional, Protocol
+from typing import Any, Protocol
 
 from pydantic import BaseModel
 
@@ -79,8 +79,8 @@ class ResponseQueueItem(BaseModel):
     """
 
     request_id: str
-    error: Optional[str] = None
-    payload: Optional[BaseModel] = None
+    error: str | None = None
+    payload: BaseModel | None = None
 
 
 class CrossProcessTraceServerSender(tsi.TraceServerInterface):
@@ -305,18 +305,6 @@ class CrossProcessTraceServerSender(tsi.TraceServerInterface):
         """Start calls in batch."""
         return self._send_request("call_start_batch", req)
 
-    def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
-        """Create an operation."""
-        return self._send_request("op_create", req)
-
-    def op_read(self, req: tsi.OpReadReq) -> tsi.OpReadRes:
-        """Read an operation."""
-        return self._send_request("op_read", req)
-
-    def ops_query(self, req: tsi.OpQueryReq) -> tsi.OpQueryRes:
-        """Query operations."""
-        return self._send_request("ops_query", req)
-
     def cost_create(self, req: tsi.CostCreateReq) -> tsi.CostCreateRes:
         """Create cost data."""
         return self._send_request("cost_create", req)
@@ -478,7 +466,7 @@ class CrossProcessTraceServerReceiver:
             self.manager.Queue()
         )
         self._stop_event = threading.Event()
-        self._worker_thread: Optional[threading.Thread] = None
+        self._worker_thread: threading.Thread | None = None
         self._start_worker()
 
     def _start_worker(self) -> None:

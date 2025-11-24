@@ -4,10 +4,8 @@ from __future__ import annotations
 
 import contextlib
 import logging
-import sys
-import warnings
 from collections.abc import Iterator
-from typing import Any, Union, cast
+from typing import Any, cast
 
 # TODO: type_handlers is imported here to trigger registration of the image serializer.
 # There is probably a better place for this, but including here for now to get the fix in.
@@ -18,7 +16,7 @@ from weave.trace.constants import TRACE_OBJECT_EMOJI
 from weave.trace.context import call_context
 from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace.context.call_context import get_current_call, require_current_call
-from weave.trace.display.term import configure_logger
+from weave.trace.display.term import configure_logger, update_logger_level
 from weave.trace.op import PostprocessInputsFunc, PostprocessOutputFunc, as_op, op
 from weave.trace.refs import ObjectRef, Ref
 from weave.trace.settings import (
@@ -81,13 +79,6 @@ def init(
         raise ValueError("project_name must be non-empty")
 
     configure_logger()
-
-    if sys.version_info < (3, 10):
-        warnings.warn(
-            "Python 3.9 will reach end of life in October 2025, after which weave will drop support for it.  Please upgrade to Python 3.10 or later!",
-            DeprecationWarning,
-            stacklevel=2,
-        )
 
     # Check if deprecated autopatch_settings is used
     if autopatch_settings is not None:
@@ -172,6 +163,8 @@ def publish(obj: Any, name: str | None = None) -> ObjectRef:
                 ref.name,
                 ref.digest,
             )
+        # Ensure logger level is up to date before logging
+        update_logger_level()
         logger.info(f"{TRACE_OBJECT_EMOJI} Published to {url}")
     return ref
 
@@ -370,7 +363,7 @@ def thread(thread_id: str | None | object = _AUTO_GENERATE) -> Iterator[ThreadCo
         actual_thread_id = generate_id()
     else:
         # Explicit thread_id (string or None)
-        actual_thread_id = cast(Union[str, None], thread_id)
+        actual_thread_id = cast(str | None, thread_id)
 
     # Create context object
     context = ThreadContext(actual_thread_id)
@@ -392,11 +385,6 @@ def finish() -> None:
     # Flush any remaining calls
     if wc := weave_client_context.get_weave_client():
         wc.finish()
-
-
-# As of this writing, most important symbols are
-# re-exported in __init__.py.
-# __docspec__ = []
 
 
 __all__ = [

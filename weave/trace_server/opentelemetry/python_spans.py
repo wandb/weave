@@ -10,7 +10,7 @@ from binascii import hexlify
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
 from opentelemetry.proto.common.v1.common_pb2 import InstrumentationScope
 from opentelemetry.proto.resource.v1.resource_pb2 import Resource as PbResource
@@ -29,6 +29,7 @@ from opentelemetry.proto.trace.v1.trace_pb2 import (
 from opentelemetry.proto.trace.v1.trace_pb2 import (
     TracesData as PbTracesData,
 )
+from typing_extensions import Self
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.constants import MAX_DISPLAY_NAME_LENGTH, MAX_OP_NAME_LENGTH
@@ -59,7 +60,7 @@ class SpanKind(Enum):
     CONSUMER = 5
 
     @classmethod
-    def from_proto(cls, proto_kind: int) -> "SpanKind":
+    def from_proto(cls, proto_kind: int) -> Self:
         return cls(proto_kind)
 
 
@@ -71,7 +72,7 @@ class StatusCode(Enum):
     ERROR = 2
 
     @classmethod
-    def from_proto(cls, proto_code: int) -> "StatusCode":
+    def from_proto(cls, proto_code: int) -> Self:
         """Convert from protobuf enum value to StatusCode."""
         return cls(proto_code)
 
@@ -84,13 +85,13 @@ class Status:
     message: str = ""
 
     @classmethod
-    def from_proto(cls, proto_status: PbStatus) -> "Status":
+    def from_proto(cls, proto_status: PbStatus) -> Self:
         """Create a Status from a protobuf Status."""
         return cls(
             code=StatusCode.from_proto(proto_status.code), message=proto_status.message
         )
 
-    def as_weave_status(self) -> Optional[tsi.TraceStatus]:
+    def as_weave_status(self) -> tsi.TraceStatus | None:
         """Convert from protobuf enum value to StatusCode."""
         if self.code == StatusCode.ERROR:
             return tsi.TraceStatus.ERROR
@@ -122,7 +123,7 @@ class Event:
         return datetime.datetime.fromtimestamp(self.timestamp / 1_000_000_000)
 
     @classmethod
-    def from_proto(cls, proto_event: PbSpan.Event) -> "Event":
+    def from_proto(cls, proto_event: PbSpan.Event) -> Self:
         """Create an Event from a protobuf Event."""
         return cls(
             name=proto_event.name,
@@ -152,7 +153,7 @@ class Link:
     flags: int = 0
 
     @classmethod
-    def from_proto(cls, proto_link: PbSpan.Link) -> "Link":
+    def from_proto(cls, proto_link: PbSpan.Link) -> Self:
         """Create a Link from a protobuf Link."""
         return cls(
             trace_id=hexlify(proto_link.trace_id).decode("ascii"),
@@ -170,7 +171,7 @@ class Resource:
     dropped_attributes_count: int = 0
 
     @classmethod
-    def from_proto(cls, proto_resource: PbResource) -> "Resource":
+    def from_proto(cls, proto_resource: PbResource) -> Self:
         attributes = {}
         if proto_resource.attributes:
             attributes = unflatten_key_values(proto_resource.attributes)
@@ -190,7 +191,7 @@ class Resource:
 class Span:
     """Represents a span in a trace."""
 
-    resource: Optional[Resource]
+    resource: Resource | None
     name: str
     trace_id: str
     span_id: str
@@ -198,7 +199,7 @@ class Span:
     end_time_unix_nano: int
     attributes: dict[str, Any] = field(default_factory=dict)
     kind: SpanKind = SpanKind.UNSPECIFIED
-    parent_id: Optional[str] = None
+    parent_id: str | None = None
     trace_state: str = ""
     flags: int = 0
     dropped_attributes_count: int = 0
@@ -231,9 +232,7 @@ class Span:
         return self.duration_ns / 1_000_000
 
     @classmethod
-    def from_proto(
-        cls, proto_span: PbSpan, resource: Optional[Resource] = None
-    ) -> "Span":
+    def from_proto(cls, proto_span: PbSpan, resource: Resource | None = None) -> Self:
         """Create a Span from a protobuf Span."""
         parent_id = None
         if proto_span.parent_span_id:
@@ -282,7 +281,10 @@ class Span:
         )
 
     def to_call(
-        self, project_id: str, wb_user_id: Optional[str] = None
+        self,
+        project_id: str,
+        wb_user_id: str | None = None,
+        wb_run_id: str | None = None,
     ) -> tuple[tsi.StartedCallSchemaForInsert, tsi.EndedCallSchemaForInsert]:
         events = [SpanEvent(e.as_dict()) for e in self.events]
         usage = get_weave_usage(self.attributes) or {}
@@ -335,11 +337,15 @@ class Span:
         has_outputs = isinstance(outputs, int) or len(outputs) > 0
         has_usage = len(usage) > 0
 
-        # We failed to load any of the Weave attributes, dump all attributes
+        # Load user defined attributes - tagging system
+        if custom_attributes := wandb_attributes.get("attributes"):
+            attributes.update(custom_attributes)
+
+        # We failed to load any weave or user defined attributes, dump all attributes
         if not has_attributes and not has_inputs and not has_outputs and not has_usage:
             attributes = to_json_serializable(self.attributes)
 
-        attributes["otel_span"] = self.as_dict()
+        otel_span_data = self.as_dict()
         op_name = self.name
 
         display_name = wandb_attributes.get("display_name")
@@ -351,6 +357,20 @@ class Span:
             turn_id = self.span_id
         else:
             turn_id = None
+
+        ### START HACK
+        # If wb_run_id is defined here - then it came in from the headers
+        # If it contains a '/' then it is a malformed conversion in adapting layer
+        # If it doesn't contain a ':' while this is defined from headers it is a malformed conversion in adapting layer
+        # If it does contain a ':' while this is not defined and the attribute field is defined, again we have a malformed value
+        if not wb_run_id:  # headers not defined
+            attr_wb_run_id = wandb_attributes.get("wb_run_id") or None
+            if attr_wb_run_id and not ("/" in attr_wb_run_id or ":" in attr_wb_run_id):
+                wb_run_id = f"{project_id}:{attr_wb_run_id}"
+        ### END HACK
+
+        wb_run_step = wandb_attributes.get("wb_run_step") or None
+        wb_run_step_end = wandb_attributes.get("wb_run_step_end") or None
 
         if display_name and len(display_name) >= MAX_DISPLAY_NAME_LENGTH:
             display_name = shorten_name(display_name, MAX_DISPLAY_NAME_LENGTH)
@@ -384,9 +404,11 @@ class Span:
             started_at=start_time,
             attributes=attributes,
             inputs=inputs,
+            otel_dump=otel_span_data,
             display_name=display_name,
             wb_user_id=wb_user_id,
-            wb_run_id=None,
+            wb_run_id=wb_run_id,
+            wb_run_step=wb_run_step,
             turn_id=turn_id,
             thread_id=thread_id,
         )
@@ -402,6 +424,7 @@ class Span:
             exception=exception_msg,
             output=outputs,
             summary=summary_map,
+            wb_run_step_end=wb_run_step_end,
         )
         return (start_call, end_call)
 
@@ -419,8 +442,8 @@ class ScopeSpans:
 
     @classmethod
     def from_proto(
-        cls, proto_scope_spans: PbScopeSpans, resource: Optional[Resource] = None
-    ) -> "ScopeSpans":
+        cls, proto_scope_spans: PbScopeSpans, resource: Resource | None = None
+    ) -> Self:
         """Create a ScopeSpans from a protobuf ScopeSpans."""
         return cls(
             scope=proto_scope_spans.scope,
@@ -433,7 +456,7 @@ class ScopeSpans:
 class ResourceSpans:
     """Represents a collection of spans from a specific resource."""
 
-    resource: Optional[Resource]
+    resource: Resource | None
     scope_spans: list[ScopeSpans] = field(default_factory=list)
     schema_url: str = ""
 
@@ -441,7 +464,7 @@ class ResourceSpans:
         yield from self.scope_spans
 
     @classmethod
-    def from_proto(cls, proto_resource_spans: PbResourceSpans) -> "ResourceSpans":
+    def from_proto(cls, proto_resource_spans: PbResourceSpans) -> Self:
         """Create a ResourceSpans from a protobuf ResourceSpans."""
         resource = Resource.from_proto(proto_resource_spans.resource)
         return cls(
@@ -464,7 +487,7 @@ class TracesData:
         yield from self.resource_spans
 
     @classmethod
-    def from_proto(cls, proto_traces_data: PbTracesData) -> "TracesData":
+    def from_proto(cls, proto_traces_data: PbTracesData) -> Self:
         """Create a TracesData from a protobuf TracesData."""
         return cls(
             resource_spans=[

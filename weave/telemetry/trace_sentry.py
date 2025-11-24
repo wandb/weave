@@ -14,7 +14,8 @@ import functools
 import os
 import site
 import sys
-from typing import TYPE_CHECKING, Any, Callable, Literal
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any, Literal
 
 try:
     import sentry_sdk  # type: ignore

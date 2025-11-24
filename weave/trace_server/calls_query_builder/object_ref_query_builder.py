@@ -48,10 +48,11 @@ where brackets indicate that the data is stored in the table_rows table.
 """
 
 from abc import abstractmethod
-from typing import TYPE_CHECKING, Any, Optional, Union, get_args
+from typing import TYPE_CHECKING, Any, Optional, get_args
 
 from pydantic import BaseModel
 
+from weave.trace_server.calls_query_builder.cte import CTECollection
 from weave.trace_server.calls_query_builder.optimization_builder import (
     QueryOptimizationProcessor,
     apply_processor,
@@ -66,6 +67,7 @@ from weave.trace_server.orm import (
     combine_conditions,
     python_value_to_ch_type,
     quote_json_path,
+    split_escaped_field_path,
 )
 
 if TYPE_CHECKING:
@@ -87,9 +89,9 @@ class ObjectRefCondition(BaseModel):
     field_path: str
     expand_columns: list[str]
     case_insensitive: bool = False
-    conversion_type: Optional[tsi_query.CastTo] = None
+    conversion_type: tsi_query.CastTo | None = None
 
-    def get_expand_column_match(self, shortest: bool = True) -> Optional[str]:
+    def get_expand_column_match(self, shortest: bool = True) -> str | None:
         """Find the matching expand column for this field path.
 
         Args:
@@ -140,7 +142,7 @@ class ObjectRefCondition(BaseModel):
 
     def get_root_field(self) -> str:
         """Get the root field name (e.g., 'inputs_dump' from 'inputs.model.config.temperature')."""
-        field_parts = self.field_path.split(".")
+        field_parts = split_escaped_field_path(self.field_path)
         root = field_parts[0] + "_dump"
         return root
 
@@ -211,12 +213,12 @@ class ObjectRefCondition(BaseModel):
         if not expand_match:
             raise ValueError(f"No expand column match found for {self.field_path}")
 
-        expand_parts = expand_match.split(".")
+        expand_parts = split_escaped_field_path(expand_match)
         if len(expand_parts) > 1:
             return ".".join(expand_parts[1:])
 
         object_property_path = self.get_object_property_path()
-        property_parts = object_property_path.split(".")
+        property_parts = split_escaped_field_path(object_property_path)
         return property_parts[0]
 
     @property
@@ -264,7 +266,7 @@ class ObjectRefCondition(BaseModel):
         root_field = self.get_root_field()
         key = self.get_accessor_key()
 
-        key_parts = key.split(".") if key else []
+        key_parts = split_escaped_field_path(key) if key else []
         field_sql = f"{table_alias}.{root_field}"
         if use_agg_fn:
             field_sql = f"any({field_sql})"
@@ -290,7 +292,7 @@ class ObjectRefFilterCondition(ObjectRefCondition):
     """Represents a condition that filters on object references."""
 
     operation_type: str
-    value: Union[str, int, float, bool, list, dict, None]
+    value: str | int | float | bool | list | dict | None
 
     @property
     def unique_key(self) -> str:
@@ -329,7 +331,7 @@ class ObjectRefConditionHandler:
         self.json_path_param = json_path_param
 
     def _create_json_extract_expression(
-        self, conversion_type: Optional[tsi_query.CastTo] = None
+        self, conversion_type: tsi_query.CastTo | None = None
     ) -> str:
         """Creates a JSON_VALUE expression with optional type conversion.
 
@@ -525,7 +527,7 @@ class ObjectRefFilterToCTEProcessor(QueryOptimizationProcessor):
 
     def _extract_field_operand(
         self, operand: "tsi_query.Operand"
-    ) -> tuple[Optional["tsi_query.GetFieldOperator"], Optional[str]]:
+    ) -> tuple[Optional["tsi_query.GetFieldOperator"], str | None]:
         """Extract field operand and conversion type from an operand.
 
         Returns:
@@ -547,7 +549,7 @@ class ObjectRefFilterToCTEProcessor(QueryOptimizationProcessor):
         operands: tuple["tsi_query.Operand", "tsi_query.Operand"],
         operation_type: str,
         **kwargs: Any,
-    ) -> Optional[str]:
+    ) -> str | None:
         """Process binary operations (eq, gt, gte) with common logic.
 
         Args:
@@ -582,7 +584,7 @@ class ObjectRefFilterToCTEProcessor(QueryOptimizationProcessor):
                 self.object_ref_conditions.append(obj_condition)
         return None
 
-    def process_or(self, operation: tsi_query.OrOperation) -> Optional[str]:
+    def process_or(self, operation: tsi_query.OrOperation) -> str | None:
         """Process OR operations to extract object reference conditions from all operands."""
         # Unlike the parent class, we need to process ALL operands to extract conditions,
         # regardless of whether they can be "optimized" or not
@@ -590,12 +592,12 @@ class ObjectRefFilterToCTEProcessor(QueryOptimizationProcessor):
             self.process_operand(op)
         return None
 
-    def process_eq(self, operation: tsi_query.EqOperation) -> Optional[str]:
+    def process_eq(self, operation: tsi_query.EqOperation) -> str | None:
         """Process equality operation for object refs."""
         self._process_binary_operation(operation.eq_, "eq")
         return None
 
-    def process_contains(self, operation: tsi_query.ContainsOperation) -> Optional[str]:
+    def process_contains(self, operation: tsi_query.ContainsOperation) -> str | None:
         """Process contains operation for object refs."""
         if isinstance(operation.contains_.input, tsi_query.GetFieldOperator):
             field_path = operation.contains_.input.get_field_
@@ -612,17 +614,17 @@ class ObjectRefFilterToCTEProcessor(QueryOptimizationProcessor):
                 self.object_ref_conditions.append(obj_condition)
         return None
 
-    def process_gt(self, operation: tsi_query.GtOperation) -> Optional[str]:
+    def process_gt(self, operation: tsi_query.GtOperation) -> str | None:
         """Process greater than operation for object refs."""
         self._process_binary_operation(operation.gt_, "gt")
         return None
 
-    def process_gte(self, operation: tsi_query.GteOperation) -> Optional[str]:
+    def process_gte(self, operation: tsi_query.GteOperation) -> str | None:
         """Process greater than or equal operation for object refs."""
         self._process_binary_operation(operation.gte_, "gte")
         return None
 
-    def process_in(self, operation: tsi_query.InOperation) -> Optional[str]:
+    def process_in(self, operation: tsi_query.InOperation) -> str | None:
         """Process in operation for object refs."""
         if isinstance(operation.in_[0], tsi_query.GetFieldOperator):
             field_path = operation.in_[0].get_field_
@@ -653,7 +655,7 @@ def build_object_ref_ctes(
     pb: "ParamBuilder",
     project_id: str,
     object_ref_conditions: list[ObjectRefCondition],
-) -> tuple[str, dict[str, str]]:
+) -> tuple[CTECollection, dict[str, str]]:
     """Build CTEs (Common Table Expressions) for object reference filtering and ordering.
 
     This function creates CTEs that check both object_versions and table_rows tables,
@@ -673,11 +675,11 @@ def build_object_ref_ctes(
         object_ref_conditions: List of object reference conditions to build CTEs for
 
     Returns:
-        - CTE SQL string
+        - CTECollection containing all object reference CTEs
         - Dictionary mapping field paths to CTE alias names
     """
     if not object_ref_conditions:
-        return "", {}
+        return CTECollection(), {}
 
     if len(object_ref_conditions) > MAX_CTES_PER_QUERY:
         raise ValueError(
@@ -686,7 +688,7 @@ def build_object_ref_ctes(
         )
 
     project_param = pb.add_param(project_id)
-    cte_parts = []
+    cte_collection = CTECollection()
     field_to_cte_alias_map: dict[str, str] = {}
     cte_counter = 0
 
@@ -712,7 +714,7 @@ def build_object_ref_ctes(
 
         # For filters, don't select object value. Only needed when ordering
         val_dump_select = ""
-        val_condition: Optional[str] = None
+        val_condition: str | None = None
         if isinstance(condition, ObjectRefOrderCondition):
             # For ordering, select the actual leaf value that we want to order by
             # This value will be propagated through intermediate CTEs to the final result
@@ -720,7 +722,7 @@ def build_object_ref_ctes(
                 pb,
                 "object_versions",
                 "any(val_dump)",
-                leaf_property.split("."),
+                split_escaped_field_path(leaf_property),
             )
             val_dump_select = f"nullIf({json_extract_sql}, '') AS object_val_dump,"
         elif isinstance(condition, ObjectRefFilterCondition):
@@ -736,14 +738,14 @@ def build_object_ref_ctes(
                 val_condition = handler.handle_in_operation(condition)
         val_condition_sql = f"AND {val_condition}" if val_condition else ""
 
-        leaf_cte = _build_leaf_cte_sql(
+        leaf_cte_sql = _build_leaf_cte_sql(
             project_param,
             condition,
             leaf_cte_name,
             val_dump_select,
             val_condition_sql,
         )
-        cte_parts.append(leaf_cte)
+        cte_collection.add_cte(leaf_cte_name, leaf_cte_sql)
         current_cte_name = leaf_cte_name
 
         intermediate_refs = condition.get_intermediate_object_refs()
@@ -755,24 +757,19 @@ def build_object_ref_ctes(
         for ref_property in reversed(intermediate_refs):
             intermediate_cte_name, cte_counter = _get_cte_name(cte_counter)
             prop_json_path_param = pb.add_param(quote_json_path(ref_property))
-            intermediate_cte = _build_intermediate_cte_sql(
+            intermediate_cte_sql = _build_intermediate_cte_sql(
                 project_param,
                 intermediate_cte_name,
                 condition,
                 prop_json_path_param,
                 current_cte_name,
             )
-            cte_parts.append(intermediate_cte)
+            cte_collection.add_cte(intermediate_cte_name, intermediate_cte_sql)
             current_cte_name = intermediate_cte_name
 
         field_to_cte_alias_map[condition.unique_key] = current_cte_name
 
-    if not cte_parts:
-        return "", {}
-
-    cte_part_sql = ",\n".join(cte_parts)
-
-    return cte_part_sql, field_to_cte_alias_map
+    return cte_collection, field_to_cte_alias_map
 
 
 def _build_leaf_cte_sql(
@@ -784,7 +781,6 @@ def _build_leaf_cte_sql(
 ) -> str:
     # Build the leaf CTE that unions both object_versions and table_rows
     return f"""
-    {leaf_cte_name} AS (
         SELECT
             digest,
             {val_dump_select}
@@ -804,7 +800,7 @@ def _build_leaf_cte_sql(
         WHERE project_id = {param_slot(project_param, "String")}
         {val_condition_sql}
         GROUP BY project_id, digest
-    )"""
+    """
 
 
 def _build_intermediate_cte_sql(
@@ -827,7 +823,6 @@ def _build_intermediate_cte_sql(
         intermediate_val_dump_select = "any(prev.object_val_dump) AS object_val_dump,"
         join_clause_for_ordering = f"JOIN {current_cte_name} prev ON JSON_VALUE(ov.val_dump, {param_slot(prop_json_path_param, 'String')}) = prev.ref"
     return f"""
-    {intermediate_cte_name} AS (
         SELECT
             ov.digest,
             {intermediate_val_dump_select}
@@ -840,7 +835,7 @@ def _build_intermediate_cte_sql(
                 SELECT ref FROM {current_cte_name}
             )
         GROUP BY ov.project_id, ov.object_id, ov.digest
-    )"""
+    """
 
 
 def has_object_ref_field(field_path: str, expand_columns: list[str]) -> bool:

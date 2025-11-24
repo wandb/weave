@@ -1,5 +1,5 @@
 import re
-from typing import Any, Literal, Optional
+from typing import Any, Literal
 
 from weave.trace_server import refs_internal, validation_util
 from weave.trace_server.constants import MAX_DISPLAY_NAME_LENGTH, MAX_OP_NAME_LENGTH
@@ -24,13 +24,13 @@ def trace_id_validator(s: str) -> str:
         return validation_util.require_uuid(s)
 
 
-def parent_id_validator(s: Optional[str]) -> Optional[str]:
+def parent_id_validator(s: str | None) -> str | None:
     if s is None:
         return None
     return call_id_validator(s)
 
 
-def display_name_validator(s: Optional[str]) -> Optional[str]:
+def display_name_validator(s: str | None) -> str | None:
     if s is None:
         return None
     return validation_util.require_max_str_len(s, MAX_DISPLAY_NAME_LENGTH)
@@ -45,13 +45,13 @@ def op_name_validator(s: str) -> str:
     return s
 
 
-def wb_user_id_validator(s: Optional[str]) -> Optional[str]:
+def wb_user_id_validator(s: str | None) -> str | None:
     if s is None:
         return None
     return validation_util.require_base64(s)
 
 
-def wb_run_id_validator(s: Optional[str]) -> Optional[str]:
+def wb_run_id_validator(s: str | None) -> str | None:
     if s is None:
         return None
     splits = s.split(":")
@@ -64,7 +64,7 @@ def wb_run_id_validator(s: Optional[str]) -> Optional[str]:
     return s
 
 
-def wb_run_step_validator(s: Optional[int]) -> Optional[int]:
+def wb_run_step_validator(s: int | None) -> int | None:
     if s is None:
         return None
     if not isinstance(s, int):

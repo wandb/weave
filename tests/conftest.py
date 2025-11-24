@@ -120,16 +120,6 @@ class ThrowingServer(tsi.TraceServerInterface):
     def call_update(self, req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
         raise DummyTestException("FAILURE - call_update, req:", req)
 
-    # Op API
-    def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
-        raise DummyTestException("FAILURE - op_create, req:", req)
-
-    def op_read(self, req: tsi.OpReadReq) -> tsi.OpReadRes:
-        raise DummyTestException("FAILURE - op_read, req:", req)
-
-    def ops_query(self, req: tsi.OpQueryReq) -> tsi.OpQueryRes:
-        raise DummyTestException("FAILURE - ops_query, req:", req)
-
     # Cost API
     def cost_create(self, req: tsi.CostCreateReq) -> tsi.CostCreateRes:
         raise DummyTestException("FAILURE - cost_create, req:", req)
@@ -358,7 +348,7 @@ def make_server_recorder(server: tsi.TraceServerInterface):  # type: ignore
 def create_client(
     request,
     trace_server,
-    global_attributes: typing.Optional[dict[str, typing.Any]] = None,
+    global_attributes: dict[str, typing.Any] | None = None,
 ) -> weave_client.WeaveClient:
     trace_server_flag = get_trace_server_flag(request)
     if trace_server_flag == "prod":
@@ -407,8 +397,8 @@ def client_creator(zero_stack, request, trace_server):
 
     @contextlib.contextmanager
     def client(
-        global_attributes: typing.Optional[dict[str, typing.Any]] = None,
-        settings: typing.Optional[weave.trace.settings.UserSettings] = None,
+        global_attributes: dict[str, typing.Any] | None = None,
+        settings: weave.trace.settings.UserSettings | None = None,
     ):
         if settings is not None:
             weave.trace.settings.parse_and_apply_settings(settings)

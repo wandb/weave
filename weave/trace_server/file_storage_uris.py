@@ -6,6 +6,8 @@ Each storage type (S3, GCS, Azure) has its own URI format and validation rules.
 
 from urllib.parse import ParseResult, urlparse
 
+from typing_extensions import Self
+
 
 class URIParseError(ValueError):
     """Raised when a storage URI cannot be parsed or is invalid."""
@@ -29,7 +31,7 @@ class FileStorageURI:
     path: str
 
     @classmethod
-    def _from_parse_result(cls, parsed_uri: ParseResult) -> "FileStorageURI":
+    def _from_parse_result(cls, parsed_uri: ParseResult) -> Self:
         """Create a storage URI instance from a parsed URI.
 
         Args:
@@ -63,7 +65,7 @@ class FileStorageURI:
         return self._to_parse_result().geturl()
 
     @classmethod
-    def parse_uri_str(cls, uri: str) -> "FileStorageURI":
+    def parse_uri_str(cls, uri: str) -> Self:
         parsed_uri = urlparse(uri)
         scheme = parsed_uri.scheme
 
@@ -102,7 +104,7 @@ class S3FileStorageURI(FileStorageURI):
         self.path = path.strip("/")
 
     @classmethod
-    def _from_parse_result(cls, parsed_uri: ParseResult) -> "S3FileStorageURI":
+    def _from_parse_result(cls, parsed_uri: ParseResult) -> Self:
         if parsed_uri.scheme != cls.scheme:
             raise URIParseError(
                 f"Incorrect scheme for S3 file storage URI: {parsed_uri.geturl()}"
@@ -154,7 +156,7 @@ class GCSFileStorageURI(FileStorageURI):
         self.path = path.strip("/")
 
     @classmethod
-    def _from_parse_result(cls, parsed_uri: ParseResult) -> "GCSFileStorageURI":
+    def _from_parse_result(cls, parsed_uri: ParseResult) -> Self:
         if parsed_uri.scheme != cls.scheme:
             raise URIParseError(
                 f"Incorrect scheme for GCS file storage URI: {parsed_uri.geturl()}"
@@ -208,7 +210,7 @@ class AzureFileStorageURI(FileStorageURI):
         self.path = path.strip("/")
 
     @classmethod
-    def _from_parse_result(cls, parsed_uri: ParseResult) -> "AzureFileStorageURI":
+    def _from_parse_result(cls, parsed_uri: ParseResult) -> Self:
         if parsed_uri.scheme != cls.scheme:
             raise URIParseError(
                 f"Incorrect scheme for Azure file storage URI: {parsed_uri.geturl()}"

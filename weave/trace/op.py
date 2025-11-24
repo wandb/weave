@@ -13,6 +13,7 @@ from collections import defaultdict
 from collections.abc import (
     AsyncGenerator,
     AsyncIterator,
+    Callable,
     Coroutine,
     Generator,
     Iterator,
@@ -24,7 +25,6 @@ from types import MethodType
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
     Generic,
     TypedDict,
     TypeVar,
@@ -32,7 +32,7 @@ from typing import (
     overload,
 )
 
-from typing_extensions import ParamSpec, TypeIs
+from typing_extensions import ParamSpec, TypeIs, Unpack
 
 from weave.trace import box, settings
 from weave.trace.context import call_context
@@ -59,27 +59,11 @@ from weave.trace.util import log_once
 if TYPE_CHECKING:
     from weave.trace.call import Call, CallsIter, NoOpCall
 
-
 S = TypeVar("S")
 V = TypeVar("V")
 
 P = ParamSpec("P")
 R = TypeVar("R")
-
-
-if sys.version_info < (3, 10):
-
-    def aiter(obj: AsyncIterator[V]) -> AsyncIterator[V]:
-        return obj.__aiter__()
-
-    async def anext(obj: AsyncIterator[V], default: V | None = None) -> V:
-        try:
-            return await obj.__anext__()
-        except StopAsyncIteration:
-            if default is not None:
-                return default
-            else:
-                raise
 
 
 logger = logging.getLogger(__name__)
@@ -92,6 +76,9 @@ UNINITIALIZED_MSG = "Warning: Traces will not be logged. Call weave.init to log 
 
 
 class DisplayNameFuncError(ValueError): ...
+
+
+class OpCallError(Exception): ...
 
 
 # Call, original function output, exception if occurred
@@ -196,6 +183,18 @@ class WeaveKwargs(TypedDict):
     call_id: str | None
 
 
+class OpKwargs(TypedDict, total=False):
+    """TypedDict for op() keyword arguments."""
+
+    name: str | None
+    call_display_name: str | CallDisplayNameFunc | None
+    postprocess_inputs: PostprocessInputsFunc | None
+    postprocess_output: PostprocessOutputFunc | None
+    tracing_sample_rate: float
+    enable_code_capture: bool
+    accumulator: Callable[[Any | None, Any], Any] | None
+
+
 def setup_dunder_weave_dict(d: WeaveKwargs | None = None) -> WeaveKwargs:
     """Sets up a __weave dict used to pass WeaveKwargs to ops."""
     res: dict[str, Any] = {}
@@ -238,9 +237,6 @@ def _is_unbound_method(func: Callable) -> bool:
     is_method = params and params[0].name in {"self", "cls"}
 
     return bool(is_method)
-
-
-class OpCallError(Exception): ...
 
 
 def _default_on_input_handler(func: Op, args: tuple, kwargs: dict) -> ProcessedInputs:
@@ -1160,37 +1156,9 @@ def calls(op: Op) -> CallsIter:
 
 
 @overload
-def op(
-    func: Callable[P, R],
-    *,
-    name: str | None = None,
-    call_display_name: str | CallDisplayNameFunc | None = None,
-    postprocess_inputs: PostprocessInputsFunc | None = None,
-    postprocess_output: PostprocessOutputFunc | None = None,
-    accumulator: Callable[[Any | None, Any], Any] | None = None,
-) -> Op[P, R]: ...
-
-
+def op(func: Callable[P, R], **kwargs: Unpack[OpKwargs]) -> Op[P, R]: ...
 @overload
-def op(
-    *,
-    name: str | None = None,
-    call_display_name: str | CallDisplayNameFunc | None = None,
-    postprocess_inputs: PostprocessInputsFunc | None = None,
-    postprocess_output: PostprocessOutputFunc | None = None,
-    accumulator: Callable[[Any | None, Any], Any] | None = None,
-) -> Callable[[Callable[P, R]], Op[P, R]]: ...
-
-
-@overload
-def op(
-    *,
-    name: str | None = None,
-    enable_code_capture: bool = True,
-    accumulator: Callable[[Any | None, Any], Any] | None = None,
-) -> Callable[[Callable[P, R]], Op[P, R]]: ...
-
-
+def op(**kwargs: Unpack[OpKwargs]) -> Callable[[Callable[P, R]], Op[P, R]]: ...
 def op(
     func: Callable[P, R] | None = None,
     *,
@@ -1285,6 +1253,7 @@ def op(
 
             wrapper._set_on_finish_handler = partial(_set_on_finish_handler, wrapper)  # type: ignore
             wrapper._on_finish_handler = None  # type: ignore
+            wrapper._on_finish_post_processor = None  # type: ignore
 
             wrapper._tracing_enabled = True  # type: ignore
             wrapper.tracing_sample_rate = tracing_sample_rate  # type: ignore
@@ -1620,7 +1589,7 @@ class _Accumulator(Generic[S, V]):
 
 
 def _build_iterator_from_accumulator_for_op(
-    value: Iterator[V],
+    value: Iterator[V] | AsyncIterator[V],
     accumulator: Callable,
     on_finish: FinishCallbackType,
     iterator_wrapper: type[_IteratorWrapper] = _IteratorWrapper,
@@ -1674,28 +1643,23 @@ def _add_accumulator(
     """
 
     def on_output(
-        value: Iterator[V], on_finish: FinishCallbackType, inputs: dict
-    ) -> Iterator:
-        def wrapped_on_finish(value: Any, e: BaseException | None = None) -> None:
-            if on_finish_post_processor is not None:
-                value = on_finish_post_processor(value)
-            on_finish(value, e)
-
+        value: Iterator[V] | AsyncIterator[V],
+        on_finish: FinishCallbackType,
+        inputs: dict,
+    ) -> Iterator | AsyncIterator:
         if should_accumulate is None or should_accumulate(inputs):
             # we build the accumulator here dependent on the inputs (optional)
             accumulator = make_accumulator(inputs)
             return _build_iterator_from_accumulator_for_op(
                 value,
                 accumulator,
-                wrapped_on_finish,
+                on_finish,
                 iterator_wrapper,
             )
         else:
-            wrapped_on_finish(value)
+            on_finish(value, None)
             return value
 
     op._set_on_output_handler(on_output)
+    op._on_finish_post_processor = on_finish_post_processor
     return op
-
-
-__docspec__ = [call, calls]

@@ -9,6 +9,8 @@ import sys
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal
 
+from typing_extensions import Self
+
 from weave.trace import util
 from weave.trace.display import display
 from weave.trace.display.rich import pydantic_util
@@ -407,7 +409,7 @@ class Grid:
 
         # Check column types and coerce values if possible
         processed_values: RowValues = []
-        for _i, (value, column) in enumerate(zip(values, self.columns)):
+        for _i, (value, column) in enumerate(zip(values, self.columns, strict=False)):
             if column.type is not None:
                 try:
                     if column.type == "bool" and not isinstance(value, bool):
@@ -605,7 +607,7 @@ class Grid:
         return pd.DataFrame(data)
 
     @classmethod
-    def from_pandas(cls, df: pd.DataFrame) -> Grid:
+    def from_pandas(cls, df: pd.DataFrame) -> Self:
         """Create a Grid from a pandas DataFrame.
 
         Args:
@@ -635,7 +637,7 @@ class Grid:
         return grid
 
     @classmethod
-    def load_csv(cls, file_path: str | os.PathLike, **kwargs: Any) -> Grid:
+    def load_csv(cls, file_path: str | os.PathLike, **kwargs: Any) -> Self:
         """Create a Grid from a CSV file.
 
         Args:

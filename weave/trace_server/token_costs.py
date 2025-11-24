@@ -1,8 +1,10 @@
 import base64
 import re
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.calls_query_builder.cte import CTE
 from weave.trace_server.clickhouse_schema import SelectableCHCallSchema
 from weave.trace_server.errors import InvalidRequest
 from weave.trace_server.orm import (
@@ -16,6 +18,9 @@ from weave.trace_server.validation import (
     validate_purge_req_multiple,
     validate_purge_req_one,
 )
+
+if TYPE_CHECKING:
+    from weave.trace_server.calls_query_builder.calls_query_builder import OrderField
 
 DUMMY_LLM_ID = "weave_dummy_llm_id"
 DUMMY_LLM_USAGE = (
@@ -300,14 +305,6 @@ def get_ranked_prices(
     return prepared_query
 
 
-# SELECT
-#   SELECT_FIELDS, (Passed in as a list)
-#   CONSTRUCTED_SUMMARY_OBJECT AS summary_dump
-# FROM ranked_prices
-# The group by joins the rows that were split back together
-# GROUP BY (all_calls.id, all_calls.project_id, all_calls.display_name)
-# WHERE rank = 1
-# From all the calls usage, group by and construct the costs object
 """
     Takes in something like the following:
     4 rows
@@ -327,18 +324,13 @@ def get_ranked_prices(
 """
 
 
-def final_call_select_with_cost(
-    param_builder: ParamBuilder,
-    price_table_alias: str,
-    select_fields: list[str],
-    order_fields: list[tsi.SortBy],
-) -> PreparedSelect:
-    # We filter out summary_dump, because we add costs to summary dump in the select statement
-    final_select_fields = [field for field in select_fields if field != "summary_dump"]
+def _build_cost_summary_dump_snippet() -> str:
+    """Build the SQL snippet for adding costs to summary_dump.
 
+    Returns:
+        SQL expression for the summary_dump field with costs
+    """
     # These two objects are used to construct the costs object
-    # We add two more fields in addition to this
-    # prompt_tokens_total_cost and completion_tokens_total_cost
     cost_string_fields = [
         "prompt_token_cost_unit",
         "completion_token_cost_unit",
@@ -396,7 +388,7 @@ def final_call_select_with_cost(
     """
 
     # If no cost was found dont add a costs object
-    summary_dump_snippet = f"""
+    return f"""
     if( any(llm_id) = '{DUMMY_LLM_ID}' or any(llm_token_prices.id) == '',
     any(summary_dump),
     concat(
@@ -406,52 +398,181 @@ def final_call_select_with_cost(
     ) AS summary_dump
     """
 
-    usage_with_costs_fields = [
-        *[col for col in LLM_USAGE_COLUMNS if col.name != "llm_id"],
-        *LLM_TOKEN_PRICES_COLUMNS,
-        Column(name="rank", type="string"),
-        Column(name="prompt_tokens_cost", type="float"),
-        Column(name="completion_tokens_cost", type="float"),
-    ]
 
-    ranked_price_table = Table(
-        price_table_alias,
-        [
-            *get_calls_merged_columns(),
-            *get_optional_join_field_columns(),
-            *usage_with_costs_fields,
-        ],
+def _prepare_final_select_fields(
+    select_fields: list[str],
+    order_fields: list["OrderField"],
+) -> list[str]:
+    """Prepare the final list of fields to select.
+
+    Filters out summary_dump (we generate it ourselves) and adds any fields
+    needed for ORDER BY clauses (except feedback fields which come from a JOIN).
+
+    Args:
+        select_fields: Requested fields to select
+        order_fields: Fields to order by
+
+    Returns:
+        Final list of field names to select
+    """
+    from weave.trace_server.calls_query_builder.calls_query_builder import (
+        CallsMergedFeedbackPayloadField,
     )
 
-    final_query = (
-        ranked_price_table.select()
-        .fields(final_select_fields)
-        .raw_sql_fields([summary_dump_snippet])
-        .where(
-            tsi.Query(**{"$expr": {"$eq": [{"$getField": "rank"}, {"$literal": 1}]}})
-        )
-        .group_by(final_select_fields)
-        .order_by(order_fields)
+    # Filter out summary_dump - we generate it ourselves with cost data
+    final_fields = [f for f in select_fields if f != "summary_dump"]
+
+    # Add fields required for ORDER BY (but not feedback fields - those come from JOIN)
+    for order_field in order_fields:
+        if isinstance(order_field.field, CallsMergedFeedbackPayloadField):
+            continue
+        field_name = order_field.field.field
+        if field_name not in final_fields and field_name != "summary_dump":
+            final_fields.append(field_name)
+
+    return final_fields
+
+
+def _needs_feedback_join(order_fields: list["OrderField"]) -> bool:
+    """Check if any order field requires a feedback JOIN.
+
+    Args:
+        order_fields: Fields to order by
+
+    Returns:
+        True if feedback JOIN is needed
+    """
+    from weave.trace_server.calls_query_builder.calls_query_builder import (
+        CallsMergedFeedbackPayloadField,
     )
 
-    final_prepared_query = final_query.prepare(
-        database_type="clickhouse", param_builder=param_builder
+    return any(
+        isinstance(order_field.field, CallsMergedFeedbackPayloadField)
+        for order_field in order_fields
     )
-    return final_prepared_query
+
+
+def _build_feedback_join(
+    param_builder: ParamBuilder, project_id: str, table_alias: str
+) -> str:
+    """Build the feedback LEFT JOIN clause.
+
+    Args:
+        param_builder: Parameter builder for SQL parameters
+        project_id: Project ID for filtering feedback
+        table_alias: Table alias to join to
+
+    Returns:
+        Complete LEFT JOIN SQL clause
+    """
+    project_param = param_builder.add_param(project_id)
+    return f"""LEFT JOIN (
+    SELECT * FROM feedback WHERE feedback.project_id = {{{project_param}:String}}
+) AS feedback ON (
+    feedback.weave_ref = concat('weave-trace-internal:///', {{{project_param}:String}}, '/call/', {table_alias}.id))"""
 
 
 # From a calls query
 # We get the usage data and split the rows so that each usage object is a row
 # For each row we get matching price and rank them accordingly
 # Finally we join all rows with rank 1 together based on call id and construct cost object
+def build_cost_ctes(
+    pb: ParamBuilder,
+    call_table_alias: str,
+    project_id: str,
+) -> list[CTE]:
+    """Build CTEs for cost calculations.
+
+    Returns a list of CTE objects for:
+    - llm_usage: Extracts usage data from calls
+    - ranked_prices: Ranks prices for each LLM by specificity and effective date
+
+    Args:
+        pb: Parameter builder for SQL parameters
+        call_table_alias: Alias of the table containing call data
+        project_id: Project ID for filtering prices
+
+    Returns:
+        List of CTE objects
+    """
+    return [
+        CTE(
+            name="llm_usage",
+            sql=f"""-- From the all_calls we get the usage data for LLMs
+                {get_llm_usage(pb, call_table_alias).sql}""",
+        ),
+        CTE(
+            name="ranked_prices",
+            sql=f"""-- based on the llm_ids in the usage data we get all the prices and rank them according to specificity and effective date
+                {get_ranked_prices(pb, "llm_usage", project_id).sql}""",
+        ),
+    ]
+
+
+def get_cost_final_select(
+    pb: ParamBuilder,
+    select_fields: list[str],
+    order_fields: list["OrderField"],
+    project_id: str,
+) -> str:
+    """Build the final SELECT statement that adds costs to the results.
+
+    Takes ranked_prices CTE and generates a query that:
+    - Filters to rank=1 (best matching price for each LLM)
+    - Groups rows by call ID to reconstruct summary_dump with costs
+    - Optionally joins feedback data if needed for ordering
+
+    Args:
+        pb: Parameter builder for SQL parameters
+        select_fields: Fields to select
+        order_fields: Fields to order by
+        project_id: Project ID for feedback joins
+
+    Returns:
+        Complete SQL SELECT statement
+    """
+    final_fields = _prepare_final_select_fields(select_fields, order_fields)
+    fields_str = ", ".join(final_fields)
+
+    # Build SELECT clause with cost calculation
+    summary_dump = _build_cost_summary_dump_snippet()
+    select_clause = f"SELECT {fields_str},\n{summary_dump}"
+
+    from_clause = "FROM ranked_prices"
+    feedback_join = ""
+    if _needs_feedback_join(order_fields):
+        feedback_join = "\n" + _build_feedback_join(pb, project_id, "ranked_prices")
+
+    where_clause = f"WHERE (rank = {{{pb.add_param(1)}:UInt64}})"
+    group_by = f"GROUP BY {', '.join(final_fields)}"
+    order_by = ""
+    if order_fields:
+        order_parts = [of.as_sql(pb, "ranked_prices") for of in order_fields]
+        order_by = f"ORDER BY {', '.join(order_parts)}"
+
+    parts = [select_clause, from_clause]
+    if feedback_join:
+        parts.append(feedback_join)
+    parts.extend([where_clause, group_by])
+    if order_by:
+        parts.append(order_by)
+
+    comment = (
+        "Final Select, which just selects the correct fields, and adds a costs object"
+    )
+    return f"-- {comment}\n" + "\n".join(parts)
+
+
 def cost_query(
     pb: ParamBuilder,
     call_table_alias: str,
     project_id: str,
     select_fields: list[str],
-    order_fields: list[tsi.SortBy],
+    order_fields: list["OrderField"],
 ) -> str:
-    """This function takes something like the following:
+    """Build complete cost query with CTEs and final SELECT.
+
+    This function takes something like the following:
     1 call row
         [ id, summary_dump: {usage: { llm_1, llm_2}} ]
     splits it based on usage and extracts fields
@@ -473,17 +594,10 @@ def cost_query(
     1 row
         [ id, summary_dump: {usage: { llm_1, llm_2}, cost: { llm_1: { prompt_tokens_total_cost, completion_tokens_total_cost, ... }, llm_2: { prompt_tokens_total_cost, completion_tokens_total_cost, ... } } } ]
     """
-    raw_sql = f"""
-        -- From the all_calls we get the usage data for LLMs
-        llm_usage AS ({get_llm_usage(pb, call_table_alias).sql}),
-
-        -- based on the llm_ids in the usage data we get all the prices and rank them according to specificity and effective date
-        ranked_prices AS ({get_ranked_prices(pb, "llm_usage", project_id).sql})
-
-        -- Final Select, which just selects the correct fields, and adds a costs object
-        {final_call_select_with_cost(pb, "ranked_prices", select_fields, order_fields).sql}
-    """
-    return raw_sql
+    ctes = build_cost_ctes(pb, call_table_alias, project_id)
+    cte_sql = ",\n".join(f"{cte.name} AS ({cte.sql})" for cte in ctes)
+    final_select = get_cost_final_select(pb, select_fields, order_fields, project_id)
+    return f"{cte_sql}\n\n{final_select}"
 
 
 # This is a temporary workaround for the issue of clickhouse not allowing the use of parameters in row_number() over function

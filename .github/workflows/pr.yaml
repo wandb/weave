@@ -18,7 +18,6 @@ jobs:
           # Allowed types: See CONTRIBUTING.md
           types: |
             chore
-            docs
             feat
             fix
             perf
@@ -31,7 +30,6 @@ jobs:
             ui
             weave
             weave_ts
-            weave_query
             app
             dev
             deps

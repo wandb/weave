@@ -5,6 +5,9 @@ from weave.trace_server.interface.builtin_object_classes.annotation_spec import 
 from weave.trace_server.interface.builtin_object_classes.base_object_def import (
     BaseObject,
 )
+from weave.trace_server.interface.builtin_object_classes.comparison_view import (
+    ComparisonView,
+)
 from weave.trace_server.interface.builtin_object_classes.leaderboard import Leaderboard
 from weave.trace_server.interface.builtin_object_classes.llm_structured_model import (
     LLMStructuredCompletionModel,
@@ -44,5 +47,6 @@ register_base_object(AnnotationSpec)
 register_base_object(Provider)
 register_base_object(ProviderModel)
 register_base_object(SavedView)
+register_base_object(ComparisonView)
 register_base_object(LLMStructuredCompletionModel)
 register_base_object(ChartConfig)

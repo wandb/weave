@@ -5,7 +5,7 @@ coverage:
   precision: 2
   round: down
   range: "70...100"
-  
+
   status:
     project:
       default:
@@ -33,10 +33,8 @@ comment:
 
 ignore:
   - "tests/"
-  - "docs/"
   - "examples/"
   - "scripts/"
-  - "weave_query/tests/"
   - "sdks/node/"
   - "**/*_test.py"
   - "**/*_tests.py"

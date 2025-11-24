@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import functools
 import logging
-from collections.abc import Sequence
-from typing import Any, Callable
+from collections.abc import Callable, Sequence
+from typing import Any
+
+from pydantic import BaseModel
 
 from weave.evaluation.eval_imperative import EvaluationLogger
 from weave.integrations.dspy.dspy_utils import dictify, get_symbol_patcher
@@ -69,7 +71,6 @@ class DSPyPatcher(MultiPatcher):
                 import types
 
                 # Create model metadata for EvaluationLogger
-                model_name = getattr(program, "__class__", type(program)).__name__
                 metric = metric if metric is not None else self.metric
                 devset = devset if devset is not None else self.devset
                 num_threads = (
@@ -83,21 +84,24 @@ class DSPyPatcher(MultiPatcher):
                 display_table = (
                     display_table if display_table is not None else self.display_table
                 )
+                # get the name of the program we are evaluating
+                model_name = getattr(program, "__class__", type(program)).__name__
 
                 if callback_metadata:
                     logger.debug(
                         f"Evaluate is called with callback metadata: {callback_metadata}"
                     )
 
-                failure_score = getattr(self, "failure_score", 0.0)
                 max_errors = getattr(self, "max_errors", dspy.settings.max_errors)
                 provide_traceback = getattr(self, "provide_traceback", None)
+                failure_score = getattr(self, "failure_score", 0.0)
 
                 # Serialize the program's state
                 raw_dump_state = getattr(program, "dump_state", lambda: None)
                 if callable(raw_dump_state):
                     raw_dump_state = dictify(raw_dump_state())
 
+                # prepare metadata for the evaluation logger
                 module_meta: dict[str, Any] = {
                     "name": model_name,
                     "dump_state": raw_dump_state,
@@ -112,13 +116,19 @@ class DSPyPatcher(MultiPatcher):
                     "provide_traceback": provide_traceback,
                 }
 
+                # prepare dataset for the evaluation logger
+                dataset = (
+                    [dictify(ex.toDict()) for ex in devset]
+                    if devset is not None
+                    else []
+                )
+
                 ev = EvaluationLogger(
                     name=f"dspy_eval_{model_name}",
                     model=module_meta,
-                    dataset=[dict(ex.inputs()) for ex in devset],
+                    dataset=dataset,
                 )
 
-                # Prepare parallel executor for evaluation
                 executor = ParallelExecutor(
                     num_threads=num_threads,
                     disable_progress_bar=not display_progress,
@@ -131,34 +141,35 @@ class DSPyPatcher(MultiPatcher):
                     example: dspy.Example,
                 ) -> tuple[dspy.Prediction | dspy.Completions, float]:
                     with call_context.set_call_stack([ev._evaluate_call]):  # type: ignore
-                        prediction = program(**example.inputs())
-                        score = metric(example, prediction)
-
-                        # Increment assert and suggest failures to program's attributes
-                        if hasattr(program, "_assert_failures"):
-                            program._assert_failures += dspy.settings.get(
-                                "assert_failures"
-                            )
-                        if hasattr(program, "_suggest_failures"):
-                            program._suggest_failures += dspy.settings.get(
-                                "suggest_failures"
-                            )
-
                         # DSPy expects the inputs to be wrapped in an Example object
-                        serialized_inputs = dictify(example.toDict())
+                        with ev.log_prediction(
+                            inputs=dictify(example.toDict())
+                        ) as pred:
+                            prediction = program(**example.inputs())
+                            score = metric(example, prediction)
 
-                        if isinstance(prediction, dspy.Prediction):
-                            # Prediction is inherited from Example
-                            serialized_pred = dictify(prediction.toDict())
-                        if isinstance(prediction, dspy.Completions):
-                            # Completions exposes the `items` method
-                            serialized_pred = dictify(prediction.items())
+                            # Increment assert and suggest failures to program's attributes
+                            if hasattr(program, "_assert_failures"):
+                                program._assert_failures += dspy.settings.get(
+                                    "assert_failures"
+                                )
+                            if hasattr(program, "_suggest_failures"):
+                                program._suggest_failures += dspy.settings.get(
+                                    "suggest_failures"
+                                )
 
-                        pl = ev.log_prediction(
-                            inputs=serialized_inputs, output=serialized_pred
-                        )
-                        pl.log_score(scorer=scorer_name, score=score)
-                        pl.finish()
+                            serialized_pred = None
+                            if isinstance(prediction, dspy.Prediction):
+                                # Prediction is inherited from Example
+                                serialized_pred = dictify(prediction.toDict())
+                            if isinstance(prediction, dspy.Completions):
+                                # Completions exposes the `items` method
+                                serialized_pred = dictify(prediction.items())
+                            if isinstance(prediction, BaseModel):
+                                serialized_pred = dictify(prediction.model_dump())
+
+                            pred.output = serialized_pred
+                            pred.log_score(scorer=scorer_name, score=score)
 
                         return prediction, score
 
@@ -171,7 +182,6 @@ class DSPyPatcher(MultiPatcher):
                 if scorer_name == "method":
                     scorer_name = "score"
 
-                # Kick off parallel execution
                 results = executor.execute(process_item, devset)
                 assert len(devset) == len(results)
 

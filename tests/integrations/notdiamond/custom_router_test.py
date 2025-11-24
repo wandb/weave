@@ -2,7 +2,7 @@ import json
 import os
 import sys
 from collections.abc import Generator
-from typing import Optional
+from pathlib import Path
 
 import pytest
 import yaml
@@ -52,9 +52,11 @@ def model_datasets(model_evals: dict[str, EvaluationResults]):
 @pytest.fixture
 def preference_id():
     try:
-        with open(
-            "integrations/notdiamond/cassettes/custom_router_test/test_custom_router_train_router.yaml",
-        ) as file:
+        test_dir = Path(__file__).parent
+        cassette_path = (
+            test_dir / "cassettes" / "custom_router_test" / "test_train_router.yaml"
+        )
+        with open(cassette_path) as file:
             cassette = yaml.safe_load(file)
 
         response_body = cassette["interactions"][0]["response"]["body"]
@@ -72,7 +74,7 @@ def preference_id():
 def test_train_router(
     client: WeaveClient,
     model_evals: dict[str, EvaluationResults],
-    preference_id: Optional[str],
+    preference_id: str | None,
 ):
     api_key = os.getenv("NOTDIAMOND_API_KEY", "DUMMY_API_KEY")
     preference_id = train_router(

@@ -8,14 +8,8 @@ organization:
   contact: support@wandb.ai
 
 # `targets` define the output targets and their customization options, such as
-# whether to emit the Node SDK and what it's package name should be.
+# package names and publishing settings.
 targets:
-  node:
-    package_name: weave-server-sdk-old
-    production_repo: null
-    publish:
-      npm: false
-    skip: false
   python:
     package_name: weave_server_sdk
     project_name: weave_server_sdk
@@ -37,17 +31,17 @@ client_settings:
   opts:
     username:
       type: string
-      description: Username for HTTP Basic authentication
+      description: Weights & Biases username
       nullable: false
-      read_env: USERNAME
+      read_env: WANDB_USERNAME
       auth:
         security_scheme: HTTPBasic
         role: username
     password:
       type: string
-      description: Password for HTTP Basic authentication
+      description: Weights & Biases API key
       nullable: false
-      read_env: PASSWORD
+      read_env: WANDB_API_KEY
       auth:
         security_scheme: HTTPBasic
         role: password
@@ -168,6 +162,64 @@ resources:
   threads:
     methods:
       stream_query: post /threads/stream_query
+
+  v2_ops:
+    methods:
+      create: post /object/{entity}/{project}/ops
+      list: get /object/{entity}/{project}/ops
+      read: get /object/{entity}/{project}/ops/{object_id}/versions/{digest}
+      delete: delete /object/{entity}/{project}/ops/{object_id}
+
+  v2_scorers:
+    methods:
+      create: post /object/{entity}/{project}/scorers
+      list: get /object/{entity}/{project}/scorers
+      read: get /object/{entity}/{project}/scorers/{object_id}/versions/{digest}
+      delete: delete /object/{entity}/{project}/scorers/{object_id}
+
+  v2_datasets:
+    methods:
+      create: post /object/{entity}/{project}/datasets
+      list: get /object/{entity}/{project}/datasets
+      read: get /object/{entity}/{project}/datasets/{object_id}/versions/{digest}
+      delete: delete /object/{entity}/{project}/datasets/{object_id}
+
+  v2_evaluations:
+    methods:
+      create: post /object/{entity}/{project}/evaluations
+      list: get /object/{entity}/{project}/evaluations
+      read: get /object/{entity}/{project}/evaluations/{object_id}/versions/{digest}
+      delete: delete /object/{entity}/{project}/evaluations/{object_id}
+
+  v2_models:
+    methods:
+      create: post /object/{entity}/{project}/models
+      list: get /object/{entity}/{project}/models
+      read: get /object/{entity}/{project}/models/{object_id}/versions/{digest}
+      delete: delete /object/{entity}/{project}/models/{object_id}
+
+  v2_evaluation_runs:
+    methods:
+      create: post /object/{entity}/{project}/evaluation_runs
+      list: get /object/{entity}/{project}/evaluation_runs
+      read: get /object/{entity}/{project}/evaluation_runs/{evaluation_run_id}/versions/{digest}
+      delete: delete /object/{entity}/{project}/evaluation_runs/{evaluation_run_id}
+      finish: post /object/{entity}/{project}/evaluation_runs/{evaluation_run_id}/finish
+
+  v2_predictions:
+    methods:
+      create: post /object/{entity}/{project}/predictions
+      list: get /object/{entity}/{project}/predictions
+      read: get /object/{entity}/{project}/predictions/{prediction_id}/versions/{digest}
+      delete: delete /object/{entity}/{project}/predictions/{prediction_id}
+      finish: post /object/{entity}/{project}/predictions/{prediction_id}/finish
+
+  v2_scores:
+    methods:
+      create: post /object/{entity}/{project}/scores
+      list: get /object/{entity}/{project}/scores
+      read: get /object/{entity}/{project}/scores/{score_id}/versions/{digest}
+      delete: delete /object/{entity}/{project}/scores/{score_id}
 
 settings:
   license: Apache-2.0
