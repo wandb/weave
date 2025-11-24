@@ -649,10 +649,7 @@ export class WeaveClient {
     return this.stackContext.run(callStack, fn);
   }
 
-  public runWithAttributes<T>(
-    attributes: Record<string, any>,
-    fn: () => T
-  ): T {
+  public runWithAttributes<T>(attributes: Record<string, any>, fn: () => T): T {
     const mergedAttributes = {
       ...this.getCurrentAttributes(),
       ...attributes,

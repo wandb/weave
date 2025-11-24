@@ -20,7 +20,9 @@ async function main() {
   );
 
   console.log('Result:', result);
-  console.log('Calls in the UI will have requestId/env on both parent and child.');
+  console.log(
+    'Calls in the UI will have requestId/env on both parent and child.'
+  );
 }
 
 main().catch(err => {
