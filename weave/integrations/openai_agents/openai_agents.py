@@ -125,12 +125,14 @@ class WeaveTracingProcessor(TracingProcessor):  # pyright: ignore[reportGeneralT
 
         # When the trace ends, pop all spans that belong to this trace from the stack
         # This cleans up the stack after all work is complete
-        for span_id, span_call in list(self._span_calls.items()):
-            if span_call.id in self._pushed_calls:
-                # Only pop spans that belong to this trace
-                if span_call.trace_id == trace_call.trace_id:
-                    call_context.pop_call(span_call.id)
-                    self._pushed_calls.discard(span_call.id)
+        for _, span_call in list(self._span_calls.items()):
+            # Only pop spans that belong to this trace
+            if (
+                span_call.id in self._pushed_calls
+                and span_call.trace_id == trace_call.trace_id
+            ):
+                call_context.pop_call(span_call.id)
+                self._pushed_calls.discard(span_call.id)
 
         # Finally, pop the trace call itself
         if trace_call.id in self._pushed_calls:
