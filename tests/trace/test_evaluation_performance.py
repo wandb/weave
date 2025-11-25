@@ -111,13 +111,9 @@ async def test_evaluation_performance(client: WeaveClient):
 
     log = [l for l in client.server.attribute_access_log if not l.startswith("_")]
 
-    gold_log = [
-        "ensure_project_exists",
-        "get_call_processor",
-        "get_call_processor",
-        "get_feedback_processor",
-        "get_feedback_processor",
-    ]
+    # get_call_processor, get_feedback_processor are filtered out by ServerRecorder
+    # as they are internal setup calls
+    gold_log: list[str] = ["ensure_project_exists"]
     assert log == gold_log
 
     with paused_client(client) as client:
@@ -130,14 +126,13 @@ async def test_evaluation_performance(client: WeaveClient):
 
     counts = Counter(log)
 
-    # Tim: This is very specific and intentiaion, please don't change
+    # Tim: This is very specific and intentional, please don't change
     # this unless you are sure that is the expected behavior
+    # Note: get_call_processor, get_feedback_processor are filtered out as internal setup calls
     assert (
         counts
         == {
             "ensure_project_exists": 1,
-            "get_call_processor": 2,
-            "get_feedback_processor": 2,
             "table_create": 2,  # dataset and score results
             "obj_create": 9,  # Evaluate Op, Score Op, Predict and Score Op, Summarize Op, predict Op, PIL Image Serializer, Eval Results DS, MainDS, Evaluation Object
             "file_create": 10,  # 4 images, 6 ops
