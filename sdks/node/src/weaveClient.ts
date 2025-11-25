@@ -81,6 +81,7 @@ const MAX_BATCH_SIZE_CHARS = 10 * 1024 * 1024;
 
 export class WeaveClient {
   private stackContext = new AsyncLocalStorage<CallStack>();
+  private attributesContext = new AsyncLocalStorage<Record<string, any>>();
   private callQueue: Array<{mode: 'start' | 'end'; data: any}> = [];
   private batchProcessTimeout: NodeJS.Timeout | null = null;
   private isBatchProcessing: boolean = false;
@@ -636,12 +637,24 @@ export class WeaveClient {
     return this.stackContext.getStore() || new CallStack();
   }
 
+  public getCurrentAttributes(): Record<string, any> {
+    return this.attributesContext.getStore() || {};
+  }
+
   public pushNewCall() {
     return this.getCallStack().pushNewCall();
   }
 
   public runWithCallStack<T>(callStack: CallStack, fn: () => T): T {
     return this.stackContext.run(callStack, fn);
+  }
+
+  public runWithAttributes<T>(attributes: Record<string, any>, fn: () => T): T {
+    const mergedAttributes = {
+      ...this.getCurrentAttributes(),
+      ...attributes,
+    };
+    return this.attributesContext.run(mergedAttributes, fn);
   }
 
   private async paramsToCallInputs(
@@ -727,12 +740,17 @@ export class WeaveClient {
     }
 
     // Merge custom attributes with default weave attributes
+    const combinedAttributes = {
+      ...this.settings.attributes,
+      ...this.getCurrentAttributes(),
+      ...(attributes || {}),
+    };
     const mergedAttributes = {
       weave: {
         client_version: packageVersion,
         source: 'js-sdk',
       },
-      ...attributes,
+      ...combinedAttributes,
     };
 
     const startReq = {
