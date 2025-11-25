@@ -40,10 +40,22 @@ class Message(BaseModel):
 
 
 class LLMStructuredCompletionModelDefaultParams(BaseModel):
-    # Could use Prompt objects for the message template
+    """Default parameters for LLMStructuredCompletionModel.
+
+    Attributes:
+        messages_template: A list of Messages to use as a template. Messages can contain
+            template variables using {variable_name} syntax. These will be substituted
+            when predict() is called with template_vars.
+        prompt: A reference string to a MessagesPrompt object. If provided, this takes
+            precedence over messages_template. The referenced prompt's format() method will
+            be used to generate messages with template variable substitution.
+            Example: "weave:///entity/project/object/my_prompt:latest"
+    """
+
     # This is a list of Messages, loosely following litellm's message format
     # https://docs.litellm.ai/docs/completion/input#properties-of-messages
     messages_template: list[Message] | None = None
+    prompt: base_object_def.RefStr | None = None
 
     temperature: float | None = None
     top_p: float | None = None
@@ -120,8 +132,16 @@ class LLMStructuredCompletionModel(Model):
         """Generates a prediction by preparing messages (template + user_input)
         and calling the LLM completions endpoint with overridden config, using the provided client.
 
+        Messages are prepared in one of two ways:
+        1. If default_params.prompt is set, the referenced MessagesPrompt object is
+           loaded and its format() method is called with template_vars to generate messages.
+        2. If default_params.messages_template is set (and prompt is not), the template
+           messages are used with template variable substitution.
+
+        Note: If both prompt and messages_template are provided, prompt takes precedence.
+
         Args:
-            user_input: The user input messages
+            user_input: The user input messages to append after template messages
             config: Optional configuration to override default parameters
             **template_vars: Variables to substitute in the messages template using {variable_name} syntax
         """
@@ -182,9 +202,17 @@ class LLMStructuredCompletionModel(Model):
         ):
             user_input = cast_to_message_list(user_input)
 
-        # 1. Prepare messages with template variable substitution
+        # 1. Prepare messages from messages_template (if no prompt is set)
+        # Note: If prompt is set, we don't prepare messages here - we pass the prompt
+        # reference to the completions endpoint which will resolve and substitute it
         template_msgs = None
-        if self.default_params and self.default_params.messages_template:
+
+        # Only use messages_template if prompt is NOT set
+        if (
+            self.default_params
+            and self.default_params.messages_template
+            and not self.default_params.prompt
+        ):
             template_msgs = self.default_params.messages_template
             if template_vars:
                 # Convert Message objects to dicts, apply template vars, convert back
@@ -213,6 +241,11 @@ class LLMStructuredCompletionModel(Model):
 
         # 4. Create the completion inputs
         model_id_str = str(self.llm_model_id)
+
+        # Include template_vars if they exist
+        if template_vars:
+            completion_params["template_vars"] = template_vars
+
         completion_inputs = CompletionsCreateRequestInputs(
             model=model_id_str, messages=prepared_messages_dicts, **completion_params
         )
