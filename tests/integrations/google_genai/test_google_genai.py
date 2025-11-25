@@ -53,6 +53,16 @@ def test_content_generation_sync(client):
         + call.output.usageMetadata.promptTokenCount
     )
 
+    # Verify that token usage is recorded in call.summary for cost tracking
+    assert call.summary is not None
+    assert "usage" in call.summary
+    usage = call.summary["usage"]["gemini-2.0-flash"]
+    assert usage["requests"] == 1
+    assert usage["prompt_tokens"] > 0
+    assert usage["completion_tokens"] > 0
+    assert usage["total_tokens"] > 0
+    assert usage["total_tokens"] == usage["prompt_tokens"] + usage["completion_tokens"]
+
 
 @pytest.mark.asyncio
 @pytest.mark.vcr(
@@ -79,6 +89,16 @@ async def test_content_generation_async(client):
         == call.output.usageMetadata.candidatesTokenCount
         + call.output.usageMetadata.promptTokenCount
     )
+
+    # Verify that token usage is recorded in call.summary for cost tracking
+    assert call.summary is not None
+    assert "usage" in call.summary
+    usage = call.summary["usage"]["gemini-2.0-flash"]
+    assert usage["requests"] == 1
+    assert usage["prompt_tokens"] > 0
+    assert usage["completion_tokens"] > 0
+    assert usage["total_tokens"] > 0
+    assert usage["total_tokens"] == usage["prompt_tokens"] + usage["completion_tokens"]
 
 
 @pytest.mark.vcr(

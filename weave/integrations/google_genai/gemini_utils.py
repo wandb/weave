@@ -56,8 +56,9 @@ def google_genai_gemini_on_finish(
                     "total_tokens": output.usage_metadata.total_token_count,
                 }
             )
-    if call.summary is not None:
-        call.summary.update(summary_update)
+    if call.summary is None:
+        call.summary = {}
+    call.summary.update(summary_update)
 
 
 def google_genai_gemini_accumulator(
