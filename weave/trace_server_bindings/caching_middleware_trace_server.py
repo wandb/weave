@@ -57,7 +57,7 @@ CACHE_DIR_PREFIX = "weave_trace_server_cache"
 CACHE_KEY_SUFFIX = "v_" + version.VERSION
 
 
-class CachingMiddlewareTraceServer(tsi.FullTraceServerInterface):
+class CachingMiddlewareTraceServer:
     """A middleware trace server that provides caching functionality.
 
     This server wraps another trace server and caches responses to improve performance.
@@ -65,7 +65,8 @@ class CachingMiddlewareTraceServer(tsi.FullTraceServerInterface):
     operations like obj_read, table_query, etc.
 
     Methods not explicitly defined are automatically delegated to the underlying server
-    via __getattr__.
+    via __getattr__. This class satisfies the FullTraceServerInterface protocol through
+    structural typing (duck typing) rather than explicit inheritance.
 
     Attributes:
         _next_trace_server: The underlying trace server being wrapped
