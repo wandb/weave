@@ -480,21 +480,6 @@ conflicts = [
     { extra = "instructor" },
     { extra = "verdict" },
   ],
-  # crewai and langchain have incompatible litellm version requirements
-  # [
-  #   { extra = "crewai" },
-  #   { extra = "langchain" },
-  # ],
-  # crewai and instructor have incompatible httpx version requirements
-  # [
-  #   { extra = "crewai" },
-  #   { extra = "instructor" },
-  # ],
-  # crewai and scorers have incompatible crewai-tools version requirements
-  # [
-  #   { extra = "crewai" },
-  #   { extra = "scorers" },
-  # ],
 ]
 
 [tool.coverage.report]
