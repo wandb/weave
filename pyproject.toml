@@ -382,6 +382,8 @@ dev = [
   # linting
   "pre-commit",
   "jupyter",
+  # coverage
+  "codecov",
 ]
 trace_server = [
   # Same dependencies as the trace_server optional dependency, but as a dependency group for tests
@@ -451,6 +453,9 @@ test = [
   "weave[trace_server]",
   "moto[s3]>=5.0.0",
   "respx",
+
+  # Coverage reporting
+  "codecov",
 ]
 
 [tool.uv]

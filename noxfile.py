@@ -245,3 +245,16 @@ def tests(session: nox.Session, shard: str):
             *test_dirs,
             env=env,
         )
+
+    # Upload coverage to codecov if CODECOV_TOKEN is set
+    codecov_token = os.getenv("CODECOV_TOKEN")
+    if codecov_token:
+        session.run(
+            "codecov",
+            "--token",
+            codecov_token,
+            "--file",
+            "coverage.xml",
+            "--flags",
+            shard,
+        )
