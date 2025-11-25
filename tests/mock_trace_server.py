@@ -16,6 +16,11 @@ from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ids import generate_id
 
 
+class NotFoundError(Exception):
+    """Exception raised when a resource is not found in the mock server."""
+    pass
+
+
 class MockTraceServer:
     """In-memory mock implementation of TraceServerInterface.
 
@@ -84,7 +89,7 @@ class MockTraceServer:
 
     def call_end(self, req: tsi.CallEndReq) -> tsi.CallEndRes:
         if req.end.id not in self.calls:
-            raise tsi.NotFoundError(f"Call {req.end.id} not found")
+            raise NotFoundError(f"Call {req.end.id} not found")
 
         call = self.calls[req.end.id]
         call.ended_at = req.end.ended_at
@@ -97,7 +102,7 @@ class MockTraceServer:
 
     def call_read(self, req: tsi.CallReadReq) -> tsi.CallReadRes:
         if req.id not in self.calls:
-            raise tsi.NotFoundError(f"Call {req.id} not found")
+            raise NotFoundError(f"Call {req.id} not found")
 
         return tsi.CallReadRes(call=self.calls[req.id])
 
@@ -177,7 +182,7 @@ class MockTraceServer:
 
     def call_update(self, req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
         if req.call_id not in self.calls:
-            raise tsi.NotFoundError(f"Call {req.call_id} not found")
+            raise NotFoundError(f"Call {req.call_id} not found")
 
         call = self.calls[req.call_id]
         if req.display_name is not None:
@@ -221,20 +226,24 @@ class MockTraceServer:
 
     # Obj API
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
-        key = f"{req.obj.project_id}:{req.obj.object_id}:{req.obj.digest}"
+        # Generate digest based on the object value
+        digest = generate_id()
+        key = f"{req.obj.project_id}:{req.obj.object_id}:{digest}"
         self.objs[key] = {
             "project_id": req.obj.project_id,
             "object_id": req.obj.object_id,
-            "digest": req.obj.digest,
+            "digest": digest,
             "val": req.obj.val,
             "created_at": datetime.datetime.now(tz=datetime.timezone.utc),
+            "kind": "object",  # Default kind
+            "base_object_class": req.obj.builtin_object_class or "Object",
         }
-        return tsi.ObjCreateRes(digest=req.obj.digest)
+        return tsi.ObjCreateRes(digest=digest)
 
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
         key = f"{req.project_id}:{req.object_id}:{req.digest}"
         if key not in self.objs:
-            raise tsi.NotFoundError(f"Object {key} not found")
+            raise NotFoundError(f"Object {key} not found")
 
         obj_data = self.objs[key]
         return tsi.ObjReadRes(
@@ -245,6 +254,8 @@ class MockTraceServer:
                 digest=obj_data["digest"],
                 version_index=0,
                 is_latest=1,
+                kind=obj_data["kind"],
+                base_object_class=obj_data["base_object_class"],
                 val=obj_data["val"],
             )
         )
@@ -268,6 +279,8 @@ class MockTraceServer:
                     digest=obj_data["digest"],
                     version_index=0,
                     is_latest=1,
+                    kind=obj_data["kind"],
+                    base_object_class=obj_data["base_object_class"],
                     val=obj_data["val"],
                 )
             )
@@ -321,14 +334,28 @@ class MockTraceServer:
     def table_update(self, req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
         key = f"{req.project_id}:{req.base_digest}"
         if key not in self.tables:
-            raise tsi.NotFoundError(f"Table {key} not found")
+            raise NotFoundError(f"Table {key} not found")
 
         # Create new version with updated rows
         new_digest = generate_id()
         new_key = f"{req.project_id}:{new_digest}"
 
+        # Process updates on a copy of base rows
         base_rows = self.tables[key]["rows"].copy()
-        base_rows.extend(req.updates)
+
+        # Apply each update operation in order
+        for update in req.updates:
+            if hasattr(update, 'append') and update.append is not None:
+                # Append operation: add row to end
+                base_rows.append(update.append.row)
+            elif hasattr(update, 'pop') and update.pop is not None:
+                # Pop operation: remove row at index
+                if 0 <= update.pop.index < len(base_rows):
+                    base_rows.pop(update.pop.index)
+            elif hasattr(update, 'insert') and update.insert is not None:
+                # Insert operation: insert row at index
+                if 0 <= update.insert.index <= len(base_rows):
+                    base_rows.insert(update.insert.index, update.insert.row)
 
         self.tables[new_key] = {
             "project_id": req.project_id,
@@ -341,7 +368,7 @@ class MockTraceServer:
     def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
         key = f"{req.project_id}:{req.digest}"
         if key not in self.tables:
-            raise tsi.NotFoundError(f"Table {key} not found")
+            raise NotFoundError(f"Table {key} not found")
 
         table_data = self.tables[key]
         rows = []
@@ -401,7 +428,7 @@ class MockTraceServer:
     def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
         key = f"{req.project_id}:{req.digest}"
         if key not in self.files:
-            raise tsi.NotFoundError(f"File {key} not found")
+            raise NotFoundError(f"File {key} not found")
 
         return tsi.FileContentReadRes(content=self.files[key])
 

@@ -24,8 +24,8 @@ def pytest_addoption(parser):
         parser.addoption(
             "--trace-server",
             action="store",
-            default="mock",
-            help="Specify the client object to use: mock, sqlite or clickhouse",
+            default="clickhouse",
+            help="Specify the client object to use: clickhouse, sqlite, or mock",
         )
         parser.addoption(
             "--ch",
@@ -201,6 +201,5 @@ def trace_server(
         from tests.mock_trace_server import MockTraceServer
         return MockTraceServer()
     else:
-        # Default to mock for unknown options
-        from tests.mock_trace_server import MockTraceServer
-        return MockTraceServer()
+        # Default to clickhouse for unknown options
+        return get_ch_trace_server()

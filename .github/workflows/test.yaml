@@ -227,6 +227,49 @@ jobs:
           fail_ci_if_error: false
           token: ${{ secrets.CODECOV_TOKEN }}
 
+  trace_mock:
+    name: Trace tests with mock server
+    timeout-minutes: 15
+    runs-on: ubuntu-latest-8-cores
+    strategy:
+      matrix:
+        python-version-major: ["3"]
+        python-version-minor: [
+            "10",
+            "11",
+            "13",
+            #
+          ]
+        nox-shard: ["trace_mock"]
+      fail-fast: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Set up Python ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install nox uv
+      - name: Run nox (Mock Trace Server)
+        env:
+          WEAVE_SENTRY_ENV: ci
+          CI: 1
+          WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
+          DD_TRACE_ENABLED: false
+        run: |
+          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')"
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: ./tests/coverage.xml
+          flags: trace-mock
+          name: trace-mock-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
+
   trace-tests:
     name: Trace nox tests
     timeout-minutes: 15
