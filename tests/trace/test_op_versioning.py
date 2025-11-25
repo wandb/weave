@@ -642,7 +642,7 @@ def test_standard_import():
 
 ALIASED_FUNC_CODE = """import weave as wv
 
-@wv.op()
+@wv.op
 def aliased_func(): ...
 """
 
@@ -659,13 +659,13 @@ def test_aliased_import_wv():
 
 PAREN_FUNC_CODE = """import weave as wv
 
-@wv.op()
+@wv.op
 def paren_func(): ...
 """
 
 
 def test_op_with_parentheses():
-    """Test that @wv.op() with parentheses is handled correctly - should preserve the alias."""
+    """Test that @wv.op() with parentheses is normalized to @wv.op - should preserve the alias."""
 
     @wv.op()
     def paren_func(): ...
