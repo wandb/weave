@@ -181,6 +181,9 @@ def get_crewai_patcher(
             for tool in crewai_tools:
                 try:
                     tool_class = getattr(crewai_tools_module, tool)
+                    # Check if it's a class before using issubclass
+                    if not isinstance(tool_class, type):
+                        continue
                     if issubclass(tool_class, BaseTool):
                         tools_settings[tool] = base.model_copy(
                             update={

@@ -88,9 +88,8 @@ video_support = ["moviepy<=1.0.3"]
 anthropic = ["anthropic>=0.18.0"]
 cerebras = ["cerebras-cloud-sdk"]
 cohere = ["cohere>=5.13.5"]
-# Pin until https://github.com/crewAIInc/crewAI/pull/2553 is released
 crewai = [
-  "crewai>=0.100.1,<=0.108.0; python_version >= '3.10' and python_version <= '3.13' and platform_python_implementation != 'PyPy'",
+  "crewai>=1.5.0; python_version >= '3.10' and python_version <= '3.13' and platform_python_implementation != 'PyPy'",
   "crewai-tools>=0.38.0; python_version >= '3.10' and python_version <= '3.13' and platform_python_implementation != 'PyPy'",
   "openai>=1.99.9,<1.100.0",
 ]
@@ -160,7 +159,7 @@ presidio = [
   "presidio-anonymizer==2.2.357; python_version < '3.13'",
 ]
 modal = ["modal", "python-dotenv"]
-mcp = ["mcp[cli]>=1.6.0,<1.10.0; python_version >= '3.10'"]
+mcp = ["mcp[cli]>=1.16.0; python_version >= '3.10'"]
 vertexai = [
   "vertexai>=1.70.0; platform_python_implementation != 'PyPy' and python_version < '3.13'",
   "shapely<=2.0.6; platform_python_implementation != 'PyPy'",
@@ -465,7 +464,8 @@ environments = ["platform_python_implementation == 'CPython'"]
 # Declare conflicts between optional dependencies that have incompatible requirements
 # This allows uv sync to work correctly by not validating conflicting extras together
 conflicts = [
-  # crewai and dspy have incompatible litellm version requirements
+  # crewai and dspy have incompatible json-repair version requirements
+  # crewai requires json-repair==0.25.2, dspy requires json-repair>=0.30.0
   [
     { extra = "crewai" },
     { extra = "dspy" },
@@ -481,20 +481,20 @@ conflicts = [
     { extra = "verdict" },
   ],
   # crewai and langchain have incompatible litellm version requirements
-  [
-    { extra = "crewai" },
-    { extra = "langchain" },
-  ],
+  # [
+  #   { extra = "crewai" },
+  #   { extra = "langchain" },
+  # ],
   # crewai and instructor have incompatible httpx version requirements
-  [
-    { extra = "crewai" },
-    { extra = "instructor" },
-  ],
+  # [
+  #   { extra = "crewai" },
+  #   { extra = "instructor" },
+  # ],
   # crewai and scorers have incompatible crewai-tools version requirements
-  [
-    { extra = "crewai" },
-    { extra = "scorers" },
-  ],
+  # [
+  #   { extra = "crewai" },
+  #   { extra = "scorers" },
+  # ],
 ]
 
 [tool.coverage.report]
