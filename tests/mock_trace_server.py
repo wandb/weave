@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import copy
 import datetime
+import functools
 import hashlib
 import json
 from collections.abc import Iterator
@@ -15,8 +16,10 @@ from typing import Any
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ids import generate_id
+from weave.trace_server.interface import query as q
 from weave.trace_server.trace_server_interface_util import bytes_digest, str_digest
 from weave.trace_server.object_class_util import process_incoming_object_val
+from weave.trace_server.trace_server_common import make_derived_summary_fields
 
 
 def _get_type(val: Any) -> str:
@@ -36,6 +39,110 @@ def _get_kind(val: Any) -> str:
     if val_type == "Op":
         return "op"
     return "object"
+
+
+def _get_nested_value(obj: Any, path: str) -> Any:
+    """Get a nested value from an object using a dotted path.
+
+    Supports:
+    - Object attributes (e.g., "started_at")
+    - Dict keys (e.g., "inputs.in_val.prim")
+    - List indices (e.g., "inputs.list.0")
+    """
+    parts = path.split(".")
+    value = obj
+
+    for part in parts:
+        if value is None:
+            return None
+
+        # Try as object attribute first
+        if hasattr(value, part) and not isinstance(value, dict):
+            value = getattr(value, part)
+        elif isinstance(value, dict):
+            value = value.get(part)
+        elif isinstance(value, list):
+            # Try to parse as integer index
+            try:
+                idx = int(part)
+                value = value[idx] if 0 <= idx < len(value) else None
+            except (ValueError, IndexError):
+                return None
+        else:
+            return None
+
+    return value
+
+
+def _evaluate_operand(operand: q.Operand, call: tsi.CallSchema) -> Any:
+    """Evaluate a query operand against a call."""
+    if isinstance(operand, q.LiteralOperation):
+        return operand.literal_
+    elif isinstance(operand, q.GetFieldOperator):
+        return _get_nested_value(call, operand.get_field_)
+    elif isinstance(operand, q.ConvertOperation):
+        value = _evaluate_operand(operand.convert_.input, call)
+        target_type = operand.convert_.to
+        if target_type == "int":
+            return int(value) if value is not None else None
+        elif target_type == "double":
+            return float(value) if value is not None else None
+        elif target_type == "string":
+            return str(value) if value is not None else None
+        elif target_type == "bool":
+            return bool(value) if value is not None else None
+        elif target_type == "exists":
+            return value is not None
+        return value
+    elif isinstance(operand, (q.AndOperation, q.OrOperation, q.NotOperation,
+                               q.EqOperation, q.GtOperation, q.GteOperation,
+                               q.InOperation, q.ContainsOperation)):
+        return _evaluate_operation(operand, call)
+    return None
+
+
+def _evaluate_operation(operation: q.Operation, call: tsi.CallSchema) -> bool:
+    """Evaluate a query operation against a call."""
+    if isinstance(operation, q.AndOperation):
+        return all(_evaluate_operand(op, call) for op in operation.and_)
+    elif isinstance(operation, q.OrOperation):
+        return any(_evaluate_operand(op, call) for op in operation.or_)
+    elif isinstance(operation, q.NotOperation):
+        return not _evaluate_operand(operation.not_[0], call)
+    elif isinstance(operation, q.EqOperation):
+        left = _evaluate_operand(operation.eq_[0], call)
+        right = _evaluate_operand(operation.eq_[1], call)
+        return left == right
+    elif isinstance(operation, q.GtOperation):
+        left = _evaluate_operand(operation.gt_[0], call)
+        right = _evaluate_operand(operation.gt_[1], call)
+        if left is None or right is None:
+            return False
+        return left > right
+    elif isinstance(operation, q.GteOperation):
+        left = _evaluate_operand(operation.gte_[0], call)
+        right = _evaluate_operand(operation.gte_[1], call)
+        if left is None or right is None:
+            return False
+        return left >= right
+    elif isinstance(operation, q.InOperation):
+        left = _evaluate_operand(operation.in_[0], call)
+        right_list = [_evaluate_operand(op, call) for op in operation.in_[1]]
+        return left in right_list
+    elif isinstance(operation, q.ContainsOperation):
+        input_val = _evaluate_operand(operation.contains_.input, call)
+        substr = _evaluate_operand(operation.contains_.substr, call)
+        if input_val is None or substr is None:
+            return False
+        if operation.contains_.case_insensitive:
+            return str(substr).lower() in str(input_val).lower()
+        return str(substr) in str(input_val)
+    return False
+
+
+def _evaluate_query(query: q.Query, call: tsi.CallSchema) -> bool:
+    """Evaluate a query against a call."""
+    return _evaluate_operation(query.expr_, call)
 
 
 class NotFoundError(Exception):
@@ -61,6 +168,10 @@ class MockTraceServer:
 
         # Track latest timestamps for ordering
         self.call_order: list[str] = []
+
+        # Self-reference for compatibility with client_is_sqlite checks
+        # This is used by tests that check `._internal_trace_server`
+        self._internal_trace_server = self
 
     def ensure_project_exists(
         self, entity: str, project: str
@@ -121,10 +232,96 @@ class MockTraceServer:
         call.ended_at = req.end.ended_at
         call.exception = req.end.exception
         call.output = req.end.output
-        call.summary = req.end.summary
         call.wb_run_step_end = req.end.wb_run_step_end
 
+        # Process summary to add derived fields (weave.status, weave.latency_ms, etc.)
+        summary = copy.deepcopy(req.end.summary) if req.end.summary else {}
+        try:
+            call.summary = make_derived_summary_fields(
+                summary=summary,
+                op_name=call.op_name,
+                started_at=call.started_at,
+                ended_at=call.ended_at,
+                exception=call.exception,
+                display_name=call.display_name,
+            )
+        except Exception:
+            # If make_derived_summary_fields fails (e.g., due to ref parsing issues),
+            # fall back to manual summary construction
+            call.summary = self._make_summary_fallback(
+                summary=summary,
+                call=call,
+            )
+
         return tsi.CallEndRes()
+
+    def _make_summary_fallback(
+        self,
+        summary: dict[str, Any],
+        call: tsi.CallSchema,
+    ) -> dict[str, Any]:
+        """Fallback summary construction when make_derived_summary_fields fails."""
+        weave_summary = summary.pop("weave", {})
+
+        # Determine status
+        if call.exception:
+            status = tsi.TraceStatus.ERROR
+        elif call.ended_at is None:
+            status = tsi.TraceStatus.RUNNING
+        elif summary.get("status_counts", {}).get(tsi.TraceStatus.ERROR, 0) > 0:
+            status = tsi.TraceStatus.DESCENDANT_ERROR
+        else:
+            status = tsi.TraceStatus.SUCCESS
+        weave_summary["status"] = status
+
+        # Calculate latency
+        if call.ended_at and call.started_at:
+            delta = call.ended_at - call.started_at
+            days = delta.days
+            seconds = delta.seconds
+            milliseconds = delta.microseconds // 1000
+            weave_summary["latency_ms"] = (days * 24 * 60 * 60 + seconds) * 1000 + milliseconds
+
+        # Set display_name or trace_name
+        if call.display_name:
+            weave_summary["display_name"] = call.display_name
+        else:
+            # Extract trace_name from op_name
+            op_name = call.op_name
+            # Try to get the name part from URIs like "weave:///entity/project/op/name:hash"
+            if op_name.startswith("weave:///"):
+                parts = op_name.split("/")
+                if len(parts) >= 5 and parts[3] == "op":
+                    name_with_hash = parts[4]
+                    # Remove the hash suffix (e.g., "x:C6hohMXy..." -> "x")
+                    name = name_with_hash.split(":")[0]
+                    weave_summary["trace_name"] = name
+                else:
+                    weave_summary["trace_name"] = op_name
+            else:
+                weave_summary["trace_name"] = op_name
+
+        summary["weave"] = weave_summary
+        return summary
+
+    def _ensure_call_summary(self, call: tsi.CallSchema) -> tsi.CallSchema:
+        """Ensure a call has proper summary fields computed."""
+        summary = copy.deepcopy(call.summary) if call.summary else {}
+        try:
+            call.summary = make_derived_summary_fields(
+                summary=summary,
+                op_name=call.op_name,
+                started_at=call.started_at,
+                ended_at=call.ended_at,
+                exception=call.exception,
+                display_name=call.display_name,
+            )
+        except Exception:
+            call.summary = self._make_summary_fallback(
+                summary=summary,
+                call=call,
+            )
+        return call
 
     def call_read(self, req: tsi.CallReadReq) -> tsi.CallReadRes:
         if req.id not in self.calls:
@@ -132,6 +329,8 @@ class MockTraceServer:
 
         # Return a deep copy to prevent mutation by client-side deserialization (from_json pops _type)
         call = copy.deepcopy(self.calls[req.id])
+        # Ensure summary is computed
+        call = self._ensure_call_summary(call)
         return tsi.CallReadRes(call=call)
 
     def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
@@ -139,18 +338,79 @@ class MockTraceServer:
         return tsi.CallsQueryRes(calls=calls)
 
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
-        # Filter calls by project_id
-        filtered_calls = [
-            call for call in self.calls.values()
-            if call.project_id == req.project_id
-        ]
+        # Filter calls by project_id and compute summaries
+        # We compute summaries first so that query filters can access summary fields
+        filtered_calls = []
+        for call in self.calls.values():
+            if call.project_id == req.project_id:
+                call_copy = copy.deepcopy(call)
+                call_copy = self._ensure_call_summary(call_copy)
+                filtered_calls.append(call_copy)
 
         # Apply filters if provided
         if req.filter:
             filtered_calls = self._apply_call_filters(filtered_calls, req.filter)
 
-        # Sort by started_at (most recent first by default)
-        filtered_calls.sort(key=lambda c: c.started_at, reverse=True)
+        # Apply query filter if provided
+        if req.query:
+            filtered_calls = [c for c in filtered_calls if _evaluate_query(req.query, c)]
+
+        # Apply sorting - default to started_at ascending (oldest first), matching SQLite
+        if req.sort_by is None:
+            # Default sort: oldest first
+            filtered_calls.sort(key=lambda c: c.started_at)
+        elif len(req.sort_by) > 0:
+            # Apply custom sort
+            for sort_spec in reversed(req.sort_by):
+                reverse = sort_spec.direction == "desc"
+                field = sort_spec.field
+
+                def get_sort_value(call: tsi.CallSchema, field_path: str):
+                    """Get value and type order for sorting.
+
+                    Returns (type_order, value, is_none) where:
+                    - type_order: 0 for numbers, 1 for strings, 2 for None
+                    - value: the actual value for comparison
+                    - is_none: True if the value is None
+                    """
+                    value = _get_nested_value(call, field_path)
+                    if value is None:
+                        return (2, None, True)
+                    elif isinstance(value, bool):
+                        return (0, int(value), False)
+                    elif isinstance(value, (int, float)):
+                        return (0, value, False)
+                    elif isinstance(value, str):
+                        return (1, value, False)
+                    else:
+                        return (1, str(value), False)
+
+                # Custom sort that maintains type order but reverses value order for desc
+                def mixed_type_cmp(a: tsi.CallSchema, b: tsi.CallSchema) -> int:
+                    a_type, a_val, a_none = get_sort_value(a, field)
+                    b_type, b_val, b_none = get_sort_value(b, field)
+
+                    # None always sorts last
+                    if a_none and b_none:
+                        return 0
+                    if a_none:
+                        return 1  # a after b
+                    if b_none:
+                        return -1  # a before b
+
+                    # Different types: numbers before strings (always)
+                    if a_type != b_type:
+                        return a_type - b_type
+
+                    # Same type: compare values with direction
+                    if a_val == b_val:
+                        return 0
+                    if reverse:
+                        return -1 if a_val > b_val else 1  # desc: larger first
+                    else:
+                        return -1 if a_val < b_val else 1  # asc: smaller first
+
+                filtered_calls.sort(key=functools.cmp_to_key(mixed_type_cmp))
 
         # Apply limit and offset
         offset = req.offset or 0
@@ -161,35 +421,61 @@ class MockTraceServer:
         else:
             filtered_calls = filtered_calls[offset:]
 
-        # Return deep copies to prevent mutation by client-side deserialization (from_json pops _type)
+        # Return deep copies (summaries already computed at the start)
         for call in filtered_calls:
             yield copy.deepcopy(call)
 
     def _apply_call_filters(
-        self, calls: list[tsi.CallSchema], filter_dict: dict[str, Any]
+        self, calls: list[tsi.CallSchema], filter_obj: tsi.CallsFilter
     ) -> list[tsi.CallSchema]:
         """Apply filters to calls list."""
         filtered = calls
 
         # Filter by op_names
-        if "op_names" in filter_dict:
-            op_names = filter_dict["op_names"]
-            filtered = [c for c in filtered if c.op_name in op_names]
+        if filter_obj.op_names:
+            filtered = [c for c in filtered if c.op_name in filter_obj.op_names]
 
         # Filter by trace_ids
-        if "trace_ids" in filter_dict:
-            trace_ids = filter_dict["trace_ids"]
-            filtered = [c for c in filtered if c.trace_id in trace_ids]
+        if filter_obj.trace_ids:
+            filtered = [c for c in filtered if c.trace_id in filter_obj.trace_ids]
 
         # Filter by parent_ids
-        if "parent_ids" in filter_dict:
-            parent_ids = filter_dict["parent_ids"]
-            filtered = [c for c in filtered if c.parent_id in parent_ids]
+        if filter_obj.parent_ids:
+            filtered = [c for c in filtered if c.parent_id in filter_obj.parent_ids]
 
         # Filter by call_ids
-        if "call_ids" in filter_dict:
-            call_ids = filter_dict["call_ids"]
-            filtered = [c for c in filtered if c.id in call_ids]
+        if filter_obj.call_ids:
+            filtered = [c for c in filtered if c.id in filter_obj.call_ids]
+
+        # Filter by trace_roots_only
+        if filter_obj.trace_roots_only:
+            filtered = [c for c in filtered if c.parent_id is None]
+
+        # Filter by wb_user_ids
+        if filter_obj.wb_user_ids:
+            filtered = [c for c in filtered if c.wb_user_id in filter_obj.wb_user_ids]
+
+        # Filter by wb_run_ids
+        if filter_obj.wb_run_ids:
+            filtered = [c for c in filtered if c.wb_run_id in filter_obj.wb_run_ids]
+
+        # Filter by input_refs - check if any input value contains one of the refs
+        if filter_obj.input_refs:
+            def has_input_ref(call: tsi.CallSchema, refs: list[str]) -> bool:
+                if not call.inputs:
+                    return False
+                inputs_str = json.dumps(call.inputs)
+                return any(ref in inputs_str for ref in refs)
+            filtered = [c for c in filtered if has_input_ref(c, filter_obj.input_refs)]
+
+        # Filter by output_refs - check if output value contains one of the refs
+        if filter_obj.output_refs:
+            def has_output_ref(call: tsi.CallSchema, refs: list[str]) -> bool:
+                if not call.output:
+                    return False
+                output_str = json.dumps(call.output) if isinstance(call.output, (dict, list)) else str(call.output)
+                return any(ref in output_str for ref in refs)
+            filtered = [c for c in filtered if has_output_ref(c, filter_obj.output_refs)]
 
         return filtered
 
@@ -303,10 +589,23 @@ class MockTraceServer:
             if obj_data["project_id"] != req.project_id:
                 continue
 
-            # Apply filters
+            # Apply filters (filter is ObjectVersionFilter model, not dict)
             if req.filter:
-                if "object_ids" in req.filter and obj_data["object_id"] not in req.filter["object_ids"]:
+                # Filter by object_ids
+                if req.filter.object_ids and obj_data["object_id"] not in req.filter.object_ids:
                     continue
+                # Filter by base_object_classes
+                if req.filter.base_object_classes and obj_data.get("base_object_class") not in req.filter.base_object_classes:
+                    continue
+                # Filter by is_op
+                if req.filter.is_op is not None:
+                    is_op = obj_data.get("kind") == "op"
+                    if req.filter.is_op != is_op:
+                        continue
+                # Filter by latest_only
+                if req.filter.latest_only:
+                    # For now, all objects are "latest" in the mock (we don't track versions)
+                    pass
 
             objs.append(
                 tsi.ObjSchema(
@@ -521,17 +820,26 @@ class MockTraceServer:
     # Feedback API
     def feedback_create(self, req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
         feedback_id = generate_id()
+        created_at = datetime.datetime.now(tz=datetime.timezone.utc)
+        payload = req.payload or {}
+        wb_user_id = req.wb_user_id or ""
+
         self.feedback[feedback_id] = {
             "id": feedback_id,
             "project_id": req.project_id,
             "weave_ref": req.weave_ref,
             "feedback_type": req.feedback_type,
-            "payload": req.payload or {},
+            "payload": payload,
             "creator": req.creator,
-            "created_at": datetime.datetime.now(tz=datetime.timezone.utc),
-            "wb_user_id": req.wb_user_id,
+            "created_at": created_at,
+            "wb_user_id": wb_user_id,
         }
-        return tsi.FeedbackCreateRes(id=feedback_id)
+        return tsi.FeedbackCreateRes(
+            id=feedback_id,
+            created_at=created_at,
+            wb_user_id=wb_user_id,
+            payload=payload,
+        )
 
     def feedback_create_batch(
         self, req: tsi.FeedbackCreateBatchReq
