@@ -68,9 +68,7 @@ class WeaveTracingProcessor(TracingProcessor):  # pyright: ignore[reportGeneralT
         self._span_calls: dict[str, Call] = {}
         self._ended_traces: set[str] = set()
         self._span_parents: dict[str, str] = {}
-        self._pushed_calls: set[str] = (
-            set()
-        )  # Track which calls we pushed onto the stack
+        self._pushed_calls: set[str] = set()
 
     def on_trace_start(self, trace: Trace) -> None:
         """Called when a trace starts."""
@@ -122,7 +120,8 @@ class WeaveTracingProcessor(TracingProcessor):  # pyright: ignore[reportGeneralT
             "metadata": trace_data.get("metadata", {}),
         }
         wc.finish_call(trace_call, output=output)
-        self._pushed_calls.discard(trace_call.id)
+        if trace_call.id is not None:
+            self._pushed_calls.discard(trace_call.id)
 
         # Safety net: pop any spans that weren't properly finished via on_span_end
         # (e.g., due to errors or cancellation). Most spans will already have been
@@ -411,7 +410,8 @@ class WeaveTracingProcessor(TracingProcessor):  # pyright: ignore[reportGeneralT
         wc.finish_call(span_call, output=output, exception=exception)
 
         # Update _pushed_calls since finish_call already popped this call from the stack
-        self._pushed_calls.discard(span_call.id)
+        if span_call.id is not None:
+            self._pushed_calls.discard(span_call.id)
 
     def _finish_unfinished_calls(self, status: str) -> None:
         """Helper method for finishing unfinished calls on shutdown or flush."""
