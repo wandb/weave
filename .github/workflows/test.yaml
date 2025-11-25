@@ -135,6 +135,7 @@ jobs:
             "mistral",
             "notdiamond",
             "openai",
+            "openai_agents",
             "verifiers_test",
             "vertexai",
             "pandas_test",
