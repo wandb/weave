@@ -114,8 +114,7 @@ jobs:
             "13",
             #
           ]
-        nox-shard:
-          [
+        nox-shard: [
             "trace",
             "flow",
             "trace_server",
@@ -128,13 +127,19 @@ jobs:
             "dspy",
             "groq",
             "google_genai",
+            # "huggingface",
             "instructor",
             "langchain",
+            # "langchain_nvidia_ai_endpoints",
             "litellm",
             "llamaindex",
             "mistral",
             "notdiamond",
             "openai",
+            "openai_agents",
+            "openai_realtime",
+            "scorers",
+            # "verdict",
             "verifiers_test",
             "vertexai",
             "pandas_test",
@@ -204,6 +209,7 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
           DD_TRACE_ENABLED: false
         run: |
           nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- \
@@ -296,8 +302,7 @@ jobs:
             "13",
             #
           ]
-        nox-shard:
-          [
+        nox-shard: [
             "trace",
             "flow",
             "trace_server",
@@ -310,13 +315,19 @@ jobs:
             "dspy",
             "groq",
             "google_genai",
+            # "huggingface",
             "instructor",
             "langchain",
+            # "langchain_nvidia_ai_endpoints",
             "litellm",
             "llamaindex",
             "mistral",
             "notdiamond",
             "openai",
+            "openai_agents",
+            "openai_realtime",
+            "scorers",
+            # "verdict",
             "verifiers_test",
             "vertexai",
             "pandas_test",
@@ -349,6 +360,7 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
           DD_TRACE_ENABLED: false
         run: |
           nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- -m "trace_server" --trace-server=sqlite
