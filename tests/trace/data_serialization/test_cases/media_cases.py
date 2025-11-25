@@ -58,13 +58,13 @@ media_cases = [
                 "exp_val": {
                     "_type": "CustomWeaveType",
                     "weave_type": {"type": "Op"},
-                    "files": {"obj.py": "N4DNKMmxsQXSUwJUHgNuDJboXqRyYTI8UvLtmYvCBQE"},
+                    "files": {"obj.py": "CxQFcFPlpWhtgyAfl3OyBe8Pvg9siZOzi7RFr2SOApk"},
                 },
             }
         ],
         exp_files=[
             {
-                "digest": "N4DNKMmxsQXSUwJUHgNuDJboXqRyYTI8UvLtmYvCBQE",
+                "digest": "CxQFcFPlpWhtgyAfl3OyBe8Pvg9siZOzi7RFr2SOApk",
                 "exp_content": b'import weave\nfrom weave.trace.serialization.mem_artifact import MemTraceFilesArtifact\nfrom typing import Any\nimport datetime\n\n@weave.op\ndef load(artifact: MemTraceFilesArtifact, name: str, val: Any) -> datetime.datetime:\n    """Deserialize an ISO format string back to a datetime object with timezone."""\n    return datetime.datetime.fromisoformat(val)\n',
             }
         ],
@@ -92,13 +92,13 @@ media_cases = [
                 "exp_val": {
                     "_type": "CustomWeaveType",
                     "weave_type": {"type": "Op"},
-                    "files": {"obj.py": "oxqbCLXF1PsVGFKXZgXHGIuFqlgDG69IwQFUQsGzfHw"},
+                    "files": {"obj.py": "oKyWpRrHWg5AtuM6dCGDiqzY_3OaozIwkLIx995b1s0"},
                 },
             }
         ],
         exp_files=[
             {
-                "digest": "oxqbCLXF1PsVGFKXZgXHGIuFqlgDG69IwQFUQsGzfHw",
+                "digest": "oKyWpRrHWg5AtuM6dCGDiqzY_3OaozIwkLIx995b1s0",
                 "exp_content": b'import weave\nfrom weave.trace.serialization.mem_artifact import MemTraceFilesArtifact\nfrom typing import Any\nfrom weave.utils.iterators import first\nimport PIL.Image as Image\n\n@weave.op\ndef load(artifact: MemTraceFilesArtifact, name: str, val: Any) -> Image.Image:\n    # Today, we assume there can only be 1 image in the artifact.\n    filename = first(artifact.path_contents)\n    if not filename.startswith("image."):\n        raise ValueError(f"Expected filename to start with \'image.\', got {filename}")\n\n    path = artifact.path(filename)\n    return Image.open(path)\n',
             },
             {
@@ -188,7 +188,7 @@ media_cases = [
                 "exp_val": {
                     "_type": "CustomWeaveType",
                     "weave_type": {"type": "Op"},
-                    "files": {"obj.py": "ZlYsZB0XaBa8O0kLSbW6sMAnaoJmztqBevEAxxERDLc"},
+                    "files": {"obj.py": "bDUl9kLLYCdQ7dk15Y26cjzH6yVPPnN9TokEOpi6-To"},
                 },
             }
         ],
@@ -198,7 +198,7 @@ media_cases = [
                 "exp_content": b"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             },
             {
-                "digest": "ZlYsZB0XaBa8O0kLSbW6sMAnaoJmztqBevEAxxERDLc",
+                "digest": "bDUl9kLLYCdQ7dk15Y26cjzH6yVPPnN9TokEOpi6-To",
                 "exp_content": b'import weave\nfrom typing import Any\nfrom rich.markdown import Markdown\n\n@weave.op\ndef load(artifact: "MemTraceFilesArtifact", name: str, val: Any) -> Markdown:\n    """Load markdown from file and metadata."""\n    if "markup" in val:\n        markup = val["markup"]\n    else:\n        with artifact.open("markup.md", binary=False) as f:\n            markup = f.read()\n\n    kwargs = {}\n    if val and isinstance(val, dict) and "code_theme" in val:\n        kwargs["code_theme"] = val["code_theme"]\n\n    return Markdown(markup=markup, **kwargs)\n',
             },
         ],
@@ -268,7 +268,7 @@ media_cases = [
                 "exp_val": {
                     "_type": "CustomWeaveType",
                     "weave_type": {"type": "Op"},
-                    "files": {"obj.py": "YafOZjnk1XBoGDQRvrGNadv8zLKrhM36QGJB92Bf8Ps"},
+                    "files": {"obj.py": "Fq40XcU67vm2ddGsMKX_cyjAGKuPmKPvqkFUh1e763I"},
                 },
             }
         ],
@@ -286,7 +286,7 @@ media_cases = [
                 "exp_content": AUDIO_BYTES,
             },
             {
-                "digest": "YafOZjnk1XBoGDQRvrGNadv8zLKrhM36QGJB92Bf8Ps",
+                "digest": "Fq40XcU67vm2ddGsMKX_cyjAGKuPmKPvqkFUh1e763I",
                 "exp_content": b'import weave\nfrom weave.trace.serialization.mem_artifact import MemTraceFilesArtifact\nfrom typing import Any\nimport json\n\n@weave.op\ndef load(artifact: MemTraceFilesArtifact, name: str, val: Any) -> Content:\n    from weave.type_wrappers.Content.content import Content\n    from weave.type_wrappers.Content.content_types import (\n        ResolvedContentArgs,\n        ResolvedContentArgsWithoutData,\n    )\n\n    metadata_path = artifact.path("metadata.json")\n\n    with open(metadata_path) as f:\n        metadata: ResolvedContentArgsWithoutData = json.load(f)\n\n    with open(artifact.path("content"), "rb") as f:\n        data = f.read()\n\n    resolved_args: ResolvedContentArgs = {"data": data, **metadata}\n\n    return Content._from_resolved_args(resolved_args)\n',
             },
         ],
@@ -313,13 +313,13 @@ media_cases = [
                 "exp_val": {
                     "_type": "CustomWeaveType",
                     "weave_type": {"type": "Op"},
-                    "files": {"obj.py": "ncV0DfMpJ6gN2ls9iSpQwSiYplvhm8CO2ZDNqjPbdBg"},
+                    "files": {"obj.py": "zPd-pSluF0nK2T_UIjkzOq7FfXxFZ0Thtkcr91vznGQ"},
                 },
             }
         ],
         exp_files=[
             {
-                "digest": "ncV0DfMpJ6gN2ls9iSpQwSiYplvhm8CO2ZDNqjPbdBg",
+                "digest": "zPd-pSluF0nK2T_UIjkzOq7FfXxFZ0Thtkcr91vznGQ",
                 "exp_content": b'import weave\nimport datetime\n\n@weave.op\ndef load(encoded: str) -> datetime.datetime:\n    """Deserialize an ISO format string back to a datetime object with timezone."""\n    return datetime.datetime.fromisoformat(encoded)\n',
             }
         ],
@@ -342,13 +342,13 @@ media_cases = [
                 "exp_val": {
                     "_type": "CustomWeaveType",
                     "weave_type": {"type": "Op"},
-                    "files": {"obj.py": "oxqbCLXF1PsVGFKXZgXHGIuFqlgDG69IwQFUQsGzfHw"},
+                    "files": {"obj.py": "oKyWpRrHWg5AtuM6dCGDiqzY_3OaozIwkLIx995b1s0"},
                 },
             }
         ],
         exp_files=[
             {
-                "digest": "oxqbCLXF1PsVGFKXZgXHGIuFqlgDG69IwQFUQsGzfHw",
+                "digest": "oKyWpRrHWg5AtuM6dCGDiqzY_3OaozIwkLIx995b1s0",
                 "exp_content": b'import weave\nfrom weave.trace.serialization.mem_artifact import MemTraceFilesArtifact\nfrom typing import Any\nfrom weave.utils.iterators import first\nimport PIL.Image as Image\n\n@weave.op\ndef load(artifact: MemTraceFilesArtifact, name: str, val: Any) -> Image.Image:\n    # Today, we assume there can only be 1 image in the artifact.\n    filename = first(artifact.path_contents)\n    if not filename.startswith("image."):\n        raise ValueError(f"Expected filename to start with \'image.\', got {filename}")\n\n    path = artifact.path(filename)\n    return Image.open(path)\n',
             },
             {
@@ -418,13 +418,13 @@ media_cases = [
                 "exp_val": {
                     "_type": "CustomWeaveType",
                     "weave_type": {"type": "Op"},
-                    "files": {"obj.py": "zunYz3rpUk5IkwbglUHXBJFszhSKvtLIftOGvMp4xFo"},
+                    "files": {"obj.py": "t9_66w8NW5FQmjQnxpSRo8fMN8RSKEYrG6yQEmAQCZs"},
                 },
             }
         ],
         exp_files=[
             {
-                "digest": "zunYz3rpUk5IkwbglUHXBJFszhSKvtLIftOGvMp4xFo",
+                "digest": "t9_66w8NW5FQmjQnxpSRo8fMN8RSKEYrG6yQEmAQCZs",
                 "exp_content": b"import weave\nfrom typing import TypedDict\nfrom typing import NotRequired\nfrom rich.markdown import Markdown\n\nclass SerializedMarkdown(TypedDict):\n    markup: str\n    code_theme: NotRequired[str]\n\n@weave.op\ndef load(encoded: SerializedMarkdown) -> Markdown:\n    return Markdown(**encoded)\n",
             }
         ],
@@ -490,7 +490,7 @@ media_cases = [
                 "exp_val": {
                     "_type": "CustomWeaveType",
                     "weave_type": {"type": "Op"},
-                    "files": {"obj.py": "ymHqYyPKBxJIc6lBglJ0h5BWXEou6NAWQY97YHkhqyM"},
+                    "files": {"obj.py": "YLa4Br_iztcCIeYklpe1uiCCBYZdTNYaVxTSd_cx46w"},
                 },
             }
         ],
@@ -508,7 +508,7 @@ media_cases = [
                 "exp_content": AUDIO_BYTES,
             },
             {
-                "digest": "ymHqYyPKBxJIc6lBglJ0h5BWXEou6NAWQY97YHkhqyM",
+                "digest": "YLa4Br_iztcCIeYklpe1uiCCBYZdTNYaVxTSd_cx46w",
                 "exp_content": b'import weave\nfrom weave.trace.serialization.mem_artifact import MemTraceFilesArtifact\nimport json\n\n@weave.op\ndef load(artifact: MemTraceFilesArtifact, name: str) -> Content:\n    from weave.type_wrappers.Content.content import Content\n    from weave.type_wrappers.Content.content_types import (\n        ResolvedContentArgs,\n        ResolvedContentArgsWithoutData,\n    )\n\n    metadata_path = artifact.path("metadata.json")\n\n    with open(metadata_path) as f:\n        metadata: ResolvedContentArgsWithoutData = json.load(f)\n\n    with open(artifact.path("content"), "rb") as f:\n        data = f.read()\n\n    resolved_args: ResolvedContentArgs = {"data": data, **metadata}\n\n    return Content._from_resolved_args(resolved_args)\n',
             },
         ],
