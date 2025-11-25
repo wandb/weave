@@ -1,8 +1,6 @@
-# Weave (Alpha)
+# Weave
 
 Weave is a library for tracing and monitoring AI applications.
-
-This is an Alpha release, APIs are extremely subject to change.
 
 ## Installation
 
@@ -198,27 +196,3 @@ Get your wandb API key from [here](https://wandb.ai/authorize).
 ## License
 
 This project is licensed under the Apaache2 License - see the [LICENSE](../LICENSE) file for details.
-
-### Roadmap / TODO
-
-- [x] Return token counts
-- [x] Summary merging
-- [x] Image support
-- [x] Decide how to handle args in js, since they're not named
-- [x] Make sure LLM streaming is handled
-- [x] Op versioning / code capture
-- [ ] Retry logic
-- [ ] Handle other wandb backends (managed / self-hosted)
-- [ ] Include system information in call attributes including package version.
-- [x] Objects / Datasets / Models / Evaluations
-- [ ] Ref tracking
-- [ ] More integrations
-
-## Known Issues
-
-- [ ] openai choices > 1 and "tools" not handled (function works though)
-- [ ] we always inject params.stream_options.include_usage in openai request, need to not send back usage chunk if user didn't ask for it.
-- [ ] handle all openai.images.generate formats, and images in inputs.
-- [ ] openai.images.generate token counts.
-- [ ] if a streaming op with streamReducer returns its iterator instead of iterating within the op, summary rollups won't work.
-- [ ] Decide what's in public interface (WeaveClient)
