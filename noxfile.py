@@ -61,7 +61,6 @@ SHARDS_WITHOUT_EXTRAS = {
     "custom",
     "flow",
     "trace",
-    "trace_mock",
     "trace_no_server",
     "trace_server",
     "trace_server_bindings",
@@ -113,7 +112,6 @@ SHARDS_WITHOUT_EXTRAS = {
         "verifiers_test",
         "autogen_tests",
         "trace",
-        "trace_mock",
         "trace_no_server",
     ],
 )
@@ -186,12 +184,6 @@ def tests(session: nox.Session, shard: str):
             "tests/utils/",
             "tests/wandb_interface/",
         ],
-        "trace_mock": [
-            "tests/trace/",
-            "tests/compat/",
-            "tests/utils/",
-            "tests/wandb_interface/",
-        ],
         "trace_no_server": ["tests/trace/"],
     }
 
@@ -202,8 +194,8 @@ def tests(session: nox.Session, shard: str):
             raise ValueError(f"Test directory {test_dir} does not exist")
 
     # Each worker gets its own isolated database namespace
-    # Only use parallel workers for the trace/trace_mock shards if we have more than 1 CPU core
-    if shard in ("trace", "trace_mock"):
+    # Only use parallel workers for the trace shard if we have more than 1 CPU core
+    if shard == "trace":
         cpu_count = os.cpu_count()
         if cpu_count is not None and cpu_count > 1:
             session.posargs.insert(0, f"-n{cpu_count}")
@@ -221,9 +213,6 @@ def tests(session: nox.Session, shard: str):
 
     if shard == "trace":
         pytest_args.extend(["-m", "trace_server"])
-
-    if shard == "trace_mock":
-        pytest_args.extend(["-m", "trace_server", "--trace-server=mock"])
 
     if shard == "trace_no_server":
         pytest_args.extend(["-m", "not trace_server"])
