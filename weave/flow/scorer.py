@@ -4,8 +4,7 @@ import textwrap
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from numbers import Number
-from typing import Any, Callable, Generic, Optional, TypeVar, Union, cast
-from typing import Any, cast
+from typing import Any, Generic, TypeVar, cast
 
 from pydantic import BaseModel, Field
 from typing_extensions import Self
@@ -32,7 +31,7 @@ def _import_numpy() -> Any | None:
 
 
 class Scorer(Object, Generic[O, S]):
-    column_map: Optional[dict[str, str]] = Field(
+    column_map: dict[str, str] | None = Field(
         default=None,
         description="A mapping from column names in the dataset to the names expected by the scorer",
     )
@@ -71,7 +70,7 @@ class Scorer(Object, Generic[O, S]):
         raise NotImplementedError
 
     @op
-    def summarize(self, score_rows: list[S]) -> Optional[dict]:
+    def summarize(self, score_rows: list[S]) -> dict | None:
         return auto_summarize(score_rows)
 
     @classmethod

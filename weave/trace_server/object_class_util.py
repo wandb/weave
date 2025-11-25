@@ -30,7 +30,7 @@ class GetObjectClassesResult(TypedDict):
 
 
 def get_object_classes(val: Any) -> GetObjectClassesResult | None:
-    if (
+    if not (
         isinstance(val, dict)
         and "_bases" in val
         and isinstance(val["_bases"], list)
