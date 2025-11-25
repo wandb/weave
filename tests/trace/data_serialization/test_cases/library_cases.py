@@ -81,7 +81,7 @@ library_cases = [
             "dataset": "weave:///shawn/test-project/object/Dataset:N0VKaX8wr9kF9QQzM7mSQz3yKrJJjTiJi4c9Bt7RSTA",
             "scorers": [
                 "weave:///shawn/test-project/object/MyScorer:QMbCYGONPYjlikHOl7FAXBG6TtRvixJyovX6QM8bGFs",
-                "weave:///shawn/test-project/object/LLMAsAJudgeScorer:dUEF5Gk8jP0EingKh6RuyG6boVKaHk1vfcuJHtlCgXg",
+                "weave:///shawn/test-project/object/LLMAsAJudgeScorer:m0T6bJ0H5oDvM6d3D3fO8qIj8tmetXmLpUUIMWqBcOA",
             ],
             "preprocess_model_input": None,
             "trials": 1,
@@ -140,7 +140,7 @@ library_cases = [
             },
             {
                 "object_id": "LLMAsAJudgeScorer",
-                "digest": "dUEF5Gk8jP0EingKh6RuyG6boVKaHk1vfcuJHtlCgXg",
+                "digest": "m0T6bJ0H5oDvM6d3D3fO8qIj8tmetXmLpUUIMWqBcOA",
                 "exp_val": {
                     "_type": "LLMAsAJudgeScorer",
                     "name": None,
@@ -148,7 +148,8 @@ library_cases = [
                     "column_map": None,
                     "model": "weave:///shawn/test-project/object/LLMStructuredCompletionModel:bgxkRqJaX9ksC4XbqjYUdYmHkaEVWNnm10dxIN8J07g",
                     "scoring_prompt": "Here are the inputs: {inputs}. Here is the output: {output}. Is the output correct?",
-                    "score": "weave:///shawn/test-project/op/LLMAsAJudgeScorer.score:3DXMPEFwP04oJ362x6sxQIqQmVYYX2jB4Kg5EF2SF60",
+                    "scoring_prompt_ref": None,
+                    "score": "weave:///shawn/test-project/op/LLMAsAJudgeScorer.score:H9CdoAoo6SZxYijddsofxYec1c3DeBNzfcG5up7Z3QQ",
                     "summarize": "weave:///shawn/test-project/op/Scorer.summarize:Jc12U3b8FvfVmPvXafwLCg5Q7RFqIxkIaT7cYdWkJG0",
                     "_class_name": "LLMAsAJudgeScorer",
                     "_bases": ["Scorer", "Object", "BaseModel"],
@@ -156,11 +157,11 @@ library_cases = [
             },
             {
                 "object_id": "LLMAsAJudgeScorer.score",
-                "digest": "3DXMPEFwP04oJ362x6sxQIqQmVYYX2jB4Kg5EF2SF60",
+                "digest": "H9CdoAoo6SZxYijddsofxYec1c3DeBNzfcG5up7Z3QQ",
                 "exp_val": {
                     "_type": "CustomWeaveType",
                     "weave_type": {"type": "Op"},
-                    "files": {"obj.py": "4oOflcautfbAjJY1FJD3ogkSBuuhrh01tWaiAAl54Xw"},
+                    "files": {"obj.py": "Vj5nprCJflAOIfw3RzIF4IXXqEgYPd9rXffbbAgGe5A"},
                 },
             },
             {
@@ -262,8 +263,8 @@ library_cases = [
                 "exp_content": b'import weave\nfrom weave.object.obj import Object\nfrom weave.trace.table import Table\nfrom weave.flow.util import transpose\nfrom weave.flow.scorer import get_scorer_attributes\nfrom weave.flow.scorer import auto_summarize\nfrom weave.trace.op import op\n\nclass EvaluationResults(Object):\n    rows: Table\n\n@weave.op()\n@op\nasync def summarize(self, eval_table: EvaluationResults) -> dict:\n    eval_table_rows = list(eval_table.rows)\n    cols = transpose(eval_table_rows)\n    summary = {}\n\n    for name, vals in cols.items():\n        if name == "scores":\n            if scorers := self.scorers:\n                for scorer in scorers:\n                    scorer_attributes = get_scorer_attributes(scorer)\n                    scorer_name = scorer_attributes.scorer_name\n                    summarize_fn = scorer_attributes.summarize_fn\n                    scorer_stats = transpose(vals)\n                    score_table = scorer_stats[scorer_name]\n                    scored = summarize_fn(score_table)\n                    summary[scorer_name] = scored\n        else:\n            model_output_summary = auto_summarize(vals)\n            if model_output_summary:\n                summary[name] = model_output_summary\n    return summary\n',
             },
             {
-                "digest": "4oOflcautfbAjJY1FJD3ogkSBuuhrh01tWaiAAl54Xw",
-                "exp_content": b'import weave\nfrom typing import Any\nfrom weave.trace.op import op\n\n@weave.op()\n@op\ndef score(self, *, output: str, **kwargs: Any) -> Any:\n    scoring_prompt = self.scoring_prompt.format(output=output, **kwargs)\n    model_input = [\n        {"role": "user", "content": scoring_prompt},\n    ]\n    return self.model.predict(model_input)\n',
+                "digest": "Vj5nprCJflAOIfw3RzIF4IXXqEgYPd9rXffbbAgGe5A",
+                "exp_content": b'import weave\nfrom typing import Any\nfrom weave.trace.context.weave_client_context import get_weave_client\nfrom weave.prompt.prompt import MessagesPrompt\nfrom weave.trace.op import op\n\n@weave.op()\n@op\ndef score(self, *, output: str, **kwargs: Any) -> Any:\n    """Score the output using the scoring_prompt.\n\n    Args:\n        output: The model output to score\n        **kwargs: Additional template variables for the prompt\n\n    Returns:\n        The model\'s prediction/score\n    """\n    # Combine output with kwargs for template variables\n    template_vars = {"output": output, **kwargs}\n\n    if self.scoring_prompt_ref:\n        client = get_weave_client()\n        if client is None:\n            raise ValueError(\n                "Weave client not initialized. Call weave.init() first."\n            )\n        scoring_prompt = client.get(self.scoring_prompt_ref)\n        if not isinstance(scoring_prompt, MessagesPrompt):\n            raise ValueError(\n                f"Prompt object at {self.scoring_prompt_ref} is not a MessagesPrompt"\n            )\n        formatted_messages = scoring_prompt.format(**template_vars)\n        return self.model.predict(formatted_messages)\n    elif isinstance(self.scoring_prompt, str):\n        # Fall back to scoring_prompt\n        scoring_prompt = self.scoring_prompt.format(**template_vars)\n        model_input = [\n            {"role": "user", "content": scoring_prompt},\n        ]\n        return self.model.predict(model_input)\n    else:\n        raise ValueError(\n            "Either scoring_prompt or scoring_prompt_ref must be provided to LLMAsAJudgeScorer"\n        )\n',
             },
             {
                 "digest": "EEmf74IV2JVEyFOQ6XatSoNG7CB5Gvh9Th7KYTt7GQQ",
@@ -276,7 +277,7 @@ library_cases = [
         python_version_code_capture=(3, 13),
     ),
     SerializationTestCase(
-        id="Library Objects - Scorer, Evaluation, Dataset, LLMAsAJudgeScorer, LLMStructuredCompletionModel (Legacy)",
+        id="Library Objects - Scorer, Evaluation, Dataset, LLMAsAJudgeScorer, LLMStructuredCompletionModel (Legacy-Prompts in Models and Scorers)",
         runtime_object_factory=lambda: make_evaluation(),
         inline_call_param=False,
         is_legacy=True,
