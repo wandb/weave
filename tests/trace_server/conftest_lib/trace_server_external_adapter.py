@@ -86,11 +86,11 @@ class TestOnlyUserInjectingExternalTraceServer(
 ):
     def __init__(
         self,
-        internal_trace_server: tsi.TraceServerInterface,
+        inner: tsi.TraceServerInterface,
         id_converter: external_to_internal_trace_server_adapter.IdConverter,
         user_id: str,
     ):
-        super().__init__(internal_trace_server, id_converter)
+        super().__init__(inner, id_converter)
         self._user_id = user_id
 
     def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:

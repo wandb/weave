@@ -24,6 +24,7 @@ from weave.trace_server_bindings import remote_http_trace_server
 from weave.trace_server_bindings.caching_middleware_trace_server import (
     CachingMiddlewareTraceServer,
 )
+from weave.trace_server_bindings.trace_server_stack import TraceServerStack
 
 # Force testing to never report wandb sentry events
 os.environ["WANDB_ERROR_REPORTING"] = "false"
@@ -304,8 +305,8 @@ class TestOnlyFlushingWeaveClient(weave_client.WeaveClient):
         return attr
 
 
-def make_server_recorder(server: tsi.TraceServerInterface):  # type: ignore
-    """A wrapper around a trace server that records all attribute access.
+def make_server_recorder(stack: TraceServerStack):  # type: ignore
+    """A wrapper around a trace server stack that records all attribute access.
 
     This is extremely helpful for tests to assert that a certain series of
     attribute accesses happen (or don't happen), and in order. We will
@@ -315,34 +316,48 @@ def make_server_recorder(server: tsi.TraceServerInterface):  # type: ignore
     For example, you can do something like the followng to assert that various
     read operations do not happen!
 
-    ```pyth
+    ```python
     access_log = client.server.attribute_access_log
     assert "table_query" not in access_log
     assert "obj_read" not in access_log
     assert "file_content_read" not in access_log
     ```
+
+    To access specific middleware layers, use get_layer():
+
+    ```python
+    from tests.trace_server.conftest_lib.trace_server_external_adapter import (
+        TestOnlyUserInjectingExternalTraceServer,
+    )
+    inner_server = client.server.get_layer(TestOnlyUserInjectingExternalTraceServer)
+    inner_server._user_id = "test_user"
+    ```
     """
 
-    class ServerRecorder(type(server)):  # type: ignore
+    class ServerRecorder(TraceServerStack):
         attribute_access_log: list[str]
 
-        def __init__(self, server: tsi.TraceServerInterface):
-            self.server = server
+        def __init__(self, stack: TraceServerStack):
+            self._stack = stack
             self.attribute_access_log = []
 
+        def get_layer(self, layer_type):
+            """Pass through to the underlying stack's get_layer method."""
+            return self._stack.get_layer(layer_type)
+
         def __getattribute__(self, name):
-            self_server = super().__getattribute__("server")
+            # These attributes are on this class, not proxied
+            if name in ("_stack", "attribute_access_log", "get_layer"):
+                return super().__getattribute__(name)
+
+            stack = super().__getattribute__("_stack")
             access_log = super().__getattribute__("attribute_access_log")
-            if name == "server":
-                return self_server
-            if name == "attribute_access_log":
-                return access_log
-            attr = self_server.__getattribute__(name)
-            if name != "attribute_access_log":
-                access_log.append(name)
+
+            attr = getattr(stack, name)
+            access_log.append(name)
             return attr
 
-    return ServerRecorder(server)
+    return ServerRecorder(stack)
 
 
 def create_client(
@@ -355,16 +370,30 @@ def create_client(
         # Note: this is only for local dev testing and should be removed
         return weave_init.init_weave("dev_testing")
     elif trace_server_flag == "http":
-        server = remote_http_trace_server.RemoteHTTPTraceServer(trace_server_flag)
+        inner_server = remote_http_trace_server.RemoteHTTPTraceServer(trace_server_flag)
+        layers = [inner_server]
     else:
-        server = trace_server
+        # trace_server is a TestOnlyUserInjectingExternalTraceServer which wraps
+        # the actual database server (ClickHouse or SQLite)
+        inner_server = trace_server
+        # Collect all layers for the stack (outer to inner)
+        layers = [inner_server]
+        # Walk through .inner attributes to find all layers
+        current = inner_server
+        while hasattr(current, "inner"):
+            current = current.inner
+            layers.append(current)
 
     # Removing this as it lead to passing tests that were not passing in prod!
     # Keeping off for now until it is the default behavior.
     # os.environ["WEAVE_USE_SERVER_CACHE"] = "true"
-    caching_server = CachingMiddlewareTraceServer.from_env(server)
+    caching_server = CachingMiddlewareTraceServer.from_env(inner_server)
+
+    # Create a typed stack for clean layer access in tests
+    # Stack order: caching_server -> inner_server -> ... -> database_server
+    stack = TraceServerStack(caching_server, *layers)
     client = TestOnlyFlushingWeaveClient(
-        TEST_ENTITY, "test-project", make_server_recorder(caching_server)
+        TEST_ENTITY, "test-project", make_server_recorder(stack)
     )
     weave_client_context.set_weave_client_global(client)
     if global_attributes is not None:
