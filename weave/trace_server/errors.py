@@ -125,22 +125,28 @@ def _format_error_to_json_with_extra(
     return result
 
 
-@dataclass
+@dataclass(frozen=True)
 class ErrorWithStatus:
-    """Base class for errors with a status code."""
+    """Immutable container for an error with its HTTP status code."""
 
     status_code: int
     message: dict[str, Any]
 
 
 # Error Registry System
-@dataclass
+@dataclass(frozen=True)
 class ErrorDefinition:
-    """Represents a single error handler definition."""
+    """Immutable error handler definition."""
 
     exception_class: type
-    status_code: int
+    status_code: int | Callable[[Exception], int]
     formatter: Callable[[Exception], dict[str, Any]]
+
+    def get_status_code(self, exc: Exception) -> int:
+        """Get the status code for an exception, resolving callable if needed."""
+        if callable(self.status_code):
+            return self.status_code(exc)
+        return self.status_code
 
 
 # Global registry instance
@@ -157,12 +163,19 @@ class ErrorRegistry:
     def register(
         self,
         exception_class: type,
-        status_code: int,
+        status_code: int | Callable[[Exception], int],
         formatter: Callable[
             [Exception], dict[str, Any]
         ] = _format_error_to_json_with_extra,
     ) -> None:
-        """Register an exception with its handling definition."""
+        """Register an exception with its handling definition.
+
+        Args:
+            exception_class: The exception type to register.
+            status_code: Either a fixed HTTP status code or a callable that
+                takes the exception and returns a status code (for dynamic codes).
+            formatter: A callable that formats the exception into a dict for the response.
+        """
         self._definitions[exception_class] = ErrorDefinition(
             exception_class, status_code, formatter
         )
@@ -177,22 +190,13 @@ class ErrorRegistry:
 
     def handle_exception(self, exc: Exception) -> ErrorWithStatus:
         """Handle an exception using registered definitions."""
-        from gql.transport.exceptions import TransportServerError
-
-        # Special handling for TransportServerError to preserve HTTP status codes
-        # from gorilla (e.g. 401 Unauthorized should be returned as 401, not 500)
-        if isinstance(exc, TransportServerError) and exc.code is not None:
-            return ErrorWithStatus(
-                status_code=exc.code, message={"reason": str(exc)}
-            )
-
         exc_type = type(exc)
         definition = self.get_definition(exc_type)
 
         if definition:
             error_content = definition.formatter(exc)
             return ErrorWithStatus(
-                status_code=definition.status_code, message=error_content
+                status_code=definition.get_status_code(exc), message=error_content
             )
 
         return ErrorWithStatus(
@@ -263,8 +267,11 @@ class ErrorRegistry:
         from gql.transport.exceptions import TransportQueryError, TransportServerError
 
         self.register(TransportQueryError, 403, lambda exc: {"reason": "Forbidden"})
-        # TransportServerError is handled specially in handle_exception to preserve
-        # the original HTTP status code from gorilla (e.g. 401 -> 401, not 500)
+        self.register(
+            TransportServerError,
+            lambda exc: exc.code if exc.code and 400 <= exc.code < 500 else 500,
+            lambda exc: {"reason": str(exc)},
+        )
 
 
 def _get_error_registry() -> ErrorRegistry:

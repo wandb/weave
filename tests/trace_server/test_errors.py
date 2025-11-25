@@ -1,18 +1,21 @@
+import pytest
 from gql.transport.exceptions import TransportServerError
 
 from weave.trace_server.errors import handle_server_exception
 
 
-def test_transport_server_error_preserves_status_code():
-    """TransportServerError should preserve the HTTP status code from gorilla."""
-    exc = TransportServerError("401 Unauthorized", code=401)
+@pytest.mark.parametrize("code", [400, 401, 403, 404, 429])
+def test_transport_server_error_preserves_4xx_status_code(code: int):
+    """TransportServerError should preserve 4xx HTTP status codes from gorilla."""
+    exc = TransportServerError(f"{code} Error", code=code)
     result = handle_server_exception(exc)
-    assert result.status_code == 401
-    assert result.message == {"reason": "401 Unauthorized"}
+    assert result.status_code == code
+    assert result.message == {"reason": f"{code} Error"}
 
 
-def test_transport_server_error_without_code_returns_500():
-    """TransportServerError without a code should fall back to 500."""
-    exc = TransportServerError("Some error", code=None)
+@pytest.mark.parametrize("code", [None, 500, 502, 503])
+def test_transport_server_error_5xx_or_none_returns_500(code: int | None):
+    """TransportServerError with 5xx or None should fall back to 500."""
+    exc = TransportServerError("Server error", code=code)
     result = handle_server_exception(exc)
     assert result.status_code == 500
