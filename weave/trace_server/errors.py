@@ -177,6 +177,15 @@ class ErrorRegistry:
 
     def handle_exception(self, exc: Exception) -> ErrorWithStatus:
         """Handle an exception using registered definitions."""
+        from gql.transport.exceptions import TransportServerError
+
+        # Special handling for TransportServerError to preserve HTTP status codes
+        # from gorilla (e.g. 401 Unauthorized should be returned as 401, not 500)
+        if isinstance(exc, TransportServerError) and exc.code is not None:
+            return ErrorWithStatus(
+                status_code=exc.code, message={"reason": str(exc)}
+            )
+
         exc_type = type(exc)
         definition = self.get_definition(exc_type)
 
@@ -251,9 +260,11 @@ class ErrorRegistry:
         )
 
         # GraphQL transport errors
-        from gql.transport.exceptions import TransportQueryError
+        from gql.transport.exceptions import TransportQueryError, TransportServerError
 
         self.register(TransportQueryError, 403, lambda exc: {"reason": "Forbidden"})
+        # TransportServerError is handled specially in handle_exception to preserve
+        # the original HTTP status code from gorilla (e.g. 401 -> 401, not 500)
 
 
 def _get_error_registry() -> ErrorRegistry:
