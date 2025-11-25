@@ -67,8 +67,6 @@ class WeaveTracingProcessor(TracingProcessor):  # pyright: ignore[reportGeneralT
         self._trace_calls: dict[str, Call] = {}
         self._span_calls: dict[str, Call] = {}
         self._ended_traces: set[str] = set()
-        self._span_parents: dict[str, str] = {}
-        self._pushed_calls: set[str] = set()
 
     def on_trace_start(self, trace: Trace) -> None:
         """Called when a trace starts."""
@@ -96,7 +94,6 @@ class WeaveTracingProcessor(TracingProcessor):  # pyright: ignore[reportGeneralT
         # Push the trace call onto the call context stack so nested spans
         # and OpenAI calls can find it as their parent
         call_context.push_call(trace_call)
-        self._pushed_calls.add(trace_call.id)
 
     def on_trace_end(self, trace: Trace) -> None:
         """Called when a trace ends."""
@@ -120,21 +117,13 @@ class WeaveTracingProcessor(TracingProcessor):  # pyright: ignore[reportGeneralT
             "metadata": trace_data.get("metadata", {}),
         }
         wc.finish_call(trace_call, output=output)
-        if trace_call.id is not None:
-            self._pushed_calls.discard(trace_call.id)
 
         # Safety net: pop any spans that weren't properly finished via on_span_end
-        # (e.g., due to errors or cancellation). Most spans will already have been
-        # popped by finish_call and removed from _pushed_calls.
-        # Pop in reverse order (LIFO) - children must be popped before parents
+        # (e.g., due to errors or cancellation). pop_call gracefully handles
+        # already-popped calls. Pop in reverse order (LIFO).
         for _, span_call in reversed(list(self._span_calls.items())):
-            # Only pop spans that belong to this trace and weren't already popped
-            if (
-                span_call.id in self._pushed_calls
-                and span_call.trace_id == trace_call.trace_id
-            ):
+            if span_call.trace_id == trace_call.trace_id:
                 call_context.pop_call(span_call.id)
-                self._pushed_calls.discard(span_call.id)
 
     def _agent_log_data(self, span: Span[AgentSpanData]) -> WeaveDataDict:
         """Extract log data from an agent span."""
@@ -346,7 +335,6 @@ class WeaveTracingProcessor(TracingProcessor):  # pyright: ignore[reportGeneralT
 
             # Push immediately so nested OpenAI calls can find it
             call_context.push_call(span_call)
-            self._pushed_calls.add(span_call.id)
             return
 
         # For other spans, create and push normally
@@ -371,7 +359,6 @@ class WeaveTracingProcessor(TracingProcessor):  # pyright: ignore[reportGeneralT
         # Push the call onto the call context stack so nested OpenAI calls
         # can find it as their parent
         call_context.push_call(span_call)
-        self._pushed_calls.add(span_call.id)
 
     def on_span_end(self, span: Span) -> None:
         """Called when a span ends."""
@@ -408,10 +395,6 @@ class WeaveTracingProcessor(TracingProcessor):  # pyright: ignore[reportGeneralT
         # This ensures all calls are properly finalized
         # Note: finish_call automatically pops the call from the stack
         wc.finish_call(span_call, output=output, exception=exception)
-
-        # Update _pushed_calls since finish_call already popped this call from the stack
-        if span_call.id is not None:
-            self._pushed_calls.discard(span_call.id)
 
     def _finish_unfinished_calls(self, status: str) -> None:
         """Helper method for finishing unfinished calls on shutdown or flush."""
