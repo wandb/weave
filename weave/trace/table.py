@@ -1,15 +1,17 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
-from typing import Any
+from typing import Any, Generic, TypeVar
 
 from weave.trace.refs import TableRef
 
+R = TypeVar("R", bound=dict[str, Any])
 
-class Table:
+
+class Table(Generic[R]):
     ref: TableRef | None
 
-    def __init__(self, rows: list[dict]) -> None:
+    def __init__(self, rows: list[R]) -> None:
         if not isinstance(rows, list):
             try:
                 import pandas as pd
@@ -27,27 +29,27 @@ class Table:
             raise ValueError("Rows must be a list of dicts")
 
     @property
-    def rows(self) -> list[dict]:
+    def rows(self) -> list[R]:
         return self._rows
 
     @rows.setter
-    def rows(self, value: list[dict]) -> None:
+    def rows(self, value: list[R]) -> None:
         self._validate_rows(value)
         self._rows = value
 
     def __len__(self) -> int:
         return len(self.rows)
 
-    def __getitem__(self, key: int) -> dict:
+    def __getitem__(self, key: int) -> R:
         return self.rows[key]
 
-    def __iter__(self) -> Iterator:
+    def __iter__(self) -> Iterator[R]:
         return iter(self.rows)
 
     def __eq__(self, other: Any) -> bool:
         return self.rows == other
 
-    def append(self, row: dict) -> None:
+    def append(self, row: R) -> None:
         """Add a row to the table."""
         if not isinstance(row, dict):
             raise TypeError("Can only append dicts to tables")
