@@ -114,7 +114,7 @@ class WeaveTracingProcessor(TracingProcessor):  # pyright: ignore[reportGeneralT
         trace_data = self._trace_data[tid]
         self._ended_traces.add(tid)
 
-        # Finish the trace call
+        # Finish the trace call (note: finish_call automatically pops from stack)
         trace_call = self._trace_calls[tid]
         output = {
             "status": "completed",
@@ -122,22 +122,20 @@ class WeaveTracingProcessor(TracingProcessor):  # pyright: ignore[reportGeneralT
             "metadata": trace_data.get("metadata", {}),
         }
         wc.finish_call(trace_call, output=output)
+        self._pushed_calls.discard(trace_call.id)
 
-        # When the trace ends, pop all spans that belong to this trace from the stack
-        # This cleans up the stack after all work is complete
-        for _, span_call in list(self._span_calls.items()):
-            # Only pop spans that belong to this trace
+        # Safety net: pop any spans that weren't properly finished via on_span_end
+        # (e.g., due to errors or cancellation). Most spans will already have been
+        # popped by finish_call and removed from _pushed_calls.
+        # Pop in reverse order (LIFO) - children must be popped before parents
+        for _, span_call in reversed(list(self._span_calls.items())):
+            # Only pop spans that belong to this trace and weren't already popped
             if (
                 span_call.id in self._pushed_calls
                 and span_call.trace_id == trace_call.trace_id
             ):
                 call_context.pop_call(span_call.id)
                 self._pushed_calls.discard(span_call.id)
-
-        # Finally, pop the trace call itself
-        if trace_call.id in self._pushed_calls:
-            call_context.pop_call(trace_call.id)
-            self._pushed_calls.discard(trace_call.id)
 
     def _agent_log_data(self, span: Span[AgentSpanData]) -> WeaveDataDict:
         """Extract log data from an agent span."""
@@ -409,13 +407,11 @@ class WeaveTracingProcessor(TracingProcessor):  # pyright: ignore[reportGeneralT
 
         # Finish the call with the collected data, even if interrupted/cancelled
         # This ensures all calls are properly finalized
+        # Note: finish_call automatically pops the call from the stack
         wc.finish_call(span_call, output=output, exception=exception)
 
-        # Don't pop agent spans from the stack when they end, because nested async work
-        # (like OpenAI calls) may still be in progress. Instead, let them stay on the
-        # stack until the trace ends or until they're naturally popped by their children.
-        # This ensures that any OpenAI calls that complete after the span ends will
-        # still find the correct parent.
+        # Update _pushed_calls since finish_call already popped this call from the stack
+        self._pushed_calls.discard(span_call.id)
 
     def _finish_unfinished_calls(self, status: str) -> None:
         """Helper method for finishing unfinished calls on shutdown or flush."""
