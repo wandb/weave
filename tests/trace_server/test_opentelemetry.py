@@ -31,6 +31,7 @@ from weave.trace_server.opentelemetry.attributes import (
     get_weave_inputs,
     get_weave_outputs,
     get_weave_usage,
+    SpanEvent,
 )
 from weave.trace_server.opentelemetry.helpers import (
     AttributePathConflictError,
@@ -1102,7 +1103,6 @@ class TestSemanticConventionParsing:
 
     def test_opentelemetry_usage_output_tokens_extraction(self):
         """Test that gen_ai.usage.output_tokens is properly parsed and combined with input_tokens."""
-        # Test with gen_ai.usage.input_tokens and gen_ai.usage.output_tokens
         attributes = create_attributes(
             {
                 "gen_ai.usage.input_tokens": 10,
@@ -1112,29 +1112,24 @@ class TestSemanticConventionParsing:
 
         usage = get_weave_usage(attributes) or {}
 
-        # Verify individual tokens are parsed
         assert usage.get("input_tokens") == 10
         assert usage.get("output_tokens") == 20
-        # Verify total_tokens is calculated when not provided
         assert usage.get("total_tokens") == 30
 
     def test_opentelemetry_usage_output_tokens_with_explicit_total(self):
         """Test that explicit total_tokens takes precedence over calculated value."""
-        # Test with explicit total_tokens provided
         attributes = create_attributes(
             {
                 "gen_ai.usage.input_tokens": 10,
                 "gen_ai.usage.output_tokens": 20,
-                "llm.usage.total_tokens": 35,  # Explicit total (might include overhead)
+                "llm.usage.total_tokens": 35,
             }
         )
 
         usage = get_weave_usage(attributes) or {}
 
-        # Verify individual tokens are parsed
         assert usage.get("input_tokens") == 10
         assert usage.get("output_tokens") == 20
-        # Verify explicit total_tokens is used instead of calculated value
         assert usage.get("total_tokens") == 35
 
     def test_opentelemetry_cost_calculation(self, client: weave_client.WeaveClient):
@@ -1232,6 +1227,67 @@ class TestSemanticConventionParsing:
         # Verify no cost information when not requested
         assert "costs" not in call_no_cost.summary.get("weave", {})  # type: ignore
 
+    def test_bedrock_agent_event_input_output_and_tools(self):
+        """Ensure Bedrock agent OTEL events hydrate inputs, outputs, and attributes."""
+        question_text = "How to see configs of runs in W&B Models?"
+        answer_text = "Based on the search results, I can now provide you with information..."
+        events = [
+            SpanEvent(
+                name="gen_ai.user.message",
+                timestamp=datetime.now(),
+                attributes={"content": [{"text": question_text}]},
+                dropped_attributes_count=0,
+            ),
+            SpanEvent(
+                name="gen_ai.choice",
+                timestamp=datetime.now(),
+                attributes={
+                    "message": answer_text,
+                    "finish_reason": "end_turn",
+                },
+                dropped_attributes_count=0,
+            ),
+        ]
+        attributes = create_attributes(
+            {
+                "system_prompt": "You are a helpful documentation assistant for W&B Weave.",
+                "gen_ai.agent.tools": [
+                    "SearchWeightsBiasesDocumentation",
+                    "http_request",
+                ],
+                "gen_ai.agent.name": "Strands Agents",
+                "gen_ai.operation.name": "invoke_agent",
+                "gen_ai.request.model": "us.anthropic.claude-3-7-sonnet-20250219-v1:0",
+            }
+        )
+
+        inputs = get_weave_inputs(events, attributes)
+        assert "events.gen_ai.user.message" in inputs
+        event_messages = inputs["events.gen_ai.user.message"]
+        assert isinstance(event_messages, list)
+        assert event_messages[0]["content"][0]["text"] == question_text
+
+        outputs = get_weave_outputs(events, attributes)
+        assert "events.gen_ai.choice" in outputs
+        choice_events = outputs["events.gen_ai.choice"]
+        assert isinstance(choice_events, list)
+        assert choice_events[0]["message"] == answer_text
+
+        extracted_attributes = get_weave_attributes(attributes)
+        assert (
+            extracted_attributes["system"]
+            == "You are a helpful documentation assistant for W&B Weave."
+        )
+        assert extracted_attributes["tools"] == [
+            "SearchWeightsBiasesDocumentation",
+            "http_request",
+        ]
+        assert extracted_attributes["agent"] == "Strands Agents"
+        assert extracted_attributes["operation"] == "invoke_agent"
+        assert (
+            extracted_attributes["model"]
+            == "us.anthropic.claude-3-7-sonnet-20250219-v1:0"
+        )
 
 class TestHelpers:
     def test_capture_parts(self):

@@ -57,6 +57,7 @@ INPUT_KEYS = [
     "traceloop.entity.input",  # From Traceloop's conventions
     "gcp.vertex.agent.tool_call_args",  # From Google's Vertex AI
     "gcp.vertex.agent.llm_request",  # From Google's Vertex AI
+    "events.gen_ai.user.message",  # Bedrock / Strands agent OTEL events
     "input",  # Generic fallback for Pydantic models - lowest priority
     "inputs",
 ]
@@ -75,6 +76,7 @@ OUTPUT_KEYS = [
     "traceloop.entity.output",  # From Traceloop's conventions
     "gcp.vertex.agent.tool_response",  # From Google's Vertex AI
     "gcp.vertex.agent.llm_response",  # From Google's Vertex AI
+    "events.gen_ai.choice",  # Bedrock / Strands agent OTEL events
     "output",  # Generic fallback for Pydantic models - lowest priority
     "outputs",
 ]
@@ -117,6 +119,7 @@ ATTRIBUTE_KEYS = {
         "gen_ai.system",  # OpenTelemetry AI
         "llm.system",  # OpenInference
         "gen_ai.system_instructions",
+        "system_prompt",  # Bedrock Strands agents
     ],
     # Span kind - identifies the type of operation
     "kind": [
@@ -127,7 +130,12 @@ ATTRIBUTE_KEYS = {
         "openinference.span.kind",  # OpenInference - LLM, EMBEDDING, CHAIN, RETRIEVER, RERANKER, TOOL, AGENT, GUARDRAIL, EVALUATOR, PROMPT
     ],
     # Model name/identifier
-    "model": ["gen_ai.response.model", "llm.model_name", "ai.model.id"],
+    "model": [
+        "gen_ai.response.model",
+        "gen_ai.request.model",
+        "llm.model_name",
+        "ai.model.id",
+    ],
     # Provider/vendor of the model
     "provider": [
         "llm.provider",  # Common across standards
@@ -135,6 +143,12 @@ ATTRIBUTE_KEYS = {
     ],
     # Model generation parameters (temperature, max_tokens, etc.)
     "model_parameters": ["gen_ai.request", "llm.invocation_parameters"],
+    # Agent level metadata
+    "agent": ["gen_ai.agent.name"],
+    # Tool metadata surfaced by agent runtimes (e.g. Bedrock)
+    "tools": ["gen_ai.agent.tools"],
+    # Operation metadata
+    "operation": ["gen_ai.operation.name"],
 }
 
 # WB_KEYS: Wandb/Weave specific attributes for enhanced visualization and reporting
