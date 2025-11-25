@@ -16,13 +16,15 @@ class LLMAsAJudgeScorer(Scorer):
 
     Attributes:
         model: The LLM model to use for scoring
-        scoring_prompt: A prompt string template with {variable} placeholders (optional if prompt_ref is provided)
-        scoring_prompt_ref: A reference to a MessagesPrompt object (optional, takes precedence over scoring_prompt)
+        scoring_prompt: A prompt string template with {variable} placeholders (optional if scoring_prompt_ref is provided)
+        scoring_prompt_ref: A reference to a MessagesPrompt object, either as a URI string
+            or the resolved MessagesPrompt object (optional, takes precedence over scoring_prompt)
     """
 
     model: LLMStructuredCompletionModel
     scoring_prompt: str | None = None
-    scoring_prompt_ref: str | None = None
+    # Accept both string (ref URI) and MessagesPrompt (resolved ref from weave.get())
+    scoring_prompt_ref: str | MessagesPrompt | None = None
 
     @op
     def score(self, *, output: str, **kwargs: Any) -> Any:
@@ -38,18 +40,23 @@ class LLMAsAJudgeScorer(Scorer):
         # Combine output with kwargs for template variables
         template_vars = {"output": output, **kwargs}
 
-        if self.scoring_prompt_ref:
-            client = get_weave_client()
-            if client is None:
-                raise ValueError(
-                    "Weave client not initialized. Call weave.init() first."
-                )
-            scoring_prompt = client.get(self.scoring_prompt_ref)
-            if not isinstance(scoring_prompt, MessagesPrompt):
-                raise ValueError(
-                    f"Prompt object at {self.scoring_prompt_ref} is not a MessagesPrompt"
-                )
-            formatted_messages = scoring_prompt.format(**template_vars)
+        if self.scoring_prompt_ref is not None:
+            # Handle both string refs and already-resolved MessagesPrompt objects
+            if isinstance(self.scoring_prompt_ref, MessagesPrompt):
+                scoring_prompt_obj = self.scoring_prompt_ref
+            else:
+                # It's a string ref, need to resolve it
+                client = get_weave_client()
+                if client is None:
+                    raise ValueError(
+                        "Weave client not initialized. Call weave.init() first."
+                    )
+                scoring_prompt_obj = client.get(self.scoring_prompt_ref)
+                if not isinstance(scoring_prompt_obj, MessagesPrompt):
+                    raise ValueError(
+                        f"Prompt object at {self.scoring_prompt_ref} is not a MessagesPrompt"
+                    )
+            formatted_messages = scoring_prompt_obj.format(**template_vars)
             return self.model.predict(formatted_messages)
         elif isinstance(self.scoring_prompt, str):
             # Fall back to scoring_prompt

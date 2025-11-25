@@ -83,8 +83,8 @@ class Prompt(Object):
 class StringPrompt(Prompt):
     content: str = ""
 
-    def __init__(self, content: str):
-        super().__init__()
+    def __init__(self, content: str, **kwargs: Any):
+        super().__init__(**kwargs)
         self.content = content
 
     def format(self, **kwargs: Any) -> str:
@@ -148,8 +148,8 @@ def format_message_with_template_vars(message: dict, **kwargs: Any) -> dict:
 class MessagesPrompt(Prompt):
     messages: list[dict] = Field(default_factory=list)
 
-    def __init__(self, messages: list[dict]):
-        super().__init__()
+    def __init__(self, messages: list[dict], **kwargs: Any):
+        super().__init__(**kwargs)
         self.messages = messages
 
     def format_message(self, message: dict, **kwargs: Any) -> dict:
