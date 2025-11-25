@@ -1,5 +1,5 @@
 import {Api as TraceServerApi} from './generated/traceServerApi';
-import {Settings} from './settings';
+import {makeSettings, SettingsInit} from './settings';
 import {defaultHost, getUrls, setGlobalDomain} from './urls';
 import {ConcurrencyLimiter} from './utils/concurrencyLimit';
 import {Netrc} from './utils/netrc';
@@ -82,11 +82,13 @@ export async function login(apiKey: string, host?: string) {
  */
 export async function init(
   project: string,
-  settings?: Settings
+  settings?: SettingsInit
 ): Promise<WeaveClient> {
   const {apiKey, baseUrl, traceBaseUrl, domain} = getWandbConfigs();
   try {
     const wandbServerApi = new WandbServerApi(baseUrl, apiKey);
+
+    const resolvedSettings = makeSettings(settings);
 
     let entityName: string | undefined;
     let projectName: string;
@@ -130,7 +132,7 @@ export async function init(
       traceServerApi,
       wandbServerApi,
       projectId,
-      settings
+      resolvedSettings
     );
     setGlobalClient(client);
     setGlobalDomain(domain);
@@ -173,4 +175,28 @@ export function requireGlobalClient(): WeaveClient {
 
 export function setGlobalClient(client: WeaveClient) {
   globalClient = client;
+}
+
+/**
+ * Attach attributes to the current execution context so that any calls created
+ * inside `fn` automatically inherit them. Attributes are written to the call
+ * record on the trace server and surface in the Weave UI/filtering, so they’re
+ * ideal for tagging runs with request IDs, tenants, experiments, etc.
+ *
+ * Example:
+ * ```ts
+ * await withAttributes({requestId: 'abc'}, async () => {
+ *   await myOp();
+ * });
+ * ```
+ */
+export function withAttributes<T>(
+  attrs: Record<string, any>,
+  fn: () => Promise<T> | T
+): Promise<T> | T {
+  const client = getGlobalClient();
+  if (!client) {
+    return fn();
+  }
+  return client.runWithAttributes(attrs, fn);
 }

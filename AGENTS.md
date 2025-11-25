@@ -58,17 +58,20 @@ _Important:_ Since you don't have internet access, you must run `nox` with `--no
 **Test paths must be relative to the repository root**, not the `tests/` directory.
 
 Examples:
+
 - ✅ CORRECT: `-- tests/trace/test_dataset.py::test_basic_dataset_lifecycle`
 - ❌ WRONG: `-- trace/test_dataset.py::test_basic_dataset_lifecycle`
 
 #### Backend Selection
 
 **SQLite (Default/Recommended for Development):**
+
 ```bash
 nox --no-install -e "tests-3.12(shard='trace')" -- tests/trace/test_client_trace.py::test_simple_op --trace-server=sqlite
 ```
 
 **ClickHouse (Required for Full Testing):**
+
 ```bash
 nox --no-install -e "tests-3.12(shard='trace')" -- tests/trace/test_client_trace.py::test_simple_op --trace-server=clickhouse --clickhouse-process=true
 ```
@@ -79,6 +82,7 @@ nox --no-install -e "tests-3.12(shard='trace')" -- tests/trace/test_client_trace
 
 **Color Flag Conflicts:**
 If you encounter an error like `Can not specify both --no-color and --force-color`, this is due to conflicting environment variables. Unset them before running nox:
+
 ```bash
 unset NO_COLOR FORCE_COLOR && nox --no-install -e "tests-3.12(shard='trace')" -- tests/trace/test_dataset.py::test_basic_dataset_lifecycle --trace-server=sqlite
 ```
@@ -86,6 +90,7 @@ unset NO_COLOR FORCE_COLOR && nox --no-install -e "tests-3.12(shard='trace')" --
 #### Reinstalling Dependencies
 
 If you encounter import errors or missing modules, reinstall the test shard environment:
+
 ```bash
 nox --install-only -e "tests-3.12(shard='trace')"
 ```
@@ -97,13 +102,18 @@ Then run your tests with `--no-install` as usual.
 The langchain integration tests work fully on macOS including chromadb/vector store tests.
 
 **Running LangChain Tests:**
+
 ```bash
 nox --no-install -e "tests-3.12(shard='langchain')" -- tests/integrations/langchain/ --trace-server=sqlite
 ```
 
 ## Typescript Testing Guidelines
 
-TODO: need to fill this out
+```
+cd sdks/node
+npm i
+npm run test
+```
 
 ## Code Review & PR Guidelines
 

@@ -189,6 +189,46 @@ MOCK_APPLY_GUARDRAIL_INTERVENTION_RESPONSE = {
     "usage": {"inputTokens": 25, "outputTokens": 30, "totalTokens": 55},
 }
 
+# Mock response for bedrock-agent-runtime invoke_agent
+MOCK_INVOKE_AGENT_EVENTS = [
+    {"chunk": {"bytes": b"Hello! I'm here to help you. How can I assist you today?"}},
+    {
+        "trace": {
+            "trace": {
+                "sessionId": "test-session",
+                "trace": {
+                    "orchestrationTrace": {
+                        "invocationInput": {
+                            "invocationType": "ACTION",
+                            "actionInvocationType": "RESULT",
+                        }
+                    }
+                },
+            }
+        }
+    },
+]
+
+MOCK_INVOKE_AGENT_RESPONSE = {
+    "ResponseMetadata": {
+        "RequestId": "test-request-id",
+        "HTTPStatusCode": 200,
+        "HTTPHeaders": {
+            "date": "Fri, 20 Dec 2024 16:44:08 GMT",
+            "content-type": "application/vnd.amazon.eventstream",
+            "transfer-encoding": "chunked",
+            "connection": "keep-alive",
+            "x-amzn-requestid": "test-request-id",
+            "x-amz-bedrock-agent-session-id": "test-session",
+            "x-amzn-bedrock-agent-content-type": "application/json",
+        },
+        "RetryAttempts": 0,
+    },
+    "completion": MOCK_INVOKE_AGENT_EVENTS,
+    "contentType": "application/json",
+    "sessionId": "test-session",
+}
+
 # Original botocore _make_api_call function
 orig = botocore.client.BaseClient._make_api_call
 
@@ -242,6 +282,14 @@ def mock_invoke_exception_make_api_call(
             },
             operation_name="InvokeModel",
         )
+    return orig(self, operation_name, api_params)
+
+
+def mock_invoke_agent_make_api_call(
+    self, operation_name: str, api_params: dict
+) -> dict:
+    if operation_name == "InvokeAgent":
+        return MOCK_INVOKE_AGENT_RESPONSE
     return orig(self, operation_name, api_params)
 
 
@@ -531,3 +579,51 @@ def test_bedrock_invoke_exception_handling(
 
     # Verify the output is None (since the call failed)
     assert call.output is None
+
+
+@pytest.mark.skip_clickhouse_client
+@mock_aws
+def test_bedrock_agent_invoke_agent(
+    client: weave.trace.weave_client.WeaveClient,
+) -> None:
+    """Test that bedrock-agent-runtime invoke_agent method is properly traced."""
+    bedrock_agent_client = boto3.client(
+        "bedrock-agent-runtime", region_name="us-east-1"
+    )
+    patch_client(bedrock_agent_client)
+
+    with patch(
+        "botocore.client.BaseClient._make_api_call", new=mock_invoke_agent_make_api_call
+    ):
+        response = bedrock_agent_client.invoke_agent(
+            agentId="test-agent-id",
+            agentAliasId="test-alias-id",
+            sessionId="test-session-id",
+            inputText="Hello, how can you help me?",
+        )
+
+        # Basic assertions on the response
+        assert response is not None
+        assert "completion" in response
+        assert "sessionId" in response
+        assert response["sessionId"] == "test-session"
+
+    # Check that a trace was captured
+    calls = list(client.get_calls())
+    assert len(calls) == 1, "Expected exactly one trace call for invoke_agent"
+    call = calls[0]
+
+    assert call.exception is None
+    assert call.ended_at is not None
+    assert "BedrockAgentRuntime.invoke_agent" in call.op_name
+    # Verify inputs were captured
+    inputs = call.inputs
+    assert inputs["agentId"] == "test-agent-id"
+    assert inputs["agentAliasId"] == "test-alias-id"
+    assert inputs["sessionId"] == "test-session-id"
+    assert inputs["inputText"] == "Hello, how can you help me?"
+
+    # Basic usage tracking (detailed token extraction requires complex mocking)
+    summary = call.summary
+    assert summary is not None, "Summary should not be None"
+    assert "usage" in summary
