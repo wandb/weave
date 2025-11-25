@@ -3,7 +3,7 @@ from __future__ import annotations
 import warnings
 from collections.abc import Iterable, Iterator
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, Generic, TypeVar, Union
+from typing import TYPE_CHECKING, Any, Generic, TypeVar, cast
 
 from pydantic import field_validator
 from typing_extensions import Self
@@ -51,7 +51,7 @@ class Dataset(Object, Generic[R]):
     ```
     """
 
-    rows: Union[Table[R], WeaveTable]
+    rows: Table[R] | WeaveTable
 
     @classmethod
     def from_obj(cls, obj: WeaveObject) -> Self:
@@ -68,12 +68,12 @@ class Dataset(Object, Generic[R]):
         return cls(rows=rows)
 
     @classmethod
-    def from_pandas(cls, df: "pd.DataFrame") -> Self:
+    def from_pandas(cls, df: pd.DataFrame) -> Self:
         rows = df.to_dict(orient="records")
         return cls(rows=rows)
 
     @classmethod
-    def from_hf(cls, hf_dataset: Union["HFDataset", "HFDatasetDict"]) -> Self:
+    def from_hf(cls, hf_dataset: HFDataset | HFDatasetDict) -> Self:
         try:
             from datasets import Dataset as HFDataset
             from datasets import DatasetDict as HFDatasetDict
@@ -108,7 +108,7 @@ class Dataset(Object, Generic[R]):
         rows = target_hf_dataset.to_list()
         return cls(rows=rows)
 
-    def to_pandas(self) -> "pd.DataFrame":
+    def to_pandas(self) -> pd.DataFrame:
         try:
             import pandas as pd
         except ImportError:
@@ -116,7 +116,7 @@ class Dataset(Object, Generic[R]):
 
         return pd.DataFrame(self.rows)
 
-    def to_hf(self) -> "HFDataset":
+    def to_hf(self) -> HFDataset:
         try:
             from datasets import Dataset as HFDataset
         except ImportError:
@@ -168,14 +168,14 @@ class Dataset(Object, Generic[R]):
             )
 
         new_table = client._append_to_table(self.rows.table_ref.digest, list(rows))
-        new_dataset = Dataset(
+        new_dataset: Dataset[R] = Dataset(
             name=self.name, description=self.description, rows=new_table
         )
         weave.publish(new_dataset, name=self.name)
         return new_dataset
 
     @field_validator("rows", mode="before")
-    def convert_to_table(cls, rows: Any) -> Union[Table[R], WeaveTable]:  # noqa: N805
+    def convert_to_table(cls, rows: Any) -> Table[R] | WeaveTable:  # noqa: N805
         if weave_isinstance(rows, WeaveTable):
             return rows
         if not isinstance(rows, Table):
@@ -200,7 +200,7 @@ class Dataset(Object, Generic[R]):
         return rows
 
     def __iter__(self) -> Iterator[R]:
-        return iter(self.rows)
+        return cast(Iterator[R], iter(self.rows))
 
     def __len__(self) -> int:
         return len(self.rows)
@@ -208,7 +208,7 @@ class Dataset(Object, Generic[R]):
     def __getitem__(self, key: int) -> R:
         if key < 0:
             raise IndexError("Negative indexing is not supported")
-        return self.rows[key]
+        return cast(R, self.rows[key])
 
     def __str__(self) -> str:
         return f"Dataset({{\n    features: {list(self.columns_names)},\n    num_rows: {self.num_rows}\n}})"

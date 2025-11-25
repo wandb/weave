@@ -17,6 +17,10 @@ There are two standard base object classes: BaseObject and Object
 """
 base_object_class_names = ["BaseObject", "Object"]
 
+# These are classes that should be filtered out when computing base_object_class
+# because they are implementation details (e.g., Generic for type hints)
+ignored_base_class_names = ["Generic"]
+
 
 class GetObjectClassesResult(TypedDict):
     # object_class is the "leaf" class of the val assuming it is a subclass of weave.Object or weave.BaseObject
@@ -26,23 +30,31 @@ class GetObjectClassesResult(TypedDict):
 
 
 def get_object_classes(val: Any) -> Optional[GetObjectClassesResult]:
-    if (
+    if not (
         isinstance(val, dict)
         and "_bases" in val
         and isinstance(val["_bases"], list)
         and len(val["_bases"]) >= 2
-        and val["_bases"][-1] == "BaseModel"
-        and val["_bases"][-2] in base_object_class_names
     ):
-        object_class = val["_class_name"]
-        base_object_class = object_class
-        if len(val["_bases"]) > 2:
-            base_object_class = val["_bases"][-3]
-        return GetObjectClassesResult(
-            object_class=object_class,
-            base_object_class=base_object_class,
-        )
-    return None
+        return None
+
+    # Filter out implementation detail classes like Generic
+    bases = [b for b in val["_bases"] if b not in ignored_base_class_names]
+
+    if len(bases) < 2:
+        return None
+
+    if bases[-1] != "BaseModel" or bases[-2] not in base_object_class_names:
+        return None
+
+    object_class = val["_class_name"]
+    base_object_class = object_class
+    if len(bases) > 2:
+        base_object_class = bases[-3]
+    return GetObjectClassesResult(
+        object_class=object_class,
+        base_object_class=base_object_class,
+    )
 
 
 class ProcessIncomingObjectResult(TypedDict):
