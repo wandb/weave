@@ -29,6 +29,7 @@ from tests.trace.util import (
 )
 from tests.trace_server.conftest_lib.trace_server_external_adapter import (
     DummyIdConverter,
+    TestOnlyUserInjectingExternalTraceServer,
 )
 from weave import Thread, ThreadPoolExecutor
 from weave.trace import weave_client
@@ -931,12 +932,12 @@ def test_trace_call_query_filter_wb_run_ids(client):
 def test_trace_call_query_filter_wb_user_ids(client):
     call_spec_1 = simple_line_call_bootstrap()
 
-    # OMG! How ugly is this?! The layers of testing servers is nasty
-    client.server.server._next_trace_server._user_id = "second_user"
+    # Access the user-injecting server layer via typed stack API
+    user_server = client.server.get_layer(TestOnlyUserInjectingExternalTraceServer)
+    user_server._user_id = "second_user"
     call_spec_2 = simple_line_call_bootstrap()
 
-    # OMG! How ugly is this?! The layers of testing servers is nasty
-    client.server.server._next_trace_server._user_id = "third_user"
+    user_server._user_id = "third_user"
     call_spec_3 = simple_line_call_bootstrap()
 
     for wb_user_ids, exp_count in [
@@ -4205,9 +4206,12 @@ def test_call_stream_query_heavy_query_batch(client):
 
 @pytest.fixture
 def clickhouse_client(client):
+    from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
+
     if client_is_sqlite(client):
         return None
-    return client.server._next_trace_server.ch_client
+    ch_server = client.server.get_layer(ClickHouseTraceServer)
+    return ch_server.ch_client if ch_server else None
 
 
 def test_calls_query_with_storage_size_clickhouse(client, clickhouse_client):
