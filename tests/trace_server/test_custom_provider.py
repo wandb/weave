@@ -152,6 +152,7 @@ def create_mock_completion_response(
                     "role": "assistant",
                     "tool_calls": None,
                     "function_call": None,
+                    "provider_specific_fields": None,
                 },
             }
         ],

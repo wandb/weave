@@ -20,10 +20,10 @@ from weave.trace import weave_client, weave_init
 from weave.trace.context import weave_client_context
 from weave.trace.context.call_context import set_call_stack
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server_bindings import remote_http_trace_server
 from weave.trace_server_bindings.caching_middleware_trace_server import (
     CachingMiddlewareTraceServer,
 )
+from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
 
 # Force testing to never report wandb sentry events
 os.environ["WANDB_ERROR_REPORTING"] = "false"
@@ -41,6 +41,35 @@ def patch_kafka_producer():
         return_value=MagicMock(),
     ):
         yield
+
+
+@pytest.fixture(autouse=True)
+def reset_serializer_load_refs():
+    """Reset refs on serializer load functions between tests.
+
+    When encode_custom_obj wraps a serializer's load function as an Op and saves it,
+    a ref is attached to the Op. This ref persists in memory across tests since
+    serializers are module-level globals. If a subsequent test runs with a fresh
+    database (same project name), the _save_object_basic method sees the ref and
+    returns early without saving - but the referenced object doesn't exist!
+
+    This fixture clears those refs before each test to ensure proper test isolation.
+    """
+    from weave.trace.op_protocol import Op
+    from weave.trace.ref_util import remove_ref
+    from weave.trace.serialization.serializer import SERIALIZERS
+
+    # Before test: clear refs from serializer load functions
+    for serializer in SERIALIZERS:
+        if isinstance(serializer.load, Op):
+            remove_ref(serializer.load)
+
+    yield
+
+    # After test: clear refs again to prevent pollution to other tests
+    for serializer in SERIALIZERS:
+        if isinstance(serializer.load, Op):
+            remove_ref(serializer.load)
 
 
 @pytest.fixture(autouse=True)
@@ -355,7 +384,7 @@ def create_client(
         # Note: this is only for local dev testing and should be removed
         return weave_init.init_weave("dev_testing")
     elif trace_server_flag == "http":
-        server = remote_http_trace_server.RemoteHTTPTraceServer(trace_server_flag)
+        server = RemoteHTTPTraceServer(trace_server_flag)
     else:
         server = trace_server
 
@@ -534,7 +563,7 @@ def network_proxy_client(client):
         orig_post = weave.utils.http_requests.post
         weave.utils.http_requests.post = post
 
-        remote_client = remote_http_trace_server.RemoteHTTPTraceServer(
+        remote_client = RemoteHTTPTraceServer(
             trace_server_url="",
             should_batch=True,
         )
