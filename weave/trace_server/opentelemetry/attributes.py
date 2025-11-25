@@ -38,37 +38,19 @@ def _insert_event(events_tree: dict[str, Any], name: str, attributes: dict[str, 
     leaf = parts[-1]
     existing = current.get(leaf)
     if existing is None:
-        current[leaf] = [attributes]
+        current[leaf] = [copy.deepcopy(attributes)]
     elif isinstance(existing, list):
-        existing.append(attributes)
+        existing.append(copy.deepcopy(attributes))
     elif isinstance(existing, dict):
-        existing.setdefault("__events__", []).append(attributes)
+        existing.setdefault("__events__", []).append(copy.deepcopy(attributes))
     else:
-        current[leaf] = [attributes]
+        current[leaf] = [copy.deepcopy(attributes)]
 
 
-def _merge_event_trees(dest: dict[str, Any], src: dict[str, Any]) -> dict[str, Any]:
-    """Recursively merge two event trees."""
-    for key, value in src.items():
-        if key not in dest:
-            dest[key] = copy.deepcopy(value)
-            continue
-        if isinstance(value, dict) and isinstance(dest[key], dict):
-            _merge_event_trees(dest[key], value)
-            continue
-        if isinstance(value, list) and isinstance(dest[key], list):
-            dest[key].extend(copy.deepcopy(value))
-            continue
-        dest[key] = copy.deepcopy(value)
-    return dest
-
-
-def _augment_attributes_with_events(
-    attributes: dict[str, Any], events: list[SpanEvent]
-) -> dict[str, Any]:
-    """Attach OTEL span events to the attribute dictionary for downstream parsing."""
+def _build_events_tree(events: list[SpanEvent] | None) -> dict[str, Any]:
+    """Convert OTEL span events into a nested dict for attribute lookups."""
     if not events:
-        return attributes
+        return {}
 
     events_tree: dict[str, Any] = {}
     for event in events:
@@ -81,17 +63,9 @@ def _augment_attributes_with_events(
         _insert_event(events_tree, name, event_attributes)
 
     if not events_tree:
-        return attributes
+        return {}
 
-    augmented = dict(attributes)
-    existing_events = augmented.get("events")
-    if isinstance(existing_events, dict):
-        augmented["events"] = _merge_event_trees(
-            copy.deepcopy(existing_events), events_tree
-        )
-    else:
-        augmented["events"] = events_tree
-    return augmented
+    return {"events": events_tree}
 
 
 def parse_weave_values(
@@ -100,8 +74,17 @@ def parse_weave_values(
     | dict[str, list[str]]
     | list[tuple[str, Callable[..., Any]]]
     | dict[str, list[tuple[str, Callable[..., Any]]]],
+    events: list[SpanEvent] | None = None,
 ) -> dict[str, Any]:
     result = {}
+    events_tree = _build_events_tree(events) if events else None
+
+    def _get_value(key: str) -> Any:
+        value = get_attribute(attributes, key)
+        if value is None and events_tree:
+            value = get_attribute(events_tree, key)
+        return value
+
     # If list use the attribute as the key - Prevents synthetic attributes under input and output
 
     if isinstance(key_mapping, list):
@@ -111,8 +94,8 @@ def parse_weave_values(
                 attribute_key, handler = attribute_key_or_tuple
             else:
                 attribute_key = attribute_key_or_tuple
-            value = get_attribute(attributes, attribute_key)
-            if value:
+            value = _get_value(attribute_key)
+            if value is not None:
                 # Handler should never raise - Always use a try in handler and default to passed in value
                 if handler:
                     value = handler(value)
@@ -131,8 +114,8 @@ def parse_weave_values(
             else:
                 attribute_key = attribute_key_or_tuple
 
-            value = get_attribute(attributes, attribute_key)
-            if value:
+            value = _get_value(attribute_key)
+            if value is not None:
                 if handler:
                     # Handler should never raise - Always use a try in handler and default to passed in value
                     value = handler(value)
@@ -173,14 +156,12 @@ def get_weave_usage(attributes: dict[str, Any]) -> dict[str, Any]:
 
 # Some providers (e.g. Bedrock agents) encode inputs inside span events
 def get_weave_inputs(events: list[SpanEvent], attributes: dict[str, Any]) -> dict[str, Any]:
-    augmented_attributes = _augment_attributes_with_events(attributes, events)
-    return parse_weave_values(augmented_attributes, INPUT_KEYS)
+    return parse_weave_values(attributes, INPUT_KEYS, events)
 
 
 # Some providers (e.g. Bedrock agents) encode outputs inside span events
 def get_weave_outputs(events: list[SpanEvent], attributes: dict[str, Any]) -> dict[str, Any]:
-    augmented_attributes = _augment_attributes_with_events(attributes, events)
-    return parse_weave_values(augmented_attributes, OUTPUT_KEYS)
+    return parse_weave_values(attributes, OUTPUT_KEYS, events)
 
 
 # Custom attributes for weave to enable setting fields like wb_user_id otherwise unavailable in OTEL Traces
