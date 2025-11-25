@@ -53,7 +53,7 @@ class LLMAsAJudgeScorer(Scorer):
                     )
                 scoring_prompt_obj = client.get(self.scoring_prompt_ref)
                 if not isinstance(scoring_prompt_obj, MessagesPrompt):
-                    raise ValueError(
+                    raise TypeError(
                         f"Prompt object at {self.scoring_prompt_ref} is not a MessagesPrompt"
                     )
             formatted_messages = scoring_prompt_obj.format(**template_vars)

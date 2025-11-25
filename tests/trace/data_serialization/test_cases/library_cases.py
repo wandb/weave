@@ -81,7 +81,7 @@ library_cases = [
             "dataset": "weave:///shawn/test-project/object/Dataset:N0VKaX8wr9kF9QQzM7mSQz3yKrJJjTiJi4c9Bt7RSTA",
             "scorers": [
                 "weave:///shawn/test-project/object/MyScorer:QMbCYGONPYjlikHOl7FAXBG6TtRvixJyovX6QM8bGFs",
-                "weave:///shawn/test-project/object/LLMAsAJudgeScorer:m0T6bJ0H5oDvM6d3D3fO8qIj8tmetXmLpUUIMWqBcOA",
+                "weave:///shawn/test-project/object/LLMAsAJudgeScorer:2AYxwqzSqVf3yEVZTbkzGZcPXMFZxnYsBO23N5FTrLU",
             ],
             "preprocess_model_input": None,
             "trials": 1,
@@ -140,7 +140,7 @@ library_cases = [
             },
             {
                 "object_id": "LLMAsAJudgeScorer",
-                "digest": "m0T6bJ0H5oDvM6d3D3fO8qIj8tmetXmLpUUIMWqBcOA",
+                "digest": "2AYxwqzSqVf3yEVZTbkzGZcPXMFZxnYsBO23N5FTrLU",
                 "exp_val": {
                     "_type": "LLMAsAJudgeScorer",
                     "name": None,
@@ -149,7 +149,7 @@ library_cases = [
                     "model": "weave:///shawn/test-project/object/LLMStructuredCompletionModel:bgxkRqJaX9ksC4XbqjYUdYmHkaEVWNnm10dxIN8J07g",
                     "scoring_prompt": "Here are the inputs: {inputs}. Here is the output: {output}. Is the output correct?",
                     "scoring_prompt_ref": None,
-                    "score": "weave:///shawn/test-project/op/LLMAsAJudgeScorer.score:H9CdoAoo6SZxYijddsofxYec1c3DeBNzfcG5up7Z3QQ",
+                    "score": "weave:///shawn/test-project/op/LLMAsAJudgeScorer.score:HeFNULC62b6QzYX6icYpDkHtiPoYUOY13rYmu9lON6g",
                     "summarize": "weave:///shawn/test-project/op/Scorer.summarize:Jc12U3b8FvfVmPvXafwLCg5Q7RFqIxkIaT7cYdWkJG0",
                     "_class_name": "LLMAsAJudgeScorer",
                     "_bases": ["Scorer", "Object", "BaseModel"],
@@ -157,11 +157,11 @@ library_cases = [
             },
             {
                 "object_id": "LLMAsAJudgeScorer.score",
-                "digest": "H9CdoAoo6SZxYijddsofxYec1c3DeBNzfcG5up7Z3QQ",
+                "digest": "HeFNULC62b6QzYX6icYpDkHtiPoYUOY13rYmu9lON6g",
                 "exp_val": {
                     "_type": "CustomWeaveType",
                     "weave_type": {"type": "Op"},
-                    "files": {"obj.py": "Vj5nprCJflAOIfw3RzIF4IXXqEgYPd9rXffbbAgGe5A"},
+                    "files": {"obj.py": "TeO7o3uM1Xv3wv63cVAiwxosx592vceMWnA8aPsmNnE"},
                 },
             },
             {
@@ -263,8 +263,8 @@ library_cases = [
                 "exp_content": b'import weave\nfrom weave.object.obj import Object\nfrom weave.trace.table import Table\nfrom weave.flow.util import transpose\nfrom weave.flow.scorer import get_scorer_attributes\nfrom weave.flow.scorer import auto_summarize\nfrom weave.trace.op import op\n\nclass EvaluationResults(Object):\n    rows: Table\n\n@weave.op()\n@op\nasync def summarize(self, eval_table: EvaluationResults) -> dict:\n    eval_table_rows = list(eval_table.rows)\n    cols = transpose(eval_table_rows)\n    summary = {}\n\n    for name, vals in cols.items():\n        if name == "scores":\n            if scorers := self.scorers:\n                for scorer in scorers:\n                    scorer_attributes = get_scorer_attributes(scorer)\n                    scorer_name = scorer_attributes.scorer_name\n                    summarize_fn = scorer_attributes.summarize_fn\n                    scorer_stats = transpose(vals)\n                    score_table = scorer_stats[scorer_name]\n                    scored = summarize_fn(score_table)\n                    summary[scorer_name] = scored\n        else:\n            model_output_summary = auto_summarize(vals)\n            if model_output_summary:\n                summary[name] = model_output_summary\n    return summary\n',
             },
             {
-                "digest": "Vj5nprCJflAOIfw3RzIF4IXXqEgYPd9rXffbbAgGe5A",
-                "exp_content": b'import weave\nfrom typing import Any\nfrom weave.trace.context.weave_client_context import get_weave_client\nfrom weave.prompt.prompt import MessagesPrompt\nfrom weave.trace.op import op\n\n@weave.op()\n@op\ndef score(self, *, output: str, **kwargs: Any) -> Any:\n    """Score the output using the scoring_prompt.\n\n    Args:\n        output: The model output to score\n        **kwargs: Additional template variables for the prompt\n\n    Returns:\n        The model\'s prediction/score\n    """\n    # Combine output with kwargs for template variables\n    template_vars = {"output": output, **kwargs}\n\n    if self.scoring_prompt_ref:\n        client = get_weave_client()\n        if client is None:\n            raise ValueError(\n                "Weave client not initialized. Call weave.init() first."\n            )\n        scoring_prompt = client.get(self.scoring_prompt_ref)\n        if not isinstance(scoring_prompt, MessagesPrompt):\n            raise ValueError(\n                f"Prompt object at {self.scoring_prompt_ref} is not a MessagesPrompt"\n            )\n        formatted_messages = scoring_prompt.format(**template_vars)\n        return self.model.predict(formatted_messages)\n    elif isinstance(self.scoring_prompt, str):\n        # Fall back to scoring_prompt\n        scoring_prompt = self.scoring_prompt.format(**template_vars)\n        model_input = [\n            {"role": "user", "content": scoring_prompt},\n        ]\n        return self.model.predict(model_input)\n    else:\n        raise ValueError(\n            "Either scoring_prompt or scoring_prompt_ref must be provided to LLMAsAJudgeScorer"\n        )\n',
+                "digest": "TeO7o3uM1Xv3wv63cVAiwxosx592vceMWnA8aPsmNnE",
+                "exp_content": b'import weave\nfrom typing import Any\nfrom weave.prompt.prompt import MessagesPrompt\nfrom weave.trace.context.weave_client_context import get_weave_client\nfrom weave.trace.op import op\n\n@weave.op()\n@op\ndef score(self, *, output: str, **kwargs: Any) -> Any:\n    """Score the output using the scoring_prompt.\n\n    Args:\n        output: The model output to score\n        **kwargs: Additional template variables for the prompt\n\n    Returns:\n        The model\'s prediction/score\n    """\n    # Combine output with kwargs for template variables\n    template_vars = {"output": output, **kwargs}\n\n    if self.scoring_prompt_ref is not None:\n        # Handle both string refs and already-resolved MessagesPrompt objects\n        if isinstance(self.scoring_prompt_ref, MessagesPrompt):\n            scoring_prompt_obj = self.scoring_prompt_ref\n        else:\n            # It\'s a string ref, need to resolve it\n            client = get_weave_client()\n            if client is None:\n                raise ValueError(\n                    "Weave client not initialized. Call weave.init() first."\n                )\n            scoring_prompt_obj = client.get(self.scoring_prompt_ref)\n            if not isinstance(scoring_prompt_obj, MessagesPrompt):\n                raise TypeError(\n                    f"Prompt object at {self.scoring_prompt_ref} is not a MessagesPrompt"\n                )\n        formatted_messages = scoring_prompt_obj.format(**template_vars)\n        return self.model.predict(formatted_messages)\n    elif isinstance(self.scoring_prompt, str):\n        # Fall back to scoring_prompt\n        scoring_prompt = self.scoring_prompt.format(**template_vars)\n        model_input = [\n            {"role": "user", "content": scoring_prompt},\n        ]\n        return self.model.predict(model_input)\n    else:\n        raise ValueError(\n            "Either scoring_prompt or scoring_prompt_ref must be provided to LLMAsAJudgeScorer"\n        )\n',
             },
             {
                 "digest": "EEmf74IV2JVEyFOQ6XatSoNG7CB5Gvh9Th7KYTt7GQQ",
