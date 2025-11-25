@@ -329,24 +329,36 @@ def make_server_recorder(server: tsi.TraceServerInterface):  # type: ignore
         "get_feedback_processor",
     }
 
-    class ServerRecorder(type(server)):  # type: ignore
-        attribute_access_log: list[str]
+    class ServerRecorder:
+        """Wrapper that records attribute accesses without inheriting from server.
+
+        Uses composition instead of inheritance to avoid issues with __getattr__
+        delegation in middleware classes.
+        """
 
         def __init__(self, server: tsi.TraceServerInterface):
-            self.server = server
-            self.attribute_access_log = []
+            # Use object.__setattr__ to avoid triggering __getattr__
+            object.__setattr__(self, "_server", server)
+            object.__setattr__(self, "attribute_access_log", [])
 
-        def __getattribute__(self, name):
-            self_server = super().__getattribute__("server")
-            access_log = super().__getattribute__("attribute_access_log")
-            if name == "server":
-                return self_server
-            if name == "attribute_access_log":
-                return access_log
-            attr = self_server.__getattribute__(name)
-            if name not in ("attribute_access_log",) and name not in IGNORED_METHODS:
+        def __getattr__(self, name: str):
+            # Get from our own __dict__ first
+            if name in ("_server", "attribute_access_log"):
+                return object.__getattribute__(self, name)
+
+            server = object.__getattribute__(self, "_server")
+            access_log = object.__getattribute__(self, "attribute_access_log")
+
+            attr = getattr(server, name)
+            if name not in IGNORED_METHODS:
                 access_log.append(name)
             return attr
+
+        def __setattr__(self, name: str, value):
+            if name == "attribute_access_log":
+                object.__setattr__(self, name, value)
+            else:
+                setattr(object.__getattribute__(self, "_server"), name, value)
 
     return ServerRecorder(server)
 

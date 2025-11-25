@@ -59,12 +59,16 @@ CACHE_DIR_PREFIX = "weave_trace_server_cache"
 CACHE_KEY_SUFFIX = "v_" + version.VERSION
 
 
-class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
+class CachingMiddlewareTraceServer:
     """A middleware trace server that provides caching functionality.
 
     This server wraps another trace server and caches responses to improve performance.
     It uses diskcache to store responses on disk and implements caching for read-only
     operations like obj_read, table_query, etc.
+
+    Methods not explicitly defined are automatically delegated to the underlying server
+    via __getattr__. This class satisfies the FullTraceServerInterface protocol through
+    structural typing (duck typing).
 
     Attributes:
         _next_trace_server: The underlying trace server being wrapped
@@ -72,12 +76,12 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
         _cache_recorder: Metrics tracking cache hits, misses, errors and skips
     """
 
-    _next_trace_server: tsi.TraceServerInterface
+    _next_trace_server: tsi.FullTraceServerInterface
     _cache_prefix: str
 
     def __init__(
         self,
-        next_trace_server: tsi.TraceServerInterface,
+        next_trace_server: tsi.FullTraceServerInterface,
         cache_dir: str | None = None,
         size_limit: int = 1_000_000_000,
     ):
@@ -97,6 +101,14 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
             "skips": 0,
         }
 
+    def __getattr__(self, name: str) -> Any:
+        """Delegate attribute access to the underlying trace server.
+
+        This allows the middleware to automatically pass through any methods
+        not explicitly defined on this class.
+        """
+        return getattr(self._next_trace_server, name)
+
     def __del__(self) -> None:
         """Cleanup method called when object is destroyed."""
         try:
@@ -104,17 +116,8 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
         except Exception as e:
             logger.exception("Error closing cache")
 
-    def get_call_processor(self) -> AsyncBatchProcessor | None:
-        """
-        Custom method not defined on the formal TraceServerInterface to expose
-        the underlying call processor. Should be formalized in a client-side interface.
-        """
-        if hasattr(self._next_trace_server, "get_call_processor"):
-            return self._next_trace_server.get_call_processor()
-        return None
-
     @classmethod
-    def from_env(cls, next_trace_server: tsi.TraceServerInterface) -> Self:
+    def from_env(cls, next_trace_server: tsi.FullTraceServerInterface) -> Self:
         cache_dir = server_cache_dir()
         size_limit = server_cache_size_limit()
         return cls(next_trace_server, cache_dir, size_limit)
@@ -409,111 +412,7 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
             tsi.FilesStatsRes,
         )
 
-    # Remaining Un-cacheable Methods:
-
-    def ensure_project_exists(
-        self, entity: str, project: str
-    ) -> tsi.EnsureProjectExistsRes:
-        return self._next_trace_server.ensure_project_exists(entity, project)
-
-    # Call API
-    def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
-        return self._next_trace_server.call_start(req)
-
-    def call_end(self, req: tsi.CallEndReq) -> tsi.CallEndRes:
-        return self._next_trace_server.call_end(req)
-
-    def call_read(self, req: tsi.CallReadReq) -> tsi.CallReadRes:
-        return self._next_trace_server.call_read(req)
-
-    def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
-        return self._next_trace_server.calls_query(req)
-
-    def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
-        return self._next_trace_server.calls_query_stream(req)
-
-    def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
-        return self._next_trace_server.calls_delete(req)
-
-    def calls_query_stats(self, req: tsi.CallsQueryStatsReq) -> tsi.CallsQueryStatsRes:
-        return self._next_trace_server.calls_query_stats(req)
-
-    def call_update(self, req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
-        return self._next_trace_server.call_update(req)
-
-    # OTEL API
-    def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
-        return self._next_trace_server.otel_export(req)
-
-    # Op API
-    def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
-        return self._next_trace_server.op_create(req)
-
-    def op_read(self, req: tsi.OpReadReq) -> tsi.OpReadRes:
-        return self._next_trace_server.op_read(req)
-
-    def ops_query(self, req: tsi.OpQueryReq) -> tsi.OpQueryRes:
-        return self._next_trace_server.ops_query(req)
-
-    # Cost API
-    def cost_create(self, req: tsi.CostCreateReq) -> tsi.CostCreateRes:
-        return self._next_trace_server.cost_create(req)
-
-    def cost_query(self, req: tsi.CostQueryReq) -> tsi.CostQueryRes:
-        return self._next_trace_server.cost_query(req)
-
-    def cost_purge(self, req: tsi.CostPurgeReq) -> tsi.CostPurgeRes:
-        return self._next_trace_server.cost_purge(req)
-
-    def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
-        return self._next_trace_server.objs_query(req)
-
-    # Table API
-    def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
-        return self._next_trace_server.table_create(req)
-
-    def table_update(self, req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
-        return self._next_trace_server.table_update(req)
-
-    def feedback_create(self, req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
-        return self._next_trace_server.feedback_create(req)
-
-    def feedback_query(self, req: tsi.FeedbackQueryReq) -> tsi.FeedbackQueryRes:
-        return self._next_trace_server.feedback_query(req)
-
-    def feedback_purge(self, req: tsi.FeedbackPurgeReq) -> tsi.FeedbackPurgeRes:
-        return self._next_trace_server.feedback_purge(req)
-
-    def feedback_replace(self, req: tsi.FeedbackReplaceReq) -> tsi.FeedbackReplaceRes:
-        return self._next_trace_server.feedback_replace(req)
-
-    # Action API
-    def actions_execute_batch(
-        self, req: tsi.ActionsExecuteBatchReq
-    ) -> tsi.ActionsExecuteBatchRes:
-        return self._next_trace_server.actions_execute_batch(req)
-
-    # Execute LLM API
-    def completions_create(
-        self, req: tsi.CompletionsCreateReq
-    ) -> tsi.CompletionsCreateRes:
-        return self._next_trace_server.completions_create(req)
-
-    def project_stats(self, req: tsi.ProjectStatsReq) -> tsi.ProjectStatsRes:
-        return self._next_trace_server.project_stats(req)
-
-    def threads_query_stream(
-        self, req: tsi.ThreadsQueryReq
-    ) -> Iterator[tsi.ThreadSchema]:
-        return self._next_trace_server.threads_query_stream(req)
-
-    def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
-        return self._next_trace_server.evaluate_model(req)
-
-    def evaluation_status(
-        self, req: tsi.EvaluationStatusReq
-    ) -> tsi.EvaluationStatusRes:
-        return self._next_trace_server.evaluation_status(req)
+    # All other methods are automatically delegated to _next_trace_server via __getattr__
 
 
 def pydantic_bytes_safe_dump(obj: BaseModel) -> str:
