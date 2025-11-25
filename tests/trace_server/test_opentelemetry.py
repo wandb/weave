@@ -1103,8 +1103,10 @@ class TestSemanticConventionParsing:
 
         usage = get_weave_usage(attributes) or {}
 
+        # Verify individual tokens are parsed
         assert usage.get("input_tokens") == 10
         assert usage.get("output_tokens") == 20
+        # Verify total_tokens is calculated when not provided
         assert usage.get("total_tokens") == 30
 
     def test_opentelemetry_usage_output_tokens_with_explicit_total(self):
@@ -1119,8 +1121,10 @@ class TestSemanticConventionParsing:
 
         usage = get_weave_usage(attributes) or {}
 
+        # Verify individual tokens are parsed
         assert usage.get("input_tokens") == 10
         assert usage.get("output_tokens") == 20
+        # Verify explicit total_tokens is used instead of calculated value
         assert usage.get("total_tokens") == 35
 
     def test_bedrock_agent_event_input_output_and_tools(self):
