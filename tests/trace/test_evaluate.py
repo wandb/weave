@@ -384,12 +384,10 @@ def test_evaluate_table_lazy_iter(client, monkeypatch):
         return input == output
 
     log = client.server.attribute_access_log
+    # get_call_processor, get_feedback_processor are filtered out by ServerRecorder
+    # as they are internal setup calls
     assert [l for l in log if not l.startswith("_")] == [
         "ensure_project_exists",
-        "get_call_processor",
-        "get_call_processor",
-        "get_feedback_processor",
-        "get_feedback_processor",
         "table_create",
         "obj_create",
         "obj_read",

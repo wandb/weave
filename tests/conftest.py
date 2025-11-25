@@ -322,6 +322,12 @@ def make_server_recorder(server: tsi.TraceServerInterface):  # type: ignore
     assert "file_content_read" not in access_log
     ```
     """
+    # Internal methods that are called during setup/initialization and should
+    # not be logged as they are not part of the business logic being tested
+    IGNORED_METHODS = {
+        "get_call_processor",
+        "get_feedback_processor",
+    }
 
     class ServerRecorder(type(server)):  # type: ignore
         attribute_access_log: list[str]
@@ -338,7 +344,7 @@ def make_server_recorder(server: tsi.TraceServerInterface):  # type: ignore
             if name == "attribute_access_log":
                 return access_log
             attr = self_server.__getattribute__(name)
-            if name != "attribute_access_log":
+            if name not in ("attribute_access_log",) and name not in IGNORED_METHODS:
                 access_log.append(name)
             return attr
 
