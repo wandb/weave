@@ -66,28 +66,28 @@ class CachingMiddlewareTraceServer(tsi.FullTraceServerInterface):
     operations like obj_read, table_query, etc.
 
     Attributes:
-        inner: The underlying trace server being wrapped
+        wrapped: The underlying trace server being wrapped
         _cache: The disk cache instance used to store responses
         _cache_recorder: Metrics tracking cache hits, misses, errors and skips
     """
 
-    inner: tsi.FullTraceServerInterface
+    wrapped: tsi.FullTraceServerInterface
     _cache_prefix: str
 
     def __init__(
         self,
-        inner: tsi.FullTraceServerInterface,
+        wrapped: tsi.FullTraceServerInterface,
         cache_dir: str | None = None,
         size_limit: int = 1_000_000_000,
     ):
         """Initialize the caching middleware.
 
         Args:
-            inner: The trace server to wrap with caching
+            wrapped: The trace server to wrap with caching
             cache_dir: Directory to store the disk cache. If None, uses system temp dir
             size_limit: Maximum size in bytes for the cache (default 1GB)
         """
-        self.inner = inner
+        self.wrapped = wrapped
         cache_dir = cache_dir or os.path.join(tempfile.gettempdir(), CACHE_DIR_PREFIX)
         self._cache = create_memory_disk_cache(cache_dir, size_limit)
         self._cache_recorder: CacheRecorder = {
@@ -107,23 +107,23 @@ class CachingMiddlewareTraceServer(tsi.FullTraceServerInterface):
         """Custom method not defined on the formal TraceServerInterface to expose
         the underlying call processor. Should be formalized in a client-side interface.
         """
-        if hasattr(self.inner, "get_call_processor"):
-            return self.inner.get_call_processor()
+        if hasattr(self.wrapped, "get_call_processor"):
+            return self.wrapped.get_call_processor()
         return None
 
     def get_feedback_processor(self) -> AsyncBatchProcessor | None:
         """Custom method not defined on the formal TraceServerInterface to expose
         the underlying feedback processor. Should be formalized in a client-side interface.
         """
-        if hasattr(self.inner, "get_feedback_processor"):
-            return self.inner.get_feedback_processor()
+        if hasattr(self.wrapped, "get_feedback_processor"):
+            return self.wrapped.get_feedback_processor()
         return None
 
     @classmethod
-    def from_env(cls, inner: tsi.FullTraceServerInterface) -> Self:
+    def from_env(cls, wrapped: tsi.FullTraceServerInterface) -> Self:
         cache_dir = server_cache_dir()
         size_limit = server_cache_size_limit()
-        return cls(inner, cache_dir, size_limit)
+        return cls(wrapped, cache_dir, size_limit)
 
     def _safe_cache_get(self, key: str) -> Any:
         """Safely retrieve a value from cache, handling errors and recording metrics.
@@ -276,16 +276,16 @@ class CachingMiddlewareTraceServer(tsi.FullTraceServerInterface):
     # Cacheable Methods:
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
         if not digest_is_cacheable(req.digest):
-            return self.inner.obj_read(req)
+            return self.wrapped.obj_read(req)
         return self._with_cache_pydantic(
-            self.inner.obj_read, req, tsi.ObjReadRes
+            self.wrapped.obj_read, req, tsi.ObjReadRes
         )
 
     # Obj API
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
         # All obj_create requests are cacheable!
         return self._with_cache_pydantic(
-            self.inner.obj_create, req, tsi.ObjCreateRes
+            self.wrapped.obj_create, req, tsi.ObjCreateRes
         )
 
     def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjDeleteRes:
@@ -304,36 +304,36 @@ class CachingMiddlewareTraceServer(tsi.FullTraceServerInterface):
             self._safe_cache_delete_prefix(cache_key_prefix)
             cache_key_prefix = f'obj_create_{{"obj": {cache_key_partial}'
             self._safe_cache_delete_prefix(cache_key_prefix)
-        return self.inner.obj_delete(req)
+        return self.wrapped.obj_delete(req)
 
     def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
         if not digest_is_cacheable(req.digest):
-            return self.inner.table_query(req)
+            return self.wrapped.table_query(req)
         return self._with_cache_pydantic(
-            self.inner.table_query, req, tsi.TableQueryRes
+            self.wrapped.table_query, req, tsi.TableQueryRes
         )
 
     def table_query_stream(
         self, req: tsi.TableQueryReq
     ) -> Iterator[tsi.TableRowSchema]:
         # I am not sure the best way to cache the iterator here. TODO
-        return self.inner.table_query_stream(req)
+        return self.wrapped.table_query_stream(req)
 
     # This is a legacy endpoint, it should be removed once the client is mostly updated
     def table_query_stats(self, req: tsi.TableQueryStatsReq) -> tsi.TableQueryStatsRes:
         if not digest_is_cacheable(req.digest):
-            return self.inner.table_query_stats(req)
+            return self.wrapped.table_query_stats(req)
         return self._with_cache_pydantic(
-            self.inner.table_query_stats, req, tsi.TableQueryStatsRes
+            self.wrapped.table_query_stats, req, tsi.TableQueryStatsRes
         )
 
     def table_query_stats_batch(
         self, req: tsi.TableQueryStatsBatchReq
     ) -> tsi.TableQueryStatsBatchRes:
         if any(not digest_is_cacheable(digest) for digest in req.digests or []):
-            return self.inner.table_query_stats_batch(req)
+            return self.wrapped.table_query_stats_batch(req)
         return self._with_cache_pydantic(
-            self.inner.table_query_stats_batch,
+            self.wrapped.table_query_stats_batch,
             req,
             tsi.TableQueryStatsBatchRes,
         )
@@ -370,7 +370,7 @@ class CachingMiddlewareTraceServer(tsi.FullTraceServerInterface):
 
         if needed_refs:
             new_req = tsi.RefsReadBatchReq(refs=needed_refs)
-            needed_results = self.inner.refs_read_batch(new_req)
+            needed_results = self.wrapped.refs_read_batch(new_req)
             for needed_ndx, needed_ref, needed_val in zip(
                 needed_indices, needed_refs, needed_results.vals, strict=False
             ):
@@ -395,12 +395,12 @@ class CachingMiddlewareTraceServer(tsi.FullTraceServerInterface):
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
         # All file_create requests are cacheable!
         return self._with_cache_pydantic(
-            self.inner.file_create, req, tsi.FileCreateRes
+            self.wrapped.file_create, req, tsi.FileCreateRes
         )
 
     def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
         return self._with_cache(
-            self.inner.file_content_read,
+            self.wrapped.file_content_read,
             req,
             "file_content_read",
             lambda req: req.model_dump_json(),
@@ -410,7 +410,7 @@ class CachingMiddlewareTraceServer(tsi.FullTraceServerInterface):
 
     def files_stats(self, req: tsi.FilesStatsReq) -> tsi.FilesStatsRes:
         return self._with_cache_pydantic(
-            self.inner.files_stats,
+            self.wrapped.files_stats,
             req,
             tsi.FilesStatsRes,
         )
@@ -420,248 +420,248 @@ class CachingMiddlewareTraceServer(tsi.FullTraceServerInterface):
     def ensure_project_exists(
         self, entity: str, project: str
     ) -> tsi.EnsureProjectExistsRes:
-        return self.inner.ensure_project_exists(entity, project)
+        return self.wrapped.ensure_project_exists(entity, project)
 
     # Call API
     def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
-        return self.inner.call_start(req)
+        return self.wrapped.call_start(req)
 
     def call_end(self, req: tsi.CallEndReq) -> tsi.CallEndRes:
-        return self.inner.call_end(req)
+        return self.wrapped.call_end(req)
 
     def call_read(self, req: tsi.CallReadReq) -> tsi.CallReadRes:
-        return self.inner.call_read(req)
+        return self.wrapped.call_read(req)
 
     def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
-        return self.inner.calls_query(req)
+        return self.wrapped.calls_query(req)
 
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
-        return self.inner.calls_query_stream(req)
+        return self.wrapped.calls_query_stream(req)
 
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
-        return self.inner.calls_delete(req)
+        return self.wrapped.calls_delete(req)
 
     def calls_query_stats(self, req: tsi.CallsQueryStatsReq) -> tsi.CallsQueryStatsRes:
-        return self.inner.calls_query_stats(req)
+        return self.wrapped.calls_query_stats(req)
 
     def call_update(self, req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
-        return self.inner.call_update(req)
+        return self.wrapped.call_update(req)
 
     # OTEL API
     def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
-        return self.inner.otel_export(req)
+        return self.wrapped.otel_export(req)
 
     # Cost API
     def cost_create(self, req: tsi.CostCreateReq) -> tsi.CostCreateRes:
-        return self.inner.cost_create(req)
+        return self.wrapped.cost_create(req)
 
     def cost_query(self, req: tsi.CostQueryReq) -> tsi.CostQueryRes:
-        return self.inner.cost_query(req)
+        return self.wrapped.cost_query(req)
 
     def cost_purge(self, req: tsi.CostPurgeReq) -> tsi.CostPurgeRes:
-        return self.inner.cost_purge(req)
+        return self.wrapped.cost_purge(req)
 
     def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
-        return self.inner.objs_query(req)
+        return self.wrapped.objs_query(req)
 
     # Table API
     def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
-        return self.inner.table_create(req)
+        return self.wrapped.table_create(req)
 
     def table_create_from_digests(
         self, req: tsi.TableCreateFromDigestsReq
     ) -> tsi.TableCreateFromDigestsRes:
-        return self.inner.table_create_from_digests(req)
+        return self.wrapped.table_create_from_digests(req)
 
     def table_update(self, req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
-        return self.inner.table_update(req)
+        return self.wrapped.table_update(req)
 
     def feedback_create(self, req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
-        return self.inner.feedback_create(req)
+        return self.wrapped.feedback_create(req)
 
     def feedback_create_batch(
         self, req: tsi.FeedbackCreateBatchReq
     ) -> tsi.FeedbackCreateBatchRes:
-        return self.inner.feedback_create_batch(req)
+        return self.wrapped.feedback_create_batch(req)
 
     def feedback_query(self, req: tsi.FeedbackQueryReq) -> tsi.FeedbackQueryRes:
-        return self.inner.feedback_query(req)
+        return self.wrapped.feedback_query(req)
 
     def feedback_purge(self, req: tsi.FeedbackPurgeReq) -> tsi.FeedbackPurgeRes:
-        return self.inner.feedback_purge(req)
+        return self.wrapped.feedback_purge(req)
 
     def feedback_replace(self, req: tsi.FeedbackReplaceReq) -> tsi.FeedbackReplaceRes:
-        return self.inner.feedback_replace(req)
+        return self.wrapped.feedback_replace(req)
 
     # Action API
     def actions_execute_batch(
         self, req: tsi.ActionsExecuteBatchReq
     ) -> tsi.ActionsExecuteBatchRes:
-        return self.inner.actions_execute_batch(req)
+        return self.wrapped.actions_execute_batch(req)
 
     # Execute LLM API
     def completions_create(
         self, req: tsi.CompletionsCreateReq
     ) -> tsi.CompletionsCreateRes:
-        return self.inner.completions_create(req)
+        return self.wrapped.completions_create(req)
 
     def project_stats(self, req: tsi.ProjectStatsReq) -> tsi.ProjectStatsRes:
-        return self.inner.project_stats(req)
+        return self.wrapped.project_stats(req)
 
     def threads_query_stream(
         self, req: tsi.ThreadsQueryReq
     ) -> Iterator[tsi.ThreadSchema]:
-        return self.inner.threads_query_stream(req)
+        return self.wrapped.threads_query_stream(req)
 
     def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
-        return self.inner.evaluate_model(req)
+        return self.wrapped.evaluate_model(req)
 
     def evaluation_status(
         self, req: tsi.EvaluationStatusReq
     ) -> tsi.EvaluationStatusRes:
-        return self.inner.evaluation_status(req)
+        return self.wrapped.evaluation_status(req)
 
     # === Object APIs ===
 
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
-        return self.inner.op_create(req)
+        return self.wrapped.op_create(req)
 
     def op_read(self, req: tsi.OpReadReq) -> tsi.OpReadRes:
         if not digest_is_cacheable(req.digest):
-            return self.inner.op_read(req)
+            return self.wrapped.op_read(req)
         return self._with_cache_pydantic(
-            self.inner.op_read, req, tsi.OpReadRes
+            self.wrapped.op_read, req, tsi.OpReadRes
         )
 
     def op_list(self, req: tsi.OpListReq) -> Iterator[tsi.OpReadRes]:
-        return self.inner.op_list(req)
+        return self.wrapped.op_list(req)
 
     def op_delete(self, req: tsi.OpDeleteReq) -> tsi.OpDeleteRes:
-        return self.inner.op_delete(req)
+        return self.wrapped.op_delete(req)
 
     def dataset_create(self, req: tsi.DatasetCreateReq) -> tsi.DatasetCreateRes:
-        return self.inner.dataset_create(req)
+        return self.wrapped.dataset_create(req)
 
     def dataset_read(self, req: tsi.DatasetReadReq) -> tsi.DatasetReadRes:
         if not digest_is_cacheable(req.digest):
-            return self.inner.dataset_read(req)
+            return self.wrapped.dataset_read(req)
         return self._with_cache_pydantic(
-            self.inner.dataset_read, req, tsi.DatasetReadRes
+            self.wrapped.dataset_read, req, tsi.DatasetReadRes
         )
 
     def dataset_list(self, req: tsi.DatasetListReq) -> Iterator[tsi.DatasetReadRes]:
-        return self.inner.dataset_list(req)
+        return self.wrapped.dataset_list(req)
 
     def dataset_delete(self, req: tsi.DatasetDeleteReq) -> tsi.DatasetDeleteRes:
-        return self.inner.dataset_delete(req)
+        return self.wrapped.dataset_delete(req)
 
     def scorer_create(self, req: tsi.ScorerCreateReq) -> tsi.ScorerCreateRes:
-        return self.inner.scorer_create(req)
+        return self.wrapped.scorer_create(req)
 
     def scorer_read(self, req: tsi.ScorerReadReq) -> tsi.ScorerReadRes:
-        return self.inner.scorer_read(req)
+        return self.wrapped.scorer_read(req)
 
     def scorer_list(self, req: tsi.ScorerListReq) -> Iterator[tsi.ScorerReadRes]:
-        return self.inner.scorer_list(req)
+        return self.wrapped.scorer_list(req)
 
     def scorer_delete(self, req: tsi.ScorerDeleteReq) -> tsi.ScorerDeleteRes:
-        return self.inner.scorer_delete(req)
+        return self.wrapped.scorer_delete(req)
 
     def evaluation_create(
         self, req: tsi.EvaluationCreateReq
     ) -> tsi.EvaluationCreateRes:
-        return self.inner.evaluation_create(req)
+        return self.wrapped.evaluation_create(req)
 
     def evaluation_read(self, req: tsi.EvaluationReadReq) -> tsi.EvaluationReadRes:
-        return self.inner.evaluation_read(req)
+        return self.wrapped.evaluation_read(req)
 
     def evaluation_list(
         self, req: tsi.EvaluationListReq
     ) -> Iterator[tsi.EvaluationReadRes]:
-        return self.inner.evaluation_list(req)
+        return self.wrapped.evaluation_list(req)
 
     def evaluation_delete(
         self, req: tsi.EvaluationDeleteReq
     ) -> tsi.EvaluationDeleteRes:
-        return self.inner.evaluation_delete(req)
+        return self.wrapped.evaluation_delete(req)
 
     # Model API
 
     def model_create(self, req: tsi.ModelCreateReq) -> tsi.ModelCreateRes:
-        return self.inner.model_create(req)
+        return self.wrapped.model_create(req)
 
     def model_read(self, req: tsi.ModelReadReq) -> tsi.ModelReadRes:
-        return self.inner.model_read(req)
+        return self.wrapped.model_read(req)
 
     def model_list(self, req: tsi.ModelListReq) -> Iterator[tsi.ModelReadRes]:
-        return self.inner.model_list(req)
+        return self.wrapped.model_list(req)
 
     def model_delete(self, req: tsi.ModelDeleteReq) -> tsi.ModelDeleteRes:
-        return self.inner.model_delete(req)
+        return self.wrapped.model_delete(req)
 
     def evaluation_run_create(
         self, req: tsi.EvaluationRunCreateReq
     ) -> tsi.EvaluationRunCreateRes:
-        return self.inner.evaluation_run_create(req)
+        return self.wrapped.evaluation_run_create(req)
 
     def evaluation_run_read(
         self, req: tsi.EvaluationRunReadReq
     ) -> tsi.EvaluationRunReadRes:
-        return self.inner.evaluation_run_read(req)
+        return self.wrapped.evaluation_run_read(req)
 
     def evaluation_run_list(
         self, req: tsi.EvaluationRunListReq
     ) -> Iterator[tsi.EvaluationRunReadRes]:
-        return self.inner.evaluation_run_list(req)
+        return self.wrapped.evaluation_run_list(req)
 
     def evaluation_run_delete(
         self, req: tsi.EvaluationRunDeleteReq
     ) -> tsi.EvaluationRunDeleteRes:
-        return self.inner.evaluation_run_delete(req)
+        return self.wrapped.evaluation_run_delete(req)
 
     def evaluation_run_finish(
         self, req: tsi.EvaluationRunFinishReq
     ) -> tsi.EvaluationRunFinishRes:
-        return self.inner.evaluation_run_finish(req)
+        return self.wrapped.evaluation_run_finish(req)
 
     # Prediction API
 
     def prediction_create(
         self, req: tsi.PredictionCreateReq
     ) -> tsi.PredictionCreateRes:
-        return self.inner.prediction_create(req)
+        return self.wrapped.prediction_create(req)
 
     def prediction_read(self, req: tsi.PredictionReadReq) -> tsi.PredictionReadRes:
-        return self.inner.prediction_read(req)
+        return self.wrapped.prediction_read(req)
 
     def prediction_list(
         self, req: tsi.PredictionListReq
     ) -> Iterator[tsi.PredictionReadRes]:
-        return self.inner.prediction_list(req)
+        return self.wrapped.prediction_list(req)
 
     def prediction_delete(
         self, req: tsi.PredictionDeleteReq
     ) -> tsi.PredictionDeleteRes:
-        return self.inner.prediction_delete(req)
+        return self.wrapped.prediction_delete(req)
 
     def prediction_finish(
         self, req: tsi.PredictionFinishReq
     ) -> tsi.PredictionFinishRes:
-        return self.inner.prediction_finish(req)
+        return self.wrapped.prediction_finish(req)
 
     # Score API
 
     def score_create(self, req: tsi.ScoreCreateReq) -> tsi.ScoreCreateRes:
-        return self.inner.score_create(req)
+        return self.wrapped.score_create(req)
 
     def score_read(self, req: tsi.ScoreReadReq) -> tsi.ScoreReadRes:
-        return self.inner.score_read(req)
+        return self.wrapped.score_read(req)
 
     def score_list(self, req: tsi.ScoreListReq) -> Iterator[tsi.ScoreReadRes]:
-        return self.inner.score_list(req)
+        return self.wrapped.score_list(req)
 
     def score_delete(self, req: tsi.ScoreDeleteReq) -> tsi.ScoreDeleteRes:
-        return self.inner.score_delete(req)
+        return self.wrapped.score_delete(req)
 
 
 def pydantic_bytes_safe_dump(obj: BaseModel) -> str:

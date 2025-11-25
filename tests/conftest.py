@@ -378,10 +378,10 @@ def create_client(
         inner_server = trace_server
         # Collect all layers for the stack (outer to inner)
         layers = [inner_server]
-        # Walk through .inner attributes to find all layers
+        # Walk through .wrapped attributes to find all layers
         current = inner_server
-        while hasattr(current, "inner"):
-            current = current.inner
+        while hasattr(current, "wrapped"):
+            current = current.wrapped
             layers.append(current)
 
     # Removing this as it lead to passing tests that were not passing in prod!

@@ -133,7 +133,7 @@ def test_server_cache_size_limit(client):
     limit = 50000
     with tempfile.TemporaryDirectory() as temp_dir:
         caching_server = CachingMiddlewareTraceServer(
-            inner=MockServer("a" * 1000),
+            wrapped=MockServer("a" * 1000),
             cache_dir=temp_dir,
             size_limit=50000,
         )
@@ -183,7 +183,7 @@ def test_server_cache_latency(client):
     count = 500
 
     base_server = MockServer("a" * 1000)
-    caching_server = CachingMiddlewareTraceServer(inner=base_server)
+    caching_server = CachingMiddlewareTraceServer(wrapped=base_server)
 
     def get_latency_for_server(server: TraceServerInterface, count: int):
         start = time.time()
