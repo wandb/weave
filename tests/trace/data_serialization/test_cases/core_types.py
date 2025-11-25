@@ -19,12 +19,12 @@ core_cases = [
         exp_json={
             "_type": "CustomWeaveType",
             "weave_type": {"type": "Op"},
-            "files": {"obj.py": "uArqT16jBFwMsG3X0-doxT_X_2iTB-4OEYDQtWM6zME"},
+            "files": {"obj.py": "uArqT16jBFwMsG3X0XdoxTYXY2iTBX4OEYDQtWM6zME"},
         },
         exp_objects=[],
         exp_files=[
             {
-                "digest": "uArqT16jBFwMsG3X0-doxT_X_2iTB-4OEYDQtWM6zME",
+                "digest": "uArqT16jBFwMsG3X0XdoxTYXY2iTBX4OEYDQtWM6zME",
                 "exp_content": b'import weave\n\n@weave.op\ndef say_hello(name: str):\n    return "hello " + name\n',
             }
         ],
@@ -40,24 +40,24 @@ core_cases = [
             "name": None,
             "description": None,
             "my_name": "John",
-            "say_hello": "weave:///shawn/test-project/op/CustomObject.say_hello:ZiIEs8e6Z-WEtOAQMh342bCbSGM7-dotgQ0HIK1wZV4",
+            "say_hello": "weave:///shawn/test-project/op/CustomObject.say_hello:TLgRYvsemwoveeGJcNDuzY5jUFcgSZdWdB2eZdKe598",
             "_class_name": "CustomObject",
             "_bases": ["Object", "BaseModel"],
         },
         exp_objects=[
             {
                 "object_id": "CustomObject.say_hello",
-                "digest": "ZiIEs8e6Z-WEtOAQMh342bCbSGM7-dotgQ0HIK1wZV4",
+                "digest": "TLgRYvsemwoveeGJcNDuzY5jUFcgSZdWdB2eZdKe598",
                 "exp_val": {
                     "_type": "CustomWeaveType",
                     "weave_type": {"type": "Op"},
-                    "files": {"obj.py": "ZiIEs8e6Z-WEtOAQMh342bCbSGM7-dotgQ0HIK1wZV4"},
+                    "files": {"obj.py": "ZiIEs8e6ZXWEtOAQMh342bCbSGM7XdotgQ0HIK1wZV4"},
                 },
             }
         ],
         exp_files=[
             {
-                "digest": "ZiIEs8e6Z-WEtOAQMh342bCbSGM7-dotgQ0HIK1wZV4",
+                "digest": "ZiIEs8e6ZXWEtOAQMh342bCbSGM7XdotgQ0HIK1wZV4",
                 "exp_content": b'import weave\n\n@weave.op\ndef say_hello(self):\n    return "hello " + self.my_name\n',
             }
         ],
