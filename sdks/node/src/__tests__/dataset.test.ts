@@ -44,8 +44,10 @@ describe('Dataset', () => {
     expect(ref.projectId).toBe(projectId);
     expect(ref.objectId).toBe('test-dataset');
 
-    // Read the dataset back
-    const retrievedDataset = await client.get(ref);
+    // Read the dataset back using the factory method
+    const uri = `weave:///${projectId}/object/test-dataset:${ref.digest}`;
+    const refFromUri = ObjectRef.fromUri(uri);
+    const retrievedDataset = await client.get(refFromUri);
 
     expect(retrievedDataset).toBeInstanceOf(Dataset);
     expect(retrievedDataset.name).toBe('test-dataset');

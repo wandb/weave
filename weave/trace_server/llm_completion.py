@@ -3,10 +3,12 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from weave.prompt.prompt import format_message_with_template_vars
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import (
     InvalidRequest,
     MissingLLMApiKeyError,
+    NotFoundError,
 )
 from weave.trace_server.interface.builtin_object_classes.provider import (
     Provider,
@@ -15,6 +17,204 @@ from weave.trace_server.interface.builtin_object_classes.provider import (
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 
 NOVA_MODELS = ("nova-pro-v1", "nova-lite-v1", "nova-micro-v1")
+
+
+def parse_prompt_reference(prompt: str) -> tuple[str, str, str | None]:
+    """Parse a prompt reference into its components.
+
+    Supports multiple reference formats:
+    1. Internal URI: "weave-trace-internal:///project_id/object/name:digest"
+    2. Full weave URI: "weave:///entity/project/object/name:digest"
+    3. Simple format: "object_id:digest" or "object_id:vN"
+    4. Name only: "object_id" (assumes latest version)
+
+    Args:
+        prompt: The prompt reference string to parse
+
+    Returns:
+        Tuple of (object_id, version, project_id_from_uri)
+        - object_id: The name/ID of the prompt object
+        - version: The version/digest (or "latest" if not specified)
+        - project_id_from_uri: The project_id extracted from URI (None for simple format)
+
+    Raises:
+        InvalidRequest: If the prompt reference format is invalid
+
+    Examples:
+        >>> parse_prompt_reference("my_prompt:v1")
+        ("my_prompt", "v1", None)
+
+        >>> parse_prompt_reference("my_prompt")
+        ("my_prompt", "latest", None)
+
+        >>> parse_prompt_reference("weave:///entity/project/object/my_prompt:abc123")
+        ("my_prompt", "abc123", "project_id")
+    """
+    from weave.trace_server import refs_internal as ri
+
+    # Handle Weave URI formats (internal and external)
+    if prompt.startswith(("weave-trace-internal:///", "weave:///")):
+        try:
+            parsed_ref = ri.parse_internal_uri(prompt)
+            if not isinstance(parsed_ref, ri.InternalObjectRef):
+                raise InvalidRequest(
+                    f"Prompt reference must be an object reference, got: {type(parsed_ref).__name__}"
+                )
+            else:
+                return (
+                    parsed_ref.name,
+                    parsed_ref.version,
+                    parsed_ref.project_id or None,
+                )
+        except InvalidRequest:
+            # Re-raise InvalidRequest as-is
+            raise
+        except Exception as e:
+            raise InvalidRequest(
+                f"Failed to parse prompt reference '{prompt}': {e!s}"
+            ) from e
+
+    # Handle simple formats
+    if ":" in prompt:
+        # Format: "object_id:version"
+        object_id, version = prompt.rsplit(":", 1)
+        return object_id, version, None
+
+    # Format: "object_id" (no version specified)
+    return prompt, "latest", None
+
+
+def resolve_prompt_messages(
+    prompt: str,
+    project_id: str,
+    obj_read_func: Callable[[tsi.ObjReadReq], tsi.ObjReadRes],
+) -> list[dict[str, Any]]:
+    """Resolve a prompt reference to its messages.
+
+    Args:
+        prompt: The prompt reference (e.g., "weave:///entity/project/object/prompt_name:version")
+        project_id: The project ID (can be overridden if prompt contains a full URI with project_id)
+        obj_read_func: Function to read objects from the database
+
+    Returns:
+        List of messages from the prompt
+    """
+    object_id, version, uri_project_id = parse_prompt_reference(prompt)
+
+    # Use project_id from URI if available, otherwise use the provided one
+    if uri_project_id:
+        project_id = uri_project_id
+
+    # Fetch the prompt object
+    try:
+        prompt_obj_req = tsi.ObjReadReq(
+            project_id=project_id,
+            object_id=object_id,
+            digest=version,
+            metadata_only=False,
+        )
+        prompt_obj_res = obj_read_func(prompt_obj_req)
+
+        if prompt_obj_res.obj is None:
+            raise NotFoundError(f"Could not find prompt with ref {prompt}")
+
+        # Validate that this is a Prompt or MessagesPrompt object
+        if prompt_obj_res.obj.base_object_class not in ("Prompt", "MessagesPrompt"):
+            raise InvalidRequest(
+                f"Prompt {prompt} is not a Prompt or MessagesPrompt (found {prompt_obj_res.obj.base_object_class})"
+            )
+
+        # Extract messages from the prompt object
+        prompt_val = prompt_obj_res.obj.val
+
+        if not isinstance(prompt_val, dict):
+            raise InvalidRequest(f"Prompt {prompt} has invalid format")
+
+        messages = prompt_val.get("messages", [])
+
+        if not isinstance(messages, list):
+            raise InvalidRequest(f"Prompt {prompt} messages field is not a list")
+        else:
+            return messages
+    except NotFoundError:
+        raise
+    except Exception as e:
+        raise InvalidRequest(
+            f"Failed to resolve prompt reference {prompt}: {e!s}"
+        ) from e
+
+
+def resolve_and_apply_prompt(
+    prompt: str | None,
+    messages: list[dict[str, Any]] | None,
+    template_vars: dict[str, Any] | None,
+    project_id: str,
+    obj_read_func: Callable[[tsi.ObjReadReq], tsi.ObjReadRes],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Resolve prompt reference and apply template variables to combined messages.
+
+    This helper consolidates the logic for:
+    1. Resolving a prompt reference to its messages (if provided)
+    2. Combining prompt messages with user-provided messages
+    3. Applying template variable substitution to the combined messages
+
+    Args:
+        prompt: Optional prompt reference (e.g., "weave:///entity/project/object/prompt:digest")
+        messages: Optional list of user-provided message dictionaries
+        template_vars: Optional dictionary of template variables to replace
+        project_id: The project ID for resolving the prompt
+        obj_read_func: Function to read objects from the database
+
+    Returns:
+        Tuple of (combined_templated_messages, initial_messages):
+        - combined_templated_messages: The final messages with prompt + user messages + template vars applied
+        - initial_messages: The original user-provided messages (before template vars)
+
+    Raises:
+        NotFoundError: If the prompt reference cannot be found
+        InvalidRequest: If the prompt format is invalid or required template variables are missing
+
+    Examples:
+        >>> # With prompt and template vars
+        >>> combined, initial = resolve_and_apply_prompt(
+        ...     prompt="weave:///entity/project/object/my_prompt:v1",
+        ...     messages=[{"role": "user", "content": "Hello"}],
+        ...     template_vars={"name": "World"},
+        ...     project_id="entity/project",
+        ...     obj_read_func=obj_read
+        ... )
+
+        >>> # Without prompt (just user messages)
+        >>> combined, initial = resolve_and_apply_prompt(
+        ...     prompt=None,
+        ...     messages=[{"role": "user", "content": "Hello {name}"}],
+        ...     template_vars={"name": "World"},
+        ...     project_id="entity/project",
+        ...     obj_read_func=obj_read
+        ... )
+    """
+    initial_messages = messages or []
+    prompt_messages = []
+
+    # Step 1: Resolve prompt reference to messages (if provided)
+    if prompt:
+        prompt_messages = resolve_prompt_messages(
+            prompt=prompt,
+            project_id=project_id,
+            obj_read_func=obj_read_func,
+        )
+
+    # Step 2: Combine prompt messages with user messages
+    combined_messages = prompt_messages + initial_messages
+
+    # Step 3: Apply template variable substitution (if provided)
+    if template_vars and combined_messages:
+        combined_messages = [
+            format_message_with_template_vars(msg, **template_vars)
+            for msg in combined_messages
+        ]
+
+    return combined_messages, initial_messages
 
 
 def lite_llm_completion(
@@ -39,6 +239,11 @@ def lite_llm_completion(
     # This allows us to drop params that are not supported by the LLM provider
     litellm.drop_params = True
 
+    # Exclude weave-specific fields that litellm doesn't understand
+    inputs_dict = inputs.model_dump(
+        exclude_none=True, exclude={"prompt", "template_vars"}
+    )
+
     # Handle custom provider
     if provider == "custom" and base_url:
         try:
@@ -47,7 +252,7 @@ def lite_llm_completion(
 
             # Make the API call using litellm
             res = litellm.completion(
-                **inputs.model_dump(exclude_none=True),
+                **inputs_dict,
                 api_key=api_key,
                 api_base=base_url,
                 extra_headers=headers,
@@ -74,7 +279,7 @@ def lite_llm_completion(
 
     try:
         res = litellm.completion(
-            **inputs.model_dump(exclude_none=True),
+            **inputs_dict,
             api_key=api_key,
             aws_access_key_id=aws_access_key_id,
             aws_secret_access_key=aws_secret_access_key,

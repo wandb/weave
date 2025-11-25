@@ -99,6 +99,51 @@ class StringPrompt(Prompt):
         return prompt
 
 
+def format_message_with_template_vars(message: dict, **kwargs: Any) -> dict:
+    """Format a message dictionary by replacing template variables.
+
+    This function recursively processes message dictionaries, replacing template
+    variables in string values using Python's .format() syntax. It handles nested
+    structures like multimodal message content.
+
+    Args:
+        message: Message dictionary to format
+        **kwargs: Template variables to substitute
+
+    Returns:
+        Formatted message dictionary with variables replaced
+
+    Examples:
+        >>> msg = {"role": "user", "content": "Hello {name}"}
+        >>> format_message_with_template_vars(msg, name="World")
+        {"role": "user", "content": "Hello World"}
+
+        >>> # Works with nested structures (multimodal content)
+        >>> msg = {
+        ...     "role": "user",
+        ...     "content": [
+        ...         {"type": "text", "text": "Hello {name}"},
+        ...         {"type": "image_url", "image_url": {"url": "https://..."}}
+        ...     ]
+        ... }
+        >>> result = format_message_with_template_vars(msg, name="World")
+        >>> result["content"][0]["text"]
+        "Hello World"
+    """
+    formatted: dict[str, Any] = {}
+    for key, value in message.items():
+        if isinstance(value, str):
+            formatted[key] = value.format(**kwargs)
+        elif isinstance(value, list) and all(isinstance(d, dict) for d in value):
+            # Recursively format nested dicts in lists
+            formatted[key] = [
+                format_message_with_template_vars(d, **kwargs) for d in value
+            ]
+        else:
+            formatted[key] = value
+    return formatted
+
+
 @register_object
 class MessagesPrompt(Prompt):
     messages: list[dict] = Field(default_factory=list)
@@ -108,15 +153,12 @@ class MessagesPrompt(Prompt):
         self.messages = messages
 
     def format_message(self, message: dict, **kwargs: Any) -> dict:
-        m: dict[str, Any] = {}
-        for k, v in message.items():
-            if isinstance(v, str):
-                m[k] = v.format(**kwargs)
-            elif isinstance(v, list) and all(isinstance(d, dict) for d in v):
-                m[k] = [self.format_message(d, **kwargs) for d in v]
-            else:
-                m[k] = v
-        return m
+        """Format a single message by replacing template variables.
+
+        This method delegates to the standalone format_message_with_template_vars
+        function for the actual formatting logic.
+        """
+        return format_message_with_template_vars(message, **kwargs)
 
     def format(self, **kwargs: Any) -> list:
         return [self.format_message(m, **kwargs) for m in self.messages]

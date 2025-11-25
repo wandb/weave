@@ -11,7 +11,6 @@ from weave.trace_server.interface.builtin_object_classes.llm_structured_model im
     LLMStructuredCompletionModelDefaultParams,
     Message,
     _prepare_llm_messages,
-    _substitute_template_variables,
     cast_to_message,
     cast_to_message_list,
     parse_params_to_litellm_params,
@@ -442,40 +441,6 @@ def test_llm_structured_completion_model_predict_error_handling(
         RuntimeError, match="Failed to extract message from LLM response"
     ):
         model.predict(user_input="Test")
-
-
-def test_substitute_template_variables():
-    """Test the _substitute_template_variables helper function."""
-    # Test basic substitution
-    messages = [
-        Message(role="system", content="You are {assistant_name}"),
-        Message(role="user", content="Hello {user_name}, how are you?"),
-    ]
-
-    template_vars = {"assistant_name": "Claude", "user_name": "Alice"}
-    result = _substitute_template_variables(messages, template_vars)
-
-    assert len(result) == 2
-    assert result[0].content == "You are Claude"
-    assert result[1].content == "Hello Alice, how are you?"
-    assert result[0].role == "system"
-    assert result[1].role == "user"
-
-    # Test missing template variable
-    with pytest.raises(ValueError, match="Template variable"):
-        _substitute_template_variables(
-            [Message(role="user", content="Hello {missing_var}")],
-            {"other_var": "value"},
-        )
-
-    # Test message without content
-    messages_no_content = [
-        Message(role="system", content=None),
-        Message(role="user", content="Hello {name}"),
-    ]
-    result = _substitute_template_variables(messages_no_content, {"name": "World"})
-    assert result[0].content is None
-    assert result[1].content == "Hello World"
 
 
 def test_prepare_llm_messages():

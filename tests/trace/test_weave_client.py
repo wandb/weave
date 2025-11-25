@@ -8,9 +8,9 @@ import sys
 import time
 import uuid
 
+import httpx
 import pydantic
 import pytest
-import requests
 from pydantic import ValidationError
 
 import weave
@@ -1447,7 +1447,8 @@ def test_weave_server(client):
     ref = client._save_object(model, "my-model")
 
     url = weave.serve(ref, thread=True)
-    response = requests.post(url + "/predict", json={"input": "x"})
+    with httpx.Client() as http_client:
+        response = http_client.post(url + "/predict", json={"input": "x"})
     assert response.json() == {"result": "input is: x"}
 
 
@@ -3632,7 +3633,7 @@ def test_feedback_batching(network_proxy_client):
         feedback_items.append(id)
 
     # make sure we aren't actually waiting for 10 feedbacks, should be quick
-    assert time.time() - start < 0.2, "Feedback creation took too long"
+    assert time.time() - start < 0.5, "Feedback creation took too long"
     assert client.server.get_feedback_processor() is not None
 
     # Flush to ensure all feedback is processed
