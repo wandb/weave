@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 import warnings
 from collections.abc import Iterable, Iterator
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, Union
+from typing import TYPE_CHECKING, Any, Generic, TypeVar, Union
 
 from pydantic import field_validator
 from typing_extensions import Self
@@ -22,9 +24,11 @@ if TYPE_CHECKING:
     from datasets import Dataset as HFDataset
     from datasets import DatasetDict as HFDatasetDict
 
+R = TypeVar("R", bound=dict[str, Any])
+
 
 @register_object
-class Dataset(Object):
+class Dataset(Object, Generic[R]):
     """Dataset object with easy saving and automatic versioning.
 
     Examples:
@@ -47,7 +51,7 @@ class Dataset(Object):
     ```
     """
 
-    rows: Union[Table, WeaveTable]
+    rows: Union[Table[R], WeaveTable]
 
     @classmethod
     def from_obj(cls, obj: WeaveObject) -> Self:
@@ -126,7 +130,7 @@ class Dataset(Object):
         data = {key: [row.get(key) for row in self.rows] for key in self.rows[0]}
         return HFDataset.from_dict(data)
 
-    def add_rows(self, rows: Iterable[dict]) -> "Dataset":
+    def add_rows(self, rows: Iterable[R]) -> Dataset[R]:
         """Create a new dataset version by appending rows to the existing dataset.
 
         This is useful for adding examples to large datasets without having to
@@ -171,7 +175,7 @@ class Dataset(Object):
         return new_dataset
 
     @field_validator("rows", mode="before")
-    def convert_to_table(cls, rows: Any) -> Union[Table, WeaveTable]:  # noqa: N805
+    def convert_to_table(cls, rows: Any) -> Union[Table[R], WeaveTable]:  # noqa: N805
         if weave_isinstance(rows, WeaveTable):
             return rows
         if not isinstance(rows, Table):
@@ -195,13 +199,13 @@ class Dataset(Object):
                 )
         return rows
 
-    def __iter__(self) -> Iterator[dict]:
+    def __iter__(self) -> Iterator[R]:
         return iter(self.rows)
 
     def __len__(self) -> int:
         return len(self.rows)
 
-    def __getitem__(self, key: int) -> dict:
+    def __getitem__(self, key: int) -> R:
         if key < 0:
             raise IndexError("Negative indexing is not supported")
         return self.rows[key]
