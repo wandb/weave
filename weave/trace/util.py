@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import importlib
 import warnings
-from collections.abc import Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from concurrent.futures import ThreadPoolExecutor as _ThreadPoolExecutor
 from contextvars import Context, copy_context
 from functools import partial, wraps
 from threading import Thread as _Thread
-from typing import Any, Callable
+from typing import Any
 
 LOG_ONCE_MESSAGE_SUFFIX = " (subsequent messages of this type will be suppressed)"
 logged_messages = []
@@ -177,5 +177,3 @@ def deprecated(new_name: str) -> Callable[[Callable[..., Any]], Callable[..., An
 # rename for cleaner export
 ThreadPoolExecutor = ContextAwareThreadPoolExecutor
 Thread = ContextAwareThread
-
-__docspec__ = [ThreadPoolExecutor, Thread]

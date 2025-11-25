@@ -15,10 +15,6 @@
 # and as the repository path for updating pyproject.toml
 python_output: /path/to/your/local/python/repo
 
-# Path to the Node package repository (optional)
-# Comment out or remove if not needed
-# node_output: /path/to/your/local/node/repo
-
 # Path to the TypeScript package repository (optional)
 # Comment out or remove if not needed
 # typescript_output: /path/to/your/local/typescript/repo
@@ -31,6 +27,3 @@ openapi_output: tools/codegen/openapi.json
 
 # Package name for pyproject.toml updates (required)
 package_name: weave_server_sdk
-
-# Whether to use release version instead of git SHA (optional, defaults to false)
-release: false

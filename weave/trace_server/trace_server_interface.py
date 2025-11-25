@@ -1,7 +1,7 @@
 import datetime
 from collections.abc import Iterator
 from enum import Enum
-from typing import Any, Literal, Optional, Protocol, Union
+from typing import Any, Literal, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field, field_serializer
 from typing_extensions import TypedDict
@@ -28,27 +28,27 @@ ExtraKeysTypedDict.__pydantic_config__ = ConfigDict(extra="allow")  # type: igno
 
 
 class LLMUsageSchema(TypedDict, total=False):
-    prompt_tokens: Optional[int]
-    input_tokens: Optional[int]
-    completion_tokens: Optional[int]
-    output_tokens: Optional[int]
-    requests: Optional[int]
-    total_tokens: Optional[int]
+    prompt_tokens: int | None
+    input_tokens: int | None
+    completion_tokens: int | None
+    output_tokens: int | None
+    requests: int | None
+    total_tokens: int | None
 
 
 class LLMCostSchema(LLMUsageSchema):
-    prompt_tokens_total_cost: Optional[float]
-    completion_tokens_total_cost: Optional[float]
-    prompt_token_cost: Optional[float]
-    completion_token_cost: Optional[float]
-    prompt_token_cost_unit: Optional[str]
-    completion_token_cost_unit: Optional[str]
-    effective_date: Optional[str]
-    provider_id: Optional[str]
-    pricing_level: Optional[str]
-    pricing_level_id: Optional[str]
-    created_at: Optional[str]
-    created_by: Optional[str]
+    prompt_tokens_total_cost: float | None
+    completion_tokens_total_cost: float | None
+    prompt_token_cost: float | None
+    completion_token_cost: float | None
+    prompt_token_cost_unit: str | None
+    completion_token_cost_unit: str | None
+    effective_date: str | None
+    provider_id: str | None
+    pricing_level: str | None
+    pricing_level_id: str | None
+    created_at: str | None
+    created_by: str | None
 
 
 class FeedbackDict(TypedDict, total=False):
@@ -56,9 +56,9 @@ class FeedbackDict(TypedDict, total=False):
     feedback_type: str
     weave_ref: str
     payload: dict[str, Any]
-    creator: Optional[str]
-    created_at: Optional[datetime.datetime]
-    wb_user_id: Optional[str]
+    creator: str | None
+    created_at: datetime.datetime | None
+    wb_user_id: str | None
 
 
 class TraceStatus(str, Enum):
@@ -69,12 +69,12 @@ class TraceStatus(str, Enum):
 
 
 class WeaveSummarySchema(ExtraKeysTypedDict, total=False):
-    status: Optional[TraceStatus]
-    trace_name: Optional[str]
+    status: TraceStatus | None
+    trace_name: str | None
     # latency in milliseconds
-    latency_ms: Optional[int]
-    costs: Optional[dict[str, LLMCostSchema]]
-    feedback: Optional[list[FeedbackDict]]
+    latency_ms: int | None
+    costs: dict[str, LLMCostSchema] | None
+    feedback: list[FeedbackDict] | None
 
 
 class SummaryInsertMap(ExtraKeysTypedDict, total=False):
@@ -83,7 +83,7 @@ class SummaryInsertMap(ExtraKeysTypedDict, total=False):
 
 
 class SummaryMap(SummaryInsertMap, total=False):
-    weave: Optional[WeaveSummarySchema]
+    weave: WeaveSummarySchema | None
 
 
 class CallSchema(BaseModel):
@@ -93,16 +93,16 @@ class CallSchema(BaseModel):
     # Name of the calling function (op)
     op_name: str
     # Optional display name of the call
-    display_name: Optional[str] = None
+    display_name: str | None = None
 
     # Trace ID
     trace_id: str
     # Parent ID is optional because the call may be a root
-    parent_id: Optional[str] = None
+    parent_id: str | None = None
     # Thread ID is optional
-    thread_id: Optional[str] = None
+    thread_id: str | None = None
     # Turn ID is optional
-    turn_id: Optional[str] = None
+    turn_id: str | None = None
 
     # Start time is required
     started_at: datetime.datetime
@@ -113,30 +113,30 @@ class CallSchema(BaseModel):
     inputs: dict[str, Any]
 
     # End time is required if finished
-    ended_at: Optional[datetime.datetime] = None
+    ended_at: datetime.datetime | None = None
 
     # Exception is present if the call failed
-    exception: Optional[str] = None
+    exception: str | None = None
 
     # Outputs
-    output: Optional[Any] = None
+    output: Any | None = None
 
     # Summary: a summary of the call
-    summary: Optional[SummaryMap] = None
+    summary: SummaryMap | None = None
 
     # WB Metadata
-    wb_user_id: Optional[str] = None
-    wb_run_id: Optional[str] = None
-    wb_run_step: Optional[int] = None
-    wb_run_step_end: Optional[int] = None
+    wb_user_id: str | None = None
+    wb_run_id: str | None = None
+    wb_run_step: int | None = None
+    wb_run_step_end: int | None = None
 
-    deleted_at: Optional[datetime.datetime] = None
+    deleted_at: datetime.datetime | None = None
 
     # Size of metadata storage for this call
-    storage_size_bytes: Optional[int] = None
+    storage_size_bytes: int | None = None
 
     # Total size of metadata storage for the entire trace
-    total_storage_size_bytes: Optional[int] = None
+    total_storage_size_bytes: int | None = None
 
     @field_serializer("attributes", "summary", when_used="unless-none")
     def serialize_typed_dicts(self, v: dict[str, Any]) -> dict[str, Any]:
@@ -148,21 +148,21 @@ class CallSchema(BaseModel):
 # - trace_id is not required (will be generated)
 class StartedCallSchemaForInsert(BaseModel):
     project_id: str
-    id: Optional[str] = None  # Will be generated if not provided
+    id: str | None = None  # Will be generated if not provided
 
     # Name of the calling function (op)
     op_name: str
     # Optional display name of the call
-    display_name: Optional[str] = None
+    display_name: str | None = None
 
     # Trace ID
-    trace_id: Optional[str] = None  # Will be generated if not provided
+    trace_id: str | None = None  # Will be generated if not provided
     # Parent ID is optional because the call may be a root
-    parent_id: Optional[str] = None
+    parent_id: str | None = None
     # Thread ID is optional
-    thread_id: Optional[str] = None
+    thread_id: str | None = None
     # Turn ID is optional
-    turn_id: Optional[str] = None
+    turn_id: str | None = None
 
     # Start time is required
     started_at: datetime.datetime
@@ -173,12 +173,12 @@ class StartedCallSchemaForInsert(BaseModel):
     inputs: dict[str, Any]
 
     # OTEL span data source of truth
-    otel_dump: Optional[dict[str, Any]] = None
+    otel_dump: dict[str, Any] | None = None
 
     # WB Metadata
-    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
-    wb_run_id: Optional[str] = None
-    wb_run_step: Optional[int] = None
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
+    wb_run_id: str | None = None
+    wb_run_step: int | None = None
 
 
 class EndedCallSchemaForInsert(BaseModel):
@@ -189,16 +189,16 @@ class EndedCallSchemaForInsert(BaseModel):
     ended_at: datetime.datetime
 
     # Exception is present if the call failed
-    exception: Optional[str] = None
+    exception: str | None = None
 
     # Outputs
-    output: Optional[Any] = None
+    output: Any | None = None
 
     # Summary: a summary of the call
     summary: SummaryInsertMap
 
     # WB Metadata
-    wb_run_step_end: Optional[int] = None
+    wb_run_step_end: int | None = None
 
     @field_serializer("summary")
     def serialize_typed_dicts(self, v: dict[str, Any]) -> dict[str, Any]:
@@ -209,30 +209,30 @@ class ObjSchema(BaseModel):
     project_id: str
     object_id: str
     created_at: datetime.datetime
-    deleted_at: Optional[datetime.datetime] = None
+    deleted_at: datetime.datetime | None = None
     digest: str
     version_index: int
     is_latest: int
     kind: str
-    base_object_class: Optional[str]
-    leaf_object_class: Optional[str] = None
+    base_object_class: str | None
+    leaf_object_class: str | None = None
     val: Any
 
-    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
-    size_bytes: Optional[int] = None
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
+    size_bytes: int | None = None
 
 
 class ObjSchemaForInsert(BaseModel):
     project_id: str
     object_id: str
     val: Any
-    builtin_object_class: Optional[str] = None
+    builtin_object_class: str | None = None
     # Keeping `set_base_object_class` here until it is successfully removed from UI client
-    set_base_object_class: Optional[str] = Field(
+    set_base_object_class: str | None = Field(
         exclude=True, default=None, deprecated=True
     )
 
-    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
 
     def model_post_init(self, __context: Any) -> None:
         # If set_base_object_class is provided, use it to set builtin_object_class for backwards compatibility
@@ -250,8 +250,8 @@ class OtelExportReq(BaseModel):
     project_id: str
     # traces must be ExportTraceServiceRequest payload but allowing Any removes the proto package as a requirement.
     traces: Any
-    wb_run_id: Optional[str] = None
-    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+    wb_run_id: str | None = None
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
 class ExportTracePartialSuccess(BaseModel):
@@ -262,7 +262,7 @@ class ExportTracePartialSuccess(BaseModel):
 # Spec requires that the response be of type Export<signal>ServiceResponse
 # https://opentelemetry.io/docs/specs/otlp/
 class OtelExportRes(BaseModel):
-    partial_success: Optional[ExportTracePartialSuccess] = Field(
+    partial_success: ExportTracePartialSuccess | None = Field(
         default=None,
         description="The details of a partially successful export request. When None or rejected_spans is 0, the request was fully accepted.",
     )
@@ -296,23 +296,23 @@ class CallBatchEndMode(BaseModel):
 
 
 class CallCreateBatchReq(BaseModelStrict):
-    batch: list[Union[CallBatchStartMode, CallBatchEndMode]]
+    batch: list[CallBatchStartMode | CallBatchEndMode]
 
 
 class CallCreateBatchRes(BaseModel):
-    res: list[Union[CallStartRes, CallEndRes]]
+    res: list[CallStartRes | CallEndRes]
 
 
 class CallReadReq(BaseModelStrict):
     project_id: str
     id: str
-    include_costs: Optional[bool] = False
-    include_storage_size: Optional[bool] = False
-    include_total_storage_size: Optional[bool] = False
+    include_costs: bool | None = False
+    include_storage_size: bool | None = False
+    include_total_storage_size: bool | None = False
 
 
 class CallReadRes(BaseModel):
-    call: Optional[CallSchema]
+    call: CallSchema | None
 
 
 class CallsDeleteReq(BaseModelStrict):
@@ -320,7 +320,7 @@ class CallsDeleteReq(BaseModelStrict):
     call_ids: list[str]
 
     # wb_user_id is automatically populated by the server
-    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
 class CallsDeleteRes(BaseModel):
@@ -330,59 +330,72 @@ class CallsDeleteRes(BaseModel):
 class CompletionsCreateRequestInputs(BaseModel):
     model: str
     messages: list = []
-    timeout: Optional[Union[float, str]] = None
-    temperature: Optional[float] = None
-    top_p: Optional[float] = None
-    n: Optional[int] = None
-    stop: Optional[Union[str, list]] = None
-    max_completion_tokens: Optional[int] = None
-    max_tokens: Optional[int] = None
-    modalities: Optional[list] = None
-    presence_penalty: Optional[float] = None
-    frequency_penalty: Optional[float] = None
-    stream: Optional[bool] = None
-    logit_bias: Optional[dict] = None
-    user: Optional[str] = None
+    timeout: float | str | None = None
+    temperature: float | None = None
+    top_p: float | None = None
+    n: int | None = None
+    stop: str | list | None = None
+    max_completion_tokens: int | None = None
+    max_tokens: int | None = None
+    modalities: list | None = None
+    presence_penalty: float | None = None
+    frequency_penalty: float | None = None
+    stream: bool | None = None
+    logit_bias: dict | None = None
+    user: str | None = None
     # openai v1.0+ new params
-    response_format: Optional[Union[dict, type[BaseModel]]] = None
-    seed: Optional[int] = None
-    tools: Optional[list] = None
-    tool_choice: Optional[Union[str, dict]] = None
-    logprobs: Optional[bool] = None
-    top_logprobs: Optional[int] = None
-    parallel_tool_calls: Optional[bool] = None
-    extra_headers: Optional[dict] = None
+    response_format: dict | type[BaseModel] | None = None
+    seed: int | None = None
+    tools: list | None = None
+    tool_choice: str | dict | None = None
+    logprobs: bool | None = None
+    top_logprobs: int | None = None
+    parallel_tool_calls: bool | None = None
+    extra_headers: dict | None = None
     # soon to be deprecated params by OpenAI
-    functions: Optional[list] = None
-    function_call: Optional[str] = None
-    api_version: Optional[str] = None
+    functions: list | None = None
+    function_call: str | None = None
+    api_version: str | None = None
+    # Weave-specific params
+    prompt: str | None = Field(
+        None,
+        description="Reference to a Weave Prompt object (e.g., 'weave:///entity/project/object/prompt_name:version'). "
+        "If provided, the messages from this prompt will be prepended to the messages in this request. "
+        "Template variables in the prompt messages can be substituted using the template_vars parameter.",
+    )
+    template_vars: dict[str, Any] | None = Field(
+        None,
+        description="Dictionary of template variables to substitute in prompt messages. "
+        "Variables in messages like '{variable_name}' will be replaced with the corresponding values. "
+        "Applied to both prompt messages (if prompt is provided) and regular messages.",
+    )
 
 
 class CompletionsCreateReq(BaseModelStrict):
     project_id: str
     inputs: CompletionsCreateRequestInputs
-    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
-    track_llm_call: Optional[bool] = Field(
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
+    track_llm_call: bool | None = Field(
         True, description="Whether to track this LLM call in the trace server"
     )
 
 
 class CompletionsCreateRes(BaseModel):
     response: dict[str, Any]
-    weave_call_id: Optional[str] = None
+    weave_call_id: str | None = None
 
 
 class ImageGenerationRequestInputs(BaseModel):
     model: str
     prompt: str
-    n: Optional[int] = None
+    n: int | None = None
 
 
 class ImageGenerationCreateReq(BaseModel):
     project_id: str
     inputs: ImageGenerationRequestInputs
-    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
-    track_llm_call: Optional[bool] = Field(
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
+    track_llm_call: bool | None = Field(
         True,
         description="Whether to track this image generation call in the trace server",
     )
@@ -390,21 +403,21 @@ class ImageGenerationCreateReq(BaseModel):
 
 class ImageGenerationCreateRes(BaseModel):
     response: dict[str, Any]
-    weave_call_id: Optional[str] = None
+    weave_call_id: str | None = None
 
 
 class CallsFilter(BaseModelStrict):
-    op_names: Optional[list[str]] = None
-    input_refs: Optional[list[str]] = None
-    output_refs: Optional[list[str]] = None
-    parent_ids: Optional[list[str]] = None
-    trace_ids: Optional[list[str]] = None
-    call_ids: Optional[list[str]] = None
-    thread_ids: Optional[list[str]] = None
-    turn_ids: Optional[list[str]] = None
-    trace_roots_only: Optional[bool] = None
-    wb_user_ids: Optional[list[str]] = None
-    wb_run_ids: Optional[list[str]] = None
+    op_names: list[str] | None = None
+    input_refs: list[str] | None = None
+    output_refs: list[str] | None = None
+    parent_ids: list[str] | None = None
+    trace_ids: list[str] | None = None
+    call_ids: list[str] | None = None
+    thread_ids: list[str] | None = None
+    turn_ids: list[str] | None = None
+    trace_roots_only: bool | None = None
+    wb_user_ids: list[str] | None = None
+    wb_run_ids: list[str] | None = None
 
 
 class SortBy(BaseModelStrict):
@@ -418,28 +431,28 @@ class SortBy(BaseModelStrict):
 
 class CallsQueryReq(BaseModelStrict):
     project_id: str
-    filter: Optional[CallsFilter] = None
-    limit: Optional[int] = None
-    offset: Optional[int] = None
+    filter: CallsFilter | None = None
+    limit: int | None = None
+    offset: int | None = None
     # Sort by multiple fields
-    sort_by: Optional[list[SortBy]] = None
-    query: Optional[Query] = None
-    include_costs: Optional[bool] = Field(
+    sort_by: list[SortBy] | None = None
+    query: Query | None = None
+    include_costs: bool | None = Field(
         default=False,
         description="Beta, subject to change. If true, the response will"
         " include any model costs for each call.",
     )
-    include_feedback: Optional[bool] = Field(
+    include_feedback: bool | None = Field(
         default=False,
         description="Beta, subject to change. If true, the response will"
         " include feedback for each call.",
     )
-    include_storage_size: Optional[bool] = Field(
+    include_storage_size: bool | None = Field(
         default=False,
         description="Beta, subject to change. If true, the response will"
         " include the storage size for a call.",
     )
-    include_total_storage_size: Optional[bool] = Field(
+    include_total_storage_size: bool | None = Field(
         default=False,
         description="Beta, subject to change. If true, the response will"
         " include the total storage size for a trace.",
@@ -447,7 +460,7 @@ class CallsQueryReq(BaseModelStrict):
 
     # TODO: type this with call schema columns, following the same rules as
     # SortBy and thus GetFieldOperator.get_field_ (without direction)
-    columns: Optional[list[str]] = None
+    columns: list[str] | None = None
 
     # Columns to expand, i.e. refs to other objects, can be nested
     # Also used to provide a list of refs to expand when filtering or sorting.
@@ -456,7 +469,7 @@ class CallsQueryReq(BaseModelStrict):
     # When filtering and ordering, expand_columns can include paths to objects
     # that are stored in the table_rows table.
     # TODO: support expand_columns for refs to objects in table_rows (dataset rows)
-    expand_columns: Optional[list[str]] = Field(
+    expand_columns: list[str] | None = Field(
         default=None,
         examples=[["inputs.self.message", "inputs.model.prompt"]],
         description="Columns to expand, i.e. refs to other objects",
@@ -468,7 +481,7 @@ class CallsQueryReq(BaseModelStrict):
     # refs when filtering or sorting. Set this value to false to filter/order
     # by refs but rely on client methods for actually resolving the values. The
     # default is to resolve and return expanded values when expand_columns is set.
-    return_expanded_column_values: Optional[bool] = Field(
+    return_expanded_column_values: bool | None = Field(
         default=True,
         description="If true, the response will include raw values for expanded columns. "
         "If false, the response expand_columns will only be used for filtering and ordering. "
@@ -482,14 +495,14 @@ class CallsQueryRes(BaseModel):
 
 class CallsQueryStatsReq(BaseModelStrict):
     project_id: str
-    filter: Optional[CallsFilter] = None
-    query: Optional[Query] = None
-    limit: Optional[int] = None
-    include_total_storage_size: Optional[bool] = False
+    filter: CallsFilter | None = None
+    query: Query | None = None
+    limit: int | None = None
+    include_total_storage_size: bool | None = False
     # List of columns that include refs to objects or table rows that require
     # expansion during filtering or ordering. Required when filtering
     # on reffed fields.
-    expand_columns: Optional[list[str]] = Field(
+    expand_columns: list[str] | None = Field(
         default=None,
         examples=[["inputs.self.message", "inputs.model.prompt"]],
         description="Columns with refs to objects or table rows that require expansion during filtering or ordering.",
@@ -498,7 +511,7 @@ class CallsQueryStatsReq(BaseModelStrict):
 
 class CallsQueryStatsRes(BaseModel):
     count: int
-    total_storage_size_bytes: Optional[int] = None
+    total_storage_size_bytes: int | None = None
 
 
 class CallUpdateReq(BaseModelStrict):
@@ -507,46 +520,14 @@ class CallUpdateReq(BaseModelStrict):
     call_id: str
 
     # optional update fields
-    display_name: Optional[str] = None
+    display_name: str | None = None
 
     # wb_user_id is automatically populated by the server
-    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
 class CallUpdateRes(BaseModel):
     pass
-
-
-class OpCreateReq(BaseModelStrict):
-    op_obj: ObjSchemaForInsert
-
-
-class OpCreateRes(BaseModel):
-    digest: str
-
-
-class OpReadReq(BaseModelStrict):
-    project_id: str
-    name: str
-    digest: str
-
-
-class OpReadRes(BaseModel):
-    op_obj: ObjSchema
-
-
-class OpVersionFilter(BaseModel):
-    op_names: Optional[list[str]] = None
-    latest_only: Optional[bool] = None
-
-
-class OpQueryReq(BaseModelStrict):
-    project_id: str
-    filter: Optional[OpVersionFilter] = None
-
-
-class OpQueryRes(BaseModel):
-    op_objs: list[ObjSchema]
 
 
 class ObjCreateReq(BaseModelStrict):
@@ -554,7 +535,8 @@ class ObjCreateReq(BaseModelStrict):
 
 
 class ObjCreateRes(BaseModel):
-    digest: str  #
+    digest: str
+    object_id: str | None = None
 
 
 class ObjReadReq(BaseModelStrict):
@@ -562,7 +544,7 @@ class ObjReadReq(BaseModelStrict):
     object_id: str
     digest: str
 
-    metadata_only: Optional[bool] = Field(
+    metadata_only: bool | None = Field(
         default=False,
         description="If true, the `val` column is not read from the database and is empty."
         "All other fields are returned.",
@@ -574,32 +556,32 @@ class ObjReadRes(BaseModel):
 
 
 class ObjectVersionFilter(BaseModelStrict):
-    base_object_classes: Optional[list[str]] = Field(
+    base_object_classes: list[str] | None = Field(
         default=None,
         description="Filter objects by their base classes",
         examples=[["Model"], ["Dataset"]],
     )
-    exclude_base_object_classes: Optional[list[str]] = Field(
+    exclude_base_object_classes: list[str] | None = Field(
         default=None,
         description="Exclude objects by their base classes",
         examples=[["Model"], ["Dataset"]],
     )
-    leaf_object_classes: Optional[list[str]] = Field(
+    leaf_object_classes: list[str] | None = Field(
         default=None,
         description="Filter objects by their leaf classes",
         examples=[["Model"], ["Dataset"], ["LLMStructuredCompletionModel"]],
     )
-    object_ids: Optional[list[str]] = Field(
+    object_ids: list[str] | None = Field(
         default=None,
         description="Filter objects by their IDs",
         examples=["my_favorite_model", "my_favorite_dataset"],
     )
-    is_op: Optional[bool] = Field(
+    is_op: bool | None = Field(
         default=None,
         description="Filter objects based on whether they are weave.ops or not. `True` will only return ops, `False` will return non-ops, and `None` will return all objects",
         examples=[True, False, None],
     )
-    latest_only: Optional[bool] = Field(
+    latest_only: bool | None = Field(
         default=None,
         description="If True, return only the latest version of each object. `False` and `None` will return all versions",
         examples=[True, False],
@@ -610,32 +592,32 @@ class ObjQueryReq(BaseModelStrict):
     project_id: str = Field(
         description="The ID of the project to query", examples=["user/project"]
     )
-    filter: Optional[ObjectVersionFilter] = Field(
+    filter: ObjectVersionFilter | None = Field(
         default=None,
         description="Filter criteria for the query. See `ObjectVersionFilter`",
         examples=[
             ObjectVersionFilter(object_ids=["my_favorite_model"], latest_only=True)
         ],
     )
-    limit: Optional[int] = Field(
+    limit: int | None = Field(
         default=None, description="Maximum number of results to return", examples=[100]
     )
-    offset: Optional[int] = Field(
+    offset: int | None = Field(
         default=None,
         description="Number of results to skip before returning",
         examples=[0],
     )
-    sort_by: Optional[list[SortBy]] = Field(
+    sort_by: list[SortBy] | None = Field(
         default=None,
         description="Sorting criteria for the query results. Currently only supports 'object_id' and 'created_at'.",
         examples=[[SortBy(field="created_at", direction="desc")]],
     )
-    metadata_only: Optional[bool] = Field(
+    metadata_only: bool | None = Field(
         default=False,
         description="If true, the `val` column is not read from the database and is empty."
         "All other fields are returned.",
     )
-    include_storage_size: Optional[bool] = Field(
+    include_storage_size: bool | None = Field(
         default=False,
         description="If true, the `size_bytes` column is returned.",
     )
@@ -644,7 +626,7 @@ class ObjQueryReq(BaseModelStrict):
 class ObjDeleteReq(BaseModelStrict):
     project_id: str
     object_id: str
-    digests: Optional[list[str]] = Field(
+    digests: list[str] | None = Field(
         default=None,
         description="List of digests to delete. If not provided, all digests for the object will be deleted.",
     )
@@ -747,7 +729,7 @@ class TableInsertSpec(BaseModel):
     insert: TableInsertSpecPayload
 
 
-TableUpdateSpec = Union[TableAppendSpec, TablePopSpec, TableInsertSpec]
+TableUpdateSpec = TableAppendSpec | TablePopSpec | TableInsertSpec
 
 
 class TableUpdateReq(BaseModelStrict):
@@ -775,7 +757,7 @@ class TableUpdateRes(BaseModel):
 class TableRowSchema(BaseModel):
     digest: str
     val: Any
-    original_index: Optional[int] = None
+    original_index: int | None = None
 
 
 class TableCreateRes(BaseModel):
@@ -795,7 +777,7 @@ class TableCreateRes(BaseModel):
 
 
 class TableRowFilter(BaseModelStrict):
-    row_digests: Optional[list[str]] = Field(
+    row_digests: list[str] | None = Field(
         default=None,
         description="List of row digests to filter by",
         examples=[
@@ -815,7 +797,7 @@ class TableQueryReq(BaseModelStrict):
         description="The digest of the table to query",
         examples=["aonareimsvtl13apimtalpa4435rpmgnaemrpgmarltarstaorsnte134avrims"],
     )
-    filter: Optional[TableRowFilter] = Field(
+    filter: TableRowFilter | None = Field(
         default=None,
         description="Optional filter to apply to the query. See `TableRowFilter` for more details.",
         examples=[
@@ -827,15 +809,15 @@ class TableQueryReq(BaseModelStrict):
             }
         ],
     )
-    limit: Optional[int] = Field(
+    limit: int | None = Field(
         default=None, description="Maximum number of rows to return", examples=[100]
     )
-    offset: Optional[int] = Field(
+    offset: int | None = Field(
         default=None,
         description="Number of rows to skip before starting to return rows",
         examples=[10],
     )
-    sort_by: Optional[list[SortBy]] = Field(
+    sort_by: list[SortBy] | None = Field(
         default=None,
         description="List of fields to sort by. Fields can be dot-separated to access dictionary values. No sorting uses the default table order (insertion order).",
         examples=[[{"field": "col_a.prop_b", "order": "desc"}]],
@@ -860,7 +842,7 @@ class TableQueryStatsBatchReq(BaseModelStrict):
         description="The ID of the project", examples=["my_entity/my_project"]
     )
 
-    digests: Optional[list[str]] = Field(
+    digests: list[str] | None = Field(
         description="The digests of the tables to query",
         examples=[
             "aonareimsvtl13apimtalpa4435rpmgnaemrpgmarltarstaorsnte134avrims",
@@ -868,7 +850,7 @@ class TableQueryStatsBatchReq(BaseModelStrict):
         ],
         default=[],
     )
-    include_storage_size: Optional[bool] = Field(
+    include_storage_size: bool | None = Field(
         default=False,
         description="If true, the `storage_size_bytes` column is returned.",
     )
@@ -881,7 +863,7 @@ class TableQueryStatsRes(BaseModel):
 class TableStatsRow(BaseModel):
     count: int
     digest: str
-    storage_size_bytes: Optional[int] = None
+    storage_size_bytes: int | None = None
 
 
 class TableQueryStatsBatchRes(BaseModel):
@@ -897,14 +879,14 @@ class RefsReadBatchRes(BaseModel):
 
 
 class FeedbackCreateReq(BaseModelStrict):
-    id: Optional[str] = Field(
+    id: str | None = Field(
         default=None,
         description="If provided by the client, this ID will be used for the feedback row instead of a server-generated one.",
         examples=["018f1f2a-9c2b-7d3e-b5a1-8c9d2e4f6a7b"],
     )
     project_id: str = Field(examples=["entity/project"])
     weave_ref: str = Field(examples=["weave:///entity/project/object/name:digest"])
-    creator: Optional[str] = Field(default=None, examples=["Jane Smith"])
+    creator: str | None = Field(default=None, examples=["Jane Smith"])
     feedback_type: str = Field(examples=["custom"])
     payload: dict[str, Any] = Field(
         examples=[
@@ -915,21 +897,21 @@ class FeedbackCreateReq(BaseModelStrict):
     )
     # TODO: From Griffin: `it would be nice if we could type this to a kind of ref,
     # like objectRef, with a pydantic validator and then check its construction in the client.`
-    annotation_ref: Optional[str] = Field(
+    annotation_ref: str | None = Field(
         default=None, examples=["weave:///entity/project/object/name:digest"]
     )
-    runnable_ref: Optional[str] = Field(
+    runnable_ref: str | None = Field(
         default=None, examples=["weave:///entity/project/op/name:digest"]
     )
-    call_ref: Optional[str] = Field(
+    call_ref: str | None = Field(
         default=None, examples=["weave:///entity/project/call/call_id"]
     )
-    trigger_ref: Optional[str] = Field(
+    trigger_ref: str | None = Field(
         default=None, examples=["weave:///entity/project/object/name:digest"]
     )
 
     # wb_user_id is automatically populated by the server
-    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
 # The response provides the additional fields needed to convert a request
@@ -949,15 +931,15 @@ class Feedback(FeedbackCreateReq):
 
 class FeedbackQueryReq(BaseModelStrict):
     project_id: str = Field(examples=["entity/project"])
-    fields: Optional[list[str]] = Field(
+    fields: list[str] | None = Field(
         default=None, examples=[["id", "feedback_type", "payload.note"]]
     )
-    query: Optional[Query] = None
+    query: Query | None = None
     # TODO: I think I would prefer to call this order_by to match SQL, but this is what calls API uses
     # TODO: Might be nice to have shortcut for single field and implied ASC direction
-    sort_by: Optional[list[SortBy]] = None
-    limit: Optional[int] = Field(default=None, examples=[10])
-    offset: Optional[int] = Field(default=None, examples=[0])
+    sort_by: list[SortBy] | None = None
+    limit: int | None = Field(default=None, examples=[10])
+    offset: int | None = Field(default=None, examples=[0])
 
 
 class FeedbackQueryRes(BaseModel):
@@ -1024,17 +1006,17 @@ class EnsureProjectExistsRes(BaseModel):
 class CostCreateInput(BaseModelStrict):
     prompt_token_cost: float
     completion_token_cost: float
-    prompt_token_cost_unit: Optional[str] = Field(
+    prompt_token_cost_unit: str | None = Field(
         "USD", description="The unit of the cost for the prompt tokens"
     )
-    completion_token_cost_unit: Optional[str] = Field(
+    completion_token_cost_unit: str | None = Field(
         "USD", description="The unit of the cost for the completion tokens"
     )
-    effective_date: Optional[datetime.datetime] = Field(
+    effective_date: datetime.datetime | None = Field(
         None,
         description="The date after which the cost is effective for, will default to the current date if not provided",
     )
-    provider_id: Optional[str] = Field(
+    provider_id: str | None = Field(
         None,
         description="The provider of the LLM, e.g. 'openai' or 'mistral'. If not provided, the provider_id will be set to 'default'",
     )
@@ -1043,7 +1025,7 @@ class CostCreateInput(BaseModelStrict):
 class CostCreateReq(BaseModelStrict):
     project_id: str = Field(examples=["entity/project"])
     costs: dict[str, CostCreateInput]
-    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
 # Returns a list of tuples of (llm_id, cost_id)
@@ -1053,7 +1035,7 @@ class CostCreateRes(BaseModel):
 
 class CostQueryReq(BaseModelStrict):
     project_id: str = Field(examples=["entity/project"])
-    fields: Optional[list[str]] = Field(
+    fields: list[str] | None = Field(
         default=None,
         examples=[
             [
@@ -1068,26 +1050,26 @@ class CostQueryReq(BaseModelStrict):
             ]
         ],
     )
-    query: Optional[Query] = None
+    query: Query | None = None
     # TODO: From FeedbackQueryReq,
     # TODO: I think I would prefer to call this order_by to match SQL, but this is what calls API uses
     # TODO: Might be nice to have shortcut for single field and implied ASC direction
-    sort_by: Optional[list[SortBy]] = None
-    limit: Optional[int] = Field(default=None, examples=[10])
-    offset: Optional[int] = Field(default=None, examples=[0])
+    sort_by: list[SortBy] | None = None
+    limit: int | None = Field(default=None, examples=[10])
+    offset: int | None = Field(default=None, examples=[0])
 
 
 class CostQueryOutput(BaseModel):
-    id: Optional[str] = Field(default=None, examples=["2341-asdf-asdf"])
-    llm_id: Optional[str] = Field(default=None, examples=["gpt4"])
-    prompt_token_cost: Optional[float] = Field(default=None, examples=[1.0])
-    completion_token_cost: Optional[float] = Field(default=None, examples=[1.0])
-    prompt_token_cost_unit: Optional[str] = Field(default=None, examples=["USD"])
-    completion_token_cost_unit: Optional[str] = Field(default=None, examples=["USD"])
-    effective_date: Optional[datetime.datetime] = Field(
+    id: str | None = Field(default=None, examples=["2341-asdf-asdf"])
+    llm_id: str | None = Field(default=None, examples=["gpt4"])
+    prompt_token_cost: float | None = Field(default=None, examples=[1.0])
+    completion_token_cost: float | None = Field(default=None, examples=[1.0])
+    prompt_token_cost_unit: str | None = Field(default=None, examples=["USD"])
+    completion_token_cost_unit: str | None = Field(default=None, examples=["USD"])
+    effective_date: datetime.datetime | None = Field(
         default=None, examples=["2024-01-01T00:00:00Z"]
     )
-    provider_id: Optional[str] = Field(default=None, examples=["openai"])
+    provider_id: str | None = Field(default=None, examples=["openai"])
 
 
 class CostQueryRes(BaseModel):
@@ -1107,7 +1089,7 @@ class ActionsExecuteBatchReq(BaseModelStrict):
     project_id: str
     action_ref: str
     call_ids: list[str]
-    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
 class ActionsExecuteBatchRes(BaseModel):
@@ -1116,10 +1098,10 @@ class ActionsExecuteBatchRes(BaseModel):
 
 class ProjectStatsReq(BaseModelStrict):
     project_id: str
-    include_trace_storage_size: Optional[bool] = True
-    include_object_storage_size: Optional[bool] = True
-    include_table_storage_size: Optional[bool] = True
-    include_file_storage_size: Optional[bool] = True
+    include_trace_storage_size: bool | None = True
+    include_object_storage_size: bool | None = True
+    include_table_storage_size: bool | None = True
+    include_file_storage_size: bool | None = True
 
 
 class ProjectStatsRes(BaseModel):
@@ -1141,32 +1123,32 @@ class ThreadSchema(BaseModel):
     last_updated: datetime.datetime = Field(
         description="Latest end time of turn calls in this thread"
     )
-    first_turn_id: Optional[str] = Field(
+    first_turn_id: str | None = Field(
         description="Turn ID of the first turn in this thread (earliest start_time)"
     )
-    last_turn_id: Optional[str] = Field(
+    last_turn_id: str | None = Field(
         description="Turn ID of the latest turn in this thread (latest end_time)"
     )
-    p50_turn_duration_ms: Optional[float] = Field(
+    p50_turn_duration_ms: float | None = Field(
         description="50th percentile (median) of turn durations in milliseconds within this thread"
     )
-    p99_turn_duration_ms: Optional[float] = Field(
+    p99_turn_duration_ms: float | None = Field(
         description="99th percentile of turn durations in milliseconds within this thread"
     )
 
 
 class ThreadsQueryFilter(BaseModelStrict):
-    after_datetime: Optional[datetime.datetime] = Field(
+    after_datetime: datetime.datetime | None = Field(
         default=None,
         description="Only include threads with start_time after this timestamp",
         examples=["2024-01-01T00:00:00Z"],
     )
-    before_datetime: Optional[datetime.datetime] = Field(
+    before_datetime: datetime.datetime | None = Field(
         default=None,
         description="Only include threads with last_updated before this timestamp",
         examples=["2024-12-31T23:59:59Z"],
     )
-    thread_ids: Optional[list[str]] = Field(
+    thread_ids: list[str] | None = Field(
         default=None,
         description="Only include threads with thread_ids in this list",
         examples=[["thread_1", "thread_2", "my_thread_id"]],
@@ -1184,15 +1166,15 @@ class ThreadsQueryReq(BaseModelStrict):
     project_id: str = Field(
         description="The ID of the project", examples=["my_entity/my_project"]
     )
-    filter: Optional[ThreadsQueryFilter] = Field(
+    filter: ThreadsQueryFilter | None = Field(
         default=None,
         description="Filter criteria for the threads query",
     )
-    limit: Optional[int] = Field(
+    limit: int | None = Field(
         default=None, description="Maximum number of threads to return"
     )
-    offset: Optional[int] = Field(default=None, description="Number of threads to skip")
-    sort_by: Optional[list[SortBy]] = Field(
+    offset: int | None = Field(default=None, description="Number of threads to skip")
+    sort_by: list[SortBy] | None = Field(
         default=None,
         description="Sorting criteria for the threads. Supported fields: 'thread_id', 'turn_count', 'start_time', 'last_updated', 'p50_turn_duration_ms', 'p99_turn_duration_ms'.",
         examples=[[SortBy(field="last_updated", direction="desc")]],
@@ -1203,7 +1185,7 @@ class EvaluateModelReq(BaseModelStrict):
     project_id: str
     evaluation_ref: str
     model_ref: str
-    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
     # Fixes the following warning:
     # UserWarning: Field "model_ref" has conflict with protected namespace "model_".
     model_config = ConfigDict(protected_namespaces=())
@@ -1230,7 +1212,7 @@ class EvaluationStatusRunning(BaseModelStrict):
 
 class EvaluationStatusFailed(BaseModelStrict):
     code: Literal["failed"] = "failed"
-    error: Optional[str] = None
+    error: str | None = None
 
 
 class EvaluationStatusComplete(BaseModelStrict):
@@ -1239,42 +1221,42 @@ class EvaluationStatusComplete(BaseModelStrict):
 
 
 class EvaluationStatusRes(BaseModel):
-    status: Union[
-        EvaluationStatusNotFound,
-        EvaluationStatusRunning,
-        EvaluationStatusFailed,
-        EvaluationStatusComplete,
-    ]
+    status: (
+        EvaluationStatusNotFound
+        | EvaluationStatusRunning
+        | EvaluationStatusFailed
+        | EvaluationStatusComplete
+    )
 
 
-class OpCreateV2Body(BaseModel):
+class OpCreateBody(BaseModel):
     """Request body for creating an Op object via REST API.
 
     This model excludes project_id since it comes from the URL path in RESTful endpoints.
     """
 
-    name: Optional[str] = Field(
+    name: str | None = Field(
         None,
         description="The name of this op. Ops with the same name will be versioned together.",
     )
-    source_code: Optional[str] = Field(
+    source_code: str | None = Field(
         None, description="Complete source code for this op, including imports"
     )
 
 
-class OpCreateV2Req(OpCreateV2Body):
+class OpCreateReq(OpCreateBody):
     """Request model for creating an Op object.
 
-    Extends OpCreateV2Body by adding project_id for internal API usage.
+    Extends OpCreateBody by adding project_id for internal API usage.
     """
 
     project_id: str = Field(
         ..., description="The project where this object will be saved"
     )
-    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
-class OpCreateV2Res(BaseModel):
+class OpCreateRes(BaseModel):
     """Response model for creating an Op object."""
 
     digest: str = Field(..., description="The digest of the created op")
@@ -1282,16 +1264,16 @@ class OpCreateV2Res(BaseModel):
     version_index: int = Field(..., description="The version index of the created op")
 
 
-class OpReadV2Req(BaseModel):
+class OpReadReq(BaseModel):
     project_id: str = Field(
         ..., description="The `entity/project` where this op is saved"
     )
     object_id: str = Field(..., description="The op ID")
     digest: str = Field(..., description="The digest of the op object")
-    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
-class OpReadV2Res(BaseModel):
+class OpReadRes(BaseModel):
     """Response model for reading an Op object.
 
     The code field contains the actual source code of the op.
@@ -1304,55 +1286,55 @@ class OpReadV2Res(BaseModel):
     code: str = Field(..., description="The actual op source code")
 
 
-class OpListV2Req(BaseModel):
+class OpListReq(BaseModel):
     project_id: str = Field(
         ..., description="The `entity/project` where these ops are saved"
     )
-    limit: Optional[int] = Field(
+    limit: int | None = Field(
         default=None, description="Maximum number of ops to return"
     )
-    offset: Optional[int] = Field(default=None, description="Number of ops to skip")
-    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+    offset: int | None = Field(default=None, description="Number of ops to skip")
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
-class OpDeleteV2Req(BaseModel):
+class OpDeleteReq(BaseModel):
     project_id: str = Field(
         ..., description="The `entity/project` where this op is saved"
     )
     object_id: str = Field(..., description="The op ID")
-    digests: Optional[list[str]] = Field(
+    digests: list[str] | None = Field(
         default=None,
         description="List of digests to delete. If not provided, all digests for the op will be deleted.",
     )
-    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
-class OpDeleteV2Res(BaseModel):
+class OpDeleteRes(BaseModel):
     num_deleted: int = Field(
         ..., description="Number of op versions deleted from this op"
     )
 
 
-class DatasetCreateV2Body(BaseModel):
-    name: Optional[str] = Field(
+class DatasetCreateBody(BaseModel):
+    name: str | None = Field(
         None,
         description="The name of this dataset.  Datasets with the same name will be versioned together.",
     )
-    description: Optional[str] = Field(
+    description: str | None = Field(
         None,
         description="A description of this dataset",
     )
     rows: list[dict[str, Any]] = Field(..., description="Dataset rows")
 
 
-class DatasetCreateV2Req(DatasetCreateV2Body):
+class DatasetCreateReq(DatasetCreateBody):
     project_id: str = Field(
         ..., description="The `entity/project` where this dataset will be saved"
     )
-    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
-class DatasetCreateV2Res(BaseModel):
+class DatasetCreateRes(BaseModel):
     digest: str = Field(..., description="The digest of the created dataset")
     object_id: str = Field(..., description="The ID of the created dataset")
     version_index: int = Field(
@@ -1360,16 +1342,16 @@ class DatasetCreateV2Res(BaseModel):
     )
 
 
-class DatasetReadV2Req(BaseModel):
+class DatasetReadReq(BaseModel):
     project_id: str = Field(
         ..., description="The `entity/project` where this dataset is saved"
     )
     object_id: str = Field(..., description="The dataset ID")
     digest: str = Field(..., description="The digest of the dataset object")
-    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
-class DatasetReadV2Res(BaseModel):
+class DatasetReadRes(BaseModel):
     object_id: str = Field(..., description="The dataset ID")
     digest: str = Field(..., description="The digest of the dataset object")
     version_index: int = Field(..., description="The version index of the object")
@@ -1377,48 +1359,46 @@ class DatasetReadV2Res(BaseModel):
         ..., description="When the object was created"
     )
     name: str = Field(..., description="The name of the dataset")
-    description: Optional[str] = Field(None, description="Description of the dataset")
+    description: str | None = Field(None, description="Description of the dataset")
     rows: str = Field(
         ...,
         description="Reference to the dataset rows data",
     )
 
 
-class DatasetListV2Req(BaseModel):
+class DatasetListReq(BaseModel):
     project_id: str = Field(
         ..., description="The `entity/project` where these datasets are saved"
     )
-    limit: Optional[int] = Field(
+    limit: int | None = Field(
         default=None, description="Maximum number of datasets to return"
     )
-    offset: Optional[int] = Field(
-        default=None, description="Number of datasets to skip"
-    )
-    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+    offset: int | None = Field(default=None, description="Number of datasets to skip")
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
-class DatasetDeleteV2Req(BaseModelStrict):
+class DatasetDeleteReq(BaseModelStrict):
     project_id: str = Field(
         ..., description="The `entity/project` where this dataset is saved"
     )
     object_id: str = Field(..., description="The dataset ID")
-    digests: Optional[list[str]] = Field(
+    digests: list[str] | None = Field(
         default=None,
         description="List of digests to delete. If not provided, all digests for the dataset will be deleted.",
     )
-    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
-class DatasetDeleteV2Res(BaseModel):
-    num_deleted: int = Field(..., description="Number of d  ataset versions deleted")
+class DatasetDeleteRes(BaseModel):
+    num_deleted: int = Field(..., description="Number of dataset versions deleted")
 
 
-class ScorerCreateV2Body(BaseModel):
+class ScorerCreateBody(BaseModel):
     name: str = Field(
         ...,
         description="The name of this scorer.  Scorers with the same name will be versioned together.",
     )
-    description: Optional[str] = Field(
+    description: str | None = Field(
         None,
         description="A description of this scorer",
     )
@@ -1428,14 +1408,14 @@ class ScorerCreateV2Body(BaseModel):
     )
 
 
-class ScorerCreateV2Req(ScorerCreateV2Body):
+class ScorerCreateReq(ScorerCreateBody):
     project_id: str = Field(
         ..., description="The `entity/project` where this scorer will be saved"
     )
-    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
-class ScorerCreateV2Res(BaseModel):
+class ScorerCreateRes(BaseModel):
     digest: str = Field(..., description="The digest of the created scorer")
     object_id: str = Field(..., description="The ID of the created scorer")
     version_index: int = Field(
@@ -1447,16 +1427,16 @@ class ScorerCreateV2Res(BaseModel):
     )
 
 
-class ScorerReadV2Req(BaseModel):
+class ScorerReadReq(BaseModel):
     project_id: str = Field(
         ..., description="The `entity/project` where this scorer is saved"
     )
     object_id: str = Field(..., description="The scorer ID")
     digest: str = Field(..., description="The digest of the scorer")
-    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
-class ScorerReadV2Res(BaseModel):
+class ScorerReadRes(BaseModel):
     object_id: str = Field(..., description="The scorer ID")
     digest: str = Field(..., description="The digest of the scorer")
     version_index: int = Field(..., description="The version index of the object")
@@ -1464,72 +1444,70 @@ class ScorerReadV2Res(BaseModel):
         ..., description="When the scorer was created"
     )
     name: str = Field(..., description="The name of the scorer")
-    description: Optional[str] = Field(None, description="Description of the scorer")
+    description: str | None = Field(None, description="Description of the scorer")
     score_op: str = Field(
         ...,
         description="The Scorer.score op reference",
     )
 
 
-class ScorerListV2Req(BaseModel):
+class ScorerListReq(BaseModel):
     project_id: str = Field(
         ..., description="The `entity/project` where these scorers are saved"
     )
-    limit: Optional[int] = Field(
+    limit: int | None = Field(
         default=None, description="Maximum number of scorers to return"
     )
-    offset: Optional[int] = Field(default=None, description="Number of scorers to skip")
-    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+    offset: int | None = Field(default=None, description="Number of scorers to skip")
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
-class ScorerDeleteV2Req(BaseModelStrict):
+class ScorerDeleteReq(BaseModelStrict):
     project_id: str = Field(
         ..., description="The `entity/project` where this scorer is saved"
     )
     object_id: str = Field(..., description="The scorer ID")
-    digests: Optional[list[str]] = Field(
+    digests: list[str] | None = Field(
         default=None,
         description="List of digests to delete. If not provided, all digests for the scorer will be deleted",
     )
-    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
-class ScorerDeleteV2Res(BaseModel):
+class ScorerDeleteRes(BaseModel):
     num_deleted: int = Field(..., description="Number of scorer versions deleted")
 
 
-class EvaluationCreateV2Body(BaseModel):
+class EvaluationCreateBody(BaseModel):
     name: str = Field(
         ...,
         description="The name of this evaluation.  Evaluations with the same name will be versioned together.",
     )
-    description: Optional[str] = Field(
+    description: str | None = Field(
         None,
         description="A description of this evaluation",
     )
 
     dataset: str = Field(..., description="Reference to the dataset (weave:// URI)")
-    scorers: Optional[list[str]] = Field(
+    scorers: list[str] | None = Field(
         None, description="List of scorer references (weave:// URIs)"
     )
 
     trials: int = Field(default=1, description="Number of trials to run")
-    evaluation_name: Optional[str] = Field(
-        None, description="Name for the evaluation run"
-    )
-    eval_attributes: Optional[dict[str, Any]] = Field(
+    evaluation_name: str | None = Field(None, description="Name for the evaluation run")
+    eval_attributes: dict[str, Any] | None = Field(
         None, description="Optional attributes for the evaluation"
     )
 
 
-class EvaluationCreateV2Req(EvaluationCreateV2Body):
+class EvaluationCreateReq(EvaluationCreateBody):
     project_id: str = Field(
         ..., description="The `entity/project` where this evaluation will be saved"
     )
-    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
-class EvaluationCreateV2Res(BaseModel):
+class EvaluationCreateRes(BaseModel):
     digest: str = Field(..., description="The digest of the created evaluation")
     object_id: str = Field(..., description="The ID of the created evaluation")
     version_index: int = Field(
@@ -1540,16 +1518,16 @@ class EvaluationCreateV2Res(BaseModel):
     )
 
 
-class EvaluationReadV2Req(BaseModel):
+class EvaluationReadReq(BaseModel):
     project_id: str = Field(
         ..., description="The `entity/project` where this evaluation is saved"
     )
     object_id: str = Field(..., description="The evaluation ID")
     digest: str = Field(..., description="The digest of the evaluation")
-    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
-class EvaluationReadV2Res(BaseModel):
+class EvaluationReadRes(BaseModel):
     object_id: str = Field(..., description="The evaluation ID")
     digest: str = Field(..., description="The digest of the evaluation")
     version_index: int = Field(..., description="The version index of the evaluation")
@@ -1557,66 +1535,62 @@ class EvaluationReadV2Res(BaseModel):
         ..., description="When the evaluation was created"
     )
     name: str = Field(..., description="The name of the evaluation")
-    description: Optional[str] = Field(
-        None, description="A description of the evaluation"
-    )
+    description: str | None = Field(None, description="A description of the evaluation")
     dataset: str = Field(..., description="Dataset reference (weave:// URI)")
     scorers: list[str] = Field(
         ..., description="List of scorer references (weave:// URIs)"
     )
     trials: int = Field(..., description="Number of trials")
-    evaluation_name: Optional[str] = Field(
-        None, description="Name for the evaluation run"
-    )
-    evaluate_op: Optional[str] = Field(
+    evaluation_name: str | None = Field(None, description="Name for the evaluation run")
+    evaluate_op: str | None = Field(
         None, description="Evaluate op reference (weave:// URI)"
     )
-    predict_and_score_op: Optional[str] = Field(
+    predict_and_score_op: str | None = Field(
         None, description="Predict and score op reference (weave:// URI)"
     )
-    summarize_op: Optional[str] = Field(
+    summarize_op: str | None = Field(
         None, description="Summarize op reference (weave:// URI)"
     )
 
 
-class EvaluationListV2Req(BaseModel):
+class EvaluationListReq(BaseModel):
     project_id: str = Field(
         ..., description="The `entity/project` where these evaluations are saved"
     )
-    limit: Optional[int] = Field(
+    limit: int | None = Field(
         default=None, description="Maximum number of evaluations to return"
     )
-    offset: Optional[int] = Field(
+    offset: int | None = Field(
         default=None, description="Number of evaluations to skip"
     )
-    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
-class EvaluationDeleteV2Req(BaseModel):
+class EvaluationDeleteReq(BaseModel):
     project_id: str = Field(
         ..., description="The `entity/project` where this evaluation is saved"
     )
     object_id: str = Field(..., description="The evaluation ID")
-    digests: Optional[list[str]] = Field(
+    digests: list[str] | None = Field(
         default=None,
         description="List of digests to delete. If not provided, all digests for the evaluation will be deleted.",
     )
-    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
-class EvaluationDeleteV2Res(BaseModel):
+class EvaluationDeleteRes(BaseModel):
     num_deleted: int = Field(..., description="Number of evaluation versions deleted")
 
 
-# Model V2 API Models
+# Model API Models
 
 
-class ModelCreateV2Body(BaseModel):
+class ModelCreateBody(BaseModel):
     name: str = Field(
         ...,
         description="The name of this model. Models with the same name will be versioned together.",
     )
-    description: Optional[str] = Field(
+    description: str | None = Field(
         None,
         description="A description of this model",
     )
@@ -1624,20 +1598,20 @@ class ModelCreateV2Body(BaseModel):
         ...,
         description="Complete source code for the Model class including imports",
     )
-    attributes: Optional[dict[str, Any]] = Field(
+    attributes: dict[str, Any] | None = Field(
         None,
         description="Additional attributes to be stored with the model",
     )
 
 
-class ModelCreateV2Req(ModelCreateV2Body):
+class ModelCreateReq(ModelCreateBody):
     project_id: str = Field(
         ..., description="The `entity/project` where this model will be saved"
     )
-    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
-class ModelCreateV2Res(BaseModel):
+class ModelCreateRes(BaseModel):
     digest: str = Field(..., description="The digest of the created model")
     object_id: str = Field(..., description="The ID of the created model")
     version_index: int = Field(
@@ -1649,7 +1623,7 @@ class ModelCreateV2Res(BaseModel):
     )
 
 
-class ModelReadV2Req(BaseModel):
+class ModelReadReq(BaseModel):
     project_id: str = Field(
         ..., description="The `entity/project` where this model is saved"
     )
@@ -1657,161 +1631,161 @@ class ModelReadV2Req(BaseModel):
     digest: str = Field(..., description="The digest of the model object")
 
 
-class ModelReadV2Res(BaseModel):
+class ModelReadRes(BaseModel):
     object_id: str = Field(..., description="The model ID")
     digest: str = Field(..., description="The digest of the model")
     version_index: int = Field(..., description="The version index of the object")
     created_at: datetime.datetime = Field(..., description="When the model was created")
     name: str = Field(..., description="The name of the model")
-    description: Optional[str] = Field(None, description="Description of the model")
+    description: str | None = Field(None, description="Description of the model")
     source_code: str = Field(
         ...,
         description="The source code of the model",
     )
-    attributes: Optional[dict[str, Any]] = Field(
+    attributes: dict[str, Any] | None = Field(
         None, description="Additional attributes stored with the model"
     )
 
 
-class ModelListV2Req(BaseModel):
+class ModelListReq(BaseModel):
     project_id: str = Field(
         ..., description="The `entity/project` where these models are saved"
     )
-    limit: Optional[int] = Field(
+    limit: int | None = Field(
         default=None, description="Maximum number of models to return"
     )
-    offset: Optional[int] = Field(default=None, description="Number of models to skip")
+    offset: int | None = Field(default=None, description="Number of models to skip")
 
 
-class ModelDeleteV2Req(BaseModel):
+class ModelDeleteReq(BaseModel):
     project_id: str = Field(
         ..., description="The `entity/project` where this model is saved"
     )
     object_id: str = Field(..., description="The model ID")
-    digests: Optional[list[str]] = Field(
+    digests: list[str] | None = Field(
         None,
         description="List of model digests to delete. If None, deletes all versions.",
     )
-    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
-class ModelDeleteV2Res(BaseModel):
+class ModelDeleteRes(BaseModel):
     num_deleted: int = Field(..., description="Number of model versions deleted")
 
 
-# Evaluation Run V2 API
+# Evaluation Run API
 
 
-class EvaluationRunCreateV2Body(BaseModel):
+class EvaluationRunCreateBody(BaseModel):
     evaluation: str = Field(
         ..., description="Reference to the evaluation (weave:// URI)"
     )
     model: str = Field(..., description="Reference to the model (weave:// URI)")
 
 
-class EvaluationRunCreateV2Req(EvaluationRunCreateV2Body):
+class EvaluationRunCreateReq(EvaluationRunCreateBody):
     project_id: str = Field(
         ..., description="The `entity/project` where this evaluation run will be saved"
     )
-    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
-class EvaluationRunCreateV2Res(BaseModel):
+class EvaluationRunCreateRes(BaseModel):
     evaluation_run_id: str = Field(
         ..., description="The ID of the created evaluation run"
     )
 
 
-class EvaluationRunReadV2Req(BaseModel):
+class EvaluationRunReadReq(BaseModel):
     project_id: str = Field(
         ..., description="The `entity/project` where this evaluation run is saved"
     )
     evaluation_run_id: str = Field(..., description="The evaluation run ID")
 
 
-class EvaluationRunReadV2Res(BaseModel):
+class EvaluationRunReadRes(BaseModel):
     evaluation_run_id: str = Field(..., description="The evaluation run ID")
     evaluation: str = Field(
         ..., description="Reference to the evaluation (weave:// URI)"
     )
     model: str = Field(..., description="Reference to the model (weave:// URI)")
-    status: Optional[str] = Field(None, description="Status of the evaluation run")
-    started_at: Optional[datetime.datetime] = Field(
+    status: str | None = Field(None, description="Status of the evaluation run")
+    started_at: datetime.datetime | None = Field(
         None, description="When the evaluation run started"
     )
-    finished_at: Optional[datetime.datetime] = Field(
+    finished_at: datetime.datetime | None = Field(
         None, description="When the evaluation run finished"
     )
-    summary: Optional[dict[str, Any]] = Field(
+    summary: dict[str, Any] | None = Field(
         None, description="Summary data for the evaluation run"
     )
 
 
-class EvaluationRunFilterV2(BaseModel):
-    evaluations: Optional[list[str]] = Field(
+class EvaluationRunFilter(BaseModel):
+    evaluations: list[str] | None = Field(
         None, description="Filter by evaluation references"
     )
-    models: Optional[list[str]] = Field(None, description="Filter by model references")
-    evaluation_run_ids: Optional[list[str]] = Field(
+    models: list[str] | None = Field(None, description="Filter by model references")
+    evaluation_run_ids: list[str] | None = Field(
         None, description="Filter by evaluation run IDs"
     )
 
 
-class EvaluationRunListV2Req(BaseModel):
+class EvaluationRunListReq(BaseModel):
     project_id: str = Field(
         ..., description="The `entity/project` where these evaluation runs are saved"
     )
-    filter: Optional[EvaluationRunFilterV2] = Field(
+    filter: EvaluationRunFilter | None = Field(
         None, description="Filter criteria for evaluation runs"
     )
-    limit: Optional[int] = Field(
+    limit: int | None = Field(
         default=None, description="Maximum number of evaluation runs to return"
     )
-    offset: Optional[int] = Field(
+    offset: int | None = Field(
         default=None, description="Number of evaluation runs to skip"
     )
 
 
-class EvaluationRunDeleteV2Req(BaseModel):
+class EvaluationRunDeleteReq(BaseModel):
     project_id: str = Field(
         ..., description="The `entity/project` where these evaluation runs exist"
     )
     evaluation_run_ids: list[str] = Field(
         ..., description="List of evaluation run IDs to delete"
     )
-    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
-class EvaluationRunDeleteV2Res(BaseModel):
+class EvaluationRunDeleteRes(BaseModel):
     num_deleted: int = Field(..., description="Number of evaluation runs deleted")
 
 
-class EvaluationRunFinishV2Body(BaseModel):
+class EvaluationRunFinishBody(BaseModel):
     """Request body for finishing an evaluation run via REST API.
 
     This model excludes project_id and evaluation_run_id since they come from the URL path in RESTful endpoints.
     """
 
-    summary: Optional[dict[str, Any]] = Field(
+    summary: dict[str, Any] | None = Field(
         None, description="Optional summary dictionary for the evaluation run"
     )
 
 
-class EvaluationRunFinishV2Req(EvaluationRunFinishV2Body):
+class EvaluationRunFinishReq(EvaluationRunFinishBody):
     project_id: str = Field(
         ..., description="The `entity/project` where these evaluation runs exist"
     )
     evaluation_run_id: str = Field(..., description="The evaluation run ID to finish")
-    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
-class EvaluationRunFinishV2Res(BaseModel):
+class EvaluationRunFinishRes(BaseModel):
     success: bool = Field(
         ..., description="Whether the evaluation run was finished successfully"
     )
 
 
-class PredictionCreateV2Body(BaseModel):
+class PredictionCreateBody(BaseModel):
     """Request body for creating a Prediction via REST API.
 
     This model excludes project_id since it comes from the URL path in RESTful endpoints.
@@ -1820,95 +1794,95 @@ class PredictionCreateV2Body(BaseModel):
     model: str = Field(..., description="The model reference (weave:// URI)")
     inputs: dict[str, Any] = Field(..., description="The inputs to the prediction")
     output: Any = Field(..., description="The output of the prediction")
-    evaluation_run_id: Optional[str] = Field(
+    evaluation_run_id: str | None = Field(
         None,
         description="Optional evaluation run ID to link this prediction as a child call",
     )
 
 
-class PredictionCreateV2Req(PredictionCreateV2Body):
+class PredictionCreateReq(PredictionCreateBody):
     """Request model for creating a Prediction.
 
-    Extends PredictionCreateV2Body by adding project_id for internal API usage.
+    Extends PredictionCreateBody by adding project_id for internal API usage.
     """
 
     project_id: str = Field(
         ..., description="The `entity/project` where this prediction is saved"
     )
-    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
-class PredictionCreateV2Res(BaseModel):
+class PredictionCreateRes(BaseModel):
     prediction_id: str = Field(..., description="The prediction ID")
 
 
-class PredictionReadV2Req(BaseModel):
+class PredictionReadReq(BaseModel):
     project_id: str = Field(
         ..., description="The `entity/project` where this prediction is saved"
     )
     prediction_id: str = Field(..., description="The prediction ID")
-    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
-class PredictionReadV2Res(BaseModel):
+class PredictionReadRes(BaseModel):
     prediction_id: str = Field(..., description="The prediction ID")
     model: str = Field(..., description="The model reference (weave:// URI)")
     inputs: dict[str, Any] = Field(..., description="The inputs to the prediction")
     output: Any = Field(..., description="The output of the prediction")
-    evaluation_run_id: Optional[str] = Field(
+    evaluation_run_id: str | None = Field(
         None, description="Evaluation run ID if this prediction is linked to one"
     )
-    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
-class PredictionListV2Req(BaseModel):
+class PredictionListReq(BaseModel):
     project_id: str = Field(
         ..., description="The `entity/project` where these predictions are saved"
     )
-    evaluation_run_id: Optional[str] = Field(
+    evaluation_run_id: str | None = Field(
         None,
         description="Optional evaluation run ID to filter predictions linked to this run",
     )
-    limit: Optional[int] = Field(
+    limit: int | None = Field(
         default=None, description="Maximum number of predictions to return"
     )
-    offset: Optional[int] = Field(
+    offset: int | None = Field(
         default=None, description="Number of predictions to skip"
     )
-    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
-class PredictionListV2Res(BaseModel):
-    predictions: list[PredictionReadV2Res] = Field(..., description="The predictions")
+class PredictionListRes(BaseModel):
+    predictions: list[PredictionReadRes] = Field(..., description="The predictions")
 
 
-class PredictionDeleteV2Req(BaseModel):
+class PredictionDeleteReq(BaseModel):
     project_id: str = Field(
         ..., description="The `entity/project` where these predictions are saved"
     )
     prediction_ids: list[str] = Field(..., description="The prediction IDs to delete")
-    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
-class PredictionDeleteV2Res(BaseModel):
+class PredictionDeleteRes(BaseModel):
     num_deleted: int = Field(..., description="Number of predictions deleted")
 
 
-class PredictionFinishV2Req(BaseModel):
+class PredictionFinishReq(BaseModel):
     project_id: str = Field(
         ..., description="The `entity/project` where this prediction is saved"
     )
     prediction_id: str = Field(..., description="The prediction ID to finish")
-    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
-class PredictionFinishV2Res(BaseModel):
+class PredictionFinishRes(BaseModel):
     success: bool = Field(
         ..., description="Whether the prediction was finished successfully"
     )
 
 
-class ScoreCreateV2Body(BaseModel):
+class ScoreCreateBody(BaseModel):
     """Request body for creating a Score via REST API.
 
     This model excludes project_id since it comes from the URL path in RESTful endpoints.
@@ -1917,70 +1891,70 @@ class ScoreCreateV2Body(BaseModel):
     prediction_id: str = Field(..., description="The prediction ID")
     scorer: str = Field(..., description="The scorer reference (weave:// URI)")
     value: float = Field(..., description="The value of the score")
-    evaluation_run_id: Optional[str] = Field(
+    evaluation_run_id: str | None = Field(
         None,
         description="Optional evaluation run ID to link this score as a child call",
     )
 
 
-class ScoreCreateV2Req(ScoreCreateV2Body):
+class ScoreCreateReq(ScoreCreateBody):
     """Request model for creating a Score.
 
-    Extends ScoreCreateV2Body by adding project_id for internal API usage.
+    Extends ScoreCreateBody by adding project_id for internal API usage.
     """
 
     project_id: str = Field(
         ..., description="The `entity/project` where this score is saved"
     )
-    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
-class ScoreCreateV2Res(BaseModel):
+class ScoreCreateRes(BaseModel):
     score_id: str = Field(..., description="The score ID")
 
 
-class ScoreReadV2Req(BaseModel):
+class ScoreReadReq(BaseModel):
     project_id: str = Field(
         ..., description="The `entity/project` where this score is saved"
     )
     score_id: str = Field(..., description="The score ID")
-    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
-class ScoreReadV2Res(BaseModel):
+class ScoreReadRes(BaseModel):
     score_id: str = Field(..., description="The score ID")
     scorer: str = Field(..., description="The scorer reference (weave:// URI)")
     value: float = Field(..., description="The value of the score")
-    evaluation_run_id: Optional[str] = Field(
+    evaluation_run_id: str | None = Field(
         None, description="Evaluation run ID if this score is linked to one"
     )
-    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
-class ScoreListV2Req(BaseModel):
+class ScoreListReq(BaseModel):
     project_id: str = Field(
         ..., description="The `entity/project` where these scores are saved"
     )
-    evaluation_run_id: Optional[str] = Field(
+    evaluation_run_id: str | None = Field(
         None,
         description="Optional evaluation run ID to filter scores linked to this run",
     )
-    limit: Optional[int] = Field(
+    limit: int | None = Field(
         default=None, description="Maximum number of scores to return"
     )
-    offset: Optional[int] = Field(default=None, description="Number of scores to skip")
-    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+    offset: int | None = Field(default=None, description="Number of scores to skip")
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
-class ScoreDeleteV2Req(BaseModel):
+class ScoreDeleteReq(BaseModel):
     project_id: str = Field(
         ..., description="The `entity/project` where these scores are saved"
     )
     score_ids: list[str] = Field(..., description="The score IDs to delete")
-    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
-class ScoreDeleteV2Res(BaseModel):
+class ScoreDeleteRes(BaseModel):
     num_deleted: int = Field(..., description="Number of scores deleted")
 
 
@@ -2003,11 +1977,6 @@ class TraceServerInterface(Protocol):
     def calls_query_stats(self, req: CallsQueryStatsReq) -> CallsQueryStatsRes: ...
     def call_update(self, req: CallUpdateReq) -> CallUpdateRes: ...
     def call_start_batch(self, req: CallCreateBatchReq) -> CallCreateBatchRes: ...
-
-    # Op API
-    def op_create(self, req: OpCreateReq) -> OpCreateRes: ...
-    def op_read(self, req: OpReadReq) -> OpReadRes: ...
-    def ops_query(self, req: OpQueryReq) -> OpQueryRes: ...
 
     # Cost API
     def cost_create(self, req: CostCreateReq) -> CostCreateRes: ...
@@ -2084,94 +2053,84 @@ class TraceServerInterface(Protocol):
     def evaluation_status(self, req: EvaluationStatusReq) -> EvaluationStatusRes: ...
 
 
-class TraceServerInterfaceV2(Protocol):
-    """V2 API endpoints for Trace Server.
+class ObjectInterface(Protocol):
+    """Object API endpoints for Trace Server.
 
-    This protocol contains the next generation of trace server APIs that
+    This protocol contains object management APIs that
     provide cleaner, more RESTful interfaces. Implementations should support
     both this protocol and TraceServerInterface to maintain backward compatibility.
     """
 
     # Ops
-    def op_create_v2(self, req: OpCreateV2Req) -> OpCreateV2Res: ...
-    def op_read_v2(self, req: OpReadV2Req) -> OpReadV2Res: ...
-    def op_list_v2(self, req: OpListV2Req) -> Iterator[OpReadV2Res]: ...
-    def op_delete_v2(self, req: OpDeleteV2Req) -> OpDeleteV2Res: ...
+    def op_create(self, req: OpCreateReq) -> OpCreateRes: ...
+    def op_read(self, req: OpReadReq) -> OpReadRes: ...
+    def op_list(self, req: OpListReq) -> Iterator[OpReadRes]: ...
+    def op_delete(self, req: OpDeleteReq) -> OpDeleteRes: ...
 
     # Datasets
-    def dataset_create_v2(self, req: DatasetCreateV2Req) -> DatasetCreateV2Res: ...
-    def dataset_read_v2(self, req: DatasetReadV2Req) -> DatasetReadV2Res: ...
-    def dataset_list_v2(self, req: DatasetListV2Req) -> Iterator[DatasetReadV2Res]: ...
-    def dataset_delete_v2(self, req: DatasetDeleteV2Req) -> DatasetDeleteV2Res: ...
+    def dataset_create(self, req: DatasetCreateReq) -> DatasetCreateRes: ...
+    def dataset_read(self, req: DatasetReadReq) -> DatasetReadRes: ...
+    def dataset_list(self, req: DatasetListReq) -> Iterator[DatasetReadRes]: ...
+    def dataset_delete(self, req: DatasetDeleteReq) -> DatasetDeleteRes: ...
 
     # Scorers
-    def scorer_create_v2(self, req: ScorerCreateV2Req) -> ScorerCreateV2Res: ...
-    def scorer_read_v2(self, req: ScorerReadV2Req) -> ScorerReadV2Res: ...
-    def scorer_list_v2(self, req: ScorerListV2Req) -> Iterator[ScorerReadV2Res]: ...
-    def scorer_delete_v2(self, req: ScorerDeleteV2Req) -> ScorerDeleteV2Res: ...
+    def scorer_create(self, req: ScorerCreateReq) -> ScorerCreateRes: ...
+    def scorer_read(self, req: ScorerReadReq) -> ScorerReadRes: ...
+    def scorer_list(self, req: ScorerListReq) -> Iterator[ScorerReadRes]: ...
+    def scorer_delete(self, req: ScorerDeleteReq) -> ScorerDeleteRes: ...
 
     # Evaluations
-    def evaluation_create_v2(
-        self, req: EvaluationCreateV2Req
-    ) -> EvaluationCreateV2Res: ...
-    def evaluation_read_v2(self, req: EvaluationReadV2Req) -> EvaluationReadV2Res: ...
-    def evaluation_list_v2(
-        self, req: EvaluationListV2Req
-    ) -> Iterator[EvaluationReadV2Res]: ...
-    def evaluation_delete_v2(
-        self, req: EvaluationDeleteV2Req
-    ) -> EvaluationDeleteV2Res: ...
+    def evaluation_create(self, req: EvaluationCreateReq) -> EvaluationCreateRes: ...
+    def evaluation_read(self, req: EvaluationReadReq) -> EvaluationReadRes: ...
+    def evaluation_list(
+        self, req: EvaluationListReq
+    ) -> Iterator[EvaluationReadRes]: ...
+    def evaluation_delete(self, req: EvaluationDeleteReq) -> EvaluationDeleteRes: ...
 
     # Models
-    def model_create_v2(self, req: ModelCreateV2Req) -> ModelCreateV2Res: ...
-    def model_read_v2(self, req: ModelReadV2Req) -> ModelReadV2Res: ...
-    def model_list_v2(self, req: ModelListV2Req) -> Iterator[ModelReadV2Res]: ...
-    def model_delete_v2(self, req: ModelDeleteV2Req) -> ModelDeleteV2Res: ...
+    def model_create(self, req: ModelCreateReq) -> ModelCreateRes: ...
+    def model_read(self, req: ModelReadReq) -> ModelReadRes: ...
+    def model_list(self, req: ModelListReq) -> Iterator[ModelReadRes]: ...
+    def model_delete(self, req: ModelDeleteReq) -> ModelDeleteRes: ...
 
     # Evaluation Runs
-    def evaluation_run_create_v2(
-        self, req: EvaluationRunCreateV2Req
-    ) -> EvaluationRunCreateV2Res: ...
-    def evaluation_run_read_v2(
-        self, req: EvaluationRunReadV2Req
-    ) -> EvaluationRunReadV2Res: ...
-    def evaluation_run_list_v2(
-        self, req: EvaluationRunListV2Req
-    ) -> Iterator[EvaluationRunReadV2Res]: ...
-    def evaluation_run_delete_v2(
-        self, req: EvaluationRunDeleteV2Req
-    ) -> EvaluationRunDeleteV2Res: ...
-    def evaluation_run_finish_v2(
-        self, req: EvaluationRunFinishV2Req
-    ) -> EvaluationRunFinishV2Res: ...
+    def evaluation_run_create(
+        self, req: EvaluationRunCreateReq
+    ) -> EvaluationRunCreateRes: ...
+    def evaluation_run_read(
+        self, req: EvaluationRunReadReq
+    ) -> EvaluationRunReadRes: ...
+    def evaluation_run_list(
+        self, req: EvaluationRunListReq
+    ) -> Iterator[EvaluationRunReadRes]: ...
+    def evaluation_run_delete(
+        self, req: EvaluationRunDeleteReq
+    ) -> EvaluationRunDeleteRes: ...
+    def evaluation_run_finish(
+        self, req: EvaluationRunFinishReq
+    ) -> EvaluationRunFinishRes: ...
 
     # Predictions
-    def prediction_create_v2(
-        self, req: PredictionCreateV2Req
-    ) -> PredictionCreateV2Res: ...
-    def prediction_read_v2(self, req: PredictionReadV2Req) -> PredictionReadV2Res: ...
-    def prediction_list_v2(
-        self, req: PredictionListV2Req
-    ) -> Iterator[PredictionReadV2Res]: ...
-    def prediction_delete_v2(
-        self, req: PredictionDeleteV2Req
-    ) -> PredictionDeleteV2Res: ...
-    def prediction_finish_v2(
-        self, req: PredictionFinishV2Req
-    ) -> PredictionFinishV2Res: ...
+    def prediction_create(self, req: PredictionCreateReq) -> PredictionCreateRes: ...
+    def prediction_read(self, req: PredictionReadReq) -> PredictionReadRes: ...
+    def prediction_list(
+        self, req: PredictionListReq
+    ) -> Iterator[PredictionReadRes]: ...
+    def prediction_delete(self, req: PredictionDeleteReq) -> PredictionDeleteRes: ...
+    def prediction_finish(self, req: PredictionFinishReq) -> PredictionFinishRes: ...
 
     # Scores
-    def score_create_v2(self, req: ScoreCreateV2Req) -> ScoreCreateV2Res: ...
-    def score_read_v2(self, req: ScoreReadV2Req) -> ScoreReadV2Res: ...
-    def score_list_v2(self, req: ScoreListV2Req) -> Iterator[ScoreReadV2Res]: ...
-    def score_delete_v2(self, req: ScoreDeleteV2Req) -> ScoreDeleteV2Res: ...
+    def score_create(self, req: ScoreCreateReq) -> ScoreCreateRes: ...
+    def score_read(self, req: ScoreReadReq) -> ScoreReadRes: ...
+    def score_list(self, req: ScoreListReq) -> Iterator[ScoreReadRes]: ...
+    def score_delete(self, req: ScoreDeleteReq) -> ScoreDeleteRes: ...
 
 
-class FullTraceServerInterface(TraceServerInterface, TraceServerInterfaceV2, Protocol):
-    """Complete trace server interface supporting both V1 and V2 APIs.
+class FullTraceServerInterface(TraceServerInterface, ObjectInterface, Protocol):
+    """Complete trace server interface supporting both V1 and Object APIs.
 
     This protocol represents a trace server implementation that supports the full
-    set of APIs - both legacy V1 endpoints and modern V2 endpoints. Use this type
+    set of APIs - both legacy V1 endpoints and modern Object endpoints. Use this type
     for implementations that need to support both API versions.
     """
 

@@ -91,6 +91,29 @@ def make_safe_name(name: str | None) -> str:
     return name.replace(" ", "_").replace("/", "_").lower()
 
 
+def make_object_id(name: str | None, default: str) -> str:
+    """Create an object ID from a name with a default fallback.
+
+    Args:
+        name: The object name (can be None)
+        default: The default object ID to use if name is None
+
+    Returns:
+        The object ID: default if name is None, otherwise the sanitized name
+
+    Examples:
+        >>> make_object_id(None, "Dataset")
+        'Dataset'
+        >>> make_object_id("My Dataset", "Dataset")
+        'my_dataset'
+        >>> make_object_id("user/model", "Model")
+        'user_model'
+    """
+    if name is None:
+        return default
+    return make_safe_name(name)
+
+
 def build_op_val(file_digest: str, load_op: str | None = None) -> dict[str, Any]:
     """Build the op value structure with a file digest (post-file-upload).
 

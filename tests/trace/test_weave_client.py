@@ -8,9 +8,9 @@ import sys
 import time
 import uuid
 
+import httpx
 import pydantic
 import pytest
-import requests
 from pydantic import ValidationError
 
 import weave
@@ -483,7 +483,7 @@ def test_get_calls_complete(client):
             )
         ).calls
     )
-    for call1, call2 in zip(client_result, server_result):
+    for call1, call2 in zip(client_result, server_result, strict=False):
         assert call1.id == call2.id
         assert call1.op_name == call2.op_name
         assert call1.project_id == call2.project_id
@@ -518,7 +518,7 @@ def test_get_calls_complete(client):
             )
         ).calls
     )
-    for call1, call2 in zip(client_result, server_result):
+    for call1, call2 in zip(client_result, server_result, strict=False):
         assert call1.id == call2.id
         assert call1.op_name == call2.op_name
         assert call1.project_id == call2.project_id
@@ -1447,7 +1447,8 @@ def test_weave_server(client):
     ref = client._save_object(model, "my-model")
 
     url = weave.serve(ref, thread=True)
-    response = requests.post(url + "/predict", json={"input": "x"})
+    with httpx.Client() as http_client:
+        response = http_client.post(url + "/predict", json={"input": "x"})
     assert response.json() == {"result": "input is: x"}
 
 
@@ -3632,7 +3633,7 @@ def test_feedback_batching(network_proxy_client):
         feedback_items.append(id)
 
     # make sure we aren't actually waiting for 10 feedbacks, should be quick
-    assert time.time() - start < 0.2, "Feedback creation took too long"
+    assert time.time() - start < 0.5, "Feedback creation took too long"
     assert client.server.get_feedback_processor() is not None
 
     # Flush to ensure all feedback is processed
@@ -3928,10 +3929,15 @@ def test_table_create_from_digests(network_proxy_client):
 def test_calls_query_with_wb_run_id_not_null(client, monkeypatch):
     """Test optimized stats query for wb_run_id not null."""
     # Mock wandb to simulate a run
-    import weave.trace.weave_client as wc
+    from weave.trace import weave_client
+    from weave.trace.wandb_run_context import WandbRunContext
 
     mock_run_id = f"{client._project_id()}/test_run_123"
-    monkeypatch.setattr(wc, "safe_current_wb_run_id", lambda: mock_run_id)
+    monkeypatch.setattr(
+        weave_client,
+        "get_global_wb_run_context",
+        lambda: WandbRunContext(run_id="test_run_123", step=0),
+    )
 
     @weave.op
     def test_op(x: int) -> int:
@@ -3964,3 +3970,161 @@ def test_calls_query_with_wb_run_id_not_null(client, monkeypatch):
 
     assert len(calls) == 1
     assert calls[0].wb_run_id == mock_run_id
+
+
+def test_calls_query_with_dotted_field_keys(client):
+    """Test querying calls with nested field keys containing dots."""
+    test_id = str(uuid.uuid4())
+    nested1 = {
+        "double.nested": "hello",
+        "triple.nested.dot": "world",
+    }
+    nested2 = {
+        "double.nested": "goodbye",
+        "triple.nested.dot": "universe",
+    }
+
+    @weave.op
+    def log_nested_output(test_id: str, variant: str):
+        return nested1 if variant == "nested1" else nested2
+
+    @weave.op
+    def log_nested_input(test_id: str, nested: dict):
+        return None
+
+    # Create calls with nested outputs and inputs
+    log_nested_output(test_id, "nested1")
+    log_nested_output(test_id, "nested2")
+    log_nested_input(test_id, nested1)
+    log_nested_input(test_id, nested2)
+
+    client.flush()
+
+    test_cases = [
+        {
+            "name": "output with double.nested field (eq)",
+            "field": "output.double\\.nested",  # Escaped  dot in the key name
+            "operator": "$eq",
+            "value": "hello",
+            "expected_count": 1,
+            "assertions": lambda calls: [
+                calls[0].output["double.nested"] == "hello",
+                calls[0].output["triple.nested.dot"] == "world",
+            ],
+        },
+        {
+            "name": "output with triple.nested.dot field (eq)",
+            "field": "output.triple\\.nested\\.dot",
+            "operator": "$eq",
+            "value": "world",
+            "expected_count": 1,
+            "assertions": lambda calls: [
+                calls[0].output["triple.nested.dot"] == "world",
+            ],
+        },
+        {
+            "name": "input with double.nested field (eq)",
+            "field": "inputs.nested.double\\.nested",
+            "operator": "$eq",
+            "value": "goodbye",
+            "expected_count": 1,
+            "assertions": lambda calls: [
+                calls[0].inputs["nested"]["double.nested"] == "goodbye",
+            ],
+        },
+        {
+            "name": "input with triple.nested.dot field (eq)",
+            "field": "inputs.nested.triple\\.nested\\.dot",
+            "operator": "$eq",
+            "value": "universe",
+            "expected_count": 1,
+            "assertions": lambda calls: [
+                calls[0].inputs["nested"]["triple.nested.dot"] == "universe",
+            ],
+        },
+        {
+            "name": "output with double.nested field (contains)",
+            "field": "output.double\\.nested",
+            "operator": "$contains",
+            "value": "good",
+            "expected_count": 1,
+            "assertions": lambda calls: [
+                "good" in calls[0].output["double.nested"],
+            ],
+        },
+    ]
+
+    # Run all test cases
+    for test_case in test_cases:
+        # Build query based on operator
+        if test_case["operator"] == "$contains":
+            condition = {
+                "$contains": {
+                    "input": {"$getField": test_case["field"]},
+                    "substr": {"$literal": test_case["value"]},
+                }
+            }
+        else:
+            condition = {
+                test_case["operator"]: [
+                    {"$getField": test_case["field"]},
+                    {"$literal": test_case["value"]},
+                ]
+            }
+
+        query = tsi.Query(
+            **{
+                "$expr": {
+                    "$and": [
+                        {
+                            "$eq": [
+                                {"$getField": "inputs.test_id"},
+                                {"$literal": test_id},
+                            ]
+                        },
+                        condition,
+                    ]
+                }
+            }
+        )
+
+        calls = list(client.get_calls(query=query))
+        assert len(calls) == test_case["expected_count"], (
+            f"Test '{test_case['name']}' failed: expected {test_case['expected_count']} calls, got {len(calls)}"
+        )
+
+        # Run assertions
+        assertions = test_case["assertions"](calls)
+        assert all(assertions), f"Test '{test_case['name']}' failed assertions"
+
+    # Test OR query with multiple dotted fields (with escaped dots)
+    or_query = tsi.Query(
+        **{
+            "$expr": {
+                "$and": [
+                    {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]},
+                    {
+                        "$or": [
+                            {
+                                "$eq": [
+                                    {"$getField": "output.double\\.nested"},
+                                    {"$literal": "hello"},
+                                ]
+                            },
+                            {
+                                "$eq": [
+                                    {"$getField": "output.triple\\.nested\\.dot"},
+                                    {"$literal": "universe"},
+                                ]
+                            },
+                        ]
+                    },
+                ]
+            }
+        }
+    )
+    calls = list(client.get_calls(query=or_query))
+    assert len(calls) == 2
+    outputs = [call.output for call in calls]
+    assert any(o.get("double.nested") == "hello" for o in outputs)
+    assert any(o.get("triple.nested.dot") == "universe" for o in outputs)

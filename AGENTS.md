@@ -25,12 +25,6 @@ _Important:_ For OpenAI Codex agents (most likely you!), your environment does n
   - `weave/` - Python package implementation
   - `weave/trace_server` - Backend server implementation
 
-### Legacy Code
-
-- `weave_query/` - Legacy codebase (DO NOT EDIT)
-  - Marked for future refactoring
-  - Avoid making changes to this directory
-
 ## Python Testing Guidelines
 
 ### Test Framework
@@ -54,29 +48,32 @@ Focus on these primary test shards:
 #### Basic Test Commands
 
 1. Run all tests in a specific shard: `nox --no-install -e "tests-3.12(shard='trace')"`
-2. Run a specific test by appending `-- [test]` like so: `nox --no-install -e "tests-3.12(shard='trace')" -- trace/test_client_trace.py::test_simple_op`
+2. Run a specific test by appending `-- [test]` like so: `nox --no-install -e "tests-3.12(shard='trace')" -- tests/trace/test_client_trace.py::test_simple_op`
 3. Run linting: `nox --no-install -e lint` (Note: This will modify files)
 
 _Important:_ Since you don't have internet access, you must run `nox` with `--no-install`. We have pre-installed the requirements on the above shards.
 
 #### Critical Path Information
 
-**Test paths must be relative to the `tests/` directory**, not the repository root. When nox runs, it automatically changes to the `tests/` directory before executing pytest.
+**Test paths must be relative to the repository root**, not the `tests/` directory.
 
 Examples:
-- ✅ CORRECT: `-- trace/test_dataset.py::test_basic_dataset_lifecycle`
-- ❌ WRONG: `-- tests/trace/test_dataset.py::test_basic_dataset_lifecycle`
+
+- ✅ CORRECT: `-- tests/trace/test_dataset.py::test_basic_dataset_lifecycle`
+- ❌ WRONG: `-- trace/test_dataset.py::test_basic_dataset_lifecycle`
 
 #### Backend Selection
 
 **SQLite (Default/Recommended for Development):**
+
 ```bash
-nox --no-install -e "tests-3.12(shard='trace')" -- trace/test_client_trace.py::test_simple_op --trace-server=sqlite
+nox --no-install -e "tests-3.12(shard='trace')" -- tests/trace/test_client_trace.py::test_simple_op --trace-server=sqlite
 ```
 
 **ClickHouse (Required for Full Testing):**
+
 ```bash
-nox --no-install -e "tests-3.12(shard='trace')" -- trace/test_client_trace.py::test_simple_op --trace-server=clickhouse --clickhouse-process=true
+nox --no-install -e "tests-3.12(shard='trace')" -- tests/trace/test_client_trace.py::test_simple_op --trace-server=clickhouse --clickhouse-process=true
 ```
 
 **Note:** ClickHouse tests require Docker to be running. If Docker is not available or you encounter Docker connection errors, use SQLite backend with `--trace-server=sqlite`.
@@ -85,13 +82,15 @@ nox --no-install -e "tests-3.12(shard='trace')" -- trace/test_client_trace.py::t
 
 **Color Flag Conflicts:**
 If you encounter an error like `Can not specify both --no-color and --force-color`, this is due to conflicting environment variables. Unset them before running nox:
+
 ```bash
-unset NO_COLOR FORCE_COLOR && nox --no-install -e "tests-3.12(shard='trace')" -- trace/test_dataset.py::test_basic_dataset_lifecycle --trace-server=sqlite
+unset NO_COLOR FORCE_COLOR && nox --no-install -e "tests-3.12(shard='trace')" -- tests/trace/test_dataset.py::test_basic_dataset_lifecycle --trace-server=sqlite
 ```
 
 #### Reinstalling Dependencies
 
 If you encounter import errors or missing modules, reinstall the test shard environment:
+
 ```bash
 nox --install-only -e "tests-3.12(shard='trace')"
 ```
@@ -103,13 +102,18 @@ Then run your tests with `--no-install` as usual.
 The langchain integration tests work fully on macOS including chromadb/vector store tests.
 
 **Running LangChain Tests:**
+
 ```bash
-nox --no-install -e "tests-3.12(shard='langchain')" -- integrations/langchain/ --trace-server=sqlite
+nox --no-install -e "tests-3.12(shard='langchain')" -- tests/integrations/langchain/ --trace-server=sqlite
 ```
 
 ## Typescript Testing Guidelines
 
-TODO: need to fill this out
+```
+cd sdks/node
+npm i
+npm run test
+```
 
 ## Code Review & PR Guidelines
 

@@ -2,7 +2,6 @@
 import logging
 import os
 import re
-from typing import Optional
 
 from clickhouse_connect.driver.client import Client as CHClient
 
@@ -25,13 +24,15 @@ class ClickHouseTraceServerMigrator:
     replicated: bool
     replicated_path: str
     replicated_cluster: str
+    management_db: str
 
     def __init__(
         self,
         ch_client: CHClient,
-        replicated: Optional[bool] = None,
-        replicated_path: Optional[str] = None,
-        replicated_cluster: Optional[str] = None,
+        replicated: bool | None = None,
+        replicated_path: str | None = None,
+        replicated_cluster: str | None = None,
+        management_db: str = "db_management",
     ):
         super().__init__()
         self.ch_client = ch_client
@@ -44,6 +45,7 @@ class ClickHouseTraceServerMigrator:
             if replicated_cluster is None
             else replicated_cluster
         )
+        self.management_db = management_db
         self._initialize_migration_db()
 
     def _is_safe_identifier(self, value: str) -> bool:
@@ -94,7 +96,7 @@ class ClickHouseTraceServerMigrator:
         return create_db_sql
 
     def apply_migrations(
-        self, target_db: str, target_version: Optional[int] = None
+        self, target_db: str, target_version: int | None = None
     ) -> None:
         status = self._get_migration_status(target_db)
         logger.info(f"""`{target_db}` migration status: {status}""")
@@ -121,9 +123,9 @@ class ClickHouseTraceServerMigrator:
             insert_costs(self.ch_client, target_db)
 
     def _initialize_migration_db(self) -> None:
-        self.ch_client.command(self._create_db_sql("db_management"))
-        create_table_sql = """
-            CREATE TABLE IF NOT EXISTS db_management.migrations
+        self.ch_client.command(self._create_db_sql(self.management_db))
+        create_table_sql = f"""
+            CREATE TABLE IF NOT EXISTS {self.management_db}.migrations
             (
                 db_name String,
                 curr_version UInt64,
@@ -138,13 +140,13 @@ class ClickHouseTraceServerMigrator:
         column_names = ["db_name", "curr_version", "partially_applied_version"]
         select_columns = ", ".join(column_names)
         query = f"""
-            SELECT {select_columns} FROM db_management.migrations WHERE db_name = '{db_name}'
+            SELECT {select_columns} FROM {self.management_db}.migrations WHERE db_name = '{db_name}'
         """
         res = self.ch_client.query(query)
         result_rows = res.result_rows
         if res is None or len(result_rows) == 0:
             self.ch_client.insert(
-                "db_management.migrations",
+                f"{self.management_db}.migrations",
                 data=[[db_name, 0, None]],
                 column_names=column_names,
             )
@@ -153,14 +155,14 @@ class ClickHouseTraceServerMigrator:
         if res is None or len(result_rows) == 0:
             raise MigrationError("Migration table not found")
 
-        return dict(zip(column_names, result_rows[0]))
+        return dict(zip(column_names, result_rows[0], strict=False))
 
     def _get_migrations(
         self,
-    ) -> dict[int, dict[str, Optional[str]]]:
+    ) -> dict[int, dict[str, str | None]]:
         migration_dir = os.path.join(os.path.dirname(__file__), "migrations")
         migration_files = os.listdir(migration_dir)
-        migration_map: dict[int, dict[str, Optional[str]]] = {}
+        migration_map: dict[int, dict[str, str | None]] = {}
         max_version = 0
         for file in migration_files:
             if not file.endswith(".up.sql") and not file.endswith(".down.sql"):
@@ -217,7 +219,7 @@ class ClickHouseTraceServerMigrator:
         self,
         current_version: int,
         migration_map: dict,
-        target_version: Optional[int] = None,
+        target_version: int | None = None,
     ) -> list[tuple[int, str]]:
         if target_version is None:
             target_version = len(migration_map)
@@ -263,14 +265,14 @@ class ClickHouseTraceServerMigrator:
     def _update_migration_status(
         self, target_db: str, target_version: int, is_start: bool = True
     ) -> None:
-        """Update the migration status in db_management.migrations table."""
+        """Update the migration status in management database migrations table."""
         if is_start:
             self.ch_client.command(
-                f"ALTER TABLE db_management.migrations UPDATE partially_applied_version = {target_version} WHERE db_name = '{target_db}'"
+                f"ALTER TABLE {self.management_db}.migrations UPDATE partially_applied_version = {target_version} WHERE db_name = '{target_db}'"
             )
         else:
             self.ch_client.command(
-                f"ALTER TABLE db_management.migrations UPDATE curr_version = {target_version}, partially_applied_version = NULL WHERE db_name = '{target_db}'"
+                f"ALTER TABLE {self.management_db}.migrations UPDATE curr_version = {target_version}, partially_applied_version = NULL WHERE db_name = '{target_db}'"
             )
 
     def _apply_migration(

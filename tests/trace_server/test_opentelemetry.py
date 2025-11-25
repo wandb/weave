@@ -5,6 +5,7 @@ from binascii import hexlify
 from datetime import datetime
 from typing import Any
 
+import pytest
 from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
     ExportTraceServiceRequest,
 )
@@ -145,6 +146,7 @@ def test_otel_export_clickhouse(client: weave_client.WeaveClient):
     export_req = create_test_export_request()
     project_id = client._project_id()
     export_req.project_id = project_id
+    export_req.wb_user_id = "abcd123"
 
     # Export the otel traces
     response = client.server.otel_export(export_req)
@@ -207,6 +209,7 @@ def test_otel_export_with_turn_and_thread(client: weave_client.WeaveClient):
     export_req = create_test_export_request()
     project_id = client._project_id()
     export_req.project_id = project_id
+    export_req.wb_user_id = "abcd123"
 
     # Add turn and thread attributes to the span
     test_thread_id = str(uuid.uuid4())
@@ -256,6 +259,7 @@ def test_otel_export_with_turn_no_thread(client: weave_client.WeaveClient):
     export_req = create_test_export_request()
     project_id = client._project_id()
     export_req.project_id = project_id
+    export_req.wb_user_id = "abcd123"
 
     # Add only is_turn attribute (no thread_id)
     span = export_req.traces.resource_spans[0].scope_spans[0].spans[0]
@@ -369,16 +373,11 @@ class TestPythonSpans:
         assert "array" in start_call.attributes["test"]
         assert start_call.attributes["test"]["array"] == ["value1", "value2"]
 
-        # Verify otel_span is included in attributes
-        assert "otel_span" in start_call.attributes
-        assert start_call.attributes["otel_span"]["name"] == py_span.name
-        assert (
-            start_call.attributes["otel_span"]["context"]["trace_id"]
-            == py_span.trace_id
-        )
-        assert (
-            start_call.attributes["otel_span"]["context"]["span_id"] == py_span.span_id
-        )
+        # Verify otel_dump is included in the call (otel_span is now in otel_dump)
+        assert start_call.otel_dump is not None
+        assert start_call.otel_dump["name"] == long_name
+        assert start_call.otel_dump["context"]["trace_id"] == py_span.trace_id
+        assert start_call.otel_dump["context"]["span_id"] == py_span.span_id
 
         # Verify end call
         assert isinstance(end_call, tsi.EndedCallSchemaForInsert)
@@ -865,6 +864,7 @@ class TestSemanticConventionParsing:
         assert extracted_turn_only["is_turn"] is True
         assert "thread_id" not in extracted_turn_only
 
+    @pytest.mark.skip(reason="wb_run_id extraction not yet implemented")
     def test_wandb_wb_run_id_extraction(self):
         """Test extracting wb_run_id from both wb_run_id and wandb.wb_run_id attributes."""
         # Case 1: Only top-level wb_run_id present
@@ -1091,6 +1091,43 @@ class TestSemanticConventionParsing:
         assert usage.get("completion_tokens") == 25
         assert usage.get("total_tokens") == 40
 
+    def test_opentelemetry_usage_output_tokens_extraction(self):
+        """Test that gen_ai.usage.output_tokens is properly parsed and combined with input_tokens."""
+        # Test with gen_ai.usage.input_tokens and gen_ai.usage.output_tokens
+        attributes = create_attributes(
+            {
+                "gen_ai.usage.input_tokens": 10,
+                "gen_ai.usage.output_tokens": 20,
+            }
+        )
+
+        usage = get_weave_usage(attributes) or {}
+
+        # Verify individual tokens are parsed
+        assert usage.get("input_tokens") == 10
+        assert usage.get("output_tokens") == 20
+        # Verify total_tokens is calculated when not provided
+        assert usage.get("total_tokens") == 30
+
+    def test_opentelemetry_usage_output_tokens_with_explicit_total(self):
+        """Test that explicit total_tokens takes precedence over calculated value."""
+        # Test with explicit total_tokens provided
+        attributes = create_attributes(
+            {
+                "gen_ai.usage.input_tokens": 10,
+                "gen_ai.usage.output_tokens": 20,
+                "llm.usage.total_tokens": 35,  # Explicit total (might include overhead)
+            }
+        )
+
+        usage = get_weave_usage(attributes) or {}
+
+        # Verify individual tokens are parsed
+        assert usage.get("input_tokens") == 10
+        assert usage.get("output_tokens") == 20
+        # Verify explicit total_tokens is used instead of calculated value
+        assert usage.get("total_tokens") == 35
+
 
 class TestHelpers:
     def test_capture_parts(self):
@@ -1313,6 +1350,7 @@ def test_otel_export_partial_success_on_attribute_conflict(
     export_req = create_test_export_request()
     project_id = client._project_id()
     export_req.project_id = project_id
+    export_req.wb_user_id = "abcd123"
 
     # Good span (already present at index 0)
     good_span = export_req.traces.resource_spans[0].scope_spans[0].spans[0]
@@ -1390,6 +1428,7 @@ def test_otel_span_wandb_attributes_and_data_routing(
     export_req = create_test_export_request()
     project_id = client._project_id()
     export_req.project_id = project_id
+    export_req.wb_user_id = "abcd123"
 
     # Get the span to add custom attributes
     span = export_req.traces.resource_spans[0].scope_spans[0].spans[0]

@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import TYPE_CHECKING, Any, Literal
 
-import requests
+import httpx
 from pydantic import ValidationError
 
 from weave.chat.stream import ChatCompletionChunkStream
@@ -18,6 +18,7 @@ from weave.chat.types.chat_completion_stream_options_param import (
 from weave.trace.env import weave_trace_server_url
 from weave.trace.op import op
 from weave.trace_server.constants import COMPLETIONS_CREATE_OP_NAME, INFERENCE_HOST
+from weave.utils.project_id import to_project_id
 from weave.wandb_interface.context import get_wandb_api_context
 
 if TYPE_CHECKING:
@@ -193,7 +194,7 @@ class Completions:
         headers = {
             "Content-Type": "application/json",
         }
-        project_id = f"{self._client.entity}/{self._client.project}"
+        project_id = to_project_id(self._client.entity, self._client.project)
         data: dict[str, Any] = {
             "messages": messages,
         }
@@ -240,24 +241,37 @@ class Completions:
 
         request_stream = stream is True
 
-        response = requests.post(
-            url,
-            auth=auth,
-            headers=headers,
-            json=data,
-            stream=request_stream,
-        )
-
-        if response.status_code == 401:
-            raise requests.HTTPError(
-                f"{response.reason} - please make sure inference is enabled for entity {self._client.entity}",
-                response=response,
-            )
-
-        response.raise_for_status()  # Raise exception on HTTP error
+        def check_response(response: httpx.Response) -> None:
+            """Check response for errors and raise appropriate exceptions."""
+            if response.status_code == 401:
+                raise httpx.HTTPStatusError(
+                    f"{response.reason_phrase} - please make sure inference is enabled for entity {self._client.entity}",
+                    request=response.request,
+                    response=response,
+                )
+            response.raise_for_status()
 
         if request_stream:
-            return ChatCompletionChunkStream(response)
+            # For streaming, we need to keep the client and response context
+            client = httpx.Client()
+            with client.stream(
+                "POST",
+                url,
+                auth=auth,
+                headers=headers,
+                json=data,
+            ) as response:
+                check_response(response)
+                return ChatCompletionChunkStream(response)
+        else:
+            with httpx.Client() as client:
+                response = client.post(
+                    url,
+                    auth=auth,
+                    headers=headers,
+                    json=data,
+                )
+                check_response(response)
 
         # Non-streaming case
         d = response.json()

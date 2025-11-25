@@ -1,5 +1,14 @@
 """The top-level functions and classes for working with Weave."""
 
+import sys
+import warnings
+
+if sys.version_info < (3, 10):  # noqa: UP036
+    warnings.warn(
+        "Weave only supports Python 3.10 or higher; please upgrade your Python version to avoid potential issues.",
+        stacklevel=2,
+    )
+
 from weave import version
 from weave.trace.api import *
 
@@ -32,40 +41,6 @@ from weave.type_wrappers import Content
 
 # Alias for succinct code
 P = EasyPrompt
-
-# Special object informing doc generation tooling which symbols
-# to document & to associate with this module.
-__docspec__ = [
-    # Re-exported from trace.api
-    init,
-    publish,
-    ref,
-    get,
-    require_current_call,
-    get_current_call,
-    finish,
-    op,
-    attributes,
-    thread,
-    # Re-exported from flow module
-    Object,
-    Dataset,
-    Model,
-    Prompt,
-    StringPrompt,
-    MessagesPrompt,
-    Evaluation,
-    EvaluationLogger,
-    Scorer,
-    AnnotationSpec,
-    File,
-    Content,
-    Markdown,
-    Monitor,
-    SavedView,
-    Audio,
-    log_call,
-]
 
 __all__ = [
     "Agent",
