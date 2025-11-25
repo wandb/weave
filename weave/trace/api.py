@@ -128,7 +128,6 @@ def publish(obj: Any, name: str | None = None) -> ObjectRef:
     Returns:
         A Weave Ref to the saved object.
     """
-    # Determine the save name
     save_name: str
     if name:
         save_name = name
