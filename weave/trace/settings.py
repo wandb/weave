@@ -187,6 +187,17 @@ class UserSettings(BaseModel):
     Can be overridden with the environment variable `WEAVE_USE_PARALLEL_TABLE_UPLOAD`
     """
 
+    call_raise_on_exception: bool = False
+    """
+    Globally controls whether exceptions are raised when calling ops via op.call().
+
+    If True, exceptions raised during op execution will be re-raised.
+    If False, exceptions are captured in the Call object and not raised.
+
+    This setting will change to True in a future version.
+    Can be overridden with the environment variable `WEAVE_CALL_RAISE_ON_EXCEPTION`
+    """
+
     model_config = ConfigDict(extra="forbid")
     _is_first_apply: bool = PrivateAttr(True)
 
@@ -302,6 +313,11 @@ def should_use_parallel_table_upload() -> bool:
 def should_implicitly_patch_integrations() -> bool:
     """Returns whether implicit patching of integrations is enabled."""
     return _should("implicitly_patch_integrations")
+
+
+def should_call_raise_on_exception() -> bool:
+    """Returns whether exceptions should be raised when calling ops via op.call()."""
+    return _should("call_raise_on_exception")
 
 
 def parse_and_apply_settings(
