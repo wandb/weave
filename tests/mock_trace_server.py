@@ -6,14 +6,36 @@ that can be used in tests to avoid dependencies on ClickHouse or SQLite.
 
 from __future__ import annotations
 
+import copy
 import datetime
-from collections import defaultdict
+import hashlib
+import json
 from collections.abc import Iterator
 from typing import Any
-from uuid import uuid4
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ids import generate_id
+from weave.trace_server.trace_server_interface_util import bytes_digest, str_digest
+from weave.trace_server.object_class_util import process_incoming_object_val
+
+
+def _get_type(val: Any) -> str:
+    """Get the type of a value for kind determination."""
+    if isinstance(val, dict):
+        if "_class_name" in val:
+            return val["_class_name"]
+        return "dict"
+    elif isinstance(val, list):
+        return "list"
+    return "unknown"
+
+
+def _get_kind(val: Any) -> str:
+    """Get the kind (op or object) from a value."""
+    val_type = _get_type(val)
+    if val_type == "Op":
+        return "op"
+    return "object"
 
 
 class NotFoundError(Exception):
@@ -56,6 +78,10 @@ class MockTraceServer:
         call_id = req.start.id or generate_id()
         trace_id = req.start.trace_id or call_id
 
+        # Make deep copies to prevent mutation by client-side deserialization
+        inputs_copy = copy.deepcopy(req.start.inputs)
+        attributes_copy = copy.deepcopy(req.start.attributes) or {}
+
         call = tsi.CallSchema(
             id=call_id,
             project_id=req.start.project_id,
@@ -66,8 +92,8 @@ class MockTraceServer:
             thread_id=req.start.thread_id,
             turn_id=req.start.turn_id,
             started_at=req.start.started_at,
-            attributes=req.start.attributes or {},
-            inputs=req.start.inputs,
+            attributes=attributes_copy,
+            inputs=inputs_copy,
             ended_at=None,
             exception=None,
             output=None,
@@ -104,7 +130,9 @@ class MockTraceServer:
         if req.id not in self.calls:
             raise NotFoundError(f"Call {req.id} not found")
 
-        return tsi.CallReadRes(call=self.calls[req.id])
+        # Return a deep copy to prevent mutation by client-side deserialization (from_json pops _type)
+        call = copy.deepcopy(self.calls[req.id])
+        return tsi.CallReadRes(call=call)
 
     def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
         calls = list(self.calls_query_stream(req))
@@ -133,8 +161,9 @@ class MockTraceServer:
         else:
             filtered_calls = filtered_calls[offset:]
 
+        # Return deep copies to prevent mutation by client-side deserialization (from_json pops _type)
         for call in filtered_calls:
-            yield call
+            yield copy.deepcopy(call)
 
     def _apply_call_filters(
         self, calls: list[tsi.CallSchema], filter_dict: dict[str, Any]
@@ -226,19 +255,27 @@ class MockTraceServer:
 
     # Obj API
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
-        # Generate digest based on the object value
-        digest = generate_id()
+        # Process the incoming object value (same as real servers)
+        processed_result = process_incoming_object_val(
+            req.obj.val, req.obj.builtin_object_class
+        )
+        processed_val = processed_result["val"]
+
+        # Generate content-based digest (same as ClickHouse/SQLite servers)
+        json_val = json.dumps(processed_val)
+        digest = str_digest(json_val)
+
         key = f"{req.obj.project_id}:{req.obj.object_id}:{digest}"
         self.objs[key] = {
             "project_id": req.obj.project_id,
             "object_id": req.obj.object_id,
             "digest": digest,
-            "val": req.obj.val,
+            "val": processed_val,
             "created_at": datetime.datetime.now(tz=datetime.timezone.utc),
-            "kind": "object",  # Default kind
-            "base_object_class": req.obj.builtin_object_class or "Object",
+            "kind": _get_kind(processed_val),
+            "base_object_class": processed_result["base_object_class"] or "Object",
         }
-        return tsi.ObjCreateRes(digest=digest)
+        return tsi.ObjCreateRes(digest=digest, object_id=req.obj.object_id)
 
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
         key = f"{req.project_id}:{req.object_id}:{req.digest}"
@@ -299,13 +336,32 @@ class MockTraceServer:
 
     # Table API
     def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
-        digest = generate_id()
-        key = f"{req.table.project_id}:{digest}"
+        # Calculate row digests and store rows
+        row_digests = []
+        for r in req.table.rows:
+            if not isinstance(r, dict):
+                raise TypeError(
+                    f"""Validation Error: Encountered a non-dictionary row when creating a table. Please ensure that all rows are dictionaries. Violating row:\n{r}."""
+                )
+            row_json = json.dumps(r)
+            row_digest = str_digest(row_json)
+            row_digests.append(row_digest)
+            # Store row by digest for later retrieval
+            row_key = f"{req.table.project_id}:row:{row_digest}"
+            self.files[row_key] = row_json.encode()  # Reuse files storage for row data
 
+        # Calculate table digest from row digests (same as ClickHouse server)
+        table_hasher = hashlib.sha256()
+        for row_digest in row_digests:
+            table_hasher.update(row_digest.encode())
+        digest = table_hasher.hexdigest()
+
+        key = f"{req.table.project_id}:{digest}"
         self.tables[key] = {
             "project_id": req.table.project_id,
             "digest": digest,
             "rows": req.table.rows,
+            "row_digests": row_digests,
         }
 
         return tsi.TableCreateRes(digest=digest)
@@ -313,57 +369,78 @@ class MockTraceServer:
     def table_create_from_digests(
         self, req: tsi.TableCreateFromDigestsReq
     ) -> tsi.TableCreateFromDigestsRes:
-        # Combine rows from multiple tables
-        all_rows = []
-        for digest in req.digests:
-            key = f"{req.project_id}:{digest}"
-            if key in self.tables:
-                all_rows.extend(self.tables[key]["rows"])
+        # Calculate table digest from row digests
+        table_hasher = hashlib.sha256()
+        for row_digest in req.row_digests:
+            table_hasher.update(row_digest.encode())
+        digest = table_hasher.hexdigest()
 
-        # Create new table with combined rows
-        new_digest = generate_id()
-        key = f"{req.project_id}:{new_digest}"
+        key = f"{req.project_id}:{digest}"
         self.tables[key] = {
             "project_id": req.project_id,
-            "digest": new_digest,
-            "rows": all_rows,
+            "digest": digest,
+            "rows": [],  # Will be populated on query from row_digests
+            "row_digests": req.row_digests,
         }
 
-        return tsi.TableCreateFromDigestsRes(digest=new_digest)
+        return tsi.TableCreateFromDigestsRes(digest=digest)
 
     def table_update(self, req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
         key = f"{req.project_id}:{req.base_digest}"
         if key not in self.tables:
             raise NotFoundError(f"Table {key} not found")
 
-        # Create new version with updated rows
-        new_digest = generate_id()
-        new_key = f"{req.project_id}:{new_digest}"
-
-        # Process updates on a copy of base rows
-        base_rows = self.tables[key]["rows"].copy()
+        # Get existing row digests
+        base_row_digests = list(self.tables[key].get("row_digests", []))
+        base_rows = list(self.tables[key]["rows"])
+        updated_digests: list[str] = []
 
         # Apply each update operation in order
         for update in req.updates:
             if hasattr(update, 'append') and update.append is not None:
                 # Append operation: add row to end
-                base_rows.append(update.append.row)
+                row = update.append.row
+                row_json = json.dumps(row)
+                row_digest = str_digest(row_json)
+                base_row_digests.append(row_digest)
+                base_rows.append(row)
+                updated_digests.append(row_digest)
+                # Store row by digest
+                row_key = f"{req.project_id}:row:{row_digest}"
+                self.files[row_key] = row_json.encode()
             elif hasattr(update, 'pop') and update.pop is not None:
                 # Pop operation: remove row at index
-                if 0 <= update.pop.index < len(base_rows):
+                if 0 <= update.pop.index < len(base_row_digests):
+                    base_row_digests.pop(update.pop.index)
                     base_rows.pop(update.pop.index)
             elif hasattr(update, 'insert') and update.insert is not None:
                 # Insert operation: insert row at index
-                if 0 <= update.insert.index <= len(base_rows):
-                    base_rows.insert(update.insert.index, update.insert.row)
+                row = update.insert.row
+                row_json = json.dumps(row)
+                row_digest = str_digest(row_json)
+                if 0 <= update.insert.index <= len(base_row_digests):
+                    base_row_digests.insert(update.insert.index, row_digest)
+                    base_rows.insert(update.insert.index, row)
+                updated_digests.append(row_digest)
+                # Store row by digest
+                row_key = f"{req.project_id}:row:{row_digest}"
+                self.files[row_key] = row_json.encode()
 
+        # Calculate new table digest from row digests
+        table_hasher = hashlib.sha256()
+        for row_digest in base_row_digests:
+            table_hasher.update(row_digest.encode())
+        new_digest = table_hasher.hexdigest()
+
+        new_key = f"{req.project_id}:{new_digest}"
         self.tables[new_key] = {
             "project_id": req.project_id,
             "digest": new_digest,
             "rows": base_rows,
+            "row_digests": base_row_digests,
         }
 
-        return tsi.TableUpdateRes(digest=new_digest)
+        return tsi.TableUpdateRes(digest=new_digest, updated_row_digests=updated_digests)
 
     def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
         key = f"{req.project_id}:{req.digest}"
@@ -420,7 +497,8 @@ class MockTraceServer:
 
     # File API
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
-        digest = generate_id()
+        # Generate content-based digest (same as ClickHouse server)
+        digest = bytes_digest(req.content)
         key = f"{req.project_id}:{digest}"
         self.files[key] = req.content
         return tsi.FileCreateRes(digest=digest)
