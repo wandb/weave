@@ -1617,7 +1617,7 @@ class ModelCreateRes(BaseModel):
     version_index: int = Field(
         ..., description="The version index of the created model"
     )
-    ref: str = Field(
+    model_ref: str = Field(
         ...,
         description="Full reference to the created model",
     )
