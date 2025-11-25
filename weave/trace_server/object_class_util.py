@@ -18,7 +18,9 @@ There are two standard base object classes: BaseObject and Object
 base_object_class_names = ["BaseObject", "Object"]
 
 # These are classes that should be filtered out when computing base_object_class
-# because they are implementation details (e.g., Generic for type hints)
+# for backward compatibility. When classes inherit from Generic[T], Python's MRO
+# includes Generic, but we exclude it to maintain consistent _bases serialization
+# and digest computation.
 ignored_base_class_names = ["Generic"]
 
 
@@ -146,7 +148,12 @@ def process_incoming_object_val(
 def dump_object(val: BaseModel) -> dict:
     cls = val.__class__
     cls_name = val.__class__.__name__
-    bases = [c.__name__ for c in cls.mro()[1:-1]]
+    # Filter out implementation detail classes like Generic
+    bases = [
+        c.__name__
+        for c in cls.mro()[1:-1]
+        if c.__name__ not in ignored_base_class_names
+    ]
 
     dump = {}
     # Order matters here due to the way we calculate the digest!
