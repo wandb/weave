@@ -17,7 +17,7 @@ class LLMAsAJudgeScorer(Scorer):
     Attributes:
         model: The LLM model to use for scoring
         scoring_prompt: A prompt string template with {variable} placeholders (optional if prompt_ref is provided)
-        prompt_ref: A reference to a MessagesPrompt object (optional, takes precedence over scoring_prompt)
+        scoring_prompt_ref: A reference to a MessagesPrompt object (optional, takes precedence over scoring_prompt)
     """
 
     model: LLMStructuredCompletionModel
