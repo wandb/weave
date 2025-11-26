@@ -80,8 +80,8 @@ library_cases = [
             "description": None,
             "dataset": "weave:///shawn/test-project/object/Dataset:N0VKaX8wr9kF9QQzM7mSQz3yKrJJjTiJi4c9Bt7RSTA",
             "scorers": [
-                "weave:///shawn/test-project/object/MyScorer:8FuUw3byob295YxgEuyJXxBebAPJ0vW059bXYFdchkg",
-                "weave:///shawn/test-project/object/LLMAsAJudgeScorer:kH4Vwo8xclzXceVbTYsYSIq4Yx54JMoH9ACtGxAH9ZU",
+                "weave:///shawn/test-project/object/MyScorer:yuPEyzjX11BGyjEsvG1T2GJmlKKDYYZjYTl1XmphgJA",
+                "weave:///shawn/test-project/object/LLMAsAJudgeScorer:wcWK8BRtiiyXbwZOVc8ypNNCtSLCRRU7tL0LiyzEErs",
             ],
             "preprocess_model_input": None,
             "trials": 1,
@@ -126,13 +126,13 @@ library_cases = [
             },
             {
                 "object_id": "MyScorer",
-                "digest": "8FuUw3byob295YxgEuyJXxBebAPJ0vW059bXYFdchkg",
+                "digest": "yuPEyzjX11BGyjEsvG1T2GJmlKKDYYZjYTl1XmphgJA",
                 "exp_val": {
                     "_type": "MyScorer",
                     "name": None,
                     "description": None,
                     "column_map": None,
-                    "score": "weave:///shawn/test-project/op/MyScorer.score:aYU47lnlWPzEnb4euRSicDtC5Puo4YJTl55KlTCDuOU",
+                    "score": "weave:///shawn/test-project/op/MyScorer.score:BE7Pf2XsllJGfbeffAcYiZa2zRAD24oytT9U9iqIn4o",
                     "summarize": "weave:///shawn/test-project/op/Scorer.summarize:co7gQYa2mpiRjizy4V0wlidDK2EXIjhYVlXGQEkUf6Y",
                     "_class_name": "MyScorer",
                     "_bases": ["Scorer", "Object", "BaseModel"],
@@ -140,7 +140,7 @@ library_cases = [
             },
             {
                 "object_id": "LLMAsAJudgeScorer",
-                "digest": "kH4Vwo8xclzXceVbTYsYSIq4Yx54JMoH9ACtGxAH9ZU",
+                "digest": "wcWK8BRtiiyXbwZOVc8ypNNCtSLCRRU7tL0LiyzEErs",
                 "exp_val": {
                     "_type": "LLMAsAJudgeScorer",
                     "name": None,
@@ -148,7 +148,7 @@ library_cases = [
                     "column_map": None,
                     "model": "weave:///shawn/test-project/object/LLMStructuredCompletionModel:kgMVTEoEXBudZExbXhfAS7InEQSOAzfsQ2qmvnCGd0M",
                     "scoring_prompt": "Here are the inputs: {inputs}. Here is the output: {output}. Is the output correct?",
-                    "score": "weave:///shawn/test-project/op/LLMAsAJudgeScorer.score:3DXMPEFwP04oJ362x6sxQIqQmVYYX2jB4Kg5EF2SF60",
+                    "score": "weave:///shawn/test-project/op/LLMAsAJudgeScorer.score:OIgGBpG1Xnwppf494LDa4mC2AEEu5tFePiWkX3N6B1s",
                     "summarize": "weave:///shawn/test-project/op/Scorer.summarize:co7gQYa2mpiRjizy4V0wlidDK2EXIjhYVlXGQEkUf6Y",
                     "_class_name": "LLMAsAJudgeScorer",
                     "_bases": ["Scorer", "Object", "BaseModel"],

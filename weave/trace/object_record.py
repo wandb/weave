@@ -9,6 +9,9 @@ from typing import Any
 from pydantic import BaseModel
 
 from weave.trace.op import is_op
+from weave.trace_server.client_server_common.base_class_util import (
+    IGNORED_BASE_CLASS_NAMES,
+)
 from weave.trace_server.client_server_common.pydantic_util import (
     pydantic_asdict_one_level,
 )
@@ -64,11 +67,11 @@ class ObjectRecord:
 
 def class_all_bases_names(cls: type) -> list[str]:
     # Don't include cls and don't include object
-    # Filter out implementation detail classes like Generic for backward compatibility.
-    # When classes inherit from Generic[T], Python's MRO includes Generic, but we exclude
-    # it to maintain consistent _bases serialization and digest computation.
-    ignored_bases = {"Generic"}
-    return [c.__name__ for c in cls.mro()[1:-1] if c.__name__ not in ignored_bases]
+    return [
+        c.__name__
+        for c in cls.mro()[1:-1]
+        if c.__name__ not in IGNORED_BASE_CLASS_NAMES
+    ]
 
 
 def pydantic_object_record(obj: BaseModel) -> ObjectRecord:

@@ -2,6 +2,9 @@ from typing import Any, TypedDict
 
 from pydantic import BaseModel
 
+from weave.trace_server.client_server_common.base_class_util import (
+    IGNORED_BASE_CLASS_NAMES,
+)
 from weave.trace_server.client_server_common.pydantic_util import (
     pydantic_asdict_one_level,
 )
@@ -16,12 +19,6 @@ There are two standard base object classes: BaseObject and Object
 `BaseObject` is the more simple schema-based base object class.
 """
 base_object_class_names = ["BaseObject", "Object"]
-
-# These are classes that should be filtered out when computing base_object_class
-# for backward compatibility. When classes inherit from Generic[T], Python's MRO
-# includes Generic, but we exclude it to maintain consistent _bases serialization
-# and digest computation.
-ignored_base_class_names = ["Generic"]
 
 
 class GetObjectClassesResult(TypedDict):
@@ -41,7 +38,7 @@ def get_object_classes(val: Any) -> GetObjectClassesResult | None:
         return None
 
     # Filter out implementation detail classes like Generic
-    bases = [b for b in val["_bases"] if b not in ignored_base_class_names]
+    bases = [b for b in val["_bases"] if b not in IGNORED_BASE_CLASS_NAMES]
 
     if len(bases) < 2:
         return None
@@ -152,7 +149,7 @@ def dump_object(val: BaseModel) -> dict:
     bases = [
         c.__name__
         for c in cls.mro()[1:-1]
-        if c.__name__ not in ignored_base_class_names
+        if c.__name__ not in IGNORED_BASE_CLASS_NAMES
     ]
 
     dump = {}
