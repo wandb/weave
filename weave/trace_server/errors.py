@@ -263,7 +263,13 @@ class ErrorRegistry:
         self.register(TransportQueryError, 403, lambda exc: {"reason": "Forbidden"})
         self.register(
             TransportServerError,
-            lambda exc: exc.code if exc.code and 400 <= exc.code < 500 else 500,
+            lambda exc: (
+                exc.code
+                if isinstance(exc, TransportServerError)
+                and exc.code
+                and 400 <= exc.code < 500
+                else 500
+            ),
             lambda exc: {"reason": str(exc)},
         )
 
