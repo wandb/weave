@@ -52,6 +52,56 @@ def test_disabled_env(client):
     )
 
 
+def test_publish_when_disabled(client, monkeypatch):
+    """Test that weave.publish() returns a dummy ref when WEAVE_DISABLED=true."""
+    monkeypatch.setenv("WEAVE_DISABLED", "true")
+
+    with mock.patch(
+        "weave.trace.api.weave_client_context.require_weave_client"
+    ) as mock_require_client:
+        ref = weave.publish({"foo": "bar"}, name="test_obj")
+        mock_require_client.assert_not_called()
+
+    assert ref.entity == "DISABLED"
+    assert ref.project == "DISABLED"
+    assert ref.name == "test_obj"
+    assert ref.digest == "DISABLED"
+
+
+def test_publish_when_disabled_uses_obj_name(client, monkeypatch):
+    """Test that publish uses object's name attribute when no explicit name given."""
+    monkeypatch.setenv("WEAVE_DISABLED", "true")
+
+    class NamedObj:
+        name = "my_obj"
+
+    # Assert there is no network call made
+    with mock.patch(
+        "weave.trace.api.weave_client_context.require_weave_client"
+    ) as mock_require_client:
+        ref = weave.publish(NamedObj())
+        mock_require_client.assert_not_called()
+
+    assert ref.name == "my_obj"
+
+
+def test_publish_when_disabled_uses_class_name(client, monkeypatch):
+    """Test that publish uses class name when object has no name attribute."""
+    monkeypatch.setenv("WEAVE_DISABLED", "true")
+
+    class MyClass:
+        pass
+
+    # Assert there is no network call made
+    with mock.patch(
+        "weave.trace.api.weave_client_context.require_weave_client"
+    ) as mock_require_client:
+        ref = weave.publish(MyClass())
+        mock_require_client.assert_not_called()
+
+    assert ref.name == "MyClass"
+
+
 def test_print_call_link_setting(client_creator):
     with client_creator(settings=UserSettings(print_call_link=False)) as client:
         callbacks = [flushing_callback(client)]
