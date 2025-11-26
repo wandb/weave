@@ -193,11 +193,14 @@ class MockTraceServer:
         inputs_copy = copy.deepcopy(req.start.inputs)
         attributes_copy = copy.deepcopy(req.start.attributes) or {}
 
+        # Convert empty strings to None for display_name
+        display_name = req.start.display_name or None
+
         call = tsi.CallSchema(
             id=call_id,
             project_id=req.start.project_id,
             op_name=req.start.op_name,
-            display_name=req.start.display_name,
+            display_name=display_name,
             trace_id=trace_id,
             parent_id=req.start.parent_id,
             thread_id=req.start.thread_id,
@@ -289,10 +292,12 @@ class MockTraceServer:
             # Extract trace_name from op_name
             op_name = call.op_name
             # Try to get the name part from URIs like "weave:///entity/project/op/name:hash"
+            # Splits to: ['weave:', '', '', 'entity', 'project', 'op', 'name:hash']
             if op_name.startswith("weave:///"):
                 parts = op_name.split("/")
-                if len(parts) >= 5 and parts[3] == "op":
-                    name_with_hash = parts[4]
+                # parts[5] should be 'op', parts[6] should be 'name:hash'
+                if len(parts) >= 7 and parts[5] == "op":
+                    name_with_hash = parts[6]
                     # Remove the hash suffix (e.g., "x:C6hohMXy..." -> "x")
                     name = name_with_hash.split(":")[0]
                     weave_summary["trace_name"] = name
@@ -501,7 +506,8 @@ class MockTraceServer:
 
         call = self.calls[req.call_id]
         if req.display_name is not None:
-            call.display_name = req.display_name
+            # Empty string means remove display_name (store as None)
+            call.display_name = req.display_name or None
 
         return tsi.CallUpdateRes()
 
@@ -552,6 +558,15 @@ class MockTraceServer:
         digest = str_digest(json_val)
 
         key = f"{req.obj.project_id}:{req.obj.object_id}:{digest}"
+
+        # If this exact object already exists, don't create a new version
+        if key in self.objs:
+            return tsi.ObjCreateRes(digest=digest, object_id=req.obj.object_id)
+
+        # Calculate version_index by counting existing versions of this object_id
+        obj_prefix = f"{req.obj.project_id}:{req.obj.object_id}:"
+        version_index = sum(1 for k in self.objs if k.startswith(obj_prefix))
+
         self.objs[key] = {
             "project_id": req.obj.project_id,
             "object_id": req.obj.object_id,
@@ -560,6 +575,7 @@ class MockTraceServer:
             "created_at": datetime.datetime.now(tz=datetime.timezone.utc),
             "kind": _get_kind(processed_val),
             "base_object_class": processed_result["base_object_class"] or "Object",
+            "version_index": version_index,
         }
         return tsi.ObjCreateRes(digest=digest, object_id=req.obj.object_id)
 
@@ -584,7 +600,8 @@ class MockTraceServer:
         )
 
     def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
-        objs = []
+        # First, collect all matching objects
+        matching_objs = []
         for obj_data in self.objs.values():
             if obj_data["project_id"] != req.project_id:
                 continue
@@ -602,24 +619,46 @@ class MockTraceServer:
                     is_op = obj_data.get("kind") == "op"
                     if req.filter.is_op != is_op:
                         continue
-                # Filter by latest_only
-                if req.filter.latest_only:
-                    # For now, all objects are "latest" in the mock (we don't track versions)
-                    pass
 
+            matching_objs.append(obj_data)
+
+        # Determine is_latest for each object
+        # Group by object_id and find max version_index for each
+        max_versions: dict[str, int] = {}
+        for obj_data in matching_objs:
+            obj_id = obj_data["object_id"]
+            version_index = obj_data.get("version_index", 0)
+            if obj_id not in max_versions or version_index > max_versions[obj_id]:
+                max_versions[obj_id] = version_index
+
+        # Filter by latest_only if requested
+        if req.filter and req.filter.latest_only:
+            matching_objs = [
+                obj for obj in matching_objs
+                if obj.get("version_index", 0) == max_versions.get(obj["object_id"], 0)
+            ]
+
+        # Build result objects
+        objs = []
+        for obj_data in matching_objs:
+            version_index = obj_data.get("version_index", 0)
+            is_latest = 1 if version_index == max_versions.get(obj_data["object_id"], 0) else 0
             objs.append(
                 tsi.ObjSchema(
                     project_id=obj_data["project_id"],
                     object_id=obj_data["object_id"],
                     created_at=obj_data["created_at"],
                     digest=obj_data["digest"],
-                    version_index=0,
-                    is_latest=1,
+                    version_index=version_index,
+                    is_latest=is_latest,
                     kind=obj_data["kind"],
                     base_object_class=obj_data["base_object_class"],
                     val=obj_data["val"],
                 )
             )
+
+        # Sort by created_at to ensure consistent ordering
+        objs.sort(key=lambda o: (o.object_id, o.version_index))
 
         return tsi.ObjQueryRes(objs=objs)
 
@@ -663,7 +702,7 @@ class MockTraceServer:
             "row_digests": row_digests,
         }
 
-        return tsi.TableCreateRes(digest=digest)
+        return tsi.TableCreateRes(digest=digest, row_digests=row_digests)
 
     def table_create_from_digests(
         self, req: tsi.TableCreateFromDigestsReq
@@ -744,13 +783,71 @@ class MockTraceServer:
     def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
         key = f"{req.project_id}:{req.digest}"
         if key not in self.tables:
-            raise NotFoundError(f"Table {key} not found")
+            # Return empty rows for invalid digest
+            return tsi.TableQueryRes(rows=[])
 
         table_data = self.tables[key]
+        row_digests = table_data.get("row_digests", [])
+        stored_rows = table_data.get("rows", [])
         rows = []
 
-        for row in table_data["rows"]:
-            rows.append(tsi.TableRowSchema(digest=req.digest, val=row))
+        # Build filter set if specified
+        filter_digests = None
+        if req.filter and req.filter.row_digests:
+            filter_digests = set(req.filter.row_digests)
+
+        # If rows are empty but row_digests exist (from table_create_from_digests),
+        # look up row data by digest
+        if not stored_rows and row_digests:
+            for i, row_digest in enumerate(row_digests):
+                # Apply row_digests filter
+                if filter_digests is not None and row_digest not in filter_digests:
+                    continue
+
+                # Look up row data from files storage
+                row_key = f"{req.project_id}:row:{row_digest}"
+                if row_key in self.files:
+                    row_data = json.loads(self.files[row_key].decode())
+                    rows.append(tsi.TableRowSchema(
+                        digest=row_digest,
+                        val=row_data,
+                        original_index=i
+                    ))
+        else:
+            for i, row in enumerate(stored_rows):
+                row_digest = row_digests[i] if i < len(row_digests) else req.digest
+
+                # Apply row_digests filter
+                if filter_digests is not None and row_digest not in filter_digests:
+                    continue
+
+                rows.append(tsi.TableRowSchema(
+                    digest=row_digest,
+                    val=row,
+                    original_index=i
+                ))
+
+        # Apply sorting if specified
+        if req.sort_by:
+            for sort_spec in reversed(req.sort_by):
+                field = sort_spec.field
+                direction = sort_spec.direction
+
+                def get_sort_key(row_schema):
+                    val = row_schema.val
+                    parts = field.split(".")
+                    for part in parts:
+                        if isinstance(val, dict):
+                            val = val.get(part)
+                        else:
+                            val = None
+                            break
+                    # Handle None values - sort them to the end
+                    if val is None:
+                        return (1, "")
+                    return (0, val)
+
+                rows.sort(key=get_sort_key, reverse=(direction == "desc"))
 
         # Apply limit and offset
         offset = req.offset or 0
@@ -778,21 +875,232 @@ class MockTraceServer:
     def table_query_stats_batch(
         self, req: tsi.TableQueryStatsBatchReq
     ) -> tsi.TableQueryStatsBatchRes:
-        results = []
+        tables = []
         for digest in req.digests:
-            stats = self.table_query_stats(
-                tsi.TableQueryStatsReq(project_id=req.project_id, digest=digest)
-            )
-            results.append(stats)
-        return tsi.TableQueryStatsBatchRes(results=results)
+            key = f"{req.project_id}:{digest}"
+            if key not in self.tables:
+                # Skip missing tables
+                continue
+            table_data = self.tables[key]
+            count = len(table_data["rows"])
+
+            # Calculate storage size if requested
+            storage_size_bytes = None
+            if getattr(req, 'include_storage_size', False):
+                # Estimate storage as JSON size of all rows
+                storage_size_bytes = sum(
+                    len(json.dumps(row).encode()) for row in table_data["rows"]
+                )
+
+            tables.append(tsi.TableStatsRow(
+                count=count,
+                digest=digest,
+                storage_size_bytes=storage_size_bytes
+            ))
+        return tsi.TableQueryStatsBatchRes(tables=tables)
 
     # Ref API
     def refs_read_batch(self, req: tsi.RefsReadBatchReq) -> tsi.RefsReadBatchRes:
         vals = []
         for ref in req.refs:
-            # Simple implementation - just return the ref URI as the value
-            vals.append(ref)
+            # Parse the ref URI to get the object value
+            # Format: weave:///entity/project/object/name:digest or weave:///entity/project/object/name:digest/attr/path
+            val = self._resolve_ref(ref)
+            vals.append(val)
         return tsi.RefsReadBatchRes(vals=vals)
+
+    def _resolve_ref(self, ref: str) -> Any:
+        """Resolve a ref URI to its value."""
+        if not ref.startswith("weave:///"):
+            return None
+
+        # Parse ref: weave:///entity/project/object/name:digest[/extra/path]
+        # Split: ['weave:', '', '', 'entity', 'project', 'object', 'name:digest', ...]
+        parts = ref.split("/")
+        if len(parts) < 7:
+            return None
+
+        entity = parts[3]
+        project = parts[4]
+        obj_type = parts[5]  # 'object', 'op', 'call', or 'table'
+        name_digest = parts[6]
+        extra_path = parts[7:] if len(parts) > 7 else []
+
+        project_id = f"{entity}/{project}"
+
+        if obj_type == "object" or obj_type == "op":
+            # Parse name:digest
+            if ":" in name_digest:
+                obj_name, digest = name_digest.rsplit(":", 1)
+            else:
+                return None
+
+            # Look up the object
+            key = f"{project_id}:{obj_name}:{digest}"
+            if key not in self.objs:
+                return None
+
+            val = copy.deepcopy(self.objs[key]["val"])
+
+            # Apply extra path if present
+            # Paths can be like: /index/0/key/a or /attr/name
+            i = 0
+            while i < len(extra_path):
+                if val is None:
+                    return None
+
+                path_part = extra_path[i]
+
+                if path_part == "index":
+                    # List index access: /index/N
+                    if i + 1 >= len(extra_path):
+                        return None
+                    try:
+                        idx = int(extra_path[i + 1])
+                        if isinstance(val, list) and 0 <= idx < len(val):
+                            val = val[idx]
+                        else:
+                            return None
+                    except (ValueError, IndexError):
+                        return None
+                    i += 2
+                elif path_part == "key":
+                    # Dict key access: /key/name
+                    if i + 1 >= len(extra_path):
+                        return None
+                    key_name = extra_path[i + 1]
+                    if isinstance(val, dict):
+                        val = val.get(key_name)
+                    else:
+                        return None
+                    i += 2
+                elif path_part == "attr":
+                    # Attribute access: /attr/name
+                    if i + 1 >= len(extra_path):
+                        return None
+                    attr_name = extra_path[i + 1]
+                    if hasattr(val, attr_name):
+                        val = getattr(val, attr_name)
+                    elif isinstance(val, dict):
+                        val = val.get(attr_name)
+                    else:
+                        return None
+                    i += 2
+                elif path_part == "id":
+                    # Row lookup by digest id: /id/{row_digest}
+                    # This is used for dataset rows where val is a table ref string
+                    if i + 1 >= len(extra_path):
+                        return None
+                    row_digest = extra_path[i + 1]
+
+                    # val should be a table ref string at this point
+                    if isinstance(val, str) and val.startswith("weave:///"):
+                        # Parse the table ref to get the table
+                        table_ref_parts = val.split("/")
+                        if len(table_ref_parts) >= 7 and table_ref_parts[5] == "table":
+                            table_project_id = f"{table_ref_parts[3]}/{table_ref_parts[4]}"
+                            table_digest = table_ref_parts[6]
+                            table_key = f"{table_project_id}:{table_digest}"
+
+                            if table_key in self.tables:
+                                table_data = self.tables[table_key]
+                                row_digests = table_data.get("row_digests", [])
+                                rows = table_data.get("rows", [])
+
+                                # Find the row with the matching digest
+                                for idx, rd in enumerate(row_digests):
+                                    if rd == row_digest and idx < len(rows):
+                                        val = copy.deepcopy(rows[idx])
+                                        break
+                                else:
+                                    return None
+                            else:
+                                return None
+                        else:
+                            return None
+                    else:
+                        return None
+                    i += 2
+                else:
+                    # Direct access (fallback)
+                    if isinstance(val, dict):
+                        val = val.get(path_part)
+                    elif isinstance(val, list):
+                        try:
+                            idx = int(path_part)
+                            val = val[idx] if 0 <= idx < len(val) else None
+                        except (ValueError, IndexError):
+                            return None
+                    else:
+                        return None
+                    i += 1
+
+            return val
+
+        elif obj_type == "table":
+            # Parse name (table digest)
+            digest = name_digest
+
+            key = f"{project_id}:{digest}"
+            if key not in self.tables:
+                return None
+
+            # For tables, we need to handle row access
+            if extra_path and extra_path[0] == "rows":
+                rows = self.tables[key].get("rows", [])
+                if len(extra_path) > 1:
+                    try:
+                        row_idx = int(extra_path[1])
+                        if 0 <= row_idx < len(rows):
+                            val = copy.deepcopy(rows[row_idx])
+                            # Apply remaining path
+                            for path_part in extra_path[2:]:
+                                if val is None:
+                                    return None
+                                if isinstance(val, dict):
+                                    val = val.get(path_part)
+                                elif isinstance(val, list):
+                                    try:
+                                        idx = int(path_part)
+                                        val = val[idx] if 0 <= idx < len(val) else None
+                                    except (ValueError, IndexError):
+                                        return None
+                                else:
+                                    return None
+                            return val
+                    except (ValueError, IndexError):
+                        return None
+                return copy.deepcopy(rows)
+            return copy.deepcopy(self.tables[key])
+
+        elif obj_type == "call":
+            # Parse call_id
+            call_id = name_digest
+
+            if call_id not in self.calls:
+                return None
+
+            call = copy.deepcopy(self.calls[call_id])
+            # Apply extra path if present
+            val: Any = call
+            for path_part in extra_path:
+                if val is None:
+                    return None
+                if hasattr(val, path_part):
+                    val = getattr(val, path_part)
+                elif isinstance(val, dict):
+                    val = val.get(path_part)
+                elif isinstance(val, list):
+                    try:
+                        idx = int(path_part)
+                        val = val[idx] if 0 <= idx < len(val) else None
+                    except (ValueError, IndexError):
+                        return None
+                else:
+                    return None
+            return val
+
+        return None
 
     # File API
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
