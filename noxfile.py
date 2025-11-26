@@ -111,6 +111,7 @@ def lint(session: nox.Session):
         "autogen_tests",
         "trace",
         "trace_no_server",
+        "stainless",
     ],
 )
 def tests(session: nox.Session, shard: str):
@@ -179,7 +180,8 @@ def tests(session: nox.Session, shard: str):
         "custom": [],
         "flow": ["tests/flow/"],
         "trace_server": ["tests/trace_server/"],
-        "trace_server_bindings": ["tests/trace_server_bindings"],
+        "trace_server_bindings": ["tests/trace_server_bindings/"],
+        "stainless": ["tests/trace_server_bindings/"],
         "scorers": ["tests/scorers/"],
         "autogen_tests": ["tests/integrations/autogen/"],
         "verifiers_test": ["tests/integrations/verifiers/"],
@@ -221,6 +223,10 @@ def tests(session: nox.Session, shard: str):
 
     if shard == "trace_no_server":
         pytest_args.extend(["-m", "not trace_server"])
+
+    # Set trace-server flag for stainless shard
+    if shard == "stainless":
+        pytest_args.extend(["--remote-http-trace-server=stainless"])
 
     if shard == "verifiers_test":
         # Pinning to this commit because the latest version of the gsm8k environment is broken.

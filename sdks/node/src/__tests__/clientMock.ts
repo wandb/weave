@@ -7,13 +7,14 @@ import {WeaveClient} from '../weaveClient';
 
 export function initWithCustomTraceServer(
   projectName: string,
-  customTraceServer: InMemoryTraceServer
+  customTraceServer: InMemoryTraceServer,
+  settings: Settings = new Settings(true)
 ) {
   const client = new WeaveClient(
     customTraceServer as unknown as TraceServerApi<any>,
     {} as WandbServerApi, // Placeholder, as we don't use WandbServerApi in this case
     projectName,
-    new Settings(true)
+    settings
   );
   setGlobalClient(client);
 }

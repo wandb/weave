@@ -187,6 +187,15 @@ class UserSettings(BaseModel):
     Can be overridden with the environment variable `WEAVE_USE_PARALLEL_TABLE_UPLOAD`
     """
 
+    use_stainless_server: bool = False
+    """
+    Toggles use of the stainless-generated HTTP client for trace server communication.
+
+    If True, uses StainlessRemoteHTTPTraceServer instead of RemoteHTTPTraceServer.
+    This provides better type safety and automatic client generation from OpenAPI specs.
+    Can be overridden with the environment variable `WEAVE_USE_STAINLESS_SERVER`
+    """
+
     model_config = ConfigDict(extra="forbid")
     _is_first_apply: bool = PrivateAttr(True)
 
@@ -302,6 +311,11 @@ def should_use_parallel_table_upload() -> bool:
 def should_implicitly_patch_integrations() -> bool:
     """Returns whether implicit patching of integrations is enabled."""
     return _should("implicitly_patch_integrations")
+
+
+def should_use_stainless_server() -> bool:
+    """Returns whether the stainless-generated HTTP client should be used."""
+    return _should("use_stainless_server")
 
 
 def parse_and_apply_settings(

@@ -91,8 +91,7 @@ jobs:
           pip install nox uv
       - name: Run nox (Non Trace Server)
         run: |
-          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- \
-            -m "not trace_server"
+          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- -m "not trace_server"
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
         with:
@@ -137,11 +136,13 @@ jobs:
             "mistral",
             "notdiamond",
             "openai",
+            "openai_agents",
             "verifiers_test",
             "vertexai",
             "pandas_test",
             "mcp",
             "smolagents",
+            "stainless",
             "autogen_tests",
           ]
       fail-fast: false
@@ -326,6 +327,7 @@ jobs:
             "pandas_test",
             "mcp",
             "smolagents",
+            "stainless",
             "autogen_tests",
           ]
       fail-fast: false
