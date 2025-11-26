@@ -503,8 +503,13 @@ def find_last_weave_op_function(
     for node in ast.walk(tree):
         if isinstance(node, ast.FunctionDef) or isinstance(node, AsyncFunctionDef):
             for decorator in node.decorator_list:
-                # Check if the decorator is 'weave.op'
-                if isinstance(decorator, ast.Name) and decorator.id == "weave.op":
+                # Check if the decorator is 'weave.op' (attribute without call)
+                if (
+                    isinstance(decorator, ast.Attribute)
+                    and decorator.attr == "op"
+                    and isinstance(decorator.value, ast.Name)
+                    and decorator.value.id == "weave"
+                ):
                     last_function = node
                     break  # Break the inner loop, continue with the next function
                 # Check if the decorator is a call to 'weave.op()'
@@ -571,12 +576,12 @@ def save_instance(obj: Op, artifact: MemTraceFilesArtifact, name: str) -> None:
 
     # Handle decorator normalization/addition
     if has_expected_decorator:
-        # Normalize existing decorator to have parentheses
-        # Example: @weave.op -> @weave.op() or @wv.op -> @wv.op()
+        # Normalize existing decorator to NOT have parentheses
+        # Example: @weave.op() -> @weave.op or @wv.op() -> @wv.op
         # (where decorator_prefix matches the actual import)
         op_function_code = re.sub(
-            rf"@{re.escape(decorator_prefix)}\.op(?!\()",
-            f"@{decorator_prefix}.op()",
+            rf"@{re.escape(decorator_prefix)}\.op\(\)",
+            f"@{decorator_prefix}.op",
             op_function_code,
         )
     else:
@@ -584,8 +589,8 @@ def save_instance(obj: Op, artifact: MemTraceFilesArtifact, name: str) -> None:
         # This happens when:
         # - Op created programmatically: my_op = weave.op()(plain_func)
         # - Anonymous ops: client.create_call("op_name", inputs)
-        # Example: plain function -> @weave.op() or @wv.op() prepended
-        op_function_code = f"@{decorator_prefix}.op()\n" + op_function_code
+        # Example: plain function -> @weave.op or @wv.op prepended
+        op_function_code = f"@{decorator_prefix}.op\n" + op_function_code
     code.append(op_function_code)
 
     with artifact.new_file(f"{name}.py") as f:
@@ -637,7 +642,7 @@ def load_instance(
     # In the case where the saved op calls another op, we will have multiple
     # ops in the file. The file will look like
     # op1 = weave.ref('...').get()
-    # @weave.op()
+    # @weave.op
     # def op2():
     #     op1()
     #

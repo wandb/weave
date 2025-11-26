@@ -54,7 +54,7 @@ def init(
     Logging is initialized globally, so you do not need to keep a reference
     to the return value of init.
 
-    Following init, calls of weave.op() decorated functions will be logged
+    Following init, calls of weave.op decorated functions will be logged
     to the specified project.
 
     Args:
@@ -386,7 +386,7 @@ def thread(thread_id: str | None | object = _AUTO_GENERATE) -> Iterator[ThreadCo
 def finish() -> None:
     """Stops logging to weave.
 
-    Following finish, calls of weave.op() decorated functions will no longer be logged. You will need to run weave.init() again to resume logging.
+    Following finish, calls of weave.op decorated functions will no longer be logged. You will need to run weave.init() again to resume logging.
 
     """
     weave_init.finish()
