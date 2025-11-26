@@ -191,6 +191,18 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install nox uv
+      - name: Run nox (Mock Trace Server)
+        # Only run mock server for trace shard - other shards may have features not supported by mock
+        if: matrix.nox-shard == 'trace'
+        env:
+          WEAVE_SENTRY_ENV: ci
+          CI: 1
+          WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
+          DD_TRACE_ENABLED: false
+        run: |
+          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- \
+            -m "trace_server" \
+            --trace-server=mock
       - name: Run nox (Sqlite Trace Server)
         env:
           WEAVE_SENTRY_ENV: ci
@@ -336,6 +348,16 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install nox uv
+      - name: Run nox (Mock Trace Server)
+        # Only run mock server for trace shard - other shards may have features not supported by mock
+        if: matrix.nox-shard == 'trace'
+        env:
+          WEAVE_SENTRY_ENV: ci
+          CI: 1
+          WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
+          DD_TRACE_ENABLED: false
+        run: |
+          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- -m "trace_server" --trace-server=mock
       - name: Run nox (Sqlite Trace Server)
         env:
           WEAVE_SENTRY_ENV: ci
