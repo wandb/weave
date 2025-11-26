@@ -48,7 +48,7 @@ Our documentation site can be found [here](https://wandb.me/weave).
 
 3. **Trace your functions**:
    ```python
-   @weave.op()
+   @weave.op
    def my_function():
        # Your tracked code!
        pass
@@ -57,7 +57,7 @@ Our documentation site can be found [here](https://wandb.me/weave).
 ## Usage
 
 ### Tracing
-You can trace any function using `weave.op()` - from api calls to OpenAI, Anthropic, Google AI Studio etc to generation calls from Hugging Face and other open source models to any other validation functions or data transformations in your code you'd like to keep track of.
+You can trace any function using `weave.op` - from api calls to OpenAI, Anthropic, Google AI Studio etc to generation calls from Hugging Face and other open source models to any other validation functions or data transformations in your code you'd like to keep track of.
 
 Decorate all the functions you want to trace, this will generate a trace tree of the inputs and outputs of all your functions:
 
@@ -65,15 +65,15 @@ Decorate all the functions you want to trace, this will generate a trace tree of
 import weave
 weave.init("weave-example")
 
-@weave.op()
+@weave.op
 def sum_nine(value_one: int):
     return value_one + 9
 
-@weave.op()
+@weave.op
 def multiply_two(value_two: int):
     return value_two * 2
 
-@weave.op()
+@weave.op
 def main():
     output = sum_nine(3)
     final_output = multiply_two(output)
@@ -89,7 +89,7 @@ import weave
 import json
 from openai import OpenAI
 
-@weave.op()
+@weave.op
 def extract_fruit(sentence: str) -> dict:
     client = OpenAI()
 

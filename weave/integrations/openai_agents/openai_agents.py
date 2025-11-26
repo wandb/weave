@@ -114,6 +114,11 @@ class WeaveTracingProcessor(TracingProcessor):  # pyright: ignore[reportGeneralT
         }
         wc.finish_call(self._trace_calls[tid], output=output)
 
+        # Clean up internal storage to prevent memory leaks
+        self._trace_calls.pop(tid, None)
+        self._trace_data.pop(tid, None)
+        self._ended_traces.discard(tid)
+
     def _agent_log_data(self, span: Span[AgentSpanData]) -> WeaveDataDict:
         """Extract log data from an agent span."""
         return WeaveDataDict(
@@ -381,6 +386,9 @@ class WeaveTracingProcessor(TracingProcessor):  # pyright: ignore[reportGeneralT
         # Finish the call with the collected data
         wc.finish_call(span_call, output=output)
 
+        # Clean up internal storage to prevent memory leaks
+        self._span_calls.pop(span.span_id, None)
+
     def _finish_unfinished_calls(self, status: str) -> None:
         """Helper method for finishing unfinished calls on shutdown or flush."""
         if (wc := get_weave_client()) is None:
@@ -414,10 +422,20 @@ class WeaveTracingProcessor(TracingProcessor):  # pyright: ignore[reportGeneralT
     def shutdown(self) -> None:
         """Called when the application stops."""
         self._finish_unfinished_calls("interrupted")
+        self._cleanup()
 
     def force_flush(self) -> None:
         """Forces an immediate flush of all queued traces."""
         self._finish_unfinished_calls("force_flushed")
+        self._cleanup()
+
+    def _cleanup(self) -> None:
+        """Clean up all internal storage."""
+        self._trace_calls.clear()
+        self._trace_data.clear()
+        self._span_calls.clear()
+        self._ended_traces.clear()
+        self._span_parents.clear()
 
 
 class OpenAIAgentsPatcher(Patcher):
