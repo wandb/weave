@@ -134,7 +134,14 @@ def tests(session: nox.Session, shard: str):
         # trace_server shard needs both trace_server dependency group and trace_server_tests
         sync_args.extend(["--group", "trace_server", "--group", "trace_server_tests"])
 
-    session.run(*sync_args)
+    # Set PYO3_USE_ABI3_FORWARD_COMPATIBILITY for Python 3.14 to allow PyO3-based
+    # packages (like jiter) to build using the stable ABI, since PyO3 0.23.3 doesn't
+    # officially support Python 3.14 yet
+    sync_env = {}
+    if python_version == "3.14":
+        sync_env["PYO3_USE_ABI3_FORWARD_COMPATIBILITY"] = "1"
+
+    session.run(*sync_args, env=sync_env)
 
     env = {
         k: session.env.get(k) or os.getenv(k)
