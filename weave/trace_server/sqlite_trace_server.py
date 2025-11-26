@@ -93,9 +93,30 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         self.lock = threading.Lock()
         self.db_path = db_path
         self._evaluate_model_dispatcher = evaluate_model_dispatcher
+        self._conn: sqlite3.Connection | None = None
+        self._cursor: sqlite3.Cursor | None = None
+
+    def _get_conn_cursor(self) -> tuple[sqlite3.Connection, sqlite3.Cursor]:
+        """Get or create the database connection and cursor for this server instance."""
+        if self._conn is None:
+            is_uri = self.db_path.startswith("file:")
+            self._conn = sqlite3.connect(self.db_path, uri=is_uri)
+            self._conn.create_function("reverse", 1, lambda x: x[::-1])
+            self._cursor = self._conn.cursor()
+        return self._conn, self._cursor  # type: ignore
+
+    def close(self) -> None:
+        """Close the database connection."""
+        if self._conn is not None:
+            try:
+                self._conn.close()
+            except Exception:
+                pass
+            self._conn = None
+            self._cursor = None
 
     def drop_tables(self) -> None:
-        conn, cursor = get_conn_cursor(self.db_path)
+        conn, cursor = self._get_conn_cursor()
         cursor.execute(TABLE_FEEDBACK.drop_sql())
         cursor.execute("DROP TABLE IF EXISTS calls")
         cursor.execute("DROP TABLE IF EXISTS objects")
@@ -103,7 +124,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         cursor.execute("DROP TABLE IF EXISTS table_rows")
 
     def setup_tables(self) -> None:
-        conn, cursor = get_conn_cursor(self.db_path)
+        conn, cursor = self._get_conn_cursor()
         cursor.execute(
             """
             CREATE TABLE IF NOT EXISTS calls (
@@ -196,7 +217,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
 
     # Creates a new call
     def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
-        conn, cursor = get_conn_cursor(self.db_path)
+        conn, cursor = self._get_conn_cursor()
         if req.start.trace_id is None:
             raise ValueError("trace_id is required")
         if req.start.id is None:
@@ -258,7 +279,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         )
 
     def call_end(self, req: tsi.CallEndReq) -> tsi.CallEndRes:
-        conn, cursor = get_conn_cursor(self.db_path)
+        conn, cursor = self._get_conn_cursor()
         parsable_output = req.end.output
         if not isinstance(parsable_output, dict):
             parsable_output = {"output": parsable_output}
@@ -299,7 +320,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         return tsi.CallReadRes(call=calls[0] if calls else None)
 
     def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
-        conn, cursor = get_conn_cursor(self.db_path)
+        conn, cursor = self._get_conn_cursor()
         conds = []
         filter = req.filter
         if filter:
@@ -737,7 +758,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
         assert_non_null_wb_user_id(req)
         # update row with a deleted_at field set to now
-        conn, cursor = get_conn_cursor(self.db_path)
+        conn, cursor = self._get_conn_cursor()
         with self.lock:
             recursive_query = """
                 WITH RECURSIVE Descendants AS (
@@ -779,7 +800,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         if req.display_name is None:
             raise ValueError("One of [display_name] is required for call update")
 
-        conn, cursor = get_conn_cursor(self.db_path)
+        conn, cursor = self._get_conn_cursor()
         with self.lock:
             cursor.execute(
                 "UPDATE calls SET display_name = ? WHERE id = ?",
@@ -789,7 +810,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         return tsi.CallUpdateRes()
 
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
-        conn, cursor = get_conn_cursor(self.db_path)
+        conn, cursor = self._get_conn_cursor()
 
         processed_result = process_incoming_object_val(
             req.obj.val, req.obj.builtin_object_class
@@ -993,7 +1014,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             digest_conditions_str = " OR ".join(digest_conditions)
             select_query += f"AND ({digest_conditions_str})"
 
-        conn, cursor = get_conn_cursor(self.db_path)
+        conn, cursor = self._get_conn_cursor()
         cursor.execute(select_query, parameters)
         matching_objects = cursor.fetchall()
 
@@ -1026,7 +1047,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         return tsi.ObjDeleteRes(num_deleted=len(matching_objects))
 
     def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
-        conn, cursor = get_conn_cursor(self.db_path)
+        conn, cursor = self._get_conn_cursor()
         insert_rows = []
         for r in req.table.rows:
             if not isinstance(r, dict):
@@ -1059,7 +1080,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         self, req: tsi.TableCreateFromDigestsReq
     ) -> tsi.TableCreateFromDigestsRes:
         """Create a table by specifying row digests, instead actual rows."""
-        conn, cursor = get_conn_cursor(self.db_path)
+        conn, cursor = self._get_conn_cursor()
 
         # Calculate table digest from row digests
         table_hasher = hashlib.sha256()
@@ -1077,7 +1098,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         return tsi.TableCreateFromDigestsRes(digest=digest)
 
     def table_update(self, req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
-        conn, cursor = get_conn_cursor(self.db_path)
+        conn, cursor = self._get_conn_cursor()
         # conds = ["project_id = {project_id: String}"]
 
         cursor.execute(
@@ -1232,7 +1253,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 query += " LIMIT -1"
             query += f" OFFSET {req.offset}"
 
-        conn, cursor = get_conn_cursor(self.db_path)
+        conn, cursor = self._get_conn_cursor()
         cursor.execute(query, [req.project_id, req.digest] + list(parameters))
         query_result = cursor.fetchall()
 
@@ -1277,7 +1298,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             tables.digest in ({placeholders})
         """
 
-        conn, cursor = get_conn_cursor(self.db_path)
+        conn, cursor = self._get_conn_cursor()
         cursor.execute(query, parameters)
 
         query_result = cursor.fetchall()
@@ -1360,7 +1381,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
 
         processed_payload = process_feedback_payload(req)
         row = format_feedback_to_row(req, processed_payload)
-        conn, cursor = get_conn_cursor(self.db_path)
+        conn, cursor = self._get_conn_cursor()
         with self.lock:
             prepared = TABLE_FEEDBACK.insert(row).prepare(database_type="sqlite")
             cursor.executemany(prepared.sql, prepared.data)
@@ -1386,7 +1407,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
 
         # Batch insert all rows at once
         if rows_to_insert:
-            conn, cursor = get_conn_cursor(self.db_path)
+            conn, cursor = self._get_conn_cursor()
             with self.lock:
                 # Insert each row individually but in a single transaction
                 for row in rows_to_insert:
@@ -1399,7 +1420,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         return tsi.FeedbackCreateBatchRes(res=results)
 
     def feedback_query(self, req: tsi.FeedbackQueryReq) -> tsi.FeedbackQueryRes:
-        conn, cursor = get_conn_cursor(self.db_path)
+        conn, cursor = self._get_conn_cursor()
         query = TABLE_FEEDBACK.select()
         query = query.project_id(req.project_id)
         query = query.fields(req.fields)
@@ -1417,7 +1438,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         #       This would allow us to return the number of rows deleted, and complain
         #       if too many things would be deleted.
         validate_feedback_purge_req(req)
-        conn, cursor = get_conn_cursor(self.db_path)
+        conn, cursor = self._get_conn_cursor()
         query = TABLE_FEEDBACK.purge()
         query = query.project_id(req.project_id)
         query = query.where(req.query)
@@ -1458,7 +1479,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         )
 
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
-        conn, cursor = get_conn_cursor(self.db_path)
+        conn, cursor = self._get_conn_cursor()
         digest = bytes_digest(req.content)
         with self.lock:
             cursor.execute(
@@ -1473,7 +1494,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         return tsi.FileCreateRes(digest=digest)
 
     def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
-        conn, cursor = get_conn_cursor(self.db_path)
+        conn, cursor = self._get_conn_cursor()
         cursor.execute(
             "SELECT val FROM files WHERE project_id = ? AND digest = ?",
             (req.project_id, req.digest),
@@ -1583,7 +1604,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         self, req: tsi.ThreadsQueryReq
     ) -> Iterator[tsi.ThreadSchema]:
         """Stream threads with aggregated statistics sorted by last activity."""
-        conn, cursor = get_conn_cursor(self.db_path)
+        conn, cursor = self._get_conn_cursor()
 
         # Extract filter values
         after_datetime = None
@@ -3459,7 +3480,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         return tsi.ScoreDeleteRes(num_deleted=len(req.score_ids))
 
     def _table_row_read(self, project_id: str, row_digest: str) -> tsi.TableRowSchema:
-        conn, cursor = get_conn_cursor(self.db_path)
+        conn, cursor = self._get_conn_cursor()
         # Now get the rows
         cursor.execute(
             """
@@ -3486,7 +3507,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         offset: int | None = None,
         sort_by: list[tsi.SortBy] | None = None,
     ) -> list[tsi.ObjSchema]:
-        conn, cursor = get_conn_cursor(self.db_path)
+        conn, cursor = self._get_conn_cursor()
         conditions = conditions or []
         if not include_deleted:
             conditions.append("deleted_at IS NULL")
