@@ -196,6 +196,15 @@ class UserSettings(BaseModel):
 
     Can be overridden with the environment variable `WEAVE_HTTP_TIMEOUT`
     """
+    
+    use_stainless_server: bool = False
+    """
+    Toggles use of the stainless-generated HTTP client for trace server communication.
+
+    If True, uses StainlessRemoteHTTPTraceServer instead of RemoteHTTPTraceServer.
+    This provides better type safety and automatic client generation from OpenAPI specs.
+    Can be overridden with the environment variable `WEAVE_USE_STAINLESS_SERVER`
+    """
 
     model_config = ConfigDict(extra="forbid")
     _is_first_apply: bool = PrivateAttr(True)
@@ -320,6 +329,11 @@ def http_timeout() -> float:
     if timeout is None:
         return 30.0
     return timeout
+  
+  
+def should_use_stainless_server() -> bool:
+    """Returns whether the stainless-generated HTTP client should be used."""
+    return _should("use_stainless_server")
 
 
 def parse_and_apply_settings(

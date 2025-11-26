@@ -45,6 +45,7 @@ def test_completions_create(client):
                     "role": "assistant",
                     "tool_calls": None,
                     "function_call": None,
+                    "provider_specific_fields": None,
                 },
             }
         ],

@@ -38,7 +38,7 @@ class Model(Object):
         attribute1: str
         attribute2: int
 
-        @weave.op()
+        @weave.op
         def predict(self, input_data: str) -> dict:
             # Model logic goes here
             prediction = self.attribute1 + ' ' + input_data
@@ -62,7 +62,7 @@ def get_infer_method(model: Model) -> Op:
         if (infer_method := getattr(model, name, None)) is not None:
             if not is_op(infer_method):
                 raise ValueError(
-                    f"Model {model} must implement `{name}` as a weave.op() decorated function."
+                    f"Model {model} must implement `{name}` as a weave.op decorated function."
                 )
             return infer_method
     raise MissingInferenceMethodError(
