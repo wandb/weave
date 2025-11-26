@@ -15,6 +15,7 @@ from collections.abc import Iterator
 from typing import Any
 
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.errors import NotFoundError
 from weave.trace_server.ids import generate_id
 from weave.trace_server.interface import query as q
 from weave.trace_server.trace_server_interface_util import bytes_digest, str_digest
@@ -143,11 +144,6 @@ def _evaluate_operation(operation: q.Operation, call: tsi.CallSchema) -> bool:
 def _evaluate_query(query: q.Query, call: tsi.CallSchema) -> bool:
     """Evaluate a query against a call."""
     return _evaluate_operation(query.expr_, call)
-
-
-class NotFoundError(Exception):
-    """Exception raised when a resource is not found in the mock server."""
-    pass
 
 
 class MockTraceServer:
@@ -580,22 +576,55 @@ class MockTraceServer:
         return tsi.ObjCreateRes(digest=digest, object_id=req.obj.object_id)
 
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
-        key = f"{req.project_id}:{req.object_id}:{req.digest}"
-        if key not in self.objs:
-            raise NotFoundError(f"Object {key} not found")
+        obj_prefix = f"{req.project_id}:{req.object_id}:"
+        matching_keys = [k for k in self.objs if k.startswith(obj_prefix)]
 
-        obj_data = self.objs[key]
+        # Handle "latest" digest - find the object with the highest version_index
+        if req.digest == "latest":
+            if not matching_keys:
+                raise NotFoundError(f"Object {req.project_id}:{req.object_id} not found")
+
+            # Find the key with the highest version_index
+            latest_key = max(matching_keys, key=lambda k: self.objs[k].get("version_index", 0))
+            obj_data = self.objs[latest_key]
+        elif req.digest.startswith("v") and req.digest[1:].isdigit():
+            # Handle version alias like "v0", "v1", etc.
+            version_index = int(req.digest[1:])
+            obj_data = None
+            for k in matching_keys:
+                if self.objs[k].get("version_index", 0) == version_index:
+                    obj_data = self.objs[k]
+                    break
+            if obj_data is None:
+                raise NotFoundError(f"Object {req.project_id}:{req.object_id}:{req.digest} not found")
+        else:
+            key = f"{req.project_id}:{req.object_id}:{req.digest}"
+            if key not in self.objs:
+                raise NotFoundError(f"Object {key} not found")
+            obj_data = self.objs[key]
+
+        # Calculate is_latest by finding max version_index for this object_id
+        max_version = max(
+            (self.objs[k].get("version_index", 0) for k in self.objs if k.startswith(obj_prefix)),
+            default=0
+        )
+        version_index = obj_data.get("version_index", 0)
+        is_latest = 1 if version_index == max_version else 0
+
+        # Handle metadata_only flag - return empty dict instead of None for metadata_only
+        val = {} if getattr(req, 'metadata_only', False) else obj_data["val"]
+
         return tsi.ObjReadRes(
             obj=tsi.ObjSchema(
                 project_id=obj_data["project_id"],
                 object_id=obj_data["object_id"],
                 created_at=obj_data["created_at"],
                 digest=obj_data["digest"],
-                version_index=0,
-                is_latest=1,
+                version_index=version_index,
+                is_latest=is_latest,
                 kind=obj_data["kind"],
                 base_object_class=obj_data["base_object_class"],
-                val=obj_data["val"],
+                val=val,
             )
         )
 
@@ -1165,43 +1194,87 @@ class MockTraceServer:
             if fb["project_id"] != req.project_id:
                 continue
 
-            # Apply filters
-            if req.query and "weave_ref" in req.query:
-                if fb["weave_ref"] != req.query["weave_ref"]:
-                    continue
+            # Apply Query filter if provided
+            if req.query:
+                if isinstance(req.query, q.Query):
+                    # Evaluate the query expression against the feedback dict
+                    if not _evaluate_operation(req.query.expr_, fb):
+                        continue
+                elif isinstance(req.query, dict) and "weave_ref" in req.query:
+                    # Legacy dict-style query for weave_ref
+                    if fb["weave_ref"] != req.query["weave_ref"]:
+                        continue
 
             feedback_list.append(fb)
+
+        # Apply sorting if provided
+        if req.sort_by:
+            for sort_spec in reversed(req.sort_by):
+                reverse = sort_spec.direction == "desc"
+                feedback_list.sort(
+                    key=lambda x: _get_nested_value(x, sort_spec.field) or "",
+                    reverse=reverse
+                )
+
+        # Apply offset and limit
+        if req.offset:
+            feedback_list = feedback_list[req.offset:]
+        if req.limit:
+            feedback_list = feedback_list[:req.limit]
+
+        # Apply field filtering if provided
+        if req.fields:
+            filtered_list = []
+            for fb in feedback_list:
+                filtered_fb = {}
+                for field in req.fields:
+                    filtered_fb[field] = _get_nested_value(fb, field)
+                filtered_list.append(filtered_fb)
+            feedback_list = filtered_list
 
         return tsi.FeedbackQueryRes(result=feedback_list)
 
     def feedback_purge(self, req: tsi.FeedbackPurgeReq) -> tsi.FeedbackPurgeRes:
-        to_delete = [
-            fid for fid, fb in self.feedback.items()
-            if fb["project_id"] == req.project_id and fb["weave_ref"] == req.query["weave_ref"]
-        ]
+        to_delete = []
+        for fid, fb in self.feedback.items():
+            if fb["project_id"] != req.project_id:
+                continue
+            if isinstance(req.query, q.Query):
+                if _evaluate_operation(req.query.expr_, fb):
+                    to_delete.append(fid)
+            elif isinstance(req.query, dict) and "weave_ref" in req.query:
+                if fb["weave_ref"] == req.query["weave_ref"]:
+                    to_delete.append(fid)
         for fid in to_delete:
             del self.feedback[fid]
         return tsi.FeedbackPurgeRes()
 
     def feedback_replace(self, req: tsi.FeedbackReplaceReq) -> tsi.FeedbackReplaceRes:
-        # Delete existing feedback and create new one
+        # Delete existing feedback by ID and create new one
+        query = q.Query(
+            **{
+                "$expr": {
+                    "$eq": [
+                        {"$getField": "id"},
+                        {"$literal": req.feedback_id},
+                    ],
+                }
+            }
+        )
         self.feedback_purge(
             tsi.FeedbackPurgeReq(
                 project_id=req.project_id,
-                query={"weave_ref": req.weave_ref},
+                query=query,
             )
         )
-        result = self.feedback_create(
-            tsi.FeedbackCreateReq(
-                project_id=req.project_id,
-                weave_ref=req.weave_ref,
-                feedback_type=req.feedback_type,
-                payload=req.payload,
-                creator=req.creator,
-                wb_user_id=req.wb_user_id,
-            )
+        create_req = tsi.FeedbackCreateReq(**req.model_dump(exclude={"feedback_id"}))
+        result = self.feedback_create(create_req)
+        return tsi.FeedbackReplaceRes(
+            id=result.id,
+            created_at=result.created_at,
+            wb_user_id=result.wb_user_id,
+            payload=result.payload,
         )
-        return tsi.FeedbackReplaceRes(id=result.id)
 
     # Action API
     def actions_execute_batch(
