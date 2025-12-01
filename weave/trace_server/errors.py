@@ -264,7 +264,7 @@ class ErrorRegistry:
         self.register(
             TransportServerError,
             _get_transport_server_error_status_code,
-            lambda exc: {"reason": str(exc)},
+            _get_transport_server_error_message,
         )
 
 
@@ -374,3 +374,7 @@ def _get_transport_server_error_status_code(exc: Exception) -> int:
     if 400 <= exc.code < 500:
         return exc.code
     return 500
+
+
+def _get_transport_server_error_message(exc: TransportServerError) -> dict[str, Any]:
+    return {"reason": f"{exc.code} error"}
