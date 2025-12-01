@@ -377,4 +377,4 @@ def _get_transport_server_error_status_code(exc: Exception) -> int:
 
 
 def _get_transport_server_error_message(exc: TransportServerError) -> dict[str, Any]:
-    return {"reason": f"{exc.code} error"}
+    return {"reason": f"{exc.code} Error"}
