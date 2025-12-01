@@ -147,7 +147,6 @@ class ProjectVersionResolver:
             raise RuntimeError("init_resolver() must be called before get_instance()")
         return _resolver
 
-    @ddtrace.tracer.wrap(name="project_version_resolver.resolve_version_sync")
     def _resolve_version_sync(self, project_id: str) -> ProjectVersion:
         """Resolve version through provider chain synchronously."""
         cached = self._cache.get(project_id)
