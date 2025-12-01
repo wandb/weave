@@ -4,6 +4,11 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, Optional
 
+import httpx
+from clickhouse_connect.driver.exceptions import DatabaseError as CHDatabaseError
+from clickhouse_connect.driver.exceptions import OperationalError as CHOperationalError
+from gql.transport.exceptions import TransportQueryError, TransportServerError
+
 
 class Error(Exception):
     """Base class for exceptions in this module."""
@@ -125,22 +130,28 @@ def _format_error_to_json_with_extra(
     return result
 
 
-@dataclass
+@dataclass(frozen=True)
 class ErrorWithStatus:
-    """Base class for errors with a status code."""
+    """Immutable container for an error with its HTTP status code."""
 
     status_code: int
     message: dict[str, Any]
 
 
 # Error Registry System
-@dataclass
+@dataclass(frozen=True)
 class ErrorDefinition:
-    """Represents a single error handler definition."""
+    """Immutable error handler definition."""
 
     exception_class: type
-    status_code: int
+    status_code: int | Callable[[Exception], int]
     formatter: Callable[[Exception], dict[str, Any]]
+
+    def get_status_code(self, exc: Exception) -> int:
+        """Get the status code for an exception, resolving callable if needed."""
+        if callable(self.status_code):
+            return self.status_code(exc)
+        return self.status_code
 
 
 # Global registry instance
@@ -157,12 +168,19 @@ class ErrorRegistry:
     def register(
         self,
         exception_class: type,
-        status_code: int,
+        status_code: int | Callable[[Exception], int],
         formatter: Callable[
             [Exception], dict[str, Any]
         ] = _format_error_to_json_with_extra,
     ) -> None:
-        """Register an exception with its handling definition."""
+        """Register an exception with its handling definition.
+
+        Args:
+            exception_class: The exception type to register.
+            status_code: Either a fixed HTTP status code or a callable that
+                takes the exception and returns a status code (for dynamic codes).
+            formatter: A callable that formats the exception into a dict for the response.
+        """
         self._definitions[exception_class] = ErrorDefinition(
             exception_class, status_code, formatter
         )
@@ -183,7 +201,7 @@ class ErrorRegistry:
         if definition:
             error_content = definition.formatter(exc)
             return ErrorWithStatus(
-                status_code=definition.status_code, message=error_content
+                status_code=definition.get_status_code(exc), message=error_content
             )
 
         return ErrorWithStatus(
@@ -225,9 +243,7 @@ class ErrorRegistry:
         self.register(ValueError, 400)
         self.register(KeyError, 500, lambda exc: {"reason": "Internal backend error"})
 
-        # HTTP client specific errors
-        import httpx
-
+        # HTTP client errors
         self.register(httpx.ReadTimeout, 504, lambda exc: {"reason": "Read timeout"})
         self.register(
             httpx.ConnectTimeout,
@@ -236,13 +252,6 @@ class ErrorRegistry:
         )
 
         # ClickHouse errors
-        from clickhouse_connect.driver.exceptions import (
-            DatabaseError as CHDatabaseError,
-        )
-        from clickhouse_connect.driver.exceptions import (
-            OperationalError as CHOperationalError,
-        )
-
         self.register(
             CHDatabaseError, 502, lambda exc: {"reason": "Temporary backend error"}
         )
@@ -251,9 +260,12 @@ class ErrorRegistry:
         )
 
         # GraphQL transport errors
-        from gql.transport.exceptions import TransportQueryError
-
         self.register(TransportQueryError, 403, lambda exc: {"reason": "Forbidden"})
+        self.register(
+            TransportServerError,
+            _get_transport_server_error_status_code,
+            _get_transport_server_error_message,
+        )
 
 
 def _get_error_registry() -> ErrorRegistry:
@@ -343,3 +355,26 @@ def _format_object_deleted_error(exc: Exception) -> dict[str, Any]:
     if isinstance(exc, ObjectDeletedError):
         extra["deleted_at"] = exc.deleted_at.isoformat()
     return _format_error_to_json_with_extra(exc, extra)
+
+
+def _get_transport_server_error_status_code(exc: Exception) -> int:
+    """Get status code for TransportServerError, preserving 4xx codes, defaulting to 500.
+
+    Args:
+        exc: The exception to get status code for.
+
+    Returns:
+        int: The HTTP status code. Returns the exception's code if it's a
+            TransportServerError with a 4xx status code, otherwise returns 500.
+    """
+    if not isinstance(exc, TransportServerError):
+        return 500
+    if not exc.code:
+        return 500
+    if 400 <= exc.code < 500:
+        return exc.code
+    return 500
+
+
+def _get_transport_server_error_message(exc: TransportServerError) -> dict[str, Any]:
+    return {"reason": f"{exc.code} Error"}
