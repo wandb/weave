@@ -146,6 +146,23 @@ def _evaluate_query(query: q.Query, call: tsi.CallSchema) -> bool:
     return _evaluate_operation(query.expr_, call)
 
 
+class _MockClickHouseClient:
+    """Mock ClickHouse client for MockTraceServer compatibility.
+    
+    Provides a no-op command method for tests that need to optimize
+    ClickHouse tables. Since MockTraceServer is in-memory, these
+    operations are no-ops.
+    """
+    
+    def command(self, sql: str) -> None:
+        """No-op command method for compatibility with ClickHouse tests.
+        
+        Args:
+            sql: SQL command to execute (ignored in mock).
+        """
+        pass
+
+
 class MockTraceServer:
     """In-memory mock implementation of TraceServerInterface.
 
@@ -168,6 +185,19 @@ class MockTraceServer:
         # Self-reference for compatibility with client_is_sqlite checks
         # This is used by tests that check `._internal_trace_server`
         self._internal_trace_server = self
+
+        # Mock ClickHouse client for compatibility with tests that access ch_client
+        # This is a no-op mock since MockTraceServer doesn't use ClickHouse
+        self._mock_ch_client = _MockClickHouseClient()
+
+    @property
+    def ch_client(self):
+        """Mock ClickHouse client for test compatibility.
+        
+        Returns a mock client with a command method that does nothing,
+        since MockTraceServer doesn't use ClickHouse.
+        """
+        return self._mock_ch_client
 
     def ensure_project_exists(
         self, entity: str, project: str
