@@ -263,13 +263,7 @@ class ErrorRegistry:
         self.register(TransportQueryError, 403, lambda exc: {"reason": "Forbidden"})
         self.register(
             TransportServerError,
-            lambda exc: (
-                exc.code
-                if isinstance(exc, TransportServerError)
-                and exc.code
-                and 400 <= exc.code < 500
-                else 500
-            ),
+            _get_transport_server_error_status_code,
             lambda exc: {"reason": str(exc)},
         )
 
@@ -361,3 +355,22 @@ def _format_object_deleted_error(exc: Exception) -> dict[str, Any]:
     if isinstance(exc, ObjectDeletedError):
         extra["deleted_at"] = exc.deleted_at.isoformat()
     return _format_error_to_json_with_extra(exc, extra)
+
+
+def _get_transport_server_error_status_code(exc: Exception) -> int:
+    """Get status code for TransportServerError, preserving 4xx codes, defaulting to 500.
+
+    Args:
+        exc: The exception to get status code for.
+
+    Returns:
+        int: The HTTP status code. Returns the exception's code if it's a
+            TransportServerError with a 4xx status code, otherwise returns 500.
+    """
+    if not isinstance(exc, TransportServerError):
+        return 500
+    if not exc.code:
+        return 500
+    if 400 <= exc.code < 500:
+        return exc.code
+    return 500
