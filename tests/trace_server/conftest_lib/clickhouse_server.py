@@ -22,7 +22,7 @@ def ensure_clickhouse_db_container_running(
 
     The fixture handles cleanup by stopping the Docker container when the test session ends.
     """
-    server_up = check_server_up(host, port, 0)
+    server_up = check_server_up(host, port, 1)
     started_container = None
 
     if not server_up:
