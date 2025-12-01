@@ -74,9 +74,10 @@ def test_version_resolution_by_table_contents(client, trace_server):
     both_proj = make_project_id("both_tables")
     insert_call(ch_server.ch_client, "calls_merged", both_proj)
     insert_call(ch_server.ch_client, "calls_complete", both_proj)
+    # When both tables have data, calls_complete takes priority
     assert (
         resolver.get_project_version_sync(both_proj)
-        == ProjectVersion.CALLS_MERGED_VERSION
+        == ProjectVersion.CALLS_COMPLETE_VERSION
     )
 
 

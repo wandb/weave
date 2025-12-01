@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 # │ Neither table (empty)   │ EMPTY_PROJECT          │ CALLS_MERGED_VERSION    │ CALLS_MERGED_VERSION   │
 # │ calls_merged only       │ CALLS_MERGED_VERSION   │ CALLS_MERGED_VERSION    │ CALLS_MERGED_VERSION   │
 # │ calls_complete only     │ CALLS_COMPLETE_VERSION │ CALLS_MERGED_VERSION    │ CALLS_MERGED_VERSION   │
-# │ Both tables             │ CALLS_MERGED_VERSION   │ CALLS_MERGED_VERSION    │ CALLS_MERGED_VERSION   │
+# │ Both tables             │ CALLS_COMPLETE_VERSION │ CALLS_MERGED_VERSION    │ CALLS_MERGED_VERSION   │
 # └─────────────────────────┴────────────────────────┴─────────────────────────┴────────────────────────┘
 #
 # Rollout stage 1: do the db query for latency impact, always return `calls_merged` table
