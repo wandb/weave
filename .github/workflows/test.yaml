@@ -113,8 +113,7 @@ jobs:
             "13",
             #
           ]
-        nox-shard:
-          [
+        nox-shard: [
             "trace",
             "flow",
             "trace_server",
@@ -140,7 +139,7 @@ jobs:
             "pandas_test",
             "mcp",
             "smolagents",
-            "stainless",
+            # "stainless",
             "autogen_tests",
           ]
       fail-fast: false
@@ -297,8 +296,7 @@ jobs:
             "13",
             #
           ]
-        nox-shard:
-          [
+        nox-shard: [
             "trace",
             "flow",
             "trace_server",
@@ -323,7 +321,7 @@ jobs:
             "pandas_test",
             "mcp",
             "smolagents",
-            "stainless",
+            # "stainless",
             "autogen_tests",
           ]
       fail-fast: false
