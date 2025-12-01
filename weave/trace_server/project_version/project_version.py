@@ -155,7 +155,7 @@ class ProjectVersionResolver:
             return cached
 
         version = get_project_version_from_clickhouse(
-            project_id, self._ch_client_factory
+            project_id, self._ch_client_factory, self._mode
         )
 
         # Cache non-empty projects

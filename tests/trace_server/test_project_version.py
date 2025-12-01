@@ -145,7 +145,9 @@ def test_clickhouse_provider_directly(client, trace_server):
     insert_call(ch_server.ch_client, "calls_merged", project_id)
 
     version = get_project_version_from_clickhouse(
-        project_id, ch_client_factory=lambda: ch_server.ch_client
+        project_id,
+        ch_client_factory=lambda: ch_server.ch_client,
+        mode=ProjectVersionMode.AUTO,
     )
 
     assert version == ProjectVersion.CALLS_MERGED_VERSION

@@ -53,11 +53,14 @@ class ProjectVersionMode(str, Enum):
 
     AUTO: Default behavior - uses table to determine project version.
     FORCE_ONLY_CALLS_MERGED: Forces all reads/writes to calls_merged table (queries DB for perf measurement).
+    DUAL_WRITE: Dual-write mode - Writes to both tables, prefers reads from calls_complete table.
+        Only initial write to calls_complete if project is empty.
     OFF: Skips DB queries entirely, returns CALLS_MERGED_VERSION immediately.
     """
 
     AUTO = "auto"
     FORCE_ONLY_CALLS_MERGED = "force_only_calls_merged"
+    DUAL_WRITE = "dual_write"
     OFF = "off"
 
     @classmethod
