@@ -210,7 +210,11 @@ def resolve_and_apply_prompt(
     # Step 3: Apply template variable substitution (if provided)
     if template_vars and combined_messages:
         combined_messages = [
-            format_message_with_template_vars(msg, **template_vars)
+            (
+                format_message_with_template_vars(msg, **template_vars)
+                if msg.get("role") != "assistant"
+                else msg
+            )
             for msg in combined_messages
         ]
 
