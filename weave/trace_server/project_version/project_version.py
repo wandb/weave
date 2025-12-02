@@ -1,7 +1,5 @@
 import logging
-import threading
-from collections.abc import Callable
-from typing import Any, Optional
+from typing import Any
 
 import ddtrace
 from cachetools import LRUCache
@@ -20,54 +18,25 @@ logger = logging.getLogger(__name__)
 
 PER_REPLICA_CACHE_SIZE = 10_000
 
-_resolver: Optional["TableRoutingResolver"] = None
-_resolver_lock = threading.Lock()
-
-
-def init_resolver(
-    ch_client_factory: Callable[[], Any],
-    cache_size: int = PER_REPLICA_CACHE_SIZE,
-) -> None:
-    """Initialize the project version resolver.
-
-    Call this once at application startup. Subsequent calls are ignored
-    (the first initialization wins).
-
-    Args:
-        ch_client_factory: Callable that returns a ClickHouse client.
-        cache_size: Size of the in-memory cache (defaults to 10,000).
-    """
-    global _resolver
-    with _resolver_lock:
-        if _resolver is None:
-            _resolver = TableRoutingResolver(
-                ch_client_factory=ch_client_factory,
-                cache_size=cache_size,
-            )
-
-
-def resolve_read_table(project_id: str) -> ReadTable:
-    if _resolver is None:
-        raise RuntimeError("init_resolver() must be called before resolve_read_table()")
-    return _resolver.resolve_read_table(project_id)
-
-
-def resolve_write_target(project_id: str) -> WriteTarget:
-    if _resolver is None:
-        raise RuntimeError(
-            "init_resolver() must be called before resolve_write_target()"
-        )
-    return _resolver.resolve_write_target(project_id)
-
 
 class TableRoutingResolver:
+    """Resolver for determining which table to read from or write to based on project data residence.
+
+    This resolver maintains a cache of project data residence information to avoid
+    repeated queries to the database.
+
+    Args:
+        ch_client: ClickHouse client instance for querying project data residence.
+        cache_size: Size of the in-memory cache (defaults to 10,000).
+    """
+
     def __init__(
         self,
-        ch_client_factory: Callable[[], Any],
+        ch_client: Any,
         cache_size: int = PER_REPLICA_CACHE_SIZE,
     ):
         self._cache: LRUCache[str, ProjectDataResidence] = LRUCache(maxsize=cache_size)
-        self._ch_client_factory = ch_client_factory
+        self._ch_client = ch_client
         self._mode = CallsStorageServerMode.from_env()
 
     def _get_residence(self, project_id: str) -> ProjectDataResidence:
@@ -75,7 +44,7 @@ class TableRoutingResolver:
         if cached is not None:
             return cached
 
-        residence = get_project_data_residence(project_id, self._ch_client_factory)
+        residence = get_project_data_residence(project_id, lambda: self._ch_client)
 
         # Don't cache if project is empty, we could write to either table.
         if residence != ProjectDataResidence.EMPTY:

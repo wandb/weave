@@ -12,7 +12,6 @@ from weave.trace_server.project_version.clickhouse_project_version import (
 )
 from weave.trace_server.project_version.project_version import (
     TableRoutingResolver,
-    init_resolver,
 )
 from weave.trace_server.project_version.types import (
     CallsStorageServerMode,
@@ -53,7 +52,7 @@ def test_version_resolution_by_table_contents(client, trace_server):
         pytest.skip("ClickHouse-only test")
 
     ch_server = trace_server._internal_trace_server
-    resolver = TableRoutingResolver(ch_client_factory=lambda: ch_server.ch_client)
+    resolver = TableRoutingResolver(ch_client=ch_server.ch_client)
     # manually set this to auto so we can test the switching
     resolver._mode = CallsStorageServerMode.AUTO
 
@@ -80,7 +79,7 @@ def test_caching_behavior(client, trace_server):
         pytest.skip("ClickHouse-only test")
 
     ch_server = trace_server._internal_trace_server
-    resolver = TableRoutingResolver(ch_client_factory=lambda: ch_server.ch_client)
+    resolver = TableRoutingResolver(ch_client=ch_server.ch_client)
     resolver._mode = CallsStorageServerMode.AUTO
 
     cached_proj = make_project_id("cached_project")
@@ -111,7 +110,7 @@ def test_mode_off_and_force_legacy(client, trace_server):
         pytest.skip("ClickHouse-only test")
 
     ch_server = trace_server._internal_trace_server
-    resolver = TableRoutingResolver(ch_client_factory=lambda: ch_server.ch_client)
+    resolver = TableRoutingResolver(ch_client=ch_server.ch_client)
 
     project_id = make_project_id("mode_test")
     insert_call(ch_server.ch_client, "calls_complete", project_id)
@@ -150,6 +149,40 @@ def test_clickhouse_provider_directly(client, trace_server):
     assert residence == ProjectDataResidence.MERGED_ONLY
 
 
+def test_resolver_as_trace_server_member(client, trace_server):
+    """Test that the resolver is properly integrated as a trace server member."""
+    if client_is_sqlite(client):
+        pytest.skip("ClickHouse-only test")
+
+    ch_server = trace_server._internal_trace_server
+
+    # Test that the resolver is lazily initialized
+    assert ch_server._table_routing_resolver is None
+    resolver1 = ch_server.table_routing_resolver
+    assert resolver1 is not None
+
+    resolver2 = ch_server.table_routing_resolver
+    assert resolver1 is resolver2
+
+    project_id = make_project_id("trace_server_member")
+    insert_call(ch_server.ch_client, "calls_complete", project_id)
+
+    with count_queries(ch_server.ch_client) as get_count:
+        resolver1._mode = CallsStorageServerMode.AUTO
+        table = resolver1.resolve_read_table(project_id)
+        assert table == ReadTable.CALLS_COMPLETE
+        assert get_count() == 1
+
+        # Subsequent requests hit the cache
+        table2 = resolver1.resolve_read_table(project_id)
+        assert table2 == ReadTable.CALLS_COMPLETE
+        assert get_count() == 1
+
+        table3 = resolver2.resolve_read_table(project_id)
+        assert table3 == ReadTable.CALLS_COMPLETE
+        assert get_count() == 1
+
+
 def test_project_version_mode_from_env():
     original_value = os.environ.get("PROJECT_VERSION_MODE")
 
@@ -176,24 +209,3 @@ def test_project_version_mode_from_env():
             os.environ["PROJECT_VERSION_MODE"] = original_value
         elif "PROJECT_VERSION_MODE" in os.environ:
             del os.environ["PROJECT_VERSION_MODE"]
-
-
-def test_global_singleton_resolver(client, trace_server):
-    if client_is_sqlite(client):
-        pytest.skip("ClickHouse-only test")
-
-    ch_server = trace_server._internal_trace_server
-
-    # Test that init_resolver is idempotent and creates singleton
-    init_resolver(ch_client_factory=lambda: ch_server.ch_client)
-
-    # Access internal resolver to verify singleton behavior
-    from weave.trace_server.project_version import project_version
-
-    resolver1 = project_version._resolver
-
-    # Call init again - should be no-op
-    init_resolver(ch_client_factory=lambda: ch_server.ch_client)
-    resolver2 = project_version._resolver
-
-    assert resolver1 is resolver2
