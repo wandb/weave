@@ -4998,11 +4998,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         parameters: dict[str, Any],
         column_formats: dict[str, Any] | None = None,
         settings: dict[str, Any] | None = None,
-<<<<<<< HEAD
         read_table: ReadTable | None = None,
-=======
-        project_version: ProjectVersion | None = None,
->>>>>>> 4e4f006370 (wip)
     ) -> Iterator[tuple]:
         """Streams the results of a query from the database."""
         if not settings:
@@ -5027,11 +5023,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                         "query": query,
                         "parameters": parameters,
                         "summary": summary,
-<<<<<<< HEAD
                         "read_table": read_table,
-=======
-                        "project_version": project_version,
->>>>>>> 4e4f006370 (wip)
                     },
                 )
                 yield from stream
@@ -5042,11 +5034,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     "error_str": str(e),
                     "query": query,
                     "parameters": parameters,
-<<<<<<< HEAD
                     "read_table": read_table,
-=======
-                    "project_version": project_version,
->>>>>>> 4e4f006370 (wip)
                 },
             )
             # always raises, optionally with custom error class
