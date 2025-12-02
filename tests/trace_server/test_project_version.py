@@ -10,9 +10,6 @@ from tests.trace.util import client_is_sqlite
 from weave.trace_server.project_version.clickhouse_project_version import (
     get_project_data_residence,
 )
-from weave.trace_server.project_version.project_version import (
-    TableRoutingResolver,
-)
 from weave.trace_server.project_version.types import (
     CallsStorageServerMode,
     ProjectDataResidence,
@@ -52,26 +49,95 @@ def test_version_resolution_by_table_contents(client, trace_server):
         pytest.skip("ClickHouse-only test")
 
     ch_server = trace_server._internal_trace_server
-    resolver = TableRoutingResolver(ch_client=ch_server.ch_client)
+    resolver = ch_server.table_routing_resolver
     # manually set this to auto so we can test the switching
     resolver._mode = CallsStorageServerMode.AUTO
 
     empty_proj = make_project_id("empty_project")
-    assert resolver.resolve_read_table(empty_proj) == ReadTable.CALLS_MERGED
+    assert (
+        resolver.resolve_read_table(empty_proj, ch_server.ch_client)
+        == ReadTable.CALLS_COMPLETE
+    )
 
     merged_proj = make_project_id("merged_only")
     insert_call(ch_server.ch_client, "calls_merged", merged_proj)
-    assert resolver.resolve_read_table(merged_proj) == ReadTable.CALLS_MERGED
+    assert (
+        resolver.resolve_read_table(merged_proj, ch_server.ch_client)
+        == ReadTable.CALLS_MERGED
+    )
 
     complete_proj = make_project_id("complete_only")
     insert_call(ch_server.ch_client, "calls_complete", complete_proj)
-    assert resolver.resolve_read_table(complete_proj) == ReadTable.CALLS_COMPLETE
+    assert (
+        resolver.resolve_read_table(complete_proj, ch_server.ch_client)
+        == ReadTable.CALLS_COMPLETE
+    )
 
     both_proj = make_project_id("both_tables")
     insert_call(ch_server.ch_client, "calls_merged", both_proj)
     insert_call(ch_server.ch_client, "calls_complete", both_proj)
     # When both tables have data, calls_complete takes priority
-    assert resolver.resolve_read_table(both_proj) == ReadTable.CALLS_COMPLETE
+    assert (
+        resolver.resolve_read_table(both_proj, ch_server.ch_client)
+        == ReadTable.CALLS_COMPLETE
+    )
+
+
+def test_version_resolution_by_table_duel_write(client, trace_server):
+    if client_is_sqlite(client):
+        pytest.skip("ClickHouse-only test")
+
+    ch_server = trace_server._internal_trace_server
+    resolver = ch_server.table_routing_resolver
+
+    empty_proj = make_project_id("empty_project")
+
+    merged_proj = make_project_id("merged_only")
+    insert_call(ch_server.ch_client, "calls_merged", merged_proj)
+
+    complete_proj = make_project_id("complete_only")
+    insert_call(ch_server.ch_client, "calls_complete", complete_proj)
+
+    both_proj = make_project_id("both_tables")
+    insert_call(ch_server.ch_client, "calls_merged", both_proj)
+    insert_call(ch_server.ch_client, "calls_complete", both_proj)
+
+    resolver._mode = CallsStorageServerMode.DUAL_WRITE_READ_MERGED
+    assert (
+        resolver.resolve_read_table(empty_proj, ch_server.ch_client)
+        == ReadTable.CALLS_MERGED
+    )
+    assert (
+        resolver.resolve_read_table(merged_proj, ch_server.ch_client)
+        == ReadTable.CALLS_MERGED
+    )
+    assert (
+        resolver.resolve_read_table(complete_proj, ch_server.ch_client)
+        == ReadTable.CALLS_MERGED
+    )
+    assert (
+        resolver.resolve_read_table(both_proj, ch_server.ch_client)
+        == ReadTable.CALLS_MERGED
+    )
+
+    # Now test duel write read complete
+    resolver._mode = CallsStorageServerMode.DUAL_WRITE_READ_COMPLETE
+    assert (
+        resolver.resolve_read_table(empty_proj, ch_server.ch_client)
+        == ReadTable.CALLS_COMPLETE
+    )
+    assert (
+        resolver.resolve_read_table(merged_proj, ch_server.ch_client)
+        == ReadTable.CALLS_MERGED
+    )
+    assert (
+        resolver.resolve_read_table(complete_proj, ch_server.ch_client)
+        == ReadTable.CALLS_COMPLETE
+    )
+    assert (
+        resolver.resolve_read_table(both_proj, ch_server.ch_client)
+        == ReadTable.CALLS_COMPLETE
+    )
 
 
 def test_caching_behavior(client, trace_server):
@@ -79,29 +145,29 @@ def test_caching_behavior(client, trace_server):
         pytest.skip("ClickHouse-only test")
 
     ch_server = trace_server._internal_trace_server
-    resolver = TableRoutingResolver(ch_client=ch_server.ch_client)
+    resolver = ch_server.table_routing_resolver
     resolver._mode = CallsStorageServerMode.AUTO
 
     cached_proj = make_project_id("cached_project")
     insert_call(ch_server.ch_client, "calls_complete", cached_proj)
 
     with count_queries(ch_server.ch_client) as get_count:
-        table1 = resolver.resolve_read_table(cached_proj)
+        table1 = resolver.resolve_read_table(cached_proj, ch_server.ch_client)
         assert table1 == ReadTable.CALLS_COMPLETE
         assert get_count() == 1
 
-        table2 = resolver.resolve_read_table(cached_proj)
+        table2 = resolver.resolve_read_table(cached_proj, ch_server.ch_client)
         assert table2 == ReadTable.CALLS_COMPLETE
         assert get_count() == 1
 
     empty_proj = make_project_id("empty_not_cached")
     with count_queries(ch_server.ch_client) as get_count:
-        table1 = resolver.resolve_read_table(empty_proj)
-        assert table1 == ReadTable.CALLS_MERGED
+        table1 = resolver.resolve_read_table(empty_proj, ch_server.ch_client)
+        assert table1 == ReadTable.CALLS_COMPLETE
         assert get_count() == 1
 
-        table2 = resolver.resolve_read_table(empty_proj)
-        assert table2 == ReadTable.CALLS_MERGED
+        table2 = resolver.resolve_read_table(empty_proj, ch_server.ch_client)
+        assert table2 == ReadTable.CALLS_COMPLETE
         assert get_count() == 2
 
 
@@ -110,26 +176,26 @@ def test_mode_off_and_force_legacy(client, trace_server):
         pytest.skip("ClickHouse-only test")
 
     ch_server = trace_server._internal_trace_server
-    resolver = TableRoutingResolver(ch_client=ch_server.ch_client)
+    resolver = ch_server.table_routing_resolver
 
     project_id = make_project_id("mode_test")
     insert_call(ch_server.ch_client, "calls_complete", project_id)
 
     resolver._mode = CallsStorageServerMode.OFF
     with count_queries(ch_server.ch_client) as get_count:
-        table = resolver.resolve_read_table(project_id)
+        table = resolver.resolve_read_table(project_id, ch_server.ch_client)
         assert table == ReadTable.CALLS_MERGED
         assert get_count() == 0
 
     resolver._mode = CallsStorageServerMode.FORCE_LEGACY
     # FORCE_LEGACY performs the query but returns MERGED
     with count_queries(ch_server.ch_client) as get_count:
-        table = resolver.resolve_read_table(project_id)
+        table = resolver.resolve_read_table(project_id, ch_server.ch_client)
         assert table == ReadTable.CALLS_MERGED
         assert get_count() == 1
 
     resolver._mode = CallsStorageServerMode.AUTO
-    table = resolver.resolve_read_table(project_id)
+    table = resolver.resolve_read_table(project_id, ch_server.ch_client)
     assert table == ReadTable.CALLS_COMPLETE
 
 
@@ -169,16 +235,16 @@ def test_resolver_as_trace_server_member(client, trace_server):
 
     with count_queries(ch_server.ch_client) as get_count:
         resolver1._mode = CallsStorageServerMode.AUTO
-        table = resolver1.resolve_read_table(project_id)
+        table = resolver1.resolve_read_table(project_id, ch_server.ch_client)
         assert table == ReadTable.CALLS_COMPLETE
         assert get_count() == 1
 
         # Subsequent requests hit the cache
-        table2 = resolver1.resolve_read_table(project_id)
+        table2 = resolver1.resolve_read_table(project_id, ch_server.ch_client)
         assert table2 == ReadTable.CALLS_COMPLETE
         assert get_count() == 1
 
-        table3 = resolver2.resolve_read_table(project_id)
+        table3 = resolver2.resolve_read_table(project_id, ch_server.ch_client)
         assert table3 == ReadTable.CALLS_COMPLETE
         assert get_count() == 1
 

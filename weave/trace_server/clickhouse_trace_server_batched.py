@@ -239,13 +239,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def table_routing_resolver(self) -> TableRoutingResolver:
         if self._table_routing_resolver is not None:
             return self._table_routing_resolver
-        self._table_routing_resolver = TableRoutingResolver(ch_client=self.ch_client)
+        self._table_routing_resolver = TableRoutingResolver()
         return self._table_routing_resolver
 
     def _noop_project_version_latency_test(self, project_id: str) -> None:
         # NOOP for testing latency impact of project switcher
         try:
-            self.table_routing_resolver.resolve_read_table(project_id)
+            self.table_routing_resolver.resolve_read_table(project_id, self.ch_client)
         except Exception as e:
             logger.warning(
                 f"Error getting project version for project [{project_id}]: {e}"
