@@ -207,10 +207,7 @@ def test_clickhouse_provider_directly(client, trace_server):
     project_id = make_project_id("provider_direct")
     insert_call(ch_server.ch_client, "calls_merged", project_id)
 
-    residence = get_project_data_residence(
-        project_id,
-        ch_client_factory=lambda: ch_server.ch_client,
-    )
+    residence = get_project_data_residence(project_id, ch_server.ch_client)
 
     assert residence == ProjectDataResidence.MERGED_ONLY
 
