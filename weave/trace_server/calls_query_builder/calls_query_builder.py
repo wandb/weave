@@ -64,7 +64,7 @@ from weave.trace_server.orm import (
     python_value_to_ch_type,
     split_escaped_field_path,
 )
-from weave.trace_server.project_version.types import ProjectVersion
+from weave.trace_server.project_version.types import ReadTable
 from weave.trace_server.token_costs import build_cost_ctes, get_cost_final_select
 from weave.trace_server.trace_server_common import assert_parameter_length_less_than_max
 from weave.trace_server.trace_server_interface_util import (
@@ -180,7 +180,7 @@ class CallsMergedSummaryField(CallsMergedField):
         # Look up handler for the requested summary field
         handler = get_summary_field_handler(self.summary_field)
         if handler:
-            sql = handler(pb, table_alias, ProjectVersion.CALLS_MERGED_VERSION)
+            sql = handler(pb, table_alias, ReadTable.CALLS_MERGED)
             return clickhouse_cast(sql, cast)
         else:
             supported_fields = ", ".join(SUMMARY_FIELD_HANDLERS.keys())
@@ -214,7 +214,7 @@ class CallsCompleteSummaryField(CallsCompleteField):
         # Look up handler for the requested summary field
         handler = get_summary_field_handler(self.summary_field)
         if handler:
-            sql = handler(pb, table_alias, ProjectVersion.CALLS_COMPLETE_VERSION)
+            sql = handler(pb, table_alias, ReadTable.CALLS_COMPLETE)
             return clickhouse_cast(sql, cast)
         else:
             supported_fields = ", ".join(SUMMARY_FIELD_HANDLERS.keys())
@@ -561,7 +561,7 @@ class Condition(BaseModel):
         table_alias: str,
         expand_columns: list[str] | None = None,
         field_to_object_join_alias_map: dict[str, str] | None = None,
-        project_version: ProjectVersion = ProjectVersion.CALLS_MERGED_VERSION,
+        read_table: ReadTable = ReadTable.CALLS_MERGED,
     ) -> str:
         # Check if this condition involves object references
         if (
@@ -577,7 +577,7 @@ class Condition(BaseModel):
                 self._consumed_fields = []
             for raw_field_path in processor.fields_used:
                 self._consumed_fields.append(
-                    get_field_by_name(raw_field_path, project_version)
+                    get_field_by_name(raw_field_path, read_table)
                 )
             return sql
 
@@ -585,7 +585,7 @@ class Condition(BaseModel):
             tsi_query.Query.model_validate({"$expr": {"$and": [self.operand]}}),
             pb,
             table_alias,
-            project_version=project_version,
+            read_table=read_table,
         )
         if self._consumed_fields is None:
             self._consumed_fields = []
@@ -594,15 +594,10 @@ class Condition(BaseModel):
         return combine_conditions(conditions.conditions, "AND")
 
     def _get_consumed_fields(
-        self, project_version: ProjectVersion = ProjectVersion.CALLS_MERGED_VERSION
+        self, read_table: ReadTable = ReadTable.CALLS_MERGED
     ) -> list[CallsMergedField]:
         if self._consumed_fields is None:
-            table_name = (
-                "calls_complete"
-                if project_version == ProjectVersion.CALLS_COMPLETE_VERSION
-                else "calls_merged"
-            )
-            self.as_sql(ParamBuilder(), table_name, project_version=project_version)
+            self.as_sql(ParamBuilder(), read_table.value, read_table=read_table)
         if self._consumed_fields is None:
             raise ValueError("Consumed fields should not be None")
         return self._consumed_fields
@@ -636,7 +631,7 @@ class Condition(BaseModel):
 
 class HardCodedFilter(BaseModel):
     filter: tsi.CallsFilter
-    project_version: ProjectVersion = ProjectVersion.CALLS_MERGED_VERSION
+    read_table: ReadTable = ReadTable.CALLS_MERGED
 
     def is_useful(self) -> bool:
         """Returns True if the filter is useful - i.e. it has any non-null fields
@@ -659,7 +654,9 @@ class HardCodedFilter(BaseModel):
 
     def as_sql(self, pb: ParamBuilder, table_alias: str) -> str:
         return combine_conditions(
-            process_calls_filter_to_conditions(self.filter, pb, table_alias, project_version=self.project_version),
+            process_calls_filter_to_conditions(
+                self.filter, pb, table_alias, read_table=self.read_table
+            ),
             "AND",
         )
 
@@ -678,22 +675,14 @@ class CallsQuery(BaseModel):
     include_costs: bool = False
     include_storage_size: bool = False
     include_total_storage_size: bool = False
-    project_version: ProjectVersion = ProjectVersion.CALLS_MERGED_VERSION
+    read_table: ReadTable = ReadTable.CALLS_MERGED
 
     def add_field(self, field: str) -> "CallsQuery":
-        name = get_field_by_name(field, self.project_version)
+        name = get_field_by_name(field, self.read_table)
         if name in self.select_fields:
             return self
         self.select_fields.append(name)
         return self
-
-    def _get_table_name(self) -> str:
-        """Get the table name based on project version."""
-        return (
-            "calls_complete"
-            if self.project_version == ProjectVersion.CALLS_COMPLETE_VERSION
-            else "calls_merged"
-        )
 
     def add_condition(self, operand: "tsi_query.Operand") -> "CallsQuery":
         if isinstance(operand, tsi_query.AndOperation):
@@ -719,7 +708,7 @@ class CallsQuery(BaseModel):
         direction = cast(Literal["ASC", "DESC"], direction)
         self.order_fields.append(
             OrderField(
-                field=get_field_by_name(field, self.project_version),
+                field=get_field_by_name(field, self.read_table),
                 direction=direction,
             )
         )
@@ -874,7 +863,7 @@ class CallsQuery(BaseModel):
         """
         # Set table_alias based on project version if not provided
         if table_alias is None:
-            table_alias = self._get_table_name()
+            table_alias = self.read_table.value
 
         if not self.select_fields:
             raise ValueError("Missing select columns")
@@ -895,7 +884,7 @@ class CallsQuery(BaseModel):
         # when such occurrence happens and the client terminates early.
         # Additionally: This condition is also REQUIRED for proper functioning
         # when using pre-group by (WHERE) optimizations
-        if self.project_version == ProjectVersion.CALLS_MERGED_VERSION:
+        if self.read_table == ReadTable.CALLS_MERGED:
             self.add_condition(
                 tsi_query.NotOperation.model_validate(
                     {
@@ -916,11 +905,11 @@ class CallsQuery(BaseModel):
 
         # Build two queries, first filter query CTE, then select the columns
         filter_query = CallsQuery(
-            project_id=self.project_id, project_version=self.project_version
+            project_id=self.project_id, read_table=self.read_table
         )
         select_query = CallsQuery(
             project_id=self.project_id,
-            project_version=self.project_version,
+            read_table=self.read_table,
             include_storage_size=self.include_storage_size,
             include_total_storage_size=self.include_total_storage_size,
         )
@@ -959,9 +948,7 @@ class CallsQuery(BaseModel):
                     field_obj, (CallsMergedDynamicField, QueryBuilderDynamicField)
                 ):
                     # we need to add the base field, not the dynamic one
-                    base_field = get_field_by_name(
-                        field_obj.field, self.project_version
-                    )
+                    base_field = get_field_by_name(field_obj.field, self.read_table)
                     if base_field not in select_query.select_fields:
                         select_query.select_fields.append(base_field)
                 else:
@@ -1229,7 +1216,7 @@ class CallsQuery(BaseModel):
                     table_alias,
                     expand_columns=expand_columns,
                     field_to_object_join_alias_map=field_to_object_join_alias_map,
-                    project_version=self.project_version,
+                    read_table=self.read_table,
                 )
                 having_conditions_sql.append(query_condition_sql)
                 if query_condition.is_feedback():
@@ -1295,7 +1282,7 @@ class CallsQuery(BaseModel):
 
         Routes to the appropriate implementation based on project version.
         """
-        if self.project_version == ProjectVersion.CALLS_COMPLETE_VERSION:
+        if self.read_table == ReadTable.CALLS_COMPLETE:
             return self._as_sql_complete_format(
                 pb,
                 id_subquery_name,
@@ -1409,7 +1396,7 @@ class CallsQuery(BaseModel):
                     table_alias,
                     expand_columns=expand_columns,
                     field_to_object_join_alias_map=field_to_object_join_alias_map,
-                    project_version=self.project_version,
+                    read_table=self.read_table,
                 )
                 where_conditions.append(query_condition_sql)
                 if query_condition.is_feedback():
@@ -1423,13 +1410,13 @@ class CallsQuery(BaseModel):
             else ""
         )
         op_name_sql = process_op_name_filter_to_sql(
-            self.hardcoded_filter, pb, table_alias, project_version=self.project_version
+            self.hardcoded_filter, pb, table_alias, read_table=self.read_table
         )
         trace_id_sql = process_trace_id_filter_to_sql(
-            self.hardcoded_filter, pb, table_alias, project_version=self.project_version
+            self.hardcoded_filter, pb, table_alias, read_table=self.read_table
         )
         trace_roots_sql = process_trace_roots_only_filter_to_sql(
-            self.hardcoded_filter, pb, table_alias, project_version=self.project_version
+            self.hardcoded_filter, pb, table_alias, read_table=self.read_table
         )
 
         # Add the rest of the hardcoded filters
@@ -1551,20 +1538,20 @@ DISALLOWED_FILTERING_FIELDS = {"storage_size_bytes", "total_storage_size_bytes"}
 
 
 def get_field_by_name(
-    name: str, project_version: ProjectVersion = ProjectVersion.CALLS_MERGED_VERSION
+    name: str, read_table: ReadTable = ReadTable.CALLS_MERGED
 ) -> QueryBuilderField:
     """Get field definition by name, version-aware for different storage tables.
 
     Args:
         name: Field name to look up
-        project_version: Project version (MERGED or COMPLETE) to determine field type
+        read_table: Read table (MERGED or COMPLETE) to determine field type
 
     Returns:
-        Field definition appropriate for the project version
+        Field definition appropriate for the read table
     """
     field_map = (
         ALLOWED_CALL_FIELDS_COMPLETE
-        if project_version == ProjectVersion.CALLS_COMPLETE_VERSION
+        if read_table == ReadTable.CALLS_COMPLETE
         else ALLOWED_CALL_FIELDS
     )
 
@@ -1574,7 +1561,7 @@ def get_field_by_name(
         elif name.startswith("summary.weave."):
             # Handle summary.weave.* fields
             summary_field = name[len("summary.weave.") :]
-            if project_version == ProjectVersion.CALLS_COMPLETE_VERSION:
+            if read_table == ReadTable.CALLS_COMPLETE:
                 return CallsCompleteSummaryField(
                     field=name, summary_field=summary_field
                 )
@@ -1601,22 +1588,16 @@ def get_field_by_name(
 
 # Handler function for status summary field
 def _handle_status_summary_field(
-    pb: ParamBuilder,
-    table_alias: str,
-    project_version: ProjectVersion = ProjectVersion.CALLS_MERGED_VERSION,
+    pb: ParamBuilder, table_alias: str, read_table: ReadTable = ReadTable.CALLS_MERGED
 ) -> str:
     # Status logic:
     # - If exception is not null -> ERROR
     # - Else if ended_at is null -> RUNNING
     # - Else -> SUCCESS
-    exception_sql = get_field_by_name("exception", project_version).as_sql(
-        pb, table_alias
-    )
-    ended_to_sql = get_field_by_name("ended_at", project_version).as_sql(
-        pb, table_alias
-    )
+    exception_sql = get_field_by_name("exception", read_table).as_sql(pb, table_alias)
+    ended_to_sql = get_field_by_name("ended_at", read_table).as_sql(pb, table_alias)
     status_counts_sql = get_field_by_name(
-        "summary.status_counts.error", project_version
+        "summary.status_counts.error", read_table
     ).as_sql(pb, table_alias, cast="int")
 
     error_param = pb.add_param(tsi.TraceStatus.ERROR.value)
@@ -1634,19 +1615,13 @@ def _handle_status_summary_field(
 
 # Handler function for latency_ms summary field
 def _handle_latency_ms_summary_field(
-    pb: ParamBuilder,
-    table_alias: str,
-    project_version: ProjectVersion = ProjectVersion.CALLS_MERGED_VERSION,
+    pb: ParamBuilder, table_alias: str, read_table: ReadTable = ReadTable.CALLS_MERGED
 ) -> str:
     # Latency_ms logic:
     # - If ended_at is null or there's an exception, return null
     # - Otherwise calculate milliseconds between started_at and ended_at
-    started_at_sql = get_field_by_name("started_at", project_version).as_sql(
-        pb, table_alias
-    )
-    ended_at_sql = get_field_by_name("ended_at", project_version).as_sql(
-        pb, table_alias
-    )
+    started_at_sql = get_field_by_name("started_at", read_table).as_sql(pb, table_alias)
+    ended_at_sql = get_field_by_name("ended_at", read_table).as_sql(pb, table_alias)
 
     # Convert time difference to milliseconds
     # Use toUnixTimestamp64Milli for direct and precise millisecond difference
@@ -1660,19 +1635,17 @@ def _handle_latency_ms_summary_field(
 
 # Handler function for trace_name summary field
 def _handle_trace_name_summary_field(
-    pb: ParamBuilder,
-    table_alias: str,
-    project_version: ProjectVersion = ProjectVersion.CALLS_MERGED_VERSION,
+    pb: ParamBuilder, table_alias: str, read_table: ReadTable = ReadTable.CALLS_MERGED
 ) -> str:
     # Trace_name logic:
     # - If display_name is available, use that
     # - Else if op_name starts with 'weave-trace-internal:///', extract the name using regex
     # - Otherwise, just use op_name directly
 
-    display_name_sql = get_field_by_name("display_name", project_version).as_sql(
+    display_name_sql = get_field_by_name("display_name", read_table).as_sql(
         pb, table_alias
     )
-    op_name_sql = get_field_by_name("op_name", project_version).as_sql(pb, table_alias)
+    op_name_sql = get_field_by_name("op_name", read_table).as_sql(pb, table_alias)
 
     return f"""CASE
         WHEN {display_name_sql} IS NOT NULL AND {display_name_sql} != '' THEN {display_name_sql}
@@ -1693,7 +1666,7 @@ SUMMARY_FIELD_HANDLERS = {
 # Helper function to get a summary field handler by name
 def get_summary_field_handler(
     summary_field: str,
-) -> Callable[[ParamBuilder, str, ProjectVersion], str] | None:
+) -> Callable[[ParamBuilder, str, ReadTable], str] | None:
     """Returns the handler function for a given summary field name."""
     return SUMMARY_FIELD_HANDLERS.get(summary_field)
 
@@ -1708,7 +1681,7 @@ def process_query_to_conditions(
     param_builder: ParamBuilder,
     table_alias: str,
     use_agg_fn: bool = True,
-    project_version: ProjectVersion = ProjectVersion.CALLS_MERGED_VERSION,
+    read_table: ReadTable = ReadTable.CALLS_MERGED,
 ) -> FilterToConditions:
     """Converts a Query to a list of conditions for a clickhouse query."""
     conditions = []
@@ -1779,7 +1752,7 @@ def process_query_to_conditions(
             if operand.get_field_ in DISALLOWED_FILTERING_FIELDS:
                 raise InvalidFieldError(f"Field {operand.get_field_} is not allowed")
 
-            structured_field = get_field_by_name(operand.get_field_, project_version)
+            structured_field = get_field_by_name(operand.get_field_, read_table)
 
             if isinstance(
                 structured_field, (CallsMergedDynamicField, CallsCompleteDynamicField)
@@ -1828,7 +1801,7 @@ def process_op_name_filter_to_sql(
     hardcoded_filter: HardCodedFilter | None,
     param_builder: ParamBuilder,
     table_alias: str,
-    project_version: ProjectVersion = ProjectVersion.CALLS_MERGED_VERSION,
+    read_table: ReadTable = ReadTable.CALLS_MERGED,
 ) -> str:
     """Pulls out the op_name and returns a sql string if there are any op_names."""
     if hardcoded_filter is None or not hardcoded_filter.filter.op_names:
@@ -1845,7 +1818,7 @@ def process_op_name_filter_to_sql(
     non_wildcarded_names: list[str] = []
     wildcarded_names: list[str] = []
 
-    op_field = get_field_by_name("op_name", project_version)
+    op_field = get_field_by_name("op_name", read_table)
     if not isinstance(op_field, (CallsMergedAggField, CallsCompleteField)):
         raise TypeError("op_name is not a valid field type")
 
@@ -1883,7 +1856,7 @@ def process_trace_id_filter_to_sql(
     hardcoded_filter: HardCodedFilter | None,
     param_builder: ParamBuilder,
     table_alias: str,
-    project_version: ProjectVersion = ProjectVersion.CALLS_MERGED_VERSION,
+    read_table: ReadTable = ReadTable.CALLS_MERGED,
 ) -> str:
     """Pulls out the trace_id and returns a sql string if there are any trace_ids."""
     if hardcoded_filter is None or not hardcoded_filter.filter.trace_ids:
@@ -1893,7 +1866,7 @@ def process_trace_id_filter_to_sql(
 
     assert_parameter_length_less_than_max("trace_ids", len(trace_ids))
 
-    trace_id_field = get_field_by_name("trace_id", project_version)
+    trace_id_field = get_field_by_name("trace_id", read_table)
     if not isinstance(trace_id_field, (CallsMergedAggField, CallsCompleteField)):
         raise TypeError("trace_id is not a valid field type")
 
@@ -1919,7 +1892,7 @@ def process_thread_id_filter_to_sql(
     hardcoded_filter: HardCodedFilter | None,
     param_builder: ParamBuilder,
     table_alias: str,
-    project_version: ProjectVersion = ProjectVersion.CALLS_MERGED_VERSION,
+    read_table: ReadTable = ReadTable.CALLS_MERGED,
 ) -> str:
     """Pulls out the thread_id and returns a sql string if there are any thread_ids."""
     if (
@@ -1933,7 +1906,7 @@ def process_thread_id_filter_to_sql(
 
     assert_parameter_length_less_than_max("thread_ids", len(thread_ids))
 
-    thread_id_field = get_field_by_name("thread_id", project_version)
+    thread_id_field = get_field_by_name("thread_id", read_table)
     if not isinstance(thread_id_field, (CallsMergedAggField, CallsCompleteField)):
         raise TypeError("thread_id is not a valid field type")
 
@@ -1959,7 +1932,7 @@ def process_turn_id_filter_to_sql(
     hardcoded_filter: HardCodedFilter | None,
     param_builder: ParamBuilder,
     table_alias: str,
-    project_version: ProjectVersion = ProjectVersion.CALLS_MERGED_VERSION,
+    read_table: ReadTable = ReadTable.CALLS_MERGED,
 ) -> str:
     """Pulls out the turn_id and returns a sql string if there are any turn_ids."""
     if (
@@ -1973,7 +1946,7 @@ def process_turn_id_filter_to_sql(
 
     assert_parameter_length_less_than_max("turn_ids", len(turn_ids))
 
-    turn_id_field = get_field_by_name("turn_id", project_version)
+    turn_id_field = get_field_by_name("turn_id", read_table)
     if isinstance(turn_id_field, CallsMergedAggField):
         turn_id_field_sql = turn_id_field.as_sql(
             param_builder, table_alias, use_agg_fn=False
@@ -1996,13 +1969,13 @@ def process_trace_roots_only_filter_to_sql(
     hardcoded_filter: HardCodedFilter | None,
     param_builder: ParamBuilder,
     table_alias: str,
-    project_version: ProjectVersion = ProjectVersion.CALLS_MERGED_VERSION,
+    read_table: ReadTable = ReadTable.CALLS_MERGED,
 ) -> str:
     """Pulls out the trace_roots_only and returns a sql string if there are any trace_roots_only."""
     if hardcoded_filter is None or not hardcoded_filter.filter.trace_roots_only:
         return ""
 
-    parent_id_field = get_field_by_name("parent_id", project_version)
+    parent_id_field = get_field_by_name("parent_id", read_table)
     if isinstance(parent_id_field, CallsMergedAggField):
         parent_id_field_sql = parent_id_field.as_sql(
             param_builder, table_alias, use_agg_fn=False
@@ -2128,7 +2101,7 @@ def process_calls_filter_to_conditions(
     filter: tsi.CallsFilter,
     param_builder: ParamBuilder,
     table_alias: str,
-    project_version: ProjectVersion = ProjectVersion.CALLS_MERGED_VERSION,
+    read_table: ReadTable = ReadTable.CALLS_MERGED,
 ) -> list[str]:
     """Converts a CallsFilter to a list of conditions for a clickhouse query.
 
@@ -2142,47 +2115,47 @@ def process_calls_filter_to_conditions(
     if filter.input_refs:
         assert_parameter_length_less_than_max("input_refs", len(filter.input_refs))
         conditions.append(
-            f"hasAny({get_field_by_name('input_refs', project_version).as_sql(param_builder, table_alias)}, {param_slot(param_builder.add_param(filter.input_refs), 'Array(String)')})"
+            f"hasAny({get_field_by_name('input_refs', read_table).as_sql(param_builder, table_alias)}, {param_slot(param_builder.add_param(filter.input_refs), 'Array(String)')})"
         )
 
     if filter.output_refs:
         assert_parameter_length_less_than_max("output_refs", len(filter.output_refs))
         conditions.append(
-            f"hasAny({get_field_by_name('output_refs', project_version).as_sql(param_builder, table_alias)}, {param_slot(param_builder.add_param(filter.output_refs), 'Array(String)')})"
+            f"hasAny({get_field_by_name('output_refs', read_table).as_sql(param_builder, table_alias)}, {param_slot(param_builder.add_param(filter.output_refs), 'Array(String)')})"
         )
 
     if filter.parent_ids:
         assert_parameter_length_less_than_max("parent_ids", len(filter.parent_ids))
         conditions.append(
-            f"{get_field_by_name('parent_id', project_version).as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.parent_ids), 'Array(String)')}"
+            f"{get_field_by_name('parent_id', read_table).as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.parent_ids), 'Array(String)')}"
         )
 
     if filter.call_ids:
         assert_parameter_length_less_than_max("call_ids", len(filter.call_ids))
         conditions.append(
-            f"{get_field_by_name('id', project_version).as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.call_ids), 'Array(String)')}"
+            f"{get_field_by_name('id', read_table).as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.call_ids), 'Array(String)')}"
         )
 
     if filter.thread_ids is not None:
         assert_parameter_length_less_than_max("thread_ids", len(filter.thread_ids))
         conditions.append(
-            f"{get_field_by_name('thread_id', project_version).as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.thread_ids), 'Array(String)')}"
+            f"{get_field_by_name('thread_id', read_table).as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.thread_ids), 'Array(String)')}"
         )
 
     if filter.turn_ids is not None:
         assert_parameter_length_less_than_max("turn_ids", len(filter.turn_ids))
         conditions.append(
-            f"{get_field_by_name('turn_id', project_version).as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.turn_ids), 'Array(String)')}"
+            f"{get_field_by_name('turn_id', read_table).as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.turn_ids), 'Array(String)')}"
         )
 
     if filter.wb_user_ids:
         conditions.append(
-            f"{get_field_by_name('wb_user_id', project_version).as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.wb_user_ids), 'Array(String)')}"
+            f"{get_field_by_name('wb_user_id', read_table).as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.wb_user_ids), 'Array(String)')}"
         )
 
     if filter.wb_run_ids:
         conditions.append(
-            f"{get_field_by_name('wb_run_id', project_version).as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.wb_run_ids), 'Array(String)')}"
+            f"{get_field_by_name('wb_run_id', read_table).as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.wb_run_ids), 'Array(String)')}"
         )
 
     return conditions
@@ -2194,7 +2167,7 @@ def process_calls_filter_to_conditions(
 def build_calls_stats_query(
     req: tsi.CallsQueryStatsReq,
     param_builder: ParamBuilder,
-    project_version: ProjectVersion = ProjectVersion.CALLS_MERGED_VERSION,
+    read_table: ReadTable,
 ) -> tuple[str, KeysView[str]]:
     """Build a stats query for calls, automatically using optimized queries when possible.
 
@@ -2204,7 +2177,7 @@ def build_calls_stats_query(
     Args:
         req: The stats query request
         param_builder: Parameter builder for query parameterization
-        project_version: Project version (MERGED or COMPLETE) to use
+        read_table: Read table (CALLS_MERGED or CALLS_COMPLETE) to use
 
     Returns:
         Tuple of (SQL query string, column names in the result)
@@ -2212,14 +2185,14 @@ def build_calls_stats_query(
     aggregated_columns = {"count": "count()"}
 
     # Try optimized special case queries first
-    if opt_query := _try_optimized_stats_query(req, param_builder, project_version):
+    if opt_query := _try_optimized_stats_query(req, param_builder, read_table):
         return (opt_query, aggregated_columns.keys())
 
     # Fall back to general query builder
     cq = CallsQuery(
         project_id=req.project_id,
         include_total_storage_size=req.include_total_storage_size or False,
-        project_version=project_version,
+        read_table=read_table,
     )
 
     cq.add_field("id")
@@ -2245,9 +2218,9 @@ def build_calls_stats_query(
 
 
 def _try_optimized_stats_query(
-    req: tsi.CallsQueryStatsReq, 
+    req: tsi.CallsQueryStatsReq,
     param_builder: ParamBuilder,
-    project_version: ProjectVersion = ProjectVersion.CALLS_MERGED_VERSION,
+    read_table: ReadTable = ReadTable.CALLS_MERGED,
 ) -> str | None:
     """Try to match request to an optimized special-case query.
 
@@ -2262,7 +2235,7 @@ def _try_optimized_stats_query(
         and not req.include_total_storage_size
     ):
         return _optimized_project_contains_call_query(
-            req.project_id, param_builder, project_version
+            req.project_id, param_builder, read_table
         )
 
     # Pattern 2: Query with wb_run_id check (limit=1, query present, minimal filter)
@@ -2274,7 +2247,7 @@ def _try_optimized_stats_query(
         and _is_minimal_filter(req.filter)
     ):
         return _optimized_wb_run_id_not_null_query(
-            req.project_id, param_builder, project_version
+            req.project_id, param_builder, read_table
         )
 
     return None
@@ -2283,21 +2256,16 @@ def _try_optimized_stats_query(
 def _optimized_project_contains_call_query(
     project_id: str,
     param_builder: ParamBuilder,
-    project_version: ProjectVersion = ProjectVersion.CALLS_MERGED_VERSION,
+    read_table: ReadTable = ReadTable.CALLS_MERGED,
 ) -> str:
     """Returns a query that checks if the project contains any calls."""
-    table_name = (
-        "calls_complete"
-        if project_version == ProjectVersion.CALLS_COMPLETE_VERSION
-        else "calls_merged"
-    )
     return safely_format_sql(
         f"""SELECT
     toUInt8(count()) AS has_any
     FROM
     (
         SELECT 1
-        FROM {table_name}
+        FROM {read_table.value}
         WHERE project_id = {param_slot(param_builder.add_param(project_id), "String")}
         LIMIT 1
     )
@@ -2309,18 +2277,14 @@ def _optimized_project_contains_call_query(
 def _optimized_wb_run_id_not_null_query(
     project_id: str,
     param_builder: ParamBuilder,
-    project_version: ProjectVersion = ProjectVersion.CALLS_MERGED_VERSION,
+    read_table: ReadTable = ReadTable.CALLS_MERGED,
 ) -> str:
     """Optimized query for checking existence of calls with wb_run_id not null.
 
     Uses WHERE clause instead of HAVING to avoid expensive aggregation.
     """
-    table_name = (
-        "calls_complete"
-        if project_version == ProjectVersion.CALLS_COMPLETE_VERSION
-        else "calls_merged"
-    )
     project_id_param = param_builder.add_param(project_id)
+    table_name = read_table.value
     return f"""
         SELECT count() FROM (
             SELECT {table_name}.id AS id
