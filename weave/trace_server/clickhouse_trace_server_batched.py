@@ -464,6 +464,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # This does validation and conversion of the input data as well
         # as enforcing business rules and defaults
 
+        project_version = self.project_version_resolver.get_project_version_sync(
+            req.start.project_id
+        )
+        if project_version == ProjectVersion.CALLS_COMPLETE_VERSION:
+            raise InvalidRequest(
+                f"The project '{req.start.project_id}' has been created with a newer version of the SDK. "
+                "Please upgrade your SDK to write to this project."
+            )
+
         req = process_call_req_to_content(req, self)
         ch_call = _start_call_for_insert_to_ch_insertable_start_call(req.start, self)
 
@@ -486,6 +495,16 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # Converts the user-provided call details into a clickhouse schema.
         # This does validation and conversion of the input data as well
         # as enforcing business rules and defaults
+
+        project_version = self.project_version_resolver.get_project_version_sync(
+            req.end.project_id
+        )
+        if project_version == ProjectVersion.CALLS_COMPLETE_VERSION:
+            raise InvalidRequest(
+                f"The project '{req.end.project_id}' has been created with a newer version of the SDK. "
+                "Please upgrade your SDK to write to this project."
+            )
+
         req = process_call_req_to_content(req, self)
         ch_call = _end_call_for_insert_to_ch_insertable_end_call(req.end, self)
 
