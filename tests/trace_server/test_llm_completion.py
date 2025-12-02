@@ -1260,6 +1260,54 @@ class TestResolveAndApplyPrompt(unittest.TestCase):
         self.assertEqual(len(combined), 0)
         self.assertEqual(len(initial), 0)
 
+    def test_resolve_and_apply_prompt_skips_assistant_messages(self):
+        """Test that template variable substitution is skipped for assistant messages."""
+        from weave.trace_server.llm_completion import resolve_and_apply_prompt
+
+        def mock_obj_read(req):
+            raise NotImplementedError("Should not be called")
+
+        # Messages including an assistant message with template-like content
+        user_messages = [
+            {"role": "system", "content": "You are {assistant_name}."},
+            {"role": "user", "content": "Hello {user_name}!"},
+            {"role": "assistant", "content": "Hello! I see you mentioned {user_name}."},
+            {"role": "user", "content": "Yes, my name is {user_name}."},
+        ]
+        template_vars = {
+            "assistant_name": "ChatBot",
+            "user_name": "Alice",
+        }
+
+        combined, initial = resolve_and_apply_prompt(
+            prompt=None,
+            messages=user_messages,
+            template_vars=template_vars,
+            project_id=self.project_id,
+            obj_read_func=mock_obj_read,
+        )
+
+        # Should have 4 messages
+        self.assertEqual(len(combined), 4)
+
+        # System message should have template vars applied
+        self.assertEqual(combined[0]["role"], "system")
+        self.assertEqual(combined[0]["content"], "You are ChatBot.")
+
+        # First user message should have template vars applied
+        self.assertEqual(combined[1]["role"], "user")
+        self.assertEqual(combined[1]["content"], "Hello Alice!")
+
+        # Assistant message should NOT have template vars applied (kept as-is)
+        self.assertEqual(combined[2]["role"], "assistant")
+        self.assertEqual(
+            combined[2]["content"], "Hello! I see you mentioned {user_name}."
+        )
+
+        # Second user message should have template vars applied
+        self.assertEqual(combined[3]["role"], "user")
+        self.assertEqual(combined[3]["content"], "Yes, my name is Alice.")
+
 
 if __name__ == "__main__":
     unittest.main()
