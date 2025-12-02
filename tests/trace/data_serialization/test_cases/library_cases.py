@@ -286,8 +286,8 @@ library_cases = [
             "description": None,
             "dataset": "weave:///shawn/test-project/object/Dataset:N0VKaX8wr9kF9QQzM7mSQz3yKrJJjTiJi4c9Bt7RSTA",
             "scorers": [
-                "weave:///shawn/test-project/object/MyScorer:QMbCYGONPYjlikHOl7FAXBG6TtRvixJyovX6QM8bGFs",
-                "weave:///shawn/test-project/object/LLMAsAJudgeScorer:9yMGw83okQ6uYaLTvzrJ4KhfOBzIpQ0a9KoYJojLU2U",
+                "weave:///shawn/test-project/object/MyScorer:ILpCvdAsCLLLt9wU28MU9ugSScTkg7L3XX6PlUgFvlg",
+                "weave:///shawn/test-project/object/LLMAsAJudgeScorer:U3vlpg3CT6cuu0jcm3eFm5MyDxXvH0OCvrFax0VRY3w",
             ],
             "preprocess_model_input": None,
             "trials": 1,
