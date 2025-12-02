@@ -331,7 +331,7 @@ def test_call_create(client):
     client.finish_call(call, "hello")
     result = client.get_call(call.id)
     expected = weave.trace.call.Call(
-        _op_name="weave:///shawn/test-project/op/x:C6hohMXy0DkNrsMMPocrTElTDygFB1lLVmY0mszublQ",
+        _op_name="weave:///shawn/test-project/op/x:IMZjfLeSAoLTYu8QLPrVVXrNIFX6jZlxAYAeRDEEezE",
         project_id="shawn/test-project",
         trace_id=RegexStringMatcher(".*"),
         parent_id=None,
@@ -375,7 +375,7 @@ def test_calls_query(client):
     result = list(client.get_calls(filter=tsi.CallsFilter(op_names=[call1.op_name])))
     assert len(result) == 2
     assert result[0] == weave.trace.call.Call(
-        _op_name="weave:///shawn/test-project/op/x:C6hohMXy0DkNrsMMPocrTElTDygFB1lLVmY0mszublQ",
+        _op_name="weave:///shawn/test-project/op/x:IMZjfLeSAoLTYu8QLPrVVXrNIFX6jZlxAYAeRDEEezE",
         project_id="shawn/test-project",
         trace_id=RegexStringMatcher(".*"),
         parent_id=None,
@@ -401,7 +401,7 @@ def test_calls_query(client):
         ended_at=None,
     )
     assert result[1] == weave.trace.call.Call(
-        _op_name="weave:///shawn/test-project/op/x:C6hohMXy0DkNrsMMPocrTElTDygFB1lLVmY0mszublQ",
+        _op_name="weave:///shawn/test-project/op/x:IMZjfLeSAoLTYu8QLPrVVXrNIFX6jZlxAYAeRDEEezE",
         project_id="shawn/test-project",
         trace_id=RegexStringMatcher(".*"),
         parent_id=call0.id,
@@ -2856,7 +2856,7 @@ def test_tracing_enabled_context(client):
     # Test create_call with tracing enabled
     call = client.create_call(test_op, {})
     assert isinstance(call, Call)
-    assert call.op_name.endswith("/test_op:epbtXLYvbWDYBxWnDKcKBp506QCJhrjEXswOgNShkQc")
+    assert call.op_name.endswith("/test_op:GSZXBrCr3rBDk7kuOn6iy6GeAcDxV7N8Z1EH5RKTsGs")
     assert len(list(client.get_calls())) == 1  # Verify only one call was created
 
     # Test create_call with tracing disabled

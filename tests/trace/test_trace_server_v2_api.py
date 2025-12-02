@@ -728,7 +728,7 @@ class TestModelsV2API:
 class TestModel(weave.Model):
     temperature: float = 0.7
 
-    @weave.op()
+    @weave.op
     def predict(self, input: str) -> dict:
         return {"output": f"Processed: {input}"}
 """,
@@ -752,7 +752,7 @@ class TestModel(weave.Model):
 class MyTestModel(weave.Model):
     prompt: str = "Hello"
 
-    @weave.op()
+    @weave.op
     def predict(self, input: str) -> str:
         return f"{self.prompt} {input}"
 """
@@ -796,7 +796,7 @@ class MyTestModel(weave.Model):
                 source_code=f"""import weave
 
 class ListTestModel{i}(weave.Model):
-    @weave.op()
+    @weave.op
     def predict(self):
         return {i}
 """,
@@ -825,7 +825,7 @@ class ListTestModel{i}(weave.Model):
             source_code="""import weave
 
 class DeletableModel(weave.Model):
-    @weave.op()
+    @weave.op
     def predict(self):
         pass
 """,
@@ -858,7 +858,7 @@ class DeletableModel(weave.Model):
 class MultiVersionModel(weave.Model):
     version: int = {i}
 
-    @weave.op()
+    @weave.op
     def predict(self):
         return {i}
 """,
@@ -911,7 +911,7 @@ class TestEvaluationRunsV2API:
             source_code="""import weave
 
 class EvalRunModel(weave.Model):
-    @weave.op()
+    @weave.op
     def predict(self, input: str) -> str:
         return "prediction"
 """,
@@ -957,7 +957,7 @@ class EvalRunModel(weave.Model):
             source_code="""import weave
 
 class ReadEvalRunModel(weave.Model):
-    @weave.op()
+    @weave.op
     def predict(self, input):
         return "output"
 """,
@@ -1016,7 +1016,7 @@ class ReadEvalRunModel(weave.Model):
                 source_code=f"""import weave
 
 class ListEvalRunModel{i}(weave.Model):
-    @weave.op()
+    @weave.op
     def predict(self, input):
         return {i}
 """,
@@ -1071,7 +1071,7 @@ class ListEvalRunModel{i}(weave.Model):
             source_code="""import weave
 
 class DeleteEvalRunModel(weave.Model):
-    @weave.op()
+    @weave.op
     def predict(self, input):
         return "output"
 """,
@@ -1126,7 +1126,7 @@ class DeleteEvalRunModel(weave.Model):
             source_code="""import weave
 
 class FinishEvalRunModel(weave.Model):
-    @weave.op()
+    @weave.op
     def predict(self, input):
         return "output"
 """,
@@ -1168,7 +1168,7 @@ class TestPredictionsV2API:
             source_code="""import weave
 
 class PredictionTestModel(weave.Model):
-    @weave.op()
+    @weave.op
     def predict(self, input: str) -> str:
         return f"prediction for {input}"
 """,
@@ -1199,7 +1199,7 @@ class PredictionTestModel(weave.Model):
             source_code="""import weave
 
 class ReadPredictionModel(weave.Model):
-    @weave.op()
+    @weave.op
     def predict(self, input: str) -> str:
         return "result"
 """,
@@ -1240,7 +1240,7 @@ class ReadPredictionModel(weave.Model):
             source_code="""import weave
 
 class ListPredictionModel(weave.Model):
-    @weave.op()
+    @weave.op
     def predict(self, input):
         return "output"
 """,
@@ -1281,7 +1281,7 @@ class ListPredictionModel(weave.Model):
             source_code="""import weave
 
 class DeletePredictionModel(weave.Model):
-    @weave.op()
+    @weave.op
     def predict(self, input):
         return "output"
 """,
@@ -1340,7 +1340,7 @@ class DeletePredictionModel(weave.Model):
             source_code="""import weave
 
 class PredEvalRunModel(weave.Model):
-    @weave.op()
+    @weave.op
     def predict(self, input):
         return "output"
 """,
@@ -1434,7 +1434,7 @@ class TestScoresV2API:
             source_code="""import weave
 
 class ScoreTestModel(weave.Model):
-    @weave.op()
+    @weave.op
     def predict(self, input):
         return "output"
 """,
@@ -1483,7 +1483,7 @@ class ScoreTestModel(weave.Model):
             source_code="""import weave
 
 class ReadScoreModel(weave.Model):
-    @weave.op()
+    @weave.op
     def predict(self, input):
         return "output"
 """,
@@ -1541,7 +1541,7 @@ class ReadScoreModel(weave.Model):
             source_code="""import weave
 
 class ListScoreModel(weave.Model):
-    @weave.op()
+    @weave.op
     def predict(self, input):
         return "output"
 """,
@@ -1599,7 +1599,7 @@ class ListScoreModel(weave.Model):
             source_code="""import weave
 
 class DeleteScoreModel(weave.Model):
-    @weave.op()
+    @weave.op
     def predict(self, input):
         return "output"
 """,
@@ -1675,7 +1675,7 @@ class DeleteScoreModel(weave.Model):
             source_code="""import weave
 
 class ScoreEvalRunModel(weave.Model):
-    @weave.op()
+    @weave.op
     def predict(self, input):
         return "output"
 """,

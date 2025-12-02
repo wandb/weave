@@ -187,6 +187,25 @@ class UserSettings(BaseModel):
     Can be overridden with the environment variable `WEAVE_USE_PARALLEL_TABLE_UPLOAD`
     """
 
+    http_timeout: float = 30.0
+    """
+    Sets the HTTP request timeout in seconds. Defaults to 30 seconds.
+
+    This timeout applies to all HTTP requests made by the Weave client,
+    including initialization calls and API requests.
+
+    Can be overridden with the environment variable `WEAVE_HTTP_TIMEOUT`
+    """
+
+    use_stainless_server: bool = False
+    """
+    Toggles use of the stainless-generated HTTP client for trace server communication.
+
+    If True, uses StainlessRemoteHTTPTraceServer instead of RemoteHTTPTraceServer.
+    This provides better type safety and automatic client generation from OpenAPI specs.
+    Can be overridden with the environment variable `WEAVE_USE_STAINLESS_SERVER`
+    """
+
     model_config = ConfigDict(extra="forbid")
     _is_first_apply: bool = PrivateAttr(True)
 
@@ -302,6 +321,19 @@ def should_use_parallel_table_upload() -> bool:
 def should_implicitly_patch_integrations() -> bool:
     """Returns whether implicit patching of integrations is enabled."""
     return _should("implicitly_patch_integrations")
+
+
+def http_timeout() -> float:
+    """Returns the HTTP request timeout in seconds."""
+    timeout = _optional_float("http_timeout")
+    if timeout is None:
+        return 30.0
+    return timeout
+
+
+def should_use_stainless_server() -> bool:
+    """Returns whether the stainless-generated HTTP client should be used."""
+    return _should("use_stainless_server")
 
 
 def parse_and_apply_settings(

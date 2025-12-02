@@ -14,56 +14,56 @@ PLACEHOLDER_SCORER_SUMMARIZE_OP_SOURCE = """def summarize(score_rows: list) -> d
     return auto_summarize(score_rows)
 """
 PLACEHOLDER_EVALUATE_OP_SOURCE = """import weave
-@weave.op()
+@weave.op
 def evaluate(evaluation, model):
     \"\"\"Placeholder evaluate function.\"\"\"
     # TODO: Implement actual evaluation logic
     return {"status": "not_implemented"}
 """
 PLACEHOLDER_PREDICT_AND_SCORE_OP_SOURCE = """import weave
-@weave.op()
+@weave.op
 def predict_and_score(evaluation, example):
     \"\"\"Placeholder predict_and_score function.\"\"\"
     # TODO: Implement actual predict and score logic
     return {"prediction": None, "scores": {}}
 """
 PLACEHOLDER_EVALUATION_SUMMARIZE_OP_SOURCE = """import weave
-@weave.op()
+@weave.op
 def summarize(evaluation_results):
     \"\"\"Placeholder summarize function.\"\"\"
     # TODO: Implement actual summarization logic
     return {"summary": "not_implemented"}
 """
 PLACEHOLDER_EVALUATION_EVALUATE_OP_SOURCE = """import weave
-@weave.op()
+@weave.op
 def evaluate(evaluation, model):
     \"\"\"Placeholder evaluate function.\"\"\"
     # TODO: Implement actual evaluation logic
     return {"status": "not_implemented"}
 """
 PLACEHOLDER_EVALUATION_PREDICT_AND_SCORE_OP_SOURCE = """import weave
-@weave.op()
+@weave.op
 def predict_and_score(evaluation, example):
     \"\"\"Placeholder predict_and_score function.\"\"\"
     # TODO: Implement actual predict and score logic
     return {"prediction": None, "scores": {}}
 """
 PLACEHOLDER_EVALUATION_SUMMARIZE_OP_SOURCE = """import weave
-@weave.op()
+@weave.op
 def summarize(evaluation_results):
     \"\"\"Placeholder summarize function.\"\"\"
     # TODO: Implement actual summarization logic
     return {"summary": "not_implemented"}
 """
 PLACEHOLDER_MODEL_PREDICT_OP_SOURCE = """import weave
-@weave.op()
+@weave.op
 def predict(model, **inputs):
     \"\"\"Placeholder model predict function.\"\"\"
     # System-generated op for model predictions
     return model.predict(**inputs)
 """
 PLACEHOLDER_SCORER_SCORE_OP_SOURCE = """import weave
-@weave.op()
+@weave.op
 def score(scorer, **inputs):
     \"\"\"Placeholder scorer score function.\"\"\"
     # System-generated op for scoring

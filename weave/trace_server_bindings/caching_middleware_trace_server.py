@@ -21,6 +21,7 @@ from weave.trace.settings import (
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
 from weave.trace_server_bindings.caches import DiskCache, LRUCache, StackedCache
+from weave.trace_server_bindings.client_interface import TraceServerClientInterface
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +59,7 @@ CACHE_DIR_PREFIX = "weave_trace_server_cache"
 CACHE_KEY_SUFFIX = "v_" + version.VERSION
 
 
-class CachingMiddlewareTraceServer(tsi.FullTraceServerInterface):
+class CachingMiddlewareTraceServer(TraceServerClientInterface):
     """A middleware trace server that provides caching functionality.
 
     This server wraps another trace server and caches responses to improve performance.
@@ -71,12 +72,12 @@ class CachingMiddlewareTraceServer(tsi.FullTraceServerInterface):
         _cache_recorder: Metrics tracking cache hits, misses, errors and skips
     """
 
-    _next_trace_server: tsi.FullTraceServerInterface
+    _next_trace_server: TraceServerClientInterface
     _cache_prefix: str
 
     def __init__(
         self,
-        next_trace_server: tsi.FullTraceServerInterface,
+        next_trace_server: TraceServerClientInterface,
         cache_dir: str | None = None,
         size_limit: int = 1_000_000_000,
     ):
@@ -120,7 +121,7 @@ class CachingMiddlewareTraceServer(tsi.FullTraceServerInterface):
         return None
 
     @classmethod
-    def from_env(cls, next_trace_server: tsi.FullTraceServerInterface) -> Self:
+    def from_env(cls, next_trace_server: TraceServerClientInterface) -> Self:
         cache_dir = server_cache_dir()
         size_limit = server_cache_size_limit()
         return cls(next_trace_server, cache_dir, size_limit)

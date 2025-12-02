@@ -1,5 +1,7 @@
 """Helpers for printing HTTP requests and responses."""
 
+from __future__ import annotations
+
 import datetime
 import json
 import os
@@ -154,9 +156,17 @@ class LoggingHTTPTransport(httpx.HTTPTransport):
         return response
 
 
+def _get_http_timeout() -> float:
+    """Get the HTTP timeout from settings."""
+    # Import here to avoid circular imports
+    from weave.trace.settings import http_timeout
+
+    return http_timeout()
+
+
 client = httpx.Client(
     transport=LoggingHTTPTransport(),
-    timeout=None,
+    timeout=_get_http_timeout(),
     limits=httpx.Limits(max_connections=None, max_keepalive_connections=None),
 )
 
