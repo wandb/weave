@@ -50,7 +50,7 @@ class CallsStorageServerMode(str, Enum):
             return cls(mode_str)
         except ValueError:
             logger.warning(
-                f"Invalid PROJECT_VERSION_MODE '{mode_str}', defaulting to 'auto'. "
+                f"Invalid PROJECT_VERSION_MODE '{mode_str}', defaulting to '{DEFAULT_SERVER_MODE}'. "
                 f"Valid options: {', '.join([m.value for m in cls])}"
             )
             return cls(DEFAULT_SERVER_MODE)

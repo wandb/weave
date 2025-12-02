@@ -81,6 +81,7 @@ class TableRoutingResolver:
         if residence != ProjectDataResidence.EMPTY:
             self._cache[project_id] = residence
 
+        # TODO: remove me, this is temporary to guage cache size impact
         if root_span := ddtrace.tracer.current_root_span():
             root_span.set_tag("cache_size", len(self._cache))
 
@@ -105,7 +106,7 @@ class TableRoutingResolver:
             return ReadTable.CALLS_MERGED
 
         if self._mode == CallsStorageServerMode.DUAL_WRITE:
-            # Duel writes shadows to calls_complete, we still should be reading from
+            # Duel writes shadows w/ calls_complete, we still should be reading from
             # the calls_merged tables.
             return ReadTable.CALLS_MERGED
 

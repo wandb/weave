@@ -235,16 +235,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self._kafka_producer = KafkaProducer.from_env()
         return self._kafka_producer
 
-    def _init_project_version_resolver(self) -> None:
-        init_resolver(ch_client_factory=lambda: self.ch_client)
-
     def _noop_project_version_latency_test(self, project_id: str) -> None:
         # NOOP for testing latency impact of project switcher
         try:
-            self._init_project_version_resolver()
+            init_resolver(ch_client_factory=lambda: self.ch_client)
             resolve_read_table(project_id)
         except Exception as e:
-            logger.warning(f"Error getting project version: {e}")
+            logger.warning(
+                f"Error getting project version for project [{project_id}]: {e}"
+            )
 
     def _get_existing_ops_from_spans(
         self, seen_ids: set[str], project_id: str, limit: int | None = None
