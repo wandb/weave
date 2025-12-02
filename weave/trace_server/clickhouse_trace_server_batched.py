@@ -128,8 +128,8 @@ from weave.trace_server.opentelemetry.python_spans import Resource, Span
 from weave.trace_server.orm import ParamBuilder, Row
 from weave.trace_server.project_query_builder import make_project_stats_query
 from weave.trace_server.project_version.project_version import (
-    ProjectVersionResolver,
     init_resolver,
+    resolve_read_table,
 )
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 from weave.trace_server.table_query_builder import (
@@ -204,7 +204,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self._file_storage_client: FileStorageClient | None = None
         self._kafka_producer: KafkaProducer | None = None
         self._evaluate_model_dispatcher = evaluate_model_dispatcher
-        self._project_version_resolver: ProjectVersionResolver | None = None
 
     @classmethod
     def from_env(
@@ -236,19 +235,14 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self._kafka_producer = KafkaProducer.from_env()
         return self._kafka_producer
 
-    @property
-    def project_version_resolver(self) -> ProjectVersionResolver:
-        if self._project_version_resolver is not None:
-            return self._project_version_resolver
-
+    def _init_project_version_resolver(self) -> None:
         init_resolver(ch_client_factory=lambda: self.ch_client)
-        self._project_version_resolver = ProjectVersionResolver.get_instance()
-        return self._project_version_resolver
 
     def _noop_project_version_latency_test(self, project_id: str) -> None:
         # NOOP for testing latency impact of project switcher
         try:
-            self.project_version_resolver.get_project_version_sync(project_id)
+            self._init_project_version_resolver()
+            resolve_read_table(project_id)
         except Exception as e:
             logger.warning(f"Error getting project version: {e}")
 

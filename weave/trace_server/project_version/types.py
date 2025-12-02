@@ -2,73 +2,50 @@
 
 import logging
 import os
-from enum import Enum, IntEnum
+from enum import Enum
 
 logger = logging.getLogger(__name__)
 
-# Project Version Mode Behavior Matrix
-# =====================================
-# ┌─────────────────────────┬────────────────────────┬─────────────────────────┬────────────────────────┐
-# │ Calls Present In        │ AUTO                   │ FORCE_ONLY_CALLS_MERGED │ OFF (no db query)      │
-# ├─────────────────────────┼────────────────────────┼─────────────────────────┼────────────────────────┤
-# │ Neither table (empty)   │ EMPTY_PROJECT          │ CALLS_MERGED_VERSION    │ CALLS_MERGED_VERSION   │
-# │ calls_merged only       │ CALLS_MERGED_VERSION   │ CALLS_MERGED_VERSION    │ CALLS_MERGED_VERSION   │
-# │ calls_complete only     │ CALLS_COMPLETE_VERSION │ CALLS_MERGED_VERSION    │ CALLS_MERGED_VERSION   │
-# │ Both tables             │ CALLS_COMPLETE_VERSION │ CALLS_MERGED_VERSION    │ CALLS_MERGED_VERSION   │
-# └─────────────────────────┴────────────────────────┴─────────────────────────┴────────────────────────┘
+DEFAULT_SERVER_MODE = "force_legacy"
+
+# Project Version Routing Matrix
+# ==============================
 #
-# Rollout stage 1: do the db query for latency impact, always return `calls_merged` table
-DEFAULT_PROJECT_VERSION_MODE = "force_only_calls_merged"
+# ┌─────────────────────────┬──────────────────────┬──────────────────────┬──────────────────────┬──────────────────────┐
+# │ Project Data Residence  │ AUTO                 │ DUAL_WRITE           │ FORCE_LEGACY         │ OFF                  │
+# │ (Physical State)        │ (Read / Write)       │ (Read / Write)       │ (Read / Write)       │ (Read / Write)       │
+# ├─────────────────────────┼──────────────────────┼──────────────────────┼──────────────────────┼──────────────────────┤
+# │ EMPTY                   │ MERGED / MERGED      │ MERGED / BOTH        │ MERGED / MERGED      │ MERGED / MERGED      │
+# │ MERGED_ONLY             │ MERGED / MERGED      │ MERGED / BOTH        │ MERGED / MERGED      │ MERGED / MERGED      │
+# │ COMPLETE_ONLY           │ COMPLETE / COMPLETE  │ MERGED / BOTH        │ MERGED / MERGED      │ MERGED / MERGED      │
+# │ BOTH                    │ COMPLETE / COMPLETE  │ MERGED / BOTH        │ MERGED / MERGED      │ MERGED / MERGED      │
+# └─────────────────────────┴──────────────────────┴──────────────────────┴──────────────────────┴──────────────────────┘
 
 
-class ProjectVersion(IntEnum):
-    """Represents the project version for table routing.
-
-    This enum determines which calls table to use for reads/writes:
-    - EMPTY_PROJECT (-1): No calls in either table (new project, can write to either)
-    - CALLS_MERGED_VERSION (0): Use calls_merged table (legacy schema)
-    - CALLS_COMPLETE_VERSION (1): Use calls_complete table (new schema)
-
-    The enum is designed to be extensible for future migrations.
-
-    Examples:
-        >>> version = ProjectVersion.CALLS_COMPLETE_VERSION
-        >>> assert version == 1
-        >>> version = ProjectVersion.EMPTY_PROJECT
-        >>> assert version == -1
-    """
-
-    """No calls in either table - new project."""
-    EMPTY_PROJECT = -1
-
-    """Legacy schema using calls_merged table."""
-    CALLS_MERGED_VERSION = 0
-
-    """New schema using calls_complete table."""
-    CALLS_COMPLETE_VERSION = 1
+class ProjectDataResidence(Enum):
+    EMPTY = "empty"
+    MERGED_ONLY = "merged_only"
+    COMPLETE_ONLY = "complete_only"
+    BOTH = "both"
 
 
-class ProjectVersionMode(str, Enum):
-    """Modes for controlling project version resolution behavior.
+class CallsStorageServerMode(str, Enum):
+    """Modes for controlling server storage behavior.
 
-    AUTO: Default behavior - uses table to determine project version.
-    FORCE_ONLY_CALLS_MERGED: Forces all reads/writes to calls_merged table (queries DB for perf measurement).
-    DUAL_WRITE: Dual-write mode - Writes to both tables, prefers reads from calls_complete table.
-        Only initial write to calls_complete if project is empty.
-    OFF: Skips DB queries entirely, returns CALLS_MERGED_VERSION immediately.
+    AUTO: Default behavior - uses table to determine routing.
+    FORCE_LEGACY: Forces all reads/writes to calls_merged table.
+    DUAL_WRITE: Dual-write mode - Writes to both tables, reads from calls_merged.
+    OFF: Skips DB queries entirely, assumes legacy behavior.
     """
 
     AUTO = "auto"
-    FORCE_ONLY_CALLS_MERGED = "force_only_calls_merged"
+    FORCE_LEGACY = "force_legacy"
     DUAL_WRITE = "dual_write"
     OFF = "off"
 
     @classmethod
-    def from_env(cls) -> "ProjectVersionMode":
-        """Read project version mode from environment variable (defaults to AUTO)."""
-        mode_str = os.getenv(
-            "PROJECT_VERSION_MODE", DEFAULT_PROJECT_VERSION_MODE
-        ).lower()
+    def from_env(cls) -> "CallsStorageServerMode":
+        mode_str = os.getenv("PROJECT_VERSION_MODE", DEFAULT_SERVER_MODE).lower()
         try:
             return cls(mode_str)
         except ValueError:
@@ -76,4 +53,15 @@ class ProjectVersionMode(str, Enum):
                 f"Invalid PROJECT_VERSION_MODE '{mode_str}', defaulting to 'auto'. "
                 f"Valid options: {', '.join([m.value for m in cls])}"
             )
-            return cls(DEFAULT_PROJECT_VERSION_MODE)
+            return cls(DEFAULT_SERVER_MODE)
+
+
+class ReadTable(str, Enum):
+    CALLS_MERGED = "calls_merged"
+    CALLS_COMPLETE = "calls_complete"
+
+
+class WriteTarget(str, Enum):
+    CALLS_MERGED = "calls_merged"
+    CALLS_COMPLETE = "calls_complete"
+    BOTH = "both"
