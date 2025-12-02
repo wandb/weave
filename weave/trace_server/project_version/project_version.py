@@ -1,5 +1,4 @@
 import logging
-from typing import Any
 
 import ddtrace
 from cachetools import LRUCache
@@ -34,12 +33,14 @@ class TableRoutingResolver:
     def __init__(self) -> None:
         self._mode = CallsStorageServerMode.from_env()
 
-    def _get_residence(self, project_id: str, ch_client: Any) -> ProjectDataResidence:
+    def _get_residence(
+        self, project_id: str, ch_client: CHClient
+    ) -> ProjectDataResidence:
         cached = _project_residence_cache.get(project_id)
         if cached is not None:
             return cached
 
-        residence = get_project_data_residence(project_id, lambda: ch_client)
+        residence = get_project_data_residence(project_id, ch_client)
 
         # Don't cache if project is empty, we could write to either table.
         if residence != ProjectDataResidence.EMPTY:

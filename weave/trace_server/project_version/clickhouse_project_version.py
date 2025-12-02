@@ -1,10 +1,9 @@
 """ClickHouse-based project version resolution."""
 
 import logging
-from collections.abc import Callable
-from typing import Any
 
 import ddtrace
+from clickhouse_connect.driver.client import Client as CHClient
 
 from weave.trace_server.calls_query_builder.utils import param_slot
 from weave.trace_server.orm import ParamBuilder
@@ -15,14 +14,13 @@ logger = logging.getLogger(__name__)
 
 @ddtrace.tracer.wrap(name="clickhouse_project_version.get_project_data_residence")
 def get_project_data_residence(
-    project_id: str, ch_client_factory: Callable[[], Any]
+    project_id: str, ch_client: CHClient
 ) -> ProjectDataResidence:
     """Determine where project data resides.
 
     Args:
         project_id: The project identifier.
-        ch_client_factory: Callable that returns a ClickHouse client.
-            This allows each thread to get its own thread-local client.
+        ch_client: ClickHouse client.
 
     Returns:
         ProjectDataResidence enum indicating data presence.
@@ -38,8 +36,6 @@ def get_project_data_residence(
             (SELECT 1 FROM calls_merged WHERE project_id = {project_slot} LIMIT 1) as has_merged
     """
 
-    # Get a fresh thread-local client for this query
-    ch_client = ch_client_factory()
     result = ch_client.query(query, parameters=pb.get_params())
 
     if result.result_rows:
