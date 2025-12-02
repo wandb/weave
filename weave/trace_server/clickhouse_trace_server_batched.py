@@ -134,7 +134,7 @@ from weave.trace_server.project_query_builder import make_project_stats_query
 from weave.trace_server.project_version.project_version import (
     TableRoutingResolver,
 )
-from weave.trace_server.project_version.types import ProjectVersion
+from weave.trace_server.project_version.types import ProjectVersion, WriteTarget
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 from weave.trace_server.table_query_builder import (
     ROW_ORDER_COLUMN_NAME,
@@ -255,13 +255,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             logger.warning(
                 f"Error getting project version for project [{project_id}]: {e}"
             )
-
-    def _noop_project_version_latency_test(self, project_id: str) -> None:
-        # NOOP for testing latency impact of project switcher
-        try:
-            self.project_version_resolver.get_project_version_sync(project_id)
-        except Exception as e:
-            logger.warning(f"Error getting project version: {e}")
 
     def _get_existing_ops_from_spans(
         self, seen_ids: set[str], project_id: str, limit: int | None = None
@@ -464,13 +457,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # This does validation and conversion of the input data as well
         # as enforcing business rules and defaults
 
-        project_version = self.project_version_resolver.get_project_version_sync(
-            req.start.project_id
-        )
-        if project_version == ProjectVersion.CALLS_COMPLETE_VERSION:
+        write_target = self.table_routing_resolver.resolve_write_target(req.start.project_id)
+        if write_target == WriteTarget.CALLS_COMPLETE:
             raise InvalidRequest(
                 f"The project '{req.start.project_id}' has been created with a newer version of the SDK. "
-                "Please upgrade your SDK to write to this project."
+                "Please upgrade your SDK to write to this project. If you are using the SDK, you can set the PROJECT_VERSION_MODE environment variable to 'force_only_calls_merged' to force all writes to the calls_merged table."
             )
 
         req = process_call_req_to_content(req, self)
@@ -496,13 +487,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # This does validation and conversion of the input data as well
         # as enforcing business rules and defaults
 
-        project_version = self.project_version_resolver.get_project_version_sync(
-            req.end.project_id
-        )
-        if project_version == ProjectVersion.CALLS_COMPLETE_VERSION:
+        write_target = self.table_routing_resolver.resolve_write_target(req.end.project_id)
+        if write_target == WriteTarget.CALLS_COMPLETE:
             raise InvalidRequest(
                 f"The project '{req.end.project_id}' has been created with a newer version of the SDK. "
-                "Please upgrade your SDK to write to this project."
+                "Please upgrade your SDK to write to this project. If you are using the SDK, you can set the PROJECT_VERSION_MODE environment variable to 'force_only_calls_merged' to force all writes to the calls_merged table."
             )
 
         req = process_call_req_to_content(req, self)
@@ -543,10 +532,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             elif item.mode == "complete":
                 completes.append(item.req.complete)
 
-        project_version = self.project_version_resolver.get_project_version_sync(
-            req.project_id
-        )
-        if project_version == ProjectVersion.CALLS_MERGED_VERSION:
+        write_target = self.table_routing_resolver.resolve_write_target(req.project_id)
+        if write_target in [WriteTarget.CALLS_MERGED, WriteTarget.BOTH]:
             # Write to old call_parts table: break completes into start + end
             # Convert completes to start/end pairs
             starts_from_completes = []
@@ -604,12 +591,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 batch_data.append(row)
             self._insert_call_batch(batch_data, "call_parts")
 
-            # Return early, don't write to calls_complete table
-            res = [
-                tsi.CallUpsertRes(id=c.id, trace_id=c.trace_id)
-                for c in starts + completes
-            ]
-            return tsi.CallsStartBatchRes(res=res)
+            if write_target == WriteTarget.CALLS_MERGED:
+                # Return early, don't write to calls_complete table
+                res = [
+                    tsi.CallUpsertRes(id=c.id, trace_id=c.trace_id)
+                    for c in starts + completes
+                ]
+                return tsi.CallsStartBatchRes(res=res)
 
         # Convert API-level schemas to CH-insertable schemas
         ch_insertable_starts = [
@@ -637,14 +625,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         Accepts only end call types and updates existing records in the
         calls_complete table without needing to split the batch.
         """
-        project_version = self.project_version_resolver.get_project_version_sync(
-            req.project_id
-        )
+        write_target = self.table_routing_resolver.resolve_write_target(req.project_id)
 
         # Extract ends from batch
         end_calls = [item.req.end for item in req.batch]
 
-        if project_version == ProjectVersion.CALLS_MERGED_VERSION:
+        if write_target in [WriteTarget.CALLS_MERGED, WriteTarget.BOTH]:
             # New endpoint writing to old table
             batch_data = []
             for call in end_calls:
@@ -655,7 +641,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     row.append(call_dict.get(col))
                 batch_data.append(row)
             self._insert_call_batch(batch_data, "call_parts")
-            return tsi.CallsEndBatchRes()
+            if write_target == WriteTarget.CALLS_MERGED:
+                return tsi.CallsEndBatchRes()
 
         pb = ParamBuilder()
         command = build_calls_complete_batch_update_query(end_calls, pb)
