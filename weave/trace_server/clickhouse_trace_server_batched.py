@@ -736,7 +736,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         for col in columns:
             cq.add_field(col)
         if req.filter is not None:
-            cq.set_hardcoded_filter(HardCodedFilter(filter=req.filter, project_version=project_version))
+            cq.set_hardcoded_filter(
+                HardCodedFilter(filter=req.filter, project_version=project_version)
+            )
         if req.query is not None:
             cq.add_condition(req.query.expr_)
 
@@ -757,7 +759,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             cq.set_offset(req.offset)
 
         pb = ParamBuilder()
-        raw_res = self._query_stream(cq.as_sql(pb), pb.get_params(), project_version=project_version)
+        raw_res = self._query_stream(
+            cq.as_sql(pb), pb.get_params(), project_version=project_version
+        )
 
         select_columns = [c.field for c in cq.select_fields]
         expand_columns = req.expand_columns or []

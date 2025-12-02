@@ -8,7 +8,8 @@ import pytest
 from tests.trace.util import client_is_sqlite
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ids import generate_id
-from weave.trace_server.project_version.types import ProjectVersionMode
+from weave.trace_server.project_version.project_version import TableRoutingResolver
+from weave.trace_server.project_version.types import CallsStorageServerMode
 
 
 @pytest.fixture
@@ -17,7 +18,7 @@ def ch_client_auto(client):
     if client_is_sqlite(client):
         return None
     ch_client = client.server._next_trace_server.ch_client
-    ch_client._project_version_resolver._mode = ProjectVersionMode.AUTO
+    ch_client._project_version_resolver._mode = CallsStorageServerMode.AUTO
     return ch_client
 
 
@@ -44,9 +45,9 @@ def auto_mode(client):
         return
 
     try:
-        resolver = ProjectVersionResolver.get_instance()
+        resolver = TableRoutingResolver._resolver
         original_mode = resolver._mode
-        resolver._mode = ProjectVersionMode.AUTO
+        resolver._mode = CallsStorageServerMode.AUTO
         yield
         resolver._mode = original_mode
     except RuntimeError:
@@ -65,9 +66,9 @@ def dual_write_mode(client):
         return
 
     try:
-        resolver = ProjectVersionResolver.get_instance()
+        resolver = TableRoutingResolver._resolver
         original_mode = resolver._mode
-        resolver._mode = ProjectVersionMode.DUAL_WRITE
+        resolver._mode = CallsStorageServerMode.DUAL_WRITE
         yield
         resolver._mode = original_mode
     except RuntimeError:
@@ -85,6 +86,18 @@ def query_calls_complete(ch_client, project_id, call_id=None):
     else:
         query = "SELECT * FROM calls_complete WHERE project_id = {project_id:String} ORDER BY started_at DESC"
         result = ch_client.query(query, parameters={"project_id": project_id})
+    return list(result.named_results())
+
+
+def query_calls_merged(ch_client, project_id, call_id=None):
+    """Query calls_merged table directly."""
+    if call_id:
+        query = "SELECT * FROM calls_merged WHERE project_id = {project_id:String} AND id = {call_id:String}"
+        result = ch_client.query(
+            query, parameters={"project_id": project_id, "call_id": call_id}
+        )
+    else:
+        query = "SELECT * FROM calls_merged WHERE project_id = {project_id:String} ORDER BY started_at DESC"
     return list(result.named_results())
 
 
