@@ -49,3 +49,8 @@ class FilterAndGroupSpec(BaseModel):
 class Leaderboard(base_object_def.BaseObject):
     columns: list[LeaderboardColumn]
     filter_spec: FilterAndGroupSpec | None = None
+    # Store the raw GridFilterModel from the UI for exact filter reproduction
+    grid_filter_model: dict | None = None
+    # Store the call IDs that were visible when the leaderboard was saved
+    # This provides a static snapshot of the filtered data
+    call_ids: list[str] | None = None
