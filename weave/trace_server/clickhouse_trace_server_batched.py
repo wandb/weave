@@ -329,6 +329,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         calls: list[
             tuple[tsi.StartedCallSchemaForInsert, tsi.EndedCallSchemaForInsert]
         ] = []
+        completes: list[tsi.CompletedCallSchemaForInsert] = []
         rejected_spans = 0
         error_messages: list[str] = []
 
@@ -356,13 +357,25 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                         error_messages.append(f"Rejected span ({span_ident}): {e!s}")
                         continue
 
-                    calls.append(
-                        span.to_call(
-                            req.project_id,
-                            wb_user_id=req.wb_user_id,
-                            wb_run_id=req.wb_run_id,
-                        )
+                    write_target = self.table_routing_resolver.resolve_write_target(
+                        req.project_id
                     )
+                    if write_target in [WriteTarget.CALLS_MERGED, WriteTarget.BOTH]:
+                        calls.append(
+                            span.to_call(
+                                req.project_id,
+                                wb_user_id=req.wb_user_id,
+                                wb_run_id=req.wb_run_id,
+                            )
+                        )
+                    if write_target in [WriteTarget.CALLS_COMPLETE, WriteTarget.BOTH]:
+                        completes.append(
+                            span.to_complete(
+                                req.project_id,
+                                wb_user_id=req.wb_user_id,
+                                wb_run_id=req.wb_run_id,
+                            )
+                        )
 
         obj_id_idx_map = defaultdict(list)
         for idx, (start_call, _) in enumerate(calls):
@@ -396,6 +409,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             # Modify each of the matched start calls in place
             for idx in obj_id_idx_map[obj.object_id]:
                 calls[idx][0].op_name = op_ref_uri
+                completes[idx].op_name = op_ref_uri
             # Remove this ID from the mapping so that once the for loop is done we are left with only new objects
             obj_id_idx_map.pop(obj.object_id)
 
@@ -423,6 +437,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             ).uri()
             for idx in obj_id_idx_map[result.object_id]:
                 calls[idx][0].op_name = op_ref_uri
+                completes[idx].op_name = op_ref_uri
 
         # Convert calls to CH insertable format and then to rows for batch insertion
         batch_rows = []
@@ -436,6 +451,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         # Insert directly without async_insert for OTEL calls
         self._insert_call_batch(batch_rows, settings=None, do_sync_insert=True)
+
+        if completes:
+            self._insert_call_batch(completes, "calls_complete")
 
         if rejected_spans > 0:
             # Join the first 20 errors and return them delimited by ';'
@@ -487,7 +505,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # This does validation and conversion of the input data as well
         # as enforcing business rules and defaults
 
-        write_target = self.table_routing_resolver.resolve_write_target(req.start.project_id)
+        write_target = self.table_routing_resolver.resolve_write_target(
+            req.start.project_id
+        )
         if write_target == WriteTarget.CALLS_COMPLETE:
             raise InvalidRequest(
                 f"The project '{req.start.project_id}' has been created with a newer version of the SDK. "
@@ -517,7 +537,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # This does validation and conversion of the input data as well
         # as enforcing business rules and defaults
 
-        write_target = self.table_routing_resolver.resolve_write_target(req.end.project_id)
+        write_target = self.table_routing_resolver.resolve_write_target(
+            req.end.project_id
+        )
         if write_target == WriteTarget.CALLS_COMPLETE:
             raise InvalidRequest(
                 f"The project '{req.end.project_id}' has been created with a newer version of the SDK. "
