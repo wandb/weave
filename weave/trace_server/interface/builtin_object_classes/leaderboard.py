@@ -10,47 +10,42 @@ class LeaderboardColumn(BaseModel):
     should_minimize: bool | None = None
 
 
-class FilterAndGroupSourceEvaluationSpec(BaseModel):
-    name: str
-    version: str  # "*" means all
-
-
-class FilterAndGroupDatasetScorerMetricSpec(BaseModel):
-    path: str  # "*" means all
-    should_minimize: bool | None = None
-
-
-class FilterAndGroupDatasetScorerSpec(BaseModel):
-    name: str  # "*" means all
-    version: str  # "*" means all
-    group_all_versions: bool | None = None
-    metrics: list[FilterAndGroupDatasetScorerMetricSpec] | None = None  # None means all
-
-
-class FilterAndGroupDatasetSpec(BaseModel):
-    name: str  # "*" means all
-    version: str  # "*" means all
-    group_all_versions: bool | None = None
-    scorers: list[FilterAndGroupDatasetScorerSpec] | None = None  # None means all
-
-
-class FilterAndGroupModelSpec(BaseModel):
-    name: str  # "*" means all
-    version: str  # "*" means all
-    group_all_versions: bool | None = None
-
-
-class FilterAndGroupSpec(BaseModel):
-    source_evaluations: list[FilterAndGroupSourceEvaluationSpec] | None = None  # None means all
-    datasets: list[FilterAndGroupDatasetSpec] | None = None  # None means all
-    models: list[FilterAndGroupModelSpec] | None = None  # None means all
+# class FilterAndGroupSourceEvaluationSpec(BaseModel):
+#     name: str
+#     version: str  # "*" means all
+#
+#
+# class FilterAndGroupDatasetScorerMetricSpec(BaseModel):
+#     path: str  # "*" means all
+#     should_minimize: bool | None = None
+#
+#
+# class FilterAndGroupDatasetScorerSpec(BaseModel):
+#     name: str  # "*" means all
+#     version: str  # "*" means all
+#     group_all_versions: bool | None = None
+#     metrics: list[FilterAndGroupDatasetScorerMetricSpec] | None = None  # None means all
+#
+#
+# class FilterAndGroupDatasetSpec(BaseModel):
+#     name: str  # "*" means all
+#     version: str  # "*" means all
+#     group_all_versions: bool | None = None
+#     scorers: list[FilterAndGroupDatasetScorerSpec] | None = None  # None means all
+#
+#
+# class FilterAndGroupModelSpec(BaseModel):
+#     name: str  # "*" means all
+#     version: str  # "*" means all
+#     group_all_versions: bool | None = None
+#
+#
+# class FilterAndGroupSpec(BaseModel):
+#     source_evaluations: list[FilterAndGroupSourceEvaluationSpec] | None = None  # None means all
+#     datasets: list[FilterAndGroupDatasetSpec] | None = None  # None means all
+#     models: list[FilterAndGroupModelSpec] | None = None  # None means all
 
 
 class Leaderboard(base_object_def.BaseObject):
     columns: list[LeaderboardColumn]
-    filter_spec: FilterAndGroupSpec | None = None
-    # Store the raw GridFilterModel from the UI for exact filter reproduction
-    grid_filter_model: dict | None = None
-    # Store the call IDs that were visible when the leaderboard was saved
-    # This provides a static snapshot of the filtered data
-    call_ids: list[str] | None = None
+    calls_query: str | None # The query used by the UI to filter rows. If none, use all entries
