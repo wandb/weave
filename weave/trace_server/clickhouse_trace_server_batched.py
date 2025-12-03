@@ -584,7 +584,67 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             elif item.mode == "complete":
                 completes.append(item.req.complete)
 
-        write_target = self.table_routing_resolver.resolve_write_target(req.project_id)
+        self._dual_write_calls_batch(req.project_id, starts=starts, completes=completes)
+
+        res = [
+            tsi.CallUpsertRes(id=c.id, trace_id=c.trace_id) for c in starts + completes
+        ]
+
+        return tsi.CallsStartBatchRes(res=res)
+
+    def _dual_write_calls_batch(
+        self,
+        project_id: str,
+        starts: list[tsi.StartedCallSchemaForInsert] | None = None,
+        ends: list[tsi.EndedCallSchemaForInsert] | None = None,
+        completes: list[tsi.CompletedCallSchemaForInsert] | None = None,
+    ) -> None:
+        """Main entry point for inserting calls with automatic dual-write routing.
+
+        This method handles writing calls to the appropriate table(s) based on the
+        project's write target configuration (CALLS_MERGED, CALLS_COMPLETE, or BOTH).
+
+        Args:
+            project_id: Project ID (required)
+            starts: List of call starts to insert
+            ends: List of call ends to insert (updates existing calls)
+            completes: List of complete calls to insert (start + end in one)
+        """
+        starts = starts or []
+        ends = ends or []
+        completes = completes or []
+
+        if not starts and not ends and not completes:
+            return
+
+        write_target = self.table_routing_resolver.resolve_write_target(project_id)
+
+        if starts or completes:
+            self._dual_write_starts_and_completes_impl(
+                starts, completes, project_id, write_target
+            )
+
+        if ends:
+            self._dual_write_ends_impl(ends, project_id, write_target)
+
+    def _update_calls_complete_batch(
+        self, end_calls: list[tsi.EndedCallSchemaForInsert]
+    ) -> None:
+        """Update calls_complete table with end call data."""
+        if not end_calls:
+            return
+
+        pb = ParamBuilder()
+        command = build_calls_complete_batch_update_query(end_calls, pb)
+        self._command(command, pb.get_params())
+
+    def _dual_write_starts_and_completes_impl(
+        self,
+        starts: list[tsi.StartedCallSchemaForInsert],
+        completes: list[tsi.CompletedCallSchemaForInsert],
+        project_id: str,
+        write_target: WriteTarget,
+    ) -> None:
         if write_target in [WriteTarget.CALLS_MERGED, WriteTarget.BOTH]:
             # Write to old call_parts table: break completes into start + end
             # Convert completes to start/end pairs
@@ -643,42 +703,40 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 batch_data.append(row)
             self._insert_call_batch(batch_data, "call_parts")
 
-            if write_target == WriteTarget.CALLS_MERGED:
-                # Return early, don't write to calls_complete table
-                res = [
-                    tsi.CallUpsertRes(id=c.id, trace_id=c.trace_id)
-                    for c in starts + completes
-                ]
-                return tsi.CallsStartBatchRes(res=res)
+        if write_target in [WriteTarget.CALLS_COMPLETE, WriteTarget.BOTH]:
+            # Convert API-level schemas to CH-insertable schemas
+            ch_insertable_starts = [
+                _start_call_for_insert_to_ch_insertable_start_call(start, self)
+                for start in starts
+            ]
+            ch_insertable_completes = [
+                _completed_call_for_insert_to_ch_insertable_completed_call(complete)
+                for complete in completes
+            ]
+            ch_insertable_calls = ch_insertable_starts + ch_insertable_completes
 
-        # Convert API-level schemas to CH-insertable schemas
-        ch_insertable_starts = [
-            _start_call_for_insert_to_ch_insertable_start_call(start, self)
-            for start in starts
-        ]
-        ch_insertable_completes = [
-            _completed_call_for_insert_to_ch_insertable_completed_call(complete)
-            for complete in completes
-        ]
-        ch_insertable_calls = ch_insertable_starts + ch_insertable_completes
+            self._insert_ch_insertable_calls_to_complete_table(ch_insertable_calls)
 
-        self._insert_ch_insertable_calls_to_complete_table(ch_insertable_calls)
-
-        res = [
-            tsi.CallUpsertRes(id=c.id, trace_id=c.trace_id) for c in starts + completes
-        ]
-
-        return tsi.CallsStartBatchRes(res=res)
-
-    def _update_calls_complete(
-        self, end_calls: list[tsi.EndedCallSchemaForInsert]
+    def _dual_write_ends_impl(
+        self,
+        ends: list[tsi.EndedCallSchemaForInsert],
+        project_id: str,
+        write_target: WriteTarget,
     ) -> None:
-        if not end_calls:
-            return
+        if write_target in [WriteTarget.CALLS_MERGED, WriteTarget.BOTH]:
+            # New endpoint writing to old table
+            batch_data = []
+            for call in ends:
+                insertable = _end_call_for_insert_to_ch_insertable_end_call(call)
+                call_dict = insertable.model_dump()
+                row = []
+                for col in ALL_CALL_INSERT_COLUMNS:
+                    row.append(call_dict.get(col))
+                batch_data.append(row)
+            self._insert_call_batch(batch_data, "call_parts")
 
-        pb = ParamBuilder()
-        command = build_calls_complete_batch_update_query(end_calls, pb)
-        self._command(command, pb.get_params())
+        if write_target in [WriteTarget.CALLS_COMPLETE, WriteTarget.BOTH]:
+            self._update_calls_complete_batch(ends)
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.calls_end_batch_v2")
     def calls_end_batch(self, req: tsi.CallsEndBatchReq) -> tsi.CallsEndBatchRes:
@@ -687,26 +745,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         Accepts only end call types and updates existing records in the
         calls_complete table without needing to split the batch.
         """
-        write_target = self.table_routing_resolver.resolve_write_target(req.project_id)
-
         # Extract ends from batch
         end_calls = [item.req.end for item in req.batch]
 
-        if write_target in [WriteTarget.CALLS_MERGED, WriteTarget.BOTH]:
-            # New endpoint writing to old table
-            batch_data = []
-            for call in end_calls:
-                insertable = _end_call_for_insert_to_ch_insertable_end_call(call)
-                call_dict = insertable.model_dump()
-                row = []
-                for col in ALL_CALL_INSERT_COLUMNS:
-                    row.append(call_dict.get(col))
-                batch_data.append(row)
-            self._insert_call_batch(batch_data, "call_parts")
-            if write_target == WriteTarget.CALLS_MERGED:
-                return tsi.CallsEndBatchRes()
-
-        self._update_calls_complete(end_calls)
+        self._dual_write_calls_batch(req.project_id, ends=end_calls)
 
         return tsi.CallsEndBatchRes()
 
@@ -4431,43 +4473,24 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if "error" in res.response:
             end.exception = res.response["error"]
         end_call = _end_call_for_insert_to_ch_insertable_end_call(end, self)
-        calls: list[CallStartCHInsertable | CallEndCHInsertable] = [
-            start_call,
-            end_call,
-        ]
-        batch_data = []
-        for call in calls:
-            call_dict = call.model_dump()
-            values = [call_dict.get(col) for col in ALL_CALL_INSERT_COLUMNS]
-            batch_data.append(values)
 
-        write_target = self.table_routing_resolver.resolve_write_target(req.project_id)
-        if write_target in [WriteTarget.CALLS_COMPLETE, WriteTarget.BOTH]:
-            complete_call = tsi.CompletedCallSchemaForInsert(
-                project_id=req.project_id,
-                started_at=start_time,
-                id=start_call.id,
-                ended_at=end_time,
-                output=res.response,
-                summary={},
-                wb_user_id=req.wb_user_id,
-                op_name=COMPLETIONS_CREATE_OP_NAME,
-                trace_id=start_call.trace_id,
-                parent_id=start_call.parent_id,
-                thread_id=start_call.thread_id,
-                turn_id=start_call.turn_id,
-                attributes={},
-                inputs=start.inputs,
-            )
-            complete_insertable = (
-                _completed_call_for_insert_to_ch_insertable_completed_call(
-                    complete_call
-                )
-            )
-            self._insert_ch_insertable_calls_to_complete_table(complete_insertable)
-
-        if write_target in [WriteTarget.CALLS_MERGED, WriteTarget.BOTH]:
-            self._insert_call_batch(batch_data)
+        complete_call = tsi.CompletedCallSchemaForInsert(
+            project_id=req.project_id,
+            started_at=start_time,
+            id=start_call.id,
+            ended_at=end_time,
+            output=res.response,
+            summary={},
+            wb_user_id=req.wb_user_id,
+            op_name=COMPLETIONS_CREATE_OP_NAME,
+            trace_id=start_call.trace_id,
+            parent_id=start_call.parent_id,
+            thread_id=start_call.thread_id,
+            turn_id=start_call.turn_id,
+            attributes={},
+            inputs=start.inputs,
+        )
+        self._dual_write_calls_batch(req.project_id, completes=[complete_call])
 
         return tsi.CompletionsCreateRes(
             response=res.response, weave_call_id=start_call.id
@@ -4584,12 +4607,18 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         # Otherwise, wrap the iterator with tracking
         def insert_call_handler(call: CallEndCHInsertable) -> None:
+            write_target = self.table_routing_resolver.resolve_write_target(
+                req.project_id
+            )
             if write_target in [WriteTarget.CALLS_MERGED, WriteTarget.BOTH]:
                 self._insert_call(call)
 
         def update_call_complete_handler(end: tsi.EndedCallSchemaForInsert) -> None:
+            write_target = self.table_routing_resolver.resolve_write_target(
+                req.project_id
+            )
             if write_target in [WriteTarget.CALLS_COMPLETE, WriteTarget.BOTH]:
-                self._update_calls_complete([end])
+                self._update_calls_complete_batch([end])
 
         return _create_tracked_stream_wrapper(
             insert_call_handler,
@@ -5713,10 +5742,11 @@ def _create_tracked_stream_wrapper(
                 summary=summary,
             )
             update_call_complete(end)
-            end_call = _end_call_for_insert_to_ch_insertable_end_call(
+
+            end_call_insertable = _end_call_for_insert_to_ch_insertable_end_call(
                 end, None
-            )  # No trace_server in stream wrapper
-            insert_call(end_call)
+            )
+            insert_call(end_call_insertable)
 
     return _stream_wrapper()
 
