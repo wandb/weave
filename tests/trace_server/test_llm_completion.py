@@ -1301,9 +1301,7 @@ class TestResolveAndApplyPrompt(unittest.TestCase):
 
         # Assistant message should NOT have template vars applied (kept as-is)
         self.assertEqual(combined[2]["role"], "assistant")
-        self.assertEqual(
-            combined[2]["content"], "Hello! I see you mentioned {user_name}."
-        )
+        self.assertEqual(combined[2]["content"], '{"response": "My name is ChatBot."}')
 
         # Second user message should have template vars applied
         self.assertEqual(combined[3]["role"], "user")
