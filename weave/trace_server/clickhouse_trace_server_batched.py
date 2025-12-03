@@ -195,15 +195,40 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self._user = user
         self._password = password
         self._database = database
-        self._flush_immediately = True
-        self._call_batch: list[list[Any]] = []
-        self._file_batch: list[FileChunkCreateCHInsertable] = []
         self._use_async_insert = use_async_insert
         self._model_to_provider_info_map = read_model_to_provider_info_map()
         self._file_storage_client: FileStorageClient | None = None
         self._kafka_producer: KafkaProducer | None = None
         self._evaluate_model_dispatcher = evaluate_model_dispatcher
         self._table_routing_resolver: TableRoutingResolver | None = None
+
+    @property
+    def _flush_immediately(self) -> bool:
+        return getattr(self._thread_local, "flush_immediately", True)
+
+    @_flush_immediately.setter
+    def _flush_immediately(self, value: bool) -> None:
+        self._thread_local.flush_immediately = value
+
+    @property
+    def _call_batch(self) -> list[list[Any]]:
+        if not hasattr(self._thread_local, "call_batch"):
+            self._thread_local.call_batch = []
+        return self._thread_local.call_batch
+
+    @_call_batch.setter
+    def _call_batch(self, value: list[list[Any]]) -> None:
+        self._thread_local.call_batch = value
+
+    @property
+    def _file_batch(self) -> list[FileChunkCreateCHInsertable]:
+        if not hasattr(self._thread_local, "file_batch"):
+            self._thread_local.file_batch = []
+        return self._thread_local.file_batch
+
+    @_file_batch.setter
+    def _file_batch(self, value: list[FileChunkCreateCHInsertable]) -> None:
+        self._thread_local.file_batch = value
 
     @classmethod
     def from_env(

@@ -1,4 +1,5 @@
 import logging
+import threading
 
 import ddtrace
 from cachetools import LRUCache
@@ -22,6 +23,7 @@ PROJECT_RESIDENCE_CACHE_SIZE = 10_000
 _project_residence_cache: LRUCache[str, ProjectDataResidence] = LRUCache(
     maxsize=PROJECT_RESIDENCE_CACHE_SIZE
 )
+_project_residence_cache_lock = threading.Lock()
 
 
 class TableRoutingResolver:
@@ -36,7 +38,8 @@ class TableRoutingResolver:
     def _get_residence(
         self, project_id: str, ch_client: CHClient
     ) -> ProjectDataResidence:
-        cached = _project_residence_cache.get(project_id)
+        with _project_residence_cache_lock:
+            cached = _project_residence_cache.get(project_id)
         if cached is not None:
             return cached
 
@@ -44,7 +47,8 @@ class TableRoutingResolver:
 
         # Don't cache if project is empty, we could write to either table.
         if residence != ProjectDataResidence.EMPTY:
-            _project_residence_cache[project_id] = residence
+            with _project_residence_cache_lock:
+                _project_residence_cache[project_id] = residence
 
         # TODO: remove me, this is temporary to guage cache size impact
         if root_span := ddtrace.tracer.current_root_span():
