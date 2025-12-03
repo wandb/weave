@@ -127,6 +127,9 @@ from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
 from weave.trace_server.opentelemetry.python_spans import Resource, Span
 from weave.trace_server.orm import ParamBuilder, Row
 from weave.trace_server.project_query_builder import make_project_stats_query
+from weave.trace_server.project_version.project_version import (
+    TableRoutingResolver,
+)
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 from weave.trace_server.table_query_builder import (
     ROW_ORDER_COLUMN_NAME,
@@ -192,14 +195,40 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self._user = user
         self._password = password
         self._database = database
-        self._flush_immediately = True
-        self._call_batch: list[list[Any]] = []
-        self._file_batch: list[FileChunkCreateCHInsertable] = []
         self._use_async_insert = use_async_insert
         self._model_to_provider_info_map = read_model_to_provider_info_map()
         self._file_storage_client: FileStorageClient | None = None
         self._kafka_producer: KafkaProducer | None = None
         self._evaluate_model_dispatcher = evaluate_model_dispatcher
+        self._table_routing_resolver: TableRoutingResolver | None = None
+
+    @property
+    def _flush_immediately(self) -> bool:
+        return getattr(self._thread_local, "flush_immediately", True)
+
+    @_flush_immediately.setter
+    def _flush_immediately(self, value: bool) -> None:
+        self._thread_local.flush_immediately = value
+
+    @property
+    def _call_batch(self) -> list[list[Any]]:
+        if not hasattr(self._thread_local, "call_batch"):
+            self._thread_local.call_batch = []
+        return self._thread_local.call_batch
+
+    @_call_batch.setter
+    def _call_batch(self, value: list[list[Any]]) -> None:
+        self._thread_local.call_batch = value
+
+    @property
+    def _file_batch(self) -> list[FileChunkCreateCHInsertable]:
+        if not hasattr(self._thread_local, "file_batch"):
+            self._thread_local.file_batch = []
+        return self._thread_local.file_batch
+
+    @_file_batch.setter
+    def _file_batch(self, value: list[FileChunkCreateCHInsertable]) -> None:
+        self._thread_local.file_batch = value
 
     @classmethod
     def from_env(
@@ -230,6 +259,22 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             return self._kafka_producer
         self._kafka_producer = KafkaProducer.from_env()
         return self._kafka_producer
+
+    @property
+    def table_routing_resolver(self) -> TableRoutingResolver:
+        if self._table_routing_resolver is not None:
+            return self._table_routing_resolver
+        self._table_routing_resolver = TableRoutingResolver()
+        return self._table_routing_resolver
+
+    def _noop_project_version_latency_test(self, project_id: str) -> None:
+        # NOOP for testing latency impact of project switcher
+        try:
+            self.table_routing_resolver.resolve_read_table(project_id, self.ch_client)
+        except Exception as e:
+            logger.warning(
+                f"Error getting project version for project [{project_id}]: {e}"
+            )
 
     def _get_existing_ops_from_spans(
         self, seen_ids: set[str], project_id: str, limit: int | None = None
@@ -501,6 +546,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         """Returns a stats object for the given query. This is useful for counts or other
         aggregate statistics that are not directly queryable from the calls themselves.
         """
+        self._noop_project_version_latency_test(req.project_id)
+
         pb = ParamBuilder()
         query, columns = build_calls_stats_query(req, pb)
         raw_res = self._query(query, pb.get_params())
@@ -519,6 +566,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.calls_query_stream")
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
         """Returns a stream of calls that match the given query."""
+        self._noop_project_version_latency_test(project_id=req.project_id)
+
         cq = CallsQuery(
             project_id=req.project_id,
             include_costs=req.include_costs or False,
@@ -1355,6 +1404,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         return tsi.RefsReadBatchRes(vals=vals)
 
     def project_stats(self, req: tsi.ProjectStatsReq) -> tsi.ProjectStatsRes:
+        self._noop_project_version_latency_test(req.project_id)
+
         def _default_true(val: bool | None) -> bool:
             return True if val is None else val
 
@@ -1380,6 +1431,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self, req: tsi.ThreadsQueryReq
     ) -> Iterator[tsi.ThreadSchema]:
         """Stream threads with aggregated statistics sorted by last activity."""
+        self._noop_project_version_latency_test(req.project_id)
+
         pb = ParamBuilder()
 
         # Extract filter values
@@ -4676,6 +4729,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._flush_calls")
     def _flush_calls(self) -> None:
         self._analyze_call_batch_breakdown()
+        if len(self._call_batch) > 0:
+            project_id_idx = ALL_CALL_INSERT_COLUMNS.index("project_id")
+            project_id = self._call_batch[0][project_id_idx]
+            self._noop_project_version_latency_test(project_id=project_id)
 
         try:
             self._insert_call_batch(self._call_batch)
