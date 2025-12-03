@@ -67,7 +67,7 @@
                 "$ref": "#/$defs/ConvertOperation"
               },
               {
-                "title": "AndOperation"
+                "$ref": "#/$defs/AndOperation"
               },
               {
                 "$ref": "#/$defs/OrOperation"
@@ -129,6 +129,7 @@
           "title": "Description"
         },
         "field_schema": {
+          "additionalProperties": true,
           "default": {},
           "description": "Expected to be valid JSON Schema. Can be provided as a dict, a Pydantic model class, a tuple of a primitive type and a Pydantic Field, or primitive type",
           "examples": [
@@ -597,7 +598,7 @@
               "$ref": "#/$defs/ConvertOperation"
             },
             {
-              "title": "AndOperation"
+              "$ref": "#/$defs/AndOperation"
             },
             {
               "$ref": "#/$defs/OrOperation"
@@ -618,7 +619,7 @@
               "$ref": "#/$defs/InOperation"
             },
             {
-              "title": "ContainsOperation"
+              "$ref": "#/$defs/ContainsOperation"
             }
           ],
           "title": "Input"
@@ -635,7 +636,7 @@
               "$ref": "#/$defs/ConvertOperation"
             },
             {
-              "title": "AndOperation"
+              "$ref": "#/$defs/AndOperation"
             },
             {
               "$ref": "#/$defs/OrOperation"
@@ -656,7 +657,7 @@
               "$ref": "#/$defs/InOperation"
             },
             {
-              "title": "ContainsOperation"
+              "$ref": "#/$defs/ContainsOperation"
             }
           ],
           "title": "Substr"
@@ -731,10 +732,10 @@
               "$ref": "#/$defs/GetFieldOperator"
             },
             {
-              "title": "ConvertOperation"
+              "$ref": "#/$defs/ConvertOperation"
             },
             {
-              "title": "AndOperation"
+              "$ref": "#/$defs/AndOperation"
             },
             {
               "$ref": "#/$defs/OrOperation"
@@ -755,7 +756,7 @@
               "$ref": "#/$defs/InOperation"
             },
             {
-              "title": "ContainsOperation"
+              "$ref": "#/$defs/ContainsOperation"
             }
           ],
           "title": "Input"
@@ -795,10 +796,10 @@
                   "$ref": "#/$defs/GetFieldOperator"
                 },
                 {
-                  "title": "ConvertOperation"
+                  "$ref": "#/$defs/ConvertOperation"
                 },
                 {
-                  "title": "AndOperation"
+                  "$ref": "#/$defs/AndOperation"
                 },
                 {
                   "$ref": "#/$defs/OrOperation"
@@ -807,7 +808,7 @@
                   "$ref": "#/$defs/NotOperation"
                 },
                 {
-                  "title": "EqOperation"
+                  "$ref": "#/$defs/EqOperation"
                 },
                 {
                   "$ref": "#/$defs/GtOperation"
@@ -819,7 +820,7 @@
                   "$ref": "#/$defs/InOperation"
                 },
                 {
-                  "title": "ContainsOperation"
+                  "$ref": "#/$defs/ContainsOperation"
                 }
               ]
             },
@@ -832,10 +833,10 @@
                   "$ref": "#/$defs/GetFieldOperator"
                 },
                 {
-                  "title": "ConvertOperation"
+                  "$ref": "#/$defs/ConvertOperation"
                 },
                 {
-                  "title": "AndOperation"
+                  "$ref": "#/$defs/AndOperation"
                 },
                 {
                   "$ref": "#/$defs/OrOperation"
@@ -844,7 +845,7 @@
                   "$ref": "#/$defs/NotOperation"
                 },
                 {
-                  "title": "EqOperation"
+                  "$ref": "#/$defs/EqOperation"
                 },
                 {
                   "$ref": "#/$defs/GtOperation"
@@ -856,7 +857,7 @@
                   "$ref": "#/$defs/InOperation"
                 },
                 {
-                  "title": "ContainsOperation"
+                  "$ref": "#/$defs/ContainsOperation"
                 }
               ]
             }
@@ -869,6 +870,220 @@
         "$eq"
       ],
       "title": "EqOperation",
+      "type": "object"
+    },
+    "FilterAndGroupDatasetScorerMetricSpec": {
+      "properties": {
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "should_minimize": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Should Minimize"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "title": "FilterAndGroupDatasetScorerMetricSpec",
+      "type": "object"
+    },
+    "FilterAndGroupDatasetScorerSpec": {
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "version": {
+          "title": "Version",
+          "type": "string"
+        },
+        "group_all_versions": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Group All Versions"
+        },
+        "metrics": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/FilterAndGroupDatasetScorerMetricSpec"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Metrics"
+        }
+      },
+      "required": [
+        "name",
+        "version"
+      ],
+      "title": "FilterAndGroupDatasetScorerSpec",
+      "type": "object"
+    },
+    "FilterAndGroupDatasetSpec": {
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "version": {
+          "title": "Version",
+          "type": "string"
+        },
+        "group_all_versions": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Group All Versions"
+        },
+        "scorers": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/FilterAndGroupDatasetScorerSpec"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Scorers"
+        }
+      },
+      "required": [
+        "name",
+        "version"
+      ],
+      "title": "FilterAndGroupDatasetSpec",
+      "type": "object"
+    },
+    "FilterAndGroupModelSpec": {
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "version": {
+          "title": "Version",
+          "type": "string"
+        },
+        "group_all_versions": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Group All Versions"
+        }
+      },
+      "required": [
+        "name",
+        "version"
+      ],
+      "title": "FilterAndGroupModelSpec",
+      "type": "object"
+    },
+    "FilterAndGroupSourceEvaluationSpec": {
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "version": {
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "version"
+      ],
+      "title": "FilterAndGroupSourceEvaluationSpec",
+      "type": "object"
+    },
+    "FilterAndGroupSpec": {
+      "properties": {
+        "source_evaluations": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/FilterAndGroupSourceEvaluationSpec"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Evaluations"
+        },
+        "datasets": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/FilterAndGroupDatasetSpec"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Datasets"
+        },
+        "models": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/FilterAndGroupModelSpec"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Models"
+        }
+      },
+      "title": "FilterAndGroupSpec",
       "type": "object"
     },
     "GetFieldOperator": {
@@ -901,10 +1116,10 @@
                   "$ref": "#/$defs/GetFieldOperator"
                 },
                 {
-                  "title": "ConvertOperation"
+                  "$ref": "#/$defs/ConvertOperation"
                 },
                 {
-                  "title": "AndOperation"
+                  "$ref": "#/$defs/AndOperation"
                 },
                 {
                   "$ref": "#/$defs/OrOperation"
@@ -913,10 +1128,10 @@
                   "$ref": "#/$defs/NotOperation"
                 },
                 {
-                  "title": "EqOperation"
+                  "$ref": "#/$defs/EqOperation"
                 },
                 {
-                  "title": "GtOperation"
+                  "$ref": "#/$defs/GtOperation"
                 },
                 {
                   "$ref": "#/$defs/GteOperation"
@@ -925,7 +1140,7 @@
                   "$ref": "#/$defs/InOperation"
                 },
                 {
-                  "title": "ContainsOperation"
+                  "$ref": "#/$defs/ContainsOperation"
                 }
               ]
             },
@@ -938,10 +1153,10 @@
                   "$ref": "#/$defs/GetFieldOperator"
                 },
                 {
-                  "title": "ConvertOperation"
+                  "$ref": "#/$defs/ConvertOperation"
                 },
                 {
-                  "title": "AndOperation"
+                  "$ref": "#/$defs/AndOperation"
                 },
                 {
                   "$ref": "#/$defs/OrOperation"
@@ -950,10 +1165,10 @@
                   "$ref": "#/$defs/NotOperation"
                 },
                 {
-                  "title": "EqOperation"
+                  "$ref": "#/$defs/EqOperation"
                 },
                 {
-                  "title": "GtOperation"
+                  "$ref": "#/$defs/GtOperation"
                 },
                 {
                   "$ref": "#/$defs/GteOperation"
@@ -962,7 +1177,7 @@
                   "$ref": "#/$defs/InOperation"
                 },
                 {
-                  "title": "ContainsOperation"
+                  "$ref": "#/$defs/ContainsOperation"
                 }
               ]
             }
@@ -993,10 +1208,10 @@
                   "$ref": "#/$defs/GetFieldOperator"
                 },
                 {
-                  "title": "ConvertOperation"
+                  "$ref": "#/$defs/ConvertOperation"
                 },
                 {
-                  "title": "AndOperation"
+                  "$ref": "#/$defs/AndOperation"
                 },
                 {
                   "$ref": "#/$defs/OrOperation"
@@ -1005,19 +1220,19 @@
                   "$ref": "#/$defs/NotOperation"
                 },
                 {
-                  "title": "EqOperation"
+                  "$ref": "#/$defs/EqOperation"
                 },
                 {
-                  "title": "GtOperation"
+                  "$ref": "#/$defs/GtOperation"
                 },
                 {
-                  "title": "GteOperation"
+                  "$ref": "#/$defs/GteOperation"
                 },
                 {
                   "$ref": "#/$defs/InOperation"
                 },
                 {
-                  "title": "ContainsOperation"
+                  "$ref": "#/$defs/ContainsOperation"
                 }
               ]
             },
@@ -1030,10 +1245,10 @@
                   "$ref": "#/$defs/GetFieldOperator"
                 },
                 {
-                  "title": "ConvertOperation"
+                  "$ref": "#/$defs/ConvertOperation"
                 },
                 {
-                  "title": "AndOperation"
+                  "$ref": "#/$defs/AndOperation"
                 },
                 {
                   "$ref": "#/$defs/OrOperation"
@@ -1042,19 +1257,19 @@
                   "$ref": "#/$defs/NotOperation"
                 },
                 {
-                  "title": "EqOperation"
+                  "$ref": "#/$defs/EqOperation"
                 },
                 {
-                  "title": "GtOperation"
+                  "$ref": "#/$defs/GtOperation"
                 },
                 {
-                  "title": "GteOperation"
+                  "$ref": "#/$defs/GteOperation"
                 },
                 {
                   "$ref": "#/$defs/InOperation"
                 },
                 {
-                  "title": "ContainsOperation"
+                  "$ref": "#/$defs/ContainsOperation"
                 }
               ]
             }
@@ -1085,10 +1300,10 @@
                   "$ref": "#/$defs/GetFieldOperator"
                 },
                 {
-                  "title": "ConvertOperation"
+                  "$ref": "#/$defs/ConvertOperation"
                 },
                 {
-                  "title": "AndOperation"
+                  "$ref": "#/$defs/AndOperation"
                 },
                 {
                   "$ref": "#/$defs/OrOperation"
@@ -1097,19 +1312,19 @@
                   "$ref": "#/$defs/NotOperation"
                 },
                 {
-                  "title": "EqOperation"
+                  "$ref": "#/$defs/EqOperation"
                 },
                 {
-                  "title": "GtOperation"
+                  "$ref": "#/$defs/GtOperation"
                 },
                 {
-                  "title": "GteOperation"
+                  "$ref": "#/$defs/GteOperation"
                 },
                 {
-                  "title": "InOperation"
+                  "$ref": "#/$defs/InOperation"
                 },
                 {
-                  "title": "ContainsOperation"
+                  "$ref": "#/$defs/ContainsOperation"
                 }
               ]
             },
@@ -1123,10 +1338,10 @@
                     "$ref": "#/$defs/GetFieldOperator"
                   },
                   {
-                    "title": "ConvertOperation"
+                    "$ref": "#/$defs/ConvertOperation"
                   },
                   {
-                    "title": "AndOperation"
+                    "$ref": "#/$defs/AndOperation"
                   },
                   {
                     "$ref": "#/$defs/OrOperation"
@@ -1135,19 +1350,19 @@
                     "$ref": "#/$defs/NotOperation"
                   },
                   {
-                    "title": "EqOperation"
+                    "$ref": "#/$defs/EqOperation"
                   },
                   {
-                    "title": "GtOperation"
+                    "$ref": "#/$defs/GtOperation"
                   },
                   {
-                    "title": "GteOperation"
+                    "$ref": "#/$defs/GteOperation"
                   },
                   {
-                    "title": "InOperation"
+                    "$ref": "#/$defs/InOperation"
                   },
                   {
-                    "title": "ContainsOperation"
+                    "$ref": "#/$defs/ContainsOperation"
                   }
                 ]
               },
@@ -1337,6 +1552,7 @@
           "anyOf": [
             {
               "items": {
+                "additionalProperties": true,
                 "type": "object"
               },
               "type": "array"
@@ -1401,6 +1617,17 @@
           },
           "title": "Columns",
           "type": "array"
+        },
+        "filter_spec": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FilterAndGroupSpec"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         }
       },
       "required": [
@@ -1463,13 +1690,13 @@
             },
             {
               "additionalProperties": {
-                "title": "LiteralOperation"
+                "$ref": "#/$defs/LiteralOperation"
               },
               "type": "object"
             },
             {
               "items": {
-                "title": "LiteralOperation"
+                "$ref": "#/$defs/LiteralOperation"
               },
               "type": "array"
             },
@@ -1510,6 +1737,7 @@
           "type": "string"
         },
         "response_schema": {
+          "additionalProperties": true,
           "title": "Response Schema",
           "type": "object"
         }
@@ -1536,6 +1764,7 @@
             },
             {
               "items": {
+                "additionalProperties": true,
                 "type": "object"
               },
               "type": "array"
@@ -1562,6 +1791,7 @@
         "function_call": {
           "anyOf": [
             {
+              "additionalProperties": true,
               "type": "object"
             },
             {
@@ -1606,31 +1836,31 @@
                   "$ref": "#/$defs/GetFieldOperator"
                 },
                 {
-                  "title": "ConvertOperation"
+                  "$ref": "#/$defs/ConvertOperation"
                 },
                 {
-                  "title": "AndOperation"
+                  "$ref": "#/$defs/AndOperation"
                 },
                 {
                   "$ref": "#/$defs/OrOperation"
                 },
                 {
-                  "title": "NotOperation"
+                  "$ref": "#/$defs/NotOperation"
                 },
                 {
-                  "title": "EqOperation"
+                  "$ref": "#/$defs/EqOperation"
                 },
                 {
-                  "title": "GtOperation"
+                  "$ref": "#/$defs/GtOperation"
                 },
                 {
-                  "title": "GteOperation"
+                  "$ref": "#/$defs/GteOperation"
                 },
                 {
-                  "title": "InOperation"
+                  "$ref": "#/$defs/InOperation"
                 },
                 {
-                  "title": "ContainsOperation"
+                  "$ref": "#/$defs/ContainsOperation"
                 }
               ]
             }
@@ -1694,31 +1924,31 @@
                 "$ref": "#/$defs/GetFieldOperator"
               },
               {
-                "title": "ConvertOperation"
+                "$ref": "#/$defs/ConvertOperation"
               },
               {
-                "title": "AndOperation"
+                "$ref": "#/$defs/AndOperation"
               },
               {
-                "title": "OrOperation"
+                "$ref": "#/$defs/OrOperation"
               },
               {
-                "title": "NotOperation"
+                "$ref": "#/$defs/NotOperation"
               },
               {
-                "title": "EqOperation"
+                "$ref": "#/$defs/EqOperation"
               },
               {
-                "title": "GtOperation"
+                "$ref": "#/$defs/GtOperation"
               },
               {
-                "title": "GteOperation"
+                "$ref": "#/$defs/GteOperation"
               },
               {
-                "title": "InOperation"
+                "$ref": "#/$defs/InOperation"
               },
               {
-                "title": "ContainsOperation"
+                "$ref": "#/$defs/ContainsOperation"
               }
             ]
           },
