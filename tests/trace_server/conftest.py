@@ -37,7 +37,7 @@ def pytest_addoption(parser):
             "--trace-server",
             action="store",
             default="clickhouse",
-            help="Specify the client object to use: sqlite or clickhouse",
+            help="Specify the backend to use: sqlite or clickhouse",
         )
         parser.addoption(
             "--ch",
@@ -57,6 +57,12 @@ def pytest_addoption(parser):
             default="false",
             help="Use a clickhouse process instead of a container",
         )
+        parser.addoption(
+            "--remote-http-trace-server",
+            action="store",
+            default="remote",
+            help="Specify the remote HTTP trace server implementation: remote or stainless",
+        )
     except ValueError:
         pass
 
@@ -65,6 +71,7 @@ def pytest_collection_modifyitems(config, items):
     # Add the trace_server marker to:
     # 1. All tests in the trace_server directory (regardless of fixture usage)
     # 2. All tests that use the trace_server fixture (for tests outside this directory)
+    # Note: Filtering based on remote-http-trace-server flag is handled in tests/trace_server_bindings/conftest.py
     for item in items:
         # Check if the test is in the trace_server directory by checking parent directories
         if "trace_server" in item.path.parts:
@@ -80,7 +87,25 @@ def get_trace_server_flag(request):
     if request.config.getoption("--sqlite"):
         return "sqlite"
     weave_server_flag = request.config.getoption("--trace-server")
+
+    # When running with `-m "not trace_server"` (e.g. trace_no_server shard),
+    # tests that still need a server (via client fixture) should use sqlite
+    # since we're not testing the server itself.
+    if weave_server_flag == "clickhouse":
+        markexpr = request.config.getoption("-m", default=None)
+        if markexpr and "not trace_server" in markexpr:
+            return "sqlite"
+
     return weave_server_flag
+
+
+def get_remote_http_trace_server_flag(request):
+    """Get the remote HTTP trace server implementation to use.
+
+    Returns:
+        str: Either 'remote' for RemoteHTTPTraceServer or 'stainless' for StainlessRemoteHTTPTraceServer
+    """
+    return request.config.getoption("--remote-http-trace-server")
 
 
 def _get_worker_db_suffix(request) -> str:

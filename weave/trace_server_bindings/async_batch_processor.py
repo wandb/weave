@@ -88,8 +88,8 @@ class AsyncBatchProcessor(Generic[T]):
                     item_id = id(item)
                     error_message = f"Queue is full. Dropping item. Item ID: {item_id}. Max queue size: {self.queue.maxsize}"
 
-                    # Only log every 1000th dropped item
-                    if self._dropped_item_count % 1000 == 0:
+                    # Only log the first dropped item and every 1000th thereafter
+                    if self._dropped_item_count % 1000 == 1:
                         logger.warning(
                             f"{error_message}. Total dropped items: {self._dropped_item_count}"
                         )
