@@ -670,6 +670,16 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         return tsi.CallsStartBatchRes(res=res)
 
+    def _update_calls_complete(
+        self, end_calls: list[tsi.EndedCallSchemaForInsert]
+    ) -> None:
+        if not end_calls:
+            return
+
+        pb = ParamBuilder()
+        command = build_calls_complete_batch_update_query(end_calls, pb)
+        self._command(command, pb.get_params())
+
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.calls_end_batch_v2")
     def calls_end_batch(self, req: tsi.CallsEndBatchReq) -> tsi.CallsEndBatchRes:
         """Batch update call ends in calls_complete table.
@@ -696,9 +706,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             if write_target == WriteTarget.CALLS_MERGED:
                 return tsi.CallsEndBatchRes()
 
-        pb = ParamBuilder()
-        command = build_calls_complete_batch_update_query(end_calls, pb)
-        self._command(command, pb.get_params())
+        self._update_calls_complete(end_calls)
 
         return tsi.CallsEndBatchRes()
 
@@ -4433,7 +4441,33 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             values = [call_dict.get(col) for col in ALL_CALL_INSERT_COLUMNS]
             batch_data.append(values)
 
-        self._insert_call_batch(batch_data)
+        write_target = self.table_routing_resolver.resolve_write_target(req.project_id)
+        if write_target in [WriteTarget.CALLS_COMPLETE, WriteTarget.BOTH]:
+            complete_call = tsi.CompletedCallSchemaForInsert(
+                project_id=req.project_id,
+                started_at=start_time,
+                id=start_call.id,
+                ended_at=end_time,
+                output=res.response,
+                summary={},
+                wb_user_id=req.wb_user_id,
+                op_name=COMPLETIONS_CREATE_OP_NAME,
+                trace_id=start_call.trace_id,
+                parent_id=start_call.parent_id,
+                thread_id=start_call.thread_id,
+                turn_id=start_call.turn_id,
+                attributes={},
+                inputs=start.inputs,
+            )
+            complete_insertable = (
+                _completed_call_for_insert_to_ch_insertable_completed_call(
+                    complete_call
+                )
+            )
+            self._insert_ch_insertable_calls_to_complete_table(complete_insertable)
+
+        if write_target in [WriteTarget.CALLS_MERGED, WriteTarget.BOTH]:
+            self._insert_call_batch(batch_data)
 
         return tsi.CompletionsCreateRes(
             response=res.response, weave_call_id=start_call.id
@@ -4494,6 +4528,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
             return _single_error_iter(e)
 
+        write_target = self.table_routing_resolver.resolve_write_target(req.project_id)
+
         # Track start call if requested
         start_call: CallStartCHInsertable | None = None
         if req.track_llm_call:
@@ -4516,8 +4552,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 attributes={},
             )
             start_call = _start_call_for_insert_to_ch_insertable_start_call(start, self)
-            # Insert immediately so that callers can see the call in progress
-            self._insert_call(start_call)
+            if write_target in [WriteTarget.CALLS_MERGED, WriteTarget.BOTH]:
+                # Insert immediately so that callers can see the call in progress
+                self._insert_call(start_call)
+            if write_target in [WriteTarget.CALLS_COMPLETE, WriteTarget.BOTH]:
+                self._insert_ch_insertable_calls_to_complete_table([start_call])
 
         # Set the combined messages (with template vars replaced) for LiteLLM
         req.inputs.messages = combined_messages
@@ -4544,8 +4583,17 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             return chunk_iter
 
         # Otherwise, wrap the iterator with tracking
+        def insert_call_handler(call: CallEndCHInsertable) -> None:
+            if write_target in [WriteTarget.CALLS_MERGED, WriteTarget.BOTH]:
+                self._insert_call(call)
+
+        def update_call_complete_handler(end: tsi.EndedCallSchemaForInsert) -> None:
+            if write_target in [WriteTarget.CALLS_COMPLETE, WriteTarget.BOTH]:
+                self._update_calls_complete([end])
+
         return _create_tracked_stream_wrapper(
-            self._insert_call,
+            insert_call_handler,
+            update_call_complete_handler,
             chunk_iter,
             start_call,
             model_name,
@@ -5559,6 +5607,7 @@ def _process_tool_call_delta(
 
 def _create_tracked_stream_wrapper(
     insert_call: Callable[[CallEndCHInsertable], None],
+    update_call_complete: Callable[[tsi.EndedCallSchemaForInsert], None],
     chunk_iter: Iterator[dict[str, Any]],
     start_call: CallStartCHInsertable,
     model_name: str,
@@ -5663,6 +5712,7 @@ def _create_tracked_stream_wrapper(
                 output=aggregated_output,
                 summary=summary,
             )
+            update_call_complete(end)
             end_call = _end_call_for_insert_to_ch_insertable_end_call(
                 end, None
             )  # No trace_server in stream wrapper
