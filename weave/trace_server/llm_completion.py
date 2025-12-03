@@ -212,6 +212,8 @@ def resolve_and_apply_prompt(
         combined_messages = [
             (
                 format_message_with_template_vars(msg, **template_vars)
+                # Skip template variable substitution for assistant messages
+                # If for example we specified a JSON response format, the assistant message would be a JSON string.
                 if msg.get("role") != "assistant"
                 else msg
             )

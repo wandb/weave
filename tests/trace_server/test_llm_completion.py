@@ -1030,7 +1030,7 @@ class TestResolveAndApplyPrompt(unittest.TestCase):
         prompt_uri = (
             f"weave-trace-internal:///{self.project_id}/object/test-prompt:digest-1"
         )
-        user_messages = [{"role": "user", "content": "My question: {question}"}]
+        messages = [{"role": "user", "content": "My question: {question}"}]
         template_vars = {
             "assistant_name": "TestBot",
             "language": "Spanish",
@@ -1039,7 +1039,7 @@ class TestResolveAndApplyPrompt(unittest.TestCase):
 
         combined, initial = resolve_and_apply_prompt(
             prompt=prompt_uri,
-            messages=user_messages,
+            messages=messages,
             template_vars=template_vars,
             project_id=self.project_id,
             obj_read_func=mock_obj_read,
@@ -1109,7 +1109,7 @@ class TestResolveAndApplyPrompt(unittest.TestCase):
         def mock_obj_read(req):
             raise NotImplementedError("Should not be called")
 
-        user_messages = [
+        messages = [
             {"role": "system", "content": "You are {assistant_name}."},
             {"role": "user", "content": "Hello {user_name}!"},
         ]
@@ -1120,7 +1120,7 @@ class TestResolveAndApplyPrompt(unittest.TestCase):
 
         combined, initial = resolve_and_apply_prompt(
             prompt=None,
-            messages=user_messages,
+            messages=messages,
             template_vars=template_vars,
             project_id=self.project_id,
             obj_read_func=mock_obj_read,
@@ -1268,10 +1268,11 @@ class TestResolveAndApplyPrompt(unittest.TestCase):
             raise NotImplementedError("Should not be called")
 
         # Messages including an assistant message with template-like content
-        user_messages = [
+        # If for example we specified a JSON response format, the assistant message would be a JSON object.
+        messages = [
             {"role": "system", "content": "You are {assistant_name}."},
             {"role": "user", "content": "Hello {user_name}!"},
-            {"role": "assistant", "content": "Hello! I see you mentioned {user_name}."},
+            {"role": "assistant", "content": '{"response": "My name is ChatBot."}'},
             {"role": "user", "content": "Yes, my name is {user_name}."},
         ]
         template_vars = {
@@ -1281,7 +1282,7 @@ class TestResolveAndApplyPrompt(unittest.TestCase):
 
         combined, initial = resolve_and_apply_prompt(
             prompt=None,
-            messages=user_messages,
+            messages=messages,
             template_vars=template_vars,
             project_id=self.project_id,
             obj_read_func=mock_obj_read,
