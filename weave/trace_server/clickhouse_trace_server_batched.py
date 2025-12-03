@@ -137,7 +137,7 @@ from weave.trace_server.project_query_builder import make_project_stats_query
 from weave.trace_server.project_version.project_version import (
     TableRoutingResolver,
 )
-from weave.trace_server.project_version.types import ProjectVersion, WriteTarget
+from weave.trace_server.project_version.types import WriteTarget
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 from weave.trace_server.table_query_builder import (
     ROW_ORDER_COLUMN_NAME,
@@ -358,7 +358,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                         continue
 
                     write_target = self.table_routing_resolver.resolve_write_target(
-                        req.project_id
+                        req.project_id,
+                        self.ch_client,
                     )
                     if write_target in [WriteTarget.CALLS_MERGED, WriteTarget.BOTH]:
                         calls.append(
@@ -506,7 +507,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # as enforcing business rules and defaults
 
         write_target = self.table_routing_resolver.resolve_write_target(
-            req.start.project_id
+            req.start.project_id,
+            self.ch_client,
         )
         if write_target == WriteTarget.CALLS_COMPLETE:
             raise InvalidRequest(
@@ -538,7 +540,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # as enforcing business rules and defaults
 
         write_target = self.table_routing_resolver.resolve_write_target(
-            req.end.project_id
+            req.end.project_id,
+            self.ch_client,
         )
         if write_target == WriteTarget.CALLS_COMPLETE:
             raise InvalidRequest(
@@ -617,7 +620,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if not starts and not ends and not completes:
             return
 
-        write_target = self.table_routing_resolver.resolve_write_target(project_id)
+        write_target = self.table_routing_resolver.resolve_write_target(
+            project_id, self.ch_client
+        )
 
         if starts or completes:
             self._dual_write_starts_and_completes_impl(
@@ -1035,16 +1040,19 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             all_calls=all_calls,
         )
 
-        project_version = self.project_version_resolver.get_project_version_sync(
-            req.project_id
+        write_target = self.table_routing_resolver.resolve_write_target(
+            req.project_id,
+            self.ch_client,
         )
-        if project_version == ProjectVersion.CALLS_COMPLETE_VERSION:
+        if write_target in [WriteTarget.CALLS_COMPLETE, WriteTarget.BOTH]:
             assert req.wb_user_id is not None
-            return self._calls_complete_delete_batch(
+            self._calls_complete_delete_batch(
                 project_id=req.project_id,
                 wb_user_id=req.wb_user_id,
                 call_ids=all_descendants,
             )
+            if write_target == WriteTarget.CALLS_COMPLETE:
+                return tsi.CallsDeleteRes(num_deleted=len(all_descendants))
 
         deleted_at = datetime.datetime.now()
         insertables = [
@@ -1106,10 +1114,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         assert_non_null_wb_user_id(req)
         self._ensure_valid_update_field(req)
 
-        project_version = self.project_version_resolver.get_project_version_sync(
-            req.project_id
+        write_target = self.table_routing_resolver.resolve_write_target(
+            req.project_id,
+            self.ch_client,
         )
-        if project_version == ProjectVersion.CALLS_COMPLETE_VERSION:
+        if write_target in [WriteTarget.CALLS_COMPLETE, WriteTarget.BOTH]:
             pb = ParamBuilder()
             assert req.wb_user_id is not None
             update_query = build_calls_complete_update_display_name_query(
@@ -1121,7 +1130,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 pb=pb,
             )
             self._command(update_query, pb.get_params())
-            return tsi.CallUpdateRes()
+            if write_target == WriteTarget.CALLS_COMPLETE:
+                return tsi.CallUpdateRes()
 
         renamed_insertable = CallUpdateCHInsertable(
             project_id=req.project_id,
@@ -4551,7 +4561,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
             return _single_error_iter(e)
 
-        write_target = self.table_routing_resolver.resolve_write_target(req.project_id)
+        write_target = self.table_routing_resolver.resolve_write_target(
+            req.project_id, self.ch_client
+        )
 
         # Track start call if requested
         start_call: CallStartCHInsertable | None = None
@@ -4608,14 +4620,16 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # Otherwise, wrap the iterator with tracking
         def insert_call_handler(call: CallEndCHInsertable) -> None:
             write_target = self.table_routing_resolver.resolve_write_target(
-                req.project_id
+                req.project_id,
+                self.ch_client,
             )
             if write_target in [WriteTarget.CALLS_MERGED, WriteTarget.BOTH]:
                 self._insert_call(call)
 
         def update_call_complete_handler(end: tsi.EndedCallSchemaForInsert) -> None:
             write_target = self.table_routing_resolver.resolve_write_target(
-                req.project_id
+                req.project_id,
+                self.ch_client,
             )
             if write_target in [WriteTarget.CALLS_COMPLETE, WriteTarget.BOTH]:
                 self._update_calls_complete_batch([end])
