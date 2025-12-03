@@ -10,5 +10,42 @@ class LeaderboardColumn(BaseModel):
     should_minimize: bool | None = None
 
 
+class FilterAndGroupSourceEvaluationSpec(BaseModel):
+    name: str
+    version: str  # "*" means all
+
+
+class FilterAndGroupDatasetScorerMetricSpec(BaseModel):
+    path: str  # "*" means all
+    should_minimize: bool | None = None
+
+
+class FilterAndGroupDatasetScorerSpec(BaseModel):
+    name: str  # "*" means all
+    version: str  # "*" means all
+    group_all_versions: bool | None = None
+    metrics: list[FilterAndGroupDatasetScorerMetricSpec] | None = None  # None means all
+
+
+class FilterAndGroupDatasetSpec(BaseModel):
+    name: str  # "*" means all
+    version: str  # "*" means all
+    group_all_versions: bool | None = None
+    scorers: list[FilterAndGroupDatasetScorerSpec] | None = None  # None means all
+
+
+class FilterAndGroupModelSpec(BaseModel):
+    name: str  # "*" means all
+    version: str  # "*" means all
+    group_all_versions: bool | None = None
+
+
+class FilterAndGroupSpec(BaseModel):
+    source_evaluations: list[FilterAndGroupSourceEvaluationSpec] | None = None  # None means all
+    datasets: list[FilterAndGroupDatasetSpec] | None = None  # None means all
+    models: list[FilterAndGroupModelSpec] | None = None  # None means all
+
+
 class Leaderboard(base_object_def.BaseObject):
     columns: list[LeaderboardColumn]
+    filter_spec: FilterAndGroupSpec | None = None
