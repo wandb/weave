@@ -872,220 +872,6 @@
       "title": "EqOperation",
       "type": "object"
     },
-    "FilterAndGroupDatasetScorerMetricSpec": {
-      "properties": {
-        "path": {
-          "title": "Path",
-          "type": "string"
-        },
-        "should_minimize": {
-          "anyOf": [
-            {
-              "type": "boolean"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Should Minimize"
-        }
-      },
-      "required": [
-        "path"
-      ],
-      "title": "FilterAndGroupDatasetScorerMetricSpec",
-      "type": "object"
-    },
-    "FilterAndGroupDatasetScorerSpec": {
-      "properties": {
-        "name": {
-          "title": "Name",
-          "type": "string"
-        },
-        "version": {
-          "title": "Version",
-          "type": "string"
-        },
-        "group_all_versions": {
-          "anyOf": [
-            {
-              "type": "boolean"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Group All Versions"
-        },
-        "metrics": {
-          "anyOf": [
-            {
-              "items": {
-                "$ref": "#/$defs/FilterAndGroupDatasetScorerMetricSpec"
-              },
-              "type": "array"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Metrics"
-        }
-      },
-      "required": [
-        "name",
-        "version"
-      ],
-      "title": "FilterAndGroupDatasetScorerSpec",
-      "type": "object"
-    },
-    "FilterAndGroupDatasetSpec": {
-      "properties": {
-        "name": {
-          "title": "Name",
-          "type": "string"
-        },
-        "version": {
-          "title": "Version",
-          "type": "string"
-        },
-        "group_all_versions": {
-          "anyOf": [
-            {
-              "type": "boolean"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Group All Versions"
-        },
-        "scorers": {
-          "anyOf": [
-            {
-              "items": {
-                "$ref": "#/$defs/FilterAndGroupDatasetScorerSpec"
-              },
-              "type": "array"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Scorers"
-        }
-      },
-      "required": [
-        "name",
-        "version"
-      ],
-      "title": "FilterAndGroupDatasetSpec",
-      "type": "object"
-    },
-    "FilterAndGroupModelSpec": {
-      "properties": {
-        "name": {
-          "title": "Name",
-          "type": "string"
-        },
-        "version": {
-          "title": "Version",
-          "type": "string"
-        },
-        "group_all_versions": {
-          "anyOf": [
-            {
-              "type": "boolean"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Group All Versions"
-        }
-      },
-      "required": [
-        "name",
-        "version"
-      ],
-      "title": "FilterAndGroupModelSpec",
-      "type": "object"
-    },
-    "FilterAndGroupSourceEvaluationSpec": {
-      "properties": {
-        "name": {
-          "title": "Name",
-          "type": "string"
-        },
-        "version": {
-          "title": "Version",
-          "type": "string"
-        }
-      },
-      "required": [
-        "name",
-        "version"
-      ],
-      "title": "FilterAndGroupSourceEvaluationSpec",
-      "type": "object"
-    },
-    "FilterAndGroupSpec": {
-      "properties": {
-        "source_evaluations": {
-          "anyOf": [
-            {
-              "items": {
-                "$ref": "#/$defs/FilterAndGroupSourceEvaluationSpec"
-              },
-              "type": "array"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Source Evaluations"
-        },
-        "datasets": {
-          "anyOf": [
-            {
-              "items": {
-                "$ref": "#/$defs/FilterAndGroupDatasetSpec"
-              },
-              "type": "array"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Datasets"
-        },
-        "models": {
-          "anyOf": [
-            {
-              "items": {
-                "$ref": "#/$defs/FilterAndGroupModelSpec"
-              },
-              "type": "array"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Models"
-        }
-      },
-      "title": "FilterAndGroupSpec",
-      "type": "object"
-    },
     "GetFieldOperator": {
       "description": "Access a field on the traced call.\n\nSupports dot notation for nested access, e.g. `summary.usage.tokens`.\n\nOnly works on fields present in the `CallSchema`, including:\n- Top-level fields like `op_name`, `trace_id`, `started_at`\n- Nested fields like `inputs.input_name`, `summary.usage.tokens`, etc.\n\nExample:\n    ```\n    {\"$getField\": \"op_name\"}\n    ```",
       "properties": {
@@ -1618,48 +1404,21 @@
           "title": "Columns",
           "type": "array"
         },
-        "filter_spec": {
+        "calls_query": {
           "anyOf": [
             {
-              "$ref": "#/$defs/FilterAndGroupSpec"
+              "type": "string"
             },
             {
               "type": "null"
             }
           ],
-          "default": null
-        },
-        "grid_filter_model": {
-          "anyOf": [
-            {
-              "additionalProperties": true,
-              "type": "object"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Grid Filter Model"
-        },
-        "call_ids": {
-          "anyOf": [
-            {
-              "items": {
-                "type": "string"
-              },
-              "type": "array"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Call Ids"
+          "title": "Calls Query"
         }
       },
       "required": [
-        "columns"
+        "columns",
+        "calls_query"
       ],
       "title": "Leaderboard",
       "type": "object"
