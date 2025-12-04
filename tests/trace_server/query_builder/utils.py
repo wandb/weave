@@ -75,3 +75,28 @@ def assert_sqlite_sql(expected_query: str, expected_params: list, **kwargs) -> N
     assert expected_params == params, (
         f"Params mismatch:\nExpected: {expected_params}\nFound: {params}"
     )
+
+
+def assert_sql_raw(
+    actual_query: str, actual_params: dict, expected_query: str, expected_params: dict
+) -> None:
+    """Assert that raw SQL query and params match expected values.
+
+    For raw query builder functions that return SQL strings directly.
+    Formats and compares both the SQL query and parameter dictionary.
+
+    Args:
+        actual_query: The generated SQL query string
+        actual_params: The actual parameter dictionary from ParamBuilder
+        expected_query: The expected SQL query string
+        expected_params: The expected parameter dictionary
+    """
+    expected_formatted = sqlparse.format(expected_query, reindent=True)
+    actual_formatted = sqlparse.format(actual_query, reindent=True)
+
+    assert expected_formatted == actual_formatted, (
+        f"\nQuery mismatch:\nExpected:\n{expected_formatted}\n\nGot:\n{actual_formatted}"
+    )
+    assert expected_params == actual_params, (
+        f"\nParams mismatch:\nExpected: {expected_params}\nGot: {actual_params}"
+    )

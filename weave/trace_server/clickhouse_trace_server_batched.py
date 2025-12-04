@@ -805,7 +805,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.calls_query_stream")
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
         """Returns a stream of calls that match the given query."""
-        self._noop_project_version_latency_test(req.project_id)
+        self._noop_project_version_latency_test(project_id=req.project_id)
 
         cq = CallsQuery(
             project_id=req.project_id,

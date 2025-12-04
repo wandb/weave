@@ -1,4 +1,17 @@
-"""Tests for calls_complete write endpoints (ClickHouse only)."""
+"""Tests for calls_complete write endpoints
+
+Write Operations Tested:
+1. calls_start_batch (starts) - Create started calls
+2. calls_start_batch (completes) - Create complete calls in one shot
+3. calls_end_batch - Update started calls with end data
+4. calls_delete - Soft delete calls
+5. call_update - Update call display name
+
+Test Organization:
+- AUTO mode tests: Basic functionality tests (majority of coverage)
+- Comprehensive mode tests: Single test per mode testing all edge cases
+- Parametrized tests: Where appropriate for cross-mode validation
+"""
 
 import datetime
 import json
@@ -8,16 +21,44 @@ import pytest
 from tests.trace.util import client_is_sqlite
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ids import generate_id
-from weave.trace_server.project_version.project_version import ProjectVersionResolver
-from weave.trace_server.project_version.types import ProjectVersionMode
+from weave.trace_server.project_version.types import (
+    CallsStorageServerMode,
+    ProjectDataResidence,
+)
 
+# ============================================================================
+# TEST CONFIGURATION
+# ============================================================================
 
-@pytest.fixture
-def clickhouse_client(client):
-    """Get direct ClickHouse client for table queries."""
-    if client_is_sqlite(client):
-        return None
-    return client.server._next_trace_server.ch_client
+# Mode configurations for parametrized tests
+# Format: (mode_fixture_name, ProjectDataResidence, writes_to_calls_complete, writes_to_calls_merged)
+# Based on routing matrix from types.py - covers all mode * residence combinations
+MODE_PARAMS = [
+    # EMPTY projects (new projects with no data)
+    ("auto_mode", ProjectDataResidence.EMPTY, True, False),
+    ("dual_write_read_merged_mode", ProjectDataResidence.EMPTY, True, True),
+    ("dual_write_read_complete_mode", ProjectDataResidence.EMPTY, True, True),
+    ("force_legacy_mode", ProjectDataResidence.EMPTY, False, True),
+    # MERGED_ONLY projects (legacy projects with only calls_merged data)
+    ("auto_mode", ProjectDataResidence.MERGED_ONLY, False, True),
+    ("dual_write_read_merged_mode", ProjectDataResidence.MERGED_ONLY, False, True),
+    ("dual_write_read_complete_mode", ProjectDataResidence.MERGED_ONLY, False, True),
+    ("force_legacy_mode", ProjectDataResidence.MERGED_ONLY, False, True),
+    # COMPLETE_ONLY projects (new projects with only calls_complete data)
+    ("auto_mode", ProjectDataResidence.COMPLETE_ONLY, True, False),
+    ("dual_write_read_merged_mode", ProjectDataResidence.COMPLETE_ONLY, True, True),
+    ("dual_write_read_complete_mode", ProjectDataResidence.COMPLETE_ONLY, True, True),
+    ("force_legacy_mode", ProjectDataResidence.COMPLETE_ONLY, False, True),
+    # BOTH projects (dual-write projects with data in both tables)
+    ("auto_mode", ProjectDataResidence.BOTH, True, False),
+    ("dual_write_read_merged_mode", ProjectDataResidence.BOTH, True, True),
+    ("dual_write_read_complete_mode", ProjectDataResidence.BOTH, True, True),
+    ("force_legacy_mode", ProjectDataResidence.BOTH, False, True),
+]
+
+# ============================================================================
+# FIXTURES
+# ============================================================================
 
 
 @pytest.fixture
@@ -33,45 +74,95 @@ def project_id(client):
 
 
 @pytest.fixture
-def auto_mode(client):
-    """Set project version mode to AUTO for calls_complete tests.
-
-    In AUTO mode, new projects will write to calls_complete table only.
-    """
+def internal_trace_server(client):
+    """Get internal trace server for direct access."""
     if client_is_sqlite(client):
-        yield
-        return
-
-    try:
-        resolver = ProjectVersionResolver.get_instance()
-        original_mode = resolver._mode
-        resolver._mode = ProjectVersionMode.AUTO
-        yield
-        resolver._mode = original_mode
-    except RuntimeError:
-        # Resolver not initialized, skip
-        yield
+        return None
+    return client.server._next_trace_server
 
 
 @pytest.fixture
-def dual_write_mode(client):
-    """Set project version mode to DUAL_WRITE for calls_complete tests.
+def auto_mode(client, internal_trace_server):
+    """Set project version mode to AUTO for calls_complete tests.
 
-    In DUAL_WRITE mode, new projects write to BOTH calls_complete and calls_merged.
+    In AUTO mode:
+    - EMPTY/COMPLETE_ONLY/BOTH projects: Write to calls_complete only
+    - MERGED_ONLY projects: Write to calls_merged only
     """
     if client_is_sqlite(client):
         yield
         return
 
-    try:
-        resolver = ProjectVersionResolver.get_instance()
-        original_mode = resolver._mode
-        resolver._mode = ProjectVersionMode.DUAL_WRITE
+    # Access the resolver through the internal trace server
+    resolver = internal_trace_server.table_routing_resolver
+    original_mode = resolver._mode
+    resolver._mode = CallsStorageServerMode.AUTO
+    yield
+    resolver._mode = original_mode
+
+
+@pytest.fixture
+def dual_write_read_merged_mode(client, internal_trace_server):
+    """Set project version mode to DUAL_WRITE_READ_MERGED.
+
+    In DUAL_WRITE_READ_MERGED mode:
+    - EMPTY/COMPLETE_ONLY/BOTH projects: Write to BOTH tables, read from calls_merged
+    - MERGED_ONLY projects: Write to calls_merged only
+    """
+    if client_is_sqlite(client):
         yield
-        resolver._mode = original_mode
-    except RuntimeError:
-        # Resolver not initialized, skip
+        return
+
+    # Access the resolver through the internal trace server
+    resolver = internal_trace_server.table_routing_resolver
+    original_mode = resolver._mode
+    resolver._mode = CallsStorageServerMode.DUAL_WRITE_READ_MERGED
+    yield
+    resolver._mode = original_mode
+
+
+@pytest.fixture
+def dual_write_read_complete_mode(client, internal_trace_server):
+    """Set project version mode to DUAL_WRITE_READ_COMPLETE.
+
+    In DUAL_WRITE_READ_COMPLETE mode:
+    - EMPTY/COMPLETE_ONLY/BOTH projects: Write to BOTH tables, read from calls_complete
+    - MERGED_ONLY projects: Write to calls_merged only
+    """
+    if client_is_sqlite(client):
         yield
+        return
+
+    # Access the resolver through the internal trace server
+    resolver = internal_trace_server.table_routing_resolver
+    original_mode = resolver._mode
+    resolver._mode = CallsStorageServerMode.DUAL_WRITE_READ_COMPLETE
+    yield
+    resolver._mode = original_mode
+
+
+@pytest.fixture
+def force_legacy_mode(client, internal_trace_server):
+    """Set project version mode to FORCE_LEGACY.
+
+    In FORCE_LEGACY mode:
+    - All projects: Write to calls_merged only, read from calls_merged
+    """
+    if client_is_sqlite(client):
+        yield
+        return
+
+    # Access the resolver through the internal trace server
+    resolver = internal_trace_server.table_routing_resolver
+    original_mode = resolver._mode
+    resolver._mode = CallsStorageServerMode.FORCE_LEGACY
+    yield
+    resolver._mode = original_mode
+
+
+# ============================================================================
+# HELPER FUNCTIONS
+# ============================================================================
 
 
 def query_calls_complete(ch_client, project_id, call_id=None):
@@ -100,10 +191,92 @@ def query_calls_merged(ch_client, project_id, call_id=None):
     return list(result.named_results())
 
 
-def test_calls_start_batch_with_starts_only(
+def count_calls_in_table(ch_client, project_id, table_name):
+    """Count calls in a specific table for a project."""
+    query = f"SELECT COUNT(*) as count FROM {table_name} WHERE project_id = {{project_id:String}} AND deleted_at IS NULL"
+    result = ch_client.query(query, parameters={"project_id": project_id})
+    rows = list(result.named_results())
+    return rows[0]["count"] if rows else 0
+
+
+def setup_project_residence(ch_client, project_id, residence_state):
+    """Pre-populate tables to achieve desired project residence state.
+
+    Args:
+        ch_client: ClickHouse client
+        project_id: Project ID to set up
+        residence_state: One of "EMPTY", "MERGED_ONLY", "COMPLETE_ONLY", "BOTH"
+    """
+    if residence_state == "EMPTY":
+        # No setup needed - project has no data
+        return
+
+    # Import here to avoid circular dependencies
+    import uuid
+
+    # Create a seed call to establish residence
+    call_id = str(uuid.uuid4())
+    trace_id = str(uuid.uuid4())
+
+    if residence_state == "MERGED_ONLY":
+        ch_client.command(
+            f"""
+            INSERT INTO calls_merged (project_id, id, op_name, started_at, trace_id, parent_id)
+            VALUES ('{project_id}', '{call_id}', 'seed_op', now(), '{trace_id}', '')
+            """
+        )
+    elif residence_state == "COMPLETE_ONLY":
+        ch_client.command(
+            f"""
+            INSERT INTO calls_complete (project_id, id, op_name, started_at, trace_id, parent_id)
+            VALUES ('{project_id}', '{call_id}', 'seed_op', now(), '{trace_id}', '')
+            """
+        )
+    elif residence_state == "BOTH":
+        ch_client.command(
+            f"""
+            INSERT INTO calls_merged (project_id, id, op_name, started_at, trace_id, parent_id)
+            VALUES ('{project_id}', '{call_id}', 'seed_op', now(), '{trace_id}', '')
+            """
+        )
+        ch_client.command(
+            f"""
+            INSERT INTO calls_complete (project_id, id, op_name, started_at, trace_id, parent_id)
+            VALUES ('{project_id}', '{call_id}', 'seed_op', now(), '{trace_id}', '')
+            """
+        )
+    else:
+        raise ValueError(f"Invalid residence_state: {residence_state}")
+
+
+def verify_call_exists_in_table(ch_client, project_id, call_id, table_name):
+    """Check if a call exists in a specific table."""
+    if table_name == "calls_complete":
+        rows = query_calls_complete(ch_client, project_id, call_id)
+    else:
+        rows = query_calls_merged(ch_client, project_id, call_id)
+    return len(rows) > 0
+
+
+def verify_call_deleted_in_table(ch_client, project_id, call_id, table_name):
+    """Check if a call is soft-deleted in a specific table."""
+    query = f"SELECT deleted_at FROM {table_name} WHERE project_id = {{project_id:String}} AND id = {{call_id:String}}"
+    result = ch_client.query(
+        query, parameters={"project_id": project_id, "call_id": call_id}
+    )
+    rows = list(result.named_results())
+    return len(rows) > 0 and rows[0]["deleted_at"] is not None
+
+
+# ============================================================================
+# AUTO MODE TESTS (Primary test coverage)
+# ============================================================================
+
+
+def test_auto_mode_start_batch_creates_started_calls(
     client, clickhouse_client, server, project_id, auto_mode
 ):
-    """Test calls_start_batch with only start entries (AUTO mode - calls_complete only)."""
+    """Test calls_start_batch with start mode creates started calls in AUTO mode."""
     if client_is_sqlite(client):
         pytest.skip("Skipping test for sqlite clients")
 
@@ -180,10 +353,10 @@ def test_calls_start_batch_with_starts_only(
     assert call_2["ended_at"] is None
 
 
-def test_calls_start_batch_with_completes(
+def test_auto_mode_start_batch_with_complete_mode(
     client, clickhouse_client, server, project_id, auto_mode
 ):
-    """Test calls_start_batch with complete entries (AUTO mode - calls_complete only)."""
+    """Test calls_start_batch with complete mode creates finished calls in AUTO mode."""
     if client_is_sqlite(client):
         pytest.skip("Skipping test for sqlite clients")
 
@@ -237,78 +410,153 @@ def test_calls_start_batch_with_completes(
     assert call["exception"] is None
 
 
-def test_calls_start_batch_mixed_starts_and_completes(
+def test_auto_mode_mixed_start_and_complete(
     client, clickhouse_client, server, project_id, auto_mode
 ):
-    """Test calls_start_batch with both starts and completes (AUTO mode - calls_complete only)."""
+    """Test calls_start_batch with multiple starts and completes interleaved in AUTO mode."""
     if client_is_sqlite(client):
         pytest.skip("Skipping test for sqlite clients")
 
-    call_id_start = generate_id()
-    call_id_complete = generate_id()
+    # Create multiple starts and completes interleaved
+    call_ids_start = [generate_id(), generate_id(), generate_id()]
+    call_ids_complete = [generate_id(), generate_id()]
     trace_id = generate_id()
     now = datetime.datetime.now()
 
-    start = tsi.StartedCallSchemaForInsert(
-        project_id=project_id,
-        id=call_id_start,
-        trace_id=trace_id,
-        op_name="start_op",
-        started_at=now,
-        attributes={},
-        inputs={"a": 1},
+    # Build mixed batch with starts and completes interleaved
+    batch = []
+
+    # Start 1
+    batch.append(
+        tsi.CallBatchStartMode(
+            mode="start",
+            req=tsi.CallStartReq(
+                start=tsi.StartedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=call_ids_start[0],
+                    trace_id=trace_id,
+                    op_name="start_op_1",
+                    started_at=now,
+                    attributes={},
+                    inputs={"idx": 0},
+                )
+            ),
+        )
     )
 
-    complete = tsi.CompletedCallSchemaForInsert(
-        project_id=project_id,
-        id=call_id_complete,
-        trace_id=trace_id,
-        op_name="complete_op",
-        started_at=now,
-        ended_at=now + datetime.timedelta(seconds=2),
-        attributes={},
-        inputs={"b": 2},
-        output={"c": 3},
-        summary={},
+    # Complete 1
+    batch.append(
+        tsi.CallBatchCompleteMode(
+            mode="complete",
+            req=tsi.CallCompleteReq(
+                complete=tsi.CompletedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=call_ids_complete[0],
+                    trace_id=trace_id,
+                    op_name="complete_op_1",
+                    started_at=now,
+                    ended_at=now + datetime.timedelta(seconds=1),
+                    attributes={},
+                    inputs={"idx": 10},
+                    output={"result": 100},
+                    summary={},
+                )
+            ),
+        )
+    )
+
+    # Start 2
+    batch.append(
+        tsi.CallBatchStartMode(
+            mode="start",
+            req=tsi.CallStartReq(
+                start=tsi.StartedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=call_ids_start[1],
+                    trace_id=trace_id,
+                    op_name="start_op_2",
+                    started_at=now,
+                    attributes={},
+                    inputs={"idx": 1},
+                )
+            ),
+        )
+    )
+
+    # Complete 2
+    batch.append(
+        tsi.CallBatchCompleteMode(
+            mode="complete",
+            req=tsi.CallCompleteReq(
+                complete=tsi.CompletedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=call_ids_complete[1],
+                    trace_id=trace_id,
+                    op_name="complete_op_2",
+                    started_at=now,
+                    ended_at=now + datetime.timedelta(seconds=2),
+                    attributes={},
+                    inputs={"idx": 11},
+                    output={"result": 200},
+                    summary={},
+                )
+            ),
+        )
+    )
+
+    # Start 3
+    batch.append(
+        tsi.CallBatchStartMode(
+            mode="start",
+            req=tsi.CallStartReq(
+                start=tsi.StartedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=call_ids_start[2],
+                    trace_id=trace_id,
+                    op_name="start_op_3",
+                    started_at=now,
+                    attributes={},
+                    inputs={"idx": 2},
+                )
+            ),
+        )
     )
 
     # Insert mixed batch
-    req = tsi.CallsStartBatchReq(
-        project_id=project_id,
-        batch=[
-            tsi.CallBatchStartMode(mode="start", req=tsi.CallStartReq(start=start)),
-            tsi.CallBatchCompleteMode(
-                mode="complete", req=tsi.CallCompleteReq(complete=complete)
-            ),
-        ],
-    )
+    req = tsi.CallsStartBatchReq(project_id=project_id, batch=batch)
     res = server.calls_start_batch(req)
 
     # Verify response
-    assert len(res.res) == 2
+    assert len(res.res) == 5
 
-    # Query both calls
+    # Query all calls
     rows = query_calls_complete(clickhouse_client, project_id)
-    start_call = next((r for r in rows if r["id"] == call_id_start), None)
-    complete_call = next((r for r in rows if r["id"] == call_id_complete), None)
 
-    # Verify start call
-    assert start_call is not None
-    assert start_call["ended_at"] is None
-    assert json.loads(start_call["inputs_dump"]) == {"a": 1}
-    assert json.loads(start_call["output_dump"]) == {}
+    # Verify all start calls
+    for i, call_id in enumerate(call_ids_start):
+        start_call = next((r for r in rows if r["id"] == call_id), None)
+        assert start_call is not None, f"Start call {i} not found"
+        assert start_call["ended_at"] is None, (
+            f"Start call {i} should not have ended_at"
+        )
+        assert json.loads(start_call["inputs_dump"]) == {"idx": i}
+        assert json.loads(start_call["output_dump"]) == {}
 
-    # Verify complete call
-    assert complete_call is not None
-    assert complete_call["ended_at"] is not None
-    assert json.loads(complete_call["inputs_dump"]) == {"b": 2}
-    assert json.loads(complete_call["output_dump"]) == {"c": 3}
+    # Verify all complete calls
+    for i, call_id in enumerate(call_ids_complete):
+        complete_call = next((r for r in rows if r["id"] == call_id), None)
+        assert complete_call is not None, f"Complete call {i} not found"
+        assert complete_call["ended_at"] is not None, (
+            f"Complete call {i} should have ended_at"
+        )
+        assert json.loads(complete_call["inputs_dump"]) == {"idx": 10 + i}
+        assert json.loads(complete_call["output_dump"]) == {"result": (i + 1) * 100}
 
 
-def test_calls_end_batch_updates_existing(
+def test_auto_mode_end_batch_updates_started_calls(
     client, clickhouse_client, server, project_id, auto_mode
 ):
-    """Test calls_end_batch updates existing calls (AUTO mode - calls_complete only)."""
+    """Test calls_end_batch updates existing started calls in AUTO mode."""
     if client_is_sqlite(client):
         pytest.skip("Skipping test for sqlite clients")
 
@@ -410,10 +658,124 @@ def test_calls_end_batch_updates_existing(
     assert json.loads(call_2_after["inputs_dump"]) == {"y": 20}
 
 
-def test_calls_with_metadata_fields(
+def test_auto_mode_calls_delete(
     client, clickhouse_client, server, project_id, auto_mode
 ):
-    """Test calls with refs, W&B metadata, and thread/turn IDs (AUTO mode - calls_complete only)."""
+    """Test calls_delete soft-deletes calls in AUTO mode."""
+    if client_is_sqlite(client):
+        pytest.skip("Skipping test for sqlite clients")
+
+    # Create some calls
+    call_id_1 = generate_id()
+    call_id_2 = generate_id()
+    call_id_3 = generate_id()
+    trace_id = generate_id()
+
+    starts = [
+        tsi.StartedCallSchemaForInsert(
+            project_id=project_id,
+            id=call_id,
+            trace_id=trace_id,
+            op_name=f"op_{i}",
+            started_at=datetime.datetime.now(),
+            attributes={},
+            inputs={"idx": i},
+        )
+        for i, call_id in enumerate([call_id_1, call_id_2, call_id_3])
+    ]
+
+    # Insert calls
+    start_req = tsi.CallsStartBatchReq(
+        project_id=project_id,
+        batch=[
+            tsi.CallBatchStartMode(mode="start", req=tsi.CallStartReq(start=s))
+            for s in starts
+        ],
+    )
+    server.calls_start_batch(start_req)
+
+    # Verify all calls exist and are not deleted
+    for call_id in [call_id_1, call_id_2, call_id_3]:
+        assert verify_call_exists_in_table(
+            clickhouse_client, project_id, call_id, "calls_complete"
+        )
+        assert not verify_call_deleted_in_table(
+            clickhouse_client, project_id, call_id, "calls_complete"
+        )
+
+    # Delete two of the calls
+    delete_req = tsi.CallsDeleteReq(
+        project_id=project_id, call_ids=[call_id_1, call_id_2]
+    )
+    delete_res = server.calls_delete(delete_req)
+
+    # Verify deletion response
+    assert delete_res.num_deleted == 2
+
+    # Verify calls are soft-deleted
+    assert verify_call_deleted_in_table(
+        clickhouse_client, project_id, call_id_1, "calls_complete"
+    )
+    assert verify_call_deleted_in_table(
+        clickhouse_client, project_id, call_id_2, "calls_complete"
+    )
+
+    # Verify third call is still not deleted
+    assert not verify_call_deleted_in_table(
+        clickhouse_client, project_id, call_id_3, "calls_complete"
+    )
+
+
+def test_auto_mode_call_update_display_name(
+    client, clickhouse_client, server, project_id, auto_mode
+):
+    """Test call_update updates display name in AUTO mode."""
+    if client_is_sqlite(client):
+        pytest.skip("Skipping test for sqlite clients")
+
+    # Create a call
+    call_id = generate_id()
+    trace_id = generate_id()
+
+    start = tsi.StartedCallSchemaForInsert(
+        project_id=project_id,
+        id=call_id,
+        trace_id=trace_id,
+        op_name="test_op",
+        started_at=datetime.datetime.now(),
+        attributes={},
+        inputs={},
+    )
+
+    # Insert call
+    start_req = tsi.CallsStartBatchReq(
+        project_id=project_id,
+        batch=[tsi.CallBatchStartMode(mode="start", req=tsi.CallStartReq(start=start))],
+    )
+    server.calls_start_batch(start_req)
+
+    # Verify initial display_name is None
+    rows = query_calls_complete(clickhouse_client, project_id, call_id)
+    assert len(rows) == 1
+    assert rows[0]["display_name"] is None
+
+    # Update display name
+    update_req = tsi.CallUpdateReq(
+        project_id=project_id, call_id=call_id, display_name="My Custom Name"
+    )
+    server.call_update(update_req)
+
+    # Verify display name was updated
+    rows_after = query_calls_complete(clickhouse_client, project_id, call_id)
+    assert len(rows_after) == 1
+    assert rows_after[0]["display_name"] == "My Custom Name"
+    assert rows_after[0]["updated_at"] is not None
+
+
+def test_auto_mode_metadata_fields(
+    client, clickhouse_client, server, project_id, auto_mode
+):
+    """Test calls with refs, W&B metadata, and thread/turn IDs in AUTO mode."""
     if client_is_sqlite(client):
         pytest.skip("Skipping test for sqlite clients")
 
@@ -522,10 +884,10 @@ def test_calls_with_metadata_fields(
     assert call_thread["turn_id"] == turn_id
 
 
-def test_batch_end_multiple_calls(
+def test_auto_mode_batch_operations_multiple_calls(
     client, clickhouse_client, server, project_id, auto_mode
 ):
-    """Test ending multiple calls in one batch (AUTO mode - calls_complete only)."""
+    """Test batch operations with multiple calls in AUTO mode."""
     if client_is_sqlite(client):
         pytest.skip("Skipping test for sqlite clients")
 
@@ -591,110 +953,125 @@ def test_batch_end_multiple_calls(
 
 
 # ============================================================================
-# DUAL_WRITE MODE TESTS
-# These tests verify that data is written to BOTH tables in dual-write mode
+# COMPREHENSIVE MODE-BASED TESTS
+# These tests methodically verify routing behavior for each mode
 # ============================================================================
 
 
-def test_dual_write_start_batch(
-    client, clickhouse_client, server, project_id, dual_write_mode
+def test_dual_write_read_merged_mode_comprehensive(
+    client, clickhouse_client, server, project_id, dual_write_read_merged_mode
 ):
-    """Test that calls_start_batch writes to BOTH tables in DUAL_WRITE mode."""
+    """Comprehensive test for DUAL_WRITE_READ_MERGED mode covering all operations.
+
+    Expected behavior for EMPTY project:
+    - Writes: Go to BOTH tables
+    - Reads: Come from calls_merged table
+    """
     if client_is_sqlite(client):
         pytest.skip("Skipping test for sqlite clients")
 
-    call_id_1 = generate_id()
-    call_id_2 = generate_id()
+    # Test 0: Mixed batch with starts and completes
+    call_id_mixed_start = generate_id()
+    call_id_mixed_complete = generate_id()
     trace_id = generate_id()
 
-    start_1 = tsi.StartedCallSchemaForInsert(
-        project_id=project_id,
-        id=call_id_1,
-        trace_id=trace_id,
-        op_name="dual_write_op_1",
-        started_at=datetime.datetime.now(),
-        attributes={},
-        inputs={"x": 100},
-    )
-
-    start_2 = tsi.StartedCallSchemaForInsert(
-        project_id=project_id,
-        id=call_id_2,
-        trace_id=trace_id,
-        parent_id=call_id_1,
-        op_name="dual_write_op_2",
-        started_at=datetime.datetime.now(),
-        attributes={},
-        inputs={"y": 200},
-    )
-
-    # Insert via calls_start_batch
-    req = tsi.CallsStartBatchReq(
+    mixed_batch = tsi.CallsStartBatchReq(
         project_id=project_id,
         batch=[
-            tsi.CallBatchStartMode(mode="start", req=tsi.CallStartReq(start=start_1)),
-            tsi.CallBatchStartMode(mode="start", req=tsi.CallStartReq(start=start_2)),
+            tsi.CallBatchStartMode(
+                mode="start",
+                req=tsi.CallStartReq(
+                    start=tsi.StartedCallSchemaForInsert(
+                        project_id=project_id,
+                        id=call_id_mixed_start,
+                        trace_id=trace_id,
+                        op_name="mixed_start",
+                        started_at=datetime.datetime.now(),
+                        attributes={},
+                        inputs={"test": "start"},
+                    )
+                ),
+            ),
+            tsi.CallBatchCompleteMode(
+                mode="complete",
+                req=tsi.CallCompleteReq(
+                    complete=tsi.CompletedCallSchemaForInsert(
+                        project_id=project_id,
+                        id=call_id_mixed_complete,
+                        trace_id=trace_id,
+                        op_name="mixed_complete",
+                        started_at=datetime.datetime.now(),
+                        ended_at=datetime.datetime.now()
+                        + datetime.timedelta(seconds=1),
+                        attributes={},
+                        inputs={"test": "complete"},
+                        output={"result": 99},
+                        summary={},
+                    )
+                ),
+            ),
         ],
     )
-    res = server.calls_start_batch(req)
+    server.calls_start_batch(mixed_batch)
 
-    # Verify response
-    assert len(res.res) == 2
-    assert res.res[0].id == call_id_1
-    assert res.res[1].id == call_id_2
+    # Verify mixed batch calls exist in BOTH tables
+    assert verify_call_exists_in_table(
+        clickhouse_client, project_id, call_id_mixed_start, "calls_complete"
+    ), "Mixed start should exist in calls_complete"
+    assert verify_call_exists_in_table(
+        clickhouse_client, project_id, call_id_mixed_start, "calls_merged"
+    ), "Mixed start should exist in calls_merged"
+    assert verify_call_exists_in_table(
+        clickhouse_client, project_id, call_id_mixed_complete, "calls_complete"
+    ), "Mixed complete should exist in calls_complete"
+    assert verify_call_exists_in_table(
+        clickhouse_client, project_id, call_id_mixed_complete, "calls_merged"
+    ), "Mixed complete should exist in calls_merged"
 
-    # Query BOTH tables and verify data exists in both
-    complete_rows = query_calls_complete(clickhouse_client, project_id)
-    merged_rows = query_calls_merged(clickhouse_client, project_id)
-
-    # Verify calls_complete has the data
-    complete_call_1 = next((r for r in complete_rows if r["id"] == call_id_1), None)
-    complete_call_2 = next((r for r in complete_rows if r["id"] == call_id_2), None)
-    assert complete_call_1 is not None, "call_id_1 should exist in calls_complete"
-    assert complete_call_2 is not None, "call_id_2 should exist in calls_complete"
-    assert complete_call_1["op_name"] == "dual_write_op_1"
-    assert complete_call_2["op_name"] == "dual_write_op_2"
-    assert json.loads(complete_call_1["inputs_dump"]) == {"x": 100}
-    assert json.loads(complete_call_2["inputs_dump"]) == {"y": 200}
-
-    # Verify calls_merged has the same data
-    merged_call_1 = next((r for r in merged_rows if r["id"] == call_id_1), None)
-    merged_call_2 = next((r for r in merged_rows if r["id"] == call_id_2), None)
-    assert merged_call_1 is not None, "call_id_1 should exist in calls_merged"
-    assert merged_call_2 is not None, "call_id_2 should exist in calls_merged"
-    assert merged_call_1["op_name"] == "dual_write_op_1"
-    assert merged_call_2["op_name"] == "dual_write_op_2"
-    assert json.loads(merged_call_1["inputs_dump"]) == {"x": 100}
-    assert json.loads(merged_call_2["inputs_dump"]) == {"y": 200}
-
-
-def test_dual_write_complete_and_end_batch(
-    client, clickhouse_client, server, project_id, dual_write_mode
-):
-    """Test that complete calls and call_end updates write to BOTH tables in DUAL_WRITE mode."""
-    if client_is_sqlite(client):
-        pytest.skip("Skipping test for sqlite clients")
-
-    # Test 1: Complete call (full call in one go)
-    call_id_complete = generate_id()
+    # Test 1: Start calls - should write to BOTH tables
+    call_id_start = generate_id()
     trace_id = generate_id()
-    started_at = datetime.datetime.now()
-    ended_at = started_at + datetime.timedelta(seconds=1)
+
+    start = tsi.StartedCallSchemaForInsert(
+        project_id=project_id,
+        id=call_id_start,
+        trace_id=trace_id,
+        op_name="dual_write_start",
+        started_at=datetime.datetime.now(),
+        attributes={},
+        inputs={"test": "start"},
+    )
+
+    req_start = tsi.CallsStartBatchReq(
+        project_id=project_id,
+        batch=[tsi.CallBatchStartMode(mode="start", req=tsi.CallStartReq(start=start))],
+    )
+    server.calls_start_batch(req_start)
+
+    # Verify call exists in BOTH tables
+    assert verify_call_exists_in_table(
+        clickhouse_client, project_id, call_id_start, "calls_complete"
+    ), "Start call should exist in calls_complete"
+    assert verify_call_exists_in_table(
+        clickhouse_client, project_id, call_id_start, "calls_merged"
+    ), "Start call should exist in calls_merged"
+
+    # Test 2: Complete calls - should write to BOTH tables
+    call_id_complete = generate_id()
 
     complete = tsi.CompletedCallSchemaForInsert(
         project_id=project_id,
         id=call_id_complete,
         trace_id=trace_id,
-        op_name="dual_complete_op",
-        started_at=started_at,
-        ended_at=ended_at,
+        op_name="dual_write_complete",
+        started_at=datetime.datetime.now(),
+        ended_at=datetime.datetime.now() + datetime.timedelta(seconds=1),
         attributes={},
-        inputs={"input": "dual"},
+        inputs={"test": "complete"},
         output={"result": 42},
-        summary={"latency": 1.5},
+        summary={},
     )
 
-    # Insert complete call
     req_complete = tsi.CallsStartBatchReq(
         project_id=project_id,
         batch=[
@@ -706,55 +1083,20 @@ def test_dual_write_complete_and_end_batch(
     server.calls_start_batch(req_complete)
 
     # Verify complete call in BOTH tables
-    complete_rows = query_calls_complete(
-        clickhouse_client, project_id, call_id_complete
-    )
-    merged_rows = query_calls_merged(clickhouse_client, project_id, call_id_complete)
+    assert verify_call_exists_in_table(
+        clickhouse_client, project_id, call_id_complete, "calls_complete"
+    ), "Complete call should exist in calls_complete"
+    assert verify_call_exists_in_table(
+        clickhouse_client, project_id, call_id_complete, "calls_merged"
+    ), "Complete call should exist in calls_merged"
 
-    assert len(complete_rows) == 1, "Complete call should exist in calls_complete"
-    assert len(merged_rows) == 1, "Complete call should exist in calls_merged"
-
-    assert complete_rows[0]["op_name"] == "dual_complete_op"
-    assert merged_rows[0]["op_name"] == "dual_complete_op"
-    assert json.loads(complete_rows[0]["output_dump"]) == {"result": 42}
-    assert json.loads(merged_rows[0]["output_dump"]) == {"result": 42}
-
-    # Test 2: Start then End (two-phase call)
-    call_id_start = generate_id()
-    start = tsi.StartedCallSchemaForInsert(
-        project_id=project_id,
-        id=call_id_start,
-        trace_id=trace_id,
-        op_name="dual_start_op",
-        started_at=datetime.datetime.now(),
-        attributes={},
-        inputs={"start": "data"},
-    )
-
-    # Insert start
-    req_start = tsi.CallsStartBatchReq(
-        project_id=project_id,
-        batch=[tsi.CallBatchStartMode(mode="start", req=tsi.CallStartReq(start=start))],
-    )
-    server.calls_start_batch(req_start)
-
-    # Verify start in both tables
-    complete_rows_start = query_calls_complete(
-        clickhouse_client, project_id, call_id_start
-    )
-    merged_rows_start = query_calls_merged(clickhouse_client, project_id, call_id_start)
-    assert len(complete_rows_start) == 1
-    assert len(merged_rows_start) == 1
-    assert complete_rows_start[0]["ended_at"] is None
-    assert merged_rows_start[0]["ended_at"] is None
-
-    # Now end the call
+    # Test 3: End batch - should update BOTH tables
     end = tsi.EndedCallSchemaForInsert(
         project_id=project_id,
         id=call_id_start,
         ended_at=datetime.datetime.now(),
-        output={"end": "result"},
-        summary={"tokens": 100},
+        output={"result": "ended"},
+        summary={},
     )
 
     req_end = tsi.CallsEndBatchReq(
@@ -764,18 +1106,565 @@ def test_dual_write_complete_and_end_batch(
     server.calls_end_batch(req_end)
 
     # Verify end updates in BOTH tables
-    complete_rows_end = query_calls_complete(
+    complete_rows = query_calls_complete(clickhouse_client, project_id, call_id_start)
+    merged_rows = query_calls_merged(clickhouse_client, project_id, call_id_start)
+    assert len(complete_rows) == 1
+    assert complete_rows[0]["ended_at"] is not None
+    assert len(merged_rows) == 1
+    assert merged_rows[0]["ended_at"] is not None
+
+    # Test 4: Delete - should soft delete in BOTH tables
+    delete_req = tsi.CallsDeleteReq(project_id=project_id, call_ids=[call_id_complete])
+    delete_res = server.calls_delete(delete_req)
+    assert delete_res.num_deleted == 1
+
+    assert verify_call_deleted_in_table(
+        clickhouse_client, project_id, call_id_complete, "calls_complete"
+    ), "Call should be deleted in calls_complete"
+    assert verify_call_deleted_in_table(
+        clickhouse_client, project_id, call_id_complete, "calls_merged"
+    ), "Call should be deleted in calls_merged"
+
+    # Test 5: Update display name - should update BOTH tables
+    update_req = tsi.CallUpdateReq(
+        project_id=project_id,
+        call_id=call_id_start,
+        display_name="Dual Write Test Name",
+    )
+    server.call_update(update_req)
+
+    # Verify display name in BOTH tables
+    complete_rows_after = query_calls_complete(
         clickhouse_client, project_id, call_id_start
     )
-    merged_rows_end = query_calls_merged(clickhouse_client, project_id, call_id_start)
+    merged_rows_after = query_calls_merged(clickhouse_client, project_id, call_id_start)
+    assert complete_rows_after[0]["display_name"] == "Dual Write Test Name"
+    assert merged_rows_after[0]["display_name"] == "Dual Write Test Name"
 
-    assert len(complete_rows_end) == 1
-    assert len(merged_rows_end) == 1
 
-    # Verify both tables have the end data
-    assert complete_rows_end[0]["ended_at"] is not None
-    assert merged_rows_end[0]["ended_at"] is not None
-    assert json.loads(complete_rows_end[0]["output_dump"]) == {"end": "result"}
-    assert json.loads(merged_rows_end[0]["output_dump"]) == {"end": "result"}
-    assert json.loads(complete_rows_end[0]["summary_dump"]) == {"tokens": 100}
-    assert json.loads(merged_rows_end[0]["summary_dump"]) == {"tokens": 100}
+def test_dual_write_read_complete_mode_comprehensive(
+    client, clickhouse_client, server, project_id, dual_write_read_complete_mode
+):
+    """Comprehensive test for DUAL_WRITE_READ_COMPLETE mode covering all operations.
+
+    Expected behavior for EMPTY project:
+    - Writes: Go to BOTH tables
+    - Reads: Come from calls_complete table
+    """
+    if client_is_sqlite(client):
+        pytest.skip("Skipping test for sqlite clients")
+
+    # Test 0: Mixed batch with starts and completes
+    call_id_mixed_start = generate_id()
+    call_id_mixed_complete = generate_id()
+    trace_id = generate_id()
+
+    mixed_batch = tsi.CallsStartBatchReq(
+        project_id=project_id,
+        batch=[
+            tsi.CallBatchStartMode(
+                mode="start",
+                req=tsi.CallStartReq(
+                    start=tsi.StartedCallSchemaForInsert(
+                        project_id=project_id,
+                        id=call_id_mixed_start,
+                        trace_id=trace_id,
+                        op_name="mixed_start",
+                        started_at=datetime.datetime.now(),
+                        attributes={},
+                        inputs={"test": "start"},
+                    )
+                ),
+            ),
+            tsi.CallBatchCompleteMode(
+                mode="complete",
+                req=tsi.CallCompleteReq(
+                    complete=tsi.CompletedCallSchemaForInsert(
+                        project_id=project_id,
+                        id=call_id_mixed_complete,
+                        trace_id=trace_id,
+                        op_name="mixed_complete",
+                        started_at=datetime.datetime.now(),
+                        ended_at=datetime.datetime.now()
+                        + datetime.timedelta(seconds=1),
+                        attributes={},
+                        inputs={"test": "complete"},
+                        output={"result": 99},
+                        summary={},
+                    )
+                ),
+            ),
+        ],
+    )
+    server.calls_start_batch(mixed_batch)
+
+    # Verify mixed batch calls exist in BOTH tables
+    assert verify_call_exists_in_table(
+        clickhouse_client, project_id, call_id_mixed_start, "calls_complete"
+    ), "Mixed start should exist in calls_complete"
+    assert verify_call_exists_in_table(
+        clickhouse_client, project_id, call_id_mixed_start, "calls_merged"
+    ), "Mixed start should exist in calls_merged"
+    assert verify_call_exists_in_table(
+        clickhouse_client, project_id, call_id_mixed_complete, "calls_complete"
+    ), "Mixed complete should exist in calls_complete"
+    assert verify_call_exists_in_table(
+        clickhouse_client, project_id, call_id_mixed_complete, "calls_merged"
+    ), "Mixed complete should exist in calls_merged"
+
+    # Test 1: Start calls - should write to BOTH tables
+    call_id_start = generate_id()
+    trace_id = generate_id()
+
+    start = tsi.StartedCallSchemaForInsert(
+        project_id=project_id,
+        id=call_id_start,
+        trace_id=trace_id,
+        op_name="dual_write_read_complete_start",
+        started_at=datetime.datetime.now(),
+        attributes={},
+        inputs={"test": "start"},
+    )
+
+    req_start = tsi.CallsStartBatchReq(
+        project_id=project_id,
+        batch=[tsi.CallBatchStartMode(mode="start", req=tsi.CallStartReq(start=start))],
+    )
+    server.calls_start_batch(req_start)
+
+    # Verify call exists in BOTH tables
+    assert verify_call_exists_in_table(
+        clickhouse_client, project_id, call_id_start, "calls_complete"
+    )
+    assert verify_call_exists_in_table(
+        clickhouse_client, project_id, call_id_start, "calls_merged"
+    )
+
+    # Test 2: Complete calls - should write to BOTH tables
+    call_id_complete = generate_id()
+
+    complete = tsi.CompletedCallSchemaForInsert(
+        project_id=project_id,
+        id=call_id_complete,
+        trace_id=trace_id,
+        op_name="dual_write_read_complete_complete",
+        started_at=datetime.datetime.now(),
+        ended_at=datetime.datetime.now() + datetime.timedelta(seconds=1),
+        attributes={},
+        inputs={"test": "complete"},
+        output={"result": 42},
+        summary={},
+    )
+
+    req_complete = tsi.CallsStartBatchReq(
+        project_id=project_id,
+        batch=[
+            tsi.CallBatchCompleteMode(
+                mode="complete", req=tsi.CallCompleteReq(complete=complete)
+            )
+        ],
+    )
+    server.calls_start_batch(req_complete)
+
+    # Verify complete call in BOTH tables
+    assert verify_call_exists_in_table(
+        clickhouse_client, project_id, call_id_complete, "calls_complete"
+    )
+    assert verify_call_exists_in_table(
+        clickhouse_client, project_id, call_id_complete, "calls_merged"
+    )
+
+    # Test 3: End batch - should update BOTH tables
+    end = tsi.EndedCallSchemaForInsert(
+        project_id=project_id,
+        id=call_id_start,
+        ended_at=datetime.datetime.now(),
+        output={"result": "ended"},
+        summary={},
+    )
+
+    req_end = tsi.CallsEndBatchReq(
+        project_id=project_id,
+        batch=[tsi.CallBatchEndMode(mode="end", req=tsi.CallEndReq(end=end))],
+    )
+    server.calls_end_batch(req_end)
+
+    # Verify end updates in BOTH tables
+    complete_rows = query_calls_complete(clickhouse_client, project_id, call_id_start)
+    merged_rows = query_calls_merged(clickhouse_client, project_id, call_id_start)
+    assert len(complete_rows) == 1
+    assert complete_rows[0]["ended_at"] is not None
+    assert len(merged_rows) == 1
+    assert merged_rows[0]["ended_at"] is not None
+
+    # Test 4: Delete - should soft delete in BOTH tables
+    delete_req = tsi.CallsDeleteReq(project_id=project_id, call_ids=[call_id_complete])
+    delete_res = server.calls_delete(delete_req)
+    assert delete_res.num_deleted == 1
+
+    assert verify_call_deleted_in_table(
+        clickhouse_client, project_id, call_id_complete, "calls_complete"
+    )
+    assert verify_call_deleted_in_table(
+        clickhouse_client, project_id, call_id_complete, "calls_merged"
+    )
+
+    # Test 5: Update display name - should update BOTH tables
+    update_req = tsi.CallUpdateReq(
+        project_id=project_id,
+        call_id=call_id_start,
+        display_name="Dual Write Read Complete Name",
+    )
+    server.call_update(update_req)
+
+    # Verify display name in BOTH tables
+    complete_rows_after = query_calls_complete(
+        clickhouse_client, project_id, call_id_start
+    )
+    merged_rows_after = query_calls_merged(clickhouse_client, project_id, call_id_start)
+    assert complete_rows_after[0]["display_name"] == "Dual Write Read Complete Name"
+    assert merged_rows_after[0]["display_name"] == "Dual Write Read Complete Name"
+
+
+def test_force_legacy_mode_comprehensive(
+    client, clickhouse_client, server, project_id, force_legacy_mode
+):
+    """Comprehensive test for FORCE_LEGACY mode covering all operations.
+
+    Expected behavior for all projects:
+    - Writes: Go to calls_merged ONLY
+    - Reads: Come from calls_merged table
+    """
+    if client_is_sqlite(client):
+        pytest.skip("Skipping test for sqlite clients")
+
+    # Test 1: Start calls - should write to calls_merged ONLY
+    call_id_start = generate_id()
+    trace_id = generate_id()
+
+    start = tsi.StartedCallSchemaForInsert(
+        project_id=project_id,
+        id=call_id_start,
+        trace_id=trace_id,
+        op_name="legacy_start",
+        started_at=datetime.datetime.now(),
+        attributes={},
+        inputs={"test": "start"},
+    )
+
+    req_start = tsi.CallsStartBatchReq(
+        project_id=project_id,
+        batch=[tsi.CallBatchStartMode(mode="start", req=tsi.CallStartReq(start=start))],
+    )
+    server.calls_start_batch(req_start)
+
+    # Verify call exists ONLY in calls_merged
+    assert verify_call_exists_in_table(
+        clickhouse_client, project_id, call_id_start, "calls_merged"
+    ), "Start call should exist in calls_merged"
+    assert not verify_call_exists_in_table(
+        clickhouse_client, project_id, call_id_start, "calls_complete"
+    ), "Start call should NOT exist in calls_complete in FORCE_LEGACY mode"
+
+    # Test 2: Complete calls - should write to calls_merged ONLY
+    call_id_complete = generate_id()
+
+    complete = tsi.CompletedCallSchemaForInsert(
+        project_id=project_id,
+        id=call_id_complete,
+        trace_id=trace_id,
+        op_name="legacy_complete",
+        started_at=datetime.datetime.now(),
+        ended_at=datetime.datetime.now() + datetime.timedelta(seconds=1),
+        attributes={},
+        inputs={"test": "complete"},
+        output={"result": 42},
+        summary={},
+    )
+
+    req_complete = tsi.CallsStartBatchReq(
+        project_id=project_id,
+        batch=[
+            tsi.CallBatchCompleteMode(
+                mode="complete", req=tsi.CallCompleteReq(complete=complete)
+            )
+        ],
+    )
+    server.calls_start_batch(req_complete)
+
+    # Verify complete call ONLY in calls_merged
+    assert verify_call_exists_in_table(
+        clickhouse_client, project_id, call_id_complete, "calls_merged"
+    ), "Complete call should exist in calls_merged"
+    assert not verify_call_exists_in_table(
+        clickhouse_client, project_id, call_id_complete, "calls_complete"
+    ), "Complete call should NOT exist in calls_complete in FORCE_LEGACY mode"
+
+    # Test 3: End batch - should update calls_merged ONLY
+    end = tsi.EndedCallSchemaForInsert(
+        project_id=project_id,
+        id=call_id_start,
+        ended_at=datetime.datetime.now(),
+        output={"result": "ended"},
+        summary={},
+    )
+
+    req_end = tsi.CallsEndBatchReq(
+        project_id=project_id,
+        batch=[tsi.CallBatchEndMode(mode="end", req=tsi.CallEndReq(end=end))],
+    )
+    server.calls_end_batch(req_end)
+
+    # Verify end updates ONLY in calls_merged
+    merged_rows = query_calls_merged(clickhouse_client, project_id, call_id_start)
+    assert len(merged_rows) == 1
+    assert merged_rows[0]["ended_at"] is not None
+
+    # Test 4: Delete - should soft delete in calls_merged ONLY
+    delete_req = tsi.CallsDeleteReq(project_id=project_id, call_ids=[call_id_complete])
+    delete_res = server.calls_delete(delete_req)
+    assert delete_res.num_deleted == 1
+
+    assert verify_call_deleted_in_table(
+        clickhouse_client, project_id, call_id_complete, "calls_merged"
+    ), "Call should be deleted in calls_merged"
+
+    # Test 5: Update display name - should update calls_merged ONLY
+    update_req = tsi.CallUpdateReq(
+        project_id=project_id, call_id=call_id_start, display_name="Legacy Mode Name"
+    )
+    server.call_update(update_req)
+
+    # Verify display name ONLY in calls_merged
+    merged_rows_after = query_calls_merged(clickhouse_client, project_id, call_id_start)
+    assert merged_rows_after[0]["display_name"] == "Legacy Mode Name"
+
+
+# ============================================================================
+# PARAMETRIZED CROSS-MODE TESTS
+# These tests verify consistent behavior across all modes
+# ============================================================================
+
+
+@pytest.mark.parametrize(
+    (
+        "mode_fixture_name",
+        "residence_state",
+        "expected_complete_table",
+        "expected_merged_table",
+    ),
+    MODE_PARAMS,
+)
+def test_start_call_routing_across_modes(
+    client,
+    clickhouse_client,
+    server,
+    project_id,
+    mode_fixture_name,
+    residence_state,
+    expected_complete_table,
+    expected_merged_table,
+    request,
+):
+    """Parametrized test verifying start call routing across all modes and residence states."""
+    if client_is_sqlite(client):
+        pytest.skip("Skipping test for sqlite clients")
+
+    # Apply the mode fixture
+    mode_fixture = request.getfixturevalue(mode_fixture_name)
+
+    # Setup project residence state
+    setup_project_residence(clickhouse_client, project_id, residence_state)
+
+    # Create a start call
+    call_id = generate_id()
+    trace_id = generate_id()
+
+    start = tsi.StartedCallSchemaForInsert(
+        project_id=project_id,
+        id=call_id,
+        trace_id=trace_id,
+        op_name=f"test_op_{mode_fixture_name}_{residence_state.value}",
+        started_at=datetime.datetime.now(),
+        attributes={},
+        inputs={"mode": mode_fixture_name, "residence": residence_state.value},
+    )
+
+    req = tsi.CallsStartBatchReq(
+        project_id=project_id,
+        batch=[tsi.CallBatchStartMode(mode="start", req=tsi.CallStartReq(start=start))],
+    )
+    server.calls_start_batch(req)
+
+    # Verify presence in expected tables
+    in_complete = verify_call_exists_in_table(
+        clickhouse_client, project_id, call_id, "calls_complete"
+    )
+    in_merged = verify_call_exists_in_table(
+        clickhouse_client, project_id, call_id, "calls_merged"
+    )
+
+    assert in_complete == expected_complete_table, (
+        f"Mode {mode_fixture_name}, Residence {residence_state.value}: Expected call in calls_complete={expected_complete_table}, got {in_complete}"
+    )
+    assert in_merged == expected_merged_table, (
+        f"Mode {mode_fixture_name}, Residence {residence_state.value}: Expected call in calls_merged={expected_merged_table}, got {in_merged}"
+    )
+
+
+@pytest.mark.parametrize(
+    (
+        "mode_fixture_name",
+        "residence_state",
+        "expected_complete_table",
+        "expected_merged_table",
+    ),
+    MODE_PARAMS,
+)
+def test_delete_routing_across_modes(
+    client,
+    clickhouse_client,
+    server,
+    project_id,
+    mode_fixture_name,
+    residence_state,
+    expected_complete_table,
+    expected_merged_table,
+    request,
+):
+    """Parametrized test verifying delete routing across all modes and residence states."""
+    if client_is_sqlite(client):
+        pytest.skip("Skipping test for sqlite clients")
+
+    # Apply the mode fixture
+    mode_fixture = request.getfixturevalue(mode_fixture_name)
+
+    # Setup project residence state
+    setup_project_residence(clickhouse_client, project_id, residence_state)
+
+    # Create a call
+    call_id = generate_id()
+    trace_id = generate_id()
+
+    start = tsi.StartedCallSchemaForInsert(
+        project_id=project_id,
+        id=call_id,
+        trace_id=trace_id,
+        op_name=f"delete_test_{mode_fixture_name}_{residence_state.value}",
+        started_at=datetime.datetime.now(),
+        attributes={},
+        inputs={},
+    )
+
+    req = tsi.CallsStartBatchReq(
+        project_id=project_id,
+        batch=[tsi.CallBatchStartMode(mode="start", req=tsi.CallStartReq(start=start))],
+    )
+    server.calls_start_batch(req)
+
+    # Delete the call
+    delete_req = tsi.CallsDeleteReq(project_id=project_id, call_ids=[call_id])
+    delete_res = server.calls_delete(delete_req)
+    assert delete_res.num_deleted == 1
+
+    # Verify deletion in expected tables
+    deleted_in_complete = (
+        verify_call_deleted_in_table(
+            clickhouse_client, project_id, call_id, "calls_complete"
+        )
+        if expected_complete_table
+        else False
+    )
+    deleted_in_merged = (
+        verify_call_deleted_in_table(
+            clickhouse_client, project_id, call_id, "calls_merged"
+        )
+        if expected_merged_table
+        else False
+    )
+
+    if expected_complete_table:
+        assert deleted_in_complete, (
+            f"Mode {mode_fixture_name}, Residence {residence_state.value}: Call should be deleted in calls_complete"
+        )
+    if expected_merged_table:
+        assert deleted_in_merged, (
+            f"Mode {mode_fixture_name}, Residence {residence_state.value}: Call should be deleted in calls_merged"
+        )
+
+
+@pytest.mark.parametrize(
+    (
+        "mode_fixture_name",
+        "residence_state",
+        "expected_complete_table",
+        "expected_merged_table",
+    ),
+    MODE_PARAMS,
+)
+def test_update_display_name_routing_across_modes(
+    client,
+    clickhouse_client,
+    server,
+    project_id,
+    mode_fixture_name,
+    residence_state,
+    expected_complete_table,
+    expected_merged_table,
+    request,
+):
+    """Parametrized test verifying display name update routing across all modes and residence states."""
+    if client_is_sqlite(client):
+        pytest.skip("Skipping test for sqlite clients")
+
+    # Apply the mode fixture
+    mode_fixture = request.getfixturevalue(mode_fixture_name)
+
+    # Setup project residence state
+    setup_project_residence(clickhouse_client, project_id, residence_state)
+
+    # Create a call
+    call_id = generate_id()
+    trace_id = generate_id()
+
+    start = tsi.StartedCallSchemaForInsert(
+        project_id=project_id,
+        id=call_id,
+        trace_id=trace_id,
+        op_name=f"update_test_{mode_fixture_name}_{residence_state.value}",
+        started_at=datetime.datetime.now(),
+        attributes={},
+        inputs={},
+    )
+
+    req = tsi.CallsStartBatchReq(
+        project_id=project_id,
+        batch=[tsi.CallBatchStartMode(mode="start", req=tsi.CallStartReq(start=start))],
+    )
+    server.calls_start_batch(req)
+
+    # Update display name
+    display_name = f"Updated Name - {mode_fixture_name} - {residence_state.value}"
+    update_req = tsi.CallUpdateReq(
+        project_id=project_id, call_id=call_id, display_name=display_name
+    )
+    server.call_update(update_req)
+
+    # Verify update in expected tables
+    if expected_complete_table:
+        complete_rows = query_calls_complete(clickhouse_client, project_id, call_id)
+        assert len(complete_rows) == 1, (
+            f"Mode {mode_fixture_name}, Residence {residence_state.value}: Expected 1 row in calls_complete"
+        )
+        assert complete_rows[0]["display_name"] == display_name, (
+            f"Mode {mode_fixture_name}, Residence {residence_state.value}: Display name not updated in calls_complete"
+        )
+
+    if expected_merged_table:
+        merged_rows = query_calls_merged(clickhouse_client, project_id, call_id)
+        assert len(merged_rows) == 1, (
+            f"Mode {mode_fixture_name}, Residence {residence_state.value}: Expected 1 row in calls_merged"
+        )
+        assert merged_rows[0]["display_name"] == display_name, (
+            f"Mode {mode_fixture_name}, Residence {residence_state.value}: Display name not updated in calls_merged"
+        )
