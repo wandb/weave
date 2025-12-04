@@ -24,8 +24,10 @@ from weave.trace.refs import (
     LIST_INDEX_EDGE_NAME,
     OBJECT_ATTR_EDGE_NAME,
     TABLE_ROW_ID_EDGE_NAME,
+    CallRef,
     DeletedRef,
     ObjectRef,
+    OpRef,
     RefWithExtra,
     TableRef,
 )
@@ -826,7 +828,7 @@ def make_trace_obj(
             parent=parent,
         )
 
-    if extra and not isinstance(val, DeletedRef):
+    if extra and not isinstance(val, (DeletedRef, ObjectRef, OpRef, CallRef)):
         # This is where extra resolution happens?
         for extra_index in range(0, len(extra), 2):
             op, arg = extra[extra_index], extra[extra_index + 1]
