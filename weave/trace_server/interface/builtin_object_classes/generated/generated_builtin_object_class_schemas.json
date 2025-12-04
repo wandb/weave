@@ -1544,6 +1544,21 @@
           "default": null,
           "title": "Datasets Show Version Indicator"
         },
+        "selected_datasets": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Selected Datasets"
+        },
         "dataset_display_names": {
           "anyOf": [
             {
