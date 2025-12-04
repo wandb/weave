@@ -11,7 +11,11 @@ from pydantic.json_schema import SkipJsonSchema
 from typing_extensions import Self
 
 from weave.trace.env import weave_trace_server_url
-from weave.trace.settings import max_calls_queue_size, should_enable_disk_fallback
+from weave.trace.settings import (
+    http_timeout,
+    max_calls_queue_size,
+    should_enable_disk_fallback,
+)
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ids import generate_id
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
@@ -29,17 +33,11 @@ from weave.trace_server_bindings.models import (
     ServerInfoRes,
     StartBatchItem,
 )
-from weave.utils import http_requests
 from weave.utils.project_id import from_project_id
 from weave.utils.retry import get_current_retry_id, with_retry
 from weave.wandb_interface import project_creator
 
 logger = logging.getLogger(__name__)
-
-# Default timeout values (in seconds)
-# DEFAULT_CONNECT_TIMEOUT = 10
-# DEFAULT_READ_TIMEOUT = 30
-# DEFAULT_TIMEOUT = (DEFAULT_CONNECT_TIMEOUT, DEFAULT_READ_TIMEOUT)
 
 
 class RemoteHTTPTraceServer(TraceServerClientInterface):
@@ -75,6 +73,21 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         self._extra_headers: dict[str, str] | None = extra_headers
         self.remote_request_bytes_limit = remote_request_bytes_limit
 
+        # Create httpx client with base_url, timeout and connection limits
+        # Use event hooks to add dynamic headers (retry ID)
+        def add_dynamic_headers(request: httpx.Request) -> None:
+            headers = dict(self._extra_headers) if self._extra_headers else {}
+            if retry_id := get_current_retry_id():
+                headers["X-Weave-Retry-Id"] = retry_id
+            request.headers.update(headers)
+
+        self._client = httpx.Client(
+            base_url=trace_server_url,
+            timeout=http_timeout(),
+            limits=httpx.Limits(max_connections=None, max_keepalive_connections=None),
+            event_hooks={"request": [add_dynamic_headers]},
+        )
+
     def ensure_project_exists(
         self, entity: str, project: str
     ) -> tsi.EnsureProjectExistsRes:
@@ -91,55 +104,16 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
     def set_auth(self, auth: tuple[str, str]) -> None:
         self._auth = auth
 
-    def _build_dynamic_request_headers(self) -> dict[str, str]:
-        """Build headers for HTTP requests, including extra headers and retry ID."""
-        headers = dict(self._extra_headers) if self._extra_headers else {}
-        if retry_id := get_current_retry_id():
-            headers["X-Weave-Retry-Id"] = retry_id
-        return headers
-
-    def get(self, url: str, *args: Any, **kwargs: Any) -> httpx.Response:
-        headers = self._build_dynamic_request_headers()
-
-        return http_requests.get(
-            self.trace_server_url + url,
-            *args,
-            auth=self._auth,
-            headers=headers,
-            **kwargs,
-        )
-
-    def post(self, url: str, *args: Any, **kwargs: Any) -> httpx.Response:
-        headers = self._build_dynamic_request_headers()
-
-        return http_requests.post(
-            self.trace_server_url + url,
-            *args,
-            auth=self._auth,
-            headers=headers,
-            **kwargs,
-        )
-
-    def delete(self, url: str, *args: Any, **kwargs: Any) -> httpx.Response:
-        headers = self._build_dynamic_request_headers()
-
-        return http_requests.delete(
-            self.trace_server_url + url,
-            *args,
-            auth=self._auth,
-            headers=headers,
-            **kwargs,
-        )
-
     @with_retry
     def _send_batch_to_server(self, encoded_data: bytes) -> None:
         """Send a batch of data to the server with retry logic.
 
         This method is separated from _flush_calls to avoid recursive retries.
         """
-        r = self.post(
+        r = self._client.post(
             "/call/upsert_batch",
             data=encoded_data,  # type: ignore
+            auth=self._auth,
         )
         handle_response_error(r, "/call/upsert_batch")
 
@@ -193,9 +167,10 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
 
         This method is separated from _flush_feedback to avoid recursive retries.
         """
-        r = self.post(
+        r = self._client.post(
             "/feedback/batch/create",
             data=encoded_data,  # type: ignore
+            auth=self._auth,
         )
         handle_response_error(r, "/feedback/batch/create")
 
@@ -283,13 +258,14 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         req: BaseModel,
         stream: bool = False,
     ) -> httpx.Response:
-        r = self.post(
+        # `by_alias` is required since we have Mongo-style properties in the
+        # query models that are aliased to conform to start with `$`. Without
+        # this, the model_dump will use the internal property names which are
+        # not valid for the `model_validate` step.
+        r = self._client.post(
             url,
-            # `by_alias` is required since we have Mongo-style properties in the
-            # query models that are aliased to conform to start with `$`. Without
-            # this, the model_dump will use the internal property names which are
-            # not valid for the `model_validate` step.
             data=req.model_dump_json(by_alias=True).encode("utf-8"),
+            auth=self._auth,
             stream=stream,
         )
         handle_response_error(r, url)
@@ -302,7 +278,7 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         params: dict[str, Any] | None = None,
         stream: bool = False,
     ) -> httpx.Response:
-        r = self.get(url, params=params or {}, stream=stream)
+        r = self._client.get(url, params=params or {}, auth=self._auth, stream=stream)
         handle_response_error(r, url)
         return r
 
@@ -313,7 +289,9 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         params: dict[str, Any] | None = None,
         stream: bool = False,
     ) -> httpx.Response:
-        r = self.delete(url, params=params or {}, stream=stream)
+        r = self._client.delete(
+            url, params=params or {}, auth=self._auth, stream=stream
+        )
         handle_response_error(r, url)
         return r
 
@@ -551,19 +529,21 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
 
     @with_retry
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
-        r = self.post(
+        r = self._client.post(
             "/files/create",
             data={"project_id": req.project_id},
             files={"file": (req.name, req.content)},
+            auth=self._auth,
         )
         handle_response_error(r, "/files/create")
         return tsi.FileCreateRes.model_validate(r.json())
 
     @with_retry
     def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
-        r = self.post(
+        r = self._client.post(
             "/files/content",
             json={"project_id": req.project_id, "digest": req.digest},
+            auth=self._auth,
         )
         handle_response_error(r, "/files/content")
         # TODO: Should stream to disk rather than to memory

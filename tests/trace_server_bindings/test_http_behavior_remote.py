@@ -28,7 +28,7 @@ def unbatched_server():
     return RemoteHTTPTraceServer("http://example.com")
 
 
-@patch("weave.utils.http_requests.post")
+@patch.object(RemoteHTTPTraceServer, "post")
 def test_call_start_ok(mock_post, unbatched_server):
     """Test successful call_start request."""
     call_id = generate_id()
@@ -43,7 +43,7 @@ def test_call_start_ok(mock_post, unbatched_server):
     mock_post.assert_called_once()
 
 
-@patch("weave.utils.http_requests.post")
+@patch.object(RemoteHTTPTraceServer, "post")
 def test_400_no_retry(mock_post, unbatched_server):
     """Test that 400 errors are not retried."""
     call_id = generate_id()
@@ -65,7 +65,7 @@ def test_invalid_no_retry(unbatched_server):
         unbatched_server.call_start(tsi.CallStartReq(start={"invalid": "broken"}))
 
 
-@patch("weave.utils.http_requests.post")
+@patch.object(RemoteHTTPTraceServer, "post")
 def test_500_502_503_504_429_retry(mock_post, unbatched_server, monkeypatch):
     """Test that 5xx and 429 errors are retried."""
     monkeypatch.setenv("WEAVE_RETRY_MAX_ATTEMPTS", "6")
@@ -88,7 +88,7 @@ def test_500_502_503_504_429_retry(mock_post, unbatched_server, monkeypatch):
     unbatched_server.call_start(tsi.CallStartReq(start=start))
 
 
-@patch("weave.utils.http_requests.post")
+@patch.object(RemoteHTTPTraceServer, "post")
 def test_other_error_retry(mock_post, unbatched_server, monkeypatch):
     """Test that connection errors are retried."""
     monkeypatch.setenv("WEAVE_RETRY_MAX_ATTEMPTS", "6")
@@ -110,7 +110,7 @@ def test_other_error_retry(mock_post, unbatched_server, monkeypatch):
     unbatched_server.call_start(tsi.CallStartReq(start=start))
 
 
-@patch("weave.utils.http_requests.post")
+@patch.object(RemoteHTTPTraceServer, "post")
 def test_timeout_retry_mechanism(mock_post, success_response):
     """Test that timeouts trigger the retry mechanism."""
     server = RemoteHTTPTraceServer("http://example.com", should_batch=True)
@@ -154,7 +154,7 @@ def fast_retrying_server():
 
 
 @pytest.mark.disable_logging_error_check
-@patch("weave.utils.http_requests.post")
+@patch.object(RemoteHTTPTraceServer, "post")
 def test_post_timeout(mock_post, success_response, fast_retrying_server, log_collector):
     """Test batch recovery after timeout exhaustion.
 
