@@ -37,7 +37,7 @@ def patch_kafka_producer():
     If a test needs to test the Kafka producer, they should orride this patch explicitly.
     """
     with patch(
-        "weave.trace_server.clickhouse_trace_server_batched.KafkaProducer.from_env",
+        "weave.trace_server.kafka.KafkaProducer.from_env",
         return_value=MagicMock(),
     ):
         yield
@@ -70,6 +70,23 @@ def reset_serializer_load_refs():
     for serializer in SERIALIZERS:
         if isinstance(serializer.load, Op):
             remove_ref(serializer.load)
+
+
+@pytest.fixture(autouse=True)
+def reset_project_residence_cache():
+    """Reset the project residence cache between tests.
+
+    The project residence cache stores the residence (merged/complete/both) of a project's data.
+    This needs to be cleared between tests to prevent state leakage, especially when tests
+    create projects with the same name but different data characteristics.
+    """
+    from weave.trace_server.project_version.project_version import (
+        _project_residence_cache,
+    )
+
+    _project_residence_cache.clear()
+    yield
+    _project_residence_cache.clear()
 
 
 @pytest.fixture(autouse=True)
