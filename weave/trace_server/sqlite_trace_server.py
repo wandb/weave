@@ -263,27 +263,47 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         if not isinstance(parsable_output, dict):
             parsable_output = {"output": parsable_output}
         parsable_output = cast(dict, parsable_output)
+
+        # Build the UPDATE query dynamically based on which fields are provided
+        update_fields = [
+            "ended_at = ?",
+            "exception = ?",
+            "output = ?",
+            "output_refs = ?",
+            "summary = ?",
+            "wb_run_step_end = ?",
+        ]
+        update_values: list = [
+            req.end.ended_at.isoformat(),
+            req.end.exception,
+            json.dumps(req.end.output),
+            json.dumps(extract_refs_from_values(list(parsable_output.values()))),
+            json.dumps(req.end.summary),
+            req.end.wb_run_step_end,
+        ]
+
+        # Handle optional inputs update
+        if req.end.inputs is not None:
+            update_fields.append("inputs = ?")
+            update_values.append(json.dumps(req.end.inputs))
+            # Update input_refs if inputs are provided
+            update_fields.append("input_refs = ?")
+            update_values.append(json.dumps(extract_refs_from_values(req.end.inputs)))
+
+        # Handle optional attributes update
+        if req.end.attributes is not None:
+            update_fields.append("attributes = ?")
+            update_values.append(json.dumps(req.end.attributes))
+
+        # Add the WHERE clause parameter
+        update_values.append(req.end.id)
+
         with self.lock:
             cursor.execute(
-                """UPDATE calls SET
-                    ended_at = ?,
-                    exception = ?,
-                    output = ?,
-                    output_refs = ?,
-                    summary = ?,
-                    wb_run_step_end = ?
+                f"""UPDATE calls SET
+                    {', '.join(update_fields)}
                 WHERE id = ?""",
-                (
-                    req.end.ended_at.isoformat(),
-                    req.end.exception,
-                    json.dumps(req.end.output),
-                    json.dumps(
-                        extract_refs_from_values(list(parsable_output.values()))
-                    ),
-                    json.dumps(req.end.summary),
-                    req.end.wb_run_step_end,
-                    req.end.id,
-                ),
+                tuple(update_values),
             )
             conn.commit()
         return tsi.CallEndRes()

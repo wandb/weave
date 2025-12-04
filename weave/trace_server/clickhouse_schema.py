@@ -49,6 +49,10 @@ class CallEndCHInsertable(BaseModel):
     input_refs: list[str] = Field(default_factory=list)  # sadly, this is required
     output_refs: list[str]
     wb_run_step_end: int | None = None
+    
+    # Optional update fields - these OVERWRITE call start fields if provided
+    inputs_dump: str | None = None
+    attributes_dump: str | None = None
 
     _project_id_v = field_validator("project_id")(validation.project_id_validator)
     _id_v = field_validator("id")(validation.call_id_validator)

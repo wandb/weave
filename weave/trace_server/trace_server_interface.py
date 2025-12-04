@@ -197,6 +197,10 @@ class EndedCallSchemaForInsert(BaseModel):
     # Summary: a summary of the call
     summary: SummaryInsertMap
 
+    # Optional update fields, these OVERWRITE call start fields if provided
+    inputs: dict[str, Any] | None = None
+    attributes: dict[str, Any] | None = None
+
     # WB Metadata
     wb_run_step_end: int | None = None
 

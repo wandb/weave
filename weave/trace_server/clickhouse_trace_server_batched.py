@@ -5033,6 +5033,18 @@ def _end_call_for_insert_to_ch_insertable_end_call(
     output = end_call.output
     output_refs = extract_refs_from_values(output)
 
+    # Handle optional inputs update - extract refs if provided
+    inputs_dump = None
+    input_refs: list[str] = []
+    if end_call.inputs is not None:
+        inputs_dump = _dict_value_to_dump(end_call.inputs)
+        input_refs = extract_refs_from_values(end_call.inputs)
+
+    # Handle optional attributes update
+    attributes_dump = None
+    if end_call.attributes is not None:
+        attributes_dump = _dict_value_to_dump(end_call.attributes)
+
     return CallEndCHInsertable(
         project_id=end_call.project_id,
         id=end_call.id,
@@ -5041,7 +5053,10 @@ def _end_call_for_insert_to_ch_insertable_end_call(
         summary_dump=_dict_value_to_dump(dict(end_call.summary)),
         output_dump=_any_value_to_dump(output),
         output_refs=output_refs,
+        input_refs=input_refs,
         wb_run_step_end=end_call.wb_run_step_end,
+        inputs_dump=inputs_dump,
+        attributes_dump=attributes_dump,
     )
 
 
