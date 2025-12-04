@@ -1,35 +1,13 @@
 /*
-    Revert argMax changes for inputs/attributes/input_refs back to original aggregation functions
+    Revert argMax changes - remove _impl columns and restore original views
 */
 
 -- ============================================================================
--- Revert calls_merged to original schema
+-- Revert calls_merged
 -- ============================================================================
 
-DROP VIEW calls_merged_view;
-DROP TABLE calls_merged;
-
-CREATE TABLE calls_merged (
-    project_id String,
-    id String,
-    trace_id SimpleAggregateFunction(any, Nullable(String)),
-    parent_id SimpleAggregateFunction(any, Nullable(String)),
-    op_name SimpleAggregateFunction(any, Nullable(String)),
-    started_at SimpleAggregateFunction(any, Nullable(DateTime64(3))),
-    attributes_dump SimpleAggregateFunction(any, Nullable(String)),
-    inputs_dump SimpleAggregateFunction(any, Nullable(String)),
-    input_refs SimpleAggregateFunction(array_concat_agg, Array(String)),
-    ended_at SimpleAggregateFunction(any, Nullable(DateTime64(3))),
-    output_dump SimpleAggregateFunction(any, Nullable(String)),
-    summary_dump SimpleAggregateFunction(any, Nullable(String)),
-    exception SimpleAggregateFunction(any, Nullable(String)),
-    output_refs SimpleAggregateFunction(array_concat_agg, Array(String)),
-    wb_user_id SimpleAggregateFunction(any, Nullable(String)),
-    wb_run_id SimpleAggregateFunction(any, Nullable(String)),
-    deleted_at SimpleAggregateFunction(any, Nullable(DateTime64(3))),
-    display_name AggregateFunction(argMax, Nullable(String), DateTime64(3))
-) ENGINE = AggregatingMergeTree
-ORDER BY (project_id, id);
+-- Drop and recreate view with original aggregation (no _impl columns)
+DROP VIEW IF EXISTS calls_merged_view;
 
 CREATE MATERIALIZED VIEW calls_merged_view TO calls_merged AS
 SELECT project_id,
@@ -54,34 +32,18 @@ FROM call_parts
 GROUP BY project_id,
     id;
 
+-- Remove _impl columns
+ALTER TABLE calls_merged 
+    DROP COLUMN IF EXISTS attributes_dump_impl,
+    DROP COLUMN IF EXISTS inputs_dump_impl,
+    DROP COLUMN IF EXISTS input_refs_impl;
+
 -- ============================================================================
--- Revert calls_merged_stats to original schema
+-- Revert calls_merged_stats
 -- ============================================================================
 
-DROP VIEW calls_merged_stats_view;
-DROP TABLE calls_merged_stats;
-
-CREATE TABLE calls_merged_stats
-(
-    project_id String,
-    id String,
-    trace_id SimpleAggregateFunction(any, Nullable(String)),
-    parent_id SimpleAggregateFunction(any, Nullable(String)),
-    op_name SimpleAggregateFunction(any, Nullable(String)),
-    started_at SimpleAggregateFunction(any, Nullable(DateTime64(3))),
-    attributes_size_bytes SimpleAggregateFunction(any, Nullable(UInt64)),
-    inputs_size_bytes SimpleAggregateFunction(any, Nullable(UInt64)),
-    ended_at SimpleAggregateFunction(any, Nullable(DateTime64(3))),
-    output_size_bytes SimpleAggregateFunction(any, Nullable(UInt64)),
-    summary_size_bytes SimpleAggregateFunction(any, Nullable(UInt64)),
-    exception_size_bytes SimpleAggregateFunction(any, Nullable(UInt64)),
-    wb_user_id SimpleAggregateFunction(any, Nullable(String)),
-    wb_run_id SimpleAggregateFunction(any, Nullable(String)),
-    updated_at SimpleAggregateFunction(max, DateTime64(3)),
-    deleted_at SimpleAggregateFunction(any, Nullable(DateTime64(3))),
-    display_name AggregateFunction(argMax, Nullable(String), DateTime64(3))
-) ENGINE = AggregatingMergeTree()
-ORDER BY (project_id, id);
+-- Drop and recreate view with original aggregation (no _impl columns)
+DROP VIEW IF EXISTS calls_merged_stats_view;
 
 CREATE MATERIALIZED VIEW calls_merged_stats_view
 TO calls_merged_stats
@@ -108,3 +70,8 @@ FROM call_parts
 GROUP BY
     call_parts.project_id,
     call_parts.id;
+
+-- Remove _impl columns
+ALTER TABLE calls_merged_stats 
+    DROP COLUMN IF EXISTS attributes_size_bytes_impl,
+    DROP COLUMN IF EXISTS inputs_size_bytes_impl;

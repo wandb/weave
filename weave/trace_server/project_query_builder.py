@@ -27,8 +27,8 @@ def make_project_stats_query(
         sub_sqls.append(
             f"""
             (SELECT sum(
-                COALESCE(attributes_size_bytes, 0) +
-                COALESCE(inputs_size_bytes, 0) +
+                COALESCE(argMaxMerge(attributes_size_bytes_impl), 0) +
+                COALESCE(argMaxMerge(inputs_size_bytes_impl), 0) +
                 COALESCE(output_size_bytes, 0) +
                 COALESCE(summary_size_bytes, 0)
                 )

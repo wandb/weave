@@ -191,6 +191,62 @@ class CallsMergedArgMaxEndedAtField(CallsMergedDynamicField):
         )
 
 
+class CallsMergedArgMaxArrayField(CallsMergedAggField):
+    """Array field stored as JSON-serialized argMax aggregate.
+
+    input_refs is stored as AggregateFunction(argMax, String, Tuple(...)) where
+    the String is a JSON-serialized array. This field handles the deserialization.
+    """
+
+    def as_sql(
+        self,
+        pb: ParamBuilder,
+        table_alias: str,
+        cast: tsi_query.CastTo | None = None,
+        use_agg_fn: bool = True,
+    ) -> str:
+        if not use_agg_fn:
+            return f"{table_alias}.{self.field}"
+
+        # Use argMaxMerge to get the JSON string, then parse it back to array
+        inner = f"argMaxMerge({table_alias}.{self.field})"
+        # Parse JSON string back to Array(String)
+        return f"JSONExtract({inner}, 'Array(String)')"
+
+    def is_heavy(self) -> bool:
+        return False
+
+
+class CallsMergedArgMaxMergeField(CallsMergedDynamicField):
+    """Dynamic field that uses argMaxMerge for querying argMax aggregates from calls_merged.
+
+    For fields stored as AggregateFunction(argMax, T, Tuple(...)) in calls_merged,
+    we need to use argMaxMerge() when querying the aggregated table.
+    """
+
+    def as_sql(
+        self,
+        pb: ParamBuilder,
+        table_alias: str,
+        cast: tsi_query.CastTo | None = None,
+        use_agg_fn: bool = True,
+    ) -> str:
+        if not use_agg_fn:
+            inner = f"{table_alias}.{self.field}"
+            return json_dump_field_as_sql(pb, table_alias, inner, self.extra_path, cast)
+
+        # Use argMaxMerge to extract the value from the aggregate function
+        inner = f"argMaxMerge({table_alias}.{self.field})"
+        return json_dump_field_as_sql(pb, table_alias, inner, self.extra_path, cast)
+
+    def with_path(self, path: list[str]) -> "CallsMergedArgMaxMergeField":
+        extra_path = [*(self.extra_path or [])]
+        extra_path.extend(path)
+        return CallsMergedArgMaxMergeField(
+            field=self.field, agg_fn=self.agg_fn, extra_path=extra_path
+        )
+
+
 class CallsMergedSummaryField(CallsMergedField):
     """Field class for computed summary values."""
 
@@ -1267,13 +1323,17 @@ ALLOWED_CALL_FIELDS = {
     "turn_id": CallsMergedAggField(field="turn_id", agg_fn="any"),
     "op_name": CallsMergedAggField(field="op_name", agg_fn="any"),
     "started_at": CallsMergedAggField(field="started_at", agg_fn="any"),
-    # Use argMax with ended_at to prefer call END values over call START values
-    # This ensures that updates to inputs/attributes via call_end take precedence
-    "attributes_dump": CallsMergedArgMaxEndedAtField(
-        field="attributes_dump", agg_fn="any"
+    # Use argMaxMerge to query argMax aggregates from calls_merged
+    # These fields prefer call_end values over call_start via tuple ordering in the aggregate
+    "attributes_dump": CallsMergedArgMaxMergeField(
+        field="attributes_dump_impl", agg_fn="argMaxMerge"
     ),
-    "inputs_dump": CallsMergedArgMaxEndedAtField(field="inputs_dump", agg_fn="any"),
-    "input_refs": CallsMergedAggField(field="input_refs", agg_fn="array_concat_agg"),
+    "inputs_dump": CallsMergedArgMaxMergeField(
+        field="inputs_dump_impl", agg_fn="argMaxMerge"
+    ),
+    "input_refs": CallsMergedArgMaxArrayField(
+        field="input_refs_impl", agg_fn="argMaxMerge"
+    ),
     "ended_at": CallsMergedAggField(field="ended_at", agg_fn="any"),
     "output_dump": CallsMergedDynamicField(field="output_dump", agg_fn="any"),
     "output_refs": CallsMergedAggField(field="output_refs", agg_fn="array_concat_agg"),

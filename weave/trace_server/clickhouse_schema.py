@@ -202,9 +202,12 @@ REQUIRED_CALL_COLUMNS = ["id", "project_id", "trace_id", "op_name", "started_at"
 
 # Columns in the calls_merged table with special aggregation functions:
 CALL_SELECT_RAW_COLUMNS = ["id", "project_id"]  # no aggregation
-CALL_SELECT_ARRAYS_COLUMNS = ["input_refs", "output_refs"]  # array_concat_agg
-CALL_SELECT_ARGMAX_COLUMNS = ["display_name"]  # argMaxMerge
-# all others use `any`
+CALL_SELECT_ARRAYS_COLUMNS = ["output_refs"]  # array_concat_agg
+CALL_SELECT_ARGMAX_COLUMNS = [
+    "display_name",
+    "input_refs",
+]  # argMaxMerge (input_refs uses _impl column with JSON serialization)
+# all others use `any` (inputs_dump and attributes_dump use _impl columns with argMaxMerge)
 
 ALL_OBJ_SELECT_COLUMNS = list(SelectableCHObjSchema.model_fields.keys())
 ALL_OBJ_INSERT_COLUMNS = list(ObjCHInsertable.model_fields.keys())

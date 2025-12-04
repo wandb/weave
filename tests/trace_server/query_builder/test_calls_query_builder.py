@@ -75,7 +75,7 @@ def test_query_heavy_column() -> None:
         """
         SELECT
             calls_merged.id AS id,
-            any(calls_merged.inputs_dump) AS inputs_dump
+            argMax(calls_merged.inputs_dump, coalesce(calls_merged.ended_at, toDateTime64(0, 6))) AS inputs_dump
         FROM calls_merged
         WHERE calls_merged.project_id = {pb_0:String}
         GROUP BY (calls_merged.project_id, calls_merged.id)
@@ -124,7 +124,7 @@ def test_query_heavy_column_simple_filter() -> None:
         )
         SELECT
             calls_merged.id AS id,
-            any(calls_merged.inputs_dump) AS inputs_dump
+            argMax(calls_merged.inputs_dump, coalesce(calls_merged.ended_at, toDateTime64(0, 6))) AS inputs_dump
         FROM calls_merged
         WHERE
             calls_merged.project_id = {pb_1:String}
@@ -167,7 +167,7 @@ def test_query_heavy_column_simple_filter_with_order() -> None:
         )
         SELECT
             calls_merged.id AS id,
-            any(calls_merged.inputs_dump) AS inputs_dump
+            argMax(calls_merged.inputs_dump, coalesce(calls_merged.ended_at, toDateTime64(0, 6))) AS inputs_dump
         FROM calls_merged
         WHERE
             calls_merged.project_id = {pb_1:String}
@@ -214,7 +214,7 @@ def test_query_heavy_column_simple_filter_with_order_and_limit() -> None:
         )
         SELECT
             calls_merged.id AS id,
-            any(calls_merged.inputs_dump) AS inputs_dump
+            argMax(calls_merged.inputs_dump, coalesce(calls_merged.ended_at, toDateTime64(0, 6))) AS inputs_dump
         FROM calls_merged
         WHERE
             calls_merged.project_id = {pb_1:String}
@@ -297,7 +297,7 @@ def test_query_heavy_column_simple_filter_with_order_and_limit_and_mixed_query_c
         )
         SELECT
             calls_merged.id AS id,
-            any(calls_merged.inputs_dump) AS inputs_dump
+            argMax(calls_merged.inputs_dump, coalesce(calls_merged.ended_at, toDateTime64(0, 6))) AS inputs_dump
         FROM calls_merged
         WHERE
             calls_merged.project_id = {pb_9:String}
@@ -608,7 +608,7 @@ def test_calls_query_multiple_select_columns() -> None:
         """
         SELECT
             calls_merged.id AS id,
-            any(calls_merged.inputs_dump) AS inputs_dump,
+            argMax(calls_merged.inputs_dump, coalesce(calls_merged.ended_at, toDateTime64(0, 6))) AS inputs_dump,
             any(calls_merged.output_dump) AS output_dump
         FROM calls_merged
         WHERE calls_merged.project_id = {pb_0:String}
@@ -669,7 +669,7 @@ def test_calls_query_with_predicate_filters() -> None:
         )
         SELECT
             calls_merged.id AS id,
-            any(calls_merged.inputs_dump) AS inputs_dump
+            argMax(calls_merged.inputs_dump, coalesce(calls_merged.ended_at, toDateTime64(0, 6))) AS inputs_dump
         FROM calls_merged
         WHERE
             calls_merged.project_id = {pb_4:String}
@@ -845,7 +845,7 @@ def test_calls_query_with_predicate_filters_multiple_heavy_conditions() -> None:
         )
         SELECT
             calls_merged.id AS id,
-            any(calls_merged.inputs_dump) AS inputs_dump,
+            argMax(calls_merged.inputs_dump, coalesce(calls_merged.ended_at, toDateTime64(0, 6))) AS inputs_dump,
             any(calls_merged.output_dump) AS output_dump
         FROM calls_merged
         WHERE
@@ -897,7 +897,7 @@ def test_calls_query_with_or_between_start_and_end_fields() -> None:
         """
         SELECT
             calls_merged.id AS id,
-            any(calls_merged.inputs_dump) AS inputs_dump,
+            argMax(calls_merged.inputs_dump, coalesce(calls_merged.ended_at, toDateTime64(0, 6))) AS inputs_dump,
             any(calls_merged.output_dump) AS output_dump
         FROM calls_merged
         WHERE calls_merged.project_id = {pb_6:String}
@@ -1000,7 +1000,7 @@ def test_calls_query_with_complex_heavy_filters() -> None:
         )
         SELECT
             calls_merged.id AS id,
-            any(calls_merged.inputs_dump) AS inputs_dump,
+            argMax(calls_merged.inputs_dump, coalesce(calls_merged.ended_at, toDateTime64(0, 6))) AS inputs_dump,
             any(calls_merged.output_dump) AS output_dump
         FROM calls_merged
         WHERE
@@ -1228,8 +1228,8 @@ def test_calls_query_with_combined_like_optimizations_and_op_filter() -> None:
         )
         SELECT
             calls_merged.id AS id,
-            any(calls_merged.attributes_dump) AS attributes_dump,
-            any(calls_merged.inputs_dump) AS inputs_dump
+            argMax(calls_merged.attributes_dump, coalesce(calls_merged.ended_at, toDateTime64(0, 6))) AS attributes_dump,
+            argMax(calls_merged.inputs_dump, coalesce(calls_merged.ended_at, toDateTime64(0, 6))) AS inputs_dump
         FROM calls_merged
         WHERE
             calls_merged.project_id = {pb_12:String}
@@ -1275,7 +1275,7 @@ def test_calls_query_with_unoptimizable_or_condition() -> None:
         """
         SELECT
             calls_merged.id AS id,
-            any(calls_merged.inputs_dump) AS inputs_dump
+            argMax(calls_merged.inputs_dump, coalesce(calls_merged.ended_at, toDateTime64(0, 6))) AS inputs_dump
         FROM calls_merged
         WHERE
             calls_merged.project_id = {pb_5:String}
@@ -1314,7 +1314,7 @@ def test_calls_query_filter_by_empty_string() -> None:
         """
         SELECT
             calls_merged.id AS id,
-            any(calls_merged.inputs_dump) AS inputs_dump
+            argMax(calls_merged.inputs_dump, coalesce(calls_merged.ended_at, toDateTime64(0, 6))) AS inputs_dump
         FROM calls_merged
         WHERE calls_merged.project_id = {pb_2:String}
         GROUP BY (calls_merged.project_id, calls_merged.id)
@@ -2390,7 +2390,7 @@ def test_query_with_optimization_and_attributes_order() -> None:
         )
         SELECT
             calls_merged.id AS id,
-            any(calls_merged.inputs_dump) AS inputs_dump
+            argMax(calls_merged.inputs_dump, coalesce(calls_merged.ended_at, toDateTime64(0, 6))) AS inputs_dump
         FROM calls_merged
         WHERE calls_merged.project_id = {pb_1:String}
             AND (calls_merged.id IN filtered_calls)
