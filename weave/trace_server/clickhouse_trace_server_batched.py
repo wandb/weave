@@ -415,18 +415,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             for idx in obj_id_idx_map[result.object_id]:
                 calls[idx][0].op_name = op_ref_uri
 
-        # Construct batch rows directly for insertion
+        # Convert calls to CH insertable format and then to rows for batch insertion
         batch_rows = []
         for start_call, end_call in calls:
-            # Convert start call to row
-            start_dict = start_call.model_dump()
-            start_row = [start_dict.get(col) for col in ALL_CALL_INSERT_COLUMNS]
-            batch_rows.append(start_row)
-
-            # Convert end call to row
-            end_dict = end_call.model_dump()
-            end_row = [end_dict.get(col) for col in ALL_CALL_INSERT_COLUMNS]
-            batch_rows.append(end_row)
+            ch_start = _start_call_for_insert_to_ch_insertable_start_call(
+                start_call, self
+            )
+            ch_end = _end_call_for_insert_to_ch_insertable_end_call(end_call, self)
+            batch_rows.append(_ch_call_to_row(ch_start))
+            batch_rows.append(_ch_call_to_row(ch_end))
 
         # Insert directly without async_insert for OTEL calls
         self._insert_call_batch(batch_rows, settings=None, do_sync_insert=True)
@@ -4997,6 +4994,12 @@ def _ch_table_stats_to_table_stats_schema(
         digest=digest,
         storage_size_bytes=storage_size_bytes,
     )
+
+
+def _ch_call_to_row(ch_call: CallCHInsertable) -> list[Any]:
+    """Convert a CH insertable call to a row for batch insertion with the correct defaults."""
+    call_dict = ch_call.model_dump()
+    return [call_dict.get(col) for col in ALL_CALL_INSERT_COLUMNS]
 
 
 def _start_call_for_insert_to_ch_insertable_start_call(
