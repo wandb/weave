@@ -51,6 +51,16 @@
       "title": "ActionSpec",
       "type": "object"
     },
+    "AggregationMethod": {
+      "enum": [
+        "latest",
+        "average",
+        "max",
+        "min"
+      ],
+      "title": "AggregationMethod",
+      "type": "string"
+    },
     "AndOperation": {
       "description": "Logical AND. All conditions must evaluate to true.\n\nExample:\n    ```\n    {\n        \"$and\": [\n            {\"$eq\": [{\"$getField\": \"op_name\"}, {\"$literal\": \"predict\"}]},\n            {\"$gt\": [{\"$getField\": \"summary.usage.tokens\"}, {\"$literal\": 1000}]}\n        ]\n    }\n    ```",
       "properties": {
@@ -455,6 +465,15 @@
       ],
       "title": "ChartConfig",
       "type": "object"
+    },
+    "ColorScheme": {
+      "enum": [
+        "diverging",
+        "sequential",
+        "categorical"
+      ],
+      "title": "ColorScheme",
+      "type": "string"
     },
     "Column": {
       "properties": {
@@ -885,6 +904,15 @@
       ],
       "title": "GetFieldOperator",
       "type": "object"
+    },
+    "GroupingStrategy": {
+      "enum": [
+        "model",
+        "dataset",
+        "scorer"
+      ],
+      "title": "GroupingStrategy",
+      "type": "string"
     },
     "GtOperation": {
       "description": "Greater than comparison.\n\nExample:\n    ```\n    {\n        \"$gt\": [{\"$getField\": \"summary.usage.tokens\"}, {\"$literal\": 100}]\n    }\n    ```",
@@ -1415,6 +1443,173 @@
           ],
           "default": null,
           "title": "Calls Query"
+        },
+        "color_scheme": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ColorScheme"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "grouping_by": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/GroupingStrategy"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "models_use_version_grouping": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Models Use Version Grouping"
+        },
+        "models_show_version_indicator": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Models Show Version Indicator"
+        },
+        "selected_models": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Selected Models"
+        },
+        "model_display_names": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model Display Names"
+        },
+        "datasets_use_version_grouping": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Datasets Use Version Grouping"
+        },
+        "datasets_show_version_indicator": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Datasets Show Version Indicator"
+        },
+        "dataset_display_names": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dataset Display Names"
+        },
+        "dataset_version_aggregation": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AggregationMethod"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "score_selection_strategy": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ScoreSelectionStrategy"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "manual_version_selections": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Manual Version Selections"
+        },
+        "metric_configs": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/MetricConfig"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Metric Configs"
         }
       },
       "required": [
@@ -1605,6 +1800,39 @@
         "role"
       ],
       "title": "Message",
+      "type": "object"
+    },
+    "MetricConfig": {
+      "properties": {
+        "dataset_name": {
+          "title": "Dataset Name",
+          "type": "string"
+        },
+        "scorer_name": {
+          "title": "Scorer Name",
+          "type": "string"
+        },
+        "metric_path": {
+          "title": "Metric Path",
+          "type": "string"
+        },
+        "should_minimize": {
+          "title": "Should Minimize",
+          "type": "boolean"
+        },
+        "selected": {
+          "title": "Selected",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "dataset_name",
+        "scorer_name",
+        "metric_path",
+        "should_minimize",
+        "selected"
+      ],
+      "title": "MetricConfig",
       "type": "object"
     },
     "NotOperation": {
@@ -2119,6 +2347,15 @@
       },
       "title": "SavedViewDefinition",
       "type": "object"
+    },
+    "ScoreSelectionStrategy": {
+      "enum": [
+        "latest",
+        "average",
+        "manual"
+      ],
+      "title": "ScoreSelectionStrategy",
+      "type": "string"
     },
     "SortBy": {
       "additionalProperties": false,
