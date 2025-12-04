@@ -71,6 +71,10 @@ from weave.trace_server.constants import (
     COMPLETIONS_CREATE_OP_NAME,
     IMAGE_GENERATION_CREATE_OP_NAME,
 )
+from weave.trace_server.datadog import (
+    set_current_span_dd_tags,
+    set_root_span_dd_tags,
+)
 from weave.trace_server.errors import (
     InsertTooLarge,
     InvalidRequest,
@@ -763,14 +767,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 f"Cannot delete more than {ch_settings.MAX_DELETE_CALLS_COUNT} calls at once"
             )
 
-        if root_span := ddtrace.tracer.current_span():
-            root_span.set_tags(
-                {
-                    "clickhouse_trace_server_batched.calls_delete.count": str(
-                        len(req.call_ids)
-                    )
-                }
-            )
+        set_current_span_dd_tags(
+            {
+                "clickhouse_trace_server_batched.calls_delete.count": str(
+                    len(req.call_ids)
+                )
+            }
+        )
 
         # get the requested calls to delete
         parents = list(
@@ -885,14 +888,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         This should **ONLY** be used when we know an object will never have more than one version.
         """
-        if root_span := ddtrace.tracer.current_span():
-            root_span.set_tags(
-                {
-                    "clickhouse_trace_server_batched.create_obj_batch.count": str(
-                        len(batch)
-                    )
-                }
-            )
+        set_current_span_dd_tags(
+            {"clickhouse_trace_server_batched.create_obj_batch.count": str(len(batch))}
+        )
 
         if not batch:
             return []
@@ -4117,10 +4115,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         prompt = getattr(req.inputs, "prompt", None)
         template_vars = getattr(req.inputs, "template_vars", None)
 
+        # Initialize initial_messages with the original messages
+        initial_messages = getattr(req.inputs, "messages", None) or []
+
         if prompt:
             try:
                 # Use helper to resolve prompt, combine messages, and apply template vars
-                combined_messages, _ = resolve_and_apply_prompt(
+                combined_messages, initial_messages = resolve_and_apply_prompt(
                     prompt=prompt,
                     messages=getattr(req.inputs, "messages", None),
                     template_vars=template_vars,
@@ -4162,6 +4163,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if not req.track_llm_call:
             return tsi.CompletionsCreateRes(response=res.response)
 
+        req.inputs.messages = initial_messages
         start = tsi.StartedCallSchemaForInsert(
             project_id=req.project_id,
             wb_user_id=req.wb_user_id,
@@ -4507,15 +4509,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         settings: dict[str, Any] | None = None,
         do_sync_insert: bool = False,
     ) -> None:
-        root_span = ddtrace.tracer.current_span()
-        if root_span is not None:
-            root_span.set_tags(
-                {
-                    "clickhouse_trace_server_batched._insert_call_batch.count": str(
-                        len(batch)
-                    )
-                }
-            )
+        set_current_span_dd_tags(
+            {
+                "clickhouse_trace_server_batched._insert_call_batch.count": str(
+                    len(batch)
+                )
+            }
+        )
         if not batch:
             return
 
@@ -4675,22 +4675,19 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         settings: dict[str, Any] | None = None,
         do_sync_insert: bool = False,  # overrides _use_async_insert
     ) -> QuerySummary:
-        root_span = ddtrace.tracer.current_span()
-        if root_span is not None:
-            root_span.set_tags(
-                {
-                    "clickhouse_trace_server_batched._insert.table": table,
-                }
-            )
+        set_current_span_dd_tags(
+            {
+                "clickhouse_trace_server_batched._insert.table": table,
+            }
+        )
 
         if self._use_async_insert and not do_sync_insert:
             settings = ch_settings.update_settings_for_async_insert(settings)
-            if root_span is not None:
-                root_span.set_tags(
-                    {
-                        "clickhouse_trace_server_batched._insert.async_insert": True,
-                    }
-                )
+            set_current_span_dd_tags(
+                {
+                    "clickhouse_trace_server_batched._insert.async_insert": True,
+                }
+            )
         try:
             return self.ch_client.insert(
                 table, data=data, column_names=column_names, settings=settings
@@ -4781,11 +4778,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
             unmatched_starts = started_call_ids - ended_call_ids
 
-            if root_span := ddtrace.tracer.current_span():
-                root_span.set_tag(
-                    "weave_trace_server._flush_calls.unmatched_starts",
-                    len(unmatched_starts),
-                )
+            set_current_span_dd_tags(
+                {
+                    "weave_trace_server._flush_calls.unmatched_starts": len(
+                        unmatched_starts
+                    ),
+                }
+            )
         except Exception as e:
             # Under no circumstances should we block ingest with an error
             pass
@@ -5115,17 +5114,16 @@ def find_call_descendants(
     root_ids: list[str],
     all_calls: list[tsi.CallSchema],
 ) -> list[str]:
-    if root_span := ddtrace.tracer.current_span():
-        root_span.set_tags(
-            {
-                "clickhouse_trace_server_batched.find_call_descendants.root_ids_count": str(
-                    len(root_ids)
-                ),
-                "clickhouse_trace_server_batched.find_call_descendants.all_calls_count": str(
-                    len(all_calls)
-                ),
-            }
-        )
+    set_current_span_dd_tags(
+        {
+            "clickhouse_trace_server_batched.find_call_descendants.root_ids_count": str(
+                len(root_ids)
+            ),
+            "clickhouse_trace_server_batched.find_call_descendants.all_calls_count": str(
+                len(all_calls)
+            ),
+        }
+    )
     # make a map of call_id to children list
     children_map = defaultdict(list)
     for call in all_calls:
@@ -5164,14 +5162,6 @@ def _string_to_int_in_range(input_string: str, range_max: int) -> int:
     hash_obj = hashlib.md5(input_string.encode())
     hash_int = int(hash_obj.hexdigest(), 16)
     return hash_int % range_max
-
-
-def set_root_span_dd_tags(tags: dict[str, str | float | int]) -> None:
-    root_span = ddtrace.tracer.current_root_span()
-    if root_span is None:
-        logger.debug("No root span")
-    else:
-        root_span.set_tags(tags)
 
 
 def _update_metadata_from_chunk(

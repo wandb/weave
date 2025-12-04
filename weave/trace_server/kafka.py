@@ -2,11 +2,11 @@ import logging
 import socket
 from typing import Any
 
-import ddtrace
 from confluent_kafka import Consumer as ConfluentKafkaConsumer
 from confluent_kafka import Producer as ConfluentKafkaProducer
 
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.datadog import set_root_span_dd_tags
 from weave.trace_server.environment import (
     kafka_broker_host,
     kafka_broker_port,
@@ -88,8 +88,7 @@ class KafkaProducer(ConfluentKafkaProducer):
                     "call_id": call_end.id,
                 },
             )
-            if root_span := ddtrace.tracer.current_root_span():
-                root_span.set_tags({"kafka.producer.buffer_size": buffer_size})
+            set_root_span_dd_tags({"kafka.producer.buffer_size": buffer_size})
 
             # Drop the message - do not produce
             return
@@ -105,13 +104,12 @@ class KafkaProducer(ConfluentKafkaProducer):
                     "buffer_percentage": buffer_percentage,
                 },
             )
-            if root_span := ddtrace.tracer.current_root_span():
-                root_span.set_tags(
-                    {
-                        "kafka.producer.buffer_size": buffer_size,
-                        "kafka.producer.buffer_percentage": buffer_percentage,
-                    }
-                )
+            set_root_span_dd_tags(
+                {
+                    "kafka.producer.buffer_size": buffer_size,
+                    "kafka.producer.buffer_percentage": buffer_percentage,
+                }
+            )
 
         publish_key = None
         if kafka_partition_by_project_id():
