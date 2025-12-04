@@ -4115,10 +4115,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         prompt = getattr(req.inputs, "prompt", None)
         template_vars = getattr(req.inputs, "template_vars", None)
 
+        # Initialize initial_messages with the original messages
+        initial_messages = getattr(req.inputs, "messages", None) or []
+
         if prompt:
             try:
                 # Use helper to resolve prompt, combine messages, and apply template vars
-                combined_messages, _ = resolve_and_apply_prompt(
+                combined_messages, initial_messages = resolve_and_apply_prompt(
                     prompt=prompt,
                     messages=getattr(req.inputs, "messages", None),
                     template_vars=template_vars,
@@ -4160,6 +4163,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if not req.track_llm_call:
             return tsi.CompletionsCreateRes(response=res.response)
 
+        req.inputs.messages = initial_messages
         start = tsi.StartedCallSchemaForInsert(
             project_id=req.project_id,
             wb_user_id=req.wb_user_id,
