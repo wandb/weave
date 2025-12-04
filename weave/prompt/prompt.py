@@ -26,6 +26,12 @@ class Message(TypedDict):
     content: str | list[dict]
 
 
+class IncorrectPromptVarError(Exception):
+    """Raised when prompt template variables are incorrect or missing."""
+
+    pass
+
+
 def maybe_dedent(content: str, dedent: bool) -> str:
     if dedent:
         return textwrap.dedent(content).strip()
@@ -113,6 +119,9 @@ def format_message_with_template_vars(message: dict, **kwargs: Any) -> dict:
     Returns:
         Formatted message dictionary with variables replaced
 
+    Raises:
+        IncorrectPromptVarError: If a template variable is not found in kwargs.
+
     Examples:
         >>> msg = {"role": "user", "content": "Hello {name}"}
         >>> format_message_with_template_vars(msg, name="World")
@@ -133,7 +142,15 @@ def format_message_with_template_vars(message: dict, **kwargs: Any) -> dict:
     formatted: dict[str, Any] = {}
     for key, value in message.items():
         if isinstance(value, str):
-            formatted[key] = value.format(**kwargs)
+            try:
+                formatted[key] = value.format(**kwargs)
+            except KeyError as e:
+                missing_key = e.args[0] if e.args else str(e).strip("'\"")
+                available_keys = ", ".join(sorted(kwargs.keys()))
+                raise IncorrectPromptVarError(
+                    f"Prompt template variable '{missing_key}' not found. "
+                    f"Available variables: {available_keys}"
+                ) from e
         elif isinstance(value, list) and all(isinstance(d, dict) for d in value):
             # Recursively format nested dicts in lists
             formatted[key] = [

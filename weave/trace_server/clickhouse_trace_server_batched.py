@@ -71,6 +71,10 @@ from weave.trace_server.constants import (
     COMPLETIONS_CREATE_OP_NAME,
     IMAGE_GENERATION_CREATE_OP_NAME,
 )
+from weave.trace_server.datadog import (
+    set_current_span_dd_tags,
+    set_root_span_dd_tags,
+)
 from weave.trace_server.errors import (
     InsertTooLarge,
     InvalidRequest,
@@ -106,7 +110,6 @@ from weave.trace_server.kafka import KafkaProducer
 from weave.trace_server.llm_completion import (
     _build_choices_array,
     _build_completion_response,
-    _create_completion_choice,
     get_custom_provider_info,
     lite_llm_completion,
     lite_llm_completion_stream,
@@ -127,6 +130,9 @@ from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
 from weave.trace_server.opentelemetry.python_spans import Resource, Span
 from weave.trace_server.orm import ParamBuilder, Row
 from weave.trace_server.project_query_builder import make_project_stats_query
+from weave.trace_server.project_version.project_version import (
+    TableRoutingResolver,
+)
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 from weave.trace_server.table_query_builder import (
     ROW_ORDER_COLUMN_NAME,
@@ -192,14 +198,40 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self._user = user
         self._password = password
         self._database = database
-        self._flush_immediately = True
-        self._call_batch: list[list[Any]] = []
-        self._file_batch: list[FileChunkCreateCHInsertable] = []
         self._use_async_insert = use_async_insert
         self._model_to_provider_info_map = read_model_to_provider_info_map()
         self._file_storage_client: FileStorageClient | None = None
         self._kafka_producer: KafkaProducer | None = None
         self._evaluate_model_dispatcher = evaluate_model_dispatcher
+        self._table_routing_resolver: TableRoutingResolver | None = None
+
+    @property
+    def _flush_immediately(self) -> bool:
+        return getattr(self._thread_local, "flush_immediately", True)
+
+    @_flush_immediately.setter
+    def _flush_immediately(self, value: bool) -> None:
+        self._thread_local.flush_immediately = value
+
+    @property
+    def _call_batch(self) -> list[list[Any]]:
+        if not hasattr(self._thread_local, "call_batch"):
+            self._thread_local.call_batch = []
+        return self._thread_local.call_batch
+
+    @_call_batch.setter
+    def _call_batch(self, value: list[list[Any]]) -> None:
+        self._thread_local.call_batch = value
+
+    @property
+    def _file_batch(self) -> list[FileChunkCreateCHInsertable]:
+        if not hasattr(self._thread_local, "file_batch"):
+            self._thread_local.file_batch = []
+        return self._thread_local.file_batch
+
+    @_file_batch.setter
+    def _file_batch(self, value: list[FileChunkCreateCHInsertable]) -> None:
+        self._thread_local.file_batch = value
 
     @classmethod
     def from_env(
@@ -230,6 +262,22 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             return self._kafka_producer
         self._kafka_producer = KafkaProducer.from_env()
         return self._kafka_producer
+
+    @property
+    def table_routing_resolver(self) -> TableRoutingResolver:
+        if self._table_routing_resolver is not None:
+            return self._table_routing_resolver
+        self._table_routing_resolver = TableRoutingResolver()
+        return self._table_routing_resolver
+
+    def _noop_project_version_latency_test(self, project_id: str) -> None:
+        # NOOP for testing latency impact of project switcher
+        try:
+            self.table_routing_resolver.resolve_read_table(project_id, self.ch_client)
+        except Exception as e:
+            logger.warning(
+                f"Error getting project version for project [{project_id}]: {e}"
+            )
 
     def _get_existing_ops_from_spans(
         self, seen_ids: set[str], project_id: str, limit: int | None = None
@@ -501,6 +549,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         """Returns a stats object for the given query. This is useful for counts or other
         aggregate statistics that are not directly queryable from the calls themselves.
         """
+        self._noop_project_version_latency_test(req.project_id)
+
         pb = ParamBuilder()
         query, columns = build_calls_stats_query(req, pb)
         raw_res = self._query(query, pb.get_params())
@@ -519,6 +569,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.calls_query_stream")
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
         """Returns a stream of calls that match the given query."""
+        self._noop_project_version_latency_test(project_id=req.project_id)
+
         cq = CallsQuery(
             project_id=req.project_id,
             include_costs=req.include_costs or False,
@@ -713,14 +765,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 f"Cannot delete more than {ch_settings.MAX_DELETE_CALLS_COUNT} calls at once"
             )
 
-        if root_span := ddtrace.tracer.current_span():
-            root_span.set_tags(
-                {
-                    "clickhouse_trace_server_batched.calls_delete.count": str(
-                        len(req.call_ids)
-                    )
-                }
-            )
+        set_current_span_dd_tags(
+            {
+                "clickhouse_trace_server_batched.calls_delete.count": str(
+                    len(req.call_ids)
+                )
+            }
+        )
 
         # get the requested calls to delete
         parents = list(
@@ -835,14 +886,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         This should **ONLY** be used when we know an object will never have more than one version.
         """
-        if root_span := ddtrace.tracer.current_span():
-            root_span.set_tags(
-                {
-                    "clickhouse_trace_server_batched.create_obj_batch.count": str(
-                        len(batch)
-                    )
-                }
-            )
+        set_current_span_dd_tags(
+            {"clickhouse_trace_server_batched.create_obj_batch.count": str(len(batch))}
+        )
 
         if not batch:
             return []
@@ -1355,6 +1401,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         return tsi.RefsReadBatchRes(vals=vals)
 
     def project_stats(self, req: tsi.ProjectStatsReq) -> tsi.ProjectStatsRes:
+        self._noop_project_version_latency_test(req.project_id)
+
         def _default_true(val: bool | None) -> bool:
             return True if val is None else val
 
@@ -1380,6 +1428,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self, req: tsi.ThreadsQueryReq
     ) -> Iterator[tsi.ThreadSchema]:
         """Stream threads with aggregated statistics sorted by last activity."""
+        self._noop_project_version_latency_test(req.project_id)
+
         pb = ParamBuilder()
 
         # Extract filter values
@@ -4063,10 +4113,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         prompt = getattr(req.inputs, "prompt", None)
         template_vars = getattr(req.inputs, "template_vars", None)
 
+        # Initialize initial_messages with the original messages
+        initial_messages = getattr(req.inputs, "messages", None) or []
+
         if prompt:
             try:
                 # Use helper to resolve prompt, combine messages, and apply template vars
-                combined_messages, _ = resolve_and_apply_prompt(
+                combined_messages, initial_messages = resolve_and_apply_prompt(
                     prompt=prompt,
                     messages=getattr(req.inputs, "messages", None),
                     template_vars=template_vars,
@@ -4108,6 +4161,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if not req.track_llm_call:
             return tsi.CompletionsCreateRes(response=res.response)
 
+        req.inputs.messages = initial_messages
         start = tsi.StartedCallSchemaForInsert(
             project_id=req.project_id,
             wb_user_id=req.wb_user_id,
@@ -4448,15 +4502,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert_call_batch")
     def _insert_call_batch(self, batch: list) -> None:
-        root_span = ddtrace.tracer.current_span()
-        if root_span is not None:
-            root_span.set_tags(
-                {
-                    "clickhouse_trace_server_batched._insert_call_batch.count": str(
-                        len(batch)
-                    )
-                }
-            )
+        set_current_span_dd_tags(
+            {
+                "clickhouse_trace_server_batched._insert_call_batch.count": str(
+                    len(batch)
+                )
+            }
+        )
         if not batch:
             return
 
@@ -4614,22 +4666,19 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         settings: dict[str, Any] | None = None,
         do_sync_insert: bool = False,  # overrides _use_async_insert
     ) -> QuerySummary:
-        root_span = ddtrace.tracer.current_span()
-        if root_span is not None:
-            root_span.set_tags(
-                {
-                    "clickhouse_trace_server_batched._insert.table": table,
-                }
-            )
+        set_current_span_dd_tags(
+            {
+                "clickhouse_trace_server_batched._insert.table": table,
+            }
+        )
 
         if self._use_async_insert and not do_sync_insert:
             settings = ch_settings.update_settings_for_async_insert(settings)
-            if root_span is not None:
-                root_span.set_tags(
-                    {
-                        "clickhouse_trace_server_batched._insert.async_insert": True,
-                    }
-                )
+            set_current_span_dd_tags(
+                {
+                    "clickhouse_trace_server_batched._insert.async_insert": True,
+                }
+            )
         try:
             return self.ch_client.insert(
                 table, data=data, column_names=column_names, settings=settings
@@ -4676,6 +4725,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._flush_calls")
     def _flush_calls(self) -> None:
         self._analyze_call_batch_breakdown()
+        if len(self._call_batch) > 0:
+            project_id_idx = ALL_CALL_INSERT_COLUMNS.index("project_id")
+            project_id = self._call_batch[0][project_id_idx]
+            self._noop_project_version_latency_test(project_id=project_id)
 
         try:
             self._insert_call_batch(self._call_batch)
@@ -4716,11 +4769,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
             unmatched_starts = started_call_ids - ended_call_ids
 
-            if root_span := ddtrace.tracer.current_span():
-                root_span.set_tag(
-                    "weave_trace_server._flush_calls.unmatched_starts",
-                    len(unmatched_starts),
-                )
+            set_current_span_dd_tags(
+                {
+                    "weave_trace_server._flush_calls.unmatched_starts": len(
+                        unmatched_starts
+                    ),
+                }
+            )
         except Exception as e:
             # Under no circumstances should we block ingest with an error
             pass
@@ -5044,17 +5099,16 @@ def find_call_descendants(
     root_ids: list[str],
     all_calls: list[tsi.CallSchema],
 ) -> list[str]:
-    if root_span := ddtrace.tracer.current_span():
-        root_span.set_tags(
-            {
-                "clickhouse_trace_server_batched.find_call_descendants.root_ids_count": str(
-                    len(root_ids)
-                ),
-                "clickhouse_trace_server_batched.find_call_descendants.all_calls_count": str(
-                    len(all_calls)
-                ),
-            }
-        )
+    set_current_span_dd_tags(
+        {
+            "clickhouse_trace_server_batched.find_call_descendants.root_ids_count": str(
+                len(root_ids)
+            ),
+            "clickhouse_trace_server_batched.find_call_descendants.all_calls_count": str(
+                len(all_calls)
+            ),
+        }
+    )
     # make a map of call_id to children list
     children_map = defaultdict(list)
     for call in all_calls:
@@ -5093,14 +5147,6 @@ def _string_to_int_in_range(input_string: str, range_max: int) -> int:
     hash_obj = hashlib.md5(input_string.encode())
     hash_int = int(hash_obj.hexdigest(), 16)
     return hash_int % range_max
-
-
-def set_root_span_dd_tags(tags: dict[str, str | float | int]) -> None:
-    root_span = ddtrace.tracer.current_root_span()
-    if root_span is None:
-        logger.debug("No root span")
-    else:
-        root_span.set_tags(tags)
 
 
 def _update_metadata_from_chunk(
@@ -5157,30 +5203,6 @@ def _process_tool_call_delta(
                 existing_tool_call["function"]["arguments"] += function_data[
                     "arguments"
                 ]
-
-
-def _build_aggregated_output(
-    aggregated_metadata: dict[str, Any],
-    assistant_acc: list[str],
-    tool_calls: list[dict[str, Any]],
-    chunk: dict[str, Any],
-    reasoning_content: list[str],
-    choice_index: int = 0,
-) -> dict[str, Any]:
-    """Build the aggregated output from accumulated data."""
-    current_finish_reason = chunk.get("choices", [{}])[0].get("finish_reason")
-
-    # Use the typed approach for consistency
-    choice = _create_completion_choice(
-        choice_index=choice_index,
-        content_parts=assistant_acc,
-        tool_calls=tool_calls,
-        reasoning_parts=reasoning_content,
-        finish_reason=current_finish_reason,
-    )
-
-    choices_array = [dataclasses.asdict(choice)]
-    return _build_completion_response(aggregated_metadata, choices_array)
 
 
 def _create_tracked_stream_wrapper(
