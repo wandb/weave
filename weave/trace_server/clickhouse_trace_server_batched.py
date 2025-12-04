@@ -415,16 +415,21 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             for idx in obj_id_idx_map[result.object_id]:
                 calls[idx][0].op_name = op_ref_uri
 
-        batch = [
-            item
-            for start_call, end_call in calls
-            for item in (
-                tsi.CallBatchStartMode(req=tsi.CallStartReq(start=start_call)),
-                tsi.CallBatchEndMode(req=tsi.CallEndReq(end=end_call)),
-            )
-        ]
-        # TODO: Actually populate the error fields if call_start_batch fails
-        self.call_start_batch(tsi.CallCreateBatchReq(batch=batch))
+        # Construct batch rows directly for insertion
+        batch_rows = []
+        for start_call, end_call in calls:
+            # Convert start call to row
+            start_dict = start_call.model_dump()
+            start_row = [start_dict.get(col) for col in ALL_CALL_INSERT_COLUMNS]
+            batch_rows.append(start_row)
+
+            # Convert end call to row
+            end_dict = end_call.model_dump()
+            end_row = [end_dict.get(col) for col in ALL_CALL_INSERT_COLUMNS]
+            batch_rows.append(end_row)
+
+        # Insert directly without async_insert for OTEL calls
+        self._insert_call_batch(batch_rows, settings=None, do_sync_insert=True)
 
         if rejected_spans > 0:
             # Join the first 20 errors and return them delimited by ';'
@@ -4499,7 +4504,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             client.close()
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert_call_batch")
-    def _insert_call_batch(self, batch: list) -> None:
+    def _insert_call_batch(
+        self,
+        batch: list,
+        settings: dict[str, Any] | None = None,
+        do_sync_insert: bool = False,
+    ) -> None:
         root_span = ddtrace.tracer.current_span()
         if root_span is not None:
             root_span.set_tags(
@@ -4516,6 +4526,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             "call_parts",
             data=batch,
             column_names=ALL_CALL_INSERT_COLUMNS,
+            settings=settings,
+            do_sync_insert=do_sync_insert,
         )
 
     def _select_objs_query(
