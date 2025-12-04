@@ -106,7 +106,6 @@ from weave.trace_server.kafka import KafkaProducer
 from weave.trace_server.llm_completion import (
     _build_choices_array,
     _build_completion_response,
-    _create_completion_choice,
     get_custom_provider_info,
     lite_llm_completion,
     lite_llm_completion_stream,
@@ -5214,30 +5213,6 @@ def _process_tool_call_delta(
                 existing_tool_call["function"]["arguments"] += function_data[
                     "arguments"
                 ]
-
-
-def _build_aggregated_output(
-    aggregated_metadata: dict[str, Any],
-    assistant_acc: list[str],
-    tool_calls: list[dict[str, Any]],
-    chunk: dict[str, Any],
-    reasoning_content: list[str],
-    choice_index: int = 0,
-) -> dict[str, Any]:
-    """Build the aggregated output from accumulated data."""
-    current_finish_reason = chunk.get("choices", [{}])[0].get("finish_reason")
-
-    # Use the typed approach for consistency
-    choice = _create_completion_choice(
-        choice_index=choice_index,
-        content_parts=assistant_acc,
-        tool_calls=tool_calls,
-        reasoning_parts=reasoning_content,
-        finish_reason=current_finish_reason,
-    )
-
-    choices_array = [dataclasses.asdict(choice)]
-    return _build_completion_response(aggregated_metadata, choices_array)
 
 
 def _create_tracked_stream_wrapper(
