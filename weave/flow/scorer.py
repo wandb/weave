@@ -4,7 +4,7 @@ import textwrap
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from numbers import Number
-from typing import Any, cast
+from typing import Any, Generic, TypeVar, cast
 
 from pydantic import BaseModel, Field
 from typing_extensions import Self
@@ -18,6 +18,9 @@ from weave.trace.op_protocol import Op
 from weave.trace.vals import WeaveObject
 from weave.trace.weave_client import sanitize_object_name
 
+O = TypeVar("O")
+S = TypeVar("S")
+
 
 def _import_numpy() -> Any | None:
     try:
@@ -27,7 +30,7 @@ def _import_numpy() -> Any | None:
     return numpy
 
 
-class Scorer(Object):
+class Scorer(Object, Generic[O, S]):
     column_map: dict[str, str] | None = Field(
         default=None,
         description="A mapping from column names in the dataset to the names expected by the scorer",
@@ -38,11 +41,36 @@ class Scorer(Object):
         _validate_scorer_signature(self)
 
     @op
-    def score(self, *, output: Any, **kwargs: Any) -> Any:
+    def score(self, *, output: O, **kwargs: Any) -> S:
+        """Score the model output.
+
+        Args:
+            output: The model output to score, of type O.
+            **kwargs: Additional keyword arguments that may be required by specific
+                scorer implementations. These are typically dataset columns that are
+                dynamically matched based on the scorer's signature and `column_map`.
+
+        Returns:
+            The scoring result of type S.
+
+        Note:
+            Subclasses can override this method with a more specific signature
+            to provide better type hints. For example:
+
+            ```python
+            class StringMatchScorer(Scorer[str, dict]):
+                @weave.op
+                def score(self, *, output: str, target: str, **kwargs: Any) -> dict:
+                    ...
+            ```
+
+            The `**kwargs: Any` parameter remains flexible to allow for dynamic
+            argument matching from dataset columns.
+        """
         raise NotImplementedError
 
     @op
-    def summarize(self, score_rows: list) -> dict | None:
+    def summarize(self, score_rows: list[S]) -> dict | None:
         return auto_summarize(score_rows)
 
     @classmethod

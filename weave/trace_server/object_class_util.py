@@ -2,6 +2,9 @@ from typing import Any, TypedDict
 
 from pydantic import BaseModel
 
+from weave.trace_server.client_server_common.base_class_util import (
+    IGNORED_BASE_CLASS_NAMES,
+)
 from weave.trace_server.client_server_common.pydantic_util import (
     pydantic_asdict_one_level,
 )
@@ -26,23 +29,31 @@ class GetObjectClassesResult(TypedDict):
 
 
 def get_object_classes(val: Any) -> GetObjectClassesResult | None:
-    if (
+    if not (
         isinstance(val, dict)
         and "_bases" in val
         and isinstance(val["_bases"], list)
         and len(val["_bases"]) >= 2
-        and val["_bases"][-1] == "BaseModel"
-        and val["_bases"][-2] in base_object_class_names
     ):
-        object_class = val["_class_name"]
-        base_object_class = object_class
-        if len(val["_bases"]) > 2:
-            base_object_class = val["_bases"][-3]
-        return GetObjectClassesResult(
-            object_class=object_class,
-            base_object_class=base_object_class,
-        )
-    return None
+        return None
+
+    # Filter out implementation detail classes like Generic
+    bases = [b for b in val["_bases"] if b not in IGNORED_BASE_CLASS_NAMES]
+
+    if len(bases) < 2:
+        return None
+
+    if bases[-1] != "BaseModel" or bases[-2] not in base_object_class_names:
+        return None
+
+    object_class = val["_class_name"]
+    base_object_class = object_class
+    if len(bases) > 2:
+        base_object_class = bases[-3]
+    return GetObjectClassesResult(
+        object_class=object_class,
+        base_object_class=base_object_class,
+    )
 
 
 class ProcessIncomingObjectResult(TypedDict):
@@ -134,7 +145,12 @@ def process_incoming_object_val(
 def dump_object(val: BaseModel) -> dict:
     cls = val.__class__
     cls_name = val.__class__.__name__
-    bases = [c.__name__ for c in cls.mro()[1:-1]]
+    # Filter out implementation detail classes like Generic
+    bases = [
+        c.__name__
+        for c in cls.mro()[1:-1]
+        if c.__name__ not in IGNORED_BASE_CLASS_NAMES
+    ]
 
     dump = {}
     # Order matters here due to the way we calculate the digest!
