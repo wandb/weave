@@ -4,7 +4,7 @@ import urllib
 from concurrent.futures import Future
 from dataclasses import asdict, dataclass, fields
 from datetime import datetime
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import httpx
 from typing_extensions import Self
