@@ -161,7 +161,7 @@ class CallsMergedDynamicField(CallsMergedAggField):
 
 class CallsMergedArgMaxEndedAtField(CallsMergedDynamicField):
     """Dynamic field that uses argMax with ended_at to prefer call END values over call START.
-    
+
     This ensures that when both call START and call END have values, the call END value
     is selected. NULL ended_at (from call START) is treated as timestamp 0.
     """
@@ -177,7 +177,7 @@ class CallsMergedArgMaxEndedAtField(CallsMergedDynamicField):
             # When not using agg function, just return the field
             inner = f"{table_alias}.{self.field}"
             return json_dump_field_as_sql(pb, table_alias, inner, self.extra_path, cast)
-        
+
         # Use argMax to prefer values from rows with ended_at set (call END)
         # over rows without ended_at (call START)
         inner = f"argMax({table_alias}.{self.field}, coalesce({table_alias}.ended_at, toDateTime64(0, 6)))"
@@ -189,8 +189,6 @@ class CallsMergedArgMaxEndedAtField(CallsMergedDynamicField):
         return CallsMergedArgMaxEndedAtField(
             field=self.field, agg_fn=self.agg_fn, extra_path=extra_path
         )
-
-
 
 
 class CallsMergedSummaryField(CallsMergedField):
@@ -1271,7 +1269,9 @@ ALLOWED_CALL_FIELDS = {
     "started_at": CallsMergedAggField(field="started_at", agg_fn="any"),
     # Use argMax with ended_at to prefer call END values over call START values
     # This ensures that updates to inputs/attributes via call_end take precedence
-    "attributes_dump": CallsMergedArgMaxEndedAtField(field="attributes_dump", agg_fn="any"),
+    "attributes_dump": CallsMergedArgMaxEndedAtField(
+        field="attributes_dump", agg_fn="any"
+    ),
     "inputs_dump": CallsMergedArgMaxEndedAtField(field="inputs_dump", agg_fn="any"),
     "input_refs": CallsMergedAggField(field="input_refs", agg_fn="array_concat_agg"),
     "ended_at": CallsMergedAggField(field="ended_at", agg_fn="any"),

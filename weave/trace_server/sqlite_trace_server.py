@@ -301,7 +301,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         with self.lock:
             cursor.execute(
                 f"""UPDATE calls SET
-                    {', '.join(update_fields)}
+                    {", ".join(update_fields)}
                 WHERE id = ?""",
                 tuple(update_values),
             )

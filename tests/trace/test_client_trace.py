@@ -6238,3 +6238,93 @@ def test_calls_query_ordering_with_costs_comprehensive(client):
     assert calls[0].id == call6.id
     assert calls[1].id == call5.id
     assert calls[2].id == call4.id
+
+
+def test_call_end_updates_inputs_and_attributes(client):
+    """Test that inputs and attributes can be updated at call_end and are prioritized over call_start values."""
+    server = get_client_trace_server(client)
+    project_id = get_client_project_id(client)
+
+    # Create a call with initial inputs and attributes
+    call_id = generate_id()
+    start_req = tsi.CallStartReq(
+        start=tsi.StartedCallSchemaForInsert(
+            project_id=project_id,
+            id=call_id,
+            op_name="test_op",
+            trace_id=generate_id(),
+            started_at=datetime.datetime.now(datetime.timezone.utc),
+            inputs={"initial_input": "start_value", "shared_key": "from_start"},
+            attributes={"initial_attr": "start_attr", "shared_attr": "from_start"},
+        )
+    )
+    server.call_start(start_req)
+
+    # End the call with updated inputs and attributes
+    end_req = tsi.CallEndReq(
+        end=tsi.EndedCallSchemaForInsert(
+            project_id=project_id,
+            id=call_id,
+            ended_at=datetime.datetime.now(datetime.timezone.utc),
+            output={"result": "success"},
+            summary={},
+            # These should OVERWRITE the call_start values
+            inputs={"updated_input": "end_value", "shared_key": "from_end"},
+            attributes={"updated_attr": "end_attr", "shared_attr": "from_end"},
+        )
+    )
+    server.call_end(end_req)
+
+    # Query the call back
+    read_res = server.call_read(tsi.CallReadReq(project_id=project_id, id=call_id))
+    call = read_res.call
+
+    # Verify that inputs from call_end are returned (not from call_start)
+    assert call.inputs == {
+        "updated_input": "end_value",
+        "shared_key": "from_end",
+    }, f"Expected call_end inputs, got {call.inputs}"
+
+    # Verify that attributes from call_end are returned (not from call_start)
+    assert "updated_attr" in call.attributes
+    assert call.attributes["updated_attr"] == "end_attr"
+    assert "shared_attr" in call.attributes
+    assert call.attributes["shared_attr"] == "from_end"
+
+    # Test with partial update (only inputs)
+    call_id_2 = generate_id()
+    start_req_2 = tsi.CallStartReq(
+        start=tsi.StartedCallSchemaForInsert(
+            project_id=project_id,
+            id=call_id_2,
+            op_name="test_op",
+            trace_id=generate_id(),
+            started_at=datetime.datetime.now(datetime.timezone.utc),
+            inputs={"original": "input"},
+            attributes={"original": "attribute"},
+        )
+    )
+    server.call_start(start_req_2)
+
+    # End with only inputs updated, attributes should remain from start
+    end_req_2 = tsi.CallEndReq(
+        end=tsi.EndedCallSchemaForInsert(
+            project_id=project_id,
+            id=call_id_2,
+            ended_at=datetime.datetime.now(datetime.timezone.utc),
+            output={"result": "success"},
+            summary={},
+            inputs={"new": "input"},
+            # attributes not provided, should use call_start values
+        )
+    )
+    server.call_end(end_req_2)
+
+    read_res_2 = server.call_read(tsi.CallReadReq(project_id=project_id, id=call_id_2))
+    call_2 = read_res_2.call
+
+    assert call_2.inputs == {"new": "input"}, (
+        f"Expected updated inputs, got {call_2.inputs}"
+    )
+    assert "original" in call_2.attributes
+    assert call_2.attributes["original"] == "attribute"
