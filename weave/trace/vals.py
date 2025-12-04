@@ -826,7 +826,7 @@ def make_trace_obj(
             parent=parent,
         )
 
-    if extra:
+    if extra and not isinstance(val, DeletedRef):
         # This is where extra resolution happens?
         for extra_index in range(0, len(extra), 2):
             op, arg = extra[extra_index], extra[extra_index + 1]

@@ -1,4 +1,3 @@
-import httpx
 import pytest
 
 import weave
@@ -185,15 +184,15 @@ def test_read_deleted_object(client: WeaveClient):
 
     _obj_delete(client, "obj_1", [obj1_v2.digest])
 
-    with pytest.raises(httpx.HTTPStatusError) as e:
-        ref = client.server.obj_read(
+    with pytest.raises(weave.trace_server.errors.ObjectDeletedError) as e:
+        client.server.obj_read(
             tsi.ObjReadReq(
                 project_id=client._project_id(),
                 object_id="obj_1",
                 digest=obj1_v2.digest,
             )
         )
-        assert ref.deleted_at is not None
+    assert e.value.deleted_at is not None
 
     ref_res = client.server.refs_read_batch(
         tsi.RefsReadBatchReq(
@@ -242,15 +241,15 @@ def test_read_deleted_op(client: WeaveClient):
 
     _obj_delete(client, "my_op", [op_ref.digest])
 
-    with pytest.raises(httpx.HTTPStatusError) as e:
-        ref = client.server.obj_read(
+    with pytest.raises(weave.trace_server.errors.ObjectDeletedError) as e:
+        client.server.obj_read(
             tsi.ObjReadReq(
                 project_id=client._project_id(),
                 object_id="my_op",
                 digest=op_ref.digest,
             )
         )
-        assert ref.deleted_at is not None
+    assert e.value.deleted_at is not None
 
     ref_res = client.server.refs_read_batch(
         tsi.RefsReadBatchReq(
