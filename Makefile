@@ -11,6 +11,3 @@ prepare-release: build
 synchronize-base-object-schemas:
 	cd weave && make generate_base_object_schemas && \
 	cd ../../../../frontends/weave && yarn generate-schemas
-
-generate-bindings:
-	cd ../core/services/weave-trace && make generate-bindings
