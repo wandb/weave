@@ -5,8 +5,6 @@ from dataclasses import dataclass
 from typing import Any, Optional
 
 import httpx
-from clickhouse_connect.driver.exceptions import DatabaseError as CHDatabaseError
-from clickhouse_connect.driver.exceptions import OperationalError as CHOperationalError
 from gql.transport.exceptions import TransportQueryError, TransportServerError
 
 
@@ -252,6 +250,14 @@ class ErrorRegistry:
         )
 
         # ClickHouse errors
+        # It's unfortunate we have to defer imports here because the client also imports from this file.
+        from clickhouse_connect.driver.exceptions import (
+            DatabaseError as CHDatabaseError,
+        )
+        from clickhouse_connect.driver.exceptions import (
+            OperationalError as CHOperationalError,
+        )
+
         self.register(
             CHDatabaseError, 502, lambda exc: {"reason": "Temporary backend error"}
         )
