@@ -80,8 +80,8 @@ library_cases = [
             "description": None,
             "dataset": "weave:///shawn/test-project/object/Dataset:N0VKaX8wr9kF9QQzM7mSQz3yKrJJjTiJi4c9Bt7RSTA",
             "scorers": [
-                "weave:///shawn/test-project/object/MyScorer:QMbCYGONPYjlikHOl7FAXBG6TtRvixJyovX6QM8bGFs",
-                "weave:///shawn/test-project/object/LLMAsAJudgeScorer:2AYxwqzSqVf3yEVZTbkzGZcPXMFZxnYsBO23N5FTrLU",
+                "weave:///shawn/test-project/object/MyScorer:ILpCvdAsCLLLt9wU28MU9ugSScTkg7L3XX6PlUgFvlg",
+                "weave:///shawn/test-project/object/LLMAsAJudgeScorer:kGBaQXKEp0nyjHY3oQWVcyUO94UfcO4ubGYADJRoZhQ",
             ],
             "preprocess_model_input": None,
             "trials": 1,
@@ -140,7 +140,7 @@ library_cases = [
             },
             {
                 "object_id": "LLMAsAJudgeScorer",
-                "digest": "2AYxwqzSqVf3yEVZTbkzGZcPXMFZxnYsBO23N5FTrLU",
+                "digest": "kGBaQXKEp0nyjHY3oQWVcyUO94UfcO4ubGYADJRoZhQ",
                 "exp_val": {
                     "_type": "LLMAsAJudgeScorer",
                     "name": None,
@@ -150,7 +150,7 @@ library_cases = [
                     "scoring_prompt": "Here are the inputs: {inputs}. Here is the output: {output}. Is the output correct?",
                     "scoring_prompt_ref": None,
                     "score": "weave:///shawn/test-project/op/LLMAsAJudgeScorer.score:HeFNULC62b6QzYX6icYpDkHtiPoYUOY13rYmu9lON6g",
-                    "summarize": "weave:///shawn/test-project/op/Scorer.summarize:Jc12U3b8FvfVmPvXafwLCg5Q7RFqIxkIaT7cYdWkJG0",
+                    "summarize": "weave:///shawn/test-project/op/Scorer.summarize:bWwaybJxxIBLMGZp7bzeKrmjhLNCp2DYrubnU2Ry9xQ",
                     "_class_name": "LLMAsAJudgeScorer",
                     "_bases": ["Scorer", "Object", "BaseModel"],
                 },
