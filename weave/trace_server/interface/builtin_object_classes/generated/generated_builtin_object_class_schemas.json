@@ -687,9 +687,6 @@
         "action_type": {
           "const": "contains_words",
           "default": "contains_words",
-          "enum": [
-            "contains_words"
-          ],
           "title": "Action Type",
           "type": "string"
         },
@@ -1493,9 +1490,6 @@
         "action_type": {
           "const": "llm_judge",
           "default": "llm_judge",
-          "enum": [
-            "llm_judge"
-          ],
           "title": "Action Type",
           "type": "string"
         },
@@ -1665,7 +1659,7 @@
           "type": "string"
         },
         "_digest": {
-          "title": " Digest",
+          "title": "Digest",
           "type": "string"
         },
         "_extra": {
@@ -1673,7 +1667,7 @@
           "items": {
             "type": "string"
           },
-          "title": " Extra",
+          "title": "Extra",
           "type": "array"
         }
       },
@@ -1857,7 +1851,6 @@
       "type": "object"
     },
     "ProviderReturnType": {
-      "const": "openai",
       "enum": [
         "openai"
       ],
