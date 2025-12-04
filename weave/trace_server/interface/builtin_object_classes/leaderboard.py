@@ -47,5 +47,6 @@ class LeaderboardColumn(BaseModel):
 
 
 class Leaderboard(base_object_def.BaseObject):
-    columns: list[LeaderboardColumn]
-    calls_query: str | None # The query used by the UI to filter rows. If none, use all entries
+    columns: list[LeaderboardColumn] # For legacy leaderboards
+    calls_query: str | None = None  # The query used by the UI to filter rows. If none, use all entries
+

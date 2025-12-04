@@ -1413,12 +1413,12 @@
               "type": "null"
             }
           ],
+          "default": null,
           "title": "Calls Query"
         }
       },
       "required": [
-        "columns",
-        "calls_query"
+        "columns"
       ],
       "title": "Leaderboard",
       "type": "object"
