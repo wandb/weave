@@ -1,5 +1,6 @@
 import dataclasses
 import inspect
+import json
 import logging
 import operator
 import typing
@@ -7,6 +8,7 @@ from collections.abc import Generator, Iterator, Sequence
 from copy import deepcopy
 from typing import Any, Literal, Optional, SupportsIndex
 
+import httpx
 from pydantic import BaseModel
 
 from weave.trace import box
@@ -29,7 +31,6 @@ from weave.trace.refs import (
 )
 from weave.trace.serialization.serialize import from_json
 from weave.trace.table import Table
-from weave.trace_server.errors import ObjectDeletedError
 from weave.trace_server.trace_server_interface import (
     ObjReadReq,
     TableQueryReq,
@@ -780,10 +781,16 @@ def make_trace_obj(
                 )
             )
             val = from_json(read_res.obj.val, project_id, server)
-        except ObjectDeletedError as e:
-            # encountered a deleted object, return DeletedRef, warn and continue
-            val = DeletedRef(ref=new_ref, deleted_at=e.deleted_at, error=e)
-            logger.warning(f"Could not read deleted object: {new_ref}")
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                try:
+                    parsed = json.loads(e.response.text)
+                except Exception:
+                    raise e from None
+                if not parsed or "deleted_at" not in parsed:
+                    raise e from None
+                val = DeletedRef(ref=new_ref, deleted_at=parsed["deleted_at"], error=e)
+                logger.warning(f"Could not read deleted object: {new_ref}")
 
     if isinstance(val, Table):
         val_ref = val.ref
