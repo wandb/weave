@@ -66,6 +66,7 @@ def test_then_multiple_futures() -> None:
     )
     assert future_result.result() == 15
 
+
 def test_then_multiple_futures_ordering() -> None:
     executor: FutureExecutor = FutureExecutor()
 
@@ -81,7 +82,7 @@ def test_then_multiple_futures_ordering() -> None:
         for data in data_list:
             final.extend(data)
         return final
-    
+
     future_data2: Future[list[int]] = executor.defer(fetch_data2)
     future_data1: Future[list[int]] = executor.defer(fetch_data1)
     future_result: Future[list[int]] = executor.then(
@@ -97,13 +98,12 @@ def test_then_multiple_futures_duplicate() -> None:
     def fetch_data1() -> list[int]:
         return [1, 2, 3]
 
-
     def process_multiple_data(data_list: list[list[int]]) -> int:
         final = []
         for data in data_list:
             final.extend(data)
         return final
-    
+
     future_data1: Future[list[int]] = executor.defer(fetch_data1)
     future_result: Future[list[int]] = executor.then(
         [future_data1, future_data1], process_multiple_data
