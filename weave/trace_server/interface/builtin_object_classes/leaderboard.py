@@ -35,7 +35,7 @@ class MetricConfig(BaseModel):
     scorer_name: str  # "*" to match all scorers
     metric_path: str  # "*" to match all metric paths
     should_minimize: bool
-    selected: bool
+    deselected: bool  # If True, this metric is excluded from the leaderboard
     # Wildcard matching rules:
     # - dataset_name="*" applies to all datasets with matching scorer_name and metric_path
     # - scorer_name="*" applies to all scorers with matching dataset_name and metric_path
@@ -99,13 +99,13 @@ class Leaderboard(base_object_def.BaseObject):
     # Model configuration
     models_use_version_grouping: bool | None = None
     models_show_version_indicator: bool | None = None
-    selected_models: list[str] | None = None  # List of model refs or patterns (can use "*" for wildcard matching)
+    deselected_models: list[str] | None = None  # List of model refs or patterns to exclude (can use "*" for wildcard matching)
     model_display_names: dict[str, str] | None = None  # ref/pattern -> display name (keys can use "*" wildcards)
 
     # Dataset/Scorer configuration
     datasets_use_version_grouping: bool | None = None
     datasets_show_version_indicator: bool | None = None
-    selected_datasets: list[str] | None = None  # List of dataset refs or patterns (can use "*" for wildcard matching)
+    deselected_datasets: list[str] | None = None  # List of dataset refs or patterns to exclude (can use "*" for wildcard matching)
     dataset_display_names: dict[str, str] | None = None  # ref/pattern -> display name (keys can use "*" wildcards)
     dataset_version_aggregation: AggregationMethod | None = None
     score_selection_strategy: ScoreSelectionStrategy | None = None
