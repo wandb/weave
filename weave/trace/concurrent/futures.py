@@ -116,8 +116,10 @@ class FutureExecutor:
 
         def callback() -> None:
             try:
-                done, _ = wait(futures)
-                results = [f.result() for f in done]
+                _, _ = wait(futures)
+                # Use `futures` here not the result of `wait` to
+                # ensure correct order of results
+                results = [f.result() for f in futures]
             except Exception as e:
                 result_future.set_exception(e)
                 return
