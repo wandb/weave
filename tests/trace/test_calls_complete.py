@@ -70,6 +70,7 @@ def server(client):
 @pytest.fixture
 def project_id(client):
     """Get project ID."""
+    client.project = f"test-project-{generate_id()}"
     return client._project_id()
 
 
@@ -205,9 +206,9 @@ def setup_project_residence(ch_client, project_id, residence_state):
     Args:
         ch_client: ClickHouse client
         project_id: Project ID to set up
-        residence_state: One of "EMPTY", "MERGED_ONLY", "COMPLETE_ONLY", "BOTH"
+        residence_state: ProjectDataResidence enum value
     """
-    if residence_state == "EMPTY":
+    if residence_state == ProjectDataResidence.EMPTY:
         # No setup needed - project has no data
         return
 
@@ -218,21 +219,21 @@ def setup_project_residence(ch_client, project_id, residence_state):
     call_id = str(uuid.uuid4())
     trace_id = str(uuid.uuid4())
 
-    if residence_state == "MERGED_ONLY":
+    if residence_state == ProjectDataResidence.MERGED_ONLY:
         ch_client.command(
             f"""
             INSERT INTO calls_merged (project_id, id, op_name, started_at, trace_id, parent_id)
             VALUES ('{project_id}', '{call_id}', 'seed_op', now(), '{trace_id}', '')
             """
         )
-    elif residence_state == "COMPLETE_ONLY":
+    elif residence_state == ProjectDataResidence.COMPLETE_ONLY:
         ch_client.command(
             f"""
             INSERT INTO calls_complete (project_id, id, op_name, started_at, trace_id, parent_id)
             VALUES ('{project_id}', '{call_id}', 'seed_op', now(), '{trace_id}', '')
             """
         )
-    elif residence_state == "BOTH":
+    elif residence_state == ProjectDataResidence.BOTH:
         ch_client.command(
             f"""
             INSERT INTO calls_merged (project_id, id, op_name, started_at, trace_id, parent_id)
