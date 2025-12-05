@@ -504,7 +504,9 @@ def python_value_to_ch_type(value: typing.Any) -> str:
     elif isinstance(value, bool):
         return "Bool"
     elif isinstance(value, int):
-        return "UInt64"
+        # Use signed 64-bit to support negative integers in query parameters.
+        # Specific places that need unsigned (e.g. LIMIT/OFFSET) explicitly pass the type.
+        return "Int64"
     elif isinstance(value, float):
         return "Float64"
     elif value is None:
