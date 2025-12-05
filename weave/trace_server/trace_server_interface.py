@@ -338,17 +338,17 @@ class CallUpsertRes(BaseModel):
 
 
 class CallBatchStartMode(BaseModel):
-    mode: str = "start"
+    mode: Literal["start"] = "start"
     req: CallStartReq
 
 
 class CallBatchEndMode(BaseModel):
-    mode: str = "end"
+    mode: Literal["end"] = "end"
     req: CallEndReq
 
 
 class CallBatchCompleteMode(BaseModel):
-    mode: str = "complete"
+    mode: Literal["complete"] = "complete"
     req: CallCompleteReq
 
 
@@ -2057,7 +2057,6 @@ class TraceServerInterface(Protocol):
     # Call API
     def call_start(self, req: CallStartReq) -> CallStartRes: ...
     def call_end(self, req: CallEndReq) -> CallEndRes: ...
-
     def call_read(self, req: CallReadReq) -> CallReadRes: ...
     def calls_query(self, req: CallsQueryReq) -> CallsQueryRes: ...
     def calls_query_stream(self, req: CallsQueryReq) -> Iterator[CallSchema]: ...
