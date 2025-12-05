@@ -6,7 +6,6 @@ from dataclasses import asdict, dataclass, fields
 from datetime import datetime
 from typing import Any, cast
 
-import httpx
 from typing_extensions import Self
 
 from weave.trace_server import refs_internal
@@ -325,7 +324,6 @@ class CallRef(RefWithExtra):
 class DeletedRef(Ref):
     ref: Ref
     deleted_at: datetime
-    error: httpx.HTTPStatusError
 
     def __repr__(self) -> str:
         return f"<DeletedRef {self.uri()}>"

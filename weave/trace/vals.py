@@ -789,7 +789,7 @@ def make_trace_obj(
                     raise e from None
                 if not parsed or "deleted_at" not in parsed:
                     raise e from None
-                val = DeletedRef(ref=new_ref, deleted_at=parsed["deleted_at"], error=e)
+                val = DeletedRef(ref=new_ref, deleted_at=parsed["deleted_at"])
                 logger.warning(f"Could not read deleted object: {new_ref}")
 
     if isinstance(val, Table):
