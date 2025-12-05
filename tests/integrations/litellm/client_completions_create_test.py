@@ -105,6 +105,7 @@ def test_completions_create(client):
     calls = list(client.get_calls())
     assert len(calls) == 1
     assert calls[0].output == res.response
+    print(f">> calls[0].summary: {calls[0].summary}\n{calls[0]}")
     assert calls[0].summary["usage"][model_name] == res.response["usage"]
     assert calls[0].inputs == inputs
     assert calls[0].op_name == "weave.completions_create"

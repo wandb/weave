@@ -676,3 +676,16 @@ def mock_wandb_context():
             "get": mock_get_context,
             "set": mock_set_context,
         }
+
+
+@pytest.fixture
+def clickhouse_client(client):
+    """Get direct ClickHouse client for table queries.
+
+    Returns None for SQLite clients, otherwise returns the underlying ClickHouse client.
+    """
+    from tests.trace.util import client_is_sqlite
+
+    if client_is_sqlite(client):
+        return None
+    return client.server._next_trace_server.ch_client
