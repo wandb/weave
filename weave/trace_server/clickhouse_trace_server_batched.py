@@ -419,16 +419,18 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             for idx in obj_id_idx_map[result.object_id]:
                 calls[idx][0].op_name = op_ref_uri
 
-        batch = [
-            item
-            for start_call, end_call in calls
-            for item in (
-                tsi.CallBatchStartMode(req=tsi.CallStartReq(start=start_call)),
-                tsi.CallBatchEndMode(req=tsi.CallEndReq(end=end_call)),
+        # Convert calls to CH insertable format and then to rows for batch insertion
+        batch_rows = []
+        for start_call, end_call in calls:
+            ch_start = _start_call_for_insert_to_ch_insertable_start_call(
+                start_call, self
             )
-        ]
-        # TODO: Actually populate the error fields if call_start_batch fails
-        self.call_start_batch(tsi.CallCreateBatchReq(batch=batch))
+            ch_end = _end_call_for_insert_to_ch_insertable_end_call(end_call, self)
+            batch_rows.append(_ch_call_to_row(ch_start))
+            batch_rows.append(_ch_call_to_row(ch_end))
+
+        # Insert directly without async_insert for OTEL calls
+        self._insert_call_batch(batch_rows, settings=None, do_sync_insert=True)
 
         if rejected_spans > 0:
             # Join the first 20 errors and return them delimited by ';'
@@ -4501,7 +4503,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             client.close()
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert_call_batch")
-    def _insert_call_batch(self, batch: list) -> None:
+    def _insert_call_batch(
+        self,
+        batch: list,
+        settings: dict[str, Any] | None = None,
+        do_sync_insert: bool = False,
+    ) -> None:
         set_current_span_dd_tags(
             {
                 "clickhouse_trace_server_batched._insert_call_batch.count": str(
@@ -4516,6 +4523,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             "call_parts",
             data=batch,
             column_names=ALL_CALL_INSERT_COLUMNS,
+            settings=settings,
+            do_sync_insert=do_sync_insert,
         )
 
     def _select_objs_query(
@@ -4984,6 +4993,12 @@ def _ch_table_stats_to_table_stats_schema(
         digest=digest,
         storage_size_bytes=storage_size_bytes,
     )
+
+
+def _ch_call_to_row(ch_call: CallCHInsertable) -> list[Any]:
+    """Convert a CH insertable call to a row for batch insertion with the correct defaults."""
+    call_dict = ch_call.model_dump()
+    return [call_dict.get(col) for col in ALL_CALL_INSERT_COLUMNS]
 
 
 def _start_call_for_insert_to_ch_insertable_start_call(
