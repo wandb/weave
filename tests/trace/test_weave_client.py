@@ -1715,6 +1715,135 @@ def test_summary_tokens_cost_sqlite(client):
     assert with_cost_call_summary == weave_summary
 
 
+def _setup_calls_for_storage_size_test(client):
+    """Helper function to set up calls for storage size tests.
+    
+    Returns:
+        List of created Call objects.
+    """
+    call0 = client.create_call("x", {"a": 5, "b": 10})
+    call0_child1 = client.create_call("x", {"a": 5, "b": 11}, call0)
+    call1 = client.create_call("y", {"a": 6, "b": 11})
+    return [call0, call0_child1, call1]
+
+
+def test_get_calls_with_storage_size_parameters(client):
+    """Test that get_calls accepts include_storage_size and include_total_storage_size parameters."""
+    expected_calls = _setup_calls_for_storage_size_test(client)
+    expected_count = len(expected_calls)
+
+    # Use (False, False) as the source of truth
+    baseline_calls = list(
+        client.get_calls(
+            include_storage_size=False, include_total_storage_size=False
+        )
+    )
+    baseline_count = len(baseline_calls)
+
+    # Verify baseline matches expected count
+    assert baseline_count == expected_count
+
+    # Get all storage parameter permutations (excluding baseline)
+    storage_permutations = [
+        (False, True),
+        (True, False),
+        (True, True),
+    ]
+
+    # Verify all other permutations match the baseline in both content and length
+    for include_storage_size, include_total_storage_size in storage_permutations:
+
+        calls = list(
+            client.get_calls(
+                include_storage_size=include_storage_size,
+                include_total_storage_size=include_total_storage_size,
+            )
+        )
+
+        # Verify length matches baseline
+        assert len(calls) == baseline_count
+
+        # Verify content matches baseline (storage size fields are on CallSchema, not Call object)
+        for call, baseline_call in zip(calls, baseline_calls):
+            assert call.id == baseline_call.id
+            assert call.op_name == baseline_call.op_name
+            assert call.inputs == baseline_call.inputs
+
+
+def test_get_calls_storage_size_with_other_params(client):
+    """Test that storage size parameters can be combined with other get_calls parameters."""
+    expected_calls = _setup_calls_for_storage_size_test(client)
+    call0 = expected_calls[0]
+
+    # Test that parameters can be combined with other parameters
+    calls_filtered = list(
+        client.get_calls(
+            filter=tsi.CallsFilter(op_names=[call0.op_name]),
+            include_storage_size=True,
+            include_total_storage_size=True,
+            limit=2,
+        )
+    )
+    assert len(calls_filtered) == 2
+
+
+def test_get_calls_storage_size_values(client, clickhouse_client):
+    """Test that storage size values are correctly included when parameters are set."""
+    if client_is_sqlite(client):
+        pytest.skip("Skipping test for sqlite clients")
+
+    _setup_calls_for_storage_size_test(client)
+
+    # This is a best effort to achieve consistency in the calls_merged_stats table.
+    # calls_merged_stats is an AggregatingMergeTree table populated by a materialized view.
+    # ClickHouse merges data asynchronously, so queries may see unmerged data.
+    # OPTIMIZE TABLE ... FINAL forces an immediate merge to ensure consistency for tests.
+    if clickhouse_client:
+        clickhouse_client.command("OPTIMIZE TABLE calls_merged_stats FINAL")
+
+    # Get calls via get_calls with storage size parameters
+    client_calls = list(
+        client.get_calls(
+            include_storage_size=True, include_total_storage_size=True
+        )
+    )
+
+    # Get calls directly from server with same parameters
+    server_calls = list(
+        client.server.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=client._project_id(),
+                include_storage_size=True,
+                include_total_storage_size=True,
+            )
+        )
+    )
+
+    # Verify same number of calls
+    assert len(client_calls) == len(server_calls)
+    assert len(server_calls) > 0
+
+    # Verify that get_calls returns the same calls (by ID) as direct server calls
+    client_call_ids = {call.id for call in client_calls if call.id}
+    server_call_ids = {call.id for call in server_calls if call.id}
+    assert client_call_ids == server_call_ids
+
+    # Create a mapping of call IDs to client calls for easy lookup
+    client_calls_by_id = {call.id: call for call in client_calls if call.id}
+
+    # Verify storage size fields and compare values between server and client calls
+    for server_call in server_calls:
+        # Verify storage size fields are present on server calls
+        assert hasattr(server_call, "storage_size_bytes")
+        assert hasattr(server_call, "total_storage_size_bytes")
+
+        # Verify that storage size values match between server and client calls
+        if server_call.id and server_call.id in client_calls_by_id:
+            client_call = client_calls_by_id[server_call.id]
+            assert server_call.storage_size_bytes == client_call.storage_size_bytes
+            assert server_call.total_storage_size_bytes == client_call.total_storage_size_bytes
+
+
 def test_ref_in_dict(client):
     ref = client._save_object({"a": 5}, "d1")
 
