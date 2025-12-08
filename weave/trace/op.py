@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import ast
 import atexit
 import inspect
 import logging
 import random
 import sys
 import traceback
+import types
 import weakref
 from collections import defaultdict
 from collections.abc import (
@@ -74,6 +76,102 @@ def _get_widget_values_for_current_context(func: Callable[..., Any]) -> dict[str
         return get_widget_values_for_function(combined_widgets, func)
     except (ImportError, RuntimeError):
         return None
+
+
+def _get_control_values_for_injection() -> dict[str, Any] | None:
+    """Get control values for injection into function namespace."""
+    try:
+        from weave.type_wrappers.Marimo.marimo import _control_values_context
+
+        return _control_values_context.get()
+    except (ImportError, RuntimeError):
+        return None
+
+
+class _ControlValueTransformer(ast.NodeTransformer):
+    """AST transformer that replaces `variable = ...` with `variable = control.variable`."""
+
+    def visit_Assign(self, node: ast.Assign) -> ast.Assign:
+        """Transform assignments where value is Ellipsis."""
+        # Check if the value is Ellipsis (...)
+        if isinstance(node.value, ast.Constant) and node.value.value is ...:
+            # Replace with control.<variable_name>
+            # We'll take the first target name
+            if node.targets and isinstance(node.targets[0], ast.Name):
+                var_name = node.targets[0].id
+                # Create: control.<var_name>
+                node.value = ast.Attribute(
+                    value=ast.Name(id="control", ctx=ast.Load()),
+                    attr=var_name,
+                    ctx=ast.Load(),
+                )
+        return self.generic_visit(node)
+
+
+def _transform_function_for_controls(func: Callable[..., Any]) -> Callable[..., Any]:
+    """Transform a function to replace `variable = ...` with control value lookups."""
+    try:
+        import inspect
+        import types
+
+        # Get function source
+        try:
+            source = inspect.getsource(func)
+        except (OSError, TypeError):
+            # Can't get source, return original
+            return func
+
+        # Parse AST
+        try:
+            tree = ast.parse(source)
+        except SyntaxError:
+            return func
+
+        # Transform AST
+        transformer = _ControlValueTransformer()
+        transformed_tree = transformer.visit(tree)
+        ast.fix_missing_locations(transformed_tree)
+
+        # Find the function definition
+        func_node = None
+        for node in ast.walk(transformed_tree):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                if node.name == func.__name__:
+                    func_node = node
+                    break
+
+        if func_node is None:
+            return func
+
+        # Compile and create new function
+        code = compile(transformed_tree, inspect.getfile(func), "exec")
+        namespace: dict[str, Any] = {}
+        exec(code, func.__globals__, namespace)
+
+        new_func = namespace.get(func.__name__)
+        if new_func is None:
+            return func
+
+        # Preserve function metadata
+        new_func.__name__ = func.__name__
+        new_func.__qualname__ = func.__qualname__
+        new_func.__doc__ = func.__doc__
+        new_func.__annotations__ = func.__annotations__
+        new_func.__module__ = func.__module__
+
+        # Inject 'control' into globals if not present
+        if "control" not in new_func.__globals__:
+            try:
+                from weave.type_wrappers.Marimo.marimo import control
+
+                new_func.__globals__["control"] = control
+            except ImportError:
+                pass
+
+        return new_func
+    except Exception:
+        # If transformation fails, return original function
+        return func
 
 S = TypeVar("S")
 V = TypeVar("V")
@@ -1195,6 +1293,9 @@ def op(
         raise ValueError("tracing_sample_rate must be between 0 and 1")
 
     def op_deco(func: Callable[P, R]) -> Op[P, R]:
+        # Transform function to replace `variable = ...` with control lookups
+        func = _transform_function_for_controls(func)
+
         # Check function type
         is_method = _is_unbound_method(func)
         is_async = inspect.iscoroutinefunction(func)

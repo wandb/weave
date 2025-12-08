@@ -17,6 +17,11 @@ _combined_widgets_context: ContextVar[Any | None] = ContextVar(
     "combined_widgets", default=None
 )
 
+# Context variable to store control values for variable injection
+_control_values_context: ContextVar[dict[str, Any] | None] = ContextVar(
+    "control_values", default=None
+)
+
 
 def _is_marimo_widget(obj: Any) -> bool:
     """Check if an object is a marimo UI widget.
@@ -162,8 +167,8 @@ def get_marimo_widgets(func: Callable[..., Any]) -> Any:
     return widgets
 
 
-def combine_marimo_widgets(*funcs: Callable[..., Any]) -> Any:
-    """Combine marimo UI widgets from multiple functions into a single dictionary.
+def expose_controls(*funcs: Callable[..., Any]) -> Any:
+    """Expose marimo UI widget controls from multiple functions in a single dictionary.
 
     This function extracts widgets from multiple functions and combines them into
     a single marimo.ui.dictionary. This is useful when you want to display controls
@@ -196,13 +201,13 @@ def combine_marimo_widgets(*funcs: Callable[..., Any]) -> Any:
         ) -> list[str]:
             return [search() for _ in range(limit)]
 
-        # Combine widgets from both functions
-        combined_widgets = combine_marimo_widgets(search, fan_out)
-        # combined_widgets.value = {"model": "...", "prompt": "...", "limit": 3}
+        # Expose controls from both functions
+        controls = expose_controls(search, fan_out)
+        # controls.value = {"model": "...", "prompt": "...", "limit": 3}
 
         # Extract values for each function
-        search_values = extract_widget_values_for_function(combined_widgets, search)
-        fan_out_values = extract_widget_values_for_function(combined_widgets, fan_out)
+        search_values = extract_widget_values_for_function(controls, search)
+        fan_out_values = extract_widget_values_for_function(controls, fan_out)
 
         # Use the values
         result = await fan_out(**fan_out_values)
@@ -231,7 +236,35 @@ def combine_marimo_widgets(*funcs: Callable[..., Any]) -> Any:
                 combined_annotations[param_name] = widget
                 func_names[param_name] = [func_name]
 
-    return mo.ui.dictionary(combined_annotations)
+    widgets_dict = mo.ui.dictionary(combined_annotations)
+
+    # Return the actual mo.ui.dictionary for proper marimo dependency tracking
+    # Wrap it to set context and inject control values when value is accessed
+    class _ContextDict:
+        """Wrapper that sets context and control values on value access."""
+
+        def __init__(self, d: Any):
+            object.__setattr__(self, "_dict", d)
+
+        def __getattribute__(self, name: str) -> Any:
+            if name == "value":
+                # Set both contexts when value is accessed
+                val = object.__getattribute__(self, "_dict").value
+                _combined_widgets_context.set(object.__getattribute__(self, "_dict"))
+                _control_values_context.set(val)  # Make values available for injection
+                return val
+            return getattr(object.__getattribute__(self, "_dict"), name)
+
+        def __setattr__(self, name: str, value: Any) -> None:
+            if name == "_dict":
+                object.__setattr__(self, name, value)
+            else:
+                setattr(object.__getattribute__(self, "_dict"), name, value)
+
+        def __getattr__(self, name: str) -> Any:
+            return getattr(object.__getattribute__(self, "_dict"), name)
+
+    return _ContextDict(widgets_dict)
 
 
 def extract_widget_values_for_function(
@@ -246,7 +279,7 @@ def extract_widget_values_for_function(
     in the same cell where they were created.
 
     Args:
-        widgets_or_funcs: Either a marimo.ui.dictionary from `combine_marimo_widgets`,
+        widgets_or_funcs: Either a marimo.ui.dictionary from `expose_controls`,
             or a list of functions to combine widgets from.
         func: The function to extract values for.
 
@@ -260,7 +293,7 @@ def extract_widget_values_for_function(
         # In one cell:
         get_search_values = extract_widget_values_for_function([search, fan_out], search)
         get_fan_out_values = extract_widget_values_for_function([search, fan_out], fan_out)
-        combined_widgets = combine_marimo_widgets(search, fan_out)  # For display
+        controls = expose_controls(search, fan_out)  # For display
 
         # In another cell (to avoid accessing .value in the same cell):
         search_values = get_search_values()
@@ -269,12 +302,12 @@ def extract_widget_values_for_function(
         result2 = await fan_out(**fan_out_values)
 
         # Option 2: Using pre-combined widgets
-        combined_widgets = combine_marimo_widgets(search, fan_out)
+        controls = expose_controls(search, fan_out)
         get_search_values = extract_widget_values_for_function(combined_widgets, search)
     """
     # If it's a list, combine the widgets internally
     if isinstance(widgets_or_funcs, list):
-        combined_widgets = combine_marimo_widgets(*widgets_or_funcs)
+        combined_widgets = expose_controls(*widgets_or_funcs)
     else:
         combined_widgets = widgets_or_funcs
 
@@ -304,7 +337,7 @@ def get_widget_values_for_function(
     restriction on accessing widget values in the same cell.
 
     Args:
-        widgets_or_funcs: Either a marimo.ui.dictionary from `combine_marimo_widgets`,
+        widgets_or_funcs: Either a marimo.ui.dictionary from `expose_controls`,
             or a list of functions to combine widgets from.
         func: The function to extract values for.
 
@@ -315,7 +348,7 @@ def get_widget_values_for_function(
     Example:
         # Option 1: Using a list of functions (recommended)
         # In cell 1:
-        combined_widgets = combine_marimo_widgets(search, fan_out)  # For display
+        controls = expose_controls(search, fan_out)  # For display
 
         # In cell 2 (separate cell!):
         search_values = get_widget_values_for_function([search, fan_out], search)
@@ -323,12 +356,12 @@ def get_widget_values_for_function(
         result = await fan_out(**fan_out_values)
 
         # Option 2: Using pre-combined widgets
-        combined_widgets = combine_marimo_widgets(search, fan_out)
+        controls = expose_controls(search, fan_out)
         search_values = get_widget_values_for_function(combined_widgets, search)
     """
     # If it's a list, combine the widgets internally
     if isinstance(widgets_or_funcs, list):
-        combined_widgets = combine_marimo_widgets(*widgets_or_funcs)
+        combined_widgets = expose_controls(*widgets_or_funcs)
     else:
         combined_widgets = widgets_or_funcs
 
@@ -351,12 +384,12 @@ def with_widgets(widgets_or_funcs: Any | list[Callable[..., Any]]) -> Iterator[A
     get their widget values without needing to pass widgets around.
 
     Args:
-        widgets_or_funcs: Either a marimo.ui.dictionary from `combine_marimo_widgets`,
+        widgets_or_funcs: Either a marimo.ui.dictionary from `expose_controls`,
             or a list of functions to combine widgets from.
 
     Example:
         # In cell 1:
-        combined_widgets = combine_marimo_widgets(search, fan_out)
+        controls = expose_controls(search, fan_out)
 
         # In cell 2:
         with with_widgets(combined_widgets):
@@ -365,7 +398,7 @@ def with_widgets(widgets_or_funcs: Any | list[Callable[..., Any]]) -> Iterator[A
     """
     # Resolve widgets
     if isinstance(widgets_or_funcs, list):
-        combined_widgets = combine_marimo_widgets(*widgets_or_funcs)
+        combined_widgets = expose_controls(*widgets_or_funcs)
     else:
         combined_widgets = widgets_or_funcs
 
@@ -488,6 +521,87 @@ def auto_widget(func: Callable[..., Any]) -> Callable[..., Any]:
                 return func(*args, **kwargs)
 
         return wrapper
+
+
+class _ControlResolver:
+    """Special object that resolves control values when accessed as attributes.
+
+    Usage:
+        from weave.type_wrappers.Marimo import control
+
+        @weave.op
+        async def fan_out(limit: ...) -> list[str]:
+            model = control.model  # Gets value from controls
+            prompt = control.prompt  # Gets value from controls
+            # Use model and prompt...
+    """
+
+    def __getattr__(self, name: str) -> Any:
+        """Resolve control value by name."""
+        control_values = _control_values_context.get()
+        if control_values is None:
+            raise RuntimeError(
+                f"control.{name} must be used within a cell that "
+                "accesses controls.value (e.g., controls = expose_controls(...); controls.value)"
+            )
+        if name not in control_values:
+            raise AttributeError(
+                f"Control '{name}' not found in controls. "
+                f"Available controls: {list(control_values.keys())}"
+            )
+        return control_values[name]
+
+    def __repr__(self) -> str:
+        return "control"
+
+
+# Global instance for easy access
+control = _ControlResolver()
+
+
+def control_value(name: str) -> Any:
+    """Get a control value by name from the current controls context.
+
+    This function retrieves values from controls created by `expose_controls`.
+    It must be called within a cell that has accessed `controls.value` to set
+    the context.
+
+    Args:
+        name: The name of the control to retrieve.
+
+    Returns:
+        The current value of the control.
+
+    Raises:
+        RuntimeError: If called outside a controls context.
+        KeyError: If the control name is not found.
+
+    Example:
+        @weave.op
+        async def fan_out(limit: Annotated[int, mo.ui.slider(...)]) -> list[str]:
+            model = control_value('model')  # Gets from controls
+            prompt = control_value('prompt')  # Gets from controls
+            async with asyncio.TaskGroup() as tg:
+                tasks = [tg.create_task(search(model, prompt)) for _ in range(limit)]
+            return [t.result() for t in tasks]
+
+        # In a cell:
+        controls = expose_controls(search, fan_out)
+        controls.value  # This sets the context
+        await fan_out(controls.value['limit'])
+    """
+    control_values = _control_values_context.get()
+    if control_values is None:
+        raise RuntimeError(
+            f"control_value('{name}') must be used within a cell that "
+            "accesses controls.value (e.g., controls = expose_controls(...); controls.value)"
+        )
+    if name not in control_values:
+        raise KeyError(
+            f"Control '{name}' not found in controls. "
+            f"Available controls: {list(control_values.keys())}"
+        )
+    return control_values[name]
 
 
 def get_return_marimo_annotation(func: Callable[..., Any]) -> Any | None:

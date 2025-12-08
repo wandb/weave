@@ -1,5 +1,5 @@
 from weave.type_wrappers.Marimo.marimo import (
-    combine_marimo_widgets as combine_marimo_widgets,
+    expose_controls as expose_controls,
 )
 from weave.type_wrappers.Marimo.marimo import (
     extract_widget_values_for_function as extract_widget_values_for_function,
@@ -15,6 +15,12 @@ from weave.type_wrappers.Marimo.marimo import (
 )
 from weave.type_wrappers.Marimo.marimo import (
     auto_widget as auto_widget,
+)
+from weave.type_wrappers.Marimo.marimo import (
+    control as control,
+)
+from weave.type_wrappers.Marimo.marimo import (
+    control_value as control_value,
 )
 from weave.type_wrappers.Marimo.marimo import (
     get_widget_values_for_current_context as get_widget_values_for_current_context,
