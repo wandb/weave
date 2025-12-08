@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-from typing import Any, Callable, Literal, get_args, get_origin
+from collections.abc import Callable
+from typing import Any, Literal, get_args, get_origin
 
+import marimo as mo
 from pydantic import BaseModel
 
 
@@ -219,7 +221,7 @@ def get_marimo_annotations(func: Callable[..., Any]) -> dict[str, Marimo]:
     try:
         from typing import Annotated, get_type_hints
     except ImportError:
-        from typing_extensions import Annotated, get_type_hints
+        from typing import Annotated, get_type_hints
 
     annotations: dict[str, Marimo] = {}
 
@@ -276,7 +278,9 @@ def get_marimo_widgets(func: Callable[..., Any]) -> dict[str, Any]:
         # widgets = {"x": <marimo.ui.slider>}
     """
     annotations = get_marimo_annotations(func)
-    return {name: marimo.to_widget() for name, marimo in annotations.items()}
+    return mo.ui.dictionary(
+        {name: marimo.to_widget() for name, marimo in annotations.items()}
+    )
 
 
 def get_return_marimo_annotation(func: Callable[..., Any]) -> Marimo | None:
@@ -301,7 +305,7 @@ def get_return_marimo_annotation(func: Callable[..., Any]) -> Marimo | None:
     try:
         from typing import Annotated, get_type_hints
     except ImportError:
-        from typing_extensions import Annotated, get_type_hints
+        from typing import Annotated, get_type_hints
 
     # Use get_type_hints to properly resolve string annotations from
     # `from __future__ import annotations`. We include_extras to preserve
