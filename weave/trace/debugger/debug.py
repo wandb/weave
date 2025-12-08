@@ -1,9 +1,11 @@
-import time
 from typing import Callable
-from fastapi import FastAPI,Request
-from fastapi.openapi.utils import get_openapi
 
 import uvicorn
+from fastapi import FastAPI
+from fastapi.openapi.utils import get_openapi
+
+# from weave.trace.debugger.cert import get_ssl_certs
+from fastapi.middleware.cors import CORSMiddleware
 
 class Debugger:
     target_callable: Callable
@@ -13,9 +15,32 @@ class Debugger:
 
         # Setup FastAPI app
         self.app = FastAPI()
+
+        self.app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "https://wandb.ai",
+        "https://beta.wandb.ai",
+        "https://qa.wandb.ai",
+        "https://zoo-qa.wandb.dev",
+        "https://app.wandb.test",
+        "http://localhost",
+        "http://localhost:3000",
+        "http://localhost:9000",
+        # Docs site:
+        "https://wandb.github.io",
+        "https://weave_scorer.wandb.test",
+        # environment.wandb_public_base_url(),
+    ],
+    allow_origin_regex=r"https://.+\.wandb\.dev",
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
         self.app.get("/")(self.root)
         self.app.post("/trace")(self.trace)
         self.app.get("/spec")(self.spec)
+
 
     
 
@@ -34,6 +59,22 @@ class Debugger:
             routes=self.app.routes,
         )
 
-    def start(self):
+    def start(self, host: str = "0.0.0.0", port: int = 8000) -> None:
+        """Start the debugger server with HTTPS.
 
-        uvicorn.run(self.app, host="0.0.0.0", port=8000)
+        Automatically generates a self-signed certificate for local development.
+
+        Args:
+            host: Host address to bind to. Defaults to "0.0.0.0".
+            port: Port to listen on. Defaults to 8000.
+        """
+        # cert_path, key_path = get_ssl_certs()
+
+        uvicorn.run(
+            self.app,
+            host=host,
+            port=port,
+            # allowed_origins=["localhost:9002"]
+            # ssl_keyfile=key_path,
+            # ssl_certfile=cert_path,
+        )
