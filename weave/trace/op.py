@@ -2,14 +2,12 @@
 
 from __future__ import annotations
 
-import ast
 import atexit
 import inspect
 import logging
 import random
 import sys
 import traceback
-import types
 import weakref
 from collections import defaultdict
 from collections.abc import (
@@ -61,8 +59,11 @@ from weave.trace.util import log_once
 if TYPE_CHECKING:
     from weave.trace.call import Call, CallsIter, NoOpCall
 
+
 # Lazy import to avoid circular dependencies
-def _get_widget_values_for_current_context(func: Callable[..., Any]) -> dict[str, Any] | None:
+def _get_widget_values_for_current_context(
+    func: Callable[..., Any],
+) -> dict[str, Any] | None:
     """Try to get widget values from context, return None if not available."""
     try:
         from weave.type_wrappers.Marimo.marimo import (
@@ -87,91 +88,6 @@ def _get_control_values_for_injection() -> dict[str, Any] | None:
     except (ImportError, RuntimeError):
         return None
 
-
-class _ControlValueTransformer(ast.NodeTransformer):
-    """AST transformer that replaces `variable = ...` with `variable = control.variable`."""
-
-    def visit_Assign(self, node: ast.Assign) -> ast.Assign:
-        """Transform assignments where value is Ellipsis."""
-        # Check if the value is Ellipsis (...)
-        if isinstance(node.value, ast.Constant) and node.value.value is ...:
-            # Replace with control.<variable_name>
-            # We'll take the first target name
-            if node.targets and isinstance(node.targets[0], ast.Name):
-                var_name = node.targets[0].id
-                # Create: control.<var_name>
-                node.value = ast.Attribute(
-                    value=ast.Name(id="control", ctx=ast.Load()),
-                    attr=var_name,
-                    ctx=ast.Load(),
-                )
-        return self.generic_visit(node)
-
-
-def _transform_function_for_controls(func: Callable[..., Any]) -> Callable[..., Any]:
-    """Transform a function to replace `variable = ...` with control value lookups."""
-    try:
-        import inspect
-        import types
-
-        # Get function source
-        try:
-            source = inspect.getsource(func)
-        except (OSError, TypeError):
-            # Can't get source, return original
-            return func
-
-        # Parse AST
-        try:
-            tree = ast.parse(source)
-        except SyntaxError:
-            return func
-
-        # Transform AST
-        transformer = _ControlValueTransformer()
-        transformed_tree = transformer.visit(tree)
-        ast.fix_missing_locations(transformed_tree)
-
-        # Find the function definition
-        func_node = None
-        for node in ast.walk(transformed_tree):
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                if node.name == func.__name__:
-                    func_node = node
-                    break
-
-        if func_node is None:
-            return func
-
-        # Compile and create new function
-        code = compile(transformed_tree, inspect.getfile(func), "exec")
-        namespace: dict[str, Any] = {}
-        exec(code, func.__globals__, namespace)
-
-        new_func = namespace.get(func.__name__)
-        if new_func is None:
-            return func
-
-        # Preserve function metadata
-        new_func.__name__ = func.__name__
-        new_func.__qualname__ = func.__qualname__
-        new_func.__doc__ = func.__doc__
-        new_func.__annotations__ = func.__annotations__
-        new_func.__module__ = func.__module__
-
-        # Inject 'control' into globals if not present
-        if "control" not in new_func.__globals__:
-            try:
-                from weave.type_wrappers.Marimo.marimo import control
-
-                new_func.__globals__["control"] = control
-            except ImportError:
-                pass
-
-        return new_func
-    except Exception:
-        # If transformation fails, return original function
-        return func
 
 S = TypeVar("S")
 V = TypeVar("V")
@@ -512,6 +428,18 @@ def _call_sync_func(
     func = op.resolve_fn
     call = placeholder_call()
 
+    # Inject control values into kwargs if available and not already provided
+    # This allows functions to receive control values as parameters
+    control_values = _get_control_values_for_injection()
+    if control_values:
+        # Only inject values that aren't already in kwargs and match function parameters
+        import inspect
+
+        sig = inspect.signature(func)
+        for key, value in control_values.items():
+            if key not in kwargs and key in sig.parameters:
+                kwargs[key] = value
+
     # Handle all of the possible cases where we would skip tracing.
     if is_tracing_setting_disabled() or should_skip_tracing_for_op(op):
         res = func(*args, **kwargs)
@@ -656,6 +584,18 @@ async def _call_async_func(
 ) -> tuple[Any, Call]:
     func = op.resolve_fn
     call = placeholder_call()
+
+    # Inject control values into kwargs if available and not already provided
+    # This allows functions to receive control values as parameters
+    control_values = _get_control_values_for_injection()
+    if control_values:
+        # Only inject values that aren't already in kwargs and match function parameters
+        import inspect
+
+        sig = inspect.signature(func)
+        for key, value in control_values.items():
+            if key not in kwargs and key in sig.parameters:
+                kwargs[key] = value
 
     # Handle all of the possible cases where we would skip tracing.
     if is_tracing_setting_disabled() or should_skip_tracing_for_op(op):
@@ -1293,9 +1233,6 @@ def op(
         raise ValueError("tracing_sample_rate must be between 0 and 1")
 
     def op_deco(func: Callable[P, R]) -> Op[P, R]:
-        # Transform function to replace `variable = ...` with control lookups
-        func = _transform_function_for_controls(func)
-
         # Check function type
         is_method = _is_unbound_method(func)
         is_async = inspect.iscoroutinefunction(func)
