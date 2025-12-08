@@ -8,10 +8,10 @@ from functools import wraps
 from typing import Any
 
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
-from pydantic import BaseModel
+from pydantic import BaseModel, TypeAdapter
 
 
 class Span(BaseModel):
@@ -63,6 +63,24 @@ class Debugger:
     async def get_spans(self, name: str) -> list[Span]:
         """Get all spans for a given callable name."""
         return self.spans[name]
+
+    async def get_input_json_schema(self, name: str) -> dict[str, Any]:
+        """Get the JSON schema for a callable's inputs.
+
+        Args:
+            name: The name of the registered callable.
+
+        Returns:
+            A JSON schema object describing the callable's input parameters.
+
+        Raises:
+            HTTPException: If the callable is not found.
+        """
+        if name not in self.callables:
+            raise HTTPException(status_code=404, detail=f"Callable '{name}' not found")
+
+        callable = self.callables[name]
+        return get_callable_input_json_schema(callable)
 
     def make_call_fn(self, name: str) -> Callable[..., Any]:
         """Create an async wrapper function for the named callable.
@@ -118,6 +136,14 @@ class Debugger:
             routes=self.app.routes,
         )
 
+    def _make_input_schema_fn(self, name: str) -> Callable[[], dict[str, Any]]:
+        """Create an async function that returns the input schema for a callable."""
+
+        async def get_schema() -> dict[str, Any]:
+            return await self.get_input_json_schema(name)
+
+        return get_schema
+
     def start(self, host: str = "0.0.0.0", port: int = 8000) -> None:
         """Start the debugger server.
 
@@ -150,6 +176,9 @@ class Debugger:
 
         for name in self.callables.keys():
             self.app.post(f"/callables/{name}")(self.make_call_fn(name))
+            self.app.get(f"/callables/{name}/input_json_schema")(
+                self._make_input_schema_fn(name)
+            )
 
         self.app.get("/spec")(self.spec)
         self.app.get("/spans/{name}")(self.get_spans)
@@ -186,3 +215,90 @@ def safe_serialize_input_value(value: Any) -> Any:
             return str(value)
         except Exception:
             return "<<SERIALIZATION_ERROR>>"
+
+
+def get_callable_input_json_schema(callable: Callable[..., Any]) -> dict[str, Any]:
+    """Generate a JSON schema for a callable's input parameters.
+
+    Uses Pydantic's TypeAdapter for robust type-to-JSON-schema conversion.
+
+    Args:
+        callable: The function to generate schema for.
+
+    Returns:
+        A JSON schema object with properties for each parameter.
+
+    Examples:
+        >>> def my_func(a: int, b: str = "default") -> float:
+        ...     pass
+        >>> schema = get_callable_input_json_schema(my_func)
+        >>> schema["properties"]["a"]["type"]
+        'integer'
+    """
+    sig = inspect.signature(callable)
+    type_hints: dict[str, Any] = {}
+    try:
+        type_hints = inspect.get_annotations(callable)
+    except Exception:
+        pass
+
+    properties: dict[str, Any] = {}
+    required: list[str] = []
+    defs: dict[str, Any] = {}
+
+    for param_name, param in sig.parameters.items():
+        if param_name in ("self", "cls"):
+            continue
+
+        annotation = type_hints.get(param_name)
+
+        if annotation is not None:
+            # Use Pydantic's TypeAdapter to generate the JSON schema
+            adapter = TypeAdapter(annotation)
+            param_schema = adapter.json_schema()
+
+            # Extract $defs if present and merge into our definitions
+            if "$defs" in param_schema:
+                defs.update(param_schema.pop("$defs"))
+        else:
+            # No type annotation - allow any type
+            param_schema = {}
+
+        # Add default value if present
+        if param.default is not inspect.Parameter.empty:
+            param_schema["default"] = _serialize_default(param.default)
+        else:
+            required.append(param_name)
+
+        properties[param_name] = param_schema
+
+    schema: dict[str, Any] = {
+        "type": "object",
+        "properties": properties,
+    }
+
+    if required:
+        schema["required"] = required
+
+    if defs:
+        schema["$defs"] = defs
+
+    return schema
+
+
+def _serialize_default(value: Any) -> Any:
+    """Serialize a default value for JSON schema.
+
+    Args:
+        value: The default value to serialize.
+
+    Returns:
+        A JSON-serializable representation of the default value.
+    """
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, (list, tuple)):
+        return [_serialize_default(v) for v in value]
+    if isinstance(value, dict):
+        return {k: _serialize_default(v) for k, v in value.items()}
+    return str(value)

@@ -1,11 +1,13 @@
 """Tests for the weave.trace.debugger.debug module."""
 
 import pytest
+from fastapi import HTTPException
 
 from weave.trace.debugger.debug import (
     Debugger,
     Span,
     derive_callable_name,
+    get_callable_input_json_schema,
     safe_serialize_input_value,
 )
 
@@ -344,6 +346,132 @@ class TestSpanModel:
         )
 
         assert span.error == "Something went wrong"
+
+
+# --- Tests for get_callable_input_json_schema ---
+
+
+class TestGetCallableInputJsonSchema:
+    def test_basic_types(self) -> None:
+        """Test schema generation for basic Python types."""
+
+        def func(a: int, b: str, c: float, d: bool) -> None:
+            pass
+
+        schema = get_callable_input_json_schema(func)
+
+        assert schema["type"] == "object"
+        assert schema["properties"]["a"]["type"] == "integer"
+        assert schema["properties"]["b"]["type"] == "string"
+        assert schema["properties"]["c"]["type"] == "number"
+        assert schema["properties"]["d"]["type"] == "boolean"
+        assert set(schema["required"]) == {"a", "b", "c", "d"}
+
+    def test_with_defaults(self) -> None:
+        """Test that default values are captured in schema."""
+
+        def func(a: int, b: str = "default", c: float = 3.14) -> None:
+            pass
+
+        schema = get_callable_input_json_schema(func)
+
+        assert schema["required"] == ["a"]
+        assert schema["properties"]["b"]["default"] == "default"
+        assert schema["properties"]["c"]["default"] == 3.14
+
+    def test_optional_types(self) -> None:
+        """Test schema generation for Optional types (Pydantic uses anyOf)."""
+
+        def func(a: int | None, b: str | None = None) -> None:
+            pass
+
+        schema = get_callable_input_json_schema(func)
+
+        # Pydantic represents Optional types as anyOf
+        assert schema["properties"]["a"]["anyOf"] == [
+            {"type": "integer"},
+            {"type": "null"},
+        ]
+        assert schema["properties"]["b"]["anyOf"] == [
+            {"type": "string"},
+            {"type": "null"},
+        ]
+
+    def test_list_types(self) -> None:
+        """Test schema generation for list types."""
+
+        def func(a: list[int], b: list[str]) -> None:
+            pass
+
+        schema = get_callable_input_json_schema(func)
+
+        assert schema["properties"]["a"]["type"] == "array"
+        assert schema["properties"]["a"]["items"]["type"] == "integer"
+        assert schema["properties"]["b"]["type"] == "array"
+        assert schema["properties"]["b"]["items"]["type"] == "string"
+
+    def test_dict_types(self) -> None:
+        """Test schema generation for dict types."""
+
+        def func(a: dict[str, int]) -> None:
+            pass
+
+        schema = get_callable_input_json_schema(func)
+
+        assert schema["properties"]["a"]["type"] == "object"
+        assert schema["properties"]["a"]["additionalProperties"]["type"] == "integer"
+
+    def test_no_annotations(self) -> None:
+        """Test schema generation for functions without type annotations."""
+
+        def func(a, b):
+            pass
+
+        schema = get_callable_input_json_schema(func)
+
+        assert schema["type"] == "object"
+        assert "a" in schema["properties"]
+        assert "b" in schema["properties"]
+        # No type info, so properties should be empty dicts
+        assert schema["properties"]["a"] == {}
+        assert schema["properties"]["b"] == {}
+
+    def test_existing_functions(self) -> None:
+        """Test schema generation for the existing test functions."""
+        schema = get_callable_input_json_schema(adder)
+
+        assert schema["type"] == "object"
+        assert schema["properties"]["a"]["type"] == "number"
+        assert schema["properties"]["b"]["type"] == "number"
+        assert set(schema["required"]) == {"a", "b"}
+
+
+# --- Tests for Debugger.get_input_json_schema ---
+
+
+class TestDebuggerGetInputJsonSchema:
+    @pytest.mark.asyncio
+    async def test_get_input_json_schema(self) -> None:
+        """Test getting input JSON schema for a registered callable."""
+        debugger = Debugger()
+        debugger.add_callable(adder)
+
+        schema = await debugger.get_input_json_schema("adder")
+
+        assert schema["type"] == "object"
+        assert "a" in schema["properties"]
+        assert "b" in schema["properties"]
+
+    @pytest.mark.asyncio
+    async def test_get_input_json_schema_not_found(self) -> None:
+        """Test that HTTPException is raised for unknown callable."""
+        debugger = Debugger()
+
+        with pytest.raises(HTTPException) as exc_info:
+            await debugger.get_input_json_schema("nonexistent")
+
+        assert exc_info.value.status_code == 404
+        assert "nonexistent" in exc_info.value.detail
 
 
 # --- Integration-style tests ---
