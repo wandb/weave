@@ -144,149 +144,145 @@ class TestDebuggerAddCallable:
             debugger.add_callable(multiplier, name="my_func")
 
 
-# --- Tests for Debugger.get_callable_names ---
+# --- Tests for Debugger.list_callables ---
 
 
-class TestDebuggerGetCallableNames:
+class TestDebuggerListCallables:
     @pytest.mark.asyncio
-    async def test_get_callable_names_empty(self) -> None:
-        """Test getting callable names when no callables are registered."""
+    async def test_list_callables_empty(self) -> None:
+        """Test listing callables when none are registered."""
         debugger = Debugger()
-        names = await debugger.get_callable_names()
+        names = await debugger.list_callables()
 
         assert names == []
 
     @pytest.mark.asyncio
-    async def test_get_callable_names_with_callables(self) -> None:
-        """Test getting callable names after adding callables."""
+    async def test_list_callables_with_callables(self) -> None:
+        """Test listing callables after adding some."""
         debugger = Debugger()
         debugger.add_callable(adder)
         debugger.add_callable(multiplier)
         debugger.add_callable(liner)
 
-        names = await debugger.get_callable_names()
+        names = await debugger.list_callables()
 
         assert set(names) == {"adder", "multiplier", "liner"}
 
 
-# --- Tests for Debugger.make_call_fn ---
+# --- Tests for Debugger.invoke_callable ---
 
 
-class TestDebuggerMakeCallFn:
+class TestDebuggerInvokeCallable:
     @pytest.mark.asyncio
-    async def test_call_function_returns_correct_result(self) -> None:
-        """Test that calling a function through make_call_fn returns correct result."""
+    async def test_invoke_returns_correct_result(self) -> None:
+        """Test that invoking a callable returns the correct result."""
         debugger = Debugger()
         debugger.add_callable(adder)
 
-        call_fn = debugger.make_call_fn("adder")
-        result = await call_fn(3.0, 5.0)
+        result = await debugger.invoke_callable("adder", {"a": 3.0, "b": 5.0})
 
         assert result == 8.0
 
     @pytest.mark.asyncio
-    async def test_call_function_with_kwargs(self) -> None:
-        """Test calling a function with keyword arguments."""
+    async def test_invoke_creates_call(self) -> None:
+        """Test that invoking a callable creates a call record."""
         debugger = Debugger()
         debugger.add_callable(adder)
 
-        call_fn = debugger.make_call_fn("adder")
-        result = await call_fn(a=10.0, b=20.0)
+        await debugger.invoke_callable("adder", {"a": 2.0, "b": 3.0})
 
-        assert result == 30.0
+        calls = await debugger.get_calls("adder")
+        assert len(calls) == 1
+
+        call = calls[0]
+        assert call.name == "adder"
+        assert call.inputs == {"a": 2.0, "b": 3.0}
+        assert call.output == 5.0
+        assert call.error is None
 
     @pytest.mark.asyncio
-    async def test_call_function_creates_span(self) -> None:
-        """Test that calling a function creates a span."""
+    async def test_invoke_records_timing(self) -> None:
+        """Test that calls record timing information."""
         debugger = Debugger()
         debugger.add_callable(adder)
 
-        call_fn = debugger.make_call_fn("adder")
-        await call_fn(2.0, 3.0)
+        await debugger.invoke_callable("adder", {"a": 1.0, "b": 1.0})
 
-        spans = await debugger.get_spans("adder")
-        assert len(spans) == 1
+        calls = await debugger.get_calls("adder")
+        call = calls[0]
 
-        span = spans[0]
-        assert span.name == "adder"
-        assert span.inputs == {"a": 2.0, "b": 3.0}
-        assert span.output == 5.0
-        assert span.error is None
+        assert call.start_time_unix_nano > 0
+        assert call.end_time_unix_nano >= call.start_time_unix_nano
 
     @pytest.mark.asyncio
-    async def test_call_function_records_timing(self) -> None:
-        """Test that spans record timing information."""
+    async def test_multiple_invokes_create_multiple_calls(self) -> None:
+        """Test that multiple invocations create multiple call records."""
         debugger = Debugger()
         debugger.add_callable(adder)
 
-        call_fn = debugger.make_call_fn("adder")
-        await call_fn(1.0, 1.0)
+        await debugger.invoke_callable("adder", {"a": 1.0, "b": 2.0})
+        await debugger.invoke_callable("adder", {"a": 3.0, "b": 4.0})
+        await debugger.invoke_callable("adder", {"a": 5.0, "b": 6.0})
 
-        spans = await debugger.get_spans("adder")
-        span = spans[0]
+        calls = await debugger.get_calls("adder")
+        assert len(calls) == 3
 
-        assert span.start_time_unix_nano > 0
-        assert span.end_time_unix_nano >= span.start_time_unix_nano
+        assert calls[0].output == 3.0
+        assert calls[1].output == 7.0
+        assert calls[2].output == 11.0
 
     @pytest.mark.asyncio
-    async def test_multiple_calls_create_multiple_spans(self) -> None:
-        """Test that multiple calls create multiple spans."""
+    async def test_invoke_not_found_raises_error(self) -> None:
+        """Test that invoking an unknown callable raises HTTPException."""
+        debugger = Debugger()
+
+        with pytest.raises(HTTPException) as exc_info:
+            await debugger.invoke_callable("nonexistent", {})
+
+        assert exc_info.value.status_code == 404
+        assert "nonexistent" in exc_info.value.detail
+
+
+# --- Tests for Debugger.get_calls ---
+
+
+class TestDebuggerGetCalls:
+    @pytest.mark.asyncio
+    async def test_get_calls_empty(self) -> None:
+        """Test getting calls when none have been made."""
         debugger = Debugger()
         debugger.add_callable(adder)
 
-        call_fn = debugger.make_call_fn("adder")
-        await call_fn(1.0, 2.0)
-        await call_fn(3.0, 4.0)
-        await call_fn(5.0, 6.0)
-
-        spans = await debugger.get_spans("adder")
-        assert len(spans) == 3
-
-        assert spans[0].output == 3.0
-        assert spans[1].output == 7.0
-        assert spans[2].output == 11.0
-
-
-# --- Tests for Debugger.get_spans ---
-
-
-class TestDebuggerGetSpans:
-    @pytest.mark.asyncio
-    async def test_get_spans_empty(self) -> None:
-        """Test getting spans when no calls have been made."""
-        debugger = Debugger()
-        debugger.add_callable(adder)
-
-        spans = await debugger.get_spans("adder")
-        assert spans == []
+        calls = await debugger.get_calls("adder")
+        assert calls == []
 
     @pytest.mark.asyncio
-    async def test_get_spans_nonexistent_name(self) -> None:
-        """Test getting spans for a name that was never registered."""
+    async def test_get_calls_not_found_raises_error(self) -> None:
+        """Test that getting calls for unknown callable raises HTTPException."""
         debugger = Debugger()
 
-        spans = await debugger.get_spans("nonexistent")
-        assert spans == []
+        with pytest.raises(HTTPException) as exc_info:
+            await debugger.get_calls("nonexistent")
+
+        assert exc_info.value.status_code == 404
+        assert "nonexistent" in exc_info.value.detail
 
     @pytest.mark.asyncio
-    async def test_spans_isolated_per_callable(self) -> None:
-        """Test that spans are isolated per callable name."""
+    async def test_calls_isolated_per_callable(self) -> None:
+        """Test that calls are isolated per callable."""
         debugger = Debugger()
         debugger.add_callable(adder)
         debugger.add_callable(multiplier)
 
-        adder_fn = debugger.make_call_fn("adder")
-        multiplier_fn = debugger.make_call_fn("multiplier")
+        await debugger.invoke_callable("adder", {"a": 1.0, "b": 2.0})
+        await debugger.invoke_callable("multiplier", {"a": 3.0, "b": 4.0})
+        await debugger.invoke_callable("adder", {"a": 5.0, "b": 6.0})
 
-        await adder_fn(1.0, 2.0)
-        await multiplier_fn(3.0, 4.0)
-        await adder_fn(5.0, 6.0)
+        adder_calls = await debugger.get_calls("adder")
+        multiplier_calls = await debugger.get_calls("multiplier")
 
-        adder_spans = await debugger.get_spans("adder")
-        multiplier_spans = await debugger.get_spans("multiplier")
-
-        assert len(adder_spans) == 2
-        assert len(multiplier_spans) == 1
+        assert len(adder_calls) == 2
+        assert len(multiplier_calls) == 1
 
 
 # --- Tests for error handling ---
@@ -294,22 +290,20 @@ class TestDebuggerGetSpans:
 
 class TestDebuggerErrorHandling:
     @pytest.mark.asyncio
-    async def test_call_function_with_error_records_span(self) -> None:
-        """Test that errors are recorded in spans and re-raised."""
+    async def test_invoke_with_error_records_call(self) -> None:
+        """Test that errors are recorded in calls and re-raised."""
         debugger = Debugger()
         debugger.add_callable(failing_func)
 
-        call_fn = debugger.make_call_fn("failing_func")
-
         with pytest.raises(ValueError, match="Intentional test error"):
-            await call_fn()
+            await debugger.invoke_callable("failing_func", {})
 
-        spans = await debugger.get_spans("failing_func")
-        assert len(spans) == 1
+        calls = await debugger.get_calls("failing_func")
+        assert len(calls) == 1
 
-        span = spans[0]
-        assert span.error == "Intentional test error"
-        assert span.output is None
+        call = calls[0]
+        assert call.error == "Intentional test error"
+        assert call.output is None
 
 
 # --- Tests for Span model ---
@@ -446,29 +440,29 @@ class TestGetCallableInputJsonSchema:
         assert set(schema["required"]) == {"a", "b"}
 
 
-# --- Tests for Debugger.get_input_json_schema ---
+# --- Tests for Debugger.get_json_schema ---
 
 
-class TestDebuggerGetInputJsonSchema:
+class TestDebuggerGetJsonSchema:
     @pytest.mark.asyncio
-    async def test_get_input_json_schema(self) -> None:
-        """Test getting input JSON schema for a registered callable."""
+    async def test_get_json_schema(self) -> None:
+        """Test getting JSON schema for a registered callable."""
         debugger = Debugger()
         debugger.add_callable(adder)
 
-        schema = await debugger.get_input_json_schema("adder")
+        schema = await debugger.get_json_schema("adder")
 
         assert schema["type"] == "object"
         assert "a" in schema["properties"]
         assert "b" in schema["properties"]
 
     @pytest.mark.asyncio
-    async def test_get_input_json_schema_not_found(self) -> None:
+    async def test_get_json_schema_not_found(self) -> None:
         """Test that HTTPException is raised for unknown callable."""
         debugger = Debugger()
 
         with pytest.raises(HTTPException) as exc_info:
-            await debugger.get_input_json_schema("nonexistent")
+            await debugger.get_json_schema("nonexistent")
 
         assert exc_info.value.status_code == 404
         assert "nonexistent" in exc_info.value.detail
@@ -480,7 +474,7 @@ class TestDebuggerGetInputJsonSchema:
 class TestDebuggerIntegration:
     @pytest.mark.asyncio
     async def test_end_to_end_workflow(self) -> None:
-        """Test the complete workflow: add callable, call it, retrieve spans."""
+        """Test the complete workflow: add callable, invoke it, retrieve calls."""
         debugger = Debugger()
 
         # Add callables
@@ -488,25 +482,29 @@ class TestDebuggerIntegration:
         debugger.add_callable(multiplier)
 
         # Verify registration
-        names = await debugger.get_callable_names()
+        names = await debugger.list_callables()
         assert set(names) == {"adder", "multiplier"}
 
-        # Make calls
-        adder_fn = debugger.make_call_fn("adder")
-        result = await adder_fn(10.0, 5.0)
+        # Invoke callables
+        result = await debugger.invoke_callable("adder", {"a": 10.0, "b": 5.0})
         assert result == 15.0
 
-        multiplier_fn = debugger.make_call_fn("multiplier")
-        result = await multiplier_fn(3.0, 7.0)
+        result = await debugger.invoke_callable("multiplier", {"a": 3.0, "b": 7.0})
         assert result == 21.0
 
-        # Verify spans
-        adder_spans = await debugger.get_spans("adder")
-        assert len(adder_spans) == 1
-        assert adder_spans[0].inputs == {"a": 10.0, "b": 5.0}
-        assert adder_spans[0].output == 15.0
+        # Verify calls
+        adder_calls = await debugger.get_calls("adder")
+        assert len(adder_calls) == 1
+        assert adder_calls[0].inputs == {"a": 10.0, "b": 5.0}
+        assert adder_calls[0].output == 15.0
 
-        multiplier_spans = await debugger.get_spans("multiplier")
-        assert len(multiplier_spans) == 1
-        assert multiplier_spans[0].inputs == {"a": 3.0, "b": 7.0}
-        assert multiplier_spans[0].output == 21.0
+        multiplier_calls = await debugger.get_calls("multiplier")
+        assert len(multiplier_calls) == 1
+        assert multiplier_calls[0].inputs == {"a": 3.0, "b": 7.0}
+        assert multiplier_calls[0].output == 21.0
+
+        # Verify schema
+        schema = await debugger.get_json_schema("adder")
+        assert schema["type"] == "object"
+        assert "a" in schema["properties"]
+        assert "b" in schema["properties"]

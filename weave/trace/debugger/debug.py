@@ -4,13 +4,11 @@ import inspect
 import time
 from collections import defaultdict
 from collections.abc import Callable
-from functools import wraps
 from typing import Any
 
 import uvicorn
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.openapi.utils import get_openapi
 from pydantic import BaseModel, TypeAdapter
 
 
@@ -26,7 +24,15 @@ class Span(BaseModel):
 
 
 class Debugger:
-    """Exposes local callables as a traceable HTTP service."""
+    """Exposes local callables as a traceable HTTP service.
+
+    Endpoints:
+        GET  /callables                             - List all registered callables
+        POST /callables/{callable_name}             - Invoke a callable
+        GET  /callables/{callable_name}/json_schema - Get input JSON schema
+        GET  /callables/{callable_name}/calls       - Get call history (spans)
+        GET  /openapi.json                          - OpenAPI spec (provided by FastAPI)
+    """
 
     callables: dict[str, Callable[..., Any]]
     spans: dict[str, list[Span]]
@@ -56,19 +62,62 @@ class Debugger:
 
         self.callables[name] = callable
 
-    async def get_callable_names(self) -> list[str]:
-        """Get the names of all registered callables."""
+    async def list_callables(self) -> list[str]:
+        """List all registered callable names."""
         return list(self.callables.keys())
 
-    async def get_spans(self, name: str) -> list[Span]:
-        """Get all spans for a given callable name."""
-        return self.spans[name]
+    async def invoke_callable(
+        self, callable_name: str, inputs: dict[str, Any]
+    ) -> Any:
+        """Invoke a registered callable with the given inputs.
 
-    async def get_input_json_schema(self, name: str) -> dict[str, Any]:
+        Args:
+            callable_name: The name of the callable to invoke.
+            inputs: Dictionary of input arguments.
+
+        Returns:
+            The result of calling the callable.
+
+        Raises:
+            HTTPException: If the callable is not found.
+        """
+        if callable_name not in self.callables:
+            raise HTTPException(
+                status_code=404, detail=f"Callable '{callable_name}' not found"
+            )
+
+        callable = self.callables[callable_name]
+
+        # Create span
+        span = Span(
+            name=callable_name,
+            start_time_unix_nano=time.time(),
+            end_time_unix_nano=time.time(),
+            inputs={k: safe_serialize_input_value(v) for k, v in inputs.items()},
+            output=None,
+        )
+
+        error_to_raise: Exception | None = None
+        try:
+            output = callable(**inputs)
+            span.output = output
+        except Exception as e:
+            span.error = str(e)
+            error_to_raise = e
+
+        span.end_time_unix_nano = time.time()
+        self.spans[callable_name].append(span)
+
+        if error_to_raise is not None:
+            raise error_to_raise
+
+        return output
+
+    async def get_json_schema(self, callable_name: str) -> dict[str, Any]:
         """Get the JSON schema for a callable's inputs.
 
         Args:
-            name: The name of the registered callable.
+            callable_name: The name of the registered callable.
 
         Returns:
             A JSON schema object describing the callable's input parameters.
@@ -76,73 +125,32 @@ class Debugger:
         Raises:
             HTTPException: If the callable is not found.
         """
-        if name not in self.callables:
-            raise HTTPException(status_code=404, detail=f"Callable '{name}' not found")
+        if callable_name not in self.callables:
+            raise HTTPException(
+                status_code=404, detail=f"Callable '{callable_name}' not found"
+            )
 
-        callable = self.callables[name]
+        callable = self.callables[callable_name]
         return get_callable_input_json_schema(callable)
 
-    def make_call_fn(self, name: str) -> Callable[..., Any]:
-        """Create an async wrapper function for the named callable.
+    async def get_calls(self, callable_name: str) -> list[Span]:
+        """Get all calls (spans) for a given callable.
 
         Args:
-            name: The name of the registered callable.
+            callable_name: The name of the callable.
 
         Returns:
-            An async function that wraps the callable with span tracking.
+            List of spans representing call history.
+
+        Raises:
+            HTTPException: If the callable is not found.
         """
-        callable = self.callables[name]
-
-        @wraps(callable)
-        async def call_fn(*args: Any, **kwargs: Any) -> Any:
-            bound_args = inspect.signature(callable).bind(*args, **kwargs)
-            bound_args.apply_defaults()
-            inputs = {
-                k: safe_serialize_input_value(v)
-                for k, v in bound_args.arguments.items()
-            }
-
-            span = Span(
-                name=name,
-                start_time_unix_nano=time.time(),
-                end_time_unix_nano=time.time(),
-                inputs=inputs,
-                output=None,
+        if callable_name not in self.callables:
+            raise HTTPException(
+                status_code=404, detail=f"Callable '{callable_name}' not found"
             )
-            error_to_raise: Exception | None = None
-            try:
-                output = callable(*args, **kwargs)
-                span.output = output
-            except Exception as e:
-                span.error = str(e)
-                error_to_raise = e
-            span.end_time_unix_nano = time.time()
-            self.spans[name].append(span)
 
-            if error_to_raise is not None:
-                raise error_to_raise
-
-            return output
-
-        return call_fn
-
-    async def spec(self) -> dict[str, Any]:
-        """Get the OpenAPI specification for the debugger service."""
-        return get_openapi(
-            title=self.app.title,
-            version=self.app.version,
-            openapi_version=self.app.openapi_version,
-            description=self.app.description,
-            routes=self.app.routes,
-        )
-
-    def _make_input_schema_fn(self, name: str) -> Callable[[], dict[str, Any]]:
-        """Create an async function that returns the input schema for a callable."""
-
-        async def get_schema() -> dict[str, Any]:
-            return await self.get_input_json_schema(name)
-
-        return get_schema
+        return self.spans[callable_name]
 
     def start(self, host: str = "0.0.0.0", port: int = 8000) -> None:
         """Start the debugger server.
@@ -151,7 +159,7 @@ class Debugger:
             host: Host address to bind to. Defaults to "0.0.0.0".
             port: Port to listen on. Defaults to 8000.
         """
-        self.app = FastAPI()
+        self.app = FastAPI(title="Weave Debugger")
 
         self.app.add_middleware(
             CORSMiddleware,
@@ -172,16 +180,25 @@ class Debugger:
             allow_methods=["*"],
             allow_headers=["*"],
         )
-        self.app.get("/callables")(self.get_callable_names)
 
-        for name in self.callables.keys():
-            self.app.post(f"/callables/{name}")(self.make_call_fn(name))
-            self.app.get(f"/callables/{name}/input_json_schema")(
-                self._make_input_schema_fn(name)
-            )
+        # Register endpoints with path variables
+        @self.app.get("/callables")
+        async def list_callables() -> list[str]:
+            return await self.list_callables()
 
-        self.app.get("/spec")(self.spec)
-        self.app.get("/spans/{name}")(self.get_spans)
+        @self.app.post("/callables/{callable_name}")
+        async def invoke_callable(
+            callable_name: str, inputs: dict[str, Any]
+        ) -> Any:
+            return await self.invoke_callable(callable_name, inputs)
+
+        @self.app.get("/callables/{callable_name}/json_schema")
+        async def get_json_schema(callable_name: str) -> dict[str, Any]:
+            return await self.get_json_schema(callable_name)
+
+        @self.app.get("/callables/{callable_name}/calls")
+        async def get_calls(callable_name: str) -> list[Span]:
+            return await self.get_calls(callable_name)
 
         uvicorn.run(
             self.app,
