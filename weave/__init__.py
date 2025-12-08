@@ -38,6 +38,7 @@ from weave.type_handlers.Audio.audio import Audio
 from weave.type_handlers.File.file import File
 from weave.type_handlers.Markdown.markdown import Markdown
 from weave.type_wrappers import Content
+from weave.trace.debug import debug
 
 # Alias for succinct code
 P = EasyPrompt
@@ -74,4 +75,5 @@ __all__ = [
     "require_current_call",
     "set_view",
     "thread",
+    "debug",
 ]
