@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, TypeAdapter
 
 from weave.trace.context.weave_client_context import get_weave_client
-from weave.trace.op import is_op
+from weave.trace.op import is_op, op
 
 
 class Span(BaseModel):
@@ -51,6 +51,9 @@ class Debugger:
     ) -> None:
         """Add a callable to be exposed by the debugger.
 
+        If the callable is not already a weave op, it will be automatically
+        wrapped with @weave.op to ensure all invocations are traced.
+
         Args:
             callable: The function to add.
             name: Optional custom name. If not provided, uses the function's __name__.
@@ -64,6 +67,10 @@ class Debugger:
         if name in self.callables:
             raise ValueError(f"Callable with name {name} already exists")
 
+        # Automatically wrap non-ops with @weave.op to ensure all calls are traced
+        if not is_op(callable):
+            callable = op(callable, name=name)
+
         self.callables[name] = callable
 
     async def list_callables(self) -> list[str]:
@@ -75,8 +82,8 @@ class Debugger:
     ) -> Any:
         """Invoke a registered callable with the given inputs.
 
-        If weave is initialized and the callable is a weave op, the call will be
-        traced and a weave_call_ref will be stored in the span.
+        All callables are automatically wrapped as weave ops, so if weave is
+        initialized, every call will be traced and have a weave_call_ref.
 
         Args:
             callable_name: The name of the callable to invoke.
@@ -95,9 +102,8 @@ class Debugger:
 
         callable = self.callables[callable_name]
 
-        # Check if we should use weave tracing
+        # Check if weave is initialized for tracing
         weave_client = get_weave_client()
-        use_weave_tracing = weave_client is not None and is_op(callable)
 
         # Create span
         span = Span(
@@ -110,7 +116,7 @@ class Debugger:
 
         error_to_raise: Exception | None = None
         try:
-            if use_weave_tracing:
+            if weave_client is not None:
                 # Use op.call() to get both result and call object with ref
                 # Note: op.call() never raises - errors are captured in the Call object
                 output, call = callable.call(**inputs)
@@ -123,6 +129,7 @@ class Debugger:
                     # Re-raise with the original error message
                     error_to_raise = Exception(call.exception)
             else:
+                # Weave not initialized - just call directly (no tracing)
                 output = callable(**inputs)
                 span.output = output
         except Exception as e:

@@ -578,13 +578,13 @@ class TestDebuggerWeaveIntegration:
         assert call.weave_call_ref is None
 
     @pytest.mark.asyncio
-    async def test_invoke_regular_function_with_weave_initialized_has_no_call_ref(
+    async def test_invoke_regular_function_auto_wrapped_as_op(
         self, client
     ) -> None:
-        """Test that invoking a regular function (not an op) has no call ref even with weave initialized."""
+        """Test that regular functions are auto-wrapped as ops and get call refs."""
 
         def regular_function(a: float, b: float) -> float:
-            """A regular function, not a weave op."""
+            """A regular function that will be auto-wrapped as a weave op."""
             return a - b
 
         debugger = Debugger()
@@ -601,8 +601,10 @@ class TestDebuggerWeaveIntegration:
 
         call = calls[0]
         assert call.output == 7.0
-        # weave_call_ref should be None since it's not a weave op
-        assert call.weave_call_ref is None
+        # weave_call_ref should be populated since regular functions are auto-wrapped as ops
+        assert call.weave_call_ref is not None
+        assert call.weave_call_ref.startswith("weave:///")
+        assert "/call/" in call.weave_call_ref
 
     @pytest.mark.asyncio
     async def test_invoke_op_with_error_still_stores_span(self, client) -> None:
