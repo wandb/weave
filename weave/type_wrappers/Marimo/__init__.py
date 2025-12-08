@@ -14,5 +14,14 @@ from weave.type_wrappers.Marimo.marimo import (
     get_return_marimo_annotation as get_return_marimo_annotation,
 )
 from weave.type_wrappers.Marimo.marimo import (
+    auto_widget as auto_widget,
+)
+from weave.type_wrappers.Marimo.marimo import (
+    get_widget_values_for_current_context as get_widget_values_for_current_context,
+)
+from weave.type_wrappers.Marimo.marimo import (
     get_widget_values_for_function as get_widget_values_for_function,
+)
+from weave.type_wrappers.Marimo.marimo import (
+    with_widgets as with_widgets,
 )

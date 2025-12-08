@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from collections.abc import Callable
+import contextlib
+from collections.abc import Callable, Iterator
+from contextvars import ContextVar
 from typing import Any, get_args, get_origin
 from weakref import WeakKeyDictionary
 
@@ -9,6 +11,11 @@ import marimo as mo
 # Cache for widget dictionaries to ensure we return the same instance
 # for the same function, preventing duplicate widget registrations in marimo
 _widget_cache: WeakKeyDictionary[Callable[..., Any], Any] = WeakKeyDictionary()
+
+# Context variable to store combined widgets for automatic value extraction
+_combined_widgets_context: ContextVar[Any | None] = ContextVar(
+    "combined_widgets", default=None
+)
 
 
 def _is_marimo_widget(obj: Any) -> bool:
@@ -334,6 +341,153 @@ def get_widget_values_for_function(
         for param_name in func_annotations.keys()
         if param_name in combined_values
     }
+
+
+@contextlib.contextmanager
+def with_widgets(widgets_or_funcs: Any | list[Callable[..., Any]]) -> Iterator[Any]:
+    """Context manager that makes widget values available to functions.
+
+    Within this context, functions can call `get_widget_values()` to automatically
+    get their widget values without needing to pass widgets around.
+
+    Args:
+        widgets_or_funcs: Either a marimo.ui.dictionary from `combine_marimo_widgets`,
+            or a list of functions to combine widgets from.
+
+    Example:
+        # In cell 1:
+        combined_widgets = combine_marimo_widgets(search, fan_out)
+
+        # In cell 2:
+        with with_widgets(combined_widgets):
+            # Now functions can use get_widget_values() internally
+            result = await fan_out(**get_widget_values_for_current_context(fan_out))
+    """
+    # Resolve widgets
+    if isinstance(widgets_or_funcs, list):
+        combined_widgets = combine_marimo_widgets(*widgets_or_funcs)
+    else:
+        combined_widgets = widgets_or_funcs
+
+    token = _combined_widgets_context.set(combined_widgets)
+    try:
+        yield combined_widgets
+    finally:
+        _combined_widgets_context.reset(token)
+
+
+def get_widget_values_for_current_context(func: Callable[..., Any]) -> dict[str, Any]:
+    """Get widget values for a function from the current context.
+
+    This function extracts widget values for the given function from widgets
+    set in the current `with_widgets()` context. This allows functions to access
+    widget values without needing them passed as parameters.
+
+    Args:
+        func: The function to extract values for.
+
+    Returns:
+        A dictionary mapping parameter names to their current widget values.
+
+    Raises:
+        RuntimeError: If called outside a `with_widgets()` context.
+
+    Example:
+        @weave.op
+        async def fan_out(limit: ...) -> list[str]:
+            # Get search values from context - no need to pass widgets!
+            search_values = get_widget_values_for_current_context(search)
+            async with asyncio.TaskGroup() as tg:
+                tasks = [tg.create_task(search(**search_values)) for _ in range(limit)]
+            return [t.result() for t in tasks]
+
+        # Usage:
+        with with_widgets([search, fan_out]):
+            result = await fan_out(**get_widget_values_for_current_context(fan_out))
+    """
+    combined_widgets = _combined_widgets_context.get()
+    if combined_widgets is None:
+        raise RuntimeError(
+            "get_widget_values_for_current_context() must be called within "
+            "a 'with_widgets()' context manager"
+        )
+    return get_widget_values_for_function(combined_widgets, func)
+
+
+def auto_widget(func: Callable[..., Any]) -> Callable[..., Any]:
+    """Wrap a function to automatically use widget values when called without arguments.
+
+    This wrapper allows a function to be called without arguments, and it will
+    automatically extract widget values from the current `with_widgets()` context.
+    If arguments are provided, they override the widget values.
+
+    Args:
+        func: The function to wrap.
+
+    Returns:
+        A wrapped function that can be called with or without arguments.
+
+    Example:
+        @weave.op
+        async def search(
+            model: Annotated[str, mo.ui.dropdown(...)],
+            prompt: Annotated[str, mo.ui.text(...)],
+        ) -> str:
+            ...
+
+        @weave.op
+        async def fan_out(limit: Annotated[int, mo.ui.slider(...)]) -> list[str]:
+            # Wrap search to auto-use widget values
+            auto_search = auto_widget(search)
+
+            # Can call without arguments - uses widget values automatically
+            async with asyncio.TaskGroup() as tg:
+                tasks = [tg.create_task(auto_search()) for _ in range(limit)]
+            return [t.result() for t in tasks]
+
+        # Usage:
+        with with_widgets([search, fan_out]):
+            result = await fan_out(**get_widget_values_for_current_context(fan_out))
+    """
+    import inspect
+    from functools import wraps
+
+    is_async = inspect.iscoroutinefunction(func)
+
+    if is_async:
+
+        @wraps(func)
+        async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
+            # If no arguments provided, try to get widget values from context
+            if not args and not kwargs:
+                try:
+                    widget_values = get_widget_values_for_current_context(func)
+                    return await func(**widget_values)
+                except RuntimeError:
+                    # No context available, call with no args (will use defaults)
+                    return await func()
+            else:
+                # Arguments provided, use them (they override widget values)
+                return await func(*args, **kwargs)
+
+        return async_wrapper
+    else:
+
+        @wraps(func)
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
+            # If no arguments provided, try to get widget values from context
+            if not args and not kwargs:
+                try:
+                    widget_values = get_widget_values_for_current_context(func)
+                    return func(**widget_values)
+                except RuntimeError:
+                    # No context available, call with no args (will use defaults)
+                    return func()
+            else:
+                # Arguments provided, use them (they override widget values)
+                return func(*args, **kwargs)
+
+        return wrapper
 
 
 def get_return_marimo_annotation(func: Callable[..., Any]) -> Any | None:

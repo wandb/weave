@@ -59,6 +59,22 @@ from weave.trace.util import log_once
 if TYPE_CHECKING:
     from weave.trace.call import Call, CallsIter, NoOpCall
 
+# Lazy import to avoid circular dependencies
+def _get_widget_values_for_current_context(func: Callable[..., Any]) -> dict[str, Any] | None:
+    """Try to get widget values from context, return None if not available."""
+    try:
+        from weave.type_wrappers.Marimo.marimo import (
+            _combined_widgets_context,
+            get_widget_values_for_function,
+        )
+
+        combined_widgets = _combined_widgets_context.get()
+        if combined_widgets is None:
+            return None
+        return get_widget_values_for_function(combined_widgets, func)
+    except (ImportError, RuntimeError):
+        return None
+
 S = TypeVar("S")
 V = TypeVar("V")
 
@@ -1191,6 +1207,11 @@ def op(
 
                 @wraps(func)
                 async def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:  # pyright: ignore[reportRedeclaration]
+                    # Auto-inject widget values if no arguments provided and context available
+                    if not args and not kwargs:
+                        widget_values = _get_widget_values_for_current_context(func)
+                        if widget_values:
+                            kwargs = widget_values  # type: ignore
                     res, _ = await _call_async_func(
                         cast(Op[P, R], wrapper), *args, __should_raise=True, **kwargs
                     )
@@ -1199,6 +1220,11 @@ def op(
 
                 @wraps(func)
                 def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:  # pyright: ignore[reportRedeclaration]
+                    # Auto-inject widget values if no arguments provided and context available
+                    if not args and not kwargs:
+                        widget_values = _get_widget_values_for_current_context(func)
+                        if widget_values:
+                            kwargs = widget_values  # type: ignore
                     res, _ = _call_sync_gen(
                         cast(Op[P, R], wrapper), *args, __should_raise=True, **kwargs
                     )
@@ -1209,6 +1235,11 @@ def op(
                 async def wrapper(  # pyright: ignore[reportRedeclaration]
                     *args: P.args, **kwargs: P.kwargs
                 ) -> AsyncGenerator[R]:
+                    # Auto-inject widget values if no arguments provided and context available
+                    if not args and not kwargs:
+                        widget_values = _get_widget_values_for_current_context(func)
+                        if widget_values:
+                            kwargs = widget_values  # type: ignore
                     res, _ = await _call_async_gen(
                         cast(Op[P, R], wrapper), *args, __should_raise=True, **kwargs
                     )
@@ -1218,6 +1249,11 @@ def op(
 
                 @wraps(func)
                 def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+                    # Auto-inject widget values if no arguments provided and context available
+                    if not args and not kwargs:
+                        widget_values = _get_widget_values_for_current_context(func)
+                        if widget_values:
+                            kwargs = widget_values  # type: ignore
                     res, _ = _call_sync_func(
                         cast(Op[P, R], wrapper), *args, __should_raise=True, **kwargs
                     )
