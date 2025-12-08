@@ -1,229 +1,79 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Any, Literal, get_args, get_origin
+from typing import Any, get_args, get_origin
 
 import marimo as mo
-from pydantic import BaseModel
 
 
-class Marimo(BaseModel):
-    """A type annotation wrapper for specifying Marimo UI widgets.
+def _is_marimo_widget(obj: Any) -> bool:
+    """Check if an object is a marimo UI widget.
 
-    Use this class with `typing.Annotated` to specify how a function parameter
-    should be rendered as a Marimo UI widget.
+    Args:
+        obj: The object to check.
 
-    Example:
-        from typing import Annotated
-        import weave
-        from weave.type_wrappers import Marimo
-
-        @weave.op
-        def process_value(
-            x: Annotated[int, Marimo(type="slider", start=0, stop=100, step=1)]
-        ) -> int:
-            return x * 2
-
-        # Later, when creating the Marimo UI:
-        marimo_annotation = Marimo(type="slider", start=0, stop=100, step=1)
-        slider_widget = marimo_annotation.to_widget()
+    Returns:
+        True if the object appears to be a marimo widget, False otherwise.
     """
+    if obj is None:
+        return False
 
-    type: Literal["slider", "range_slider", "number", "text", "checkbox", "dropdown"]
-    """The type of Marimo UI widget to create."""
+    # Check if it has the 'value' attribute (all marimo widgets have this)
+    if not hasattr(obj, "value"):
+        return False
 
-    # Slider-specific options
-    start: float | int | None = None
-    """Minimum value for slider widgets."""
+    # Check if the type name matches known marimo widget types
+    widget_type_names = {
+        "slider",
+        "range_slider",
+        "number",
+        "text",
+        "checkbox",
+        "dropdown",
+        "button",
+        "date",
+        "file",
+        "multiselect",
+        "radio",
+        "switch",
+        "textarea",
+    }
 
-    stop: float | int | None = None
-    """Maximum value for slider widgets."""
-
-    step: float | int | None = None
-    """Step increment for slider widgets."""
-
-    value: Any = None
-    """Default/initial value for the widget."""
-
-    # Common options
-    label: str | None = None
-    """Label to display for the widget."""
-
-    debounce: bool = False
-    """Only emit changes on release (for sliders)."""
-
-    show_value: bool = True
-    """Whether to display the current value."""
-
-    # Dropdown-specific options
-    options: list[str] | dict[str, Any] | None = None
-    """Options for dropdown widgets."""
-
-    # Text-specific options
-    placeholder: str | None = None
-    """Placeholder text for text inputs."""
-
-    def to_widget(self) -> Any:
-        """Create and return the corresponding marimo.ui widget.
-
-        Returns:
-            A marimo UI widget instance based on the configured type.
-
-        Raises:
-            ImportError: If marimo is not installed.
-            ValueError: If required parameters are missing for the widget type.
-        """
-        try:
-            import marimo as mo
-        except ImportError as e:
-            raise ImportError(
-                "marimo is required to create widgets. Install it with: pip install marimo"
-            ) from e
-
-        if self.type == "slider":
-            return self._create_slider(mo)
-        elif self.type == "range_slider":
-            return self._create_range_slider(mo)
-        elif self.type == "number":
-            return self._create_number(mo)
-        elif self.type == "text":
-            return self._create_text(mo)
-        elif self.type == "checkbox":
-            return self._create_checkbox(mo)
-        elif self.type == "dropdown":
-            return self._create_dropdown(mo)
-        else:
-            raise ValueError(f"Unknown widget type: {self.type}")
-
-    def _create_slider(self, mo: Any) -> Any:
-        """Create a marimo.ui.slider widget."""
-        if self.start is None or self.stop is None:
-            raise ValueError("Slider requires 'start' and 'stop' parameters")
-
-        kwargs: dict[str, Any] = {
-            "start": self.start,
-            "stop": self.stop,
-            "debounce": self.debounce,
-            "show_value": self.show_value,
-        }
-
-        if self.step is not None:
-            kwargs["step"] = self.step
-        if self.value is not None:
-            kwargs["value"] = self.value
-        if self.label is not None:
-            kwargs["label"] = self.label
-
-        return mo.ui.slider(**kwargs)
-
-    def _create_range_slider(self, mo: Any) -> Any:
-        """Create a marimo.ui.range_slider widget."""
-        if self.start is None or self.stop is None:
-            raise ValueError("Range slider requires 'start' and 'stop' parameters")
-
-        kwargs: dict[str, Any] = {
-            "start": self.start,
-            "stop": self.stop,
-            "debounce": self.debounce,
-            "show_value": self.show_value,
-        }
-
-        if self.step is not None:
-            kwargs["step"] = self.step
-        if self.value is not None:
-            kwargs["value"] = self.value
-        if self.label is not None:
-            kwargs["label"] = self.label
-
-        return mo.ui.range_slider(**kwargs)
-
-    def _create_number(self, mo: Any) -> Any:
-        """Create a marimo.ui.number widget."""
-        kwargs: dict[str, Any] = {}
-
-        if self.start is not None:
-            kwargs["start"] = self.start
-        if self.stop is not None:
-            kwargs["stop"] = self.stop
-        if self.step is not None:
-            kwargs["step"] = self.step
-        if self.value is not None:
-            kwargs["value"] = self.value
-        if self.label is not None:
-            kwargs["label"] = self.label
-
-        return mo.ui.number(**kwargs)
-
-    def _create_text(self, mo: Any) -> Any:
-        """Create a marimo.ui.text widget."""
-        kwargs: dict[str, Any] = {}
-
-        if self.value is not None:
-            kwargs["value"] = self.value
-        if self.label is not None:
-            kwargs["label"] = self.label
-        if self.placeholder is not None:
-            kwargs["placeholder"] = self.placeholder
-
-        return mo.ui.text(**kwargs)
-
-    def _create_checkbox(self, mo: Any) -> Any:
-        """Create a marimo.ui.checkbox widget."""
-        kwargs: dict[str, Any] = {}
-
-        if self.value is not None:
-            kwargs["value"] = self.value
-        if self.label is not None:
-            kwargs["label"] = self.label
-
-        return mo.ui.checkbox(**kwargs)
-
-    def _create_dropdown(self, mo: Any) -> Any:
-        """Create a marimo.ui.dropdown widget."""
-        if self.options is None:
-            raise ValueError("Dropdown requires 'options' parameter")
-
-        kwargs: dict[str, Any] = {"options": self.options}
-
-        if self.value is not None:
-            kwargs["value"] = self.value
-        if self.label is not None:
-            kwargs["label"] = self.label
-
-        return mo.ui.dropdown(**kwargs)
+    type_name = type(obj).__name__
+    return type_name in widget_type_names
 
 
-def get_marimo_annotations(func: Callable[..., Any]) -> dict[str, Marimo]:
-    """Extract Marimo annotations from a function's type hints.
+def get_marimo_annotations(func: Callable[..., Any]) -> dict[str, Any]:
+    """Extract marimo widget annotations from a function's type hints.
 
     This function inspects the type hints of a function and extracts any
-    `Marimo` instances used with `typing.Annotated`.
+    marimo widget instances used with `typing.Annotated`.
 
     Args:
         func: The function to inspect.
 
     Returns:
-        A dictionary mapping parameter names to their Marimo annotations.
+        A dictionary mapping parameter names to their marimo widget instances.
 
     Example:
         from typing import Annotated
-        from weave.type_wrappers import Marimo
+        import marimo as mo
 
         def my_func(
-            x: Annotated[int, Marimo(type="slider", start=0, stop=100)],
+            x: Annotated[int, mo.ui.slider(start=0, stop=100)],
             y: str,
         ) -> int:
             return x
 
         annotations = get_marimo_annotations(my_func)
-        # annotations = {"x": Marimo(type="slider", start=0, stop=100)}
+        # annotations = {"x": <marimo.ui.slider widget>}
     """
     try:
         from typing import Annotated, get_type_hints
     except ImportError:
         from typing import Annotated, get_type_hints
 
-    annotations: dict[str, Marimo] = {}
+    annotations: dict[str, Any] = {}
 
     # Use get_type_hints to properly resolve string annotations from
     # `from __future__ import annotations`. We include_extras to preserve
@@ -244,63 +94,62 @@ def get_marimo_annotations(func: Callable[..., Any]) -> dict[str, Marimo]:
             args = get_args(hint)
             # args[0] is the base type, args[1:] are the metadata
             for arg in args[1:]:
-                if isinstance(arg, Marimo):
+                # Check for literal marimo widgets
+                if _is_marimo_widget(arg):
                     annotations[param_name] = arg
                     break
 
     return annotations
 
 
-def get_marimo_widgets(func: Callable[..., Any]) -> dict[str, Any]:
-    """Create Marimo UI widgets for all annotated parameters of a function.
+def get_marimo_widgets(func: Callable[..., Any]) -> Any:
+    """Get marimo UI widgets for all annotated parameters of a function.
 
-    This is a convenience function that extracts Marimo annotations and
-    creates the corresponding UI widgets.
+    This is a convenience function that extracts marimo widget annotations
+    and returns them as a marimo.ui.dictionary.
 
     Args:
-        func: The function to create widgets for.
+        func: The function to get widgets for.
 
     Returns:
-        A dictionary mapping parameter names to their Marimo UI widgets.
+        A marimo.ui.dictionary mapping parameter names to their marimo UI widgets.
 
     Example:
         from typing import Annotated
+        import marimo as mo
         import weave
-        from weave.type_wrappers import Marimo
 
         @weave.op
         def process_value(
-            x: Annotated[int, Marimo(type="slider", start=0, stop=100, step=1)]
+            x: Annotated[int, mo.ui.slider(start=0, stop=100, step=1)]
         ) -> int:
             return x * 2
 
         widgets = get_marimo_widgets(process_value)
-        # widgets = {"x": <marimo.ui.slider>}
+        # widgets is a marimo.ui.dictionary with {"x": <marimo.ui.slider>}
     """
     annotations = get_marimo_annotations(func)
-    return mo.ui.dictionary(
-        {name: marimo.to_widget() for name, marimo in annotations.items()}
-    )
+    return mo.ui.dictionary(annotations)
 
 
-def get_return_marimo_annotation(func: Callable[..., Any]) -> Marimo | None:
-    """Extract the Marimo annotation from a function's return type.
+def get_return_marimo_annotation(func: Callable[..., Any]) -> Any | None:
+    """Extract the marimo widget annotation from a function's return type.
 
     Args:
         func: The function to inspect.
 
     Returns:
-        The Marimo annotation for the return type, or None if not present.
+        The marimo widget instance for the return type, or None if not present.
 
     Example:
         from typing import Annotated
-        from weave.type_wrappers import Marimo
+        import marimo as mo
 
-        def my_func(x: int) -> Annotated[int, Marimo(type="slider", start=0, stop=100)]:
+        def my_func(x: int) -> Annotated[int, mo.ui.slider(start=0, stop=100)]:
             return x * 2
 
         annotation = get_return_marimo_annotation(my_func)
-        # annotation = Marimo(type="slider", start=0, stop=100)
+        # annotation = <marimo.ui.slider widget>
     """
     try:
         from typing import Annotated, get_type_hints
@@ -325,7 +174,8 @@ def get_return_marimo_annotation(func: Callable[..., Any]) -> Marimo | None:
     if origin is Annotated:
         args = get_args(return_hint)
         for arg in args[1:]:
-            if isinstance(arg, Marimo):
+            # Check for literal marimo widgets
+            if _is_marimo_widget(arg):
                 return arg
 
     return None

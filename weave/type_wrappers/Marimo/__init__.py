@@ -1,4 +1,3 @@
-from weave.type_wrappers.Marimo.marimo import Marimo as Marimo
 from weave.type_wrappers.Marimo.marimo import (
     get_marimo_annotations as get_marimo_annotations,
 )

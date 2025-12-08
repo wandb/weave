@@ -38,7 +38,6 @@ from weave.type_handlers.Audio.audio import Audio
 from weave.type_handlers.File.file import File
 from weave.type_handlers.Markdown.markdown import Markdown
 from weave.type_wrappers import Content
-from weave.type_wrappers import Marimo
 
 # Alias for succinct code
 P = EasyPrompt
@@ -54,7 +53,6 @@ __all__ = [
     "Evaluation",
     "EvaluationLogger",
     "File",
-    "Marimo",
     "Markdown",
     "MessagesPrompt",
     "Model",
