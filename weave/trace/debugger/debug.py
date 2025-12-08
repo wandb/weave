@@ -11,6 +11,9 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, TypeAdapter
 
+from weave.trace.context.weave_client_context import get_weave_client
+from weave.trace.op import is_op
+
 
 class Span(BaseModel):
     """Represents a single execution span of a callable."""
@@ -21,6 +24,7 @@ class Span(BaseModel):
     inputs: dict[str, Any]
     output: Any
     error: str | None = None
+    weave_call_ref: str | None = None
 
 
 class Debugger:
@@ -71,6 +75,9 @@ class Debugger:
     ) -> Any:
         """Invoke a registered callable with the given inputs.
 
+        If weave is initialized and the callable is a weave op, the call will be
+        traced and a weave_call_ref will be stored in the span.
+
         Args:
             callable_name: The name of the callable to invoke.
             inputs: Dictionary of input arguments.
@@ -88,6 +95,10 @@ class Debugger:
 
         callable = self.callables[callable_name]
 
+        # Check if we should use weave tracing
+        weave_client = get_weave_client()
+        use_weave_tracing = weave_client is not None and is_op(callable)
+
         # Create span
         span = Span(
             name=callable_name,
@@ -99,8 +110,21 @@ class Debugger:
 
         error_to_raise: Exception | None = None
         try:
-            output = callable(**inputs)
-            span.output = output
+            if use_weave_tracing:
+                # Use op.call() to get both result and call object with ref
+                # Note: op.call() never raises - errors are captured in the Call object
+                output, call = callable.call(**inputs)
+                span.output = output
+                # Store the weave call ref URI
+                span.weave_call_ref = call.ref.uri()
+                # Check if the call had an exception
+                if call.exception is not None:
+                    span.error = call.exception
+                    # Re-raise with the original error message
+                    error_to_raise = Exception(call.exception)
+            else:
+                output = callable(**inputs)
+                span.output = output
         except Exception as e:
             span.error = str(e)
             error_to_raise = e

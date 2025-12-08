@@ -3,6 +3,7 @@
 import pytest
 from fastapi import HTTPException
 
+import weave
 from weave.trace.debugger.debug import (
     Debugger,
     Span,
@@ -508,3 +509,175 @@ class TestDebuggerIntegration:
         assert schema["type"] == "object"
         assert "a" in schema["properties"]
         assert "b" in schema["properties"]
+
+
+# --- Tests for Weave integration ---
+
+
+class TestDebuggerWeaveIntegration:
+    """Tests for weave op integration with the debugger."""
+
+    @pytest.mark.asyncio
+    async def test_invoke_op_with_weave_initialized_stores_call_ref(
+        self, client
+    ) -> None:
+        """Test that invoking a weave op with weave initialized stores the call ref."""
+
+        @weave.op
+        def weave_adder(a: float, b: float) -> float:
+            """Add two numbers using weave op."""
+            return a + b
+
+        debugger = Debugger()
+        debugger.add_callable(weave_adder)
+
+        result = await debugger.invoke_callable("weave_adder", {"a": 3.0, "b": 5.0})
+
+        assert result == 8.0
+
+        calls = await debugger.get_calls("weave_adder")
+        assert len(calls) == 1
+
+        call = calls[0]
+        assert call.name == "weave_adder"
+        assert call.inputs == {"a": 3.0, "b": 5.0}
+        assert call.output == 8.0
+        assert call.error is None
+
+        # The weave_call_ref should be populated since weave is initialized
+        assert call.weave_call_ref is not None
+        assert call.weave_call_ref.startswith("weave:///")
+        assert "/call/" in call.weave_call_ref
+
+    @pytest.mark.asyncio
+    @pytest.mark.trace_server
+    async def test_invoke_op_without_weave_initialized_has_no_call_ref(self) -> None:
+        """Test that invoking a weave op without weave initialized has no call ref."""
+        # Note: This test runs without the client fixture, so weave is not initialized
+
+        @weave.op
+        def weave_multiplier(a: float, b: float) -> float:
+            """Multiply two numbers using weave op."""
+            return a * b
+
+        debugger = Debugger()
+        debugger.add_callable(weave_multiplier)
+
+        result = await debugger.invoke_callable(
+            "weave_multiplier", {"a": 4.0, "b": 5.0}
+        )
+
+        assert result == 20.0
+
+        calls = await debugger.get_calls("weave_multiplier")
+        assert len(calls) == 1
+
+        call = calls[0]
+        assert call.output == 20.0
+        # weave_call_ref should be None since weave is not initialized
+        assert call.weave_call_ref is None
+
+    @pytest.mark.asyncio
+    async def test_invoke_regular_function_with_weave_initialized_has_no_call_ref(
+        self, client
+    ) -> None:
+        """Test that invoking a regular function (not an op) has no call ref even with weave initialized."""
+
+        def regular_function(a: float, b: float) -> float:
+            """A regular function, not a weave op."""
+            return a - b
+
+        debugger = Debugger()
+        debugger.add_callable(regular_function)
+
+        result = await debugger.invoke_callable(
+            "regular_function", {"a": 10.0, "b": 3.0}
+        )
+
+        assert result == 7.0
+
+        calls = await debugger.get_calls("regular_function")
+        assert len(calls) == 1
+
+        call = calls[0]
+        assert call.output == 7.0
+        # weave_call_ref should be None since it's not a weave op
+        assert call.weave_call_ref is None
+
+    @pytest.mark.asyncio
+    async def test_invoke_op_with_error_still_stores_span(self, client) -> None:
+        """Test that errors during op invocation are properly recorded."""
+
+        @weave.op
+        def failing_weave_op(x: int) -> int:
+            """A weave op that always fails."""
+            raise ValueError("Intentional op error")
+
+        debugger = Debugger()
+        debugger.add_callable(failing_weave_op)
+
+        # op.call() captures errors in the Call object rather than raising,
+        # so the debugger re-raises as a generic Exception with the error message
+        with pytest.raises(Exception, match="Intentional op error"):
+            await debugger.invoke_callable("failing_weave_op", {"x": 42})
+
+        calls = await debugger.get_calls("failing_weave_op")
+        assert len(calls) == 1
+
+        call = calls[0]
+        assert "Intentional op error" in call.error
+        assert call.output is None
+        # Even on error, we should have a weave_call_ref since op.call() completes
+        assert call.weave_call_ref is not None
+        assert call.weave_call_ref.startswith("weave:///")
+
+    @pytest.mark.asyncio
+    async def test_multiple_op_invocations_each_have_unique_refs(self, client) -> None:
+        """Test that multiple invocations of the same op get unique call refs."""
+
+        @weave.op
+        def counter_op(n: int) -> int:
+            """Return the input number."""
+            return n
+
+        debugger = Debugger()
+        debugger.add_callable(counter_op)
+
+        await debugger.invoke_callable("counter_op", {"n": 1})
+        await debugger.invoke_callable("counter_op", {"n": 2})
+        await debugger.invoke_callable("counter_op", {"n": 3})
+
+        calls = await debugger.get_calls("counter_op")
+        assert len(calls) == 3
+
+        # Each call should have a unique weave_call_ref
+        refs = [call.weave_call_ref for call in calls]
+        assert all(ref is not None for ref in refs)
+        assert len(set(refs)) == 3  # All refs should be unique
+
+    @pytest.mark.asyncio
+    @pytest.mark.trace_server
+    async def test_span_model_includes_weave_call_ref(self) -> None:
+        """Test that the Span model properly handles weave_call_ref field."""
+        span_with_ref = Span(
+            name="test",
+            start_time_unix_nano=1000.0,
+            end_time_unix_nano=2000.0,
+            inputs={"a": 1},
+            output=42,
+            error=None,
+            weave_call_ref="weave:///entity/project/call/abc123",
+        )
+
+        assert span_with_ref.weave_call_ref == "weave:///entity/project/call/abc123"
+
+        span_without_ref = Span(
+            name="test",
+            start_time_unix_nano=1000.0,
+            end_time_unix_nano=2000.0,
+            inputs={"a": 1},
+            output=42,
+            error=None,
+        )
+
+        assert span_without_ref.weave_call_ref is None
