@@ -25,6 +25,7 @@ ACTIONS_TAG_NAME = "Actions"
 OTEL_TAG_NAME = "OpenTelemetry"
 THREADS_TAG_NAME = "Threads"
 OPS_TAG_NAME = "Ops"
+MCP_TAG_NAME = "MCP"
 DATASETS_TAG_NAME = "Datasets"
 SCORERS_TAG_NAME = "Scorers"
 EVALUATIONS_TAG_NAME = "Evaluations"
@@ -1221,6 +1222,13 @@ def generate_routes(
             service.trace_server_interface.completions_create_stream(req),
             media_type="application/jsonl",
         )
+
+    @router.post("/mcp/tools/list", tags=[MCP_TAG_NAME])
+    def mcp_tools_list(
+        req: tsi.MCPToolsListReq,
+        service: TraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.MCPToolsListRes:
+        return service.trace_server_interface.mcp_tools_list(req)
 
     # TODO: This is mislabeled in the core impl.  Keeping it the same here for now.
     @router.post("/project/stats", tags=["project"], include_in_schema=False)

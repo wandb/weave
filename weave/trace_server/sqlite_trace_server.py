@@ -1514,6 +1514,12 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         response = self.completions_create(req)
         yield {"response": response.response, "weave_call_id": response.weave_call_id}
 
+    def mcp_tools_list(self, req: tsi.MCPToolsListReq) -> tsi.MCPToolsListRes:
+        # TODO: This is not implemented for the sqlite trace server
+        return tsi.MCPToolsListRes(
+            tools=[], errors=["MCP tools list is not supported in sqlite trace server"]
+        )
+
     def image_create(
         self, req: tsi.ImageGenerationCreateReq
     ) -> tsi.ImageGenerationCreateRes:

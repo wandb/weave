@@ -327,6 +327,54 @@ class CallsDeleteRes(BaseModel):
     num_deleted: int = Field(..., description="The number of calls deleted")
 
 
+class MCPServerConfig(BaseModel):
+    """Configuration for an MCP (Model Context Protocol) server."""
+
+    name: str = Field(..., description="Unique identifier for this MCP server")
+    url: str = Field(..., description="HTTP endpoint of the MCP server")
+    api_key_secret: str = Field(
+        "",
+        description="Name of the team secret containing the API key for this MCP server (used for Authorization header)",
+    )
+    headers: dict[str, str] = Field(
+        default_factory=dict,
+        description="Additional custom headers to send with requests to this MCP server",
+    )
+    enabled: bool = Field(True, description="Whether this MCP server is enabled")
+
+
+class MCPTool(BaseModel):
+    """Tool definition from an MCP server."""
+
+    name: str
+    description: str | None = None
+    input_schema: dict | None = Field(
+        None, description="JSON Schema for the tool's input parameters"
+    )
+    server_name: str = Field(
+        ..., description="Name of the MCP server this tool belongs to"
+    )
+
+
+class MCPToolsListReq(BaseModel):
+    """Request to list tools from MCP servers."""
+
+    project_id: str
+    mcp_servers: list[MCPServerConfig] = Field(
+        ..., description="List of MCP servers to fetch tools from"
+    )
+
+
+class MCPToolsListRes(BaseModel):
+    """Response containing tools from MCP servers."""
+
+    tools: list[MCPTool] = Field(default_factory=list, description="List of tools")
+    errors: list[str] = Field(
+        default_factory=list,
+        description="List of error messages for servers that failed",
+    )
+
+
 class CompletionsCreateRequestInputs(BaseModel):
     model: str
     messages: list = []
@@ -369,6 +417,24 @@ class CompletionsCreateRequestInputs(BaseModel):
         "Variables in messages like '{variable_name}' will be replaced with the corresponding values. "
         "Applied to both prompt messages (if prompt is provided) and regular messages.",
     )
+    # MCP (Model Context Protocol) configuration
+    mcp_servers: list[MCPServerConfig] | None = Field(
+        None,
+        description="List of MCP servers to fetch tools from. Tools from these servers will be added "
+        "to the tools list and can be called by the LLM.",
+    )
+    execute_mcp_tools: bool | None = Field(
+        True,
+        description="If True, automatically execute MCP tool calls and append results to the conversation. "
+        "If False, tool calls will be returned without execution.",
+    )
+    # Weave conversation tracking
+    thread_id: str | None = Field(
+        None,
+        description="Thread ID for grouping related conversation calls. "
+        "If not provided, a new thread_id will be generated. "
+        "Provide the same thread_id to link retry/edit calls together.",
+    )
 
 
 class CompletionsCreateReq(BaseModelStrict):
@@ -378,11 +444,15 @@ class CompletionsCreateReq(BaseModelStrict):
     track_llm_call: bool | None = Field(
         True, description="Whether to track this LLM call in the trace server"
     )
+    external_project_id: str | None = Field(
+        None, description="Original external project ID (entity/project format)"
+    )
 
 
 class CompletionsCreateRes(BaseModel):
     response: dict[str, Any]
     weave_call_id: str | None = None
+    thread_id: str | None = None
 
 
 class ImageGenerationRequestInputs(BaseModel):
@@ -2036,6 +2106,9 @@ class TraceServerInterface(Protocol):
     def completions_create_stream(
         self, req: CompletionsCreateReq
     ) -> Iterator[dict[str, Any]]: ...
+
+    # List MCP tools from configured servers
+    def mcp_tools_list(self, req: MCPToolsListReq) -> MCPToolsListRes: ...
 
     # Execute Image Generation API
     def image_create(

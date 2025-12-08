@@ -1,3 +1,5 @@
+import hashlib
+import json
 from collections.abc import Callable, Iterator
 from typing import Any
 
@@ -17,6 +19,166 @@ from weave.trace_server.interface.builtin_object_classes.provider import (
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 
 NOVA_MODELS = ("nova-pro-v1", "nova-lite-v1", "nova-micro-v1")
+
+
+def compute_message_hash(message: dict[str, Any], previous_hash: str = "") -> str:
+    """Compute a hash for a message based on its content and the previous message's hash.
+
+    This creates a chain hash where each message's hash depends on all previous messages,
+    enabling detection of conversation branching points.
+
+    Args:
+        message: The message dict containing role, content, and optionally tool_calls.
+        previous_hash: The hash of the previous message in the conversation (empty for first message).
+
+    Returns:
+        A short hash string (first 12 chars of SHA256) for the message.
+    """
+    # Extract relevant fields for hashing
+    role = message.get("role", "")
+    content = message.get("content", "")
+    tool_calls = message.get("tool_calls")
+
+    # Normalize content to string
+    if isinstance(content, list):
+        # For multi-part content, serialize to JSON
+        content = json.dumps(content, sort_keys=True)
+    elif content is None:
+        content = ""
+
+    # Build the hash input
+    hash_parts = [
+        previous_hash,
+        role,
+        str(content),
+    ]
+
+    # Include tool_calls if present
+    if tool_calls:
+        hash_parts.append(json.dumps(tool_calls, sort_keys=True))
+
+    # Compute hash
+    hash_input = "|".join(hash_parts)
+    full_hash = hashlib.sha256(hash_input.encode("utf-8")).hexdigest()
+
+    # Return truncated hash (12 chars is enough for uniqueness in conversation context)
+    return full_hash[:12]
+
+
+def compute_message_hashes(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Compute hashes for all messages in a conversation.
+
+    Each message gets a 'hash' field added based on its content and all previous messages.
+
+    Args:
+        messages: List of message dicts.
+
+    Returns:
+        List of message dicts with 'hash' field added to each.
+    """
+    result = []
+    previous_hash = ""
+
+    for message in messages:
+        # Skip if message already has a hash
+        if "hash" in message:
+            previous_hash = message["hash"]
+            result.append(message)
+            continue
+
+        # Compute hash for this message
+        msg_hash = compute_message_hash(message, previous_hash)
+
+        # Create new message dict with hash
+        new_message = {**message, "hash": msg_hash}
+        result.append(new_message)
+        previous_hash = msg_hash
+
+    return result
+
+
+def strip_message_hashes(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Remove hash fields from messages before sending to LLM.
+
+    Args:
+        messages: List of message dicts that may contain 'hash' fields.
+
+    Returns:
+        List of message dicts with 'hash' fields removed.
+    """
+    result = []
+    for message in messages:
+        if "hash" in message:
+            new_message = {k: v for k, v in message.items() if k != "hash"}
+            result.append(new_message)
+        else:
+            result.append(message)
+    return result
+
+
+def compute_choice_hashes(
+    response: dict[str, Any], last_input_hash: str
+) -> dict[str, Any]:
+    """Compute hashes for choice messages in the LLM response.
+
+    Each choice message gets a hash based on its content and the last input message hash.
+    This allows deduplication of identical responses across different calls.
+
+    Handles both standard choices (with single 'message') and MCP choices (with 'messages' array).
+
+    Args:
+        response: The LLM response dict containing choices.
+        last_input_hash: The hash of the last input message.
+
+    Returns:
+        The response dict with hashes added to choice messages.
+    """
+    if "choices" not in response or not response["choices"]:
+        return response
+
+    result = response.copy()
+    new_choices = []
+
+    for choice in response["choices"]:
+        # Handle MCP choices with messages array
+        if "messages" in choice and isinstance(choice.get("messages"), list):
+            new_choice = choice.copy()
+            messages_with_hashes = []
+            previous_hash = last_input_hash
+
+            for msg in choice["messages"]:
+                if isinstance(msg, dict):
+                    # Skip if message already has a hash
+                    if "hash" in msg:
+                        previous_hash = msg["hash"]
+                        messages_with_hashes.append(msg)
+                    else:
+                        msg_hash = compute_message_hash(msg, previous_hash)
+                        messages_with_hashes.append({**msg, "hash": msg_hash})
+                        previous_hash = msg_hash
+                else:
+                    messages_with_hashes.append(msg)
+
+            new_choice["messages"] = messages_with_hashes
+            new_choices.append(new_choice)
+            continue
+
+        # Handle standard choices with single message
+        if "message" not in choice:
+            new_choices.append(choice)
+            continue
+
+        message = choice["message"]
+        # Compute hash for this choice message
+        msg_hash = compute_message_hash(message, last_input_hash)
+
+        # Create new choice with hash added to message
+        new_choice = choice.copy()
+        new_choice["message"] = {**message, "hash": msg_hash}
+        new_choices.append(new_choice)
+
+    result["choices"] = new_choices
+    return result
 
 
 def parse_prompt_reference(prompt: str) -> tuple[str, str, str | None]:

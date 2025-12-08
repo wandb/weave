@@ -1,5 +1,6 @@
 # Clickhouse Trace Server
 
+import concurrent.futures
 import dataclasses
 import datetime
 import hashlib
@@ -110,10 +111,14 @@ from weave.trace_server.kafka import KafkaProducer
 from weave.trace_server.llm_completion import (
     _build_choices_array,
     _build_completion_response,
+    compute_choice_hashes,
+    compute_message_hash,
+    compute_message_hashes,
     get_custom_provider_info,
     lite_llm_completion,
     lite_llm_completion_stream,
     resolve_and_apply_prompt,
+    strip_message_hashes,
 )
 from weave.trace_server.methods.evaluation_status import evaluation_status
 from weave.trace_server.model_providers.model_providers import (
@@ -4111,6 +4116,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def completions_create(
         self, req: tsi.CompletionsCreateReq
     ) -> tsi.CompletionsCreateRes:
+        # --- Get or generate thread_id for conversation tracking
+        thread_id = getattr(req.inputs, "thread_id", None) or generate_id()
+        # Set it on req.inputs so it's available to MCP tool execution
+        req.inputs.thread_id = thread_id
+
         # --- Resolve prompt if provided and set messages
         prompt = getattr(req.inputs, "prompt", None)
         template_vars = getattr(req.inputs, "template_vars", None)
@@ -4136,6 +4146,37 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     response={"error": f"Failed to resolve prompt: {e!s}"}
                 )
 
+        # --- Fetch MCP tools if MCP servers are configured
+        mcp_servers = getattr(req.inputs, "mcp_servers", None) or []
+        mcp_tools: list[tsi.MCPTool] = []
+        mcp_errors: list[str] = []
+
+        logger.info(f"Completions create: mcp_servers count = {len(mcp_servers)}")
+        for i, server in enumerate(mcp_servers):
+            logger.info(f"  MCP Server {i}: name={server.name}, url={server.url}, enabled={server.enabled}")
+
+        if mcp_servers:
+            try:
+                from weave.trace_server.mcp_client import (
+                    convert_mcp_tools_to_openai_format,
+                    fetch_mcp_tools,
+                )
+
+                mcp_tools, mcp_errors = fetch_mcp_tools(mcp_servers)
+
+                if mcp_errors:
+                    logger.warning(f"MCP tool fetch errors: {mcp_errors}")
+
+                if mcp_tools:
+                    # Convert MCP tools to OpenAI format and add to tools list
+                    openai_format_tools = convert_mcp_tools_to_openai_format(mcp_tools)
+                    existing_tools = req.inputs.tools or []
+                    req.inputs.tools = existing_tools + openai_format_tools
+
+            except Exception as e:
+                logger.error(f"Failed to fetch MCP tools: {e}", exc_info=True)
+                # Continue without MCP tools rather than failing the request
+
         # Use shared setup logic
         model_info = self._model_to_provider_info_map.get(req.inputs.model)
         try:
@@ -4148,29 +4189,97 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # Now that we have all the fields for both cases, we can make the API call
         start_time = datetime.datetime.now()
 
+        # --- Compute message hashes for conversation tracking
+        # This creates a chain hash where each message's hash depends on previous messages
+        messages_with_hashes = compute_message_hashes(req.inputs.messages)
+        req.inputs.messages = messages_with_hashes
+
+        # Make a copy of inputs without MCP-specific fields for the API call
+        api_inputs = req.inputs.model_copy()
+        if hasattr(api_inputs, "mcp_servers"):
+            api_inputs.mcp_servers = None
+        if hasattr(api_inputs, "execute_mcp_tools"):
+            api_inputs.execute_mcp_tools = None
+        if hasattr(api_inputs, "thread_id"):
+            api_inputs.thread_id = None
+
+        # Strip message hashes before sending to LiteLLM (they don't understand them)
+        api_inputs.messages = strip_message_hashes(api_inputs.messages)
+
         # Make the API call
         res = lite_llm_completion(
             api_key=api_key,
-            inputs=req.inputs,
+            inputs=api_inputs,
             provider=provider,
             base_url=base_url,
             extra_headers=extra_headers,
             return_type=return_type,
         )
 
+        # Compute hashes for choice messages based on the last input message hash
+        # This enables deduplication in the DAG view
+        if "error" not in res.response and messages_with_hashes:
+            last_input_hash = messages_with_hashes[-1].get("hash", "")
+            res.response = compute_choice_hashes(res.response, last_input_hash)
+
         end_time = datetime.datetime.now()
+
+        # --- Execute MCP tool calls if present and execution is enabled
+        execute_mcp_tools = getattr(req.inputs, "execute_mcp_tools", True)
+        logger.info(
+            f"MCP tool execution check: mcp_tools={len(mcp_tools) if mcp_tools else 0}, "
+            f"mcp_servers={len(mcp_servers) if mcp_servers else 0}, "
+            f"execute_mcp_tools={execute_mcp_tools}, "
+            f"has_error={'error' in res.response}"
+        )
+        if (
+            mcp_tools
+            and mcp_servers
+            and execute_mcp_tools
+            and "error" not in res.response
+        ):
+            logger.info("Entering MCP tool execution loop")
+            res = _handle_mcp_tool_execution(
+                res=res,
+                mcp_servers=mcp_servers,
+                mcp_tools=mcp_tools,
+                req=req,
+                api_key=api_key,
+                provider=provider,
+                base_url=base_url,
+                extra_headers=extra_headers,
+                return_type=return_type,
+            )
+            end_time = datetime.datetime.now()
 
         if not req.track_llm_call:
             return tsi.CompletionsCreateRes(response=res.response)
 
-        req.inputs.messages = initial_messages
+        # If MCP tool execution happened, req.inputs.messages now contains the full
+        # conversation including tool calls and tool results. Otherwise, use initial_messages
+        # to preserve template variable syntax.
+        if not mcp_tools:
+            req.inputs.messages = initial_messages
+
+        # Filter MCP tools from inputs (keeps mcp_servers for loading into settings)
+        inputs_for_save = _filter_mcp_from_inputs(
+            req.inputs.model_dump(exclude_none=True)
+        )
+
+        # Generate a description by summarizing user messages via W&B Inference
+        # Use external_project_id (entity/project format) for the API call
+        description = _generate_call_description(
+            req.inputs.messages, req.external_project_id or req.project_id
+        )
+
         start = tsi.StartedCallSchemaForInsert(
             project_id=req.project_id,
             wb_user_id=req.wb_user_id,
             op_name=COMPLETIONS_CREATE_OP_NAME,
             started_at=start_time,
-            inputs={**req.inputs.model_dump(exclude_none=True)},
-            attributes={},
+            inputs=inputs_for_save,
+            attributes={"description": description} if description else {},
+            thread_id=thread_id,
         )
         start_call = _start_call_for_insert_to_ch_insertable_start_call(start, self)
         end = tsi.EndedCallSchemaForInsert(
@@ -4199,7 +4308,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self._insert_call_batch(batch_data)
 
         return tsi.CompletionsCreateRes(
-            response=res.response, weave_call_id=start_call.id
+            response=res.response, weave_call_id=start_call.id, thread_id=thread_id
         )
 
     # -------------------------------------------------------------------
@@ -4216,7 +4325,14 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         When req.inputs.n > 1, properly separates and tracks all choices
         within a single call's output rather than creating separate calls.
+
+        Note: MCP tool execution is not supported in streaming mode. If MCP servers
+        are configured and the LLM returns tool calls, they will be passed through
+        without execution. Use non-streaming mode for automatic MCP tool execution.
         """
+        # --- Get or generate thread_id for conversation tracking
+        thread_id = getattr(req.inputs, "thread_id", None) or generate_id()
+
         # --- Resolve prompt if provided and prepend messages
         prompt = getattr(req.inputs, "prompt", None)
         template_vars = getattr(req.inputs, "template_vars", None)
@@ -4239,6 +4355,33 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
             return _single_error_iter(e)
 
+        # --- Fetch MCP tools if MCP servers are configured
+        mcp_servers = getattr(req.inputs, "mcp_servers", None) or []
+        mcp_tools: list[tsi.MCPTool] = []
+        execute_mcp_tools = getattr(req.inputs, "execute_mcp_tools", True)
+
+        if mcp_servers:
+            try:
+                from weave.trace_server.mcp_client import (
+                    convert_mcp_tools_to_openai_format,
+                    fetch_mcp_tools,
+                )
+
+                mcp_tools, mcp_errors = fetch_mcp_tools(mcp_servers)
+
+                if mcp_errors:
+                    logger.warning(f"MCP tool fetch errors: {mcp_errors}")
+
+                if mcp_tools:
+                    # Convert MCP tools to OpenAI format and add to tools list
+                    openai_format_tools = convert_mcp_tools_to_openai_format(mcp_tools)
+                    existing_tools = req.inputs.tools or []
+                    req.inputs.tools = existing_tools + openai_format_tools
+
+            except Exception as e:
+                logger.error(f"Failed to fetch MCP tools: {e}", exc_info=True)
+                # Continue without MCP tools rather than failing the request
+
         # --- Shared setup logic (copy of completions_create up to litellm call)
         model_info = self._model_to_provider_info_map.get(req.inputs.model)
         try:
@@ -4260,15 +4403,28 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # Track start call if requested
         start_call: CallStartCHInsertable | None = None
         if req.track_llm_call:
+            # Compute message hashes for initial_messages
+            initial_messages_with_hashes = compute_message_hashes(initial_messages)
+
             # Prepare inputs for tracking: use original messages (with template syntax)
             # and include prompt and template_vars
             tracked_inputs = req.inputs.model_dump(exclude_none=True)
             tracked_inputs["model"] = model_name
-            tracked_inputs["messages"] = initial_messages
+            tracked_inputs["messages"] = initial_messages_with_hashes
+            tracked_inputs["thread_id"] = thread_id
             if prompt:
                 tracked_inputs["prompt"] = prompt
             if template_vars:
                 tracked_inputs["template_vars"] = template_vars
+
+            # Filter MCP-related data before saving
+            tracked_inputs = _filter_mcp_from_inputs(tracked_inputs)
+
+            # Generate a description by summarizing user messages via W&B Inference
+            # Use external_project_id (entity/project format) for the API call
+            description = _generate_call_description(
+                initial_messages, req.external_project_id or req.project_id
+            )
 
             start = tsi.StartedCallSchemaForInsert(
                 project_id=req.project_id,
@@ -4276,14 +4432,18 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 op_name=COMPLETIONS_CREATE_OP_NAME,
                 started_at=datetime.datetime.now(),
                 inputs=tracked_inputs,
-                attributes={},
+                attributes={"description": description} if description else {},
+                thread_id=thread_id,
             )
             start_call = _start_call_for_insert_to_ch_insertable_start_call(start, self)
             # Insert immediately so that callers can see the call in progress
             self._insert_call(start_call)
 
+        # Compute message hashes for combined_messages (for LiteLLM)
+        combined_messages_with_hashes = compute_message_hashes(combined_messages)
+
         # Set the combined messages (with template vars replaced) for LiteLLM
-        req.inputs.messages = combined_messages
+        req.inputs.messages = combined_messages_with_hashes
 
         # Make a copy for the API call without prompt and template_vars
         api_inputs = req.inputs.model_copy()
@@ -4291,6 +4451,16 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             api_inputs.prompt = None
         if hasattr(api_inputs, "template_vars"):
             api_inputs.template_vars = None
+        # Remove MCP-specific fields from API inputs
+        if hasattr(api_inputs, "mcp_servers"):
+            api_inputs.mcp_servers = None
+        if hasattr(api_inputs, "execute_mcp_tools"):
+            api_inputs.execute_mcp_tools = None
+        if hasattr(api_inputs, "thread_id"):
+            api_inputs.thread_id = None
+
+        # Strip message hashes before sending to LiteLLM (they don't understand them)
+        api_inputs.messages = strip_message_hashes(api_inputs.messages)
 
         # --- Build the underlying chunk iterator
         chunk_iter = lite_llm_completion_stream(
@@ -4302,9 +4472,34 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             return_type=return_type,
         )
 
+        # Wrap with MCP tool execution if enabled
+        logger.info(
+            f"Streaming MCP check: mcp_servers={len(mcp_servers) if mcp_servers else 0}, "
+            f"mcp_tools={len(mcp_tools) if mcp_tools else 0}, "
+            f"execute_mcp_tools={execute_mcp_tools}"
+        )
+        if mcp_servers and mcp_tools and execute_mcp_tools:
+            logger.info("Streaming MCP tool execution enabled")
+            chunk_iter = _handle_mcp_tool_execution_stream(
+                initial_chunk_iter=chunk_iter,
+                mcp_servers=mcp_servers,
+                mcp_tools=mcp_tools,
+                req=req,
+                api_key=api_key,
+                provider=provider,
+                base_url=base_url,
+                extra_headers=extra_headers,
+                return_type=return_type,
+            )
+
         # If tracking not requested just return chunks directly
         if not req.track_llm_call or start_call is None:
             return chunk_iter
+
+        # Get the last input hash for computing choice hashes
+        last_input_hash = ""
+        if combined_messages_with_hashes:
+            last_input_hash = combined_messages_with_hashes[-1].get("hash", "")
 
         # Otherwise, wrap the iterator with tracking
         return _create_tracked_stream_wrapper(
@@ -4313,7 +4508,30 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             start_call,
             model_name,
             req.project_id,
+            thread_id,
+            last_input_hash,
         )
+
+    def mcp_tools_list(self, req: tsi.MCPToolsListReq) -> tsi.MCPToolsListRes:
+        """List tools from MCP servers.
+
+        Fetches available tools from the configured MCP servers so they can
+        be displayed in the UI.
+
+        Args:
+            req: The request containing MCP server configurations.
+
+        Returns:
+            MCPToolsListRes containing the tools and any errors.
+        """
+        from weave.trace_server.mcp_client import fetch_mcp_tools
+
+        if not req.mcp_servers:
+            return tsi.MCPToolsListRes(tools=[], errors=[])
+
+        mcp_tools, errors = fetch_mcp_tools(req.mcp_servers)
+
+        return tsi.MCPToolsListRes(tools=mcp_tools, errors=errors)
 
     def image_create(
         self, req: tsi.ImageGenerationCreateReq
@@ -5226,12 +5444,14 @@ def _create_tracked_stream_wrapper(
     start_call: CallStartCHInsertable,
     model_name: str,
     project_id: str,
+    thread_id: str | None = None,
+    last_input_hash: str = "",
 ) -> Iterator[dict[str, Any]]:
     """Create a wrapper that tracks streaming completion and emits call records."""
 
     def _stream_wrapper() -> Iterator[dict[str, Any]]:
         # (1) send meta chunk first so clients can associate stream
-        yield {"_meta": {"weave_call_id": start_call.id}}
+        yield {"_meta": {"weave_call_id": start_call.id, "thread_id": thread_id}}
 
         # Initialize accumulation variables for all choices
         aggregated_output: dict[str, Any] | None = None
@@ -5245,6 +5465,8 @@ def _create_tracked_stream_wrapper(
         choice_finish_reasons: dict[
             int, str | None
         ] = {}  # Track finish reasons by choice index
+        # Track MCP choices with messages arrays (replaces standard aggregation)
+        mcp_choices: dict[int, dict[str, Any]] = {}
         aggregated_metadata: dict[str, Any] = {}
 
         try:
@@ -5262,6 +5484,16 @@ def _create_tracked_stream_wrapper(
                 if choices:
                     for choice in choices:
                         choice_index = choice.get("index", 0)
+
+                        # Handle MCP choices with messages arrays
+                        # These replace the standard streaming aggregation for this choice
+                        if "messages" in choice and isinstance(choice.get("messages"), list):
+                            mcp_choices[choice_index] = {
+                                "index": choice_index,
+                                "messages": choice["messages"],
+                                "finish_reason": choice.get("finish_reason", "stop"),
+                            }
+                            continue
 
                         # Initialize choice accumulators if not present
                         if choice_index not in choice_contents:
@@ -5299,17 +5531,37 @@ def _create_tracked_stream_wrapper(
 
         finally:
             # Build final aggregated output with all choices
-            if choice_contents or choice_tool_calls or choice_reasoning_content:
+            if choice_contents or choice_tool_calls or choice_reasoning_content or mcp_choices:
+                # Build standard choices from streaming aggregation
                 choices_array = _build_choices_array(
                     choice_contents,
                     choice_tool_calls,
                     choice_reasoning_content,
                     choice_finish_reasons,
                 )
+
+                # Replace standard choices with MCP choices where applicable
+                for mcp_choice_idx, mcp_choice in mcp_choices.items():
+                    # Find and replace the choice at this index
+                    replaced = False
+                    for i, choice in enumerate(choices_array):
+                        if choice.get("index") == mcp_choice_idx:
+                            choices_array[i] = mcp_choice
+                            replaced = True
+                            break
+                    if not replaced:
+                        choices_array.append(mcp_choice)
+
                 aggregated_output = _build_completion_response(
                     aggregated_metadata,
                     choices_array,
                 )
+
+                # Compute hashes for choice messages based on the last input message hash
+                if aggregated_output and last_input_hash:
+                    aggregated_output = compute_choice_hashes(
+                        aggregated_output, last_input_hash
+                    )
 
             # Prepare summary and end call
             summary: dict[str, Any] = {}
@@ -5332,6 +5584,1253 @@ def _create_tracked_stream_wrapper(
             insert_call(end_call)
 
     return _stream_wrapper()
+
+
+def _aggregate_streaming_chunks(
+    chunk_iter: Iterator[dict[str, Any]], choice_index: int = 0
+) -> dict[str, Any]:
+    """Aggregate streaming chunks into a final completion response.
+
+    Args:
+        chunk_iter: Iterator of streaming chunks
+        choice_index: Index of the choice to extract (default 0)
+
+    Returns:
+        Dictionary with aggregated response similar to lite_llm_completion format
+    """
+    aggregated_metadata: dict[str, Any] = {}
+    choice_contents: list[str] = []
+    choice_tool_calls: list[dict[str, Any]] = []
+    choice_reasoning_content: list[str] = []
+    finish_reason: str | None = None
+
+    for chunk in chunk_iter:
+        # Check for errors
+        if "error" in chunk:
+            return {"error": chunk["error"]}
+
+        # Aggregate metadata
+        if "id" in chunk and "id" not in aggregated_metadata:
+            aggregated_metadata["id"] = chunk["id"]
+        if "created" in chunk and "created" not in aggregated_metadata:
+            aggregated_metadata["created"] = chunk["created"]
+        if "model" in chunk and "model" not in aggregated_metadata:
+            aggregated_metadata["model"] = chunk["model"]
+        if "system_fingerprint" in chunk and "system_fingerprint" not in aggregated_metadata:
+            aggregated_metadata["system_fingerprint"] = chunk.get("system_fingerprint")
+        if "usage" in chunk:
+            # Merge usage data
+            if "usage" not in aggregated_metadata:
+                aggregated_metadata["usage"] = {}
+            chunk_usage = chunk["usage"]
+            for key, value in chunk_usage.items():
+                if key in aggregated_metadata["usage"]:
+                    aggregated_metadata["usage"][key] += value
+                else:
+                    aggregated_metadata["usage"][key] = value
+
+        # Process choices
+        chunk_choices = chunk.get("choices", [])
+        for choice in chunk_choices:
+            if choice.get("index") == choice_index:
+                delta = choice.get("delta", {})
+
+                # Aggregate content
+                if "content" in delta and delta["content"]:
+                    choice_contents.append(delta["content"])
+
+                # Aggregate reasoning content
+                if "reasoning_content" in delta and delta["reasoning_content"]:
+                    choice_reasoning_content.append(delta["reasoning_content"])
+
+                # Aggregate tool calls
+                # NOTE: Some LLM providers don't properly increment the tool call index
+                # in streaming responses - all tool calls come with index: 0, AND they
+                # may reuse the same ID for different tool calls. We detect new tool calls
+                # by checking when both 'id' AND 'name' are present, and ALWAYS create
+                # a new entry when this happens.
+                if "tool_calls" in delta and delta["tool_calls"]:
+                    tool_calls_delta = delta["tool_calls"]
+                    for tc_delta in tool_calls_delta:
+                        tc_id = tc_delta.get("id")
+                        func_data = tc_delta.get("function", {})
+                        func_name = func_data.get("name")
+                        func_args = func_data.get("arguments", "")
+
+                        # Check if this is a NEW tool call (has both id AND name)
+                        # ALWAYS create a new entry when we see id+name, even if ID is reused
+                        if tc_id and func_name:
+                            # Generate unique ID if this ID is already used
+                            existing_count = sum(
+                                1 for tc in choice_tool_calls
+                                if tc.get("id") == tc_id or (tc.get("id") or "").startswith(f"{tc_id}_")
+                            )
+                            unique_id = f"{tc_id}_{existing_count}" if existing_count > 0 else tc_id
+
+                            # This is a NEW tool call - add it
+                            choice_tool_calls.append({
+                                "id": unique_id,
+                                "type": tc_delta.get("type", "function"),
+                                "function": {"name": func_name, "arguments": func_args},
+                            })
+                            continue
+
+                        # For chunks without id+name, append arguments to the LAST tool call
+                        if choice_tool_calls:
+                            target_tc = choice_tool_calls[-1]
+
+                            # Update the target tool call
+                            if tc_id and not target_tc.get("id"):
+                                target_tc["id"] = tc_id
+                            if func_name and not target_tc.get("function", {}).get("name"):
+                                target_tc["function"]["name"] = func_name
+                            if func_args:
+                                target_tc["function"]["arguments"] += func_args
+                        else:
+                            # No tool calls yet - create one
+                            choice_tool_calls.append({
+                                "id": tc_id or "",
+                                "type": tc_delta.get("type", "function"),
+                                "function": {"name": func_name or "", "arguments": func_args},
+                            })
+
+                # Get finish reason
+                if "finish_reason" in choice and choice["finish_reason"]:
+                    finish_reason = choice["finish_reason"]
+
+    # Build the final message
+    content = "".join(choice_contents) if choice_contents else None
+    reasoning_content = "".join(choice_reasoning_content) if choice_reasoning_content else None
+
+    # Filter out empty/incomplete tool calls and ensure proper structure
+    cleaned_tool_calls: list[dict[str, Any]] = []
+    for idx, tc in enumerate(choice_tool_calls):
+        func = tc.get("function", {})
+        func_name = func.get("name", "")
+        func_args = func.get("arguments", "")
+        tc_id = tc.get("id")
+
+        # Only include tool calls that have a name
+        if func_name:
+            cleaned_tc = {
+                "id": tc_id,
+                "type": "function",
+                "function": {
+                    "name": func_name,
+                    "arguments": func_args or "{}",
+                },
+            }
+            cleaned_tool_calls.append(cleaned_tc)
+
+    message: dict[str, Any] = {
+        "role": "assistant",
+        "content": content,
+    }
+    if cleaned_tool_calls:
+        message["tool_calls"] = cleaned_tool_calls
+    if reasoning_content:
+        message["reasoning_content"] = reasoning_content
+
+    # Build the choice
+    choice_dict: dict[str, Any] = {
+        "index": choice_index,
+        "message": message,
+        "finish_reason": finish_reason,
+    }
+
+    # Build the response
+    response: dict[str, Any] = {
+        "id": aggregated_metadata.get("id", ""),
+        "object": "chat.completion",
+        "created": aggregated_metadata.get("created", 0),
+        "model": aggregated_metadata.get("model", ""),
+        "choices": [choice_dict],
+    }
+    if "usage" in aggregated_metadata:
+        response["usage"] = aggregated_metadata["usage"]
+    if "system_fingerprint" in aggregated_metadata:
+        response["system_fingerprint"] = aggregated_metadata["system_fingerprint"]
+
+    return response
+
+
+def _process_choice_with_mcp_tools_iteratively(
+    choice: dict[str, Any],
+    choice_idx: int,
+    original_messages: list[dict[str, Any]],
+    mcp_tool_names: set[str],
+    mcp_servers: list[tsi.MCPServerConfig],
+    mcp_tools: list[tsi.MCPTool],
+    req: tsi.CompletionsCreateReq,
+    api_key: str | None,
+    provider: str,
+    base_url: str | None,
+    extra_headers: dict[str, str],
+    return_type: str | None,
+    max_iterations: int = 10,
+) -> dict[str, Any] | None:
+    """Process a single choice iteratively, executing MCP tool calls until resolved.
+
+    This function handles nested tool calls by iteratively:
+    1. Executing MCP tool calls
+    2. Sending results to LLM
+    3. Checking if LLM response has more tool calls
+    4. Repeating until no more tool calls or max_iterations reached
+
+    Args:
+        choice: The choice dictionary to process
+        choice_idx: Index of the choice for logging
+        original_messages: Original conversation messages before this choice
+        mcp_tool_names: Set of available MCP tool names (with server prefix)
+        mcp_servers: List of MCP server configurations
+        mcp_tools: List of available MCP tools
+        req: The original completion request
+        api_key: API key for LLM
+        provider: LLM provider name
+        base_url: Base URL for custom providers
+        extra_headers: Extra headers for the request
+        return_type: Return type configuration
+        max_iterations: Maximum number of tool execution iterations
+
+    Returns:
+        Dictionary with processed choice (index, finish_reason, messages) or None if processing failed
+    """
+    from weave.trace_server.mcp_client import (
+        execute_mcp_tool_calls,
+        format_tool_results_as_messages,
+    )
+
+    # Ensure secret fetcher context is available when executing MCP tools
+    # This is a fallback in case contextvars doesn't preserve it across async boundaries
+    if _secret_fetcher_context.get() is None:
+        # Try to recreate the secret fetcher if in local mode
+        # Import here to avoid circular dependencies
+        try:
+            import os
+            use_local = (
+                os.environ.get("WEAVE_TRACE_USE_LOCAL_ENV_SECRET_FETCHER", "false").lower()
+                == "true"
+            )
+            if use_local:
+                # In local mode, try to create a simple secret fetcher that reads from env
+                # This is a minimal fallback - the proper fix should be at the endpoint level
+                class LocalEnvSecretFetcher:
+                    def fetch(self, secret_name: str) -> dict:
+                        return {"secrets": {secret_name: os.environ.get(secret_name, None)}}
+                _secret_fetcher_context.set(LocalEnvSecretFetcher())
+            else:
+                logger.warning(
+                    "Secret fetcher context not available for MCP tool execution. "
+                    "MCP tools may not be able to authenticate."
+                )
+        except Exception:
+            logger.warning(
+                "Secret fetcher context not available for MCP tool execution. "
+                "MCP tools may not be able to authenticate."
+            )
+
+    # Skip choices that already have messages arrays (already processed MCP choices)
+    if "messages" in choice and isinstance(choice.get("messages"), list):
+        logger.info(f"Choice {choice_idx}: Already has messages array (already processed), skipping")
+        return None
+
+    # Standard format with single message
+    message = choice.get("message", {})
+    if not message:
+        logger.info(f"Choice {choice_idx}: No message found, skipping")
+        return None
+
+    # Build conversation history starting from original messages
+    conversation_messages = list(original_messages)
+    all_choice_messages: list[dict[str, Any]] = []
+
+    # Iteratively process tool calls until resolved
+    iteration = 0
+    current_message = message
+    finish_reason = choice.get("finish_reason", "stop")
+
+    while iteration < max_iterations:
+        iteration += 1
+        logger.info(f"Choice {choice_idx}: Iteration {iteration}/{max_iterations}")
+
+        # Check for tool calls in current message
+        tool_calls = current_message.get("tool_calls") or []
+        if not tool_calls:
+            # No more tool calls, add final response and break
+            if current_message:
+                all_choice_messages.append(current_message)
+            break
+
+        logger.info(f"Choice {choice_idx}: Found {len(tool_calls)} tool calls in iteration {iteration}")
+
+        # Filter to only MCP tool calls
+        mcp_tool_calls = []
+        for tc in tool_calls:
+            func_name = tc.get("function", {}).get("name", "")
+            is_mcp = func_name in mcp_tool_names
+            logger.info(f"  Checking tool call: func_name='{func_name}', is_mcp={is_mcp}")
+            if is_mcp:
+                mcp_tool_calls.append(tc)
+            else:
+                logger.info(f"    Not in mcp_tool_names: {mcp_tool_names}")
+
+        logger.info(f"Choice {choice_idx}: {len(mcp_tool_calls)} MCP tool calls after filtering")
+
+        if not mcp_tool_calls:
+            # No MCP tool calls, add message and break
+            all_choice_messages.append(current_message)
+            break
+
+        # Execute MCP tool calls
+        logger.info(f"Choice {choice_idx}: Executing {len(mcp_tool_calls)} MCP tool calls...")
+        try:
+            tool_results = execute_mcp_tool_calls(
+                tool_calls=mcp_tool_calls,
+                servers=mcp_servers,
+                mcp_tools=mcp_tools,
+            )
+            logger.info(f"Choice {choice_idx}: MCP execution completed with {len(tool_results)} results")
+            for tr in tool_results:
+                if tr.error:
+                    logger.error(f"  Tool {tr.tool_name} error: {tr.error}")
+                else:
+                    logger.info(f"  Tool {tr.tool_name} succeeded: {str(tr.result)[:100]}...")
+        except Exception as e:
+            logger.error(f"Choice {choice_idx}: Failed to execute MCP tool calls: {e}", exc_info=True)
+            return None
+
+        # Format results as messages
+        result_messages = format_tool_results_as_messages(tool_results)
+
+        # Build a mapping from tool_call_id to result message
+        result_msg_map: dict[str, dict[str, Any]] = {}
+        for result_msg in result_messages:
+            tool_call_id = result_msg.get("tool_call_id")
+            if tool_call_id:
+                result_msg_map[tool_call_id] = result_msg
+
+        # Build the assistant message with tool calls (with responses attached)
+        tool_calls_with_responses = []
+        all_result_msgs = []
+        for tc in mcp_tool_calls:
+            tool_call_id = tc.get("id")
+            result_msg = result_msg_map.get(tool_call_id) if tool_call_id else None
+
+            if result_msg:
+                # Attach the tool result as 'response' on the tool call for frontend
+                tool_call_with_response = dict(tc)
+                tool_call_with_response["response"] = result_msg
+                tool_calls_with_responses.append(tool_call_with_response)
+                all_result_msgs.append(result_msg)
+            else:
+                logger.warning(f"No result for tool_call_id {tool_call_id}")
+
+        if not all_result_msgs:
+            logger.warning(f"Choice {choice_idx}: No tool results, stopping")
+            all_choice_messages.append(current_message)
+            break
+
+        # Build the assistant message with all tool calls
+        assistant_message = {
+            "role": "assistant",
+            "content": current_message.get("content"),
+            "tool_calls": tool_calls_with_responses,
+        }
+
+        # Add assistant message and tool results to conversation history
+        all_choice_messages.append(assistant_message)
+        all_choice_messages.extend(all_result_msgs)
+
+        # Build messages for LLM call: conversation so far + assistant with tool calls + all tool results
+        branch_messages = conversation_messages + [assistant_message] + all_result_msgs
+
+        # Create a copy of inputs for this branch
+        api_inputs = req.inputs.model_copy()
+
+        # Strip hashes from messages before sending to LLM
+        clean_branch_messages = strip_message_hashes(branch_messages)
+        api_inputs.messages = clean_branch_messages
+
+        # Remove fields that OpenAI doesn't recognize
+        if hasattr(api_inputs, "mcp_servers"):
+            api_inputs.mcp_servers = None
+        if hasattr(api_inputs, "execute_mcp_tools"):
+            api_inputs.execute_mcp_tools = None
+        if hasattr(api_inputs, "thread_id"):
+            api_inputs.thread_id = None
+
+        # Make LLM call with n=1
+        logger.info(f"Choice {choice_idx}: Making follow-up LLM call with n=1 (iteration {iteration})")
+        try:
+            api_inputs.n = 1
+            branch_res = lite_llm_completion(
+                api_key=api_key,
+                inputs=api_inputs,
+                provider=provider,
+                base_url=base_url,
+                extra_headers=extra_headers,
+                return_type=return_type,
+            )
+
+            if "error" in branch_res.response:
+                logger.error(f"Choice {choice_idx}: LLM call failed: {branch_res.response}")
+                return None
+
+            # Get the response from this LLM call
+            branch_choices = branch_res.response.get("choices", [])
+            if not branch_choices:
+                logger.warning(f"Choice {choice_idx}: No choices in LLM response")
+                return None
+
+            branch_choice = branch_choices[0]
+            finish_reason = branch_choice.get("finish_reason", "stop")
+            current_message = branch_choice.get("message", {})
+
+            # Update conversation messages for next iteration
+            conversation_messages = branch_messages
+
+            # Check if there are more tool calls to process
+            if not current_message.get("tool_calls"):
+                # No more tool calls, add final response
+                if current_message:
+                    all_choice_messages.append(current_message)
+                break
+
+        except Exception as e:
+            logger.error(f"Choice {choice_idx}: Failed to make LLM call: {e}", exc_info=True)
+            return None
+
+    if iteration >= max_iterations:
+        logger.warning(f"Choice {choice_idx}: Reached max_iterations ({max_iterations}), stopping")
+
+    # Build final choice with all messages
+    if not all_choice_messages:
+        logger.warning(f"Choice {choice_idx}: No messages collected, skipping")
+        return None
+
+    new_choice = {
+        "index": choice_idx,
+        "finish_reason": finish_reason,
+        "messages": all_choice_messages,
+    }
+    logger.info(f"Choice {choice_idx}: Successfully generated with {len(all_choice_messages)} messages after {iteration} iteration(s)")
+    return new_choice
+
+
+def _process_single_choice_mcp_stream_yielding(
+    choice_idx: int,
+    choice_data: dict[str, Any],
+    original_messages: list[dict[str, Any]],
+    mcp_tool_names: set[str],
+    mcp_servers: list[tsi.MCPServerConfig],
+    mcp_tools: list[tsi.MCPTool],
+    req: tsi.CompletionsCreateReq,
+    api_key: str | None,
+    provider: str,
+    base_url: str | None,
+    extra_headers: dict[str, str],
+    return_type: str | None,
+    max_iterations: int = 10,
+) -> Iterator[dict[str, Any]]:
+    """Process a single choice's MCP tool calls with streaming, yielding intermediate chunks.
+
+    This generator yields:
+    1. After each tool call completes: a chunk with the tool result
+    2. During follow-up LLM calls: stream chunks as they arrive
+    3. At the end: a final chunk with the complete messages array
+
+    Args:
+        choice_idx: Index of the choice
+        choice_data: Aggregated choice data with message and tool calls
+        ... (same as _process_single_choice_mcp_stream)
+
+    Yields:
+        Streaming chunks with intermediate and final results
+    """
+    from weave.trace_server.mcp_client import (
+        execute_mcp_tool_calls,
+        format_tool_results_as_messages,
+    )
+
+    # Ensure secret fetcher context is available when executing MCP tools
+    # This is a fallback in case contextvars doesn't preserve it across async boundaries
+    if _secret_fetcher_context.get() is None:
+        # Try to recreate the secret fetcher if in local mode
+        # Import here to avoid circular dependencies
+        try:
+            import os
+            use_local = (
+                os.environ.get("WEAVE_TRACE_USE_LOCAL_ENV_SECRET_FETCHER", "false").lower()
+                == "true"
+            )
+            if use_local:
+                # In local mode, try to create a simple secret fetcher that reads from env
+                # This is a minimal fallback - the proper fix should be at the endpoint level
+                class LocalEnvSecretFetcher:
+                    def fetch(self, secret_name: str) -> dict:
+                        return {"secrets": {secret_name: os.environ.get(secret_name, None)}}
+                _secret_fetcher_context.set(LocalEnvSecretFetcher())
+            else:
+                logger.warning(
+                    "Secret fetcher context not available for MCP tool execution. "
+                    "MCP tools may not be able to authenticate."
+                )
+        except Exception:
+            logger.warning(
+                "Secret fetcher context not available for MCP tool execution. "
+                "MCP tools may not be able to authenticate."
+            )
+
+    message = choice_data.get("message", {})
+    if not message:
+        return
+
+    # Build conversation history
+    conversation_messages = list(original_messages)
+    all_choice_messages: list[dict[str, Any]] = []
+    iteration = 0
+    current_message = message
+    finish_reason = choice_data.get("finish_reason", "stop")
+
+    while iteration < max_iterations:
+        iteration += 1
+        logger.info(f"Choice {choice_idx}: Streaming iteration {iteration}/{max_iterations}")
+
+        # Get tool calls from current message
+        tool_calls = current_message.get("tool_calls") or []
+        if not tool_calls:
+            # No more tool calls, add final message and break
+            if current_message:
+                all_choice_messages.append(current_message)
+            break
+
+        # Filter for MCP tool calls
+        mcp_tool_calls = [
+            tc for tc in tool_calls
+            if tc.get("function", {}).get("name", "") in mcp_tool_names
+        ]
+
+        if not mcp_tool_calls:
+            # No MCP tool calls, add message and break
+            all_choice_messages.append(current_message)
+            break
+
+        # Execute MCP tool calls
+        logger.info(f"Choice {choice_idx}: Executing {len(mcp_tool_calls)} MCP tool calls")
+        try:
+            tool_results = execute_mcp_tool_calls(
+                tool_calls=mcp_tool_calls,
+                servers=mcp_servers,
+                mcp_tools=mcp_tools,
+            )
+            logger.info(f"Choice {choice_idx}: MCP execution completed with {len(tool_results)} results")
+        except Exception as e:
+            logger.error(f"Choice {choice_idx}: Failed to execute MCP tools: {e}", exc_info=True)
+            return
+
+        # Format results as messages
+        result_messages = format_tool_results_as_messages(tool_results)
+
+        # Build mapping from tool_call_id to result
+        result_msg_map: dict[str, dict[str, Any]] = {}
+        for result_msg in result_messages:
+            tool_call_id = result_msg.get("tool_call_id")
+            if tool_call_id:
+                result_msg_map[tool_call_id] = result_msg
+
+        # Build assistant message with tool responses attached
+        tool_calls_with_responses = []
+        all_result_msgs = []
+        for tc in mcp_tool_calls:
+            tool_call_id = tc.get("id")
+            result_msg = result_msg_map.get(tool_call_id) if tool_call_id else None
+            if result_msg:
+                tool_call_with_response = dict(tc)
+                tool_call_with_response["response"] = result_msg
+                tool_calls_with_responses.append(tool_call_with_response)
+                all_result_msgs.append(result_msg)
+
+        if not all_result_msgs:
+            logger.warning(f"Choice {choice_idx}: No tool results")
+            all_choice_messages.append(current_message)
+            break
+
+        # Build assistant message
+        assistant_message = {
+            "role": "assistant",
+            "content": current_message.get("content"),
+            "tool_calls": tool_calls_with_responses,
+        }
+
+        # Add assistant message to choice messages
+        all_choice_messages.append(assistant_message)
+
+        # Yield assistant message with tool calls (complete, not streaming)
+        yield {
+            "choices": [{
+                "index": choice_idx,
+                "finish_reason": None,
+                "delta": {
+                    "role": "assistant",
+                    "tool_calls": tool_calls_with_responses,
+                },
+            }]
+        }
+
+        # Yield each tool result message individually for real-time feedback
+        for result_msg in all_result_msgs:
+            all_choice_messages.append(result_msg)
+            yield {
+                "choices": [{
+                    "index": choice_idx,
+                    "finish_reason": None,
+                    "delta": {
+                        "role": "tool",
+                        "content": result_msg.get("content"),
+                        "tool_call_id": result_msg.get("tool_call_id"),
+                    },
+                }]
+            }
+
+        # Build messages for follow-up LLM call
+        branch_messages = conversation_messages + [assistant_message] + all_result_msgs
+
+        # Create API inputs
+        api_inputs = req.inputs.model_copy()
+        api_inputs.messages = strip_message_hashes(branch_messages)
+        api_inputs.n = 1
+        if hasattr(api_inputs, "mcp_servers"):
+            api_inputs.mcp_servers = None
+        if hasattr(api_inputs, "execute_mcp_tools"):
+            api_inputs.execute_mcp_tools = None
+        if hasattr(api_inputs, "thread_id"):
+            api_inputs.thread_id = None
+
+        # Make streaming LLM call
+        logger.info(f"Choice {choice_idx}: Making streaming follow-up LLM call (iteration {iteration})")
+        try:
+            chunk_iter = lite_llm_completion_stream(
+                api_key=api_key or "",
+                inputs=api_inputs,
+                provider=provider,
+                base_url=base_url,
+                extra_headers=extra_headers,
+                return_type=return_type,
+            )
+
+            # Collect chunks for aggregation
+            # For responses with tool calls: buffer all chunks, don't stream (need complete JSON)
+            # For responses without tool calls: stream content chunks immediately
+            collected_chunks = []
+            has_tool_calls = False
+            buffered_tool_call_chunks = []
+
+            for chunk in chunk_iter:
+                collected_chunks.append(chunk)
+
+                if "choices" in chunk:
+                    for c in chunk["choices"]:
+                        delta = c.get("delta", {})
+                        # Check if this chunk has tool calls
+                        if delta.get("tool_calls"):
+                            has_tool_calls = True
+                            buffered_tool_call_chunks.append(chunk)
+                        elif not has_tool_calls:
+                            # No tool calls detected yet, stream content immediately
+                            if delta.get("content") or delta.get("role"):
+                                modified_chunk = dict(chunk)
+                                modified_chunk["choices"] = [
+                                    {**c, "index": choice_idx}
+                                    for c in chunk["choices"]
+                                ]
+                                yield modified_chunk
+
+            # Aggregate the collected chunks
+            aggregated = _aggregate_streaming_chunks(iter(collected_chunks), choice_index=0)
+
+            if "error" in aggregated:
+                logger.error(f"Choice {choice_idx}: Streaming LLM call failed: {aggregated}")
+                return
+
+            branch_choices = aggregated.get("choices", [])
+            if not branch_choices:
+                logger.warning(f"Choice {choice_idx}: No choices in response")
+                return
+
+            branch_choice = branch_choices[0]
+            finish_reason = branch_choice.get("finish_reason", "stop")
+            current_message = branch_choice.get("message", {})
+
+            # Update conversation for next iteration
+            conversation_messages = branch_messages
+
+            # Check if there are more tool calls
+            if not current_message.get("tool_calls"):
+                if current_message:
+                    all_choice_messages.append(current_message)
+                break
+
+        except Exception as e:
+            logger.error(f"Choice {choice_idx}: Failed streaming LLM call: {e}", exc_info=True)
+            return
+
+    if iteration >= max_iterations:
+        logger.warning(f"Choice {choice_idx}: Reached max iterations ({max_iterations})")
+
+    if not all_choice_messages:
+        return
+
+    # Yield final chunk with complete messages array
+    logger.info(f"Choice {choice_idx}: Yielding final chunk with {len(all_choice_messages)} messages")
+    yield {
+        "choices": [{
+            "index": choice_idx,
+            "finish_reason": finish_reason,
+            "messages": all_choice_messages,
+        }]
+    }
+
+
+def _process_single_choice_mcp_stream(
+    choice_idx: int,
+    choice_data: dict[str, Any],
+    original_messages: list[dict[str, Any]],
+    mcp_tool_names: set[str],
+    mcp_servers: list[tsi.MCPServerConfig],
+    mcp_tools: list[tsi.MCPTool],
+    req: tsi.CompletionsCreateReq,
+    api_key: str | None,
+    provider: str,
+    base_url: str | None,
+    extra_headers: dict[str, str],
+    return_type: str | None,
+    max_iterations: int = 10,
+) -> dict[str, Any] | None:
+    """Process a single choice with MCP tool calls using streaming for follow-up calls.
+
+    This is called in parallel for each choice that has MCP tool calls.
+
+    Args:
+        choice_idx: Index of the choice
+        choice_data: Aggregated choice data with message and tool calls
+        original_messages: Original conversation messages
+        mcp_tool_names: Set of MCP tool names
+        mcp_servers: MCP server configurations
+        mcp_tools: Available MCP tools
+        req: Original completion request
+        api_key: API key for LLM
+        provider: LLM provider name
+        base_url: Base URL for custom providers
+        extra_headers: Extra headers for the request
+        return_type: Return type configuration
+        max_iterations: Maximum iterations for nested tool calls
+
+    Returns:
+        Final choice dict with messages array, or None if processing failed
+    """
+    from weave.trace_server.mcp_client import (
+        execute_mcp_tool_calls,
+        format_tool_results_as_messages,
+    )
+
+    message = choice_data.get("message", {})
+    if not message:
+        return None
+
+    # Build conversation history
+    conversation_messages = list(original_messages)
+    all_choice_messages: list[dict[str, Any]] = []
+    iteration = 0
+    current_message = message
+    finish_reason = choice_data.get("finish_reason", "stop")
+
+    while iteration < max_iterations:
+        iteration += 1
+        logger.info(f"Choice {choice_idx}: Streaming iteration {iteration}/{max_iterations}")
+
+        # Get tool calls from current message
+        tool_calls = current_message.get("tool_calls") or []
+        if not tool_calls:
+            # No more tool calls, add final message and break
+            if current_message:
+                all_choice_messages.append(current_message)
+            break
+
+        # Filter for MCP tool calls
+        mcp_tool_calls = [
+            tc for tc in tool_calls
+            if tc.get("function", {}).get("name", "") in mcp_tool_names
+        ]
+
+        if not mcp_tool_calls:
+            # No MCP tool calls, add message and break
+            all_choice_messages.append(current_message)
+            break
+
+        # Execute MCP tool calls
+        logger.info(f"Choice {choice_idx}: Executing {len(mcp_tool_calls)} MCP tool calls")
+        try:
+            tool_results = execute_mcp_tool_calls(
+                tool_calls=mcp_tool_calls,
+                servers=mcp_servers,
+                mcp_tools=mcp_tools,
+            )
+            logger.info(f"Choice {choice_idx}: MCP execution completed with {len(tool_results)} results")
+        except Exception as e:
+            logger.error(f"Choice {choice_idx}: Failed to execute MCP tools: {e}", exc_info=True)
+            return None
+
+        # Format results as messages
+        result_messages = format_tool_results_as_messages(tool_results)
+
+        # Build mapping from tool_call_id to result
+        result_msg_map: dict[str, dict[str, Any]] = {}
+        for result_msg in result_messages:
+            tool_call_id = result_msg.get("tool_call_id")
+            if tool_call_id:
+                result_msg_map[tool_call_id] = result_msg
+
+        # Build assistant message with tool responses attached
+        tool_calls_with_responses = []
+        all_result_msgs = []
+        for tc in mcp_tool_calls:
+            tool_call_id = tc.get("id")
+            result_msg = result_msg_map.get(tool_call_id) if tool_call_id else None
+            if result_msg:
+                tool_call_with_response = dict(tc)
+                tool_call_with_response["response"] = result_msg
+                tool_calls_with_responses.append(tool_call_with_response)
+                all_result_msgs.append(result_msg)
+
+        if not all_result_msgs:
+            logger.warning(f"Choice {choice_idx}: No tool results")
+            all_choice_messages.append(current_message)
+            break
+
+        # Build assistant message
+        assistant_message = {
+            "role": "assistant",
+            "content": current_message.get("content"),
+            "tool_calls": tool_calls_with_responses,
+        }
+
+        # Add to choice messages
+        all_choice_messages.append(assistant_message)
+        all_choice_messages.extend(all_result_msgs)
+
+        # Build messages for follow-up LLM call
+        branch_messages = conversation_messages + [assistant_message] + all_result_msgs
+
+        # Create API inputs
+        api_inputs = req.inputs.model_copy()
+        api_inputs.messages = strip_message_hashes(branch_messages)
+        api_inputs.n = 1
+        if hasattr(api_inputs, "mcp_servers"):
+            api_inputs.mcp_servers = None
+        if hasattr(api_inputs, "execute_mcp_tools"):
+            api_inputs.execute_mcp_tools = None
+        if hasattr(api_inputs, "thread_id"):
+            api_inputs.thread_id = None
+
+        # Make streaming LLM call and aggregate
+        logger.info(f"Choice {choice_idx}: Making streaming follow-up LLM call (iteration {iteration})")
+        try:
+            chunk_iter = lite_llm_completion_stream(
+                api_key=api_key or "",
+                inputs=api_inputs,
+                provider=provider,
+                base_url=base_url,
+                extra_headers=extra_headers,
+                return_type=return_type,
+            )
+
+            # Aggregate the streaming response
+            aggregated = _aggregate_streaming_chunks(chunk_iter, choice_index=0)
+
+            if "error" in aggregated:
+                logger.error(f"Choice {choice_idx}: Streaming LLM call failed: {aggregated}")
+                return None
+
+            branch_choices = aggregated.get("choices", [])
+            if not branch_choices:
+                logger.warning(f"Choice {choice_idx}: No choices in response")
+                return None
+
+            branch_choice = branch_choices[0]
+            finish_reason = branch_choice.get("finish_reason", "stop")
+            current_message = branch_choice.get("message", {})
+
+            # Update conversation for next iteration
+            conversation_messages = branch_messages
+
+            # Check if there are more tool calls
+            if not current_message.get("tool_calls"):
+                if current_message:
+                    all_choice_messages.append(current_message)
+                break
+
+        except Exception as e:
+            logger.error(f"Choice {choice_idx}: Failed streaming LLM call: {e}", exc_info=True)
+            return None
+
+    if iteration >= max_iterations:
+        logger.warning(f"Choice {choice_idx}: Reached max iterations ({max_iterations})")
+
+    if not all_choice_messages:
+        return None
+
+    return {
+        "index": choice_idx,
+        "finish_reason": finish_reason,
+        "messages": all_choice_messages,
+    }
+
+
+def _handle_mcp_tool_execution_stream(
+    initial_chunk_iter: Iterator[dict[str, Any]],
+    mcp_servers: list[tsi.MCPServerConfig],
+    mcp_tools: list[tsi.MCPTool],
+    req: tsi.CompletionsCreateReq,
+    api_key: str | None,
+    provider: str,
+    base_url: str | None,
+    extra_headers: dict[str, str],
+    return_type: str | None,
+    max_iterations: int = 10,
+) -> Iterator[dict[str, Any]]:
+    """Handle MCP tool execution with streaming support.
+
+    Flow:
+    1. Stream initial LLM response, buffer finish_reason chunks
+    2. After streaming completes, check aggregated data for MCP tool calls
+    3. If no MCP tool calls, yield buffered finish_reason chunks
+    4. If there are MCP tool calls, process them in parallel
+    5. Yield final choices with messages arrays
+
+    Args:
+        initial_chunk_iter: Iterator of chunks from initial LLM call
+        mcp_servers: List of MCP server configurations
+        mcp_tools: List of available MCP tools
+        req: The original completion request
+        api_key: API key for LLM
+        provider: LLM provider name
+        base_url: Base URL for custom providers
+        extra_headers: Extra headers for the request
+        return_type: Return type configuration
+        max_iterations: Maximum tool execution iterations
+
+    Yields:
+        Streaming chunks with MCP tool execution results
+    """
+    # Build set of MCP tool names for quick lookup
+    mcp_tool_names = {f"{t.server_name}__{t.name}" for t in mcp_tools}
+    logger.info(f"Streaming MCP: {len(mcp_tool_names)} tools available")
+
+    # Track chunks per choice index (for aggregation)
+    choice_chunks: dict[int, list[dict[str, Any]]] = {}
+    finish_reason_chunks: list[dict[str, Any]] = []  # Buffer finish_reason chunks
+    original_n = req.inputs.n if req.inputs.n else 1
+
+    # Step 1: Stream initial response, collecting chunks and buffering finish_reason
+    for chunk in initial_chunk_iter:
+        # Check for errors
+        if "error" in chunk:
+            yield chunk
+            return
+
+        # Process choices in this chunk
+        chunk_choices = chunk.get("choices", [])
+        has_finish_reason = False
+
+        for choice in chunk_choices:
+            choice_idx = choice.get("index", 0)
+            if choice_idx not in choice_chunks:
+                choice_chunks[choice_idx] = []
+
+            # Collect all chunks for aggregation
+            choice_chunks[choice_idx].append(chunk)
+
+            # Check for finish_reason
+            if "finish_reason" in choice and choice["finish_reason"]:
+                has_finish_reason = True
+
+        # Buffer finish_reason chunks, yield others immediately
+        if has_finish_reason:
+            finish_reason_chunks.append(chunk)
+        else:
+            yield chunk
+
+    # Step 2: Aggregate chunks to check for tool calls
+    aggregated_choices: dict[int, dict[str, Any]] = {}
+    for choice_idx, chunks in choice_chunks.items():
+        aggregated = _aggregate_streaming_chunks(iter(chunks), choice_index=choice_idx)
+        if "choices" in aggregated and aggregated["choices"]:
+            aggregated_choices[choice_idx] = aggregated["choices"][0]
+
+    # Check if any choice has MCP tool calls
+    choices_with_mcp_tools: list[int] = []
+    choices_without_mcp_tools: list[int] = []
+
+    for choice_idx in range(original_n):
+        if choice_idx not in aggregated_choices:
+            continue
+
+        choice_data = aggregated_choices[choice_idx]
+        message = choice_data.get("message", {})
+        tool_calls = message.get("tool_calls") or []
+
+        has_mcp_tools = False
+        if tool_calls:
+            for tc in tool_calls:
+                func_name = tc.get("function", {}).get("name", "")
+                if func_name in mcp_tool_names:
+                    has_mcp_tools = True
+                    break
+
+        if has_mcp_tools:
+            choices_with_mcp_tools.append(choice_idx)
+        else:
+            choices_without_mcp_tools.append(choice_idx)
+
+    # Step 3: If no MCP tool calls in any choice, yield buffered finish_reason chunks
+    if not choices_with_mcp_tools:
+        logger.info("No MCP tool calls found in any choice, yielding finish_reason chunks")
+        for chunk in finish_reason_chunks:
+            yield chunk
+        return
+
+    logger.info(f"Found MCP tool calls in choices: {choices_with_mcp_tools}")
+
+    # Yield finish_reason for choices without MCP tools
+    for chunk in finish_reason_chunks:
+        chunk_choices = chunk.get("choices", [])
+        for choice in chunk_choices:
+            if choice.get("index") in choices_without_mcp_tools:
+                yield chunk
+                break
+
+    # Step 4: Process choices with MCP tool calls
+    # For streaming, we process sequentially and yield intermediate results
+    original_messages = list(req.inputs.messages or [])
+
+    for choice_idx in choices_with_mcp_tools:
+        choice_data = aggregated_choices[choice_idx]
+        try:
+            # Use the streaming generator version that yields intermediate chunks
+            for chunk in _process_single_choice_mcp_stream_yielding(
+                choice_idx=choice_idx,
+                choice_data=choice_data,
+                original_messages=original_messages,
+                mcp_tool_names=mcp_tool_names,
+                mcp_servers=mcp_servers,
+                mcp_tools=mcp_tools,
+                req=req,
+                api_key=api_key,
+                provider=provider,
+                base_url=base_url,
+                extra_headers=extra_headers,
+                return_type=return_type,
+                max_iterations=max_iterations,
+            ):
+                yield chunk
+        except Exception as e:
+            logger.error(f"Choice {choice_idx}: Streaming processing failed: {e}", exc_info=True)
+            # Yield the original finish_reason chunk on failure
+            for chunk in finish_reason_chunks:
+                chunk_choices = chunk.get("choices", [])
+                for choice in chunk_choices:
+                    if choice.get("index") == choice_idx:
+                        yield chunk
+                        break
+
+
+def _handle_mcp_tool_execution(
+    res: tsi.CompletionsCreateRes,
+    mcp_servers: list[tsi.MCPServerConfig],
+    mcp_tools: list[tsi.MCPTool],
+    req: tsi.CompletionsCreateReq,
+    api_key: str | None,
+    provider: str,
+    base_url: str | None,
+    extra_headers: dict[str, str],
+    return_type: str | None,
+    max_iterations: int = 10,
+) -> tsi.CompletionsCreateRes:
+    """Handle MCP tool execution for each choice.
+
+    Flow:
+    1. Get the LLM response with n choices (already done before this function)
+    2. For EACH choice, check for MCP tool calls
+    3. Execute MCP tools for each choice that has them
+    4. Send tool results back to LLM with n=1 for each choice
+    5. Return n choices, each with messages: [tool_call, tool_result, llm_response]
+
+    Args:
+        res: The initial completion response (with n choices)
+        mcp_servers: List of MCP server configurations
+        mcp_tools: List of available MCP tools
+        req: The original completion request
+        api_key: API key for LLM
+        provider: LLM provider name
+        base_url: Base URL for custom providers
+        extra_headers: Extra headers for the request
+        return_type: Return type configuration
+        max_iterations: Maximum tool execution iterations (unused)
+
+    Returns:
+        The completion response with choices containing messages arrays.
+        Each choice has: index, finish_reason, and messages (tool_call, tool_result, llm_response).
+    """
+    from weave.trace_server.mcp_client import (
+        execute_mcp_tool_calls,
+        format_tool_results_as_messages,
+    )
+
+    # Build set of MCP tool names (with server prefix) for quick lookup
+    mcp_tool_names = {f"{t.server_name}__{t.name}" for t in mcp_tools}
+    logger.info(f"MCP tool names available ({len(mcp_tool_names)}): {mcp_tool_names}")
+
+    # Also log the raw tool info for debugging
+    for t in mcp_tools:
+        logger.info(f"  MCP tool: server={t.server_name}, name={t.name}, full={t.server_name}__{t.name}")
+
+    # Get all choices from the response
+    choices = res.response.get("choices", [])
+    if not choices:
+        logger.info("No choices in response, returning as-is")
+        return res
+
+    logger.info(f"Processing {len(choices)} choices for MCP tool execution")
+
+    # Check if ANY choice has MCP tool calls
+    # Skip choices that already have messages arrays (already processed)
+    any_has_mcp_tools = False
+    for choice_idx, choice in enumerate(choices):
+        # Skip choices with messages arrays - these are already processed MCP choices
+        if "messages" in choice and isinstance(choice.get("messages"), list):
+            continue
+
+        # Standard format with single message
+        message = choice.get("message", {})
+        if not message:
+            continue
+
+        tool_calls = message.get("tool_calls") or []
+        logger.info(f"Choice {choice_idx} has {len(tool_calls)} tool calls")
+        for tc in tool_calls:
+            func_name = tc.get("function", {}).get("name", "")
+            logger.info(f"  Tool call function name: '{func_name}', in MCP tools: {func_name in mcp_tool_names}")
+            if func_name in mcp_tool_names:
+                any_has_mcp_tools = True
+
+    if not any_has_mcp_tools:
+        logger.info("No MCP tool calls found in any choice, returning as-is")
+        return res
+
+    logger.info(f"Found MCP tool calls, proceeding with execution")
+
+    # Process each choice in parallel for better performance
+    new_choices: list[dict[str, Any]] = []
+    original_messages = list(req.inputs.messages)
+
+    # Filter choices that need processing (skip already processed ones)
+    choices_to_process: list[tuple[int, dict[str, Any]]] = []
+    for choice_idx, choice in enumerate(choices):
+        # Skip choices that already have messages arrays (already processed MCP choices)
+        if "messages" in choice and isinstance(choice.get("messages"), list):
+            continue
+        choices_to_process.append((choice_idx, choice))
+
+    if not choices_to_process:
+        logger.info("No choices to process")
+        return res
+
+    logger.info(f"Processing {len(choices_to_process)} choices in parallel")
+
+    # Process choices in parallel using ThreadPoolExecutor
+    max_workers = min(len(choices_to_process), 5)  # Limit to 5 concurrent requests
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_to_choice = {
+            executor.submit(
+                _process_choice_with_mcp_tools_iteratively,
+                choice=choice,
+                choice_idx=choice_idx,
+                original_messages=original_messages,
+                mcp_tool_names=mcp_tool_names,
+                mcp_servers=mcp_servers,
+                mcp_tools=mcp_tools,
+                req=req,
+                api_key=api_key,
+                provider=provider,
+                base_url=base_url,
+                extra_headers=extra_headers,
+                return_type=return_type,
+                max_iterations=max_iterations,
+            ): (choice_idx, choice)
+            for choice_idx, choice in choices_to_process
+        }
+
+        for future in concurrent.futures.as_completed(future_to_choice):
+            choice_idx, choice = future_to_choice[future]
+            try:
+                processed_choice = future.result()
+                if processed_choice:
+                    new_choices.append(processed_choice)
+                    logger.info(f"Choice {choice_idx}: Completed processing")
+            except Exception as e:
+                logger.error(f"Choice {choice_idx}: Exception during processing: {e}", exc_info=True)
+                # Continue processing other choices even if one fails
+
+    logger.info(f"MCP execution complete: {len(new_choices)} choices generated")
+
+    # Sort choices by index to maintain order (parallel processing may complete out of order)
+    new_choices.sort(key=lambda c: c.get("index", 0))
+
+    # If no choices were generated, return the original response
+    if not new_choices:
+        logger.warning("No MCP choices generated, returning original response")
+        return res
+
+    # Compute hashes for messages in each choice
+    # Get the last input message hash as the base for computing hashes
+    last_input_hash = ""
+    if original_messages:
+        last_msg = original_messages[-1]
+        if isinstance(last_msg, dict) and "hash" in last_msg:
+            last_input_hash = last_msg["hash"]
+
+    for choice in new_choices:
+        if "messages" in choice and choice["messages"]:
+            # Compute hashes for the messages array, starting from last_input_hash
+            messages_with_hashes = []
+            previous_hash = last_input_hash
+            for msg in choice["messages"]:
+                if isinstance(msg, dict):
+                    # Skip if message already has a hash
+                    if "hash" in msg:
+                        previous_hash = msg["hash"]
+                        messages_with_hashes.append(msg)
+                    else:
+                        msg_hash = compute_message_hash(msg, previous_hash)
+                        new_msg = {**msg, "hash": msg_hash}
+                        messages_with_hashes.append(new_msg)
+                        previous_hash = msg_hash
+                else:
+                    messages_with_hashes.append(msg)
+            choice["messages"] = messages_with_hashes
+
+    # Build new response with the new choices format
+    new_response = dict(res.response)
+    new_response["choices"] = new_choices
+
+    # Get thread_id from request if available, otherwise use res.thread_id, otherwise generate
+    thread_id = getattr(req.inputs, "thread_id", None) or res.thread_id or generate_id()
+
+    return tsi.CompletionsCreateRes(
+        response=new_response,
+        weave_call_id=res.weave_call_id,
+        thread_id=thread_id,
+    )
 
 
 def _setup_completion_model_info(
@@ -5454,3 +6953,152 @@ def _setup_completion_model_info(
 
 def _sanitize_name_for_object_id(name: str) -> str:
     return sub(r"[^a-zA-Z0-9_-]", "_", name)
+
+
+def _generate_call_description(
+    messages: list[dict[str, Any]] | None, project_id: str
+) -> str | None:
+    """Generate a description by summarizing user messages via W&B Inference API.
+
+    Makes a separate LLM call to W&B's inference service using gpt-oss-20b
+    to summarize user messages in 10 words or less.
+
+    Args:
+        messages: List of message dictionaries from the request.
+        project_id: The project ID for the OpenAI-Project header.
+
+    Returns:
+        A short description summarizing user messages, or None if generation fails.
+
+    Examples:
+        >>> messages = [{"role": "user", "content": "How do I create a Python class?"}]
+        >>> _generate_call_description(messages, "team/project")
+        "User asks about creating Python classes"
+    """
+    if not messages:
+        return None
+
+    # Extract user messages content
+    user_contents = []
+    for msg in messages:
+        if msg.get("role") == "user":
+            content = msg.get("content", "")
+            if isinstance(content, str):
+                user_contents.append(content)
+            elif isinstance(content, list):
+                # Handle multi-part content (e.g., text + images)
+                for part in content:
+                    if isinstance(part, dict) and part.get("type") == "text":
+                        user_contents.append(part.get("text", ""))
+
+    if not user_contents:
+        return None
+
+    combined_user_text = "\n".join(user_contents)
+
+    # W&B Inference API configuration
+    # See: curl https://api.inference.wandb.ai/v1/chat/completions
+    inference_base_url = "https://api.inference.wandb.ai/v1"
+    inference_api_key = ""
+    # Model name format: "openai/<model-name>" for LiteLLM custom provider
+    inference_model = "openai/Qwen/Qwen3-235B-A22B-Instruct-2507"
+
+    try:
+        # Create inputs for the lite_llm_completion call
+        inputs = tsi.CompletionsCreateRequestInputs(
+            model=inference_model,
+            messages=[
+                {
+                    "role": "system",
+                    "content": "Summarize the following user message(s) in 10 words or less. Be concise and capture the main intent, so that the user might remember what the point of the whoel sequence was.",
+                },
+                {
+                    "role": "user",
+                    "content": combined_user_text,
+                },
+            ],
+            max_tokens=100,
+        )
+
+        # Use lite_llm_completion with custom provider (W&B Inference API)
+        # The OpenAI-Project header needs team/project format (e.g., "entity/project")
+        # If project_id contains "/", it's already in external format
+        # Otherwise it's an internal ID (base64 encoded) and we need to skip or use fallback
+        openai_project = project_id if "/" in project_id else None
+        extra_headers = {"OpenAI-Project": openai_project} if openai_project else {}
+
+        logger.info(
+            f"Generating call description via W&B Inference: "
+            f"model={inference_model}, base_url={inference_base_url}, "
+            f"project_id={project_id}, api_key_length={len(inference_api_key)}"
+        )
+
+        res = lite_llm_completion(
+            api_key=inference_api_key,
+            inputs=inputs,
+            provider="custom",
+            base_url=inference_base_url,
+            return_type="openai",
+            extra_headers=extra_headers,
+        )
+
+        # Extract the summary from the response
+        response = res.response
+        logger.info(f"W&B Inference description response: {response}")
+
+        if "error" in response:
+            logger.warning(f"W&B Inference description error: {response.get('error')}")
+        else:
+            choices = response.get("choices", [])
+            logger.info(f"W&B Inference description choices: {choices}")
+            if choices and len(choices) > 0:
+                message = choices[0].get("message", {})
+                summary = message.get("content")
+                logger.info(f"W&B Inference description summary: {summary}")
+                if summary:
+                    return summary.strip()
+            else:
+                logger.warning("W&B Inference description: No choices in response")
+    except Exception as e:
+        logger.warning(f"Failed to generate call description: {e}", exc_info=True)
+
+    return None
+
+
+def _is_mcp_tool_name(name: str) -> bool:
+    """Check if a tool name is an MCP tool (has serverName__toolName format)."""
+    return "__" in name
+
+
+def _filter_mcp_from_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
+    """Filter MCP tools from inputs before saving.
+
+    Removes tools that have the MCP naming convention (serverName__toolName).
+    Keeps mcp_servers so they can be loaded back into playground settings.
+    """
+    if not inputs:
+        return inputs
+
+    filtered = inputs.copy()
+
+    # Filter MCP tools from tools list (so they don't show in Functions)
+    if "tools" in filtered and filtered["tools"]:
+        filtered["tools"] = [
+            tool
+            for tool in filtered["tools"]
+            if not _is_mcp_tool_name(
+                tool.get("function", {}).get("name", "")
+                if isinstance(tool.get("function"), dict)
+                else tool.get("name", "")
+            )
+        ]
+        # Remove tools key if empty
+        if not filtered["tools"]:
+            del filtered["tools"]
+
+    # Keep mcp_servers so they can be loaded into playground settings
+    # Only remove execute_mcp_tools as it's an internal flag
+    if "execute_mcp_tools" in filtered:
+        del filtered["execute_mcp_tools"]
+
+    return filtered

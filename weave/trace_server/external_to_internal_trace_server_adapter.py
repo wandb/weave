@@ -398,6 +398,8 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
     def completions_create(
         self, req: tsi.CompletionsCreateReq
     ) -> tsi.CompletionsCreateRes:
+        # Store external project ID before converting to internal
+        req.external_project_id = req.project_id
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         res = self._ref_apply(self._internal_trace_server.completions_create, req)
         return res
@@ -406,12 +408,20 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
     def completions_create_stream(
         self, req: tsi.CompletionsCreateReq
     ) -> typing.Iterator[dict[str, typing.Any]]:
+        # Store external project ID before converting to internal
+        req.external_project_id = req.project_id
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         # Convert any refs in the request (e.g., prompt) to internal format
         req = universal_ext_to_int_ref_converter(req, self._idc.ext_to_int_project_id)
         # The streamed chunks contain no project-scoped references, so we can
         # forward directly without additional ref conversion.
         return self._internal_trace_server.completions_create_stream(req)
+
+    def mcp_tools_list(
+        self, req: tsi.MCPToolsListReq
+    ) -> tsi.MCPToolsListRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._internal_trace_server.mcp_tools_list(req)
 
     def image_create(
         self, req: tsi.ImageGenerationCreateReq
