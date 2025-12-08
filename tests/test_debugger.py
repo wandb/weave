@@ -1,5 +1,8 @@
 import weave
 
+def my_func(a: int, b: int) -> int:
+    return a + b
 
 if __name__ == "__main__":
-    weave.debug()
+    debugger = weave.Debugger(my_func)
+    debugger.start()
