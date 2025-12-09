@@ -136,7 +136,6 @@ class DeployableDebugger:
         modal_image: modal.Image | None = None,
         modal_secrets: list[str] | None = None,
         modal_gpu: str | None = None,
-        modal_mounts: list[modal.Mount] | None = None,
     ) -> None:
         self._ops = ops
         self._weave_project = weave_project
@@ -146,7 +145,6 @@ class DeployableDebugger:
         self._modal_image = modal_image
         self._modal_secrets = modal_secrets or []
         self._modal_gpu = modal_gpu
-        self._modal_mounts = modal_mounts
 
         # Create Modal app lazily
         self._modal_app: modal.App | None = None
@@ -173,12 +171,22 @@ class DeployableDebugger:
         if self._modal_image is not None:
             image = self._modal_image
         else:
-            image = modal.Image.debian_slim(python_version="3.12").pip_install(
-                "weave",
-                "fastapi",
-                "uvicorn",
-                "pydantic",
-                "openai",  # Common dependency for LLM apps
+            # Install weave from the hackweek branch with debugger features
+            # Need git for pip install from GitHub
+            weave_git_url = (
+                "git+https://github.com/wandb/weave.git"
+                "@tim/hackweek_2025_debugger_weave"
+            )
+            image = (
+                modal.Image.debian_slim(python_version="3.12")
+                .apt_install("git")
+                .pip_install(
+                    weave_git_url,
+                    "fastapi",
+                    "uvicorn",
+                    "pydantic",
+                    "openai",  # Common dependency for LLM apps
+                )
             )
 
         # Add local source files to the image (Modal 1.0+ API)
