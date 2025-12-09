@@ -4,9 +4,9 @@ import pytest
 
 import weave
 from weave.trace.debugger.debug import (
-    CallableInfo,
     Debugger,
     DebuggerServer,
+    OpInfo,
     _derive_callable_name,
 )
 
@@ -49,104 +49,104 @@ class TestDeriveCallableName:
         assert _derive_callable_name(my_lambda) == "<lambda>"
 
 
-# --- Tests for Debugger.add_callable ---
+# --- Tests for Debugger.add_op ---
 
 
-class TestDebuggerAddCallable:
+class TestDebuggerAddOp:
     @pytest.mark.trace_server
-    def test_add_callable_returns_ref(self, client) -> None:
-        """Test adding a callable returns a ref URI."""
+    def test_add_op_returns_ref(self, client) -> None:
+        """Test adding an op returns a ref URI."""
         debugger = Debugger()
-        ref = debugger.add_callable(adder)
+        ref = debugger.add_op(adder)
 
         assert ref.startswith("weave:///")
-        assert ref in debugger.callables
+        assert ref in debugger.ops
 
     @pytest.mark.trace_server
-    def test_add_callable_with_custom_name(self, client) -> None:
-        """Test adding a callable with a custom name."""
+    def test_add_op_with_custom_name(self, client) -> None:
+        """Test adding an op with a custom name."""
         debugger = Debugger()
-        ref = debugger.add_callable(adder, name="my_adder")
+        ref = debugger.add_op(adder, name="my_adder")
 
         assert ref.startswith("weave:///")
         # Check the name is stored
-        callables = debugger.list_callables()
-        assert any(c.name == "my_adder" for c in callables)
+        ops = debugger.list_ops()
+        assert any(op.name == "my_adder" for op in ops)
 
     @pytest.mark.trace_server
-    def test_add_multiple_callables(self, client) -> None:
-        """Test adding multiple callables."""
+    def test_add_multiple_ops(self, client) -> None:
+        """Test adding multiple ops."""
         debugger = Debugger()
-        ref1 = debugger.add_callable(adder)
-        ref2 = debugger.add_callable(multiplier)
-        ref3 = debugger.add_callable(liner)
+        ref1 = debugger.add_op(adder)
+        ref2 = debugger.add_op(multiplier)
+        ref3 = debugger.add_op(liner)
 
-        assert len(debugger.callables) == 3
-        assert ref1 in debugger.callables
-        assert ref2 in debugger.callables
-        assert ref3 in debugger.callables
+        assert len(debugger.ops) == 3
+        assert ref1 in debugger.ops
+        assert ref2 in debugger.ops
+        assert ref3 in debugger.ops
 
     @pytest.mark.trace_server
-    def test_add_callable_duplicate_ref_raises_error(self, client) -> None:
-        """Test that adding the same callable twice raises ValueError."""
+    def test_add_op_duplicate_ref_raises_error(self, client) -> None:
+        """Test that adding the same op twice raises ValueError."""
         debugger = Debugger()
-        debugger.add_callable(adder)
+        debugger.add_op(adder)
 
         # Adding the same function again gets the same ref (content hash), so raises
         with pytest.raises(ValueError, match="already exists"):
-            debugger.add_callable(adder)
+            debugger.add_op(adder)
 
 
-# --- Tests for Debugger.list_callables ---
+# --- Tests for Debugger.list_ops ---
 
 
-class TestDebuggerListCallables:
+class TestDebuggerListOps:
     @pytest.mark.trace_server
-    def test_list_callables_empty(self, client) -> None:
-        """Test listing callables when none are registered."""
+    def test_list_ops_empty(self, client) -> None:
+        """Test listing ops when none are registered."""
         debugger = Debugger()
-        callables = debugger.list_callables()
+        ops = debugger.list_ops()
 
-        assert callables == []
+        assert ops == []
 
     @pytest.mark.trace_server
-    def test_list_callables_with_callables(self, client) -> None:
-        """Test listing callables after adding some."""
+    def test_list_ops_with_ops(self, client) -> None:
+        """Test listing ops after adding some."""
         debugger = Debugger()
-        debugger.add_callable(adder)
-        debugger.add_callable(multiplier)
-        debugger.add_callable(liner)
+        debugger.add_op(adder)
+        debugger.add_op(multiplier)
+        debugger.add_op(liner)
 
-        callables = debugger.list_callables()
+        ops = debugger.list_ops()
 
-        assert len(callables) == 3
-        names = {c.name for c in callables}
+        assert len(ops) == 3
+        names = {op.name for op in ops}
         assert names == {"adder", "multiplier", "liner"}
         # All should have refs
-        assert all(c.ref.startswith("weave:///") for c in callables)
+        assert all(op.ref.startswith("weave:///") for op in ops)
 
 
-# --- Tests for Debugger.invoke_callable ---
+# --- Tests for Debugger.call_op ---
 
 
-class TestDebuggerInvokeCallable:
+class TestDebuggerCallOp:
     @pytest.mark.trace_server
-    def test_invoke_returns_correct_result(self, client) -> None:
-        """Test that invoking a callable returns the correct result."""
+    def test_call_returns_correct_result(self, client) -> None:
+        """Test that calling an op returns the correct result."""
         debugger = Debugger()
-        ref = debugger.add_callable(adder)
+        ref = debugger.add_op(adder)
 
-        result = debugger.invoke_callable(ref, {"a": 3.0, "b": 5.0})
+        result = debugger.call_op(ref, {"a": 3.0, "b": 5.0})
 
         assert result == 8.0
 
     @pytest.mark.trace_server
-    def test_invoke_not_found_raises_error(self, client) -> None:
-        """Test that invoking an unknown callable raises KeyError."""
+    def test_call_not_found_raises_error(self, client) -> None:
+        """Test that calling an unknown op raises KeyError."""
         debugger = Debugger()
 
         with pytest.raises(KeyError, match="not found"):
-            debugger.invoke_callable("weave:///nonexistent", {})
+            debugger.call_op("weave:///nonexistent", {})
 
 
 # --- Tests for error handling ---
@@ -154,13 +154,13 @@ class TestDebuggerInvokeCallable:
 
 class TestDebuggerErrorHandling:
     @pytest.mark.trace_server
-    def test_invoke_with_error_raises_exception(self, client) -> None:
-        """Test that errors are raised when callable fails."""
+    def test_call_with_error_raises_exception(self, client) -> None:
+        """Test that errors are raised when op fails."""
         debugger = Debugger()
-        ref = debugger.add_callable(failing_func)
+        ref = debugger.add_op(failing_func)
 
         with pytest.raises(Exception, match="Intentional test error"):
-            debugger.invoke_callable(ref, {})
+            debugger.call_op(ref, {})
 
 
 # --- Tests for Op.get_input_json_schema ---
@@ -297,8 +297,8 @@ class TestDebuggerWeaveIntegration:
             Debugger()
 
     @pytest.mark.trace_server
-    def test_invoke_op_stores_call_in_weave(self, client) -> None:
-        """Test that invoking an op stores the call in weave."""
+    def test_call_op_stores_call_in_weave(self, client) -> None:
+        """Test that calling an op stores the call in weave."""
 
         @weave.op
         def weave_adder(a: float, b: float) -> float:
@@ -306,9 +306,9 @@ class TestDebuggerWeaveIntegration:
             return a + b
 
         debugger = Debugger()
-        ref = debugger.add_callable(weave_adder)
+        ref = debugger.add_op(weave_adder)
 
-        result = debugger.invoke_callable(ref, {"a": 3.0, "b": 5.0})
+        result = debugger.call_op(ref, {"a": 3.0, "b": 5.0})
 
         assert result == 8.0
 
@@ -324,15 +324,15 @@ class TestDebuggerWeaveIntegration:
             return a - b
 
         debugger = Debugger()
-        ref = debugger.add_callable(regular_function)
+        ref = debugger.add_op(regular_function)
 
-        result = debugger.invoke_callable(ref, {"a": 10.0, "b": 3.0})
+        result = debugger.call_op(ref, {"a": 10.0, "b": 3.0})
 
         assert result == 7.0
 
     @pytest.mark.trace_server
-    def test_multiple_invocations(self, client) -> None:
-        """Test that multiple invocations work correctly."""
+    def test_multiple_calls(self, client) -> None:
+        """Test that multiple calls work correctly."""
 
         @weave.op
         def counter_op(n: int) -> int:
@@ -340,11 +340,11 @@ class TestDebuggerWeaveIntegration:
             return n
 
         debugger = Debugger()
-        ref = debugger.add_callable(counter_op)
+        ref = debugger.add_op(counter_op)
 
-        r1 = debugger.invoke_callable(ref, {"n": 1})
-        r2 = debugger.invoke_callable(ref, {"n": 2})
-        r3 = debugger.invoke_callable(ref, {"n": 3})
+        r1 = debugger.call_op(ref, {"n": 1})
+        r2 = debugger.call_op(ref, {"n": 2})
+        r3 = debugger.call_op(ref, {"n": 3})
 
         assert r1 == 1
         assert r2 == 2
@@ -357,23 +357,23 @@ class TestDebuggerWeaveIntegration:
 class TestDebuggerIntegration:
     @pytest.mark.trace_server
     def test_end_to_end_workflow(self, client) -> None:
-        """Test the complete workflow: add callable, invoke it."""
+        """Test the complete workflow: add op, call it."""
         debugger = Debugger()
 
-        # Add callables
-        adder_ref = debugger.add_callable(adder)
-        multiplier_ref = debugger.add_callable(multiplier)
+        # Add ops
+        adder_ref = debugger.add_op(adder)
+        multiplier_ref = debugger.add_op(multiplier)
 
         # Verify registration
-        callables = debugger.list_callables()
-        names = {c.name for c in callables}
+        ops = debugger.list_ops()
+        names = {op.name for op in ops}
         assert names == {"adder", "multiplier"}
 
-        # Invoke callables
-        result = debugger.invoke_callable(adder_ref, {"a": 10.0, "b": 5.0})
+        # Call ops
+        result = debugger.call_op(adder_ref, {"a": 10.0, "b": 5.0})
         assert result == 15.0
 
-        result = debugger.invoke_callable(multiplier_ref, {"a": 3.0, "b": 7.0})
+        result = debugger.call_op(multiplier_ref, {"a": 3.0, "b": 7.0})
         assert result == 21.0
 
         # Calls and schemas are available via weave trace server using the ref

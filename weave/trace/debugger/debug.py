@@ -4,7 +4,7 @@ Architecture:
     1. Debugger (core business logic)
     2. DebuggerServer (FastAPI HTTP layer)
 
-Callables are identified by their stable weave ref URI after publishing.
+Ops are identified by their stable weave ref URI after publishing.
 Schema and call history can be queried from the weave trace server using the ref.
 """
 
@@ -26,11 +26,18 @@ from weave.trace.op import Op, is_op, op
 # =============================================================================
 
 
-class CallableInfo(BaseModel):
-    """Information about a registered callable."""
+class OpInfo(BaseModel):
+    """Information about a registered op."""
 
     ref: str
     name: str
+
+
+class CallRequest(BaseModel):
+    """Request body for calling an op."""
+
+    ref: str
+    inputs: dict[str, Any]
 
 
 # =============================================================================
@@ -39,11 +46,11 @@ class CallableInfo(BaseModel):
 
 
 class Debugger:
-    """Core debugger that manages callables and their execution.
+    """Core debugger that manages ops and their execution.
 
-    The Debugger requires weave to be initialized. All callables are
+    The Debugger requires weave to be initialized. All functions are
     automatically converted to weave ops and published for traceability.
-    Callables are identified by their stable weave ref URI.
+    Ops are identified by their stable weave ref URI.
 
     Schema and call history are available via the weave trace server using the ref.
 
@@ -56,20 +63,20 @@ class Debugger:
         self._client = require_weave_client()
 
         # Map of ref URI to op
-        self._callables: dict[str, Op] = {}
+        self._ops: dict[str, Op] = {}
 
         # Map of ref URI to human-readable name
         self._names: dict[str, str] = {}
 
     @property
-    def callables(self) -> dict[str, Op]:
-        """Get the registered callables (keyed by ref URI)."""
-        return self._callables
+    def ops(self) -> dict[str, Op]:
+        """Get the registered ops (keyed by ref URI)."""
+        return self._ops
 
-    def add_callable(
+    def add_op(
         self, callable: Callable[..., Any] | Op, *, name: str | None = None
     ) -> str:
-        """Add a callable to be exposed by the debugger.
+        """Add an op to be exposed by the debugger.
 
         The callable will be:
         1. Converted to a weave op (if not already)
@@ -80,10 +87,10 @@ class Debugger:
             name: Optional custom name. If not provided, uses the function's __name__.
 
         Returns:
-            The ref URI of the published callable.
+            The ref URI of the published op.
 
         Raises:
-            ValueError: If a callable with the same ref already exists.
+            ValueError: If an op with the same ref already exists.
         """
         if name is None:
             name = _derive_callable_name(callable)
@@ -104,42 +111,42 @@ class Debugger:
 
         ref_uri = callable_op.ref.uri()
 
-        if ref_uri in self._callables:
-            raise ValueError(f"Callable with ref {ref_uri} already exists")
+        if ref_uri in self._ops:
+            raise ValueError(f"Op with ref {ref_uri} already exists")
 
-        self._callables[ref_uri] = callable_op
+        self._ops[ref_uri] = callable_op
         self._names[ref_uri] = name
 
         return ref_uri
 
-    def list_callables(self) -> list[CallableInfo]:
-        """List all registered callables with their refs and names."""
+    def list_ops(self) -> list[OpInfo]:
+        """List all registered ops with their refs and names."""
         return [
-            CallableInfo(ref=ref_uri, name=self._names[ref_uri])
-            for ref_uri in self._callables.keys()
+            OpInfo(ref=ref_uri, name=self._names[ref_uri])
+            for ref_uri in self._ops.keys()
         ]
 
-    def invoke_callable(self, ref_uri: str, inputs: dict[str, Any]) -> Any:
-        """Invoke a registered callable with the given inputs.
+    def call_op(self, ref_uri: str, inputs: dict[str, Any]) -> Any:
+        """Call a registered op with the given inputs.
 
         Args:
-            ref_uri: The ref URI of the callable to invoke.
+            ref_uri: The ref URI of the op to call.
             inputs: Dictionary of input arguments.
 
         Returns:
-            The result of calling the callable.
+            The result of calling the op.
 
         Raises:
-            KeyError: If the callable is not found.
+            KeyError: If the op is not found.
         """
-        if ref_uri not in self._callables:
-            raise KeyError(f"Callable with ref '{ref_uri}' not found")
+        if ref_uri not in self._ops:
+            raise KeyError(f"Op with ref '{ref_uri}' not found")
 
-        callable = self._callables[ref_uri]
+        op_to_call = self._ops[ref_uri]
 
         # Use op.call() to get both result and call object
         # Note: op.call() never raises - errors are captured in the Call object
-        output, call = callable.call(**inputs)
+        output, call = op_to_call.call(**inputs)
 
         # Check if the call had an exception
         if call.exception is not None:
@@ -167,11 +174,11 @@ class DebuggerServer:
     """FastAPI HTTP server for the debugger.
 
     Exposes the debugger functionality via REST endpoints:
-        GET  /callables          - List all registered callables (refs and names)
-        POST /invoke?ref={ref}   - Invoke a callable by ref
-        GET  /openapi.json       - OpenAPI spec (provided by FastAPI)
+        GET  /ops            - List all registered ops (refs and names)
+        POST /call           - Call an op (JSON body: {"ref": "...", "inputs": {...}})
+        GET  /openapi.json   - OpenAPI spec (provided by FastAPI)
 
-    Callables are identified by their weave ref URI (passed as query parameter).
+    Ops are identified by their weave ref URI.
     Schema and call history can be queried from the weave trace server using the ref.
 
     Args:
@@ -212,14 +219,14 @@ class DebuggerServer:
         )
 
         # Register endpoints
-        @app.get("/callables")
-        async def list_callables() -> list[CallableInfo]:
-            return self._debugger.list_callables()
+        @app.get("/ops")
+        async def list_ops() -> list[OpInfo]:
+            return self._debugger.list_ops()
 
-        @app.post("/invoke")
-        async def invoke_callable(ref: str, inputs: dict[str, Any]) -> Any:
+        @app.post("/call")
+        async def call_op(request: CallRequest) -> Any:
             try:
-                return self._debugger.invoke_callable(ref, inputs)
+                return self._debugger.call_op(request.ref, request.inputs)
             except KeyError as e:
                 raise HTTPException(status_code=404, detail=str(e))
 

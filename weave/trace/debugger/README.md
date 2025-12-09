@@ -4,7 +4,7 @@ A tool that exposes local Python functions as a traceable HTTP service with a we
 
 ## Project Status
 
-**Current State:** Full Weave integration with ref-based callable identification
+**Current State:** Full Weave integration with ref-based op identification
 
 ### Architecture
 
@@ -12,15 +12,15 @@ A tool that exposes local Python functions as a traceable HTTP service with a we
 ┌─────────────────────────────────────────────────────────────┐
 │                    DebuggerServer                           │
 │                   (FastAPI HTTP Layer)                      │
-│             GET /callables, POST /invoke?ref=...            │
+│                  GET /ops, POST /call                       │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                       Debugger                              │
 │                 (Core Business Logic)                       │
-│          add_callable(), invoke_callable(), etc.            │
-│      Callables identified by stable weave ref URI           │
+│             add_op(), call_op(), list_ops()                 │
+│         Ops identified by stable weave ref URI              │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
@@ -35,7 +35,7 @@ A tool that exposes local Python functions as a traceable HTTP service with a we
 1. **Weave Required** - `weave.init()` must be called before creating a Debugger
 2. **Auto Op Wrapping** - Non-op functions are automatically wrapped with `@weave.op`
 3. **Auto Publishing** - Ops are `weave.publish()`ed when added for persistence
-4. **Ref-based Identification** - Callables are identified by stable weave ref URIs
+4. **Ref-based Identification** - Ops are identified by stable weave ref URIs
 5. **Schema with Op** - Input/output JSON schemas are published with the op
 6. **Weave as Storage** - Call history and schemas are queried from Weave's trace server
 
@@ -43,12 +43,12 @@ A tool that exposes local Python functions as a traceable HTTP service with a we
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/callables` | List all registered callables (refs and names) |
-| `POST` | `/invoke?ref={ref}` | Invoke a callable by ref (JSON body: `{"a": 1, "b": 2}`) |
+| `GET` | `/ops` | List all registered ops (refs and names) |
+| `POST` | `/call` | Call an op (JSON body: `{"ref": "...", "inputs": {...}}`) |
 | `GET` | `/openapi.json` | OpenAPI spec (FastAPI built-in) |
 
 **Note:** Schema and call history are available via the Weave trace server using the op ref. 
-The debug server is intentionally minimal - it only handles callable registration and invocation.
+The debug server is intentionally minimal - it only handles op registration and invocation.
 
 ### Usage Example
 
@@ -65,11 +65,11 @@ def multiplier(a: float, b: float) -> float:
 weave.init("my-project")
 
 debugger = weave.Debugger()
-adder_ref = debugger.add_callable(adder)       # Returns ref URI
-multiplier_ref = debugger.add_callable(multiplier)
+adder_ref = debugger.add_op(adder)       # Returns ref URI
+multiplier_ref = debugger.add_op(multiplier)
 
-# Invoke using ref
-result = debugger.invoke_callable(adder_ref, {"a": 1.0, "b": 2.0})
+# Call using ref
+result = debugger.call_op(adder_ref, {"a": 1.0, "b": 2.0})
 
 # Or start the HTTP server
 debugger.start()  # Starts server on http://0.0.0.0:8000
@@ -77,12 +77,20 @@ debugger.start()  # Starts server on http://0.0.0.0:8000
 
 ### Components
 
-#### CallableInfo Model
+#### OpInfo Model
 
 ```python
-class CallableInfo(BaseModel):
+class OpInfo(BaseModel):
     ref: str   # Weave ref URI (e.g., "weave:///entity/project/op/name:hash")
     name: str  # Human-readable name
+```
+
+#### CallRequest Model
+
+```python
+class CallRequest(BaseModel):
+    ref: str                  # Op ref URI to call
+    inputs: dict[str, Any]    # Input arguments
 ```
 
 #### Getting Schema and Calls
@@ -91,7 +99,7 @@ Schema and call history are stored in Weave and can be queried using the op ref:
 
 ```python
 # Schema is available directly on the op
-op = debugger.callables[ref]
+op = debugger.ops[ref]
 input_schema = op.get_input_json_schema()
 output_schema = op.get_output_json_schema()
 
