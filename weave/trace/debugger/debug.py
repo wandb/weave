@@ -1,12 +1,12 @@
 """Debugger module for exposing local functions as a traceable service.
 
 Architecture:
-    1. Datastore (abstract interface with Local and Weave implementations)
-    2. Debugger (core business logic)
-    3. DebuggerServer (FastAPI HTTP layer)
+    1. Debugger (core business logic)
+    2. DebuggerServer (FastAPI HTTP layer)
+
+Callables are identified by their stable weave ref URI after publishing.
 """
 
-from abc import ABC, abstractmethod
 from collections.abc import Callable
 from typing import Any
 
@@ -25,6 +25,13 @@ from weave.trace.op import Op, is_op, op
 # =============================================================================
 
 
+class CallableInfo(BaseModel):
+    """Information about a registered callable."""
+
+    ref: str
+    name: str
+
+
 class Span(BaseModel):
     """Represents a single execution span of a callable."""
 
@@ -38,98 +45,6 @@ class Span(BaseModel):
 
 
 # =============================================================================
-# Datastore Interface and Implementations
-# =============================================================================
-
-
-class Datastore(ABC):
-    """Abstract interface for storing and retrieving call spans."""
-
-    @abstractmethod
-    def add_span(self, callable_name: str, span: Span) -> None:
-        """Store a span for a callable.
-
-        Args:
-            callable_name: The name of the callable.
-            span: The span to store.
-        """
-        pass
-
-    @abstractmethod
-    def get_spans(self, callable_name: str, op: Op | None = None) -> list[Span]:
-        """Retrieve all spans for a callable.
-
-        Args:
-            callable_name: The name of the callable.
-            op: Optional op reference for implementations that need it.
-
-        Returns:
-            List of spans for the callable.
-        """
-        pass
-
-    @abstractmethod
-    def clear_spans(self, callable_name: str) -> None:
-        """Clear all spans for a callable.
-
-        Args:
-            callable_name: The name of the callable.
-        """
-        pass
-
-
-class WeaveDatastore(Datastore):
-    """Weave-backed datastore implementation.
-
-    Uses Weave's trace server to store and retrieve call spans.
-    Spans are automatically persisted when ops are called with weave tracing.
-    """
-
-    def add_span(self, callable_name: str, span: Span) -> None:
-        """No-op: Weave automatically stores spans when ops are called."""
-        # Spans are automatically stored by weave when using op.call()
-        pass
-
-    def get_spans(self, callable_name: str, op: Op | None = None) -> list[Span]:
-        """Query Weave for call history of an op.
-
-        Args:
-            callable_name: The name of the callable.
-            op: The op to query calls for (required for WeaveDatastore).
-
-        Returns:
-            List of spans from Weave's call history.
-        """
-        if op is None:
-            return []
-
-        spans = []
-        try:
-            # Query weave for calls to this op
-            for call in op.calls():
-                span = Span(
-                    name=callable_name,
-                    start_time_unix_nano=call.started_at.timestamp() if call.started_at else 0,
-                    end_time_unix_nano=call.ended_at.timestamp() if call.ended_at else 0,
-                    inputs=_safe_serialize_dict(call.inputs),
-                    output=_safe_serialize_value(call.output),
-                    error=call.exception,
-                    weave_call_ref=call.ref.uri() if call.id else None,
-                )
-                spans.append(span)
-        except Exception:
-            # If querying fails, return empty list
-            pass
-
-        return spans
-
-    def clear_spans(self, callable_name: str) -> None:
-        """No-op: Cannot clear spans from Weave (they are immutable)."""
-        # Weave calls are immutable - cannot be deleted via this interface
-        pass
-
-
-# =============================================================================
 # Debugger (Core Business Logic)
 # =============================================================================
 
@@ -139,32 +54,30 @@ class Debugger:
 
     The Debugger requires weave to be initialized. All callables are
     automatically converted to weave ops and published for traceability.
-
-    Args:
-        datastore: Optional datastore implementation. Defaults to WeaveDatastore.
+    Callables are identified by their stable weave ref URI.
 
     Raises:
         RuntimeError: If weave is not initialized when creating the Debugger.
     """
 
-    def __init__(self, datastore: Datastore | None = None) -> None:
+    def __init__(self) -> None:
         # Require weave to be initialized
         self._client = require_weave_client()
 
-        # Use WeaveDatastore by default
-        self._datastore = datastore or WeaveDatastore()
-
-        # Map of callable names to their ops
+        # Map of ref URI to op
         self._callables: dict[str, Op] = {}
+
+        # Map of ref URI to human-readable name
+        self._names: dict[str, str] = {}
 
     @property
     def callables(self) -> dict[str, Op]:
-        """Get the registered callables."""
+        """Get the registered callables (keyed by ref URI)."""
         return self._callables
 
     def add_callable(
         self, callable: Callable[..., Any] | Op, *, name: str | None = None
-    ) -> None:
+    ) -> str:
         """Add a callable to be exposed by the debugger.
 
         The callable will be:
@@ -175,14 +88,14 @@ class Debugger:
             callable: The function or Op to add.
             name: Optional custom name. If not provided, uses the function's __name__.
 
+        Returns:
+            The ref URI of the published callable.
+
         Raises:
-            ValueError: If a callable with the same name already exists.
+            ValueError: If a callable with the same ref already exists.
         """
         if name is None:
             name = _derive_callable_name(callable)
-
-        if name in self._callables:
-            raise ValueError(f"Callable with name {name} already exists")
 
         # Convert to op if not already
         callable_op: Op
@@ -191,20 +104,35 @@ class Debugger:
         else:
             callable_op = callable
 
-        # Publish the op to weave
+        # Publish the op to weave - this sets op.ref
         weave.publish(callable_op, name=name)
 
-        self._callables[name] = callable_op
+        # Get the ref URI after publishing
+        if callable_op.ref is None:
+            raise RuntimeError("Op ref not set after publish")
 
-    def list_callables(self) -> list[str]:
-        """List all registered callable names."""
-        return list(self._callables.keys())
+        ref_uri = callable_op.ref.uri()
 
-    def invoke_callable(self, callable_name: str, inputs: dict[str, Any]) -> Any:
+        if ref_uri in self._callables:
+            raise ValueError(f"Callable with ref {ref_uri} already exists")
+
+        self._callables[ref_uri] = callable_op
+        self._names[ref_uri] = name
+
+        return ref_uri
+
+    def list_callables(self) -> list[CallableInfo]:
+        """List all registered callables with their refs and names."""
+        return [
+            CallableInfo(ref=ref_uri, name=self._names[ref_uri])
+            for ref_uri in self._callables.keys()
+        ]
+
+    def invoke_callable(self, ref_uri: str, inputs: dict[str, Any]) -> Any:
         """Invoke a registered callable with the given inputs.
 
         Args:
-            callable_name: The name of the callable to invoke.
+            ref_uri: The ref URI of the callable to invoke.
             inputs: Dictionary of input arguments.
 
         Returns:
@@ -213,10 +141,10 @@ class Debugger:
         Raises:
             KeyError: If the callable is not found.
         """
-        if callable_name not in self._callables:
-            raise KeyError(f"Callable '{callable_name}' not found")
+        if ref_uri not in self._callables:
+            raise KeyError(f"Callable with ref '{ref_uri}' not found")
 
-        callable = self._callables[callable_name]
+        callable = self._callables[ref_uri]
 
         # Use op.call() to get both result and call object
         # Note: op.call() never raises - errors are captured in the Call object
@@ -228,11 +156,11 @@ class Debugger:
 
         return output
 
-    def get_json_schema(self, callable_name: str) -> dict[str, Any]:
+    def get_json_schema(self, ref_uri: str) -> dict[str, Any]:
         """Get the JSON schema for a callable's inputs.
 
         Args:
-            callable_name: The name of the registered callable.
+            ref_uri: The ref URI of the registered callable.
 
         Returns:
             A JSON schema object describing the callable's input parameters.
@@ -240,17 +168,17 @@ class Debugger:
         Raises:
             KeyError: If the callable is not found.
         """
-        if callable_name not in self._callables:
-            raise KeyError(f"Callable '{callable_name}' not found")
+        if ref_uri not in self._callables:
+            raise KeyError(f"Callable with ref '{ref_uri}' not found")
 
         # All callables are guaranteed to be ops (converted on add_callable)
-        return self._callables[callable_name].get_input_json_schema()
+        return self._callables[ref_uri].get_input_json_schema()
 
-    def get_calls(self, callable_name: str) -> list[Span]:
+    def get_calls(self, ref_uri: str) -> list[Span]:
         """Get all calls (spans) for a given callable.
 
         Args:
-            callable_name: The name of the callable.
+            ref_uri: The ref URI of the callable.
 
         Returns:
             List of spans representing call history.
@@ -258,11 +186,12 @@ class Debugger:
         Raises:
             KeyError: If the callable is not found.
         """
-        if callable_name not in self._callables:
-            raise KeyError(f"Callable '{callable_name}' not found")
+        if ref_uri not in self._callables:
+            raise KeyError(f"Callable with ref '{ref_uri}' not found")
 
-        op = self._callables[callable_name]
-        return self._datastore.get_spans(callable_name, op)
+        callable_op = self._callables[ref_uri]
+        name = self._names[ref_uri]
+        return _get_spans_for_op(callable_op, name)
 
     def start(self, host: str = "0.0.0.0", port: int = 8000) -> None:
         """Start the debugger HTTP server.
@@ -284,11 +213,13 @@ class DebuggerServer:
     """FastAPI HTTP server for the debugger.
 
     Exposes the debugger functionality via REST endpoints:
-        GET  /callables                             - List all registered callables
-        POST /callables/{callable_name}             - Invoke a callable
-        GET  /callables/{callable_name}/json_schema - Get input JSON schema
-        GET  /callables/{callable_name}/calls       - Get call history (spans)
-        GET  /openapi.json                          - OpenAPI spec (provided by FastAPI)
+        GET  /callables                  - List all registered callables (refs and names)
+        POST /invoke?ref={ref}           - Invoke a callable by ref
+        GET  /schema?ref={ref}           - Get input JSON schema for a callable
+        GET  /calls?ref={ref}            - Get call history (spans) for a callable
+        GET  /openapi.json               - OpenAPI spec (provided by FastAPI)
+
+    Callables are identified by their weave ref URI (passed as query parameter).
 
     Args:
         debugger: The Debugger instance to expose.
@@ -329,29 +260,27 @@ class DebuggerServer:
 
         # Register endpoints
         @app.get("/callables")
-        async def list_callables() -> list[str]:
+        async def list_callables() -> list[CallableInfo]:
             return self._debugger.list_callables()
 
-        @app.post("/callables/{callable_name}")
-        async def invoke_callable(
-            callable_name: str, inputs: dict[str, Any]
-        ) -> Any:
+        @app.post("/invoke")
+        async def invoke_callable(ref: str, inputs: dict[str, Any]) -> Any:
             try:
-                return self._debugger.invoke_callable(callable_name, inputs)
+                return self._debugger.invoke_callable(ref, inputs)
             except KeyError as e:
                 raise HTTPException(status_code=404, detail=str(e))
 
-        @app.get("/callables/{callable_name}/json_schema")
-        async def get_json_schema(callable_name: str) -> dict[str, Any]:
+        @app.get("/schema")
+        async def get_json_schema(ref: str) -> dict[str, Any]:
             try:
-                return self._debugger.get_json_schema(callable_name)
+                return self._debugger.get_json_schema(ref)
             except KeyError as e:
                 raise HTTPException(status_code=404, detail=str(e))
 
-        @app.get("/callables/{callable_name}/calls")
-        async def get_calls(callable_name: str) -> list[Span]:
+        @app.get("/calls")
+        async def get_calls(ref: str) -> list[Span]:
             try:
-                return self._debugger.get_calls(callable_name)
+                return self._debugger.get_calls(ref)
             except KeyError as e:
                 raise HTTPException(status_code=404, detail=str(e))
 
@@ -375,6 +304,36 @@ class DebuggerServer:
 def _derive_callable_name(callable: Callable[..., Any]) -> str:
     """Derive the name of a callable from its __name__ attribute."""
     return callable.__name__
+
+
+def _get_spans_for_op(callable_op: Op, name: str) -> list[Span]:
+    """Query Weave for call history of an op.
+
+    Args:
+        callable_op: The op to query calls for.
+        name: The human-readable name of the callable.
+
+    Returns:
+        List of spans from Weave's call history.
+    """
+    spans = []
+    try:
+        for call in callable_op.calls():
+            span = Span(
+                name=name,
+                start_time_unix_nano=call.started_at.timestamp() if call.started_at else 0,
+                end_time_unix_nano=call.ended_at.timestamp() if call.ended_at else 0,
+                inputs=_safe_serialize_dict(call.inputs),
+                output=_safe_serialize_value(call.output),
+                error=call.exception,
+                weave_call_ref=call.ref.uri() if call.id else None,
+            )
+            spans.append(span)
+    except Exception:
+        # If querying fails, return empty list
+        pass
+
+    return spans
 
 
 def _safe_serialize_value(value: Any) -> Any:

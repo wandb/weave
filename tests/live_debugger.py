@@ -347,25 +347,25 @@ if __name__ == "__main__":
     # Main chat interface (recommended!)
     debugger.add_callable(weave_wizard_chat)
     
-    # Specialist ops
-    debugger.add_callable(ask_weave_expert)
-    debugger.add_callable(generate_weave_code)
-    debugger.add_callable(roast_my_code)
-    debugger.add_callable(plan_tutorial)
-    debugger.add_callable(create_full_tutorial)
+    # # Specialist ops
+    # debugger.add_callable(ask_weave_expert)
+    # debugger.add_callable(generate_weave_code)
+    # debugger.add_callable(roast_my_code)
+    # debugger.add_callable(plan_tutorial)
+    # debugger.add_callable(create_full_tutorial)
     
-    # Internal/helper ops
-    debugger.add_callable(classify_intent)
-    debugger.add_callable(generate_tutorial_step)
+    # # Internal/helper ops
+    # debugger.add_callable(classify_intent)
+    # debugger.add_callable(generate_tutorial_step)
     
-    # Simple math ops for basic testing
-    debugger.add_callable(adder)
-    debugger.add_callable(multiplier)
-    debugger.add_callable(matrix_multiplier)
-    debugger.add_callable(line)
+    # # Simple math ops for basic testing
+    # debugger.add_callable(adder)
+    # debugger.add_callable(multiplier)
+    # debugger.add_callable(matrix_multiplier)
+    # debugger.add_callable(line)
 
 
-    debugger.add_callable(tell_me_n_stories)
+    # debugger.add_callable(tell_me_n_stories)
     
     print("\n✨ Debugger starting on http://0.0.0.0:8000")
     print("\nTry weave_wizard_chat with messages like:")

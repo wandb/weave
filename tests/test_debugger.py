@@ -4,10 +4,10 @@ import pytest
 
 import weave
 from weave.trace.debugger.debug import (
+    CallableInfo,
     Debugger,
     DebuggerServer,
     Span,
-    WeaveDatastore,
     _derive_callable_name,
     _safe_serialize_value,
 )
@@ -98,54 +98,47 @@ class TestSafeSerializeValue:
 
 class TestDebuggerAddCallable:
     @pytest.mark.trace_server
-    def test_add_callable_with_auto_derived_name(self, client) -> None:
-        """Test adding a callable without specifying a name."""
+    def test_add_callable_returns_ref(self, client) -> None:
+        """Test adding a callable returns a ref URI."""
         debugger = Debugger()
-        debugger.add_callable(adder)
+        ref = debugger.add_callable(adder)
 
-        assert "adder" in debugger.callables
+        assert ref.startswith("weave:///")
+        assert ref in debugger.callables
 
     @pytest.mark.trace_server
     def test_add_callable_with_custom_name(self, client) -> None:
         """Test adding a callable with a custom name."""
         debugger = Debugger()
-        debugger.add_callable(adder, name="my_adder")
+        ref = debugger.add_callable(adder, name="my_adder")
 
-        assert "my_adder" in debugger.callables
-        assert "adder" not in debugger.callables
+        assert ref.startswith("weave:///")
+        # Check the name is stored
+        callables = debugger.list_callables()
+        assert any(c.name == "my_adder" for c in callables)
 
     @pytest.mark.trace_server
     def test_add_multiple_callables(self, client) -> None:
         """Test adding multiple callables."""
         debugger = Debugger()
-        debugger.add_callable(adder)
-        debugger.add_callable(multiplier)
-        debugger.add_callable(liner)
+        ref1 = debugger.add_callable(adder)
+        ref2 = debugger.add_callable(multiplier)
+        ref3 = debugger.add_callable(liner)
 
         assert len(debugger.callables) == 3
-        assert "adder" in debugger.callables
-        assert "multiplier" in debugger.callables
-        assert "liner" in debugger.callables
+        assert ref1 in debugger.callables
+        assert ref2 in debugger.callables
+        assert ref3 in debugger.callables
 
     @pytest.mark.trace_server
-    def test_add_callable_duplicate_name_raises_error(self, client) -> None:
-        """Test that adding a callable with a duplicate name raises ValueError."""
+    def test_add_callable_duplicate_ref_raises_error(self, client) -> None:
+        """Test that adding the same callable twice raises ValueError."""
         debugger = Debugger()
         debugger.add_callable(adder)
 
-        with pytest.raises(ValueError, match="Callable with name adder already exists"):
+        # Adding the same function again gets the same ref (content hash), so raises
+        with pytest.raises(ValueError, match="already exists"):
             debugger.add_callable(adder)
-
-    @pytest.mark.trace_server
-    def test_add_callable_duplicate_custom_name_raises_error(self, client) -> None:
-        """Test that adding a callable with a duplicate custom name raises ValueError."""
-        debugger = Debugger()
-        debugger.add_callable(adder, name="my_func")
-
-        with pytest.raises(
-            ValueError, match="Callable with name my_func already exists"
-        ):
-            debugger.add_callable(multiplier, name="my_func")
 
 
 # --- Tests for Debugger.list_callables ---
@@ -156,9 +149,9 @@ class TestDebuggerListCallables:
     def test_list_callables_empty(self, client) -> None:
         """Test listing callables when none are registered."""
         debugger = Debugger()
-        names = debugger.list_callables()
+        callables = debugger.list_callables()
 
-        assert names == []
+        assert callables == []
 
     @pytest.mark.trace_server
     def test_list_callables_with_callables(self, client) -> None:
@@ -168,9 +161,13 @@ class TestDebuggerListCallables:
         debugger.add_callable(multiplier)
         debugger.add_callable(liner)
 
-        names = debugger.list_callables()
+        callables = debugger.list_callables()
 
-        assert set(names) == {"adder", "multiplier", "liner"}
+        assert len(callables) == 3
+        names = {c.name for c in callables}
+        assert names == {"adder", "multiplier", "liner"}
+        # All should have refs
+        assert all(c.ref.startswith("weave:///") for c in callables)
 
 
 # --- Tests for Debugger.invoke_callable ---
@@ -181,9 +178,9 @@ class TestDebuggerInvokeCallable:
     def test_invoke_returns_correct_result(self, client) -> None:
         """Test that invoking a callable returns the correct result."""
         debugger = Debugger()
-        debugger.add_callable(adder)
+        ref = debugger.add_callable(adder)
 
-        result = debugger.invoke_callable("adder", {"a": 3.0, "b": 5.0})
+        result = debugger.invoke_callable(ref, {"a": 3.0, "b": 5.0})
 
         assert result == 8.0
 
@@ -192,8 +189,8 @@ class TestDebuggerInvokeCallable:
         """Test that invoking an unknown callable raises KeyError."""
         debugger = Debugger()
 
-        with pytest.raises(KeyError, match="nonexistent"):
-            debugger.invoke_callable("nonexistent", {})
+        with pytest.raises(KeyError, match="not found"):
+            debugger.invoke_callable("weave:///nonexistent", {})
 
 
 # --- Tests for Debugger.get_calls ---
@@ -205,8 +202,8 @@ class TestDebuggerGetCalls:
         """Test that getting calls for unknown callable raises KeyError."""
         debugger = Debugger()
 
-        with pytest.raises(KeyError, match="nonexistent"):
-            debugger.get_calls("nonexistent")
+        with pytest.raises(KeyError, match="not found"):
+            debugger.get_calls("weave:///nonexistent")
 
 
 # --- Tests for error handling ---
@@ -217,10 +214,10 @@ class TestDebuggerErrorHandling:
     def test_invoke_with_error_raises_exception(self, client) -> None:
         """Test that errors are raised when callable fails."""
         debugger = Debugger()
-        debugger.add_callable(failing_func)
+        ref = debugger.add_callable(failing_func)
 
         with pytest.raises(Exception, match="Intentional test error"):
-            debugger.invoke_callable("failing_func", {})
+            debugger.invoke_callable(ref, {})
 
 
 # --- Tests for Span model ---
@@ -398,9 +395,9 @@ class TestDebuggerGetJsonSchema:
     def test_get_json_schema(self, client) -> None:
         """Test getting JSON schema for a registered callable."""
         debugger = Debugger()
-        debugger.add_callable(adder)
+        ref = debugger.add_callable(adder)
 
-        schema = debugger.get_json_schema("adder")
+        schema = debugger.get_json_schema(ref)
 
         assert schema["type"] == "object"
         assert "a" in schema["properties"]
@@ -411,42 +408,8 @@ class TestDebuggerGetJsonSchema:
         """Test that KeyError is raised for unknown callable."""
         debugger = Debugger()
 
-        with pytest.raises(KeyError, match="nonexistent"):
-            debugger.get_json_schema("nonexistent")
-
-
-# --- Tests for WeaveDatastore ---
-
-
-class TestWeaveDatastore:
-    def test_add_span_is_noop(self) -> None:
-        """Test that add_span is a no-op for WeaveDatastore."""
-        datastore = WeaveDatastore()
-        span = Span(
-            name="test",
-            start_time_unix_nano=1000.0,
-            end_time_unix_nano=2000.0,
-            inputs={"a": 1},
-            output=42,
-            error=None,
-        )
-
-        # Should not raise
-        datastore.add_span("test_callable", span)
-
-    def test_clear_spans_is_noop(self) -> None:
-        """Test that clear_spans is a no-op for WeaveDatastore."""
-        datastore = WeaveDatastore()
-
-        # Should not raise
-        datastore.clear_spans("test_callable")
-
-    def test_get_spans_without_op_returns_empty(self) -> None:
-        """Test that get_spans returns empty list without op."""
-        datastore = WeaveDatastore()
-        spans = datastore.get_spans("test_callable", op=None)
-
-        assert spans == []
+        with pytest.raises(KeyError, match="not found"):
+            debugger.get_json_schema("weave:///nonexistent")
 
 
 # --- Tests for Weave integration ---
@@ -475,14 +438,14 @@ class TestDebuggerWeaveIntegration:
             return a + b
 
         debugger = Debugger()
-        debugger.add_callable(weave_adder)
+        ref = debugger.add_callable(weave_adder)
 
-        result = debugger.invoke_callable("weave_adder", {"a": 3.0, "b": 5.0})
+        result = debugger.invoke_callable(ref, {"a": 3.0, "b": 5.0})
 
         assert result == 8.0
 
-        # Query calls from weave datastore
-        calls = debugger.get_calls("weave_adder")
+        # Query calls from weave
+        calls = debugger.get_calls(ref)
         assert len(calls) >= 1  # At least our call
 
         # Find our call
@@ -504,14 +467,14 @@ class TestDebuggerWeaveIntegration:
             return a - b
 
         debugger = Debugger()
-        debugger.add_callable(regular_function)
+        ref = debugger.add_callable(regular_function)
 
-        result = debugger.invoke_callable("regular_function", {"a": 10.0, "b": 3.0})
+        result = debugger.invoke_callable(ref, {"a": 10.0, "b": 3.0})
 
         assert result == 7.0
 
         # Should have calls in weave
-        calls = debugger.get_calls("regular_function")
+        calls = debugger.get_calls(ref)
         assert len(calls) >= 1
 
     @pytest.mark.trace_server
@@ -524,18 +487,18 @@ class TestDebuggerWeaveIntegration:
             return n
 
         debugger = Debugger()
-        debugger.add_callable(counter_op)
+        ref = debugger.add_callable(counter_op)
 
-        debugger.invoke_callable("counter_op", {"n": 1})
-        debugger.invoke_callable("counter_op", {"n": 2})
-        debugger.invoke_callable("counter_op", {"n": 3})
+        debugger.invoke_callable(ref, {"n": 1})
+        debugger.invoke_callable(ref, {"n": 2})
+        debugger.invoke_callable(ref, {"n": 3})
 
-        calls = debugger.get_calls("counter_op")
+        calls = debugger.get_calls(ref)
         assert len(calls) >= 3
 
         # Each call should have a unique weave_call_ref
-        refs = [c.weave_call_ref for c in calls if c.weave_call_ref]
-        assert len(set(refs)) >= 3  # All refs should be unique
+        call_refs = [c.weave_call_ref for c in calls if c.weave_call_ref]
+        assert len(set(call_refs)) >= 3  # All refs should be unique
 
 
 # --- Integration-style tests ---
@@ -548,29 +511,30 @@ class TestDebuggerIntegration:
         debugger = Debugger()
 
         # Add callables
-        debugger.add_callable(adder)
-        debugger.add_callable(multiplier)
+        adder_ref = debugger.add_callable(adder)
+        multiplier_ref = debugger.add_callable(multiplier)
 
         # Verify registration
-        names = debugger.list_callables()
-        assert set(names) == {"adder", "multiplier"}
+        callables = debugger.list_callables()
+        names = {c.name for c in callables}
+        assert names == {"adder", "multiplier"}
 
         # Invoke callables
-        result = debugger.invoke_callable("adder", {"a": 10.0, "b": 5.0})
+        result = debugger.invoke_callable(adder_ref, {"a": 10.0, "b": 5.0})
         assert result == 15.0
 
-        result = debugger.invoke_callable("multiplier", {"a": 3.0, "b": 7.0})
+        result = debugger.invoke_callable(multiplier_ref, {"a": 3.0, "b": 7.0})
         assert result == 21.0
 
         # Verify calls are tracked
-        adder_calls = debugger.get_calls("adder")
+        adder_calls = debugger.get_calls(adder_ref)
         assert len(adder_calls) >= 1
 
-        multiplier_calls = debugger.get_calls("multiplier")
+        multiplier_calls = debugger.get_calls(multiplier_ref)
         assert len(multiplier_calls) >= 1
 
         # Verify schema
-        schema = debugger.get_json_schema("adder")
+        schema = debugger.get_json_schema(adder_ref)
         assert schema["type"] == "object"
         assert "a" in schema["properties"]
         assert "b" in schema["properties"]
