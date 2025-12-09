@@ -155,3 +155,18 @@ The `Debugger` class is exported from the main `weave` package:
 from weave.trace.debugger.debug import Debugger
 # Available as weave.Debugger
 ```
+
+
+--- Human Notes ---
+1. There are 3 arch patterns (for the sake of hackweek, we are doing #2, but if we were to productionize, should consider alternatives):
+    1. Direct to client, local "UI"
+    2. Direct to client, Hosted UI
+    3. Proxy through trace server, Hosted UI
+2. In the future, it would be nice to have `weave debug IMPORT.PATH` but that can wait
+3. Let's stick to just directly exposing the ops
+4. Op publishing should publish the type spec
+5. The server should publish the op versions it can execute
+6. consider integration with the pytest form
+7. focus on the GUI experience for hackweek
+8. explore pre-validation of purity
+9. explore state tracking & actions
