@@ -1,7 +1,5 @@
 """Tests for the weave.trace.debugger.debug module."""
 
-import datetime
-
 import pytest
 
 import weave
@@ -11,7 +9,6 @@ from weave.trace.debugger.debug import (
     DebuggerServer,
     _derive_callable_name,
 )
-from weave.trace_server.trace_server_interface import CallSchema
 
 # --- Test fixtures and helper functions ---
 
@@ -152,19 +149,6 @@ class TestDebuggerInvokeCallable:
             debugger.invoke_callable("weave:///nonexistent", {})
 
 
-# --- Tests for Debugger.get_calls ---
-
-
-class TestDebuggerGetCalls:
-    @pytest.mark.trace_server
-    def test_get_calls_not_found_raises_error(self, client) -> None:
-        """Test that getting calls for unknown callable raises KeyError."""
-        debugger = Debugger()
-
-        with pytest.raises(KeyError, match="not found"):
-            debugger.get_calls("weave:///nonexistent")
-
-
 # --- Tests for error handling ---
 
 
@@ -177,67 +161,6 @@ class TestDebuggerErrorHandling:
 
         with pytest.raises(Exception, match="Intentional test error"):
             debugger.invoke_callable(ref, {})
-
-
-# --- Tests for CallSchema model ---
-
-
-class TestCallSchemaModel:
-    def test_call_schema_creation(self) -> None:
-        """Test creating a CallSchema with required fields."""
-        now = datetime.datetime.now()
-        call = CallSchema(
-            id="call-123",
-            project_id="test-project",
-            op_name="test_op",
-            trace_id="trace-456",
-            started_at=now,
-            attributes={},
-            inputs={"a": 1},
-            output=42,
-        )
-
-        assert call.id == "call-123"
-        assert call.project_id == "test-project"
-        assert call.op_name == "test_op"
-        assert call.trace_id == "trace-456"
-        assert call.inputs == {"a": 1}
-        assert call.output == 42
-        assert call.exception is None
-
-    def test_call_schema_with_exception(self) -> None:
-        """Test creating a CallSchema with an exception."""
-        now = datetime.datetime.now()
-        call = CallSchema(
-            id="call-123",
-            project_id="test-project",
-            op_name="test_op",
-            trace_id="trace-456",
-            started_at=now,
-            attributes={},
-            inputs={},
-            output=None,
-            exception="Something went wrong",
-        )
-
-        assert call.exception == "Something went wrong"
-
-    def test_call_schema_with_parent(self) -> None:
-        """Test creating a CallSchema with a parent call."""
-        now = datetime.datetime.now()
-        call = CallSchema(
-            id="call-123",
-            project_id="test-project",
-            op_name="test_op",
-            trace_id="trace-456",
-            parent_id="parent-789",
-            started_at=now,
-            attributes={},
-            inputs={"a": 1},
-            output=42,
-        )
-
-        assert call.parent_id == "parent-789"
 
 
 # --- Tests for Op.get_input_json_schema ---
@@ -357,31 +280,6 @@ class TestOpGetInputJsonSchema:
         assert schema == {}
 
 
-# --- Tests for Debugger.get_json_schema ---
-
-
-class TestDebuggerGetJsonSchema:
-    @pytest.mark.trace_server
-    def test_get_json_schema(self, client) -> None:
-        """Test getting JSON schema for a registered callable."""
-        debugger = Debugger()
-        ref = debugger.add_callable(adder)
-
-        schema = debugger.get_json_schema(ref)
-
-        assert schema["type"] == "object"
-        assert "a" in schema["properties"]
-        assert "b" in schema["properties"]
-
-    @pytest.mark.trace_server
-    def test_get_json_schema_not_found(self, client) -> None:
-        """Test that KeyError is raised for unknown callable."""
-        debugger = Debugger()
-
-        with pytest.raises(KeyError, match="not found"):
-            debugger.get_json_schema("weave:///nonexistent")
-
-
 # --- Tests for Weave integration ---
 
 
@@ -414,18 +312,8 @@ class TestDebuggerWeaveIntegration:
 
         assert result == 8.0
 
-        # Query calls from weave
-        calls = debugger.get_calls(ref)
-        assert len(calls) >= 1  # At least our call
-
-        # Find our call (CallSchema uses inputs dict directly)
-        our_call = next(
-            (c for c in calls if c.inputs.get("a") == 3.0 and c.inputs.get("b") == 5.0),
-            None,
-        )
-        assert our_call is not None
-        assert our_call.output == 8.0
-        assert our_call.id is not None  # CallSchema has id field
+        # Calls are stored in weave and can be queried via the trace server
+        # using the op ref. The debugger no longer provides a get_calls method.
 
     @pytest.mark.trace_server
     def test_regular_function_auto_wrapped_as_op(self, client) -> None:
@@ -442,13 +330,9 @@ class TestDebuggerWeaveIntegration:
 
         assert result == 7.0
 
-        # Should have calls in weave
-        calls = debugger.get_calls(ref)
-        assert len(calls) >= 1
-
     @pytest.mark.trace_server
-    def test_multiple_invocations_tracked(self, client) -> None:
-        """Test that multiple invocations are tracked in weave."""
+    def test_multiple_invocations(self, client) -> None:
+        """Test that multiple invocations work correctly."""
 
         @weave.op
         def counter_op(n: int) -> int:
@@ -458,16 +342,13 @@ class TestDebuggerWeaveIntegration:
         debugger = Debugger()
         ref = debugger.add_callable(counter_op)
 
-        debugger.invoke_callable(ref, {"n": 1})
-        debugger.invoke_callable(ref, {"n": 2})
-        debugger.invoke_callable(ref, {"n": 3})
+        r1 = debugger.invoke_callable(ref, {"n": 1})
+        r2 = debugger.invoke_callable(ref, {"n": 2})
+        r3 = debugger.invoke_callable(ref, {"n": 3})
 
-        calls = debugger.get_calls(ref)
-        assert len(calls) >= 3
-
-        # Each call should have a unique id
-        call_ids = [c.id for c in calls if c.id]
-        assert len(set(call_ids)) >= 3  # All ids should be unique
+        assert r1 == 1
+        assert r2 == 2
+        assert r3 == 3
 
 
 # --- Integration-style tests ---
@@ -476,7 +357,7 @@ class TestDebuggerWeaveIntegration:
 class TestDebuggerIntegration:
     @pytest.mark.trace_server
     def test_end_to_end_workflow(self, client) -> None:
-        """Test the complete workflow: add callable, invoke it, retrieve calls."""
+        """Test the complete workflow: add callable, invoke it."""
         debugger = Debugger()
 
         # Add callables
@@ -495,15 +376,4 @@ class TestDebuggerIntegration:
         result = debugger.invoke_callable(multiplier_ref, {"a": 3.0, "b": 7.0})
         assert result == 21.0
 
-        # Verify calls are tracked
-        adder_calls = debugger.get_calls(adder_ref)
-        assert len(adder_calls) >= 1
-
-        multiplier_calls = debugger.get_calls(multiplier_ref)
-        assert len(multiplier_calls) >= 1
-
-        # Verify schema
-        schema = debugger.get_json_schema(adder_ref)
-        assert schema["type"] == "object"
-        assert "a" in schema["properties"]
-        assert "b" in schema["properties"]
+        # Calls and schemas are available via weave trace server using the ref

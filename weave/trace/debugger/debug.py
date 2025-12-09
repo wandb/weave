@@ -5,6 +5,7 @@ Architecture:
     2. DebuggerServer (FastAPI HTTP layer)
 
 Callables are identified by their stable weave ref URI after publishing.
+Schema and call history can be queried from the weave trace server using the ref.
 """
 
 from collections.abc import Callable
@@ -18,7 +19,6 @@ from pydantic import BaseModel
 import weave
 from weave.trace.context.weave_client_context import require_weave_client
 from weave.trace.op import Op, is_op, op
-from weave.trace_server.trace_server_interface import CallSchema
 
 
 # =============================================================================
@@ -44,6 +44,8 @@ class Debugger:
     The Debugger requires weave to be initialized. All callables are
     automatically converted to weave ops and published for traceability.
     Callables are identified by their stable weave ref URI.
+
+    Schema and call history are available via the weave trace server using the ref.
 
     Raises:
         RuntimeError: If weave is not initialized when creating the Debugger.
@@ -145,42 +147,6 @@ class Debugger:
 
         return output
 
-    def get_json_schema(self, ref_uri: str) -> dict[str, Any]:
-        """Get the JSON schema for a callable's inputs.
-
-        Args:
-            ref_uri: The ref URI of the registered callable.
-
-        Returns:
-            A JSON schema object describing the callable's input parameters.
-
-        Raises:
-            KeyError: If the callable is not found.
-        """
-        if ref_uri not in self._callables:
-            raise KeyError(f"Callable with ref '{ref_uri}' not found")
-
-        # All callables are guaranteed to be ops (converted on add_callable)
-        return self._callables[ref_uri].get_input_json_schema()
-
-    def get_calls(self, ref_uri: str) -> list[CallSchema]:
-        """Get all calls for a given callable.
-
-        Args:
-            ref_uri: The ref URI of the callable.
-
-        Returns:
-            List of CallSchema objects representing call history.
-
-        Raises:
-            KeyError: If the callable is not found.
-        """
-        if ref_uri not in self._callables:
-            raise KeyError(f"Callable with ref '{ref_uri}' not found")
-
-        callable_op = self._callables[ref_uri]
-        return _get_calls_for_op(callable_op)
-
     def start(self, host: str = "0.0.0.0", port: int = 8000) -> None:
         """Start the debugger HTTP server.
 
@@ -201,13 +167,12 @@ class DebuggerServer:
     """FastAPI HTTP server for the debugger.
 
     Exposes the debugger functionality via REST endpoints:
-        GET  /callables                  - List all registered callables (refs and names)
-        POST /invoke?ref={ref}           - Invoke a callable by ref
-        GET  /schema?ref={ref}           - Get input JSON schema for a callable
-        GET  /calls?ref={ref}            - Get call history (spans) for a callable
-        GET  /openapi.json               - OpenAPI spec (provided by FastAPI)
+        GET  /callables          - List all registered callables (refs and names)
+        POST /invoke?ref={ref}   - Invoke a callable by ref
+        GET  /openapi.json       - OpenAPI spec (provided by FastAPI)
 
     Callables are identified by their weave ref URI (passed as query parameter).
+    Schema and call history can be queried from the weave trace server using the ref.
 
     Args:
         debugger: The Debugger instance to expose.
@@ -258,20 +223,6 @@ class DebuggerServer:
             except KeyError as e:
                 raise HTTPException(status_code=404, detail=str(e))
 
-        @app.get("/schema")
-        async def get_json_schema(ref: str) -> dict[str, Any]:
-            try:
-                return self._debugger.get_json_schema(ref)
-            except KeyError as e:
-                raise HTTPException(status_code=404, detail=str(e))
-
-        @app.get("/calls")
-        async def get_calls(ref: str) -> list[CallSchema]:
-            try:
-                return self._debugger.get_calls(ref)
-            except KeyError as e:
-                raise HTTPException(status_code=404, detail=str(e))
-
         return app
 
     def run(self, host: str = "0.0.0.0", port: int = 8000) -> None:
@@ -292,48 +243,3 @@ class DebuggerServer:
 def _derive_callable_name(callable: Callable[..., Any]) -> str:
     """Derive the name of a callable from its __name__ attribute."""
     return callable.__name__
-
-
-def _get_calls_for_op(callable_op: Op) -> list[CallSchema]:
-    """Query Weave for call history of an op.
-
-    Args:
-        callable_op: The op to query calls for.
-
-    Returns:
-        List of CallSchema objects from Weave's call history.
-    """
-    calls = []
-    try:
-        for call in callable_op.calls():
-            # CallSchema requires id and project_id - skip if missing
-            if call.id is None:
-                continue
-
-            call_schema = CallSchema(
-                id=call.id,
-                project_id=call.project_id,
-                op_name=call.op_name,
-                display_name=call.display_name,
-                trace_id=call.trace_id,
-                parent_id=call.parent_id,
-                thread_id=call.thread_id,
-                turn_id=call.turn_id,
-                started_at=call.started_at,
-                attributes=call.attributes or {},
-                inputs=call.inputs,
-                ended_at=call.ended_at,
-                exception=call.exception,
-                output=call.output,
-                summary=call.summary,
-                wb_run_id=call.wb_run_id,
-                wb_run_step=call.wb_run_step,
-                wb_run_step_end=call.wb_run_step_end,
-                deleted_at=call.deleted_at,
-            )
-            calls.append(call_schema)
-    except Exception:
-        # If querying fails, return empty list
-        pass
-
-    return calls
