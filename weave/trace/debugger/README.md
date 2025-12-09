@@ -24,12 +24,9 @@ A tool that exposes local Python functions as a traceable HTTP service with a we
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                      Datastore                              │
-│                  (Abstract Interface)                       │
-├─────────────────────────┬───────────────────────────────────┤
-│    LocalDatastore       │       WeaveDatastore              │
-│   (In-memory storage)   │  (Weave trace server backend)     │
-└─────────────────────────┴───────────────────────────────────┘
+│                    WeaveDatastore                           │
+│              (Weave trace server backend)                   │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 ### Key Features
@@ -72,19 +69,6 @@ debugger.start()  # Starts server on http://0.0.0.0:8000
 
 ### Components
 
-#### Datastore Interface
-
-```python
-class Datastore(ABC):
-    def add_span(self, callable_name: str, span: Span) -> None: ...
-    def get_spans(self, callable_name: str, op: Op | None = None) -> list[Span]: ...
-    def clear_spans(self, callable_name: str) -> None: ...
-```
-
-**Implementations:**
-- `LocalDatastore` - In-memory storage for testing
-- `WeaveDatastore` - Uses Weave's trace server (default)
-
 #### Span Model
 
 ```python
@@ -96,15 +80,6 @@ class Span(BaseModel):
     output: Any                  # Return value
     error: str | None            # Error message if failed
     weave_call_ref: str | None   # Weave call reference URI
-```
-
-### Using LocalDatastore for Testing
-
-```python
-from weave.trace.debugger.debug import Debugger, LocalDatastore
-
-weave.init("test-project")
-debugger = Debugger(datastore=LocalDatastore())
 ```
 
 ## Running Tests

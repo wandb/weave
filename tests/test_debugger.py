@@ -6,7 +6,6 @@ import weave
 from weave.trace.debugger.debug import (
     Debugger,
     DebuggerServer,
-    LocalDatastore,
     Span,
     WeaveDatastore,
     _derive_callable_name,
@@ -197,14 +196,14 @@ class TestDebuggerInvokeCallable:
             debugger.invoke_callable("nonexistent", {})
 
 
-# --- Tests for Debugger.get_calls with LocalDatastore ---
+# --- Tests for Debugger.get_calls ---
 
 
-class TestDebuggerGetCallsLocal:
+class TestDebuggerGetCalls:
     @pytest.mark.trace_server
     def test_get_calls_not_found_raises_error(self, client) -> None:
         """Test that getting calls for unknown callable raises KeyError."""
-        debugger = Debugger(datastore=LocalDatastore())
+        debugger = Debugger()
 
         with pytest.raises(KeyError, match="nonexistent"):
             debugger.get_calls("nonexistent")
@@ -416,74 +415,7 @@ class TestDebuggerGetJsonSchema:
             debugger.get_json_schema("nonexistent")
 
 
-# --- Tests for Datastore implementations ---
-
-
-class TestLocalDatastore:
-    def test_add_and_get_spans(self) -> None:
-        """Test adding and retrieving spans from LocalDatastore."""
-        datastore = LocalDatastore()
-        span = Span(
-            name="test",
-            start_time_unix_nano=1000.0,
-            end_time_unix_nano=2000.0,
-            inputs={"a": 1},
-            output=42,
-            error=None,
-        )
-
-        datastore.add_span("test_callable", span)
-        spans = datastore.get_spans("test_callable")
-
-        assert len(spans) == 1
-        assert spans[0].name == "test"
-        assert spans[0].output == 42
-
-    def test_clear_spans(self) -> None:
-        """Test clearing spans from LocalDatastore."""
-        datastore = LocalDatastore()
-        span = Span(
-            name="test",
-            start_time_unix_nano=1000.0,
-            end_time_unix_nano=2000.0,
-            inputs={"a": 1},
-            output=42,
-            error=None,
-        )
-
-        datastore.add_span("test_callable", span)
-        datastore.clear_spans("test_callable")
-        spans = datastore.get_spans("test_callable")
-
-        assert len(spans) == 0
-
-    def test_spans_isolated_per_callable(self) -> None:
-        """Test that spans are isolated per callable."""
-        datastore = LocalDatastore()
-        span1 = Span(
-            name="test1",
-            start_time_unix_nano=1000.0,
-            end_time_unix_nano=2000.0,
-            inputs={},
-            output=1,
-            error=None,
-        )
-        span2 = Span(
-            name="test2",
-            start_time_unix_nano=1000.0,
-            end_time_unix_nano=2000.0,
-            inputs={},
-            output=2,
-            error=None,
-        )
-
-        datastore.add_span("callable1", span1)
-        datastore.add_span("callable2", span2)
-
-        assert len(datastore.get_spans("callable1")) == 1
-        assert len(datastore.get_spans("callable2")) == 1
-        assert datastore.get_spans("callable1")[0].output == 1
-        assert datastore.get_spans("callable2")[0].output == 2
+# --- Tests for WeaveDatastore ---
 
 
 class TestWeaveDatastore:

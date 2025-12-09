@@ -7,7 +7,6 @@ Architecture:
 """
 
 from abc import ABC, abstractmethod
-from collections import defaultdict
 from collections.abc import Callable
 from typing import Any
 
@@ -77,29 +76,6 @@ class Datastore(ABC):
             callable_name: The name of the callable.
         """
         pass
-
-
-class LocalDatastore(Datastore):
-    """In-memory datastore implementation.
-
-    Stores spans in a local dictionary. Useful for testing or when
-    weave persistence is not needed.
-    """
-
-    def __init__(self) -> None:
-        self._spans: dict[str, list[Span]] = defaultdict(list)
-
-    def add_span(self, callable_name: str, span: Span) -> None:
-        """Store a span in memory."""
-        self._spans[callable_name].append(span)
-
-    def get_spans(self, callable_name: str, op: Op | None = None) -> list[Span]:
-        """Retrieve spans from memory."""
-        return self._spans[callable_name]
-
-    def clear_spans(self, callable_name: str) -> None:
-        """Clear spans from memory."""
-        self._spans[callable_name] = []
 
 
 class WeaveDatastore(Datastore):
