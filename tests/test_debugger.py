@@ -1,5 +1,7 @@
 """Tests for the weave.trace.debugger.debug module."""
 
+import datetime
+
 import pytest
 
 import weave
@@ -7,10 +9,9 @@ from weave.trace.debugger.debug import (
     CallableInfo,
     Debugger,
     DebuggerServer,
-    Span,
     _derive_callable_name,
-    _safe_serialize_value,
 )
+from weave.trace_server.trace_server_interface import CallSchema
 
 # --- Test fixtures and helper functions ---
 
@@ -49,48 +50,6 @@ class TestDeriveCallableName:
         """Test that _derive_callable_name works with lambda functions."""
         my_lambda = lambda x: x * 2
         assert _derive_callable_name(my_lambda) == "<lambda>"
-
-
-# --- Tests for _safe_serialize_value ---
-
-
-class TestSafeSerializeValue:
-    def test_serializes_primitives(self) -> None:
-        """Test serialization of primitive types."""
-        assert _safe_serialize_value("hello") == "hello"
-        assert _safe_serialize_value(42) == 42
-        assert _safe_serialize_value(3.14) == 3.14
-        assert _safe_serialize_value(True) is True
-        assert _safe_serialize_value(False) is False
-
-    def test_serializes_lists(self) -> None:
-        """Test serialization of lists."""
-        assert _safe_serialize_value([1, 2, 3]) == [1, 2, 3]
-        assert _safe_serialize_value(["a", "b"]) == ["a", "b"]
-
-    def test_serializes_tuples(self) -> None:
-        """Test serialization of tuples (converted to lists)."""
-        assert _safe_serialize_value((1, 2, 3)) == [1, 2, 3]
-
-    def test_serializes_dicts(self) -> None:
-        """Test serialization of dictionaries."""
-        assert _safe_serialize_value({"a": 1, "b": 2}) == {"a": 1, "b": 2}
-
-    def test_serializes_nested_structures(self) -> None:
-        """Test serialization of nested data structures."""
-        nested = {"list": [1, 2, {"inner": "value"}], "tuple": (3, 4)}
-        expected = {"list": [1, 2, {"inner": "value"}], "tuple": [3, 4]}
-        assert _safe_serialize_value(nested) == expected
-
-    def test_serializes_custom_objects_to_string(self) -> None:
-        """Test that custom objects are converted to their string representation."""
-
-        class CustomObj:
-            def __str__(self) -> str:
-                return "CustomObj()"
-
-        obj = CustomObj()
-        assert _safe_serialize_value(obj) == "CustomObj()"
 
 
 # --- Tests for Debugger.add_callable ---
@@ -220,54 +179,65 @@ class TestDebuggerErrorHandling:
             debugger.invoke_callable(ref, {})
 
 
-# --- Tests for Span model ---
+# --- Tests for CallSchema model ---
 
 
-class TestSpanModel:
-    def test_span_creation(self) -> None:
-        """Test creating a Span with all fields."""
-        span = Span(
-            name="test",
-            start_time_unix_nano=1000.0,
-            end_time_unix_nano=2000.0,
+class TestCallSchemaModel:
+    def test_call_schema_creation(self) -> None:
+        """Test creating a CallSchema with required fields."""
+        now = datetime.datetime.now()
+        call = CallSchema(
+            id="call-123",
+            project_id="test-project",
+            op_name="test_op",
+            trace_id="trace-456",
+            started_at=now,
+            attributes={},
             inputs={"a": 1},
             output=42,
-            error=None,
         )
 
-        assert span.name == "test"
-        assert span.start_time_unix_nano == 1000.0
-        assert span.end_time_unix_nano == 2000.0
-        assert span.inputs == {"a": 1}
-        assert span.output == 42
-        assert span.error is None
+        assert call.id == "call-123"
+        assert call.project_id == "test-project"
+        assert call.op_name == "test_op"
+        assert call.trace_id == "trace-456"
+        assert call.inputs == {"a": 1}
+        assert call.output == 42
+        assert call.exception is None
 
-    def test_span_with_error(self) -> None:
-        """Test creating a Span with an error."""
-        span = Span(
-            name="test",
-            start_time_unix_nano=1000.0,
-            end_time_unix_nano=2000.0,
+    def test_call_schema_with_exception(self) -> None:
+        """Test creating a CallSchema with an exception."""
+        now = datetime.datetime.now()
+        call = CallSchema(
+            id="call-123",
+            project_id="test-project",
+            op_name="test_op",
+            trace_id="trace-456",
+            started_at=now,
+            attributes={},
             inputs={},
             output=None,
-            error="Something went wrong",
+            exception="Something went wrong",
         )
 
-        assert span.error == "Something went wrong"
+        assert call.exception == "Something went wrong"
 
-    def test_span_with_weave_call_ref(self) -> None:
-        """Test creating a Span with a weave call ref."""
-        span = Span(
-            name="test",
-            start_time_unix_nano=1000.0,
-            end_time_unix_nano=2000.0,
+    def test_call_schema_with_parent(self) -> None:
+        """Test creating a CallSchema with a parent call."""
+        now = datetime.datetime.now()
+        call = CallSchema(
+            id="call-123",
+            project_id="test-project",
+            op_name="test_op",
+            trace_id="trace-456",
+            parent_id="parent-789",
+            started_at=now,
+            attributes={},
             inputs={"a": 1},
             output=42,
-            error=None,
-            weave_call_ref="weave:///entity/project/call/abc123",
         )
 
-        assert span.weave_call_ref == "weave:///entity/project/call/abc123"
+        assert call.parent_id == "parent-789"
 
 
 # --- Tests for Op.get_input_json_schema ---
@@ -448,15 +418,14 @@ class TestDebuggerWeaveIntegration:
         calls = debugger.get_calls(ref)
         assert len(calls) >= 1  # At least our call
 
-        # Find our call
+        # Find our call (CallSchema uses inputs dict directly)
         our_call = next(
             (c for c in calls if c.inputs.get("a") == 3.0 and c.inputs.get("b") == 5.0),
             None,
         )
         assert our_call is not None
         assert our_call.output == 8.0
-        assert our_call.weave_call_ref is not None
-        assert our_call.weave_call_ref.startswith("weave:///")
+        assert our_call.id is not None  # CallSchema has id field
 
     @pytest.mark.trace_server
     def test_regular_function_auto_wrapped_as_op(self, client) -> None:
@@ -496,9 +465,9 @@ class TestDebuggerWeaveIntegration:
         calls = debugger.get_calls(ref)
         assert len(calls) >= 3
 
-        # Each call should have a unique weave_call_ref
-        call_refs = [c.weave_call_ref for c in calls if c.weave_call_ref]
-        assert len(set(call_refs)) >= 3  # All refs should be unique
+        # Each call should have a unique id
+        call_ids = [c.id for c in calls if c.id]
+        assert len(set(call_ids)) >= 3  # All ids should be unique
 
 
 # --- Integration-style tests ---

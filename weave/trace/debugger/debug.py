@@ -18,6 +18,7 @@ from pydantic import BaseModel
 import weave
 from weave.trace.context.weave_client_context import require_weave_client
 from weave.trace.op import Op, is_op, op
+from weave.trace_server.trace_server_interface import CallSchema
 
 
 # =============================================================================
@@ -30,18 +31,6 @@ class CallableInfo(BaseModel):
 
     ref: str
     name: str
-
-
-class Span(BaseModel):
-    """Represents a single execution span of a callable."""
-
-    name: str
-    start_time_unix_nano: float
-    end_time_unix_nano: float
-    inputs: dict[str, Any]
-    output: Any
-    error: str | None = None
-    weave_call_ref: str | None = None
 
 
 # =============================================================================
@@ -174,14 +163,14 @@ class Debugger:
         # All callables are guaranteed to be ops (converted on add_callable)
         return self._callables[ref_uri].get_input_json_schema()
 
-    def get_calls(self, ref_uri: str) -> list[Span]:
-        """Get all calls (spans) for a given callable.
+    def get_calls(self, ref_uri: str) -> list[CallSchema]:
+        """Get all calls for a given callable.
 
         Args:
             ref_uri: The ref URI of the callable.
 
         Returns:
-            List of spans representing call history.
+            List of CallSchema objects representing call history.
 
         Raises:
             KeyError: If the callable is not found.
@@ -190,8 +179,7 @@ class Debugger:
             raise KeyError(f"Callable with ref '{ref_uri}' not found")
 
         callable_op = self._callables[ref_uri]
-        name = self._names[ref_uri]
-        return _get_spans_for_op(callable_op, name)
+        return _get_calls_for_op(callable_op)
 
     def start(self, host: str = "0.0.0.0", port: int = 8000) -> None:
         """Start the debugger HTTP server.
@@ -278,7 +266,7 @@ class DebuggerServer:
                 raise HTTPException(status_code=404, detail=str(e))
 
         @app.get("/calls")
-        async def get_calls(ref: str) -> list[Span]:
+        async def get_calls(ref: str) -> list[CallSchema]:
             try:
                 return self._debugger.get_calls(ref)
             except KeyError as e:
@@ -306,58 +294,46 @@ def _derive_callable_name(callable: Callable[..., Any]) -> str:
     return callable.__name__
 
 
-def _get_spans_for_op(callable_op: Op, name: str) -> list[Span]:
+def _get_calls_for_op(callable_op: Op) -> list[CallSchema]:
     """Query Weave for call history of an op.
 
     Args:
         callable_op: The op to query calls for.
-        name: The human-readable name of the callable.
 
     Returns:
-        List of spans from Weave's call history.
+        List of CallSchema objects from Weave's call history.
     """
-    spans = []
+    calls = []
     try:
         for call in callable_op.calls():
-            span = Span(
-                name=name,
-                start_time_unix_nano=call.started_at.timestamp() if call.started_at else 0,
-                end_time_unix_nano=call.ended_at.timestamp() if call.ended_at else 0,
-                inputs=_safe_serialize_dict(call.inputs),
-                output=_safe_serialize_value(call.output),
-                error=call.exception,
-                weave_call_ref=call.ref.uri() if call.id else None,
+            # CallSchema requires id and project_id - skip if missing
+            if call.id is None:
+                continue
+
+            call_schema = CallSchema(
+                id=call.id,
+                project_id=call.project_id,
+                op_name=call.op_name,
+                display_name=call.display_name,
+                trace_id=call.trace_id,
+                parent_id=call.parent_id,
+                thread_id=call.thread_id,
+                turn_id=call.turn_id,
+                started_at=call.started_at,
+                attributes=call.attributes or {},
+                inputs=call.inputs,
+                ended_at=call.ended_at,
+                exception=call.exception,
+                output=call.output,
+                summary=call.summary,
+                wb_run_id=call.wb_run_id,
+                wb_run_step=call.wb_run_step,
+                wb_run_step_end=call.wb_run_step_end,
+                deleted_at=call.deleted_at,
             )
-            spans.append(span)
+            calls.append(call_schema)
     except Exception:
         # If querying fails, return empty list
         pass
 
-    return spans
-
-
-def _safe_serialize_value(value: Any) -> Any:
-    """Safely serialize a value for storage in a span.
-
-    Args:
-        value: The value to serialize.
-
-    Returns:
-        A JSON-serializable representation of the value.
-    """
-    if value is None or isinstance(value, (str, int, float, bool)):
-        return value
-    elif isinstance(value, (list, tuple)):
-        return [_safe_serialize_value(item) for item in value]
-    elif isinstance(value, dict):
-        return {str(k): _safe_serialize_value(v) for k, v in value.items()}
-    else:
-        try:
-            return str(value)
-        except Exception:
-            return "<<SERIALIZATION_ERROR>>"
-
-
-def _safe_serialize_dict(d: dict[str, Any]) -> dict[str, Any]:
-    """Safely serialize a dictionary for storage in a span."""
-    return {k: _safe_serialize_value(v) for k, v in d.items()}
+    return calls

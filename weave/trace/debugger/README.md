@@ -4,7 +4,7 @@ A tool that exposes local Python functions as a traceable HTTP service with a we
 
 ## Project Status
 
-**Current State:** Full Weave integration with layered architecture
+**Current State:** Full Weave integration with ref-based callable identification
 
 ### Architecture
 
@@ -12,7 +12,7 @@ A tool that exposes local Python functions as a traceable HTTP service with a we
 ┌─────────────────────────────────────────────────────────────┐
 │                    DebuggerServer                           │
 │                   (FastAPI HTTP Layer)                      │
-│  GET /callables, POST /callables/{name}, GET /calls, etc.   │
+│  GET /callables, POST /invoke?ref=..., GET /calls, etc.     │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
@@ -20,12 +20,13 @@ A tool that exposes local Python functions as a traceable HTTP service with a we
 │                       Debugger                              │
 │                 (Core Business Logic)                       │
 │  add_callable(), invoke_callable(), get_calls(), etc.       │
+│      Callables identified by stable weave ref URI           │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                    WeaveDatastore                           │
-│              (Weave trace server backend)                   │
+│                    Weave Trace Server                       │
+│                   (Call history storage)                    │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -34,17 +35,17 @@ A tool that exposes local Python functions as a traceable HTTP service with a we
 1. **Weave Required** - `weave.init()` must be called before creating a Debugger
 2. **Auto Op Wrapping** - Non-op functions are automatically wrapped with `@weave.op`
 3. **Auto Publishing** - Ops are `weave.publish()`ed when added for persistence
-4. **Weave as Datastore** - Call history is queried from Weave's trace server
-5. **No Local State** - Uses Weave as the single source of truth
+4. **Ref-based Identification** - Callables are identified by stable weave ref URIs
+5. **Weave as Storage** - Call history is queried from Weave's trace server
 
 ### API Endpoints
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/callables` | List all registered callable names |
-| `POST` | `/callables/{callable_name}` | Invoke a callable (JSON body: `{"a": 1, "b": 2}`) |
-| `GET` | `/callables/{callable_name}/json_schema` | Get input JSON schema |
-| `GET` | `/callables/{callable_name}/calls` | Get call history from Weave |
+| `GET` | `/callables` | List all registered callables (refs and names) |
+| `POST` | `/invoke?ref={ref}` | Invoke a callable by ref (JSON body: `{"a": 1, "b": 2}`) |
+| `GET` | `/schema?ref={ref}` | Get input JSON schema for a callable |
+| `GET` | `/calls?ref={ref}` | Get call history from Weave |
 | `GET` | `/openapi.json` | OpenAPI spec (FastAPI built-in) |
 
 ### Usage Example
@@ -62,24 +63,43 @@ def multiplier(a: float, b: float) -> float:
 weave.init("my-project")
 
 debugger = weave.Debugger()
-debugger.add_callable(adder)       # Auto-wrapped as @weave.op and published
-debugger.add_callable(multiplier)  # Auto-wrapped as @weave.op and published
+adder_ref = debugger.add_callable(adder)       # Returns ref URI
+multiplier_ref = debugger.add_callable(multiplier)
+
+# Invoke using ref
+result = debugger.invoke_callable(adder_ref, {"a": 1.0, "b": 2.0})
+
+# Or start the HTTP server
 debugger.start()  # Starts server on http://0.0.0.0:8000
 ```
 
 ### Components
 
-#### Span Model
+#### CallableInfo Model
 
 ```python
-class Span(BaseModel):
-    name: str                    # Callable name
-    start_time_unix_nano: float  # Unix timestamp
-    end_time_unix_nano: float    # Unix timestamp  
-    inputs: dict[str, Any]       # Serialized input arguments
-    output: Any                  # Return value
-    error: str | None            # Error message if failed
-    weave_call_ref: str | None   # Weave call reference URI
+class CallableInfo(BaseModel):
+    ref: str   # Weave ref URI (e.g., "weave:///entity/project/op/name:hash")
+    name: str  # Human-readable name
+```
+
+#### CallSchema (from trace_server_interface)
+
+The debugger uses the standard `CallSchema` from `weave.trace_server.trace_server_interface` for call history. Key fields include:
+
+```python
+class CallSchema(BaseModel):
+    id: str                      # Call ID
+    project_id: str              # Project ID
+    op_name: str                 # Name of the op
+    trace_id: str                # Trace ID
+    parent_id: str | None        # Parent call ID (for nested calls)
+    started_at: datetime         # Start timestamp
+    ended_at: datetime | None    # End timestamp
+    inputs: dict[str, Any]       # Input arguments
+    output: Any | None           # Return value
+    exception: str | None        # Error message if failed
+    # ... and more fields
 ```
 
 ## Running Tests
@@ -93,7 +113,7 @@ nox --no-install -e "tests-3.12(shard='trace')" -- tests/test_debugger.py --trac
 
 ```
 weave/trace/debugger/
-├── debug.py          # Main implementation with Debugger, DebuggerServer, Datastores
+├── debug.py          # Main implementation with Debugger and DebuggerServer
 └── README.md         # This file
 
 tests/
