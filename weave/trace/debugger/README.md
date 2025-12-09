@@ -119,13 +119,70 @@ nox --no-install -e "tests-3.12(shard='trace')" -- tests/test_debugger.py --trac
 
 ```
 weave/trace/debugger/
-├── debug.py          # Main implementation with Debugger and DebuggerServer
+├── __init__.py       # Package exports
+├── debug.py          # Core Debugger and DebuggerServer
+├── deployable.py     # DeployableDebugger for local + Modal
 └── README.md         # This file
 
 tests/
 ├── test_debugger.py  # Comprehensive pytest suite
-└── live_debugger.py  # Interactive demo script
+└── live_debugger.py  # Interactive demo script (deployable to Modal!)
 ```
+
+## Modal Deployment
+
+The debugger can be deployed to Modal with zero code changes! Use `create_debugger()` to get a debugger that works both locally and on Modal:
+
+```python
+import weave
+from weave.trace.debugger import create_debugger
+
+@weave.op
+def my_op(x: int) -> int:
+    return x * 2
+
+# Create deployable debugger - works for both local and Modal!
+debugger, app = create_debugger(
+    ops=[my_op],
+    weave_project="my-project",
+    app_name="my-debugger",
+    modal_secrets=["wandb-api-key", "openai-secret"],  # Optional
+)
+
+# Same code works for both:
+# - Local: python your_file.py
+# - Modal: modal deploy your_file.py
+if __name__ == "__main__":
+    debugger.serve()
+```
+
+### Modal Deployment Options
+
+```python
+debugger, app = create_debugger(
+    ops=[...],
+    weave_project="my-project",
+    app_name="my-debugger",
+    
+    # Local server config
+    host="0.0.0.0",
+    port=8000,
+    
+    # Modal-specific config
+    modal_image=custom_image,           # Custom Modal image
+    modal_secrets=["secret-name"],      # Modal secrets
+    modal_gpu="T4",                     # GPU type (T4, A10G, etc.)
+)
+```
+
+### Deploying to Modal
+
+1. Install Modal: `pip install modal`
+2. Authenticate: `modal token new`
+3. Deploy: `modal deploy your_debugger.py`
+
+The deployed endpoint will be available at a URL like:
+`https://your-username--my-debugger-serve-debugger.modal.run`
 
 ## Live Demo
 

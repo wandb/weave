@@ -7,14 +7,18 @@ This example showcases a multi-op, multi-step LLM application that can:
 3. Review and "roast" code (humorously)
 4. Create a full tutorial on any topic
 
-Run with: python tests/live_debugger.py
-Then open the debugger UI to interact with these ops!
+Run locally:  python tests/live_debugger.py
+Deploy to Modal: modal deploy tests/live_debugger.py
+
+The same code works for both - no changes needed!
 """
 
 import weave
 from openai import OpenAI
 from pydantic import BaseModel, Field
 from typing import Literal
+
+from weave.trace.debugger import create_debugger
 
 # Initialize OpenAI client
 client = OpenAI()
@@ -63,6 +67,11 @@ Available modes:
 - "tutorial": Requests for tutorials, learning paths, or comprehensive guides on topics
 
 Respond with ONLY the mode name, nothing else. Just one word: expert, code, roast, or tutorial."""
+
+
+# =============================================================================
+# Define all the ops
+# =============================================================================
 
 
 @weave.op()
@@ -297,29 +306,78 @@ def multiplier(a: float, b: float) -> float:
     """Multiply two numbers (simple demo op)."""
     return a * b
 
+
 @weave.op()
 def line(m: float, b: float, x: float) -> float:
-    """Multiply two numbers (simple demo op)."""
+    """Calculate y = mx + b (linear function)."""
     return adder(multiplier(m, x), b)
 
 
 @weave.op()
 def matrix_multiplier(m: list[list[float]], x: list[float]) -> list[float]:
-    """Multiply two matrices."""
+    """Multiply a matrix by a vector."""
     return [sum(m[i][j] * x[j] for j in range(len(x))) for i in range(len(m))]
 
+
 class StoryConfig(BaseModel):
+    """Configuration for story generation."""
     n: int = Field(..., ge=1, le=10, description="The number of stories to generate")
     story_type: Literal["short", "medium", "long"] = Field(..., description="The type of story to generate")
 
+
 @weave.op()
 def tell_me_n_stories(config: StoryConfig) -> list[str]:
-    return [f"Story {i}" for i in range(config.n)]
+    """Generate n placeholder stories based on config."""
+    return [f"Story {i} ({config.story_type})" for i in range(config.n)]
 
+
+# =============================================================================
+# Create deployable debugger - works for both local and Modal!
+# =============================================================================
+
+# List all ops to expose
+ALL_OPS = [
+    # Main chat interface
+    weave_wizard_chat,
+    # Specialist ops
+    ask_weave_expert,
+    generate_weave_code,
+    roast_my_code,
+    plan_tutorial,
+    create_full_tutorial,
+    # Internal ops
+    classify_intent,
+    generate_tutorial_step,
+    # Simple test ops
+    adder,
+    multiplier,
+    line,
+    matrix_multiplier,
+    tell_me_n_stories,
+]
+
+# Create the deployable debugger
+# This works for BOTH local and Modal deployment!
+debugger, app = create_debugger(
+    ops=ALL_OPS,
+    weave_project="weave-wizard-hackweek",
+    app_name="weave-wizard",
+    modal_secrets=["wandb-api-key", "openai-secret"],  # Modal secrets for deployment
+)
+
+
+# =============================================================================
+# Entry point - same code runs locally or deploys to Modal
+# =============================================================================
 
 if __name__ == "__main__":
     print("🧙‍♂️ Starting the Weave Wizard Debugger...")
     print("=" * 60)
+    print()
+    print("This debugger can run two ways:")
+    print("  • Local:  python tests/live_debugger.py")
+    print("  • Modal:  modal deploy tests/live_debugger.py")
+    print()
     print("Available ops:")
     print()
     print("  🌟 MAIN INTERFACE (auto-routes based on your message):")
@@ -337,42 +395,18 @@ if __name__ == "__main__":
     print("     generate_tutorial_step - Single tutorial step")
     print()
     print("  ➕ SIMPLE TEST OPS:")
-    print("     adder, multiplier  - Basic math for testing")
+    print("     adder, multiplier, line, matrix_multiplier")
+    print("     tell_me_n_stories")
     print("=" * 60)
-    
-    weave.init("weave-wizard-hackweek-2")
-    
-    debugger = weave.Debugger()
-    
-    # Main chat interface (recommended!)
-    debugger.add_op(weave_wizard_chat)
-    
-    # # Specialist ops
-    # debugger.add_op(ask_weave_expert)
-    # debugger.add_op(generate_weave_code)
-    # debugger.add_op(roast_my_code)
-    # debugger.add_op(plan_tutorial)
-    # debugger.add_op(create_full_tutorial)
-    
-    # # Internal/helper ops
-    # debugger.add_op(classify_intent)
-    # debugger.add_op(generate_tutorial_step)
-    
-    # # Simple math ops for basic testing
-    # debugger.add_op(adder)
-    # debugger.add_op(multiplier)
-    # debugger.add_op(matrix_multiplier)
-    # debugger.add_op(line)
-
-
-    # debugger.add_op(tell_me_n_stories)
-    
-    print("\n✨ Debugger starting on http://0.0.0.0:8000")
-    print("\nTry weave_wizard_chat with messages like:")
+    print()
+    print("✨ Starting local server on http://0.0.0.0:8000")
+    print()
+    print("Try weave_wizard_chat with messages like:")
     print('  • "How do I trace async functions in Weave?"')
     print('  • "Write a RAG pipeline with Weave tracing"')
     print('  • "Roast this code: def f(x): return x+1"')
     print('  • "Create a tutorial on building LLM apps"')
     print()
     
-    debugger.start()
+    # This runs locally - Modal deployment uses the `app` variable directly
+    debugger.serve()
