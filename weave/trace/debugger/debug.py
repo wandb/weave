@@ -6,8 +6,6 @@ Architecture:
     3. DebuggerServer (FastAPI HTTP layer)
 """
 
-import inspect
-import time
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from collections.abc import Callable
@@ -16,10 +14,10 @@ from typing import Any
 import uvicorn
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, TypeAdapter
+from pydantic import BaseModel
 
 import weave
-from weave.trace.context.weave_client_context import get_weave_client, require_weave_client
+from weave.trace.context.weave_client_context import require_weave_client
 from weave.trace.op import Op, is_op, op
 
 
@@ -189,7 +187,7 @@ class Debugger:
         return self._callables
 
     def add_callable(
-        self, callable: Callable[..., Any], *, name: str | None = None
+        self, callable: Callable[..., Any] | Op, *, name: str | None = None
     ) -> None:
         """Add a callable to be exposed by the debugger.
 
@@ -198,7 +196,7 @@ class Debugger:
         2. Published to weave for persistence
 
         Args:
-            callable: The function to add.
+            callable: The function or Op to add.
             name: Optional custom name. If not provided, uses the function's __name__.
 
         Raises:
@@ -211,13 +209,16 @@ class Debugger:
             raise ValueError(f"Callable with name {name} already exists")
 
         # Convert to op if not already
+        callable_op: Op
         if not is_op(callable):
-            callable = op(callable, name=name)
+            callable_op = op(callable, name=name)
+        else:
+            callable_op = callable
 
         # Publish the op to weave
-        weave.publish(callable, name=name)
+        weave.publish(callable_op, name=name)
 
-        self._callables[name] = callable
+        self._callables[name] = callable_op
 
     def list_callables(self) -> list[str]:
         """List all registered callable names."""
@@ -266,8 +267,8 @@ class Debugger:
         if callable_name not in self._callables:
             raise KeyError(f"Callable '{callable_name}' not found")
 
-        callable = self._callables[callable_name]
-        return _get_callable_input_json_schema(callable)
+        # All callables are guaranteed to be ops (converted on add_callable)
+        return self._callables[callable_name].get_input_json_schema()
 
     def get_calls(self, callable_name: str) -> list[Span]:
         """Get all calls (spans) for a given callable.
@@ -425,104 +426,3 @@ def _safe_serialize_value(value: Any) -> Any:
 def _safe_serialize_dict(d: dict[str, Any]) -> dict[str, Any]:
     """Safely serialize a dictionary for storage in a span."""
     return {k: _safe_serialize_value(v) for k, v in d.items()}
-
-
-def _get_callable_input_json_schema(callable: Callable[..., Any]) -> dict[str, Any]:
-    """Generate a JSON schema for a callable's input parameters.
-
-    Uses Pydantic's TypeAdapter for robust type-to-JSON-schema conversion.
-
-    Args:
-        callable: The function to generate schema for.
-
-    Returns:
-        A JSON schema object with properties for each parameter.
-
-    Examples:
-        >>> def my_func(a: int, b: str = "default") -> float:
-        ...     pass
-        >>> schema = _get_callable_input_json_schema(my_func)
-        >>> schema["properties"]["a"]["type"]
-        'integer'
-    """
-    # For ops, get the underlying function
-    if is_op(callable):
-        callable = callable.resolve_fn
-
-    sig = inspect.signature(callable)
-    type_hints: dict[str, Any] = {}
-    try:
-        type_hints = inspect.get_annotations(callable)
-    except Exception:
-        pass
-
-    properties: dict[str, Any] = {}
-    required: list[str] = []
-    defs: dict[str, Any] = {}
-
-    for param_name, param in sig.parameters.items():
-        if param_name in ("self", "cls"):
-            continue
-
-        annotation = type_hints.get(param_name)
-
-        if annotation is not None:
-            # Use Pydantic's TypeAdapter to generate the JSON schema
-            adapter = TypeAdapter(annotation)
-            param_schema = adapter.json_schema()
-
-            # Extract $defs if present and merge into our definitions
-            if "$defs" in param_schema:
-                defs.update(param_schema.pop("$defs"))
-        else:
-            # No type annotation - allow any type
-            param_schema = {}
-
-        # Add default value if present
-        if param.default is not inspect.Parameter.empty:
-            param_schema["default"] = _serialize_default(param.default)
-        else:
-            required.append(param_name)
-
-        properties[param_name] = param_schema
-
-    schema: dict[str, Any] = {
-        "type": "object",
-        "properties": properties,
-    }
-
-    if required:
-        schema["required"] = required
-
-    if defs:
-        schema["$defs"] = defs
-
-    return schema
-
-
-def _serialize_default(value: Any) -> Any:
-    """Serialize a default value for JSON schema.
-
-    Args:
-        value: The default value to serialize.
-
-    Returns:
-        A JSON-serializable representation of the default value.
-    """
-    if value is None or isinstance(value, (str, int, float, bool)):
-        return value
-    if isinstance(value, (list, tuple)):
-        return [_serialize_default(v) for v in value]
-    if isinstance(value, dict):
-        return {k: _serialize_default(v) for k, v in value.items()}
-    return str(value)
-
-
-# =============================================================================
-# Backwards Compatibility Exports
-# =============================================================================
-
-# Export commonly used items for backwards compatibility
-derive_callable_name = _derive_callable_name
-safe_serialize_input_value = _safe_serialize_value
-get_callable_input_json_schema = _get_callable_input_json_schema

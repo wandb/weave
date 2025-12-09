@@ -607,6 +607,22 @@ def save_instance(obj: Op, artifact: MemTraceFilesArtifact, name: str) -> None:
         code_block = "\n".join(code)
         f.write(f"{import_block}\n\n{code_block}")
 
+    # Generate JSON schemas for input/output types
+    try:
+        input_schema = obj.get_input_json_schema()
+    except Exception:
+        input_schema = None
+
+    try:
+        output_schema = obj.get_output_json_schema()
+    except Exception:
+        output_schema = None
+
+    return {
+        "input_type_json_schema": input_schema,
+        "output_type_json_schema": output_schema,
+    }
+
 
 def load_instance(
     artifact: MemTraceFilesArtifact,

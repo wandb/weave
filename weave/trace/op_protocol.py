@@ -85,6 +85,10 @@ class Op(Protocol[P, R]):
 
     tracing_sample_rate: float
 
+    # Methods for getting JSON schemas of input/output types
+    get_input_json_schema: Callable[[], dict[str, Any]]
+    get_output_json_schema: Callable[[], dict[str, Any]]
+
 
 @dataclass
 class ProcessedInputs:

@@ -10,7 +10,6 @@ from weave.trace.debugger.debug import (
     Span,
     WeaveDatastore,
     _derive_callable_name,
-    _get_callable_input_json_schema,
     _safe_serialize_value,
 )
 
@@ -275,17 +274,20 @@ class TestSpanModel:
         assert span.weave_call_ref == "weave:///entity/project/call/abc123"
 
 
-# --- Tests for _get_callable_input_json_schema ---
+# --- Tests for Op.get_input_json_schema ---
 
 
-class TestGetCallableInputJsonSchema:
+class TestOpGetInputJsonSchema:
+    """Test the Op.get_input_json_schema() method."""
+
     def test_basic_types(self) -> None:
         """Test schema generation for basic Python types."""
 
+        @weave.op
         def func(a: int, b: str, c: float, d: bool) -> None:
             pass
 
-        schema = _get_callable_input_json_schema(func)
+        schema = func.get_input_json_schema()
 
         assert schema["type"] == "object"
         assert schema["properties"]["a"]["type"] == "integer"
@@ -297,10 +299,11 @@ class TestGetCallableInputJsonSchema:
     def test_with_defaults(self) -> None:
         """Test that default values are captured in schema."""
 
+        @weave.op
         def func(a: int, b: str = "default", c: float = 3.14) -> None:
             pass
 
-        schema = _get_callable_input_json_schema(func)
+        schema = func.get_input_json_schema()
 
         assert schema["required"] == ["a"]
         assert schema["properties"]["b"]["default"] == "default"
@@ -309,10 +312,11 @@ class TestGetCallableInputJsonSchema:
     def test_optional_types(self) -> None:
         """Test schema generation for Optional types (Pydantic uses anyOf)."""
 
+        @weave.op
         def func(a: int | None, b: str | None = None) -> None:
             pass
 
-        schema = _get_callable_input_json_schema(func)
+        schema = func.get_input_json_schema()
 
         # Pydantic represents Optional types as anyOf
         assert schema["properties"]["a"]["anyOf"] == [
@@ -327,10 +331,11 @@ class TestGetCallableInputJsonSchema:
     def test_list_types(self) -> None:
         """Test schema generation for list types."""
 
+        @weave.op
         def func(a: list[int], b: list[str]) -> None:
             pass
 
-        schema = _get_callable_input_json_schema(func)
+        schema = func.get_input_json_schema()
 
         assert schema["properties"]["a"]["type"] == "array"
         assert schema["properties"]["a"]["items"]["type"] == "integer"
@@ -340,10 +345,11 @@ class TestGetCallableInputJsonSchema:
     def test_dict_types(self) -> None:
         """Test schema generation for dict types."""
 
+        @weave.op
         def func(a: dict[str, int]) -> None:
             pass
 
-        schema = _get_callable_input_json_schema(func)
+        schema = func.get_input_json_schema()
 
         assert schema["properties"]["a"]["type"] == "object"
         assert schema["properties"]["a"]["additionalProperties"]["type"] == "integer"
@@ -351,10 +357,11 @@ class TestGetCallableInputJsonSchema:
     def test_no_annotations(self) -> None:
         """Test schema generation for functions without type annotations."""
 
+        @weave.op
         def func(a, b):
             pass
 
-        schema = _get_callable_input_json_schema(func)
+        schema = func.get_input_json_schema()
 
         assert schema["type"] == "object"
         assert "a" in schema["properties"]
@@ -363,14 +370,25 @@ class TestGetCallableInputJsonSchema:
         assert schema["properties"]["a"] == {}
         assert schema["properties"]["b"] == {}
 
-    def test_existing_functions(self) -> None:
-        """Test schema generation for the existing test functions."""
-        schema = _get_callable_input_json_schema(adder)
+    def test_output_schema(self) -> None:
+        """Test the get_output_json_schema method."""
 
-        assert schema["type"] == "object"
-        assert schema["properties"]["a"]["type"] == "number"
-        assert schema["properties"]["b"]["type"] == "number"
-        assert set(schema["required"]) == {"a", "b"}
+        @weave.op
+        def add(a: int, b: int) -> int:
+            return a + b
+
+        schema = add.get_output_json_schema()
+        assert schema["type"] == "integer"
+
+    def test_output_schema_no_return_type(self) -> None:
+        """Test output schema when no return type annotation."""
+
+        @weave.op
+        def func(a: int):
+            return a
+
+        schema = func.get_output_json_schema()
+        assert schema == {}
 
 
 # --- Tests for Debugger.get_json_schema ---
