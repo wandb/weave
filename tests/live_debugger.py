@@ -13,6 +13,8 @@ Then open the debugger UI to interact with these ops!
 
 import weave
 from openai import OpenAI
+from pydantic import BaseModel, Field
+from typing import Literal
 
 # Initialize OpenAI client
 client = OpenAI()
@@ -295,11 +297,25 @@ def multiplier(a: float, b: float) -> float:
     """Multiply two numbers (simple demo op)."""
     return a * b
 
+@weave.op()
+def line(m: float, b: float, x: float) -> float:
+    """Multiply two numbers (simple demo op)."""
+    return adder(multiplier(m, x), b)
+
 
 @weave.op()
 def matrix_multiplier(m: list[list[float]], x: list[float]) -> list[float]:
     """Multiply two matrices."""
     return [sum(m[i][j] * x[j] for j in range(len(x))) for i in range(len(m))]
+
+class StoryConfig(BaseModel):
+    n: int = Field(..., ge=1, le=10, description="The number of stories to generate")
+    story_type: Literal["short", "medium", "long"] = Field(..., description="The type of story to generate")
+
+@weave.op()
+def tell_me_n_stories(config: StoryConfig) -> list[str]:
+    return [f"Story {i}" for i in range(config.n)]
+
 
 if __name__ == "__main__":
     print("🧙‍♂️ Starting the Weave Wizard Debugger...")
@@ -324,7 +340,7 @@ if __name__ == "__main__":
     print("     adder, multiplier  - Basic math for testing")
     print("=" * 60)
     
-    weave.init("weave-wizard-hackweek")
+    weave.init("weave-wizard-hackweek-2")
     
     debugger = weave.Debugger()
     
@@ -346,6 +362,10 @@ if __name__ == "__main__":
     debugger.add_callable(adder)
     debugger.add_callable(multiplier)
     debugger.add_callable(matrix_multiplier)
+    debugger.add_callable(line)
+
+
+    debugger.add_callable(tell_me_n_stories)
     
     print("\n✨ Debugger starting on http://0.0.0.0:8000")
     print("\nTry weave_wizard_chat with messages like:")

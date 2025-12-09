@@ -1,17 +1,44 @@
 # Weave Debugger - Hackweek Project
 
-A tool that exposes local Python functions as a traceable HTTP service, with a dynamically-adapting UI (to be built).
+A tool that exposes local Python functions as a traceable HTTP service with a web UI for interactive debugging.
 
 ## Project Status
 
-**Current State:** Core functionality implemented and tested (36 passing tests)
+**Current State:** Full Weave integration with layered architecture
 
-### Implemented Features
+### Architecture
 
-1. **Function Registration** - Add Python callables to be exposed via HTTP
-2. **HTTP Invocation** - Call registered functions via POST with JSON inputs
-3. **JSON Schema Generation** - Auto-generate input schemas using Pydantic's `TypeAdapter`
-4. **Call Tracking** - Record all invocations as "spans" with inputs, outputs, timing, and errors
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    DebuggerServer                           │
+│                   (FastAPI HTTP Layer)                      │
+│  GET /callables, POST /callables/{name}, GET /calls, etc.   │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                       Debugger                              │
+│                 (Core Business Logic)                       │
+│  add_callable(), invoke_callable(), get_calls(), etc.       │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                      Datastore                              │
+│                  (Abstract Interface)                       │
+├─────────────────────────┬───────────────────────────────────┤
+│    LocalDatastore       │       WeaveDatastore              │
+│   (In-memory storage)   │  (Weave trace server backend)     │
+└─────────────────────────┴───────────────────────────────────┘
+```
+
+### Key Features
+
+1. **Weave Required** - `weave.init()` must be called before creating a Debugger
+2. **Auto Op Wrapping** - Non-op functions are automatically wrapped with `@weave.op`
+3. **Auto Publishing** - Ops are `weave.publish()`ed when added for persistence
+4. **Weave as Datastore** - Call history is queried from Weave's trace server
+5. **No Local State** - Uses Weave as the single source of truth
 
 ### API Endpoints
 
@@ -20,7 +47,7 @@ A tool that exposes local Python functions as a traceable HTTP service, with a d
 | `GET` | `/callables` | List all registered callable names |
 | `POST` | `/callables/{callable_name}` | Invoke a callable (JSON body: `{"a": 1, "b": 2}`) |
 | `GET` | `/callables/{callable_name}/json_schema` | Get input JSON schema |
-| `GET` | `/callables/{callable_name}/calls` | Get call history (spans) |
+| `GET` | `/callables/{callable_name}/calls` | Get call history from Weave |
 | `GET` | `/openapi.json` | OpenAPI spec (FastAPI built-in) |
 
 ### Usage Example
@@ -34,20 +61,32 @@ def adder(a: float, b: float) -> float:
 def multiplier(a: float, b: float) -> float:
     return a * b
 
+# Weave must be initialized first!
+weave.init("my-project")
+
 debugger = weave.Debugger()
-debugger.add_callable(adder)
-debugger.add_callable(multiplier)
+debugger.add_callable(adder)       # Auto-wrapped as @weave.op and published
+debugger.add_callable(multiplier)  # Auto-wrapped as @weave.op and published
 debugger.start()  # Starts server on http://0.0.0.0:8000
 ```
 
-## Architecture & Key Design Decisions
+### Components
 
-### JSON Schema Generation
-- Uses **Pydantic's `TypeAdapter`** for robust Python type → JSON Schema conversion
-- Handles complex types: `list[int]`, `dict[str, float]`, `Optional[X]`, nested types
-- Pydantic represents `Optional` types as `anyOf` (not `["type", "null"]` array)
+#### Datastore Interface
 
-### Span/Call Model
+```python
+class Datastore(ABC):
+    def add_span(self, callable_name: str, span: Span) -> None: ...
+    def get_spans(self, callable_name: str, op: Op | None = None) -> list[Span]: ...
+    def clear_spans(self, callable_name: str) -> None: ...
+```
+
+**Implementations:**
+- `LocalDatastore` - In-memory storage for testing
+- `WeaveDatastore` - Uses Weave's trace server (default)
+
+#### Span Model
+
 ```python
 class Span(BaseModel):
     name: str                    # Callable name
@@ -56,61 +95,62 @@ class Span(BaseModel):
     inputs: dict[str, Any]       # Serialized input arguments
     output: Any                  # Return value
     error: str | None            # Error message if failed
+    weave_call_ref: str | None   # Weave call reference URI
 ```
 
-### Error Handling
-- All endpoints return **404 HTTPException** for unknown callable names
-- Errors during invocation are recorded in the span AND re-raised
-- Input serialization gracefully handles non-JSON-serializable objects (converts to string)
+### Using LocalDatastore for Testing
 
-## File Structure
+```python
+from weave.trace.debugger.debug import Debugger, LocalDatastore
 
+weave.init("test-project")
+debugger = Debugger(datastore=LocalDatastore())
 ```
-weave/trace/debugger/
-├── debug.py          # Main implementation (~300 lines)
-└── README.md         # This file
-
-tests/
-├── test_debugger.py  # Comprehensive pytest suite (36 tests)
-└── live_debugger.py  # Manual testing script
-```
-
-## Key Functions
-
-- `Debugger` class - Main service class
-- `get_callable_input_json_schema(callable)` - Standalone schema generator
-- `safe_serialize_input_value(value)` - Safely serialize any value to JSON-compatible format
-- `derive_callable_name(callable)` - Extract function name from `__name__`
 
 ## Running Tests
 
 ```bash
 # From repo root
 nox --no-install -e "tests-3.12(shard='trace')" -- tests/test_debugger.py --trace-server=sqlite -v
-
-# Or directly with pytest (after activating the nox environment)
-source .nox/tests-3-12-shard-trace/bin/activate
-pytest tests/test_debugger.py -v
 ```
 
-## Future Work / TODO
+## File Structure
 
-- [ ] Integrate with Weave tracing (currently standalone spans, not connected to weave.init())
-- [ ] Build dynamic UI that adapts to callable schemas
-- [ ] Add support for async callables
-- [ ] Consider renaming `Span` to `Call` for consistency with endpoint naming
-- [ ] Add pagination for `/calls` endpoint
-- [ ] Add ability to clear call history
+```
+weave/trace/debugger/
+├── debug.py          # Main implementation with Debugger, DebuggerServer, Datastores
+└── README.md         # This file
+
+tests/
+├── test_debugger.py  # Comprehensive pytest suite
+└── live_debugger.py  # Interactive demo script
+```
+
+## Live Demo
+
+Run the Weave Wizard demo:
+
+```bash
+cd services/weave-python/weave-public
+python tests/live_debugger.py
+```
+
+This starts an interactive debugger with LLM-powered ops that demonstrate:
+- Intent classification
+- Code generation
+- Multi-step pipelines
+- All calls traced and queryable in Weave!
 
 ## Dependencies
 
 - FastAPI + Uvicorn (HTTP server)
 - Pydantic (JSON schema, data models)
-- Already part of weave's dependencies
+- Weave (tracing, persistence)
 
 ## Exported from weave
 
 The `Debugger` class is exported from the main `weave` package:
+
 ```python
 from weave.trace.debugger.debug import Debugger
 # Available as weave.Debugger

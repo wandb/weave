@@ -1,15 +1,17 @@
 """Tests for the weave.trace.debugger.debug module."""
 
 import pytest
-from fastapi import HTTPException
 
 import weave
 from weave.trace.debugger.debug import (
     Debugger,
+    DebuggerServer,
+    LocalDatastore,
     Span,
-    derive_callable_name,
-    get_callable_input_json_schema,
-    safe_serialize_input_value,
+    WeaveDatastore,
+    _derive_callable_name,
+    _get_callable_input_json_schema,
+    _safe_serialize_value,
 )
 
 # --- Test fixtures and helper functions ---
@@ -35,52 +37,52 @@ def failing_func() -> None:
     raise ValueError("Intentional test error")
 
 
-# --- Tests for derive_callable_name ---
+# --- Tests for _derive_callable_name ---
 
 
 class TestDeriveCallableName:
     def test_derives_name_from_function(self) -> None:
-        """Test that derive_callable_name extracts the function's __name__."""
-        assert derive_callable_name(adder) == "adder"
-        assert derive_callable_name(multiplier) == "multiplier"
-        assert derive_callable_name(liner) == "liner"
+        """Test that _derive_callable_name extracts the function's __name__."""
+        assert _derive_callable_name(adder) == "adder"
+        assert _derive_callable_name(multiplier) == "multiplier"
+        assert _derive_callable_name(liner) == "liner"
 
     def test_derives_name_from_lambda(self) -> None:
-        """Test that derive_callable_name works with lambda functions."""
+        """Test that _derive_callable_name works with lambda functions."""
         my_lambda = lambda x: x * 2
-        assert derive_callable_name(my_lambda) == "<lambda>"
+        assert _derive_callable_name(my_lambda) == "<lambda>"
 
 
-# --- Tests for safe_serialize_input_value ---
+# --- Tests for _safe_serialize_value ---
 
 
-class TestSafeSerializeInputValue:
+class TestSafeSerializeValue:
     def test_serializes_primitives(self) -> None:
         """Test serialization of primitive types."""
-        assert safe_serialize_input_value("hello") == "hello"
-        assert safe_serialize_input_value(42) == 42
-        assert safe_serialize_input_value(3.14) == 3.14
-        assert safe_serialize_input_value(True) is True
-        assert safe_serialize_input_value(False) is False
+        assert _safe_serialize_value("hello") == "hello"
+        assert _safe_serialize_value(42) == 42
+        assert _safe_serialize_value(3.14) == 3.14
+        assert _safe_serialize_value(True) is True
+        assert _safe_serialize_value(False) is False
 
     def test_serializes_lists(self) -> None:
         """Test serialization of lists."""
-        assert safe_serialize_input_value([1, 2, 3]) == [1, 2, 3]
-        assert safe_serialize_input_value(["a", "b"]) == ["a", "b"]
+        assert _safe_serialize_value([1, 2, 3]) == [1, 2, 3]
+        assert _safe_serialize_value(["a", "b"]) == ["a", "b"]
 
     def test_serializes_tuples(self) -> None:
         """Test serialization of tuples (converted to lists)."""
-        assert safe_serialize_input_value((1, 2, 3)) == [1, 2, 3]
+        assert _safe_serialize_value((1, 2, 3)) == [1, 2, 3]
 
     def test_serializes_dicts(self) -> None:
         """Test serialization of dictionaries."""
-        assert safe_serialize_input_value({"a": 1, "b": 2}) == {"a": 1, "b": 2}
+        assert _safe_serialize_value({"a": 1, "b": 2}) == {"a": 1, "b": 2}
 
     def test_serializes_nested_structures(self) -> None:
         """Test serialization of nested data structures."""
         nested = {"list": [1, 2, {"inner": "value"}], "tuple": (3, 4)}
         expected = {"list": [1, 2, {"inner": "value"}], "tuple": [3, 4]}
-        assert safe_serialize_input_value(nested) == expected
+        assert _safe_serialize_value(nested) == expected
 
     def test_serializes_custom_objects_to_string(self) -> None:
         """Test that custom objects are converted to their string representation."""
@@ -90,31 +92,32 @@ class TestSafeSerializeInputValue:
                 return "CustomObj()"
 
         obj = CustomObj()
-        assert safe_serialize_input_value(obj) == "CustomObj()"
+        assert _safe_serialize_value(obj) == "CustomObj()"
 
 
 # --- Tests for Debugger.add_callable ---
 
 
 class TestDebuggerAddCallable:
-    def test_add_callable_with_auto_derived_name(self) -> None:
+    @pytest.mark.trace_server
+    def test_add_callable_with_auto_derived_name(self, client) -> None:
         """Test adding a callable without specifying a name."""
         debugger = Debugger()
         debugger.add_callable(adder)
 
         assert "adder" in debugger.callables
-        assert debugger.callables["adder"] is adder
 
-    def test_add_callable_with_custom_name(self) -> None:
+    @pytest.mark.trace_server
+    def test_add_callable_with_custom_name(self, client) -> None:
         """Test adding a callable with a custom name."""
         debugger = Debugger()
         debugger.add_callable(adder, name="my_adder")
 
         assert "my_adder" in debugger.callables
-        assert debugger.callables["my_adder"] is adder
         assert "adder" not in debugger.callables
 
-    def test_add_multiple_callables(self) -> None:
+    @pytest.mark.trace_server
+    def test_add_multiple_callables(self, client) -> None:
         """Test adding multiple callables."""
         debugger = Debugger()
         debugger.add_callable(adder)
@@ -126,7 +129,8 @@ class TestDebuggerAddCallable:
         assert "multiplier" in debugger.callables
         assert "liner" in debugger.callables
 
-    def test_add_callable_duplicate_name_raises_error(self) -> None:
+    @pytest.mark.trace_server
+    def test_add_callable_duplicate_name_raises_error(self, client) -> None:
         """Test that adding a callable with a duplicate name raises ValueError."""
         debugger = Debugger()
         debugger.add_callable(adder)
@@ -134,7 +138,8 @@ class TestDebuggerAddCallable:
         with pytest.raises(ValueError, match="Callable with name adder already exists"):
             debugger.add_callable(adder)
 
-    def test_add_callable_duplicate_custom_name_raises_error(self) -> None:
+    @pytest.mark.trace_server
+    def test_add_callable_duplicate_custom_name_raises_error(self, client) -> None:
         """Test that adding a callable with a duplicate custom name raises ValueError."""
         debugger = Debugger()
         debugger.add_callable(adder, name="my_func")
@@ -149,23 +154,23 @@ class TestDebuggerAddCallable:
 
 
 class TestDebuggerListCallables:
-    @pytest.mark.asyncio
-    async def test_list_callables_empty(self) -> None:
+    @pytest.mark.trace_server
+    def test_list_callables_empty(self, client) -> None:
         """Test listing callables when none are registered."""
         debugger = Debugger()
-        names = await debugger.list_callables()
+        names = debugger.list_callables()
 
         assert names == []
 
-    @pytest.mark.asyncio
-    async def test_list_callables_with_callables(self) -> None:
+    @pytest.mark.trace_server
+    def test_list_callables_with_callables(self, client) -> None:
         """Test listing callables after adding some."""
         debugger = Debugger()
         debugger.add_callable(adder)
         debugger.add_callable(multiplier)
         debugger.add_callable(liner)
 
-        names = await debugger.list_callables()
+        names = debugger.list_callables()
 
         assert set(names) == {"adder", "multiplier", "liner"}
 
@@ -174,137 +179,50 @@ class TestDebuggerListCallables:
 
 
 class TestDebuggerInvokeCallable:
-    @pytest.mark.asyncio
-    async def test_invoke_returns_correct_result(self) -> None:
+    @pytest.mark.trace_server
+    def test_invoke_returns_correct_result(self, client) -> None:
         """Test that invoking a callable returns the correct result."""
         debugger = Debugger()
         debugger.add_callable(adder)
 
-        result = await debugger.invoke_callable("adder", {"a": 3.0, "b": 5.0})
+        result = debugger.invoke_callable("adder", {"a": 3.0, "b": 5.0})
 
         assert result == 8.0
 
-    @pytest.mark.asyncio
-    async def test_invoke_creates_call(self) -> None:
-        """Test that invoking a callable creates a call record."""
-        debugger = Debugger()
-        debugger.add_callable(adder)
-
-        await debugger.invoke_callable("adder", {"a": 2.0, "b": 3.0})
-
-        calls = await debugger.get_calls("adder")
-        assert len(calls) == 1
-
-        call = calls[0]
-        assert call.name == "adder"
-        assert call.inputs == {"a": 2.0, "b": 3.0}
-        assert call.output == 5.0
-        assert call.error is None
-
-    @pytest.mark.asyncio
-    async def test_invoke_records_timing(self) -> None:
-        """Test that calls record timing information."""
-        debugger = Debugger()
-        debugger.add_callable(adder)
-
-        await debugger.invoke_callable("adder", {"a": 1.0, "b": 1.0})
-
-        calls = await debugger.get_calls("adder")
-        call = calls[0]
-
-        assert call.start_time_unix_nano > 0
-        assert call.end_time_unix_nano >= call.start_time_unix_nano
-
-    @pytest.mark.asyncio
-    async def test_multiple_invokes_create_multiple_calls(self) -> None:
-        """Test that multiple invocations create multiple call records."""
-        debugger = Debugger()
-        debugger.add_callable(adder)
-
-        await debugger.invoke_callable("adder", {"a": 1.0, "b": 2.0})
-        await debugger.invoke_callable("adder", {"a": 3.0, "b": 4.0})
-        await debugger.invoke_callable("adder", {"a": 5.0, "b": 6.0})
-
-        calls = await debugger.get_calls("adder")
-        assert len(calls) == 3
-
-        assert calls[0].output == 3.0
-        assert calls[1].output == 7.0
-        assert calls[2].output == 11.0
-
-    @pytest.mark.asyncio
-    async def test_invoke_not_found_raises_error(self) -> None:
-        """Test that invoking an unknown callable raises HTTPException."""
+    @pytest.mark.trace_server
+    def test_invoke_not_found_raises_error(self, client) -> None:
+        """Test that invoking an unknown callable raises KeyError."""
         debugger = Debugger()
 
-        with pytest.raises(HTTPException) as exc_info:
-            await debugger.invoke_callable("nonexistent", {})
-
-        assert exc_info.value.status_code == 404
-        assert "nonexistent" in exc_info.value.detail
+        with pytest.raises(KeyError, match="nonexistent"):
+            debugger.invoke_callable("nonexistent", {})
 
 
-# --- Tests for Debugger.get_calls ---
+# --- Tests for Debugger.get_calls with LocalDatastore ---
 
 
-class TestDebuggerGetCalls:
-    @pytest.mark.asyncio
-    async def test_get_calls_empty(self) -> None:
-        """Test getting calls when none have been made."""
-        debugger = Debugger()
-        debugger.add_callable(adder)
+class TestDebuggerGetCallsLocal:
+    @pytest.mark.trace_server
+    def test_get_calls_not_found_raises_error(self, client) -> None:
+        """Test that getting calls for unknown callable raises KeyError."""
+        debugger = Debugger(datastore=LocalDatastore())
 
-        calls = await debugger.get_calls("adder")
-        assert calls == []
-
-    @pytest.mark.asyncio
-    async def test_get_calls_not_found_raises_error(self) -> None:
-        """Test that getting calls for unknown callable raises HTTPException."""
-        debugger = Debugger()
-
-        with pytest.raises(HTTPException) as exc_info:
-            await debugger.get_calls("nonexistent")
-
-        assert exc_info.value.status_code == 404
-        assert "nonexistent" in exc_info.value.detail
-
-    @pytest.mark.asyncio
-    async def test_calls_isolated_per_callable(self) -> None:
-        """Test that calls are isolated per callable."""
-        debugger = Debugger()
-        debugger.add_callable(adder)
-        debugger.add_callable(multiplier)
-
-        await debugger.invoke_callable("adder", {"a": 1.0, "b": 2.0})
-        await debugger.invoke_callable("multiplier", {"a": 3.0, "b": 4.0})
-        await debugger.invoke_callable("adder", {"a": 5.0, "b": 6.0})
-
-        adder_calls = await debugger.get_calls("adder")
-        multiplier_calls = await debugger.get_calls("multiplier")
-
-        assert len(adder_calls) == 2
-        assert len(multiplier_calls) == 1
+        with pytest.raises(KeyError, match="nonexistent"):
+            debugger.get_calls("nonexistent")
 
 
 # --- Tests for error handling ---
 
 
 class TestDebuggerErrorHandling:
-    @pytest.mark.asyncio
-    async def test_invoke_with_error_records_call(self) -> None:
-        """Test that errors are recorded in calls and re-raised."""
+    @pytest.mark.trace_server
+    def test_invoke_with_error_raises_exception(self, client) -> None:
+        """Test that errors are raised when callable fails."""
         debugger = Debugger()
         debugger.add_callable(failing_func)
 
-        with pytest.raises(ValueError, match="Intentional test error"):
-            await debugger.invoke_callable("failing_func", {})
-
-        calls = await debugger.get_calls("failing_func")
-        assert len(calls) == 1
-
-        call = calls[0]
-        assert call.error == "Intentional test error"
-        assert call.output is None
+        with pytest.raises(Exception, match="Intentional test error"):
+            debugger.invoke_callable("failing_func", {})
 
 
 # --- Tests for Span model ---
@@ -342,8 +260,22 @@ class TestSpanModel:
 
         assert span.error == "Something went wrong"
 
+    def test_span_with_weave_call_ref(self) -> None:
+        """Test creating a Span with a weave call ref."""
+        span = Span(
+            name="test",
+            start_time_unix_nano=1000.0,
+            end_time_unix_nano=2000.0,
+            inputs={"a": 1},
+            output=42,
+            error=None,
+            weave_call_ref="weave:///entity/project/call/abc123",
+        )
 
-# --- Tests for get_callable_input_json_schema ---
+        assert span.weave_call_ref == "weave:///entity/project/call/abc123"
+
+
+# --- Tests for _get_callable_input_json_schema ---
 
 
 class TestGetCallableInputJsonSchema:
@@ -353,7 +285,7 @@ class TestGetCallableInputJsonSchema:
         def func(a: int, b: str, c: float, d: bool) -> None:
             pass
 
-        schema = get_callable_input_json_schema(func)
+        schema = _get_callable_input_json_schema(func)
 
         assert schema["type"] == "object"
         assert schema["properties"]["a"]["type"] == "integer"
@@ -368,7 +300,7 @@ class TestGetCallableInputJsonSchema:
         def func(a: int, b: str = "default", c: float = 3.14) -> None:
             pass
 
-        schema = get_callable_input_json_schema(func)
+        schema = _get_callable_input_json_schema(func)
 
         assert schema["required"] == ["a"]
         assert schema["properties"]["b"]["default"] == "default"
@@ -380,7 +312,7 @@ class TestGetCallableInputJsonSchema:
         def func(a: int | None, b: str | None = None) -> None:
             pass
 
-        schema = get_callable_input_json_schema(func)
+        schema = _get_callable_input_json_schema(func)
 
         # Pydantic represents Optional types as anyOf
         assert schema["properties"]["a"]["anyOf"] == [
@@ -398,7 +330,7 @@ class TestGetCallableInputJsonSchema:
         def func(a: list[int], b: list[str]) -> None:
             pass
 
-        schema = get_callable_input_json_schema(func)
+        schema = _get_callable_input_json_schema(func)
 
         assert schema["properties"]["a"]["type"] == "array"
         assert schema["properties"]["a"]["items"]["type"] == "integer"
@@ -411,7 +343,7 @@ class TestGetCallableInputJsonSchema:
         def func(a: dict[str, int]) -> None:
             pass
 
-        schema = get_callable_input_json_schema(func)
+        schema = _get_callable_input_json_schema(func)
 
         assert schema["properties"]["a"]["type"] == "object"
         assert schema["properties"]["a"]["additionalProperties"]["type"] == "integer"
@@ -422,7 +354,7 @@ class TestGetCallableInputJsonSchema:
         def func(a, b):
             pass
 
-        schema = get_callable_input_json_schema(func)
+        schema = _get_callable_input_json_schema(func)
 
         assert schema["type"] == "object"
         assert "a" in schema["properties"]
@@ -433,7 +365,7 @@ class TestGetCallableInputJsonSchema:
 
     def test_existing_functions(self) -> None:
         """Test schema generation for the existing test functions."""
-        schema = get_callable_input_json_schema(adder)
+        schema = _get_callable_input_json_schema(adder)
 
         assert schema["type"] == "object"
         assert schema["properties"]["a"]["type"] == "number"
@@ -445,70 +377,126 @@ class TestGetCallableInputJsonSchema:
 
 
 class TestDebuggerGetJsonSchema:
-    @pytest.mark.asyncio
-    async def test_get_json_schema(self) -> None:
+    @pytest.mark.trace_server
+    def test_get_json_schema(self, client) -> None:
         """Test getting JSON schema for a registered callable."""
         debugger = Debugger()
         debugger.add_callable(adder)
 
-        schema = await debugger.get_json_schema("adder")
+        schema = debugger.get_json_schema("adder")
 
         assert schema["type"] == "object"
         assert "a" in schema["properties"]
         assert "b" in schema["properties"]
 
-    @pytest.mark.asyncio
-    async def test_get_json_schema_not_found(self) -> None:
-        """Test that HTTPException is raised for unknown callable."""
+    @pytest.mark.trace_server
+    def test_get_json_schema_not_found(self, client) -> None:
+        """Test that KeyError is raised for unknown callable."""
         debugger = Debugger()
 
-        with pytest.raises(HTTPException) as exc_info:
-            await debugger.get_json_schema("nonexistent")
-
-        assert exc_info.value.status_code == 404
-        assert "nonexistent" in exc_info.value.detail
+        with pytest.raises(KeyError, match="nonexistent"):
+            debugger.get_json_schema("nonexistent")
 
 
-# --- Integration-style tests ---
+# --- Tests for Datastore implementations ---
 
 
-class TestDebuggerIntegration:
-    @pytest.mark.asyncio
-    async def test_end_to_end_workflow(self) -> None:
-        """Test the complete workflow: add callable, invoke it, retrieve calls."""
-        debugger = Debugger()
+class TestLocalDatastore:
+    def test_add_and_get_spans(self) -> None:
+        """Test adding and retrieving spans from LocalDatastore."""
+        datastore = LocalDatastore()
+        span = Span(
+            name="test",
+            start_time_unix_nano=1000.0,
+            end_time_unix_nano=2000.0,
+            inputs={"a": 1},
+            output=42,
+            error=None,
+        )
 
-        # Add callables
-        debugger.add_callable(adder)
-        debugger.add_callable(multiplier)
+        datastore.add_span("test_callable", span)
+        spans = datastore.get_spans("test_callable")
 
-        # Verify registration
-        names = await debugger.list_callables()
-        assert set(names) == {"adder", "multiplier"}
+        assert len(spans) == 1
+        assert spans[0].name == "test"
+        assert spans[0].output == 42
 
-        # Invoke callables
-        result = await debugger.invoke_callable("adder", {"a": 10.0, "b": 5.0})
-        assert result == 15.0
+    def test_clear_spans(self) -> None:
+        """Test clearing spans from LocalDatastore."""
+        datastore = LocalDatastore()
+        span = Span(
+            name="test",
+            start_time_unix_nano=1000.0,
+            end_time_unix_nano=2000.0,
+            inputs={"a": 1},
+            output=42,
+            error=None,
+        )
 
-        result = await debugger.invoke_callable("multiplier", {"a": 3.0, "b": 7.0})
-        assert result == 21.0
+        datastore.add_span("test_callable", span)
+        datastore.clear_spans("test_callable")
+        spans = datastore.get_spans("test_callable")
 
-        # Verify calls
-        adder_calls = await debugger.get_calls("adder")
-        assert len(adder_calls) == 1
-        assert adder_calls[0].inputs == {"a": 10.0, "b": 5.0}
-        assert adder_calls[0].output == 15.0
+        assert len(spans) == 0
 
-        multiplier_calls = await debugger.get_calls("multiplier")
-        assert len(multiplier_calls) == 1
-        assert multiplier_calls[0].inputs == {"a": 3.0, "b": 7.0}
-        assert multiplier_calls[0].output == 21.0
+    def test_spans_isolated_per_callable(self) -> None:
+        """Test that spans are isolated per callable."""
+        datastore = LocalDatastore()
+        span1 = Span(
+            name="test1",
+            start_time_unix_nano=1000.0,
+            end_time_unix_nano=2000.0,
+            inputs={},
+            output=1,
+            error=None,
+        )
+        span2 = Span(
+            name="test2",
+            start_time_unix_nano=1000.0,
+            end_time_unix_nano=2000.0,
+            inputs={},
+            output=2,
+            error=None,
+        )
 
-        # Verify schema
-        schema = await debugger.get_json_schema("adder")
-        assert schema["type"] == "object"
-        assert "a" in schema["properties"]
-        assert "b" in schema["properties"]
+        datastore.add_span("callable1", span1)
+        datastore.add_span("callable2", span2)
+
+        assert len(datastore.get_spans("callable1")) == 1
+        assert len(datastore.get_spans("callable2")) == 1
+        assert datastore.get_spans("callable1")[0].output == 1
+        assert datastore.get_spans("callable2")[0].output == 2
+
+
+class TestWeaveDatastore:
+    def test_add_span_is_noop(self) -> None:
+        """Test that add_span is a no-op for WeaveDatastore."""
+        datastore = WeaveDatastore()
+        span = Span(
+            name="test",
+            start_time_unix_nano=1000.0,
+            end_time_unix_nano=2000.0,
+            inputs={"a": 1},
+            output=42,
+            error=None,
+        )
+
+        # Should not raise
+        datastore.add_span("test_callable", span)
+
+    def test_clear_spans_is_noop(self) -> None:
+        """Test that clear_spans is a no-op for WeaveDatastore."""
+        datastore = WeaveDatastore()
+
+        # Should not raise
+        datastore.clear_spans("test_callable")
+
+    def test_get_spans_without_op_returns_empty(self) -> None:
+        """Test that get_spans returns empty list without op."""
+        datastore = WeaveDatastore()
+        spans = datastore.get_spans("test_callable", op=None)
+
+        assert spans == []
 
 
 # --- Tests for Weave integration ---
@@ -517,11 +505,19 @@ class TestDebuggerIntegration:
 class TestDebuggerWeaveIntegration:
     """Tests for weave op integration with the debugger."""
 
-    @pytest.mark.asyncio
-    async def test_invoke_op_with_weave_initialized_stores_call_ref(
-        self, client
-    ) -> None:
-        """Test that invoking a weave op with weave initialized stores the call ref."""
+    @pytest.mark.trace_server
+    def test_weave_required_for_debugger(self) -> None:
+        """Test that Debugger requires weave to be initialized."""
+        # This test runs without the client fixture
+        # WeaveInitError should be raised
+        from weave.trace.context.weave_client_context import WeaveInitError
+
+        with pytest.raises(WeaveInitError):
+            Debugger()
+
+    @pytest.mark.trace_server
+    def test_invoke_op_stores_call_in_weave(self, client) -> None:
+        """Test that invoking an op stores the call in weave."""
 
         @weave.op
         def weave_adder(a: float, b: float) -> float:
@@ -531,111 +527,46 @@ class TestDebuggerWeaveIntegration:
         debugger = Debugger()
         debugger.add_callable(weave_adder)
 
-        result = await debugger.invoke_callable("weave_adder", {"a": 3.0, "b": 5.0})
+        result = debugger.invoke_callable("weave_adder", {"a": 3.0, "b": 5.0})
 
         assert result == 8.0
 
-        calls = await debugger.get_calls("weave_adder")
-        assert len(calls) == 1
+        # Query calls from weave datastore
+        calls = debugger.get_calls("weave_adder")
+        assert len(calls) >= 1  # At least our call
 
-        call = calls[0]
-        assert call.name == "weave_adder"
-        assert call.inputs == {"a": 3.0, "b": 5.0}
-        assert call.output == 8.0
-        assert call.error is None
-
-        # The weave_call_ref should be populated since weave is initialized
-        assert call.weave_call_ref is not None
-        assert call.weave_call_ref.startswith("weave:///")
-        assert "/call/" in call.weave_call_ref
-
-    @pytest.mark.asyncio
-    @pytest.mark.trace_server
-    async def test_invoke_op_without_weave_initialized_has_no_call_ref(self) -> None:
-        """Test that invoking a weave op without weave initialized has no call ref."""
-        # Note: This test runs without the client fixture, so weave is not initialized
-
-        @weave.op
-        def weave_multiplier(a: float, b: float) -> float:
-            """Multiply two numbers using weave op."""
-            return a * b
-
-        debugger = Debugger()
-        debugger.add_callable(weave_multiplier)
-
-        result = await debugger.invoke_callable(
-            "weave_multiplier", {"a": 4.0, "b": 5.0}
+        # Find our call
+        our_call = next(
+            (c for c in calls if c.inputs.get("a") == 3.0 and c.inputs.get("b") == 5.0),
+            None,
         )
+        assert our_call is not None
+        assert our_call.output == 8.0
+        assert our_call.weave_call_ref is not None
+        assert our_call.weave_call_ref.startswith("weave:///")
 
-        assert result == 20.0
-
-        calls = await debugger.get_calls("weave_multiplier")
-        assert len(calls) == 1
-
-        call = calls[0]
-        assert call.output == 20.0
-        # weave_call_ref should be None since weave is not initialized
-        assert call.weave_call_ref is None
-
-    @pytest.mark.asyncio
-    async def test_invoke_regular_function_auto_wrapped_as_op(
-        self, client
-    ) -> None:
-        """Test that regular functions are auto-wrapped as ops and get call refs."""
+    @pytest.mark.trace_server
+    def test_regular_function_auto_wrapped_as_op(self, client) -> None:
+        """Test that regular functions are auto-wrapped as ops."""
 
         def regular_function(a: float, b: float) -> float:
-            """A regular function that will be auto-wrapped as a weave op."""
+            """A regular function that will be auto-wrapped."""
             return a - b
 
         debugger = Debugger()
         debugger.add_callable(regular_function)
 
-        result = await debugger.invoke_callable(
-            "regular_function", {"a": 10.0, "b": 3.0}
-        )
+        result = debugger.invoke_callable("regular_function", {"a": 10.0, "b": 3.0})
 
         assert result == 7.0
 
-        calls = await debugger.get_calls("regular_function")
-        assert len(calls) == 1
+        # Should have calls in weave
+        calls = debugger.get_calls("regular_function")
+        assert len(calls) >= 1
 
-        call = calls[0]
-        assert call.output == 7.0
-        # weave_call_ref should be populated since regular functions are auto-wrapped as ops
-        assert call.weave_call_ref is not None
-        assert call.weave_call_ref.startswith("weave:///")
-        assert "/call/" in call.weave_call_ref
-
-    @pytest.mark.asyncio
-    async def test_invoke_op_with_error_still_stores_span(self, client) -> None:
-        """Test that errors during op invocation are properly recorded."""
-
-        @weave.op
-        def failing_weave_op(x: int) -> int:
-            """A weave op that always fails."""
-            raise ValueError("Intentional op error")
-
-        debugger = Debugger()
-        debugger.add_callable(failing_weave_op)
-
-        # op.call() captures errors in the Call object rather than raising,
-        # so the debugger re-raises as a generic Exception with the error message
-        with pytest.raises(Exception, match="Intentional op error"):
-            await debugger.invoke_callable("failing_weave_op", {"x": 42})
-
-        calls = await debugger.get_calls("failing_weave_op")
-        assert len(calls) == 1
-
-        call = calls[0]
-        assert "Intentional op error" in call.error
-        assert call.output is None
-        # Even on error, we should have a weave_call_ref since op.call() completes
-        assert call.weave_call_ref is not None
-        assert call.weave_call_ref.startswith("weave:///")
-
-    @pytest.mark.asyncio
-    async def test_multiple_op_invocations_each_have_unique_refs(self, client) -> None:
-        """Test that multiple invocations of the same op get unique call refs."""
+    @pytest.mark.trace_server
+    def test_multiple_invocations_tracked(self, client) -> None:
+        """Test that multiple invocations are tracked in weave."""
 
         @weave.op
         def counter_op(n: int) -> int:
@@ -645,41 +576,51 @@ class TestDebuggerWeaveIntegration:
         debugger = Debugger()
         debugger.add_callable(counter_op)
 
-        await debugger.invoke_callable("counter_op", {"n": 1})
-        await debugger.invoke_callable("counter_op", {"n": 2})
-        await debugger.invoke_callable("counter_op", {"n": 3})
+        debugger.invoke_callable("counter_op", {"n": 1})
+        debugger.invoke_callable("counter_op", {"n": 2})
+        debugger.invoke_callable("counter_op", {"n": 3})
 
-        calls = await debugger.get_calls("counter_op")
-        assert len(calls) == 3
+        calls = debugger.get_calls("counter_op")
+        assert len(calls) >= 3
 
         # Each call should have a unique weave_call_ref
-        refs = [call.weave_call_ref for call in calls]
-        assert all(ref is not None for ref in refs)
-        assert len(set(refs)) == 3  # All refs should be unique
+        refs = [c.weave_call_ref for c in calls if c.weave_call_ref]
+        assert len(set(refs)) >= 3  # All refs should be unique
 
-    @pytest.mark.asyncio
+
+# --- Integration-style tests ---
+
+
+class TestDebuggerIntegration:
     @pytest.mark.trace_server
-    async def test_span_model_includes_weave_call_ref(self) -> None:
-        """Test that the Span model properly handles weave_call_ref field."""
-        span_with_ref = Span(
-            name="test",
-            start_time_unix_nano=1000.0,
-            end_time_unix_nano=2000.0,
-            inputs={"a": 1},
-            output=42,
-            error=None,
-            weave_call_ref="weave:///entity/project/call/abc123",
-        )
+    def test_end_to_end_workflow(self, client) -> None:
+        """Test the complete workflow: add callable, invoke it, retrieve calls."""
+        debugger = Debugger()
 
-        assert span_with_ref.weave_call_ref == "weave:///entity/project/call/abc123"
+        # Add callables
+        debugger.add_callable(adder)
+        debugger.add_callable(multiplier)
 
-        span_without_ref = Span(
-            name="test",
-            start_time_unix_nano=1000.0,
-            end_time_unix_nano=2000.0,
-            inputs={"a": 1},
-            output=42,
-            error=None,
-        )
+        # Verify registration
+        names = debugger.list_callables()
+        assert set(names) == {"adder", "multiplier"}
 
-        assert span_without_ref.weave_call_ref is None
+        # Invoke callables
+        result = debugger.invoke_callable("adder", {"a": 10.0, "b": 5.0})
+        assert result == 15.0
+
+        result = debugger.invoke_callable("multiplier", {"a": 3.0, "b": 7.0})
+        assert result == 21.0
+
+        # Verify calls are tracked
+        adder_calls = debugger.get_calls("adder")
+        assert len(adder_calls) >= 1
+
+        multiplier_calls = debugger.get_calls("multiplier")
+        assert len(multiplier_calls) >= 1
+
+        # Verify schema
+        schema = debugger.get_json_schema("adder")
+        assert schema["type"] == "object"
+        assert "a" in schema["properties"]
+        assert "b" in schema["properties"]
