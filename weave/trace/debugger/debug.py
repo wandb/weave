@@ -26,13 +26,6 @@ from weave.trace.op import Op, is_op, op
 # =============================================================================
 
 
-class OpInfo(BaseModel):
-    """Information about a registered op."""
-
-    ref: str
-    name: str
-
-
 class CallRequest(BaseModel):
     """Request body for calling an op."""
 
@@ -65,17 +58,12 @@ class Debugger:
         # Map of ref URI to op
         self._ops: dict[str, Op] = {}
 
-        # Map of ref URI to human-readable name
-        self._names: dict[str, str] = {}
-
     @property
     def ops(self) -> dict[str, Op]:
         """Get the registered ops (keyed by ref URI)."""
         return self._ops
 
-    def add_op(
-        self, callable: Callable[..., Any] | Op, *, name: str | None = None
-    ) -> str:
+    def add_op(self, callable: Callable[..., Any] | Op) -> str:
         """Add an op to be exposed by the debugger.
 
         The callable will be:
@@ -84,7 +72,6 @@ class Debugger:
 
         Args:
             callable: The function or Op to add.
-            name: Optional custom name. If not provided, uses the function's __name__.
 
         Returns:
             The ref URI of the published op.
@@ -92,18 +79,15 @@ class Debugger:
         Raises:
             ValueError: If an op with the same ref already exists.
         """
-        if name is None:
-            name = _derive_callable_name(callable)
-
         # Convert to op if not already
         callable_op: Op
         if not is_op(callable):
-            callable_op = op(callable, name=name)
+            callable_op = op(callable)
         else:
             callable_op = callable
 
         # Publish the op to weave - this sets op.ref
-        weave.publish(callable_op, name=name)
+        weave.publish(callable_op)
 
         # Get the ref URI after publishing
         if callable_op.ref is None:
@@ -115,16 +99,12 @@ class Debugger:
             raise ValueError(f"Op with ref {ref_uri} already exists")
 
         self._ops[ref_uri] = callable_op
-        self._names[ref_uri] = name
 
         return ref_uri
 
-    def list_ops(self) -> list[OpInfo]:
-        """List all registered ops with their refs and names."""
-        return [
-            OpInfo(ref=ref_uri, name=self._names[ref_uri])
-            for ref_uri in self._ops.keys()
-        ]
+    def list_ops(self) -> list[str]:
+        """List all registered op refs."""
+        return list(self._ops.keys())
 
     def call_op(self, ref_uri: str, inputs: dict[str, Any]) -> Any:
         """Call a registered op with the given inputs.
@@ -174,7 +154,7 @@ class DebuggerServer:
     """FastAPI HTTP server for the debugger.
 
     Exposes the debugger functionality via REST endpoints:
-        GET  /ops            - List all registered ops (refs and names)
+        GET  /ops            - List all registered op refs
         POST /call           - Call an op (JSON body: {"ref": "...", "inputs": {...}})
         GET  /openapi.json   - OpenAPI spec (provided by FastAPI)
 
@@ -220,7 +200,7 @@ class DebuggerServer:
 
         # Register endpoints
         @app.get("/ops")
-        async def list_ops() -> list[OpInfo]:
+        async def list_ops() -> list[str]:
             return self._debugger.list_ops()
 
         @app.post("/call")
@@ -240,13 +220,3 @@ class DebuggerServer:
             port: Port to listen on.
         """
         uvicorn.run(self._app, host=host, port=port)
-
-
-# =============================================================================
-# Helper Functions
-# =============================================================================
-
-
-def _derive_callable_name(callable: Callable[..., Any]) -> str:
-    """Derive the name of a callable from its __name__ attribute."""
-    return callable.__name__

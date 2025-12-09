@@ -6,8 +6,6 @@ import weave
 from weave.trace.debugger.debug import (
     Debugger,
     DebuggerServer,
-    OpInfo,
-    _derive_callable_name,
 )
 
 # --- Test fixtures and helper functions ---
@@ -33,22 +31,6 @@ def failing_func() -> None:
     raise ValueError("Intentional test error")
 
 
-# --- Tests for _derive_callable_name ---
-
-
-class TestDeriveCallableName:
-    def test_derives_name_from_function(self) -> None:
-        """Test that _derive_callable_name extracts the function's __name__."""
-        assert _derive_callable_name(adder) == "adder"
-        assert _derive_callable_name(multiplier) == "multiplier"
-        assert _derive_callable_name(liner) == "liner"
-
-    def test_derives_name_from_lambda(self) -> None:
-        """Test that _derive_callable_name works with lambda functions."""
-        my_lambda = lambda x: x * 2
-        assert _derive_callable_name(my_lambda) == "<lambda>"
-
-
 # --- Tests for Debugger.add_op ---
 
 
@@ -61,17 +43,6 @@ class TestDebuggerAddOp:
 
         assert ref.startswith("weave:///")
         assert ref in debugger.ops
-
-    @pytest.mark.trace_server
-    def test_add_op_with_custom_name(self, client) -> None:
-        """Test adding an op with a custom name."""
-        debugger = Debugger()
-        ref = debugger.add_op(adder, name="my_adder")
-
-        assert ref.startswith("weave:///")
-        # Check the name is stored
-        ops = debugger.list_ops()
-        assert any(op.name == "my_adder" for op in ops)
 
     @pytest.mark.trace_server
     def test_add_multiple_ops(self, client) -> None:
@@ -113,17 +84,18 @@ class TestDebuggerListOps:
     def test_list_ops_with_ops(self, client) -> None:
         """Test listing ops after adding some."""
         debugger = Debugger()
-        debugger.add_op(adder)
-        debugger.add_op(multiplier)
-        debugger.add_op(liner)
+        ref1 = debugger.add_op(adder)
+        ref2 = debugger.add_op(multiplier)
+        ref3 = debugger.add_op(liner)
 
         ops = debugger.list_ops()
 
         assert len(ops) == 3
-        names = {op.name for op in ops}
-        assert names == {"adder", "multiplier", "liner"}
-        # All should have refs
-        assert all(op.ref.startswith("weave:///") for op in ops)
+        assert ref1 in ops
+        assert ref2 in ops
+        assert ref3 in ops
+        # All should be valid refs
+        assert all(ref.startswith("weave:///") for ref in ops)
 
 
 # --- Tests for Debugger.call_op ---
@@ -366,8 +338,9 @@ class TestDebuggerIntegration:
 
         # Verify registration
         ops = debugger.list_ops()
-        names = {op.name for op in ops}
-        assert names == {"adder", "multiplier"}
+        assert len(ops) == 2
+        assert adder_ref in ops
+        assert multiplier_ref in ops
 
         # Call ops
         result = debugger.call_op(adder_ref, {"a": 10.0, "b": 5.0})

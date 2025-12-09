@@ -43,7 +43,7 @@ A tool that exposes local Python functions as a traceable HTTP service with a we
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/ops` | List all registered ops (refs and names) |
+| `GET` | `/ops` | List all registered op refs |
 | `POST` | `/call` | Call an op (JSON body: `{"ref": "...", "inputs": {...}}`) |
 | `GET` | `/openapi.json` | OpenAPI spec (FastAPI built-in) |
 
@@ -76,14 +76,6 @@ debugger.start()  # Starts server on http://0.0.0.0:8000
 ```
 
 ### Components
-
-#### OpInfo Model
-
-```python
-class OpInfo(BaseModel):
-    ref: str   # Weave ref URI (e.g., "weave:///entity/project/op/name:hash")
-    name: str  # Human-readable name
-```
 
 #### CallRequest Model
 
