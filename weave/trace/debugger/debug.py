@@ -8,11 +8,12 @@ Ops are identified by their stable weave ref URI after publishing.
 Schema and call history can be queried from the weave trace server using the ref.
 """
 
+import threading
 from collections.abc import Callable
 from typing import Any
 
 import uvicorn
-from fastapi import FastAPI, HTTPException
+from fastapi import BackgroundTasks, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -31,6 +32,12 @@ class CallRequest(BaseModel):
 
     ref: str
     inputs: dict[str, Any]
+
+
+class AsyncCallResponse(BaseModel):
+    """Response for async call containing the call ID."""
+
+    call_id: str
 
 
 # =============================================================================
@@ -107,7 +114,7 @@ class Debugger:
         return list(self._ops.keys())
 
     def call_op(self, ref_uri: str, inputs: dict[str, Any]) -> Any:
-        """Call a registered op with the given inputs.
+        """Call a registered op with the given inputs (synchronous).
 
         Args:
             ref_uri: The ref URI of the op to call.
@@ -134,6 +141,43 @@ class Debugger:
 
         return output
 
+    def call_op_async(self, ref_uri: str, inputs: dict[str, Any]) -> str:
+        """Start an async call and return the call ID immediately.
+
+        The call execution continues in a background thread. Use the call ID
+        to query the call status and result from the weave trace server.
+
+        Args:
+            ref_uri: The ref URI of the op to call.
+            inputs: Dictionary of input arguments.
+
+        Returns:
+            The call ID (can be used to query status/result from weave).
+
+        Raises:
+            KeyError: If the op is not found.
+        """
+        if ref_uri not in self._ops:
+            raise KeyError(f"Op with ref '{ref_uri}' not found")
+
+        op_to_call = self._ops[ref_uri]
+
+        # Create the call record first (this gives us the call ID)
+        call = self._client.create_call(op_to_call, inputs)
+
+        # Execute the op in a background thread
+        def execute_in_background() -> None:
+            try:
+                output = op_to_call.resolve_fn(**inputs)
+                self._client.finish_call(call, output)
+            except Exception as e:
+                self._client.finish_call(call, None, exception=e)
+
+        thread = threading.Thread(target=execute_in_background, daemon=True)
+        thread.start()
+
+        return call.id
+
     def start(self, host: str = "0.0.0.0", port: int = 8000) -> None:
         """Start the debugger HTTP server.
 
@@ -155,7 +199,8 @@ class DebuggerServer:
 
     Exposes the debugger functionality via REST endpoints:
         GET  /ops            - List all registered op refs
-        POST /call           - Call an op (JSON body: {"ref": "...", "inputs": {...}})
+        POST /call           - Call an op synchronously (JSON body: {"ref": "...", "inputs": {...}})
+        POST /call_async     - Call an op asynchronously, returns call ID immediately
         GET  /openapi.json   - OpenAPI spec (provided by FastAPI)
 
     Ops are identified by their weave ref URI.
@@ -207,6 +252,14 @@ class DebuggerServer:
         async def call_op(request: CallRequest) -> Any:
             try:
                 return self._debugger.call_op(request.ref, request.inputs)
+            except KeyError as e:
+                raise HTTPException(status_code=404, detail=str(e))
+
+        @app.post("/call_async")
+        async def call_op_async(request: CallRequest) -> AsyncCallResponse:
+            try:
+                call_id = self._debugger.call_op_async(request.ref, request.inputs)
+                return AsyncCallResponse(call_id=call_id)
             except KeyError as e:
                 raise HTTPException(status_code=404, detail=str(e))
 

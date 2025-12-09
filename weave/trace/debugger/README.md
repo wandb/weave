@@ -44,11 +44,15 @@ A tool that exposes local Python functions as a traceable HTTP service with a we
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `GET` | `/ops` | List all registered op refs |
-| `POST` | `/call` | Call an op (JSON body: `{"ref": "...", "inputs": {...}}`) |
+| `POST` | `/call` | Call an op synchronously (JSON body: `{"ref": "...", "inputs": {...}}`) |
+| `POST` | `/call_async` | Call an op asynchronously, returns `{"call_id": "..."}` immediately |
 | `GET` | `/openapi.json` | OpenAPI spec (FastAPI built-in) |
 
 **Note:** Schema and call history are available via the Weave trace server using the op ref. 
 The debug server is intentionally minimal - it only handles op registration and invocation.
+
+The `/call_async` endpoint is useful for long-running operations where you don't want to wait for the result. 
+The returned `call_id` can be used to query the call status and result from the weave trace server.
 
 ### Usage Example
 
@@ -68,8 +72,12 @@ debugger = weave.Debugger()
 adder_ref = debugger.add_op(adder)       # Returns ref URI
 multiplier_ref = debugger.add_op(multiplier)
 
-# Call using ref
+# Synchronous call - waits for result
 result = debugger.call_op(adder_ref, {"a": 1.0, "b": 2.0})
+
+# Async call - returns call ID immediately, executes in background
+call_id = debugger.call_op_async(multiplier_ref, {"a": 3.0, "b": 4.0})
+# Query call status/result from weave using call_id
 
 # Or start the HTTP server
 debugger.start()  # Starts server on http://0.0.0.0:8000
