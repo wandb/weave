@@ -18,6 +18,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 import weave
+from weave.trace.context import call_context
 from weave.trace.context.weave_client_context import require_weave_client
 from weave.trace.op import Op, is_op, op
 
@@ -167,6 +168,9 @@ class Debugger:
 
         # Execute the op in a background thread
         def execute_in_background() -> None:
+            # Push the call onto the context stack so nested ops are tracked
+            # as children of this call
+            call_context.push_call(call)
             try:
                 output = op_to_call.resolve_fn(**inputs)
                 self._client.finish_call(call, output)
