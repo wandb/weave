@@ -299,6 +299,36 @@ class WeaveSenderClient:
 
         self._send_fire_and_forget("enqueue", {"items": items})
 
+    def enqueue_raw_async(self, item_type: str, payload_json: str) -> None:
+        """Enqueue a single item with pre-serialized JSON payload (fastest path).
+
+        This avoids double JSON serialization by accepting an already-serialized
+        payload string and embedding it directly in the request.
+
+        Args:
+            item_type: "start" or "end"
+            payload_json: Pre-serialized JSON string of the payload
+        """
+        if not self._initialized:
+            raise RuntimeError("Client not initialized. Call init() first.")
+
+        with self._lock:
+            if not self._connected:
+                self._connect()
+
+            if self._socket is None:
+                raise RuntimeError("Not connected to sidecar")
+
+            self._request_id += 1
+
+            # Build request manually to embed raw JSON without re-serialization
+            request_str = (
+                f'{{"id":{self._request_id},"method":"enqueue",'
+                f'"params":{{"items":[{{"type":"{item_type}","payload":{payload_json}}}]}},'
+                f'"no_reply":true}}\n'
+            )
+            self._socket.sendall(request_str.encode("utf-8"))
+
     def flush(self) -> None:
         """Force flush all pending items."""
         if not self._initialized:

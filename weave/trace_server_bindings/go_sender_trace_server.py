@@ -127,14 +127,11 @@ class GoSenderTraceServer(RemoteHTTPTraceServer):
         if req.start.id is None or req.start.trace_id is None:
             raise ValueError("CallStartReq must have id and trace_id")
 
-        # Serialize the request
-        payload = json.loads(req.model_dump_json(by_alias=True))
+        # Serialize the request directly to JSON string (avoid double serialization)
+        payload_json = req.model_dump_json(by_alias=True)
 
         # Enqueue to Go sender (fire-and-forget for speed)
-        sender.enqueue_async([{
-            "type": "start",
-            "payload": payload,
-        }])
+        sender.enqueue_raw_async("start", payload_json)
 
         return tsi.CallStartRes(id=req.start.id, trace_id=req.start.trace_id)
 
@@ -145,14 +142,11 @@ class GoSenderTraceServer(RemoteHTTPTraceServer):
 
         sender = self._ensure_go_sender()
 
-        # Serialize the request
-        payload = json.loads(req.model_dump_json(by_alias=True))
+        # Serialize the request directly to JSON string (avoid double serialization)
+        payload_json = req.model_dump_json(by_alias=True)
 
         # Enqueue to Go sender (fire-and-forget for speed)
-        sender.enqueue_async([{
-            "type": "end",
-            "payload": payload,
-        }])
+        sender.enqueue_raw_async("end", payload_json)
 
         return tsi.CallEndRes()
 
