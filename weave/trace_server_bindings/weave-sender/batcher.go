@@ -21,7 +21,7 @@ type BatchConfig struct {
 // DefaultBatchConfig returns sensible defaults
 func DefaultBatchConfig() BatchConfig {
 	return BatchConfig{
-		MaxBatchSize:    1000,             // Higher default since byte limit is the real constraint
+		MaxBatchSize:    0,                // 0 = unlimited, byte limit is the real constraint
 		MaxBatchBytes:   31 * 1024 * 1024, // 31 MiB (server limit is 32)
 		FlushInterval:   time.Second,
 		MaxRetries:      3,
@@ -240,8 +240,8 @@ func (b *Batcher) buildBatch(entries []QueueEntry) (Batch, int) {
 		totalBytes += itemBytes
 		count++
 
-		// Check item count limit
-		if len(batch.Items) >= b.config.MaxBatchSize {
+		// Check item count limit (0 means unlimited)
+		if b.config.MaxBatchSize > 0 && len(batch.Items) >= b.config.MaxBatchSize {
 			break
 		}
 	}

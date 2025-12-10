@@ -77,7 +77,8 @@ func (q *Queue) Dequeue(n int) []QueueEntry {
 	return result
 }
 
-// Peek returns up to n entries without removing them
+// Peek returns up to n entries without removing them.
+// If n <= 0, returns all entries.
 func (q *Queue) Peek(n int) []QueueEntry {
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -86,7 +87,7 @@ func (q *Queue) Peek(n int) []QueueEntry {
 		return nil
 	}
 
-	if n > len(q.entries) {
+	if n <= 0 || n > len(q.entries) {
 		n = len(q.entries)
 	}
 
