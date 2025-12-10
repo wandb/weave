@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 from collections.abc import Callable
 from dataclasses import dataclass
+from unittest.mock import patch
 
 import pytest
 
@@ -12,6 +13,7 @@ from tests.trace_server.conftest_lib.trace_server_external_adapter import (
     TestOnlyUserInjectingExternalTraceServer,
     externalize_trace_server,
 )
+from tests.trace_server.mock_clickhouse import MockClickHouseClient, MockClickHouseStorage
 from tests.trace_server.workers.evaluate_model_test_worker import (
     EvaluateModelTestDispatcher,
 )
@@ -37,7 +39,7 @@ def pytest_addoption(parser):
             "--trace-server",
             action="store",
             default="clickhouse",
-            help="Specify the backend to use: sqlite or clickhouse",
+            help="Specify the backend to use: sqlite, clickhouse, or mock",
         )
         parser.addoption(
             "--ch",
@@ -50,6 +52,12 @@ def pytest_addoption(parser):
             "--sqlite",
             action="store_true",
             help="Use sqlite server (shorthand for --trace-server=sqlite)",
+        )
+        parser.addoption(
+            "--mock",
+            "--mock-clickhouse",
+            action="store_true",
+            help="Use mock clickhouse backend (shorthand for --trace-server=mock)",
         )
         parser.addoption(
             "--clickhouse-process",
@@ -86,6 +94,8 @@ def get_trace_server_flag(request):
         return "clickhouse"
     if request.config.getoption("--sqlite"):
         return "sqlite"
+    if request.config.getoption("--mock"):
+        return "mock"
     weave_server_flag = request.config.getoption("--trace-server")
 
     # When running with `-m "not trace_server"` (e.g. trace_no_server shard),
@@ -253,6 +263,187 @@ def get_sqlite_trace_server(
             pass  # Best effort cleanup
 
 
+@dataclass
+class MockClickHouseServerState:
+    """Tracks mock ClickHouse server state for cleanup."""
+
+    server: clickhouse_trace_server_batched.ClickHouseTraceServer
+    storage: MockClickHouseStorage
+    patcher: patch
+
+
+@pytest.fixture
+def get_mock_ch_trace_server(
+    request,
+) -> Callable[[], TestOnlyUserInjectingExternalTraceServer]:
+    """Provide a factory for creating trace servers with mock ClickHouse backend.
+
+    This fixture creates a ClickHouseTraceServer that uses an in-memory mock
+    instead of a real ClickHouse database. This is useful for fast unit tests
+    that don't need the full database.
+
+    Usage:
+        pytest --mock  # or --mock-clickhouse or --trace-server=mock
+    """
+    servers_to_cleanup: list[MockClickHouseServerState] = []
+
+    def mock_ch_trace_server_inner() -> TestOnlyUserInjectingExternalTraceServer:
+        # Create a fresh storage instance for each server
+        db_suffix = _get_worker_db_suffix(request)
+        db_name = f"test_db{db_suffix}" if db_suffix else "test_db"
+        storage = MockClickHouseStorage()
+
+        # Create mock client factory
+        def create_mock_client():
+            return MockClickHouseClient(storage=storage, database=db_name)
+
+        # Create the patcher
+        patcher = patch.object(
+            clickhouse_trace_server_batched.ClickHouseTraceServer,
+            "_mint_client",
+            side_effect=create_mock_client,
+        )
+        patcher.start()
+
+        try:
+            id_converter = DummyIdConverter()
+            ch_server = clickhouse_trace_server_batched.ClickHouseTraceServer(
+                host="mock",
+                port=8123,
+                database=db_name,
+                evaluate_model_dispatcher=EvaluateModelTestDispatcher(
+                    id_converter=id_converter
+                ),
+            )
+
+            # Track for cleanup
+            servers_to_cleanup.append(
+                MockClickHouseServerState(
+                    server=ch_server,
+                    storage=storage,
+                    patcher=patcher,
+                )
+            )
+
+            # No need to run migrations for mock backend - just create the tables
+            # that the trace server expects
+            _setup_mock_tables(storage, db_name)
+
+            return externalize_trace_server(
+                ch_server, TEST_ENTITY, id_converter=id_converter
+            )
+        except Exception:
+            patcher.stop()
+            raise
+
+    yield mock_ch_trace_server_inner
+
+    # Cleanup
+    for state in servers_to_cleanup:
+        try:
+            state.patcher.stop()
+        except Exception:
+            pass
+        try:
+            state.storage.reset()
+        except Exception:
+            pass
+
+
+def _setup_mock_tables(storage: MockClickHouseStorage, database: str) -> None:
+    """Set up the tables that ClickHouseTraceServer expects.
+
+    This creates the basic table structure without running full migrations.
+    """
+    storage.create_database(database, if_not_exists=True)
+    storage.current_database = database
+
+    # Create the main tables used by the trace server
+    # These match the schema from clickhouse_schema.py
+    storage.create_table(
+        "call_parts",
+        columns=[
+            "project_id",
+            "id",
+            "trace_id",
+            "parent_id",
+            "thread_id",
+            "turn_id",
+            "op_name",
+            "started_at",
+            "ended_at",
+            "exception",
+            "attributes_dump",
+            "inputs_dump",
+            "output_dump",
+            "summary_dump",
+            "input_refs",
+            "output_refs",
+            "display_name",
+            "wb_user_id",
+            "wb_run_id",
+            "wb_run_step",
+            "wb_run_step_end",
+            "deleted_at",
+            "otel_dump",
+        ],
+        database=database,
+    )
+
+    storage.create_table(
+        "objects",
+        columns=[
+            "project_id",
+            "object_id",
+            "wb_user_id",
+            "created_at",
+            "kind",
+            "base_object_class",
+            "leaf_object_class",
+            "refs",
+            "val_dump",
+            "digest",
+            "version_index",
+            "is_latest",
+            "deleted_at",
+        ],
+        database=database,
+    )
+
+    storage.create_table(
+        "files",
+        columns=[
+            "project_id",
+            "digest",
+            "chunk_index",
+            "n_chunks",
+            "name",
+            "val_bytes",
+            "bytes_stored",
+            "file_storage_uri",
+        ],
+        database=database,
+    )
+
+    storage.create_table(
+        "feedback",
+        columns=[
+            "project_id",
+            "id",
+            "weave_ref",
+            "wb_user_id",
+            "creator",
+            "feedback_type",
+            "payload",
+            "created_at",
+            "runnable_id",
+            "call_id",
+            "sorted_trigger_refs",
+        ],
+        database=database,
+    )
+
+
 class LocalSecretFetcher:
     def fetch(self, secret_name: str) -> dict:
         return {"secrets": {secret_name: os.getenv(secret_name)}}
@@ -266,13 +457,19 @@ def local_secret_fetcher():
 
 @pytest.fixture
 def trace_server(
-    request, local_secret_fetcher, get_ch_trace_server, get_sqlite_trace_server
+    request,
+    local_secret_fetcher,
+    get_ch_trace_server,
+    get_sqlite_trace_server,
+    get_mock_ch_trace_server,
 ) -> TestOnlyUserInjectingExternalTraceServer:
     trace_server_flag = get_trace_server_flag(request)
     if trace_server_flag == "clickhouse":
         return get_ch_trace_server()
     elif trace_server_flag == "sqlite":
         return get_sqlite_trace_server()
+    elif trace_server_flag == "mock":
+        return get_mock_ch_trace_server()
     else:
         # Once we split the trace server and client code, we can raise here.
         # For now, just return the sqlite trace server so we don't break existing tests.
