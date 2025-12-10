@@ -13,11 +13,7 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from threading import Lock
 from types import MethodType
-from typing import TYPE_CHECKING, Annotated, Any, TypeVar, cast, overload
-
-if TYPE_CHECKING:
-    from weave.trace.call import Call
-
+from typing import TYPE_CHECKING, Any, TypeVar, cast, overload
 
 from weave.dataset.dataset import Dataset
 from weave.evaluation.eval import Evaluation, default_evaluation_display_name
@@ -36,6 +32,9 @@ from weave.trace.util import Thread
 from weave.trace.view_utils import set_call_view
 from weave.type_wrappers.Content.content import Content
 from weave.utils.sentinel import NOT_SET, _NotSetType
+
+if TYPE_CHECKING:
+    from weave.trace.call import Call
 
 T = TypeVar("T")
 ID = str
@@ -354,7 +353,9 @@ class ScoreLogger:
         self._captured_scores: dict[str, ScoreType] = {}
         self._has_finished: bool = False
         self._predict_output: Any = None
-        self._call_stack_context: contextlib.AbstractContextManager[list[Call]] | None = None
+        self._call_stack_context: (
+            contextlib.AbstractContextManager[list[Call]] | None
+        ) = None
 
     def finish(self, output: Any | None = None) -> None:
         """Finish the prediction and log all scores.
@@ -539,14 +540,7 @@ class ScoreLogger:
 
     async def alog_score(
         self,
-        scorer: Annotated[
-            Scorer | dict | str,
-            Field(
-                description="A metadata-only scorer used for comparisons."
-                "Alternatively, you can pass a dict of attributes or just a string"
-                "representing the ID of your scorer."
-            ),
-        ],
+        scorer: Scorer | dict | str,
         score: ScoreType,
     ) -> None:
         if self._has_finished:
@@ -689,7 +683,6 @@ class EvaluationLogger:
 
     def _initialize(self) -> None:
         """Initialize the pseudo evaluation with the dataset from the model."""
-
         # Register this instance in the global registry for atexit cleanup
         _active_evaluation_loggers.append(self)
 
