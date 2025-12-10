@@ -124,9 +124,17 @@ func (b *Batcher) flushBatch() bool {
 		return false
 	}
 
+	if Verbose {
+		var totalBytes int
+		for _, item := range batch.Items {
+			totalBytes += len(item.Payload)
+		}
+		log.Printf("[BATCH] sending %d items (%d bytes)", len(batch.Items), totalBytes)
+	}
+
 	// Send with retries
 	if err := b.sendWithRetry(batch); err != nil {
-		log.Printf("Failed to send batch after retries: %v", err)
+		log.Printf("[BATCH] FAILED after retries: %v", err)
 		b.mu.Lock()
 		b.failedCount += uint64(len(batch.Items))
 		b.mu.Unlock()
@@ -134,6 +142,10 @@ func (b *Batcher) flushBatch() bool {
 		// Dequeue failed items so we don't retry forever
 		b.queue.Dequeue(count)
 		return true
+	}
+
+	if Verbose {
+		log.Printf("[BATCH] SUCCESS sent %d items", len(batch.Items))
 	}
 
 	// Success - dequeue the sent items

@@ -187,23 +187,38 @@ func (s *Server) handleConnection(conn net.Conn) {
 }
 
 func (s *Server) handleRequest(req *Request) Response {
+	if Verbose {
+		log.Printf("[REQ] method=%s id=%d", req.Method, req.ID)
+	}
+
+	var resp Response
 	switch req.Method {
 	case "init":
-		return s.handleInit(req)
+		resp = s.handleInit(req)
 	case "enqueue":
-		return s.handleEnqueue(req)
+		resp = s.handleEnqueue(req)
 	case "flush":
-		return s.handleFlush(req)
+		resp = s.handleFlush(req)
 	case "stats":
-		return s.handleStats(req)
+		resp = s.handleStats(req)
 	case "shutdown":
-		return s.handleShutdown(req)
+		resp = s.handleShutdown(req)
 	default:
-		return Response{
+		resp = Response{
 			ID:    req.ID,
 			Error: &ErrorResponse{Code: -32601, Message: "Method not found"},
 		}
 	}
+
+	if Verbose {
+		if resp.Error != nil {
+			log.Printf("[RESP] id=%d error=%s", resp.ID, resp.Error.Message)
+		} else {
+			log.Printf("[RESP] id=%d ok", resp.ID)
+		}
+	}
+
+	return resp
 }
 
 func (s *Server) handleInit(req *Request) Response {
@@ -299,6 +314,13 @@ func (s *Server) handleEnqueue(req *Request) Response {
 
 	// Enqueue
 	ids := queue.Enqueue(entries)
+
+	if Verbose {
+		for _, item := range params.Items {
+			log.Printf("[ENQUEUE] type=%s payload_size=%d", item.Type, len(item.Payload))
+		}
+		log.Printf("[ENQUEUE] queued %d items, queue_size=%d", len(ids), queue.Len())
+	}
 
 	result, _ := json.Marshal(map[string]interface{}{
 		"ids": ids,
