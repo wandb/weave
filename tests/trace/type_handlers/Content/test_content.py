@@ -4,10 +4,9 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
+import httpx
 import pytest
 from util import generate_media
-
-import httpx
 
 import weave
 from weave import Dataset
