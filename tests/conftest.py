@@ -7,6 +7,7 @@ from collections.abc import Iterator
 from datetime import datetime
 from unittest.mock import MagicMock, patch
 
+import httpx
 import pytest
 from fastapi import FastAPI
 from fastapi.responses import StreamingResponse
@@ -577,8 +578,8 @@ def network_proxy_client(client):
             kwargs.pop("stream", None)
             return c.post(url, data=data, json=json, **kwargs)
 
-        orig_post = weave.utils.http_requests.post
-        weave.utils.http_requests.post = post
+        orig_post = httpx.post
+        httpx.post = post
 
         remote_client = RemoteHTTPTraceServer(
             trace_server_url="",
@@ -586,7 +587,7 @@ def network_proxy_client(client):
         )
         yield (client, remote_client, records)
 
-        weave.utils.http_requests.post = orig_post
+        httpx.post = orig_post
 
 
 @pytest.fixture(autouse=True)
