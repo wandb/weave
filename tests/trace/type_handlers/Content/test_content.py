@@ -7,12 +7,13 @@ from unittest.mock import patch
 import pytest
 from util import generate_media
 
+import httpx
+
 import weave
 from weave import Dataset
 from weave.trace.table import Table
 from weave.trace.weave_client import WeaveClient
 from weave.type_wrappers.Content.content import Content
-from weave.utils import http_requests as _http_requests
 
 
 class _FakeHTTPError(Exception):
@@ -546,7 +547,7 @@ That's all for now. Have a great day! ☀️
                     raise _FakeHTTPError("HTTP error")
 
         url = "https://example.com/path/to/test.txt"
-        with patch.object(_http_requests, "get", return_value=FakeResponse()):
+        with patch.object(httpx, "get", return_value=FakeResponse()):
             c = Content.from_url(url)
 
         assert isinstance(c.data, bytes)
@@ -574,7 +575,7 @@ That's all for now. Have a great day! ☀️
                     raise _FakeHTTPError("HTTP error")
 
         url = "http://example.com/download"
-        with patch.object(_http_requests, "get", return_value=FakeResponse()):
+        with patch.object(httpx, "get", return_value=FakeResponse()):
             c = Content._from_guess(url)
 
         assert c.mimetype == "application/pdf"

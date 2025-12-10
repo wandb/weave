@@ -398,11 +398,9 @@ class Content(BaseModel, Generic[T]):
         Downloads the content, infers mimetype/extension from headers, URL path,
         and data, and constructs a Content object from the resulting bytes.
         """
-        # Use our shared HTTP session with logging adapter
-        # Local import to prevent importing requests unless necessary
-        from weave.utils import http_requests as http_requests
+        import httpx
 
-        resp = http_requests.get(url, headers=headers, timeout=timeout)
+        resp = httpx.get(url, headers=headers, timeout=timeout)
         resp.raise_for_status()
 
         data = resp.content or b""
