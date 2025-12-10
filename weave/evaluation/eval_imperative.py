@@ -662,8 +662,6 @@ class EvaluationLogger:
         self._eval_started: bool = False
         self._logged_summary: bool = False
         self._is_finalized: bool = False
-        self._evaluate_call: Call | None = None
-        self._original_predict_method: Any = None
         self._context_predict_method: Any = None
         self._accumulated_predictions: list[ScoreLogger] = []
 
@@ -681,11 +679,10 @@ class EvaluationLogger:
         # objects that "look right" to our object saving system.
 
         # --- Setup the model object ---
-        # Store the original predict method if it exists
-        self._original_predict_method = None
+        # If the model doesn't have a predict method, create a placeholder
         try:
             assert isinstance(self.model, Model)
-            self._original_predict_method = self.model.get_infer_method()
+            self.model.get_infer_method()
         except MissingInferenceMethodError:
 
             @op(name="Model.predict", enable_code_capture=False)
@@ -750,15 +747,9 @@ class EvaluationLogger:
             attributes=self.attributes,
             use_stack=False,  # Don't push to global stack to prevent nesting
         )
-        if self._evaluate_call is None:
-            raise RuntimeError("Evaluation call does not exist, something went wrong!")
 
     @property
     def ui_url(self) -> str | None:
-        # In normal usage, _evaluate_call will never be None because it's set
-        # at init time.
-        if self._evaluate_call is None:
-            return None
         return self._evaluate_call.ui_url
 
     @property
@@ -786,11 +777,6 @@ class EvaluationLogger:
             return
 
         self._cleanup_predictions()
-
-        if self._evaluate_call is None:
-            raise RuntimeError(
-                "Evaluation call should exist for finalization, something went wrong!"
-            )
 
         # Finish the evaluation call
         wc = require_weave_client()
@@ -1003,11 +989,6 @@ class EvaluationLogger:
 
         if not isinstance(name, str) or len(name) == 0:
             raise ValueError("`name` must be a non-empty string")
-
-        if self._evaluate_call is None:
-            raise RuntimeError(
-                "Evaluation call not initialized; cannot add view before evaluation starts"
-            )
 
         wc = require_weave_client()
 
