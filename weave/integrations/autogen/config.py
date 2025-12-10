@@ -1,7 +1,10 @@
-from pydantic import BaseModel
+from __future__ import annotations
+
+from dataclasses import asdict, dataclass, field
 
 
-class BasePatchClassConfig(BaseModel):
+@dataclass
+class BasePatchClassConfig:
     """Configuration for patching a specific class in the autogen library.
 
     This model defines which methods of a class should be patched and whether
@@ -20,7 +23,8 @@ class BasePatchClassConfig(BaseModel):
     should_patch_subclasses: bool = True
 
 
-class BasePatchModuleConfig(BaseModel):
+@dataclass
+class BasePatchModuleConfig:
     """Configuration for patching classes within a specific module.
 
     This model defines which module contains the classes to be patched
@@ -32,7 +36,7 @@ class BasePatchModuleConfig(BaseModel):
     """
 
     module_path: str
-    classes: list[BasePatchClassConfig]
+    classes: list[BasePatchClassConfig] = field(default_factory=list)
 
 
 def _get_module_patch_configs() -> list[BasePatchModuleConfig]:
@@ -185,10 +189,10 @@ def _get_module_patch_configs() -> list[BasePatchModuleConfig]:
     ]
 
 
-def get_module_patch_configs() -> list[BasePatchModuleConfig]:
+def get_module_patch_configs() -> list[dict]:
     """Returns the module patch configurations as dictionaries.
 
-    This function converts the internal Pydantic models to dictionaries
+    This function converts the internal dataclass objects to dictionaries
     for easier consumption by the patching mechanism. This is the public
     API used by the autogen SDK to retrieve patching configurations.
 
@@ -196,4 +200,4 @@ def get_module_patch_configs() -> list[BasePatchModuleConfig]:
         A list of dictionaries representing the module patch configurations.
         Each dictionary contains module paths and classes to patch.
     """
-    return [item.model_dump() for item in _get_module_patch_configs()]
+    return [asdict(item) for item in _get_module_patch_configs()]
