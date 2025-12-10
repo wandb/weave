@@ -74,11 +74,12 @@ else:  # Unix/Linux/MacOS
     try:
         import termios
         import tty
-
-        _HAS_TERMIOS = True
     except ImportError:
         # termios not available (e.g., in Pyodide/browser environments)
         pass
+    else:
+        _HAS_TERMIOS = True
+
 
 if _HAS_TERMIOS:
 
