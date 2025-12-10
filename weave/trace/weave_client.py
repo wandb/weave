@@ -350,6 +350,21 @@ class WeaveClient:
             self._server_feedback_processor = self.server.get_feedback_processor()
         self.send_file_cache = WeaveClientSendFileCache()
 
+        # Check if using Go sender - bypass future_executor for call_start/call_end
+        self._uses_go_sender = self._check_uses_go_sender()
+
+    def _check_uses_go_sender(self) -> bool:
+        """Check if the server uses the Go sender for batching."""
+        # Import here to avoid circular imports
+        try:
+            from weave.trace_server_bindings.go_sender_trace_server import (
+                GoSenderTraceServer,
+            )
+
+            return isinstance(self.server, GoSenderTraceServer)
+        except ImportError:
+            return False
+
     ################ High Level Convenience Methods ################
 
     @trace_sentry.global_trace_sentry.watch()
@@ -803,16 +818,27 @@ class WeaveClient:
             self.server.call_start(call_start_req)
             return True
 
-        def on_complete(f: Future) -> None:
+        # For Go sender, call directly without deferring - UDS write is fast
+        if self._uses_go_sender:
             try:
-                root_call_did_not_error = f.result() and not current_call
-                if root_call_did_not_error and should_print_call_link_:
+                result = send_start_call()
+                # Handle print_call_link for root calls
+                if result and not current_call and should_print_call_link_:
                     print_call_link(call)
             except Exception:
                 pass
+        else:
+            # For Python sender, defer to background thread
+            def on_complete(f: Future) -> None:
+                try:
+                    root_call_did_not_error = f.result() and not current_call
+                    if root_call_did_not_error and should_print_call_link_:
+                        print_call_link(call)
+                except Exception:
+                    pass
 
-        fut = self.future_executor.defer(send_start_call)
-        fut.add_done_callback(on_complete)
+            fut = self.future_executor.defer(send_start_call)
+            fut.add_done_callback(on_complete)
 
         if use_stack:
             call_context.push_call(call)
@@ -963,7 +989,15 @@ class WeaveClient:
                 )
             self.server.call_end(call_end_req)
 
-        self.future_executor.defer(send_end_call)
+        # For Go sender, call directly without deferring - UDS write is fast
+        if self._uses_go_sender:
+            try:
+                send_end_call()
+            except Exception:
+                pass
+        else:
+            # For Python sender, defer to background thread
+            self.future_executor.defer(send_end_call)
 
         # If a turn call is finishing, reset turn context for next sibling
         if call.turn_id == call.id and call.thread_id:
