@@ -21,7 +21,7 @@ type BatchConfig struct {
 // DefaultBatchConfig returns sensible defaults
 func DefaultBatchConfig() BatchConfig {
 	return BatchConfig{
-		MaxBatchSize:    100,
+		MaxBatchSize:    1000,             // Higher default since byte limit is the real constraint
 		MaxBatchBytes:   31 * 1024 * 1024, // 31 MiB (server limit is 32)
 		FlushInterval:   time.Second,
 		MaxRetries:      3,
@@ -45,19 +45,26 @@ type Batcher struct {
 	mu          sync.RWMutex
 	sentCount   uint64
 	failedCount uint64
+
+	// In-flight tracking
+	inFlight   int
+	inFlightMu sync.Mutex
+	idleCond   *sync.Cond
 }
 
 // NewBatcher creates a new batcher
 func NewBatcher(config BatchConfig, queue *Queue, sender *HTTPSender) *Batcher {
 	ctx, cancel := context.WithCancel(context.Background())
 
-	return &Batcher{
+	b := &Batcher{
 		config: config,
 		queue:  queue,
 		sender: sender,
 		ctx:    ctx,
 		cancel: cancel,
 	}
+	b.idleCond = sync.NewCond(&b.inFlightMu)
+	return b
 }
 
 // Start begins the batching goroutine
@@ -77,6 +84,22 @@ func (b *Batcher) Stats() (sent, failed uint64) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 	return b.sentCount, b.failedCount
+}
+
+// InFlight returns the number of batches currently being sent
+func (b *Batcher) InFlight() int {
+	b.inFlightMu.Lock()
+	defer b.inFlightMu.Unlock()
+	return b.inFlight
+}
+
+// WaitIdle blocks until queue is empty and no batches are in flight
+func (b *Batcher) WaitIdle() {
+	b.inFlightMu.Lock()
+	defer b.inFlightMu.Unlock()
+	for b.inFlight > 0 || b.queue.Len() > 0 {
+		b.idleCond.Wait()
+	}
 }
 
 func (b *Batcher) processLoop() {
@@ -115,6 +138,12 @@ func (b *Batcher) flushBatch() bool {
 	// Peek at entries (don't dequeue yet in case send fails)
 	entries := b.queue.Peek(b.config.MaxBatchSize)
 	if len(entries) == 0 {
+		// Signal that we might be idle
+		b.inFlightMu.Lock()
+		if b.inFlight == 0 && b.queue.Len() == 0 {
+			b.idleCond.Broadcast()
+		}
+		b.inFlightMu.Unlock()
 		return false
 	}
 
@@ -123,6 +152,11 @@ func (b *Batcher) flushBatch() bool {
 	if len(batch.Items) == 0 {
 		return false
 	}
+
+	// Mark as in-flight
+	b.inFlightMu.Lock()
+	b.inFlight++
+	b.inFlightMu.Unlock()
 
 	if Verbose {
 		var totalBytes int
@@ -141,6 +175,14 @@ func (b *Batcher) flushBatch() bool {
 
 		// Dequeue failed items so we don't retry forever
 		b.queue.Dequeue(count)
+
+		// Mark as no longer in-flight
+		b.inFlightMu.Lock()
+		b.inFlight--
+		if b.inFlight == 0 && b.queue.Len() == 0 {
+			b.idleCond.Broadcast()
+		}
+		b.inFlightMu.Unlock()
 		return true
 	}
 
@@ -155,6 +197,14 @@ func (b *Batcher) flushBatch() bool {
 	b.mu.Lock()
 	b.sentCount += uint64(len(batch.Items))
 	b.mu.Unlock()
+
+	// Mark as no longer in-flight and signal if idle
+	b.inFlightMu.Lock()
+	b.inFlight--
+	if b.inFlight == 0 && b.queue.Len() == 0 {
+		b.idleCond.Broadcast()
+	}
+	b.inFlightMu.Unlock()
 
 	return true
 }

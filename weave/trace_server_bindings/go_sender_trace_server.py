@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING
 from typing_extensions import Self
 
 from weave.trace.env import weave_trace_server_url
-from weave.trace.settings import go_sender_socket_path
+from weave.trace.settings import go_sender_max_batch_size, go_sender_socket_path
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
 from weave.trace_server_bindings.weave_sender_client import (
@@ -82,10 +82,16 @@ class GoSenderTraceServer(RemoteHTTPTraceServer):
                 if self._auth:
                     auth_param = (self._auth[0], self._auth[1])
 
+                config = {}
+                max_batch = go_sender_max_batch_size()
+                if max_batch is not None:
+                    config["max_batch_size"] = max_batch
+
                 self._go_sender.init(
                     server_url=self.trace_server_url,
                     auth=auth_param,
                     headers=self._extra_headers,
+                    config=config if config else None,
                 )
                 self._go_sender_initialized = True
                 logger.debug("Go sender initialized successfully")
@@ -186,6 +192,18 @@ class GoSenderTraceServer(RemoteHTTPTraceServer):
                 self._go_sender.flush()
             except Exception as e:
                 logger.warning(f"Failed to flush Go sender: {e}")
+
+    def wait_idle(self) -> None:
+        """Wait until all items have been sent to the server.
+
+        This flushes any pending items and blocks until all in-flight
+        HTTP requests complete. Use this for accurate benchmarking.
+        """
+        if self._go_sender is not None and self._go_sender_initialized:
+            try:
+                self._go_sender.wait_idle()
+            except Exception as e:
+                logger.warning(f"Failed to wait_idle Go sender: {e}")
 
     def stats(self) -> dict[str, int] | None:
         """Get Go sender statistics."""

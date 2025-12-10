@@ -226,6 +226,15 @@ class UserSettings(BaseModel):
     Can be overridden with the environment variable `WEAVE_GO_SENDER_SOCKET_PATH`
     """
 
+    go_sender_max_batch_size: int | None = None
+    """
+    Sets the maximum number of items per batch for the Go sidecar.
+
+    If not set, defaults to 1000. The byte limit (31 MiB) is usually the
+    more important constraint for large payloads.
+    Can be overridden with the environment variable `WEAVE_GO_SENDER_MAX_BATCH_SIZE`
+    """
+
     model_config = ConfigDict(extra="forbid")
     _is_first_apply: bool = PrivateAttr(True)
 
@@ -364,6 +373,11 @@ def should_use_go_sender() -> bool:
 def go_sender_socket_path() -> str | None:
     """Returns the Unix Domain Socket path for the Go sidecar."""
     return _optional_str("go_sender_socket_path")
+
+
+def go_sender_max_batch_size() -> int | None:
+    """Returns the maximum batch size for the Go sidecar."""
+    return _optional_int("go_sender_max_batch_size")
 
 
 def parse_and_apply_settings(

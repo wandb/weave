@@ -199,6 +199,8 @@ func (s *Server) handleRequest(req *Request) Response {
 		resp = s.handleEnqueue(req)
 	case "flush":
 		resp = s.handleFlush(req)
+	case "wait_idle":
+		resp = s.handleWaitIdle(req)
 	case "stats":
 		resp = s.handleStats(req)
 	case "shutdown":
@@ -341,6 +343,32 @@ func (s *Server) handleFlush(req *Request) Response {
 	s.mu.Unlock()
 
 	batcher.FlushAll()
+
+	result, _ := json.Marshal(map[string]bool{"ok": true})
+	return Response{ID: req.ID, Result: result}
+}
+
+func (s *Server) handleWaitIdle(req *Request) Response {
+	s.mu.Lock()
+	if !s.running {
+		s.mu.Unlock()
+		return Response{
+			ID:    req.ID,
+			Error: &ErrorResponse{Code: -32000, Message: "Not initialized"},
+		}
+	}
+	batcher := s.batcher
+	s.mu.Unlock()
+
+	// First trigger a flush to start processing any queued items
+	batcher.FlushAll()
+
+	// Then wait until all in-flight requests complete
+	batcher.WaitIdle()
+
+	if Verbose {
+		log.Printf("[WAIT_IDLE] complete")
+	}
 
 	result, _ := json.Marshal(map[string]bool{"ok": true})
 	return Response{ID: req.ID, Result: result}

@@ -265,6 +265,17 @@ class WeaveSenderClient:
 
         self._send_request("flush")
 
+    def wait_idle(self) -> None:
+        """Wait until all items have been sent to the server.
+
+        This flushes any pending items and blocks until all in-flight
+        HTTP requests complete. Use this for accurate benchmarking.
+        """
+        if not self._initialized:
+            raise RuntimeError("Client not initialized. Call init() first.")
+
+        self._send_request("wait_idle")
+
     def stats(self) -> dict[str, int]:
         """Get current statistics.
 
