@@ -659,10 +659,7 @@ class EvaluationLogger:
         self.dataset: Dataset = _cast_to_imperative_dataset(dataset)
 
         # Private state
-        self._eval_started: bool = False
-        self._logged_summary: bool = False
         self._is_finalized: bool = False
-        self._context_predict_method: Any = None
         self._accumulated_predictions: list[ScoreLogger] = []
 
         # Register this instance in the global registry for atexit cleanup
