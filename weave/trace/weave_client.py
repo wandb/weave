@@ -361,7 +361,11 @@ class WeaveClient:
                 GoSenderTraceServer,
             )
 
-            return isinstance(self.server, GoSenderTraceServer)
+            # Unwrap caching middleware if present
+            server = self.server
+            if hasattr(server, "_next_trace_server"):
+                server = server._next_trace_server
+            return isinstance(server, GoSenderTraceServer)
         except ImportError:
             return False
 

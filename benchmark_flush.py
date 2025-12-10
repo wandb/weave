@@ -47,9 +47,14 @@ def run_benchmark(num_calls: int = 1000) -> dict:
     dummy_op(0)
     client.flush()
 
+    # Get the underlying server (unwrap caching middleware if present)
+    warmup_server = client.server
+    if hasattr(warmup_server, '_next_trace_server'):
+        warmup_server = warmup_server._next_trace_server
+
     # For Go sender, also wait for actual completion
-    if use_go and hasattr(client, 'server') and isinstance(client.server, GoSenderTraceServer):
-        client.server.wait_idle()
+    if use_go and isinstance(warmup_server, GoSenderTraceServer):
+        warmup_server.wait_idle()
 
     time.sleep(0.5)
 
@@ -71,14 +76,20 @@ def run_benchmark(num_calls: int = 1000) -> dict:
     print("Flushing...")
     flush_start_time = time.perf_counter()
 
-    if use_go and hasattr(client, 'server') and isinstance(client.server, GoSenderTraceServer):
-        # For Go sender, we bypass future_executor, so just wait for Go sidecar
-        print("Waiting for Go sender queue to empty...")
-        stats_before = client.server.stats()
-        print(f"  Stats before wait_queue_empty: {stats_before}")
-        client.server.wait_queue_empty()
-        stats_after = client.server.stats()
-        print(f"  Stats after wait_queue_empty: {stats_after}")
+    # Get the underlying server (unwrap caching middleware if present)
+    server = client.server
+    if hasattr(server, '_next_trace_server'):
+        server = server._next_trace_server
+
+    if use_go and isinstance(server, GoSenderTraceServer):
+        # For Go sender, we bypass future_executor, so wait for HTTP completion
+        # (same as Python's flush which joins the processing thread)
+        print("Waiting for Go sender to complete all HTTP requests...")
+        stats_before = server.stats()
+        print(f"  Stats before wait_idle: {stats_before}")
+        server.wait_idle()
+        stats_after = server.stats()
+        print(f"  Stats after wait_idle: {stats_after}")
     else:
         # For Python sender, flush the future_executor
         client.flush()
