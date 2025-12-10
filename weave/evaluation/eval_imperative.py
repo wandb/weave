@@ -667,22 +667,6 @@ class EvaluationLogger:
         self._context_predict_method: Any = None
         self._accumulated_predictions: list[ScoreLogger] = []
 
-        self._initialize()
-
-    @property
-    def ui_url(self) -> str | None:
-        # In normal usage, _evaluate_call will never be None because it's set
-        # at init time.
-        if self._evaluate_call is None:
-            return None
-        return self._evaluate_call.ui_url
-
-    @property
-    def attributes(self) -> dict[str, Any]:
-        return self.eval_attributes | IMPERATIVE_EVAL_MARKER
-
-    def _initialize(self) -> None:
-        """Initialize the pseudo evaluation with the dataset from the model."""
         # Register this instance in the global registry for atexit cleanup
         _active_evaluation_loggers.append(self)
 
@@ -768,6 +752,18 @@ class EvaluationLogger:
         )
         if self._evaluate_call is None:
             raise RuntimeError("Evaluation call does not exist, something went wrong!")
+
+    @property
+    def ui_url(self) -> str | None:
+        # In normal usage, _evaluate_call will never be None because it's set
+        # at init time.
+        if self._evaluate_call is None:
+            return None
+        return self._evaluate_call.ui_url
+
+    @property
+    def attributes(self) -> dict[str, Any]:
+        return self.eval_attributes | IMPERATIVE_EVAL_MARKER
 
     def _cleanup_predictions(self) -> None:
         if self._is_finalized:
