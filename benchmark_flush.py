@@ -75,7 +75,11 @@ def run_benchmark(num_calls: int = 1000) -> dict:
     # For Go sender, wait for actual completion (all HTTP requests done)
     if use_go and hasattr(client, 'server') and isinstance(client.server, GoSenderTraceServer):
         print("Waiting for Go sender to complete all HTTP requests...")
+        stats_before = client.server.stats()
+        print(f"  Stats before wait_idle: {stats_before}")
         client.server.wait_idle()
+        stats_after = client.server.stats()
+        print(f"  Stats after wait_idle: {stats_after}")
 
     flush_end_time = time.perf_counter()
     flush_duration = flush_end_time - flush_start_time

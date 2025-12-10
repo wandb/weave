@@ -358,16 +358,25 @@ func (s *Server) handleWaitIdle(req *Request) Response {
 		}
 	}
 	batcher := s.batcher
+	queue := s.queue
 	s.mu.Unlock()
+
+	if Verbose {
+		log.Printf("[WAIT_IDLE] starting, queue=%d, in_flight=%d", queue.Len(), batcher.InFlight())
+	}
 
 	// First trigger a flush to start processing any queued items
 	batcher.FlushAll()
+
+	if Verbose {
+		log.Printf("[WAIT_IDLE] after FlushAll, queue=%d, in_flight=%d", queue.Len(), batcher.InFlight())
+	}
 
 	// Then wait until all in-flight requests complete
 	batcher.WaitIdle()
 
 	if Verbose {
-		log.Printf("[WAIT_IDLE] complete")
+		log.Printf("[WAIT_IDLE] complete, queue=%d, in_flight=%d", queue.Len(), batcher.InFlight())
 	}
 
 	result, _ := json.Marshal(map[string]bool{"ok": true})
