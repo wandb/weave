@@ -390,7 +390,13 @@ if not _import_failed:
                 elif is_progress_event:
                     # Get or create accumulator entry
                     if event.span_id not in self._accumulators:
-                        self._accumulators[event.span_id] = [None, False, {}, None, None]
+                        self._accumulators[event.span_id] = [
+                            None,
+                            False,
+                            {},
+                            None,
+                            None,
+                        ]
 
                     acc_entry = self._accumulators[event.span_id]
                     acc_entry[2] = raw_event_payload
