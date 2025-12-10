@@ -17,10 +17,7 @@ from weave.trace.env import weave_trace_server_url
 from weave.trace.settings import go_sender_max_batch_size, go_sender_socket_path
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
-from weave.trace_server_bindings.weave_sender_client import (
-    WeaveSenderClient,
-    WeaveSenderError,
-)
+from weave.trace_server_bindings.weave_sender_client import WeaveSenderClient
 
 if TYPE_CHECKING:
     from weave.trace_server_bindings.models import ServerInfoRes
@@ -77,28 +74,23 @@ class GoSenderTraceServer(RemoteHTTPTraceServer):
             self._go_sender = WeaveSenderClient(socket_path=socket_path)
 
         if not self._go_sender_initialized:
-            try:
-                auth_param = None
-                if self._auth:
-                    auth_param = (self._auth[0], self._auth[1])
+            auth_param = None
+            if self._auth:
+                auth_param = (self._auth[0], self._auth[1])
 
-                config = {}
-                max_batch = go_sender_max_batch_size()
-                if max_batch is not None:
-                    config["max_batch_size"] = max_batch
+            config = {}
+            max_batch = go_sender_max_batch_size()
+            if max_batch is not None:
+                config["max_batch_size"] = max_batch
 
-                self._go_sender.init(
-                    server_url=self.trace_server_url,
-                    auth=auth_param,
-                    headers=self._extra_headers,
-                    config=config if config else None,
-                )
-                self._go_sender_initialized = True
-                logger.debug("Go sender initialized successfully")
-            except Exception as e:
-                logger.warning(f"Failed to initialize Go sender: {e}, falling back to Python")
-                self._should_use_go_sender = False
-                raise
+            self._go_sender.init(
+                server_url=self.trace_server_url,
+                auth=auth_param,
+                headers=self._extra_headers,
+                config=config if config else None,
+            )
+            self._go_sender_initialized = True
+            logger.debug("Go sender initialized successfully")
 
         return self._go_sender
 
@@ -122,76 +114,52 @@ class GoSenderTraceServer(RemoteHTTPTraceServer):
         # Re-initialize Go sender with new auth if already initialized
         if self._go_sender_initialized and self._go_sender is not None:
             self._go_sender_initialized = False
-            try:
-                self._ensure_go_sender()
-            except Exception:
-                pass  # Will fall back to Python
+            self._ensure_go_sender()
 
     def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
-        """Start a call, using Go sender if available."""
+        """Start a call, using Go sender."""
         if not self._should_use_go_sender:
             return super().call_start(req)
 
-        try:
-            sender = self._ensure_go_sender()
+        sender = self._ensure_go_sender()
 
-            # Ensure we have IDs
-            if req.start.id is None or req.start.trace_id is None:
-                raise ValueError("CallStartReq must have id and trace_id")
+        # Ensure we have IDs
+        if req.start.id is None or req.start.trace_id is None:
+            raise ValueError("CallStartReq must have id and trace_id")
 
-            # Serialize the request
-            payload = json.loads(req.model_dump_json(by_alias=True))
+        # Serialize the request
+        payload = json.loads(req.model_dump_json(by_alias=True))
 
-            # Enqueue to Go sender
-            sender.enqueue([{
-                "type": "start",
-                "payload": payload,
-            }])
+        # Enqueue to Go sender
+        sender.enqueue([{
+            "type": "start",
+            "payload": payload,
+        }])
 
-            return tsi.CallStartRes(id=req.start.id, trace_id=req.start.trace_id)
-
-        except WeaveSenderError as e:
-            logger.warning(f"Go sender error: {e}, falling back to Python")
-            return super().call_start(req)
-        except Exception as e:
-            logger.warning(f"Go sender error: {e}, falling back to Python")
-            self._should_use_go_sender = False
-            return super().call_start(req)
+        return tsi.CallStartRes(id=req.start.id, trace_id=req.start.trace_id)
 
     def call_end(self, req: tsi.CallEndReq) -> tsi.CallEndRes:
-        """End a call, using Go sender if available."""
+        """End a call, using Go sender."""
         if not self._should_use_go_sender:
             return super().call_end(req)
 
-        try:
-            sender = self._ensure_go_sender()
+        sender = self._ensure_go_sender()
 
-            # Serialize the request
-            payload = json.loads(req.model_dump_json(by_alias=True))
+        # Serialize the request
+        payload = json.loads(req.model_dump_json(by_alias=True))
 
-            # Enqueue to Go sender
-            sender.enqueue([{
-                "type": "end",
-                "payload": payload,
-            }])
+        # Enqueue to Go sender
+        sender.enqueue([{
+            "type": "end",
+            "payload": payload,
+        }])
 
-            return tsi.CallEndRes()
-
-        except WeaveSenderError as e:
-            logger.warning(f"Go sender error: {e}, falling back to Python")
-            return super().call_end(req)
-        except Exception as e:
-            logger.warning(f"Go sender error: {e}, falling back to Python")
-            self._should_use_go_sender = False
-            return super().call_end(req)
+        return tsi.CallEndRes()
 
     def flush(self) -> None:
         """Flush pending items in Go sender."""
         if self._go_sender is not None and self._go_sender_initialized:
-            try:
-                self._go_sender.flush()
-            except Exception as e:
-                logger.warning(f"Failed to flush Go sender: {e}")
+            self._go_sender.flush()
 
     def wait_idle(self) -> None:
         """Wait until all items have been sent to the server.
@@ -200,10 +168,7 @@ class GoSenderTraceServer(RemoteHTTPTraceServer):
         HTTP requests complete. Use this for accurate benchmarking.
         """
         if self._go_sender is not None and self._go_sender_initialized:
-            try:
-                self._go_sender.wait_idle()
-            except Exception as e:
-                logger.warning(f"Failed to wait_idle Go sender: {e}")
+            self._go_sender.wait_idle()
 
     def stats(self) -> dict[str, int] | None:
         """Get Go sender statistics."""
