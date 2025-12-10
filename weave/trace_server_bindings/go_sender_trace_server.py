@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING
 from typing_extensions import Self
 
 from weave.trace.env import weave_trace_server_url
+from weave.trace.settings import go_sender_socket_path
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
 from weave.trace_server_bindings.weave_sender_client import (
@@ -72,7 +73,8 @@ class GoSenderTraceServer(RemoteHTTPTraceServer):
     def _ensure_go_sender(self) -> WeaveSenderClient:
         """Lazily initialize the Go sender client."""
         if self._go_sender is None:
-            self._go_sender = WeaveSenderClient()
+            socket_path = go_sender_socket_path()
+            self._go_sender = WeaveSenderClient(socket_path=socket_path)
 
         if not self._go_sender_initialized:
             try:

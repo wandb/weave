@@ -216,6 +216,16 @@ class UserSettings(BaseModel):
     Can be overridden with the environment variable `WEAVE_USE_GO_SENDER`
     """
 
+    go_sender_socket_path: str | None = None
+    """
+    Sets the Unix Domain Socket path for the Go sidecar.
+
+    If not set, defaults to /tmp/weave-sender.sock.
+    This is useful when running multiple Weave instances that need separate sidecars,
+    or when you want to control exactly which sidecar process Python connects to.
+    Can be overridden with the environment variable `WEAVE_GO_SENDER_SOCKET_PATH`
+    """
+
     model_config = ConfigDict(extra="forbid")
     _is_first_apply: bool = PrivateAttr(True)
 
@@ -349,6 +359,11 @@ def should_use_stainless_server() -> bool:
 def should_use_go_sender() -> bool:
     """Returns whether the Go-based sidecar should be used for sending trace data."""
     return _should("use_go_sender")
+
+
+def go_sender_socket_path() -> str | None:
+    """Returns the Unix Domain Socket path for the Go sidecar."""
+    return _optional_str("go_sender_socket_path")
 
 
 def parse_and_apply_settings(
