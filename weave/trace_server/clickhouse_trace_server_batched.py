@@ -137,7 +137,7 @@ from weave.trace_server.project_query_builder import make_project_stats_query
 from weave.trace_server.project_version.project_version import (
     TableRoutingResolver,
 )
-from weave.trace_server.project_version.types import WriteTarget
+from weave.trace_server.project_version.types import ReadTable, WriteTarget
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 from weave.trace_server.table_query_builder import (
     ROW_ORDER_COLUMN_NAME,
@@ -758,9 +758,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         """Returns a stats object for the given query. This is useful for counts or other
         aggregate statistics that are not directly queryable from the calls themselves.
         """
-        project_version = self.table_routing_resolver.resolve_read_table(req.project_id).value
+        read_table = self.table_routing_resolver.resolve_read_table(
+            req.project_id
+        ).value
         pb = ParamBuilder()
-        query, columns = build_calls_stats_query(req, pb, project_version)
+        query, columns = build_calls_stats_query(req, pb, read_table)
         raw_res = self._query(query, pb.get_params())
 
         res_dict = (
@@ -777,7 +779,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.calls_query_stream")
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
         """Returns a stream of calls that match the given query."""
-        read_table = self.table_routing_resolver.resolve_read_table(req.project_id).value
+        read_table = self.table_routing_resolver.resolve_read_table(
+            req.project_id
+        ).value
         cq = CallsQuery(
             project_id=req.project_id,
             read_table=read_table,
@@ -826,7 +830,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             cq.add_field(col)
         if req.filter is not None:
             cq.set_hardcoded_filter(
-                HardCodedFilter(filter=req.filter, project_version=project_version)
+                HardCodedFilter(filter=req.filter, read_table=read_table)
             )
         if req.query is not None:
             cq.add_condition(req.query.expr_)
@@ -849,7 +853,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         pb = ParamBuilder()
         raw_res = self._query_stream(
-            cq.as_sql(pb), pb.get_params(), project_version=project_version
+            cq.as_sql(pb), pb.get_params(), read_table=read_table
         )
 
         select_columns = [c.field for c in cq.select_fields]
@@ -1687,7 +1691,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         def _default_true(val: bool | None) -> bool:
             return True if val is None else val
 
-        calls_table_alias = self.table_routing_resolver.resolve_read_table(req.project_id).value
+        calls_table_alias = self.table_routing_resolver.resolve_read_table(
+            req.project_id
+        ).value
 
         pb = ParamBuilder()
         query, columns = make_project_stats_query(
@@ -1723,13 +1729,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             before_datetime = req.filter.before_datetime
             thread_ids = req.filter.thread_ids
 
-        project_version = self.table_routing_resolver.resolve_read_table(req.project_id).value
+        read_table = self.table_routing_resolver.resolve_read_table(
+            req.project_id
+        ).value
 
         # Use the dedicated query builder
         query = make_threads_query(
             project_id=req.project_id,
             pb=pb,
-            project_version=project_version,
+            read_table=read_table,
             limit=req.limit,
             offset=req.offset,
             sort_by=req.sort_by,
@@ -4931,7 +4939,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         parameters: dict[str, Any],
         column_formats: dict[str, Any] | None = None,
         settings: dict[str, Any] | None = None,
-        project_version: ProjectVersion | None = None,
+        read_table: ReadTable | None = None,
     ) -> Iterator[tuple]:
         """Streams the results of a query from the database."""
         if not settings:
@@ -4956,7 +4964,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                         "query": query,
                         "parameters": parameters,
                         "summary": summary,
-                        "project_version": project_version,
+                        "read_table": read_table,
                     },
                 )
                 yield from stream
@@ -4967,7 +4975,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     "error_str": str(e),
                     "query": query,
                     "parameters": parameters,
-                    "project_version": project_version,
+                    "read_table": read_table,
                 },
             )
             # always raises, optionally with custom error class

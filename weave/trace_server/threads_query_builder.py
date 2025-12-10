@@ -2,13 +2,13 @@ import datetime
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.orm import ParamBuilder
-from weave.trace_server.project_version.types import ProjectVersion
+from weave.trace_server.project_version.types import ReadTable
 
 
 def make_threads_query(
     project_id: str,
     pb: ParamBuilder,
-    project_version: ProjectVersion,
+    read_table: ReadTable,
     *,
     limit: int | None = None,
     offset: int | None = None,
@@ -135,7 +135,7 @@ def make_threads_query(
     # - call_duration: Calculate call duration in milliseconds
     # - Group by call id to merge partial rows
     # - Filter to turn calls only
-    if project_version == ProjectVersion.CALLS_MERGED_VERSION:
+    if read_table == ReadTable.CALLS_MERGED:
         query = f"""
         SELECT
             aggregated_thread_id AS thread_id,
