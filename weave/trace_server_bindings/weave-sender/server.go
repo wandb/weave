@@ -199,6 +199,8 @@ func (s *Server) handleRequest(req *Request) Response {
 		resp = s.handleEnqueue(req)
 	case "flush":
 		resp = s.handleFlush(req)
+	case "wait_queue_empty":
+		resp = s.handleWaitQueueEmpty(req)
 	case "wait_idle":
 		resp = s.handleWaitIdle(req)
 	case "stats":
@@ -343,6 +345,40 @@ func (s *Server) handleFlush(req *Request) Response {
 	s.mu.Unlock()
 
 	batcher.FlushAll()
+
+	result, _ := json.Marshal(map[string]bool{"ok": true})
+	return Response{ID: req.ID, Result: result}
+}
+
+func (s *Server) handleWaitQueueEmpty(req *Request) Response {
+	s.mu.Lock()
+	if !s.running {
+		s.mu.Unlock()
+		return Response{
+			ID:    req.ID,
+			Error: &ErrorResponse{Code: -32000, Message: "Not initialized"},
+		}
+	}
+	batcher := s.batcher
+	queue := s.queue
+	s.mu.Unlock()
+
+	if Verbose {
+		log.Printf("[WAIT_QUEUE_EMPTY] starting, queue=%d", queue.Len())
+	}
+
+	// Trigger a flush to start processing any queued items
+	batcher.FlushAll()
+
+	// Poll until queue is empty (items picked up by batcher)
+	for queue.Len() > 0 {
+		time.Sleep(1 * time.Millisecond)
+		batcher.FlushAll()
+	}
+
+	if Verbose {
+		log.Printf("[WAIT_QUEUE_EMPTY] complete, queue=%d", queue.Len())
+	}
 
 	result, _ := json.Marshal(map[string]bool{"ok": true})
 	return Response{ID: req.ID, Result: result}

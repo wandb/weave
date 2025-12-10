@@ -161,6 +161,15 @@ class GoSenderTraceServer(RemoteHTTPTraceServer):
         if self._go_sender is not None and self._go_sender_initialized:
             self._go_sender.flush()
 
+    def wait_queue_empty(self) -> None:
+        """Wait until the queue is empty.
+
+        This flushes any pending items and blocks until all items have been
+        picked up by the batcher. HTTP requests may still be in flight.
+        """
+        if self._go_sender is not None and self._go_sender_initialized:
+            self._go_sender.wait_queue_empty()
+
     def wait_idle(self) -> None:
         """Wait until all items have been sent to the server.
 

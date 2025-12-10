@@ -73,12 +73,12 @@ def run_benchmark(num_calls: int = 1000) -> dict:
 
     if use_go and hasattr(client, 'server') and isinstance(client.server, GoSenderTraceServer):
         # For Go sender, we bypass future_executor, so just wait for Go sidecar
-        print("Waiting for Go sender to complete all HTTP requests...")
+        print("Waiting for Go sender queue to empty...")
         stats_before = client.server.stats()
-        print(f"  Stats before wait_idle: {stats_before}")
-        client.server.wait_idle()
+        print(f"  Stats before wait_queue_empty: {stats_before}")
+        client.server.wait_queue_empty()
         stats_after = client.server.stats()
-        print(f"  Stats after wait_idle: {stats_after}")
+        print(f"  Stats after wait_queue_empty: {stats_after}")
     else:
         # For Python sender, flush the future_executor
         client.flush()

@@ -265,6 +265,18 @@ class WeaveSenderClient:
 
         self._send_request("flush")
 
+    def wait_queue_empty(self) -> None:
+        """Wait until the queue is empty.
+
+        This flushes any pending items and blocks until all items have been
+        picked up by the batcher. HTTP requests may still be in flight.
+        Use this for measuring time to drain the queue.
+        """
+        if not self._initialized:
+            raise RuntimeError("Client not initialized. Call init() first.")
+
+        self._send_request("wait_queue_empty")
+
     def wait_idle(self) -> None:
         """Wait until all items have been sent to the server.
 
