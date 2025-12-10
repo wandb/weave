@@ -33,9 +33,10 @@ type Server struct {
 
 // Request represents an incoming request from a client
 type Request struct {
-	ID     int             `json:"id"`
-	Method string          `json:"method"`
-	Params json.RawMessage `json:"params"`
+	ID      int             `json:"id"`
+	Method  string          `json:"method"`
+	Params  json.RawMessage `json:"params"`
+	NoReply bool            `json:"no_reply,omitempty"` // If true, don't send a response
 }
 
 // Response represents an outgoing response to a client
@@ -179,6 +180,12 @@ func (s *Server) handleConnection(conn net.Conn) {
 		}
 
 		resp := s.handleRequest(&req)
+
+		// Skip response for fire-and-forget requests
+		if req.NoReply {
+			continue
+		}
+
 		if err := encoder.Encode(resp); err != nil {
 			log.Printf("Failed to encode response: %v", err)
 			return

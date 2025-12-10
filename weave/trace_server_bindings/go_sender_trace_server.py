@@ -130,8 +130,8 @@ class GoSenderTraceServer(RemoteHTTPTraceServer):
         # Serialize the request
         payload = json.loads(req.model_dump_json(by_alias=True))
 
-        # Enqueue to Go sender
-        sender.enqueue([{
+        # Enqueue to Go sender (fire-and-forget for speed)
+        sender.enqueue_async([{
             "type": "start",
             "payload": payload,
         }])
@@ -148,8 +148,8 @@ class GoSenderTraceServer(RemoteHTTPTraceServer):
         # Serialize the request
         payload = json.loads(req.model_dump_json(by_alias=True))
 
-        # Enqueue to Go sender
-        sender.enqueue([{
+        # Enqueue to Go sender (fire-and-forget for speed)
+        sender.enqueue_async([{
             "type": "end",
             "payload": payload,
         }])

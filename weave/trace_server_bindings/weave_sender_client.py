@@ -206,6 +206,31 @@ class WeaveSenderClient:
 
             return response.get("result")
 
+    def _send_fire_and_forget(self, method: str, params: dict[str, Any] | None = None) -> None:
+        """Send a request to the sidecar without waiting for a response.
+
+        This is much faster but provides no confirmation. Use for high-throughput
+        operations where occasional drops are acceptable.
+        """
+        with self._lock:
+            if not self._connected:
+                self._connect()
+
+            if self._socket is None:
+                raise RuntimeError("Not connected to sidecar")
+
+            self._request_id += 1
+            request = {
+                "id": self._request_id,
+                "method": method,
+                "params": params or {},
+                "no_reply": True,  # Tell server not to send response
+            }
+
+            # Send request without waiting for response
+            request_json = json.dumps(request) + "\n"
+            self._socket.sendall(request_json.encode("utf-8"))
+
     def init(
         self,
         server_url: str,
@@ -257,6 +282,22 @@ class WeaveSenderClient:
 
         result = self._send_request("enqueue", {"items": items})
         return result.get("ids", [])
+
+    def enqueue_async(self, items: list[dict[str, Any]]) -> None:
+        """Enqueue items without waiting for confirmation (fire-and-forget).
+
+        This is much faster than enqueue() but provides no confirmation.
+        Use stats() to check for dropped items if needed.
+
+        Args:
+            items: List of items to enqueue. Each item should have:
+                - type: "start" or "end"
+                - payload: The request payload (CallStartReq or CallEndReq)
+        """
+        if not self._initialized:
+            raise RuntimeError("Client not initialized. Call init() first.")
+
+        self._send_fire_and_forget("enqueue", {"items": items})
 
     def flush(self) -> None:
         """Force flush all pending items."""
