@@ -18,13 +18,6 @@ from typing import TYPE_CHECKING, Annotated, Any, TypeVar, cast, overload
 if TYPE_CHECKING:
     from weave.trace.call import Call
 
-from pydantic import (
-    BaseModel,
-    BeforeValidator,
-    ConfigDict,
-    Field,
-    PrivateAttr,
-)
 
 from weave.dataset.dataset import Dataset
 from weave.evaluation.eval import Evaluation, default_evaluation_display_name
@@ -309,7 +302,7 @@ class _LogScoreContext:
                 self._call_stack_context.__exit__(exc_type, exc_val, exc_tb)
 
 
-class ScoreLogger(BaseModel):
+class ScoreLogger:
     """Interface for logging scores and managing prediction outputs.
 
     This class is returned by `EvaluationLogger.log_prediction()` and can be used
@@ -346,20 +339,22 @@ class ScoreLogger(BaseModel):
     ```
     """
 
-    # model_id: ID
-    predict_and_score_call: Call
-    evaluate_call: Call
-    predict_call: Call
-    predefined_scorers: list[str] | None = None
+    def __init__(
+        self,
+        predict_and_score_call: Call,
+        evaluate_call: Call,
+        predict_call: Call,
+        predefined_scorers: list[str] | None = None,
+    ) -> None:
+        self.predict_and_score_call = predict_and_score_call
+        self.evaluate_call = evaluate_call
+        self.predict_call = predict_call
+        self.predefined_scorers = predefined_scorers
 
-    _captured_scores: dict[str, ScoreType] = PrivateAttr(default_factory=dict)
-    _has_finished: bool = PrivateAttr(False)
-    _predict_output: Any = PrivateAttr(None)
-    _call_stack_context: contextlib.AbstractContextManager[list[Call]] | None = (
-        PrivateAttr(None)
-    )
-
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+        self._captured_scores: dict[str, ScoreType] = {}
+        self._has_finished: bool = False
+        self._predict_output: Any = None
+        self._call_stack_context: contextlib.AbstractContextManager[list[Call]] | None = None
 
     def finish(self, output: Any | None = None) -> None:
         """Finish the prediction and log all scores.
@@ -605,7 +600,7 @@ class ScoreLogger(BaseModel):
                 self._call_stack_context.__exit__(exc_type, exc_val, exc_tb)
 
 
-class EvaluationLogger(BaseModel):
+class EvaluationLogger:
     """This class provides an imperative interface for logging evaluations.
 
     An evaluation is started automatically when the first prediction is logged
@@ -647,60 +642,38 @@ class EvaluationLogger(BaseModel):
     ```
     """
 
-    name: Annotated[
-        str | None,
-        Field(
-            default=None,
-            description="(Optional): A name for the evaluation call."
-            "If not provided, a default name will be generated.",
-        ),
-    ]
-    model: Annotated[
-        Model | dict | str,
-        BeforeValidator(_cast_to_cls(Model)),
-        Field(
-            default_factory=Model,
-            description="(Optional): A metadata-only Model used for comparisons."
-            "Alternatively, you can pass a dict of attributes or just a string"
-            "representing the ID of your model.",
-        ),
-    ]
-    dataset: Annotated[
-        Dataset | list[dict] | str,
-        BeforeValidator(_cast_to_imperative_dataset),
-        Field(
-            default_factory=lambda: Dataset(
-                rows=Table([{"dataset_id": _default_dataset_name()}]),
-            ),
-            description="(Optional): A metadata-only Dataset used for comparisons."
-            "If you already know your rows ahead of time, you can pass either"
-            "a Dataset or list[dict]."
-            "If you don't, you can just pass any string as a unique identifier",
-        ),
-    ]
+    def __init__(
+        self,
+        name: str | None = None,
+        model: Model | dict | str | None = None,
+        dataset: Dataset | list[dict] | str | None = None,
+        eval_attributes: dict[str, Any] | None = None,
+        scorers: list[str] | None = None,
+    ) -> None:
+        self.name = name
+        self.scorers = scorers
+        self.eval_attributes = eval_attributes if eval_attributes is not None else {}
 
-    eval_attributes: Annotated[
-        dict[str, Any],
-        Field(
-            default_factory=dict,
-            description="(Optional): A dictionary of attributes to add to the evaluation call."
-            "These attributes can be used to add additional metadata columns to the Evaluation.",
-        ),
-    ]
-    scorers: Annotated[
-        list[str] | None,
-        Field(
-            default=None,
-            description="(Optional): A metadata-only list of predefined scorers for the evaluation. "
-            "If specified, warnings will be issued when logging scores not in this list.",
-        ),
-    ]
+        # Convert model to Model instance if needed
+        if model is None:
+            model = Model()
+        self.model: Model = _cast_to_cls(Model)(model)
 
-    _eval_started: bool = PrivateAttr(False)
-    _logged_summary: bool = PrivateAttr(False)
-    _is_finalized: bool = PrivateAttr(False)
-    _evaluate_call: Call | None = PrivateAttr(None)
-    _pseudo_evaluation: Evaluation = PrivateAttr()
+        # Convert dataset to Dataset instance if needed
+        if dataset is None:
+            dataset = Dataset(rows=Table([{"dataset_id": _default_dataset_name()}]))
+        self.dataset: Dataset = _cast_to_imperative_dataset(dataset)
+
+        # Private state
+        self._eval_started: bool = False
+        self._logged_summary: bool = False
+        self._is_finalized: bool = False
+        self._evaluate_call: Call | None = None
+        self._original_predict_method: Any = None
+        self._context_predict_method: Any = None
+        self._accumulated_predictions: list[ScoreLogger] = []
+
+        self._initialize()
 
     @property
     def ui_url(self) -> str | None:
@@ -714,19 +687,15 @@ class EvaluationLogger(BaseModel):
     def attributes(self) -> dict[str, Any]:
         return self.eval_attributes | IMPERATIVE_EVAL_MARKER
 
-    # This private attr is used to keep track of predictions so we can finish
-    # them if the user forgot to.
-    _accumulated_predictions: list[ScoreLogger] = PrivateAttr(default_factory=list)
-
-    def model_post_init(self, __context: Any) -> None:
+    def _initialize(self) -> None:
         """Initialize the pseudo evaluation with the dataset from the model."""
+
         # Register this instance in the global registry for atexit cleanup
         _active_evaluation_loggers.append(self)
 
-        # At this point dataset has already been processed by the validator
-        # and converted to a Dataset object
+        # At this point dataset has been processed and converted to a Dataset object
         self._pseudo_evaluation = Evaluation(
-            dataset=cast(Dataset, self.dataset),
+            dataset=self.dataset,
             scorers=[],
             metadata={"scorers": self.scorers, **self.eval_attributes},
         )
