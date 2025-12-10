@@ -25,24 +25,16 @@ except ImportError:
 except Exception:
     _import_failed = True
 
-# Module-level shared state
-_weave_calls_map: dict[str | tuple[str | None, str], Call] = {}
-_weave_client_instance: WeaveClient | None = None
-_accumulators: dict[str, list[Any]] = {}
-
 logger = logging.getLogger(__name__)
 
 
 def get_weave_client() -> WeaveClient | None:
     """Get the weave client, returning None if weave hasn't been initialized."""
-    global _weave_client_instance
-    if _weave_client_instance is None:
-        try:
-            _weave_client_instance = weave_client_context.require_weave_client()
-        except Exception:
-            # weave.init() hasn't been called
-            return None
-    return _weave_client_instance
+    try:
+        return weave_client_context.require_weave_client()
+    except Exception:
+        # weave.init() hasn't been called
+        return None
 
 
 def _convert_instance_to_dict(obj: Any) -> Any:
@@ -118,6 +110,12 @@ if not _import_failed:
 
     class WeaveSpanHandler(BaseSpanHandler[Any]):  # pyright: ignore[reportRedeclaration]
         """Handles LlamaIndex span start, end, and drop events to trace operations."""
+
+        def __init__(self) -> None:
+            super().__init__()
+            # Instance-level state (shared with WeaveEventHandler)
+            self._weave_calls_map: dict[str | tuple[str | None, str], Call] = {}
+            self._accumulators: dict[str, list[Any]] = {}
 
         @classmethod
         def class_name(cls) -> str:
@@ -214,8 +212,8 @@ if not _import_failed:
                 inputs["_tags"] = tags
 
             parent_call = None
-            if parent_span_id and parent_span_id in _weave_calls_map:
-                parent_call = _weave_calls_map[parent_span_id]
+            if parent_span_id and parent_span_id in self._weave_calls_map:
+                parent_call = self._weave_calls_map[parent_span_id]
 
             # we check if the span is streaming by checking if the op_name contains streaming indicators
             self._is_streaming = (
@@ -227,10 +225,10 @@ if not _import_failed:
 
             try:
                 call = gc.create_call(op_name, inputs, parent_call)
-                _weave_calls_map[id_] = call  # Store by full span ID
+                self._weave_calls_map[id_] = call  # Store by full span ID
                 # we store the spans that are streaming in nature as a dict of id_ to call
                 if self._is_streaming:
-                    _accumulators[id_] = [call, False, {}, None, None]
+                    self._accumulators[id_] = [call, False, {}, None, None]
             except Exception as e:
                 log_once(
                     logger.error, f"Error creating call for {op_name} (ID: {id_}): {e}"
@@ -249,17 +247,17 @@ if not _import_failed:
 
             # For streaming spans, defer finishing until EndEvent to keep span on call stack
             # for proper OpenAI autopatch parenting
-            if id_ in _accumulators:
-                acc_entry = _accumulators[id_]
+            if id_ in self._accumulators:
+                acc_entry = self._accumulators[id_]
                 # Store result/error for later use, but keep span call active
                 acc_entry[3] = result
                 acc_entry[4] = err
-                _accumulators[id_] = acc_entry
+                self._accumulators[id_] = acc_entry
                 return
 
             # Non-streaming spans: finish immediately
-            if id_ in _weave_calls_map:
-                call_to_finish = _weave_calls_map.pop(id_)
+            if id_ in self._weave_calls_map:
+                call_to_finish = self._weave_calls_map.pop(id_)
                 outputs = None
                 exception_to_log = err
 
@@ -318,6 +316,16 @@ if not _import_failed:
     class WeaveEventHandler(BaseEventHandler):  # pyright: ignore[reportRedeclaration]
         """Handles LlamaIndex events to create fine-grained Weave calls within spans."""
 
+        def __init__(
+            self,
+            weave_calls_map: dict[str | tuple[str | None, str], Call],
+            accumulators: dict[str, list[Any]],
+        ) -> None:
+            super().__init__()
+            # Share state with WeaveSpanHandler
+            self._weave_calls_map = weave_calls_map
+            self._accumulators = accumulators
+
         @classmethod
         def class_name(cls) -> str:
             return "WeaveEventHandler"
@@ -359,18 +367,18 @@ if not _import_failed:
             try:
                 if is_start_event:
                     # Parent: span call or global root
-                    parent_call_for_event = _weave_calls_map.get(event.span_id)
+                    parent_call_for_event = self._weave_calls_map.get(event.span_id)
                     # Create a new call for the start event
                     call = gc.create_call(
                         op_name, raw_event_payload, parent_call_for_event
                     )
-                    _weave_calls_map[event_pairing_key] = call
+                    self._weave_calls_map[event_pairing_key] = call
 
                     # For streaming LLMCompletion and LLMChat events, pre-create the InProgress call
                     # so that OpenAI autopatch inherits it as parent
                     if (
                         base_event_name in ["LLMCompletion", "LLMChat"]
-                    ) and event.span_id in _accumulators:
+                    ) and event.span_id in self._accumulators:
                         progress_op_name = (
                             f"llama_index.event.{base_event_name}InProgress"
                         )
@@ -379,10 +387,10 @@ if not _import_failed:
                         progress_call = gc.create_call(
                             progress_op_name, raw_event_payload, call
                         )
-                        _weave_calls_map[progress_event_key] = progress_call
+                        self._weave_calls_map[progress_event_key] = progress_call
                         # Update accumulator to point to the pre-created progress call
-                        acc_entry = _accumulators[event.span_id]
-                        _accumulators[event.span_id] = [
+                        acc_entry = self._accumulators[event.span_id]
+                        self._accumulators[event.span_id] = [
                             progress_call,
                             True,
                             raw_event_payload,
@@ -391,19 +399,19 @@ if not _import_failed:
                         ]
                 elif is_progress_event:
                     # Get or create accumulator entry
-                    if event.span_id not in _accumulators:
-                        _accumulators[event.span_id] = [None, False, {}, None, None]
+                    if event.span_id not in self._accumulators:
+                        self._accumulators[event.span_id] = [None, False, {}, None, None]
 
-                    acc_entry = _accumulators[event.span_id]
+                    acc_entry = self._accumulators[event.span_id]
                     acc_entry[2] = raw_event_payload
                 elif is_end_event:
                     # Parent: span call or global root
-                    parent_call_for_event = _weave_calls_map.get(event.span_id)
+                    parent_call_for_event = self._weave_calls_map.get(event.span_id)
                     # Try to close the call for the progress event first
                     deferred_result = None
                     deferred_err = None
-                    if event.span_id in _accumulators:
-                        acc_entry = _accumulators.pop(event.span_id)
+                    if event.span_id in self._accumulators:
+                        acc_entry = self._accumulators.pop(event.span_id)
                         progress_call, _, last_progress_payload = (
                             acc_entry[0],
                             acc_entry[1],
@@ -419,9 +427,9 @@ if not _import_failed:
                             and last_progress_payload is not None
                         ):
                             gc.finish_call(progress_call, last_progress_payload)
-                    if event_pairing_key in _weave_calls_map:
+                    if event_pairing_key in self._weave_calls_map:
                         # Found matching start event, finish its call with end event data
-                        call_to_finish = _weave_calls_map.pop(event_pairing_key)
+                        call_to_finish = self._weave_calls_map.pop(event_pairing_key)
                         gc.finish_call(call_to_finish, raw_event_payload)
                     else:
                         # No matching start event found, create a standalone call
@@ -431,10 +439,10 @@ if not _import_failed:
                         gc.finish_call(call, raw_event_payload)
 
                     # Only finish spans that were deferred due to streaming (indicated by deferred_result or deferred_err being set)
-                    if event.span_id in _weave_calls_map and (
+                    if event.span_id in self._weave_calls_map and (
                         deferred_result is not None or deferred_err is not None
                     ):
-                        span_call = _weave_calls_map.pop(event.span_id)
+                        span_call = self._weave_calls_map.pop(event.span_id)
 
                         outputs = None
                         if deferred_result is not None:
@@ -455,7 +463,7 @@ if not _import_failed:
                         gc.finish_call(span_call, outputs, exception=deferred_err)
                 else:
                     # Parent: span call or global root
-                    parent_call_for_event = _weave_calls_map.get(event.span_id)
+                    parent_call_for_event = self._weave_calls_map.get(event.span_id)
                     # Handle non-start/end events as instantaneous events
                     call = gc.create_call(
                         op_name, raw_event_payload, parent_call_for_event
@@ -499,8 +507,13 @@ class LLamaIndexPatcher(Patcher):  # pyright: ignore[reportRedeclaration]
             self._original_event_handlers = list(self.dispatcher.event_handlers)
             self._original_span_handlers = list(self.dispatcher.span_handlers)
 
-            self.weave_event_handler = WeaveEventHandler()
+            # Create span handler first (it owns the shared state)
             self.weave_span_handler = WeaveSpanHandler()
+            # Create event handler with references to span handler's state
+            self.weave_event_handler = WeaveEventHandler(
+                self.weave_span_handler._weave_calls_map,
+                self.weave_span_handler._accumulators,
+            )
 
             self.dispatcher.add_event_handler(self.weave_event_handler)
             self.dispatcher.add_span_handler(self.weave_span_handler)
