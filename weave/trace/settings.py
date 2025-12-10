@@ -206,6 +206,16 @@ class UserSettings(BaseModel):
     Can be overridden with the environment variable `WEAVE_USE_STAINLESS_SERVER`
     """
 
+    use_go_sender: bool = False
+    """
+    Toggles use of the Go-based sidecar for batching and sending trace data.
+
+    If True, uses a Go sidecar process for improved batching performance and
+    better handling of high-throughput scenarios. The sidecar communicates
+    over a Unix Domain Socket and is automatically started when needed.
+    Can be overridden with the environment variable `WEAVE_USE_GO_SENDER`
+    """
+
     model_config = ConfigDict(extra="forbid")
     _is_first_apply: bool = PrivateAttr(True)
 
@@ -334,6 +344,11 @@ def http_timeout() -> float:
 def should_use_stainless_server() -> bool:
     """Returns whether the stainless-generated HTTP client should be used."""
     return _should("use_stainless_server")
+
+
+def should_use_go_sender() -> bool:
+    """Returns whether the Go-based sidecar should be used for sending trace data."""
+    return _should("use_go_sender")
 
 
 def parse_and_apply_settings(
