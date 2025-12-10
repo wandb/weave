@@ -8,9 +8,8 @@ from pydantic import BaseModel
 
 from weave.integrations.patcher import Patcher
 from weave.trace.call import Call
-from weave.trace.context import weave_client_context
+from weave.trace.context.weave_client_context import get_weave_client
 from weave.trace.util import log_once
-from weave.trace.weave_client import WeaveClient
 
 _import_failed = False
 
@@ -26,15 +25,6 @@ except Exception:
     _import_failed = True
 
 logger = logging.getLogger(__name__)
-
-
-def get_weave_client() -> WeaveClient | None:
-    """Get the weave client, returning None if weave hasn't been initialized."""
-    try:
-        return weave_client_context.require_weave_client()
-    except Exception:
-        # weave.init() hasn't been called
-        return None
 
 
 def _convert_instance_to_dict(obj: Any) -> Any:
