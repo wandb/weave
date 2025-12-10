@@ -126,38 +126,54 @@ func (b *Batcher) FlushAll() {
 }
 
 func (b *Batcher) flushAll() {
+	// Build all batches first, dequeuing items immediately
+	var batches []Batch
 	for {
-		flushed := b.flushBatch()
-		if !flushed {
-			return // No more items to flush
+		entries := b.queue.Peek(b.config.MaxBatchSize)
+		if len(entries) == 0 {
+			break
 		}
-	}
-}
 
-func (b *Batcher) flushBatch() bool {
-	// Peek at entries (don't dequeue yet in case send fails)
-	entries := b.queue.Peek(b.config.MaxBatchSize)
-	if len(entries) == 0 {
+		batch, count := b.buildBatch(entries)
+		if len(batch.Items) == 0 {
+			break
+		}
+
+		// Dequeue the items we're about to send
+		b.queue.Dequeue(count)
+		batches = append(batches, batch)
+	}
+
+	if len(batches) == 0 {
 		// Signal that we might be idle
 		b.inFlightMu.Lock()
 		if b.inFlight == 0 && b.queue.Len() == 0 {
 			b.idleCond.Broadcast()
 		}
 		b.inFlightMu.Unlock()
-		return false
+		return
 	}
 
-	// Build batch, respecting byte limits
-	batch, count := b.buildBatch(entries)
-	if len(batch.Items) == 0 {
-		return false
-	}
-
-	// Mark as in-flight
+	// Mark all batches as in-flight
 	b.inFlightMu.Lock()
-	b.inFlight++
+	b.inFlight += len(batches)
 	b.inFlightMu.Unlock()
 
+	// Send all batches concurrently
+	var wg sync.WaitGroup
+	for _, batch := range batches {
+		wg.Add(1)
+		go func(batch Batch) {
+			defer wg.Done()
+			b.sendBatch(batch)
+		}(batch)
+	}
+
+	// Wait for all batches to complete
+	wg.Wait()
+}
+
+func (b *Batcher) sendBatch(batch Batch) {
 	if Verbose {
 		var totalBytes int
 		for _, item := range batch.Items {
@@ -172,31 +188,15 @@ func (b *Batcher) flushBatch() bool {
 		b.mu.Lock()
 		b.failedCount += uint64(len(batch.Items))
 		b.mu.Unlock()
-
-		// Dequeue failed items so we don't retry forever
-		b.queue.Dequeue(count)
-
-		// Mark as no longer in-flight
-		b.inFlightMu.Lock()
-		b.inFlight--
-		if b.inFlight == 0 && b.queue.Len() == 0 {
-			b.idleCond.Broadcast()
+	} else {
+		if Verbose {
+			log.Printf("[BATCH] SUCCESS sent %d items", len(batch.Items))
 		}
-		b.inFlightMu.Unlock()
-		return true
+		// Update stats
+		b.mu.Lock()
+		b.sentCount += uint64(len(batch.Items))
+		b.mu.Unlock()
 	}
-
-	if Verbose {
-		log.Printf("[BATCH] SUCCESS sent %d items", len(batch.Items))
-	}
-
-	// Success - dequeue the sent items
-	b.queue.Dequeue(count)
-
-	// Update stats
-	b.mu.Lock()
-	b.sentCount += uint64(len(batch.Items))
-	b.mu.Unlock()
 
 	// Mark as no longer in-flight and signal if idle
 	b.inFlightMu.Lock()
@@ -205,8 +205,6 @@ func (b *Batcher) flushBatch() bool {
 		b.idleCond.Broadcast()
 	}
 	b.inFlightMu.Unlock()
-
-	return true
 }
 
 // BatchItem wraps a queue entry for sending
