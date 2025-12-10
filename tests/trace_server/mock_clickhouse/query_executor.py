@@ -156,11 +156,11 @@ class QueryExecutor:
         # Apply column selection
         columns, selected_rows = self._select_columns(query, rows, table.columns)
 
-        # Apply LIMIT
-        selected_rows = self._apply_limit(query, selected_rows)
-
-        # Apply ORDER BY (simplified)
+        # Apply ORDER BY first (before LIMIT)
         selected_rows = self._apply_order_by(query, selected_rows, columns)
+
+        # Apply LIMIT after ORDER BY
+        selected_rows = self._apply_limit(query, selected_rows)
 
         return MockQueryResult(
             result_rows=[tuple(row) for row in selected_rows],

@@ -3,7 +3,6 @@ from __future__ import annotations
 import os
 from collections.abc import Callable
 from dataclasses import dataclass
-from unittest.mock import patch
 
 import pytest
 
@@ -13,7 +12,7 @@ from tests.trace_server.conftest_lib.trace_server_external_adapter import (
     TestOnlyUserInjectingExternalTraceServer,
     externalize_trace_server,
 )
-from tests.trace_server.mock_clickhouse import MockClickHouseClient, MockClickHouseStorage
+from tests.trace_server.mock_clickhouse.in_memory_trace_server import InMemoryTraceServer
 from tests.trace_server.workers.evaluate_model_test_worker import (
     EvaluateModelTestDispatcher,
 )
@@ -263,185 +262,38 @@ def get_sqlite_trace_server(
             pass  # Best effort cleanup
 
 
-@dataclass
-class MockClickHouseServerState:
-    """Tracks mock ClickHouse server state for cleanup."""
-
-    server: clickhouse_trace_server_batched.ClickHouseTraceServer
-    storage: MockClickHouseStorage
-    patcher: patch
-
-
 @pytest.fixture
 def get_mock_ch_trace_server(
     request,
 ) -> Callable[[], TestOnlyUserInjectingExternalTraceServer]:
-    """Provide a factory for creating trace servers with mock ClickHouse backend.
+    """Provide a factory for creating in-memory trace servers for testing.
 
-    This fixture creates a ClickHouseTraceServer that uses an in-memory mock
-    instead of a real ClickHouse database. This is useful for fast unit tests
-    that don't need the full database.
+    This fixture creates an InMemoryTraceServer that stores all data in Python
+    data structures. It's much faster than using a real database and implements
+    the full trace server interface.
 
     Usage:
         pytest --mock  # or --mock-clickhouse or --trace-server=mock
     """
-    servers_to_cleanup: list[MockClickHouseServerState] = []
+    servers_to_cleanup: list[InMemoryTraceServer] = []
 
-    def mock_ch_trace_server_inner() -> TestOnlyUserInjectingExternalTraceServer:
-        # Create a fresh storage instance for each server
-        db_suffix = _get_worker_db_suffix(request)
-        db_name = f"test_db{db_suffix}" if db_suffix else "test_db"
-        storage = MockClickHouseStorage()
+    def mock_trace_server_inner() -> TestOnlyUserInjectingExternalTraceServer:
+        id_converter = DummyIdConverter()
+        server = InMemoryTraceServer()
+        servers_to_cleanup.append(server)
 
-        # Create mock client factory
-        def create_mock_client():
-            return MockClickHouseClient(storage=storage, database=db_name)
-
-        # Create the patcher
-        patcher = patch.object(
-            clickhouse_trace_server_batched.ClickHouseTraceServer,
-            "_mint_client",
-            side_effect=create_mock_client,
+        return externalize_trace_server(
+            server, TEST_ENTITY, id_converter=id_converter
         )
-        patcher.start()
 
-        try:
-            id_converter = DummyIdConverter()
-            ch_server = clickhouse_trace_server_batched.ClickHouseTraceServer(
-                host="mock",
-                port=8123,
-                database=db_name,
-                evaluate_model_dispatcher=EvaluateModelTestDispatcher(
-                    id_converter=id_converter
-                ),
-            )
-
-            # Track for cleanup
-            servers_to_cleanup.append(
-                MockClickHouseServerState(
-                    server=ch_server,
-                    storage=storage,
-                    patcher=patcher,
-                )
-            )
-
-            # No need to run migrations for mock backend - just create the tables
-            # that the trace server expects
-            _setup_mock_tables(storage, db_name)
-
-            return externalize_trace_server(
-                ch_server, TEST_ENTITY, id_converter=id_converter
-            )
-        except Exception:
-            patcher.stop()
-            raise
-
-    yield mock_ch_trace_server_inner
+    yield mock_trace_server_inner
 
     # Cleanup
-    for state in servers_to_cleanup:
+    for server in servers_to_cleanup:
         try:
-            state.patcher.stop()
+            server.clear()
         except Exception:
             pass
-        try:
-            state.storage.reset()
-        except Exception:
-            pass
-
-
-def _setup_mock_tables(storage: MockClickHouseStorage, database: str) -> None:
-    """Set up the tables that ClickHouseTraceServer expects.
-
-    This creates the basic table structure without running full migrations.
-    """
-    storage.create_database(database, if_not_exists=True)
-    storage.current_database = database
-
-    # Create the main tables used by the trace server
-    # These match the schema from clickhouse_schema.py
-    storage.create_table(
-        "call_parts",
-        columns=[
-            "project_id",
-            "id",
-            "trace_id",
-            "parent_id",
-            "thread_id",
-            "turn_id",
-            "op_name",
-            "started_at",
-            "ended_at",
-            "exception",
-            "attributes_dump",
-            "inputs_dump",
-            "output_dump",
-            "summary_dump",
-            "input_refs",
-            "output_refs",
-            "display_name",
-            "wb_user_id",
-            "wb_run_id",
-            "wb_run_step",
-            "wb_run_step_end",
-            "deleted_at",
-            "otel_dump",
-        ],
-        database=database,
-    )
-
-    storage.create_table(
-        "objects",
-        columns=[
-            "project_id",
-            "object_id",
-            "wb_user_id",
-            "created_at",
-            "kind",
-            "base_object_class",
-            "leaf_object_class",
-            "refs",
-            "val_dump",
-            "digest",
-            "version_index",
-            "is_latest",
-            "deleted_at",
-        ],
-        database=database,
-    )
-
-    storage.create_table(
-        "files",
-        columns=[
-            "project_id",
-            "digest",
-            "chunk_index",
-            "n_chunks",
-            "name",
-            "val_bytes",
-            "bytes_stored",
-            "file_storage_uri",
-        ],
-        database=database,
-    )
-
-    storage.create_table(
-        "feedback",
-        columns=[
-            "project_id",
-            "id",
-            "weave_ref",
-            "wb_user_id",
-            "creator",
-            "feedback_type",
-            "payload",
-            "created_at",
-            "runnable_id",
-            "call_id",
-            "sorted_trigger_refs",
-        ],
-        database=database,
-    )
 
 
 class LocalSecretFetcher:

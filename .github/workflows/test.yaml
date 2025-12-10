@@ -229,17 +229,59 @@ jobs:
           name: trace-tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}-${{ matrix.nox-shard }}
           fail_ci_if_error: false
           token: ${{ secrets.CODECOV_TOKEN }}
+  trace-server-mock-tests:
+    name: Trace Server Mock Tests
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version-major: ["3"]
+        python-version-minor: [
+            "10",
+            "11",
+            "13",
+            #
+          ]
+      fail-fast: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Set up Python ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install nox uv
+      - name: Run nox (Mock Trace Server)
+        env:
+          WEAVE_SENTRY_ENV: ci
+          CI: 1
+          DD_TRACE_ENABLED: false
+        run: |
+          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='trace_server_mock')"
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: ./tests/coverage.xml
+          flags: trace-server-mock
+          name: trace-server-mock-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
+
   trace-tests-matrix-check: # This job does nothing and is only used for the branch protection
     if: always()
 
     needs:
       - trace-tests
       - trace_no_server
+      - trace-server-mock-tests
 
     runs-on: ubuntu-latest
 
     steps:
-      - name: Passes if all trace-tests and trace_no_server jobs succeeded
+      - name: Passes if all trace-tests, trace_no_server, and trace-server-mock-tests jobs succeeded
         uses: re-actors/alls-green@release/v1
         with:
           jobs: ${{ toJSON(needs) }}
