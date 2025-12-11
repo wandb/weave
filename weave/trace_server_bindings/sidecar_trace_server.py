@@ -53,12 +53,15 @@ class SidecarConnection:
             self._socket = None
             self._buffer = b""
 
-    def send_request(self, method: str, payload: dict[str, Any]) -> dict[str, Any]:
+    def send_request(
+        self, method: str, payload: dict[str, Any], timeout: float | None = None
+    ) -> dict[str, Any]:
         """Send a request to the sidecar and receive the response.
 
         Args:
             method: The method name (e.g., "call_start", "call_end")
             payload: The request payload as a dict
+            timeout: Optional timeout in seconds (None uses socket default of 5s)
 
         Returns:
             The response dict from the sidecar
@@ -72,11 +75,22 @@ class SidecarConnection:
         with self._lock:
             try:
                 sock = self._ensure_connected()
-                sock.sendall(request_bytes)
 
-                # Read response (newline-delimited JSON)
-                response = self._read_response(sock)
-                return response
+                # Temporarily set timeout if specified
+                original_timeout = sock.gettimeout()
+                if timeout is not None:
+                    sock.settimeout(timeout)
+
+                try:
+                    sock.sendall(request_bytes)
+                    # Read response (newline-delimited JSON)
+                    response = self._read_response(sock)
+                    return response
+                finally:
+                    # Restore original timeout
+                    if timeout is not None:
+                        sock.settimeout(original_timeout)
+
             except (OSError, socket.error, json.JSONDecodeError) as e:
                 self._disconnect()
                 raise SidecarError(f"Sidecar communication failed: {e}") from e
@@ -188,11 +202,14 @@ class SidecarTraceServer(TraceServerClientInterface):
                     self._connection = None
             return False
 
-    def flush(self) -> bool:
+    def flush(self, timeout: float = 300.0) -> bool:
         """Flush all pending items in the sidecar to the backend.
 
         This is a synchronous operation that blocks until all pending
         items have been sent to the backend.
+
+        Args:
+            timeout: Maximum time to wait for flush to complete (default 5 minutes)
 
         Returns:
             True if flush succeeded, False if sidecar unavailable
@@ -202,7 +219,9 @@ class SidecarTraceServer(TraceServerClientInterface):
             return False
 
         try:
-            response = conn.send_request("flush", {})
+            # Use longer timeout for flush since it may need to wait for
+            # large batches to be sent to the backend
+            response = conn.send_request("flush", {}, timeout=timeout)
             return response.get("success", False)
         except SidecarError as e:
             logger.warning(f"Sidecar flush error: {e}")
