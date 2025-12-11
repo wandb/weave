@@ -57,6 +57,7 @@ def run_benchmark(project: str, num_ops: int, use_sidecar: bool) -> BenchmarkRes
 
     # Initialize weave
     weave.init(project)
+    client = weave_client_context.get_weave_client()
 
     # Define a simple traced operation
     @weave.op
@@ -67,10 +68,10 @@ def run_benchmark(project: str, num_ops: int, use_sidecar: bool) -> BenchmarkRes
     for i in range(10):
         traced_operation(i)
 
-    # If using sidecar, flush warmup data first
-    if use_sidecar:
-        client = weave_client_context.get_weave_client()
-        if client and hasattr(client.server, "flush"):
+    # Flush warmup data: first Python-side queues, then sidecar if enabled
+    if client:
+        client.flush()
+        if use_sidecar and hasattr(client.server, "flush"):
             client.server.flush()
 
     # Run benchmark
@@ -83,10 +84,12 @@ def run_benchmark(project: str, num_ops: int, use_sidecar: bool) -> BenchmarkRes
         end = time.perf_counter()
         latencies.append((end - start) * 1000)  # Convert to ms
 
-    # If using sidecar, flush and include flush time in total
-    if use_sidecar:
-        client = weave_client_context.get_weave_client()
-        if client and hasattr(client.server, "flush"):
+    # Flush all data and include flush time in total:
+    # 1. Flush Python-side async batch processor (always)
+    # 2. Flush sidecar to wait for HTTP requests to complete (if enabled)
+    if client:
+        client.flush()
+        if use_sidecar and hasattr(client.server, "flush"):
             client.server.flush()
 
     end_total = time.perf_counter()
@@ -113,6 +116,8 @@ def run_subprocess_benchmark(
 ) -> BenchmarkResult:
     """Run benchmark in a subprocess to ensure clean state."""
     env = os.environ.copy()
+    # Suppress call link output for cleaner benchmark results
+    env["WEAVE_PRINT_CALL_LINK"] = "false"
     if use_sidecar:
         env["WEAVE_USE_SIDECAR"] = "true"
     else:
