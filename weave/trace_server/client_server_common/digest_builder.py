@@ -20,7 +20,8 @@ with extreme caution!! Talk to Tim Sweeney before making any changes.
 import base64
 import hashlib
 import json
-from typing import Any, Callable, TypeVar, cast
+from collections.abc import Callable
+from typing import Any, TypeVar, cast
 
 external_ref_prefix = "weave:///"
 internal_ref_prefix = "weave-trace-internal:///"
