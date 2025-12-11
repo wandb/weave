@@ -81,6 +81,7 @@ class WeaveSenderClient:
         self,
         socket_path: str | Path | None = None,
         batch_size: int = 100,
+        flush_interval: float = 1.0,
     ):
         self._socket_path = Path(socket_path) if socket_path else _DEFAULT_SOCKET_PATH
         self._socket: socket.socket | None = None
@@ -92,10 +93,16 @@ class WeaveSenderClient:
 
         # Batching configuration
         self._batch_size = batch_size
+        self._flush_interval = flush_interval
 
         # Batch buffer (list of raw JSON strings)
         self._batch_buffer: list[str] = []
         self._batch_lock = threading.Lock()
+
+        # Timer-based flush thread
+        self._flush_timer: threading.Timer | None = None
+        self._flush_timer_lock = threading.Lock()
+        self._shutdown = False
 
     def _ensure_sidecar_running(self) -> None:
         """Ensure the sidecar process is running."""
@@ -338,6 +345,7 @@ class WeaveSenderClient:
         item_json = f'{{"type":"{item_type}","payload":{payload_json}}}'
 
         items_to_send: list[str] | None = None
+        should_schedule_timer = False
 
         with self._batch_lock:
             self._batch_buffer.append(item_json)
@@ -346,10 +354,16 @@ class WeaveSenderClient:
             if len(self._batch_buffer) >= self._batch_size:
                 items_to_send = self._batch_buffer
                 self._batch_buffer = []
+            elif len(self._batch_buffer) == 1:
+                # First item in buffer, schedule timer flush
+                should_schedule_timer = True
 
         # Send outside the lock to avoid holding it during I/O
         if items_to_send:
+            self._cancel_flush_timer()
             self._send_batch_items(items_to_send)
+        elif should_schedule_timer:
+            self._schedule_flush_timer()
 
     def _send_batch_items(self, items: list[str]) -> None:
         """Send a list of pre-built item JSON strings to the Go sidecar."""
@@ -378,8 +392,36 @@ class WeaveSenderClient:
                 # Silently drop on error (fire-and-forget)
                 pass
 
+    def _schedule_flush_timer(self) -> None:
+        """Schedule a timer to flush the batch after flush_interval."""
+        with self._flush_timer_lock:
+            if self._shutdown:
+                return
+            # Cancel any existing timer
+            if self._flush_timer is not None:
+                self._flush_timer.cancel()
+            self._flush_timer = threading.Timer(
+                self._flush_interval, self._timer_flush_callback
+            )
+            self._flush_timer.daemon = True
+            self._flush_timer.start()
+
+    def _cancel_flush_timer(self) -> None:
+        """Cancel the pending flush timer."""
+        with self._flush_timer_lock:
+            if self._flush_timer is not None:
+                self._flush_timer.cancel()
+                self._flush_timer = None
+
+    def _timer_flush_callback(self) -> None:
+        """Called by the timer to flush pending items."""
+        with self._flush_timer_lock:
+            self._flush_timer = None
+        self._flush_batch()
+
     def _flush_batch(self) -> None:
         """Flush the current batch to the Go sidecar."""
+        self._cancel_flush_timer()
         with self._batch_lock:
             if not self._batch_buffer:
                 return
@@ -451,6 +493,9 @@ class WeaveSenderClient:
 
         The sidecar will continue running and can be reconnected to.
         """
+        self._shutdown = True
+        self._cancel_flush_timer()
+        self._flush_batch()  # Flush any remaining items
         self._disconnect()
         self._initialized = False
 
@@ -460,6 +505,10 @@ class WeaveSenderClient:
         This will flush all pending items and stop the sidecar.
         Other clients connected to the same sidecar will be disconnected.
         """
+        self._shutdown = True
+        self._cancel_flush_timer()
+        self._flush_batch()  # Flush any remaining items
+
         try:
             self._send_request("shutdown")
         except Exception:

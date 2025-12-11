@@ -71,8 +71,8 @@ class GoSenderTraceServer(RemoteHTTPTraceServer):
         """Lazily initialize the Go sender client."""
         if self._go_sender is None:
             socket_path = go_sender_socket_path()
-            # Use larger batch size (500) to reduce UDS round-trips
-            self._go_sender = WeaveSenderClient(socket_path=socket_path, batch_size=500)
+            # Batch 2000 items (or 1s timeout) before sending over UDS to reduce overhead
+            self._go_sender = WeaveSenderClient(socket_path=socket_path, batch_size=2000)
 
         if not self._go_sender_initialized:
             auth_param = None
