@@ -17,7 +17,7 @@ from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.client_server_common.digest_builder import (
     bytes_digest,
-    ref_stable_json_digest,
+    ref_aware_json_digest,
     table_digest_from_row_digests,
 )
 from weave.trace_server.errors import (
@@ -798,7 +798,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         )
         processed_val = processed_result["val"]
         json_val = json.dumps(processed_val)
-        digest = ref_stable_json_digest(processed_val)
+        digest = ref_aware_json_digest(processed_val)
         project_id, object_id, wb_user_id = (
             req.obj.project_id,
             req.obj.object_id,
@@ -1034,7 +1034,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             if not isinstance(r, dict):
                 raise TypeError("All rows must be dictionaries")
             row_json = json.dumps(r)
-            row_digest = ref_stable_json_digest(r)
+            row_digest = ref_aware_json_digest(r)
             insert_rows.append((req.table.project_id, row_digest, row_json))
         with self.lock:
             cursor.executemany(
@@ -1095,7 +1095,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             if not isinstance(row_data, dict):
                 raise TypeError("All rows must be dictionaries")
             row_json = json.dumps(row_data)
-            row_digest = ref_stable_json_digest(row_data)
+            row_digest = ref_aware_json_digest(row_data)
             if row_digest not in known_digests:
                 new_rows_needed_to_insert.append((req.project_id, row_digest, row_json))
                 known_digests.add(row_digest)
