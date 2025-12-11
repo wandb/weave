@@ -2,29 +2,20 @@ package main
 
 import (
 	"bytes"
-	"compress/gzip"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
-	"sync"
 	"time"
 )
 
-// Pool of gzip writers to reduce allocations
-var gzipWriterPool = sync.Pool{
-	New: func() interface{} {
-		return gzip.NewWriter(nil)
-	},
-}
-
 // HTTPSender handles sending batches to the Weave server
 type HTTPSender struct {
-	client      *http.Client
-	baseURL     string
-	auth        *BasicAuth
-	headers     map[string]string
+	client  *http.Client
+	baseURL string
+	auth    *BasicAuth
+	headers map[string]string
 }
 
 // BasicAuth holds HTTP basic auth credentials
@@ -70,16 +61,6 @@ func NewHTTPSender(config HTTPSenderConfig) *HTTPSender {
 		auth:    config.Auth,
 		headers: config.Headers,
 	}
-}
-
-// SetAuth sets the authentication credentials
-func (s *HTTPSender) SetAuth(username, password string) {
-	s.auth = &BasicAuth{Username: username, Password: password}
-}
-
-// SetHeaders sets additional headers
-func (s *HTTPSender) SetHeaders(headers map[string]string) {
-	s.headers = headers
 }
 
 // ServerBatchRequest is the format expected by /call/upsert_batch
