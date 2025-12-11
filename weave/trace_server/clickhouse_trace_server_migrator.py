@@ -138,6 +138,10 @@ class ClickHouseTraceServerMigrator:
                 self._update_migration_status(target_db, target_version, is_start=False)
                 continue
 
+            keys_msg = f" (keys: {migration_keys})" if migration_keys else ""
+            logger.info(
+                f"Applying migration {migration_file} to `{target_db}`{keys_msg}"
+            )
             self._apply_migration(target_db, target_version, migration_file)
         if should_insert_costs(status["curr_version"], target_version):
             insert_costs(self.ch_client, target_db)
@@ -314,7 +318,6 @@ class ClickHouseTraceServerMigrator:
     def _apply_migration(
         self, target_db: str, target_version: int, migration_file: str
     ) -> None:
-        logger.info(f"Applying migration {migration_file} to `{target_db}`")
         migration_dir = os.path.join(os.path.dirname(__file__), "migrations")
         migration_file_path = os.path.join(migration_dir, migration_file)
 
