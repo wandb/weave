@@ -32,13 +32,14 @@ def migrator():
 
 def test_apply_migrations_with_target_version(mock_costs, migrator, tmp_path):
     # Setup
-    migrator._get_migration_status.return_value = {
-        "curr_version": 1,
-        "partially_applied_version": None,
-    }
+    migrator._get_migration_status.return_value = trace_server_migrator.MigrationStatus(
+        db_name="test_db",
+        curr_version=1,
+        partially_applied_version=None,
+    )
     migrator._get_migrations.return_value = {
-        "1": {"up": "1.up.sql", "down": "1.down.sql"},
-        "2": {"up": "2.up.sql", "down": "2.down.sql"},
+        1: trace_server_migrator.MigrationInfo(up="1.up.sql", down="1.down.sql"),
+        2: trace_server_migrator.MigrationInfo(up="2.up.sql", down="2.down.sql"),
     }
     migrator._determine_migrations_to_apply.return_value = [(2, "2.up.sql")]
 
