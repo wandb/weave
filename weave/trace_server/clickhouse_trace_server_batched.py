@@ -759,8 +759,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         aggregate statistics that are not directly queryable from the calls themselves.
         """
         read_table = self.table_routing_resolver.resolve_read_table(
-            req.project_id
-        ).value
+            req.project_id, self.ch_client
+        )
         pb = ParamBuilder()
         query, columns = build_calls_stats_query(req, pb, read_table)
         raw_res = self._query(query, pb.get_params())
@@ -780,8 +780,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
         """Returns a stream of calls that match the given query."""
         read_table = self.table_routing_resolver.resolve_read_table(
-            req.project_id
-        ).value
+            req.project_id, self.ch_client
+        )
         cq = CallsQuery(
             project_id=req.project_id,
             read_table=read_table,
@@ -1692,7 +1692,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             return True if val is None else val
 
         calls_table_alias = self.table_routing_resolver.resolve_read_table(
-            req.project_id
+            req.project_id, self.ch_client
         ).value
 
         pb = ParamBuilder()
@@ -1730,8 +1730,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             thread_ids = req.filter.thread_ids
 
         read_table = self.table_routing_resolver.resolve_read_table(
-            req.project_id
-        ).value
+            req.project_id, self.ch_client
+        )
 
         # Use the dedicated query builder
         query = make_threads_query(
