@@ -6,7 +6,6 @@ ClickHouse insert operation for performance optimization.
 
 import base64
 import datetime
-import json
 from typing import Any
 from unittest.mock import MagicMock, patch
 
