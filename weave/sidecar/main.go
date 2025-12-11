@@ -195,7 +195,7 @@ func (s *Sidecar) enqueue(item BatchItem) {
 
 	s.mu.Lock()
 
-	// Back-pressure: if batch is way over limit (4x), wait for in-flight flushes
+	// Back-pressure: if batch is way over limit (4x), wait for it to drain
 	// This prevents runaway growth when HTTP requests are slow
 	for len(s.batch) >= s.config.FlushMaxCount*4 || s.batchSize >= s.config.FlushMaxBytes*4 {
 		// Signal flush if not already pending
@@ -203,9 +203,9 @@ func (s *Sidecar) enqueue(item BatchItem) {
 		case s.flushChan <- struct{}{}:
 		default:
 		}
-		// Release lock and wait for some flushes to complete
+		// Release lock, sleep briefly, and check again
 		s.mu.Unlock()
-		s.sendWg.Wait()
+		time.Sleep(10 * time.Millisecond)
 		s.mu.Lock()
 	}
 
