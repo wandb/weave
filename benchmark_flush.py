@@ -26,7 +26,12 @@ from weave.trace_server_bindings.go_sender_trace_server import GoSenderTraceServ
 @weave.op
 def dummy_op(x: int) -> dict:
     """A simple op that returns some data."""
-    return {"value": x, "squared": x * x, "message": f"processed {x}"}
+    return {
+        "value": x,
+        "squared": x * x,
+        "message": f"processed {x}",
+        "this is a longer key": "a" * 10000,
+    }
 
 
 def run_benchmark(num_calls: int = 1000) -> dict:
@@ -34,10 +39,10 @@ def run_benchmark(num_calls: int = 1000) -> dict:
     use_go = os.environ.get("WEAVE_USE_GO_SENDER", "").lower() in ("true", "1", "yes")
     impl_name = "Go sidecar" if use_go else "Python"
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"Benchmark: {impl_name} implementation")
     print(f"Number of calls: {num_calls}")
-    print(f"{'='*60}\n")
+    print(f"{'=' * 60}\n")
 
     # Initialize weave
     client = weave.init("benchmark-flush-test")
@@ -49,7 +54,7 @@ def run_benchmark(num_calls: int = 1000) -> dict:
 
     # Get the underlying server (unwrap caching middleware if present)
     warmup_server = client.server
-    if hasattr(warmup_server, '_next_trace_server'):
+    if hasattr(warmup_server, "_next_trace_server"):
         warmup_server = warmup_server._next_trace_server
 
     # For Go sender, also wait for actual completion
@@ -78,7 +83,7 @@ def run_benchmark(num_calls: int = 1000) -> dict:
 
     # Get the underlying server (unwrap caching middleware if present)
     server = client.server
-    if hasattr(server, '_next_trace_server'):
+    if hasattr(server, "_next_trace_server"):
         server = server._next_trace_server
 
     if use_go and isinstance(server, GoSenderTraceServer):
@@ -100,11 +105,13 @@ def run_benchmark(num_calls: int = 1000) -> dict:
     # Total time
     total_duration = flush_end_time - start_time
 
-    print(f"\nResults:")
+    print("\nResults:")
     print(f"  Call creation time: {call_duration:.3f}s")
     print(f"  Flush time:         {flush_duration:.3f}s")
     print(f"  Total time:         {total_duration:.3f}s")
-    print(f"  Throughput:         {num_calls / total_duration:.1f} calls/sec (end-to-end)")
+    print(
+        f"  Throughput:         {num_calls / total_duration:.1f} calls/sec (end-to-end)"
+    )
 
     return {
         "implementation": impl_name,
@@ -121,20 +128,21 @@ def main():
 
     parser = argparse.ArgumentParser(description="Benchmark weave flush performance")
     parser.add_argument(
-        "-n", "--num-calls",
+        "-n",
+        "--num-calls",
         type=int,
         default=1000,
-        help="Number of calls to make (default: 1000)"
+        help="Number of calls to make (default: 1000)",
     )
     args = parser.parse_args()
 
     results = run_benchmark(num_calls=args.num_calls)
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("Summary:")
     print(f"  {results['implementation']}: {results['total_duration']:.3f}s total")
     print(f"  ({results['throughput']:.1f} calls/sec)")
-    print(f"{'='*60}\n")
+    print(f"{'=' * 60}\n")
 
 
 if __name__ == "__main__":
