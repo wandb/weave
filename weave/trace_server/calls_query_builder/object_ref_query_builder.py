@@ -444,11 +444,13 @@ class ObjectRefQueryProcessor:
         table_alias: str,
         expand_columns: list[str],
         field_to_object_join_alias_map: dict[str, str],
+        use_agg_fn: bool = True,
     ):
         self.pb = pb
         self.table_alias = table_alias
         self.expand_columns = expand_columns
         self.field_to_object_join_alias_map = field_to_object_join_alias_map
+        self.use_agg_fn = use_agg_fn
         self.fields_used: set[str] = set()
 
     def process_operand(self, operand: "tsi_query.Operand") -> str:
