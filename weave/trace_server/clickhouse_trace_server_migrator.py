@@ -24,6 +24,7 @@ class MigrationError(RuntimeError):
 class MigrationFileEntry:
     version: int
     name: str
+    keys: list[str]
     is_up: bool
 
 
@@ -38,6 +39,7 @@ class MigrationStatus:
 class MigrationInfo:
     up: str | None = None
     down: str | None = None
+    keys: list[str] | None = None
 
 
 class ClickHouseTraceServerMigrator:
@@ -54,6 +56,7 @@ class ClickHouseTraceServerMigrator:
         replicated_path: str | None = None,
         replicated_cluster: str | None = None,
         management_db: str = "db_management",
+        migration_keys: list[str] | None = None,
     ):
         super().__init__()
         self.ch_client = ch_client
@@ -67,6 +70,11 @@ class ClickHouseTraceServerMigrator:
             else replicated_cluster
         )
         self.management_db = management_db
+        if migration_keys is None:
+            env_keys = os.environ.get("WEAVE_CH_MIGRATION_KEY", "")
+            self.migration_keys = [k.strip() for k in env_keys.split(",") if k.strip()]
+        else:
+            self.migration_keys = migration_keys
         self._initialize_migration_db()
 
     def _is_safe_identifier(self, value: str) -> bool:
@@ -139,6 +147,23 @@ class ClickHouseTraceServerMigrator:
         if status.curr_version == 0:
             self.ch_client.command(self._create_db_sql(target_db))
         for target_version, migration_file in migrations_to_apply:
+            # Check keys
+            migration_keys = migration_map[target_version].keys or []
+            if migration_keys and not any(
+                k in self.migration_keys for k in migration_keys
+            ):
+                logger.info(
+                    f"Skipping migration {migration_file} (version {target_version}) "
+                    f"because keys {migration_keys} do not match active keys {self.migration_keys}"
+                )
+                # Mark as applied (skipped) by updating the version without running SQL
+                self._update_migration_status(target_db, target_version, is_start=False)
+                continue
+
+            keys_msg = f" (keys: {migration_keys})" if migration_keys else ""
+            logger.info(
+                f"Applying migration {migration_file} to `{target_db}`{keys_msg}"
+            )
             self._apply_migration(target_db, target_version, migration_file)
         if should_insert_costs(status.curr_version, target_version):
             insert_costs(self.ch_client, target_db)
@@ -187,20 +212,19 @@ class ClickHouseTraceServerMigrator:
         """Parses a migration filename into its components.
 
         Args:
-            filename: The migration filename (e.g., '1_init.up.sql').
+            filename: The migration filename (e.g., '1_init.up.sql' or '2_feature.experimental.up.sql').
 
         Returns:
-            A MigrationFileEntry containing:
-                - version (int): The migration version number.
-                - name (str): The descriptive name of the migration.
-                - is_up (bool): True if this is an 'up' migration, False for 'down'.
+            MigrationFileEntry containing version, name, keys, and direction.
 
         Raises:
             MigrationError: If the filename format is invalid.
 
         Example:
             >>> migrator._parse_migration_filename('2_feature.up.sql')
-            MigrationFileEntry(version=2, name='feature', is_up=True)
+            MigrationFileEntry(version=2, name='feature', keys=[], is_up=True)
+            >>> migrator._parse_migration_filename('3_feature.experimental.up.sql')
+            MigrationFileEntry(version=3, name='feature', keys=['experimental'], is_up=True)
         """
         if not filename.endswith(".up.sql") and not filename.endswith(".down.sql"):
             raise MigrationError(f"Invalid migration file: {filename}")
@@ -227,7 +251,16 @@ class ClickHouseTraceServerMigrator:
         if name_part.endswith(suffix):
             name_part = name_part[: -len(suffix)]
 
-        return MigrationFileEntry(version=version, name=name_part, is_up=is_up)
+        # Parse keys from name (e.g. "feature.key1_key2" -> keys=["key1", "key2"])
+        name_subparts = name_part.split(".")
+        keys: list[str] = []
+        if len(name_subparts) > 1:
+            keys_str = ".".join(name_subparts[1:])
+            keys = [k for k in keys_str.split("_") if k]
+
+        return MigrationFileEntry(
+            version=version, name=name_part, keys=keys, is_up=is_up
+        )
 
     def _get_migrations(self) -> dict[int, MigrationInfo]:
         """Gets all migration files and returns a map of version to MigrationInfo.
@@ -254,6 +287,16 @@ class ClickHouseTraceServerMigrator:
 
             if entry.version not in migration_map:
                 migration_map[entry.version] = MigrationInfo()
+
+            # Validate consistency of keys between up/down files for the same version
+            if migration_map[entry.version].keys is not None:
+                existing_keys = migration_map[entry.version].keys or []
+                if set(existing_keys) != set(entry.keys):
+                    raise MigrationError(
+                        f"Key mismatch for version {entry.version}: {existing_keys} vs {entry.keys}"
+                    )
+            else:
+                migration_map[entry.version].keys = entry.keys
 
             if entry.is_up:
                 if migration_map[entry.version].up is not None:
@@ -356,7 +399,6 @@ class ClickHouseTraceServerMigrator:
     def _apply_migration(
         self, target_db: str, target_version: int, migration_file: str
     ) -> None:
-        logger.info(f"Applying migration {migration_file} to `{target_db}`")
         migration_dir = os.path.join(os.path.dirname(__file__), "migrations")
         migration_file_path = os.path.join(migration_dir, migration_file)
 
