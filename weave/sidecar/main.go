@@ -44,7 +44,7 @@ type Batch struct {
 
 // Request from Python client
 type Request struct {
-	Method  string          `json:"method"` // "call_start" or "call_end"
+	Method  string          `json:"method"` // "call_start", "call_end", or "flush"
 	Payload json.RawMessage `json:"payload"`
 }
 
@@ -52,6 +52,7 @@ type Request struct {
 type Response struct {
 	Success bool   `json:"success"`
 	Error   string `json:"error,omitempty"`
+	Pending int    `json:"pending,omitempty"` // Number of items still pending
 }
 
 // Sidecar is the main server
@@ -163,24 +164,29 @@ func (s *Sidecar) handleConnection(conn net.Conn) {
 }
 
 func (s *Sidecar) handleRequest(req *Request) Response {
-	var mode string
 	switch req.Method {
 	case "call_start":
-		mode = "start"
+		s.enqueue(BatchItem{Mode: "start", Req: req.Payload})
+		return Response{Success: true, Pending: s.getPendingCount()}
+
 	case "call_end":
-		mode = "end"
+		s.enqueue(BatchItem{Mode: "end", Req: req.Payload})
+		return Response{Success: true, Pending: s.getPendingCount()}
+
+	case "flush":
+		// Synchronously flush all pending items and wait for completion
+		s.flushSync()
+		return Response{Success: true, Pending: 0}
+
 	default:
 		return Response{Success: false, Error: fmt.Sprintf("unknown method: %s", req.Method)}
 	}
+}
 
-	item := BatchItem{
-		Mode: mode,
-		Req:  req.Payload,
-	}
-
-	s.enqueue(item)
-
-	return Response{Success: true}
+func (s *Sidecar) getPendingCount() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return len(s.batch)
 }
 
 func (s *Sidecar) enqueue(item BatchItem) {
@@ -232,14 +238,43 @@ func (s *Sidecar) flush() {
 	batch := s.batch
 	s.batch = make([]BatchItem, 0, s.config.FlushMaxCount)
 	s.batchSize = 0
+	remaining := len(s.batch)
 	s.mu.Unlock()
 
-	log.Printf("Flushing %d items to backend", len(batch))
+	log.Printf("Flushing %d items to backend...", len(batch))
 
 	// Send to backend
 	if err := s.sendBatch(batch); err != nil {
-		log.Printf("Failed to send batch: %v", err)
+		log.Printf("Failed to send batch of %d items: %v", len(batch), err)
 		// TODO: Could implement retry logic or disk fallback here
+	} else {
+		log.Printf("Successfully flushed %d items to backend (remaining: %d)", len(batch), remaining)
+	}
+}
+
+// flushSync flushes all pending items synchronously and waits for completion
+func (s *Sidecar) flushSync() {
+	for {
+		s.mu.Lock()
+		if len(s.batch) == 0 {
+			s.mu.Unlock()
+			return
+		}
+
+		// Take the current batch and reset
+		batch := s.batch
+		s.batch = make([]BatchItem, 0, s.config.FlushMaxCount)
+		s.batchSize = 0
+		s.mu.Unlock()
+
+		log.Printf("Sync flush: sending %d items to backend...", len(batch))
+
+		// Send to backend
+		if err := s.sendBatch(batch); err != nil {
+			log.Printf("Sync flush failed for %d items: %v", len(batch), err)
+		} else {
+			log.Printf("Sync flush: successfully sent %d items", len(batch))
+		}
 	}
 }
 

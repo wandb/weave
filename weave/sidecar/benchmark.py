@@ -53,6 +53,7 @@ class BenchmarkResult:
 def run_benchmark(project: str, num_ops: int, use_sidecar: bool) -> BenchmarkResult:
     """Run the benchmark with the specified configuration."""
     import weave
+    from weave.trace.context import weave_client_context
 
     # Initialize weave
     weave.init(project)
@@ -66,6 +67,12 @@ def run_benchmark(project: str, num_ops: int, use_sidecar: bool) -> BenchmarkRes
     for i in range(10):
         traced_operation(i)
 
+    # If using sidecar, flush warmup data first
+    if use_sidecar:
+        client = weave_client_context.get_weave_client()
+        if client and hasattr(client.server, "flush"):
+            client.server.flush()
+
     # Run benchmark
     latencies = []
     start_total = time.perf_counter()
@@ -75,6 +82,12 @@ def run_benchmark(project: str, num_ops: int, use_sidecar: bool) -> BenchmarkRes
         traced_operation(i)
         end = time.perf_counter()
         latencies.append((end - start) * 1000)  # Convert to ms
+
+    # If using sidecar, flush and include flush time in total
+    if use_sidecar:
+        client = weave_client_context.get_weave_client()
+        if client and hasattr(client.server, "flush"):
+            client.server.flush()
 
     end_total = time.perf_counter()
     total_time = end_total - start_total

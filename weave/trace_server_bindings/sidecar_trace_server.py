@@ -188,6 +188,26 @@ class SidecarTraceServer(TraceServerClientInterface):
                     self._connection = None
             return False
 
+    def flush(self) -> bool:
+        """Flush all pending items in the sidecar to the backend.
+
+        This is a synchronous operation that blocks until all pending
+        items have been sent to the backend.
+
+        Returns:
+            True if flush succeeded, False if sidecar unavailable
+        """
+        conn = self._get_connection()
+        if conn is None:
+            return False
+
+        try:
+            response = conn.send_request("flush", {})
+            return response.get("success", False)
+        except SidecarError as e:
+            logger.warning(f"Sidecar flush error: {e}")
+            return False
+
     # ==========================================================================
     # Hot-path methods: delegate to sidecar with fallback to backend
     # ==========================================================================
