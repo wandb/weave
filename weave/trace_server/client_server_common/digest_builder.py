@@ -52,6 +52,7 @@ def safe_digest(val: Any) -> str:
         project-like prefixes in the digest.
 
     Supported types:
+      - `bytes` / `bytearray` / `memoryview` (e.g. file contents)
       - `None`, `bool`, `int`, `float`, `str`
       - `list`/`tuple` of supported types
       - `dict[str, ...]` of supported types
