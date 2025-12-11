@@ -137,6 +137,56 @@ The sidecar handles `SIGINT` and `SIGTERM` signals gracefully:
 
 If the sidecar is unavailable, the Python SDK automatically falls back to direct communication with the backend server. A warning is logged once when fallback occurs.
 
+## Benchmarking
+
+A benchmark script is included to measure performance improvements:
+
+```bash
+# First, start the sidecar in one terminal:
+cd weave/sidecar
+go build -o weave-sidecar .
+./weave-sidecar --backend https://trace.wandb.ai
+
+# In another terminal, run the comparison benchmark:
+cd weave/sidecar
+python benchmark.py --project your-project --ops 1000 --compare
+
+# Or run individual benchmarks:
+python benchmark.py --project your-project --ops 1000  # without sidecar
+WEAVE_USE_SIDECAR=true python benchmark.py --project your-project --ops 1000  # with sidecar
+```
+
+Example output:
+```
+--- Running without sidecar ---
+Without Sidecar (Python only)
+=============================
+  Operations:      1,000
+  Total time:      2.34s
+  Throughput:      427 ops/sec
+  Avg latency:     2.340 ms
+
+--- Running with sidecar ---
+With Go Sidecar
+===============
+  Operations:      1,000
+  Total time:      0.45s
+  Throughput:      2,222 ops/sec
+  Avg latency:     0.450 ms
+
+COMPARISON
+==========
+Throughput:
+  Without sidecar: 427 ops/sec
+  With sidecar:    2,222 ops/sec
+  Improvement:     5.2x
+
+Average Latency:
+  Without sidecar: 2.340 ms
+  With sidecar:    0.450 ms
+  Improvement:     5.2x
+```
+
 ## Performance
 
 The sidecar improves performance by:
