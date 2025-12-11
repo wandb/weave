@@ -322,9 +322,10 @@ class ClickHouseTraceServerMigrator:
             )
             # res = []
             # for i in range(current_version, target_version, -1):
-            #     if migration_map[i].down is None:
+            #     down_file = migration_map[i].down
+            #     if down_file is None:
             #         raise MigrationError(f"Missing down migration file for version {i}")
-            #     res.append((i - 1, migration_map[i].down))
+            #     res.append((i - 1, down_file))
             # return res
 
         return []
