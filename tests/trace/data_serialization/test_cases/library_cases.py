@@ -80,7 +80,7 @@ library_cases = [
             "description": None,
             "dataset": "weave:///shawn/test-project/object/Dataset:gc7uIQrayAXKgIlNvvYehEa6yVHUT7vO6pN8ZDjqX5w",
             "scorers": [
-                "weave:///shawn/test-project/object/MyScorer:SWzjBQMYsOzs5L0p9DFVqFhGcquDj0p15H0vxTj55CQ",
+                "weave:///shawn/test-project/object/MyScorer:GmEsKiLbR0GU6wieLYQ9kSetEXYDBzXXZmYNiZaY5vs",
                 "weave:///shawn/test-project/object/LLMAsAJudgeScorer:Ztdd2Ch2pOqqO4J1eLtXeH8WrwKXllgoHYKyh5Uyvx0",
             ],
             "preprocess_model_input": None,
@@ -126,7 +126,7 @@ library_cases = [
             },
             {
                 "object_id": "MyScorer",
-                "digest": "SWzjBQMYsOzs5L0p9DFVqFhGcquDj0p15H0vxTj55CQ",
+                "digest": "GmEsKiLbR0GU6wieLYQ9kSetEXYDBzXXZmYNiZaY5vs",
                 "exp_val": {
                     "_type": "MyScorer",
                     "name": None,
@@ -284,7 +284,7 @@ library_cases = [
             "_type": "Evaluation",
             "name": None,
             "description": None,
-            "dataset": "weave:///shawn/test-project/object/Dataset:N0VKaX8wr9kF9QQzM7mSQz3yKrJJjTiJi4c9Bt7RSTA",
+            "dataset": "weave:///shawn/test-project/object/Dataset:gc7uIQrayAXKgIlNvvYehEa6yVHUT7vO6pN8ZDjqX5w",
             "scorers": [
                 "weave:///shawn/test-project/object/MyScorer:ILpCvdAsCLLLt9wU28MU9ugSScTkg7L3XX6PlUgFvlg",
                 "weave:///shawn/test-project/object/LLMAsAJudgeScorer:U3vlpg3CT6cuu0jcm3eFm5MyDxXvH0OCvrFax0VRY3w",
@@ -302,7 +302,7 @@ library_cases = [
         exp_objects=[
             {
                 "object_id": "Dataset",
-                "digest": "N0VKaX8wr9kF9QQzM7mSQz3yKrJJjTiJi4c9Bt7RSTA",
+                "digest": "gc7uIQrayAXKgIlNvvYehEa6yVHUT7vO6pN8ZDjqX5w",
                 "exp_val": {
                     "_type": "Dataset",
                     "name": None,
