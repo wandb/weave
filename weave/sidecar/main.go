@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -12,6 +13,8 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -299,6 +302,39 @@ func (s *Sidecar) Stop() {
 	log.Println("Sidecar shutdown complete")
 }
 
+// getAPIKeyFromNetrc reads the API key from ~/.netrc for api.wandb.ai
+func getAPIKeyFromNetrc() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+
+	netrcPath := filepath.Join(home, ".netrc")
+	file, err := os.Open(netrcPath)
+	if err != nil {
+		return ""
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	var inWandbMachine bool
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		fields := strings.Fields(line)
+
+		for i := 0; i < len(fields); i++ {
+			if fields[i] == "machine" && i+1 < len(fields) {
+				inWandbMachine = fields[i+1] == "api.wandb.ai"
+				i++
+			} else if inWandbMachine && fields[i] == "password" && i+1 < len(fields) {
+				return fields[i+1]
+			}
+		}
+	}
+
+	return ""
+}
+
 func main() {
 	// Command line flags
 	socketPath := flag.String("socket", "/tmp/weave_sidecar.sock", "Unix socket path")
@@ -315,13 +351,19 @@ func main() {
 		log.Fatal("--backend flag is required")
 	}
 
-	// Use API key from flag or environment variable
+	// Use API key from flag, environment variable, or netrc file
 	authKey := *apiKey
 	if authKey == "" {
 		authKey = os.Getenv("WANDB_API_KEY")
 	}
 	if authKey == "" {
-		log.Println("Warning: No API key provided. Set --api-key or WANDB_API_KEY environment variable.")
+		authKey = getAPIKeyFromNetrc()
+		if authKey != "" {
+			log.Println("Using API key from ~/.netrc")
+		}
+	}
+	if authKey == "" {
+		log.Println("Warning: No API key provided. Set --api-key, WANDB_API_KEY, or run 'wandb login'.")
 	}
 
 	config := Config{

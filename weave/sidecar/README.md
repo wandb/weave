@@ -34,13 +34,17 @@ go build -o weave-sidecar .
 
 ### Authentication
 
-The sidecar needs an API key to authenticate with the Weave backend. You can provide it in two ways:
+The sidecar needs an API key to authenticate with the Weave backend. It checks these sources in order:
 
-1. **Environment variable** (recommended): Set `WANDB_API_KEY`
-2. **Command line flag**: Use `--api-key <your-key>`
+1. **Command line flag**: `--api-key <your-key>`
+2. **Environment variable**: `WANDB_API_KEY`
+3. **~/.netrc file**: Reads credentials for `api.wandb.ai` (created by `wandb login`)
 
 ```bash
-# Using environment variable (recommended)
+# If you've already run 'wandb login', just start the sidecar:
+./weave-sidecar --backend https://trace.wandb.ai
+
+# Or using environment variable
 export WANDB_API_KEY=your-api-key
 ./weave-sidecar --backend https://trace.wandb.ai
 
