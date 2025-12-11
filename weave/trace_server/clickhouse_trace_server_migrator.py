@@ -2,6 +2,7 @@
 import logging
 import os
 import re
+from typing import Any
 
 from clickhouse_connect.driver.client import Client as CHClient
 
@@ -33,6 +34,7 @@ class ClickHouseTraceServerMigrator:
         replicated_path: str | None = None,
         replicated_cluster: str | None = None,
         management_db: str = "db_management",
+        migration_keys: list[str] | None = None,
     ):
         super().__init__()
         self.ch_client = ch_client
@@ -46,6 +48,11 @@ class ClickHouseTraceServerMigrator:
             else replicated_cluster
         )
         self.management_db = management_db
+        if migration_keys is None:
+            env_keys = os.environ.get("WEAVE_CH_MIGRATION_KEY", "")
+            self.migration_keys = [k.strip() for k in env_keys.split(",") if k.strip()]
+        else:
+            self.migration_keys = migration_keys
         self._initialize_migration_db()
 
     def _is_safe_identifier(self, value: str) -> bool:
@@ -118,6 +125,19 @@ class ClickHouseTraceServerMigrator:
         if status["curr_version"] == 0:
             self.ch_client.command(self._create_db_sql(target_db))
         for target_version, migration_file in migrations_to_apply:
+            # Check keys
+            migration_keys = migration_map[target_version].get("keys", [])
+            if migration_keys and not any(
+                k in self.migration_keys for k in migration_keys
+            ):
+                logger.info(
+                    f"Skipping migration {migration_file} (version {target_version}) "
+                    f"because keys {migration_keys} do not match active keys {self.migration_keys}"
+                )
+                # Mark as applied (skipped) by updating the version without running SQL
+                self._update_migration_status(target_db, target_version, is_start=False)
+                continue
+
             self._apply_migration(target_db, target_version, migration_file)
         if should_insert_costs(status["curr_version"], target_version):
             insert_costs(self.ch_client, target_db)
@@ -159,10 +179,10 @@ class ClickHouseTraceServerMigrator:
 
     def _get_migrations(
         self,
-    ) -> dict[int, dict[str, str | None]]:
+    ) -> dict[int, dict[str, Any]]:
         migration_dir = os.path.join(os.path.dirname(__file__), "migrations")
         migration_files = os.listdir(migration_dir)
-        migration_map: dict[int, dict[str, str | None]] = {}
+        migration_map: dict[int, dict[str, Any]] = {}
         max_version = 0
         for file in migration_files:
             if not file.endswith(".up.sql") and not file.endswith(".down.sql"):
@@ -175,9 +195,25 @@ class ClickHouseTraceServerMigrator:
                 raise MigrationError(f"Invalid migration file: {file}")
 
             is_up = file.endswith(".up.sql")
+            suffix = ".up.sql" if is_up else ".down.sql"
+
+            name_part = file_name_parts[1][: -len(suffix)]
+            name_subparts = name_part.split(".")
+            keys = []
+            if len(name_subparts) > 1:
+                keys_str = ".".join(name_subparts[1:])
+                keys = [k for k in keys_str.split("_") if k]
 
             if version not in migration_map:
-                migration_map[version] = {"up": None, "down": None}
+                migration_map[version] = {"up": None, "down": None, "keys": None}
+
+            if migration_map[version]["keys"] is not None:
+                if set(migration_map[version]["keys"]) != set(keys):
+                    raise MigrationError(
+                        f"Key mismatch for version {version}: {migration_map[version]['keys']} vs {keys}"
+                    )
+            else:
+                migration_map[version]["keys"] = keys
 
             if is_up:
                 if migration_map[version]["up"] is not None:
