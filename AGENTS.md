@@ -200,13 +200,9 @@ npm run test
 `weave/trace_server/client_server_common/digest_builder.py` defines **stable** digest functions used for
 object identity and deduplication across client/server:
 
-- **`bytes_digest`**: SHA-256 -> urlsafe base64, with `=` padding stripped and `-`/`_` replaced to keep
-  the output alphanumeric.
-- **`ref_unaware_json_digest`**: ref-unaware digest for JSON-like values (stable to dict insertion
-  order). Use this only when you want a pure data-driven digest with no Weave-specific ref normalization.
-- **`ref_aware_json_digest`**: hashes JSON-like data after **stabilizing ref strings** (so owner/entity
-  prefixes don’t “pollute” the digest) and uses `json.dumps(..., sort_keys=True)` so dict insertion order
-  does not affect the digest.
+- **`safe_digest`**: the only general-purpose digest entrypoint. It is **ref-aware** for structured values
+  (normalizes Weave ref strings so owner/entity prefixes don’t “pollute” identities) and also supports raw
+  `bytes` (for file contents) and `str` (for source/code capture).
 - **`set` handling**: sets are **not supported** and will raise; callers must convert to a list/tuple.
 
 Changes to digest behavior can invalidate historical identities—treat modifications here as a migration-level change.

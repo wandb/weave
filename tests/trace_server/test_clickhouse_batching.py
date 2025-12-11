@@ -16,7 +16,7 @@ from tests.trace.util import client_is_sqlite
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.base64_content_conversion import AUTO_CONVERSION_MIN_SIZE
 from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
-from weave.trace_server.client_server_common.digest_builder import str_digest
+from weave.trace_server.client_server_common.digest_builder import safe_digest
 from weave.trace_server.errors import InvalidRequest, ObjectDeletedError
 
 
@@ -178,7 +178,7 @@ def test_obj_batch_same_object_id_different_hash(trace_server, client):
     )
     assert len(res.objs) == 2
     digests = {o.digest for o in res.objs}
-    assert digests == {str_digest(json.dumps(v1)), str_digest(json.dumps(v2))}
+    assert digests == {safe_digest(v1), safe_digest(v2)}
     # Exactly one latest
     assert sum(o.is_latest for o in res.objs) == 1
 
@@ -231,7 +231,7 @@ def test_obj_batch_identical_same_id_same_hash_deduplicates(trace_server, client
         )
     )
     assert len(res.objs) == 1
-    assert res.objs[0].digest == str_digest(json.dumps(val))
+    assert res.objs[0].digest == safe_digest(val)
 
 
 def test_obj_batch_four_versions_and_read_path(trace_server, client):
@@ -243,7 +243,7 @@ def test_obj_batch_four_versions_and_read_path(trace_server, client):
     wb_user_id = _internal_wb_user_id()
     obj_id = "multi_v"
     vals = [{"i": i} for i in range(4)]
-    digests = [str_digest(json.dumps(v)) for v in vals]
+    digests = [safe_digest(v) for v in vals]
     server.obj_create_batch(batch=[_mk_obj(pid, obj_id, wb_user_id, v) for v in vals])
 
     # All versions are queryable

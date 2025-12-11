@@ -68,8 +68,7 @@ from weave.trace_server.clickhouse_schema import (
     SelectableCHObjSchema,
 )
 from weave.trace_server.client_server_common.digest_builder import (
-    bytes_digest,
-    ref_aware_json_digest,
+    safe_digest,
     table_digest_from_row_digests,
 )
 from weave.trace_server.constants import (
@@ -304,7 +303,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self, project_id: str, create: bool
     ) -> str:
         if not create:
-            return bytes_digest(
+            return safe_digest(
                 (object_creation_utils.PLACEHOLDER_OP_SOURCE).encode("utf-8")
             )
 
@@ -856,7 +855,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
         processed_val = processed_result["val"]
         json_val = json.dumps(processed_val)
-        digest = ref_aware_json_digest(processed_val)
+        digest = safe_digest(processed_val)
 
         ch_obj = ObjCHInsertable(
             project_id=req.obj.project_id,
@@ -913,7 +912,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             )
             processed_val = processed_result["val"]
             json_val = json.dumps(processed_val)
-            digest = ref_aware_json_digest(processed_val)
+            digest = safe_digest(processed_val)
             ch_obj = ObjCHInsertable(
                 project_id=obj.project_id,
                 object_id=obj.object_id,
@@ -1079,7 +1078,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     f"""Validation Error: Encountered a non-dictionary row when creating a table. Please ensure that all rows are dictionaries. Violating row:\n{r}."""
                 )
             row_json = json.dumps(r)
-            row_digest = ref_aware_json_digest(r)
+            row_digest = safe_digest(r)
             insert_rows.append(
                 (
                     req.table.project_id,
@@ -1138,7 +1137,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             if not isinstance(row_data, dict):
                 raise TypeError("All rows must be dictionaries")
             row_json = json.dumps(row_data)
-            row_digest = ref_aware_json_digest(row_data)
+            row_digest = safe_digest(row_data)
             if row_digest not in known_digests:
                 new_rows_needed_to_insert.append(
                     (
@@ -3668,7 +3667,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         return [r.val for r in extra_results]
 
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
-        digest = bytes_digest(req.content)
+        digest = safe_digest(req.content)
         use_file_storage = self._should_use_file_storage_for_writes(req.project_id)
         client = self.file_storage_client
 

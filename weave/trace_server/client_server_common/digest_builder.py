@@ -1,20 +1,17 @@
-"""This module contains the shared functions for building digests in Weave.
+"""Stable digests for Weave identities.
 
-While small, it is extremely critical to the integrity of the system that it is
-stable and consistent. Digests are used throughout the system to generate stable
-identities for objects.
+This module must remain stable and consistent between client/server. Changing digest
+behavior changes object identities and breaks deduplication.
 
-This needs to be consistent between the client and server and cannot change over time.
+Public API (intentionally small to reduce misuse):
+  - `safe_digest`: stable digest for JSON-like values (ref-aware).
+  - `table_digest_from_row_digests`: stable, order-dependent digest for tables.
 
-If changes are made to this module, then all newly minted digests will be different than
-before, breaking our ability to dedupe and recognize the same object. Change this file
-with extreme caution!! Talk to Tim Sweeney before making any changes.
-
-* For low-level binary digests, use bytes_digest.
-* For string digests, use str_digest.
-* For JSON digests, use ref_aware_json_digest (recommended) or ref_unaware_json_digest (dangerous).
-* For table digests, use table_digest_from_row_digests.
-
+Notes:
+  - `safe_digest` is **ref-aware**: it normalizes Weave ref strings so that owner/entity/
+    project-like prefixes do not “pollute” digests.
+  - Sets are **not supported** (unordered) and raise.
+  - Dict keys must be strings (JSON semantics) and are ordered recursively for stability.
 """
 
 import base64
@@ -23,33 +20,17 @@ import json
 from collections.abc import Callable
 from typing import Any, TypeVar, cast
 
-EXTERNAL_REF_PREFIX = "weave:///"
-INTERNAL_REF_PREFIX = "weave-trace-internal:///"
+_EXTERNAL_REF_PREFIX = "weave:///"
+_INTERNAL_REF_PREFIX = "weave-trace-internal:///"
 # NOTE: This string becomes part of the stabilized value that is hashed. Changing it
 # changes digests and should be treated as a migration-level change *once shipped*.
-STABILIZED_REF_URI_PREFIX = "weave-anonymous:///_/_/"
+_STABILIZED_REF_URI_PREFIX = "weave-anonymous:///_/_/"
+
+__all__ = ["safe_digest", "table_digest_from_row_digests"]
 
 
-def bytes_digest(bytes_val: bytes) -> str:
-    """Generate a stable digest for raw bytes.
-
-    This is the lowest-level digest primitive used throughout the system. The output is a
-    SHA-256 digest encoded as urlsafe base64 with a couple of tweaks:
-      - `=` padding is stripped
-      - `-` and `_` are replaced so the result is alphanumeric-only
-
-    Args:
-        bytes_val (bytes): The input bytes.
-
-    Returns:
-        str: Stable digest string.
-
-    Examples:
-        >>> bytes_digest(b"abc") == bytes_digest(b"abc")
-        True
-        >>> bytes_digest(b"abc") == bytes_digest(b"abcd")
-        False
-    """
+def _bytes_digest(bytes_val: bytes) -> str:
+    """Digest raw bytes (private helper)."""
     hasher = hashlib.sha256()
     hasher.update(bytes_val)
     hash_bytes = hasher.digest()
@@ -57,73 +38,36 @@ def bytes_digest(bytes_val: bytes) -> str:
     return base64_encoded_hash.replace("-", "X").replace("_", "Y").rstrip("=")
 
 
-def str_digest(str_val: str) -> str:
-    """Generate a stable digest for a string.
+def _str_digest(str_val: str) -> str:
+    """Digest a string by hashing its UTF-8 bytes (private helper)."""
+    return _bytes_digest(str_val.encode())
 
-    This is just `bytes_digest` applied to UTF-8 encoded text.
 
-    Args:
-        str_val (str): Input string.
+def safe_digest(val: Any) -> str:
+    """Generate a stable digest for JSON-like values (safe default).
 
-    Returns:
-        str: Stable digest string.
+    This digest is:
+      - **Stable** to dict insertion order (recursively).
+      - **Ref-aware**: Weave ref strings are normalized to avoid embedding owner/entity/
+        project-like prefixes in the digest.
 
-    Examples:
-        >>> str_digest("hello") == bytes_digest(b"hello")
-        True
+    Supported types:
+      - `None`, `bool`, `int`, `float`, `str`
+      - `list`/`tuple` of supported types
+      - `dict[str, ...]` of supported types
+
+    Not supported:
+      - `set` (unordered): raises `TypeError`
+      - dicts with non-`str` keys: raises `TypeError`
     """
-    return bytes_digest(str_val.encode())
-
-
-def ref_unaware_json_digest(json_val: Any) -> str:
-    """Generate a stable digest for JSON-like data (ref-unaware).
-
-    Notes:
-        - Dict keys are sorted to make the digest independent of insertion order.
-        - Sets are encoded deterministically as a tagged object, since sets are not JSON.
-        - This function does NOT stabilize Weave ref strings. If you want digests that are
-          robust to owner/entity prefixes inside refs, use `ref_aware_json_digest`.
-    """
-    canonical_json_val = _canonicalize_json_like(json_val)
-    return _json_digest(canonical_json_val)
-
-
-def ref_aware_json_digest(json_val: Any) -> str:
-    """Generate a stable digest for JSON-like data (ref-aware).
-
-    This is the recommended digest for values that may contain Weave refs, because it
-    normalizes ref strings so that owner/entity/project-like prefixes do not “pollute”
-    the digest.
-
-    Normalization rules:
-      - External refs (`weave:///entity/project/...`) are stabilized by replacing the
-        `entity/project` segments with `_/_` while keeping the remaining path.
-      - Internal refs (`weave-trace-internal:///project_id/...`) are stabilized by
-        replacing `project_id` with `_/_` while keeping the remaining path.
-      - Malformed refs are left unchanged (no stabilization, no error).
-
-    Args:
-        json_val (Any): JSON-like value to digest.
-
-    Returns:
-        str: Stable digest string.
-
-    Examples:
-        >>> d = ref_unaware_json_digest({"a": 1})
-        >>> ref_aware_json_digest({"r": f"weave:///ent/proj/object/X:{d}"}) == ref_aware_json_digest({"r": f"weave-trace-internal:///pid/object/X:{d}"})
-        True
-    """
-
-    def mapper(val: Any) -> Any:
-        if isinstance(val, str):
-            return _stabilize_ref_str(val)
-        return val
-
-    mapped_json_val = _map_val(json_val, mapper)
-    canonical_json_val = _canonicalize_json_like(mapped_json_val)
-    res = _json_digest(canonical_json_val)
-
-    return res
+    if isinstance(val, (bytes, bytearray, memoryview)):
+        return _bytes_digest(bytes(val))
+    if isinstance(val, str):
+        # If this string is a Weave ref, normalize it first.
+        return _str_digest(_stabilize_ref_str(val))
+    stabilized = _stabilize_refs_in_json_like(val)
+    canonical = _canonicalize_json_like(stabilized)
+    return _json_digest(canonical)
 
 
 def table_digest_from_row_digests(row_digests: list[str]) -> str:
@@ -151,7 +95,7 @@ def _json_digest(json_val: Any) -> str:
     # NOTE: We intentionally do *not* change json.dumps separators/whitespace settings here,
     # because that would change all digests. Keep encoding defaults unless there's a strong
     # reason to change them (and a migration plan).
-    return str_digest(json.dumps(json_val, sort_keys=True))
+    return _str_digest(json.dumps(json_val, sort_keys=True))
 
 
 E = TypeVar("E")
@@ -165,10 +109,11 @@ def _map_val(obj: E, func: Callable[[E], E]) -> E:
     if isinstance(obj, tuple):
         return cast(E, tuple(_map_val(v, func) for v in obj))
     if isinstance(obj, set):
-        # Important: `_map_val` is for applying a value-level transform; it should not
-        # encode container semantics. We preserve set-ness here and handle JSON encoding
-        # deterministically in `_canonicalize_json_like`.
-        return cast(E, {_map_val(v, func) for v in obj})
+        # Sets are not supported anywhere in safe_digest; error early and avoid iterating
+        # over an unordered collection.
+        raise TypeError(
+            "Cannot hash set values in digest_builder; convert to a list/tuple first."
+        )
     return func(obj)
 
 
@@ -179,12 +124,13 @@ def _canonicalize_json_like(obj: Any) -> Any:
     containers (dict/list/tuple/set) so that stable hashing is possible.
     """
     if isinstance(obj, dict):
-        # Canonicalize in a deterministic key order *recursively*.
-        # We still keep json.dumps(sort_keys=True) in _json_digest as an extra guardrail.
-        return {
-            k: _canonicalize_json_like(obj[k])
-            for k in sorted(obj.keys(), key=_stable_json_sort_key)
-        }
+        for k in obj.keys():
+            if not isinstance(k, str):
+                raise TypeError(
+                    "safe_digest only supports JSON-like dicts with string keys; "
+                    f"got key type {type(k)}"
+                )
+        return {k: _canonicalize_json_like(obj[k]) for k in sorted(obj.keys())}
     if isinstance(obj, list):
         return [_canonicalize_json_like(v) for v in obj]
     if isinstance(obj, tuple):
@@ -198,17 +144,19 @@ def _canonicalize_json_like(obj: Any) -> Any:
     return obj
 
 
-def _stable_json_sort_key(val: Any) -> str:
-    """Return a stable string sort key for JSON-like values."""
-    try:
-        return json.dumps(val, sort_keys=True)
-    except TypeError:
-        # Fallback: make a best-effort stable ordering for unexpected key types.
-        return repr(val)
+def _stabilize_refs_in_json_like(val: Any) -> Any:
+    """Return a JSON-like value with Weave ref strings normalized."""
+
+    def mapper(v: Any) -> Any:
+        if isinstance(v, str):
+            return _stabilize_ref_str(v)
+        return v
+
+    return _map_val(val, mapper)
 
 
 def _make_stabilized_ref_str(stable_content_address: str) -> str:
-    return f"{STABILIZED_REF_URI_PREFIX}{stable_content_address}"
+    return f"{_STABILIZED_REF_URI_PREFIX}{stable_content_address}"
 
 
 def _stabilize_ref_str(ref: str) -> str:
@@ -229,9 +177,9 @@ def _stabilize_ref_str(ref: str) -> str:
         >>> _stabilize_ref_str("weave-trace-internal:///proj_id/object/Foo:abc123/attr/bar")
         'weave-anonymous:///_/_/object/Foo:abc123/attr/bar'
     """
-    if ref.startswith(EXTERNAL_REF_PREFIX):
-        # Remove EXTERNAL_REF_PREFIX and the first two path segments (entity/project)
-        ref_body = ref[len(EXTERNAL_REF_PREFIX) :]
+    if ref.startswith(_EXTERNAL_REF_PREFIX):
+        # Remove _EXTERNAL_REF_PREFIX and the first two path segments (entity/project)
+        ref_body = ref[len(_EXTERNAL_REF_PREFIX) :]
         parts = ref_body.split("/")
         if len(parts) < 3:
             # Malformed ref: don't stabilize.
@@ -239,9 +187,9 @@ def _stabilize_ref_str(ref: str) -> str:
         # join everything after first two segments (entity and project)
         stable_content_address = "/".join(parts[2:])
         return _make_stabilized_ref_str(stable_content_address)
-    elif ref.startswith(INTERNAL_REF_PREFIX):
-        # Remove INTERNAL_REF_PREFIX and the first path segment (project_id)
-        ref_body = ref[len(INTERNAL_REF_PREFIX) :]
+    elif ref.startswith(_INTERNAL_REF_PREFIX):
+        # Remove _INTERNAL_REF_PREFIX and the first path segment (project_id)
+        ref_body = ref[len(_INTERNAL_REF_PREFIX) :]
         parts = ref_body.split("/")
         if len(parts) < 2:
             # Malformed ref: don't stabilize.

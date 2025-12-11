@@ -22,7 +22,7 @@ from weave.trace.op_protocol import Op
 from weave.trace.refs import ObjectRef
 from weave.trace.serialization import serializer
 from weave.trace.serialization.mem_artifact import MemTraceFilesArtifact
-from weave.trace_server.client_server_common.digest_builder import str_digest
+from weave.trace_server.client_server_common.digest_builder import safe_digest
 from weave.utils.ipython import (
     ClassNotFoundError,
     get_class_source,
@@ -264,7 +264,7 @@ def get_source_or_fallback(fn: Callable, *, warnings: list[str]) -> str:
         fn_is_op and not op._code_capture_enabled
     ):
         # This digest is kept for op versioning purposes
-        digest = str_digest(inspect.getsource(fn))
+        digest = safe_digest(inspect.getsource(fn))
         return textwrap.dedent(
             f"""
             def func(*args, **kwargs):
