@@ -228,9 +228,6 @@ class CallsCompleteSummaryField(CallsCompleteField):
         return f"{self.as_sql(pb, table_alias)} AS {self.field}"
 
     def is_heavy(self) -> bool:
-        # These are computed from non-heavy fields (status uses exception and ended_at)
-        # If we add more summary fields that depend on heavy fields,
-        # this would need to be made more sophisticated
         return False
 
 
@@ -339,14 +336,9 @@ class AggregatedDataSizeFieldComplete(CallsMergedField):
         table_alias: str,
         cast: tsi_query.CastTo | None = None,
     ) -> str:
-        # This field is not supposed to be called yet. For now, we just take the parent class's
-        # implementation. Consider re-implementation for future use.
         return super().as_sql(pb, table_alias, cast)
 
     def as_select_sql(self, pb: ParamBuilder, table_alias: str) -> str:
-        # It doesn't make sense for a non-root call to have a total storage size,
-        # even if a value could be computed.
-        # For calls_complete, no aggregation functions are needed since there's no GROUP BY.
         conditional_field = f"""
         CASE
             WHEN {table_alias}.parent_id IS NULL
@@ -354,7 +346,6 @@ class AggregatedDataSizeFieldComplete(CallsMergedField):
             ELSE NULL
         END
         """
-
         return f"{conditional_field} AS {self.field}"
 
 
@@ -1080,10 +1071,7 @@ class CallsQuery(BaseModel):
         object_refs = process_object_refs_filter_to_opt_sql(
             pb, table_alias, object_ref_fields_consumed
         )
-
-        id_subquery = ""
-        if id_subquery_name is not None:
-            id_subquery = f"AND ({table_alias}.id IN {id_subquery_name})"
+        id_subquery = make_id_subquery(table_alias, id_subquery_name)
 
         # special optimization for call_ids filter
         id_mask = ""
@@ -1409,13 +1397,7 @@ class CallsQuery(BaseModel):
                 if query_condition.is_feedback():
                     needs_feedback = True
 
-        # Add id_subquery filter if provided (for CTE-based queries)
-        # This is critical for applying the limit from the filter query
-        id_subquery_filter = (
-            f"AND ({table_alias}.id IN {id_subquery_name})"
-            if id_subquery_name is not None
-            else ""
-        )
+        id_subquery_sql = make_id_subquery(table_alias, id_subquery_name)
         op_name_sql = process_op_name_filter_to_sql(
             self.hardcoded_filter, pb, table_alias, read_table=self.read_table
         )
@@ -1454,7 +1436,7 @@ class CallsQuery(BaseModel):
         FROM calls_complete
         {joins.to_sql()}
         WHERE calls_complete.project_id = {param_slot(project_param, "String")}
-        {id_subquery_filter}
+        {id_subquery_sql}
         {trace_id_sql}
         {trace_roots_sql}
         {op_name_sql}
@@ -2166,6 +2148,15 @@ def process_calls_filter_to_conditions(
         )
 
     return conditions
+
+
+def make_id_subquery(
+    table_alias: str,
+    id_subquery_name: str | None,
+) -> str:
+    if id_subquery_name is None:
+        return ""
+    return f"AND ({table_alias}.id IN {id_subquery_name})"
 
 
 ######### STATS QUERY HANDLING ##########
