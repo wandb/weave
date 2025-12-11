@@ -554,7 +554,7 @@ class OrderField(BaseModel):
 
 class Condition(BaseModel):
     operand: "tsi_query.Operand"
-    _consumed_fields: list[CallsMergedField] | None = None
+    _consumed_fields: list[QueryBuilderField] | None = None
 
     def as_sql(
         self,
@@ -602,7 +602,7 @@ class Condition(BaseModel):
 
     def _get_consumed_fields(
         self, read_table: ReadTable = ReadTable.CALLS_MERGED
-    ) -> list[CallsMergedField]:
+    ) -> list[QueryBuilderField]:
         if self._consumed_fields is None:
             self.as_sql(ParamBuilder(), read_table.value, read_table=read_table)
         if self._consumed_fields is None:
@@ -1680,7 +1680,7 @@ def get_summary_field_handler(
 
 class FilterToConditions(BaseModel):
     conditions: list[str]
-    fields_used: list[CallsMergedField]
+    fields_used: list[QueryBuilderField]
 
 
 def process_query_to_conditions(
@@ -1692,7 +1692,7 @@ def process_query_to_conditions(
 ) -> FilterToConditions:
     """Converts a Query to a list of conditions for a clickhouse query."""
     conditions = []
-    raw_fields_used: dict[str, CallsMergedField] = {}
+    raw_fields_used: dict[str, QueryBuilderField] = {}
 
     # This is the mongo-style query
     def process_operation(operation: tsi_query.Operation) -> str:
@@ -2693,10 +2693,11 @@ def build_calls_complete_update_display_name_query(
     pb: ParamBuilder,
 ) -> str | None:
     """Build a parameterized UPDATE query for calls_complete table to update the display_name field."""
+    update_fields = {"display_name": (display_name, "String")}
     return _build_calls_complete_update_query(
         project_id=project_id,
         call_ids=[call_id],
-        update_fields={"display_name": (display_name, "String")},
+        update_fields=update_fields,
         wb_user_id=wb_user_id,
         updated_at=updated_at,
         pb=pb,
@@ -2714,10 +2715,11 @@ def build_calls_complete_batch_delete_query(
     """Build a parameterized DELETE query for calls_complete table.
     This uses ClickHouse's lightweight DELETE with parameterized IN clause.
     """
+    update_fields = {"deleted_at": (deleted_at, "DateTime64(3)")}
     return _build_calls_complete_update_query(
         project_id=project_id,
         call_ids=call_ids,
-        update_fields={"deleted_at": (deleted_at, "DateTime64(3)")},
+        update_fields=update_fields,
         wb_user_id=wb_user_id,
         updated_at=updated_at,
         pb=pb,
