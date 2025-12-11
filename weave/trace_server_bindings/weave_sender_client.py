@@ -167,7 +167,7 @@ class WeaveSenderClient:
 
         self._socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         self._socket.connect(str(self._socket_path))
-        self._socket.settimeout(30.0)  # 30 second timeout for operations
+        # Timeout is set per-request in _send_request()
         self._connected = True
 
     def _disconnect(self) -> None:
@@ -180,14 +180,25 @@ class WeaveSenderClient:
             self._socket = None
         self._connected = False
 
-    def _send_request(self, method: str, params: dict[str, Any] | None = None) -> Any:
-        """Send a request to the sidecar and wait for a response."""
+    def _send_request(
+        self, method: str, params: dict[str, Any] | None = None, timeout: float | None = 30.0
+    ) -> Any:
+        """Send a request to the sidecar and wait for a response.
+
+        Args:
+            method: The RPC method to call
+            params: Optional parameters for the method
+            timeout: Socket timeout in seconds. None means no timeout (blocking).
+        """
         with self._lock:
             if not self._connected:
                 self._connect()
 
             if self._socket is None:
                 raise RuntimeError("Not connected to sidecar")
+
+            # Set timeout for this request
+            self._socket.settimeout(timeout)
 
             self._request_id += 1
             request = {
@@ -401,7 +412,8 @@ class WeaveSenderClient:
         # First flush the client-side batch
         self._flush_batch()
 
-        self._send_request("wait_queue_empty")
+        # Use no timeout - this can take a long time with many items
+        self._send_request("wait_queue_empty", timeout=None)
 
     def wait_idle(self) -> None:
         """Wait until all items have been sent to the server.
@@ -415,7 +427,8 @@ class WeaveSenderClient:
         # First flush the client-side batch
         self._flush_batch()
 
-        self._send_request("wait_idle")
+        # Use no timeout - this can take a long time with many items
+        self._send_request("wait_idle", timeout=None)
 
     def stats(self) -> dict[str, int]:
         """Get current statistics.
