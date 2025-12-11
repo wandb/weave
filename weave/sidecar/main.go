@@ -21,6 +21,7 @@ import (
 type Config struct {
 	SocketPath     string
 	BackendURL     string
+	APIKey         string
 	FlushInterval  time.Duration
 	FlushMaxCount  int
 	FlushMaxBytes  int
@@ -259,6 +260,11 @@ func (s *Sidecar) sendBatch(batch []BatchItem) error {
 
 	req.Header.Set("Content-Type", "application/json")
 
+	// Add authentication if API key is configured
+	if s.config.APIKey != "" {
+		req.SetBasicAuth("api", s.config.APIKey)
+	}
+
 	resp, err := s.httpClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("request failed: %w", err)
@@ -297,6 +303,7 @@ func main() {
 	// Command line flags
 	socketPath := flag.String("socket", "/tmp/weave_sidecar.sock", "Unix socket path")
 	backendURL := flag.String("backend", "", "Backend trace server URL (required)")
+	apiKey := flag.String("api-key", "", "API key for authentication (or set WANDB_API_KEY env var)")
 	flushInterval := flag.Duration("flush-interval", 1*time.Second, "Flush interval")
 	flushMaxCount := flag.Int("flush-max-count", 2000, "Max items before flush")
 	flushMaxBytes := flag.Int("flush-max-bytes", 10*1024*1024, "Max bytes before flush (10MB default)")
@@ -308,9 +315,19 @@ func main() {
 		log.Fatal("--backend flag is required")
 	}
 
+	// Use API key from flag or environment variable
+	authKey := *apiKey
+	if authKey == "" {
+		authKey = os.Getenv("WANDB_API_KEY")
+	}
+	if authKey == "" {
+		log.Println("Warning: No API key provided. Set --api-key or WANDB_API_KEY environment variable.")
+	}
+
 	config := Config{
 		SocketPath:     *socketPath,
 		BackendURL:     *backendURL,
+		APIKey:         authKey,
 		FlushInterval:  *flushInterval,
 		FlushMaxCount:  *flushMaxCount,
 		FlushMaxBytes:  *flushMaxBytes,

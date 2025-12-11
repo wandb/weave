@@ -596,6 +596,7 @@ go build -o weave-sidecar .
 #### 2. Run the Sidecar
 
 ```bash
+# API key is read from WANDB_API_KEY environment variable
 ./weave-sidecar --backend https://trace.wandb.ai
 ```
 
@@ -634,6 +635,7 @@ my_function(5)
 |------|---------|-------------|
 | `--socket` | `/tmp/weave_sidecar.sock` | Unix domain socket path |
 | `--backend` | (required) | Backend trace server URL |
+| `--api-key` | `$WANDB_API_KEY` | API key for authentication |
 | `--flush-interval` | `1s` | Time interval for flushing batches |
 | `--flush-max-count` | `2000` | Max items before triggering flush |
 | `--flush-max-bytes` | `10485760` (10MB) | Max batch size in bytes |

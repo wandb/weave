@@ -16,6 +16,7 @@ go build -o weave-sidecar .
 ## Running
 
 ```bash
+# API key is read from WANDB_API_KEY environment variable
 ./weave-sidecar --backend https://trace.wandb.ai
 ```
 
@@ -25,10 +26,27 @@ go build -o weave-sidecar .
 |------|---------|-------------|
 | `--socket` | `/tmp/weave_sidecar.sock` | Unix domain socket path |
 | `--backend` | (required) | Backend trace server URL |
+| `--api-key` | `$WANDB_API_KEY` | API key for authentication |
 | `--flush-interval` | `1s` | Time interval for flushing batches |
 | `--flush-max-count` | `2000` | Max items before triggering flush |
 | `--flush-max-bytes` | `10485760` (10MB) | Max batch size in bytes before flush |
 | `--request-timeout` | `30s` | HTTP request timeout for backend calls |
+
+### Authentication
+
+The sidecar needs an API key to authenticate with the Weave backend. You can provide it in two ways:
+
+1. **Environment variable** (recommended): Set `WANDB_API_KEY`
+2. **Command line flag**: Use `--api-key <your-key>`
+
+```bash
+# Using environment variable (recommended)
+export WANDB_API_KEY=your-api-key
+./weave-sidecar --backend https://trace.wandb.ai
+
+# Or using command line flag
+./weave-sidecar --backend https://trace.wandb.ai --api-key your-api-key
+```
 
 ### Example
 
