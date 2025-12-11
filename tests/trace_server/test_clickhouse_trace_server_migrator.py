@@ -5,7 +5,11 @@ from unittest.mock import Mock, call, patch
 import pytest
 
 from weave.trace_server import clickhouse_trace_server_migrator as trace_server_migrator
-from weave.trace_server.clickhouse_trace_server_migrator import MigrationError
+from weave.trace_server.clickhouse_trace_server_migrator import (
+    MigrationError,
+    MigrationInfo,
+    MigrationStatus,
+)
 
 
 @pytest.fixture
@@ -33,13 +37,14 @@ def migrator():
 
 def test_apply_migrations_with_target_version(mock_costs, migrator, tmp_path):
     # Setup
-    migrator._get_migration_status.return_value = {
-        "curr_version": 1,
-        "partially_applied_version": None,
-    }
+    migrator._get_migration_status.return_value = trace_server_migrator.MigrationStatus(
+        db_name="test_db",
+        curr_version=1,
+        partially_applied_version=None,
+    )
     migrator._get_migrations.return_value = {
-        1: {"up": "1.up.sql", "down": "1.down.sql", "keys": []},
-        2: {"up": "2.up.sql", "down": "2.down.sql", "keys": []},
+        1: trace_server_migrator.MigrationInfo(up="1.up.sql", down="1.down.sql"),
+        2: trace_server_migrator.MigrationInfo(up="2.up.sql", down="2.down.sql"),
     }
     migrator._determine_migrations_to_apply.return_value = [(2, "2.up.sql")]
 
@@ -263,45 +268,46 @@ def test_get_migrations_parsing(tmp_path):
         assert len(migration_map) == 4
 
         # Check standard migration
-        assert migration_map[1]["up"] == "1_init.up.sql"
-        assert migration_map[1].get("keys") == []
+        assert migration_map[1].up == "1_init.up.sql"
+        assert migration_map[1].keys == []
 
         # Check single key
-        assert migration_map[2]["up"] == "2_feature.experimental.up.sql"
-        assert set(migration_map[2]["keys"]) == {"experimental"}
+        assert migration_map[2].up == "2_feature.experimental.up.sql"
+        assert set(migration_map[2].keys) == {"experimental"}
 
         # Check multiple keys
-        assert migration_map[3]["up"] == "3_complex.alpha_beta.up.sql"
-        assert set(migration_map[3]["keys"]) == {"alpha", "beta"}
+        assert migration_map[3].up == "3_complex.alpha_beta.up.sql"
+        assert set(migration_map[3].keys) == {"alpha", "beta"}
 
         # Check legacy style (implied no keys)
-        assert migration_map[4]["up"] == "4_legacy.up.sql"
-        assert migration_map[4].get("keys") == []
+        assert migration_map[4].up == "4_legacy.up.sql"
+        assert migration_map[4].keys == []
 
 
 def test_apply_migrations_skips_mismatch_keys(mock_costs, migrator, tmp_path):
     # Setup
     migrator._get_migration_status = Mock(
-        return_value={
-            "curr_version": 0,
-            "partially_applied_version": None,
-        }
+        return_value=MigrationStatus(
+            db_name="test_db",
+            curr_version=0,
+            partially_applied_version=None,
+        )
     )
 
     # Mock migration map with keys
     migrator._get_migrations = Mock(
         return_value={
-            1: {"up": "1_init.up.sql", "down": "1_init.down.sql", "keys": []},
-            2: {
-                "up": "2_exp.experimental.up.sql",
-                "down": "2_exp.experimental.down.sql",
-                "keys": ["experimental"],
-            },
-            3: {
-                "up": "3_beta.beta.up.sql",
-                "down": "3_beta.beta.down.sql",
-                "keys": ["beta"],
-            },
+            1: MigrationInfo(up="1_init.up.sql", down="1_init.down.sql", keys=[]),
+            2: MigrationInfo(
+                up="2_exp.experimental.up.sql",
+                down="2_exp.experimental.down.sql",
+                keys=["experimental"],
+            ),
+            3: MigrationInfo(
+                up="3_beta.beta.up.sql",
+                down="3_beta.beta.down.sql",
+                keys=["beta"],
+            ),
         }
     )
 
@@ -362,12 +368,16 @@ def test_apply_migrations_skips_mismatch_keys(mock_costs, migrator, tmp_path):
 def test_apply_migrations_matches_keys(mock_costs, migrator):
     # Setup
     migrator._get_migration_status = Mock(
-        return_value={"curr_version": 0, "partially_applied_version": None}
+        return_value=MigrationStatus(
+            db_name="test_db",
+            curr_version=0,
+            partially_applied_version=None,
+        )
     )
     migrator._get_migrations = Mock(
         return_value={
-            1: {"up": "1.up.sql", "keys": []},
-            2: {"up": "2.exp.up.sql", "keys": ["experimental"]},
+            1: MigrationInfo(up="1.up.sql", keys=[]),
+            2: MigrationInfo(up="2.exp.up.sql", keys=["experimental"]),
         }
     )
     migrator._determine_migrations_to_apply = Mock(
@@ -388,11 +398,15 @@ def test_apply_migrations_matches_keys(mock_costs, migrator):
 def test_apply_migrations_partial_keys(mock_costs, migrator):
     # Setup
     migrator._get_migration_status = Mock(
-        return_value={"curr_version": 0, "partially_applied_version": None}
+        return_value=MigrationStatus(
+            db_name="test_db",
+            curr_version=0,
+            partially_applied_version=None,
+        )
     )
     migrator._get_migrations = Mock(
         return_value={
-            1: {"up": "1.up.sql", "keys": ["alpha", "beta"]},
+            1: MigrationInfo(up="1.up.sql", keys=["alpha", "beta"]),
         }
     )
     migrator._determine_migrations_to_apply = Mock(return_value=[(1, "1.up.sql")])
