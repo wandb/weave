@@ -11,12 +11,13 @@ from weave.trace.op import as_op
 from weave.trace.serialization.mem_artifact import MemTraceFilesArtifact
 from weave.trace.serialization.op_type import save_instance
 from weave.trace_server.trace_server_interface import FileContentReadReq, ObjReadReq
+from weave.utils.project_id import to_project_id
 
 
 def get_saved_code(client, ref):
     resp = client.server.obj_read(
         ObjReadReq(
-            project_id=f"{ref.entity}/{ref.project}",
+            project_id=to_project_id(ref.entity, ref.project),
             object_id=ref.name,
             digest=ref.digest,
         )
@@ -24,7 +25,7 @@ def get_saved_code(client, ref):
     files = resp.obj.val["files"]
     file_read_resp = client.server.file_content_read(
         FileContentReadReq(
-            project_id=ref.entity + "/" + ref.project, digest=files["obj.py"]
+            project_id=to_project_id(ref.entity, ref.project), digest=files["obj.py"]
         )
     )
     return file_read_resp.content.decode()
@@ -33,7 +34,7 @@ def get_saved_code(client, ref):
 EXPECTED_SOLO_OP_CODE = """import numpy as np
 import weave
 
-@weave.op()
+@weave.op
 def solo_versioned_op(a: int) -> float:
     # Rely on the "import numpy as np" import
     return np.array([a, a]).mean()
@@ -56,7 +57,7 @@ def test_solo_op_versioning(client):
 EXPECTED_OBJECT_OP_CODE = """import numpy as np
 import weave
 
-@weave.op()
+@weave.op
 def versioned_op(self, a: int) -> float:
     # Rely on the "import numpy as np" import
     return np.array([a, self.val]).mean()
@@ -81,7 +82,7 @@ def test_object_op_versioning(client):
 EXPECTED_IMPORTFROM_OP_CODE = """from numpy import array
 import weave
 
-@weave.op()
+@weave.op
 def versioned_op_importfrom(a: int) -> float:
     return array([x + 1 for x in range(a)]).mean()
 """
@@ -126,7 +127,7 @@ EXPECTED_CLOSURE_CONTANT_OP_CODE = """import weave
 
 x = 10
 
-@weave.op()
+@weave.op
 def versioned_op_closure_constant(a: int) -> float:
     return a + x
 """
@@ -155,7 +156,7 @@ x = {
     "b": 10
 }
 
-@weave.op()
+@weave.op
 def versioned_op_closure_constant(a: int) -> float:
     return a + x["a"]
 """
@@ -185,7 +186,7 @@ x = {
     "b": weave.storage.artifact_path_ref('x/b').get()
 }
 
-@weave.op()
+@weave.op
 def versioned_op_closure_constant(a: int) -> float:
     return a + x["b"].mean() + x["a"]
 """
@@ -219,7 +220,7 @@ x = {
     "c": weave.ref('weave:///shawn/test-project/op/op-dog:BGOgiFNzkGvtqGmdbRHcpcZnOuZp5ISyjesyJHCl9oI').get()
 }
 
-@weave.op()
+@weave.op
 def pony(v: int):
     v = x["a"](v)
     v = x["b"](v)
@@ -273,7 +274,7 @@ x = {
     "b": weave.storage.artifact_path_ref('x/b').get()
 }
 
-@weave.op()
+@weave.op
 def pony(v: int):
     v = dog(v)
     v = x["a"](v) + x["b"].mean()
@@ -355,7 +356,7 @@ import weave
 class SomeDict(typing.TypedDict):
     val: int
 
-@weave.op()
+@weave.op
 def some_d(v: int) -> SomeDict:
     return SomeDict(val=v)
 """
@@ -394,7 +395,7 @@ class MyCoolClass:
     def __init__(self, val):
         self.val = val
 
-@weave.op()
+@weave.op
 def some_d(v: int):
     return MyCoolClass(v)
 """
@@ -427,7 +428,7 @@ def test_op_return_return_custom_class(
 
 EXPECTED_NESTED_FUNCTION_CODE = """import weave
 
-@weave.op()
+@weave.op
 def some_d(v: int):
     def internal_fn(x):
         return x + 3
@@ -491,7 +492,7 @@ class SomeClass:
     def some_fn(self):
         return SomeOtherClass()
 
-@weave.op()
+@weave.op
 def some_d(v):
     a = SomeOtherClass()
     b = SomeClass()
@@ -520,7 +521,7 @@ EXPECTED_INSTANCE_CODE = """import weave
 
 instance = "<test_op_versioning.test_op_instance.<locals>.MyClass object at 0x000000000>"
 
-@weave.op()
+@weave.op
 def t(text: str):
     print(instance._version)
     return text
@@ -562,7 +563,7 @@ def test_op_instance(client):
 EXPECTED_IMPORT_AS_CODE = """import json as js
 import weave
 
-@weave.op()
+@weave.op
 def func(data: dict) -> str:
     return js.dumps(data)
 """
@@ -589,7 +590,7 @@ def test_op_import_as(client):
 EXPECTED_IMPORT_FROM_AS_CODE = """from json import dumps as ds
 import weave
 
-@weave.op()
+@weave.op
 def func(data: dict) -> str:
     return ds(data)
 """
@@ -624,7 +625,7 @@ def save_and_get_code(func: Callable) -> str:
 
 STANDARD_FUNC_CODE = """import weave
 
-@weave.op()
+@weave.op
 def standard_func(): ...
 """
 
@@ -641,7 +642,7 @@ def test_standard_import():
 
 ALIASED_FUNC_CODE = """import weave as wv
 
-@wv.op()
+@wv.op
 def aliased_func(): ...
 """
 
@@ -658,13 +659,13 @@ def test_aliased_import_wv():
 
 PAREN_FUNC_CODE = """import weave as wv
 
-@wv.op()
+@wv.op
 def paren_func(): ...
 """
 
 
 def test_op_with_parentheses():
-    """Test that @wv.op() with parentheses is handled correctly - should preserve the alias."""
+    """Test that @wv.op() with parentheses is normalized to @wv.op - should preserve the alias."""
 
     @wv.op()
     def paren_func(): ...

@@ -47,7 +47,7 @@ class Dataset(Object):
     ```
     """
 
-    rows: Union[Table, WeaveTable]
+    rows: Table | WeaveTable
 
     @classmethod
     def from_obj(cls, obj: WeaveObject) -> Self:
@@ -171,7 +171,7 @@ class Dataset(Object):
         return new_dataset
 
     @field_validator("rows", mode="before")
-    def convert_to_table(cls, rows: Any) -> Union[Table, WeaveTable]:  # noqa: N805
+    def convert_to_table(cls, rows: Any) -> Table | WeaveTable:  # noqa: N805
         if weave_isinstance(rows, WeaveTable):
             return rows
         if not isinstance(rows, Table):

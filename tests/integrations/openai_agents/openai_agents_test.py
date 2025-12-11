@@ -1,6 +1,9 @@
+from unittest.mock import Mock
+
 import agents
 import pytest
 from agents import Agent, GuardrailFunctionOutput, InputGuardrail, Runner
+from agents.tracing import AgentSpanData, Span, Trace
 from pydantic import BaseModel
 
 from weave.integrations.openai_agents.openai_agents import WeaveTracingProcessor
@@ -273,3 +276,76 @@ async def test_openai_agents_quickstart_homework(
     assert val13.role == "assistant"
     assert val13.type == "message"
     assert val13.status == "completed"
+
+
+def test_tracing_processor_cleanup(client: WeaveClient) -> None:
+    processor = WeaveTracingProcessor()
+
+    # Mock Trace
+    trace = Mock(spec=Trace)
+    trace.trace_id = "trace_1"
+    trace.name = "test_trace"
+
+    # Start Trace
+    processor.on_trace_start(trace)
+    assert "trace_1" in processor._trace_calls
+    assert "trace_1" in processor._trace_data
+
+    # Mock Span
+    # We use the real AgentSpanData class if available via import, but wrapped in a mock
+    # to allow setting attributes easily if needed, or just use a mock that passes spec check.
+    span_data = Mock(spec=AgentSpanData)
+    span_data.type = "agent"
+    span_data.name = "test_agent"
+    span_data.tools = []
+    span_data.handoffs = []
+    span_data.output_type = "str"
+    # Attributes that might be accessed:
+    span_data.model_dump = Mock(return_value={})
+
+    span = Mock(spec=Span)
+    span.trace_id = "trace_1"
+    span.span_id = "span_1"
+    span.parent_id = None
+    span.span_data = span_data
+    span.error = None
+
+    # We need to trick isinstance(span.span_data, AgentSpanData) to return True.
+    # Since we imported AgentSpanData, we can set __class__ on the mock or use the real object if possible.
+    # Let's try to use the real object for span_data if it's a Pydantic model.
+    # If AgentSpanData is a TypedDict or Pydantic model, we can try to instantiate it.
+    # But to be safe against signature mismatch in this environment, we'll use side_effect on isinstance
+    # OR, more robustly, we can just use a Mock and patch 'weave.integrations.openai_agents.openai_agents.AgentSpanData'
+    # But that's hard since it's imported.
+
+    # Simpler: Just set the __class__ of the mock to AgentSpanData
+    span_data.__class__ = AgentSpanData
+
+    # Start Span
+    processor.on_span_start(span)
+    assert "span_1" in processor._span_calls
+
+    # End Span
+    processor.on_span_end(span)
+    assert "span_1" not in processor._span_calls
+
+    # End Trace
+    processor.on_trace_end(trace)
+    assert "trace_1" not in processor._trace_calls
+    assert "trace_1" not in processor._trace_data
+    assert "trace_1" not in processor._ended_traces
+
+    # Test Shutdown/Flush Cleanup
+    # Re-populate
+    processor.on_trace_start(trace)
+    assert "trace_1" in processor._trace_calls
+
+    processor.force_flush()
+    assert len(processor._trace_calls) == 0
+    assert len(processor._trace_data) == 0
+
+    # Re-populate
+    processor.on_trace_start(trace)
+    processor.shutdown()
+    assert len(processor._trace_calls) == 0
+    assert len(processor._trace_data) == 0

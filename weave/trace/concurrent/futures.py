@@ -32,10 +32,11 @@ from __future__ import annotations
 import atexit
 import concurrent.futures
 import logging
+from collections.abc import Callable
 from concurrent.futures import Future, wait
 from contextvars import ContextVar
 from threading import Lock
-from typing import Any, Callable, TypeVar
+from typing import Any, TypeVar
 
 from weave.trace.context.tests_context import get_raise_on_captured_errors
 from weave.trace.util import ContextAwareThreadPoolExecutor
@@ -115,8 +116,11 @@ class FutureExecutor:
 
         def callback() -> None:
             try:
-                done, _ = wait(futures)
-                results = [f.result() for f in done]
+                _, _ = wait(futures)
+                # Use `futures` here not the result of `wait` to
+                # ensure correct order of results. `wait` returns
+                # a set of done futures (seemingly non deterministic order).
+                results = [f.result() for f in futures]
             except Exception as e:
                 result_future.set_exception(e)
                 return

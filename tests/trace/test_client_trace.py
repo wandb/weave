@@ -6,11 +6,12 @@ import random
 import sys
 import time
 from collections import defaultdict, namedtuple
+from collections.abc import Callable
 from contextlib import contextmanager
 from contextvars import copy_context
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Any, Callable, Optional
+from typing import Any
 from unittest import mock
 
 import pytest
@@ -51,6 +52,7 @@ from weave.trace_server.trace_server_interface_util import (
     extract_refs_from_values,
 )
 from weave.trace_server.validation_util import CHValidationError
+from weave.utils.project_id import from_project_id, to_project_id
 
 ## Hacky interface compatibility helpers
 
@@ -105,13 +107,13 @@ def test_simple_op(client):
     calls = list(client.get_calls())
     assert len(calls) == 1
     fetched_call = calls[0]
-    digest = "Zo4OshYu57R00QNlBBGjuiDGyewGYsJ1B69IKXSXYQY"
+    digest = "nFk3Jq6jb72HLfeGaxwcsHyckk0gRWNFn17M2AR8Oxo"
     expected_name = (
         f"{TRACE_REF_SCHEME}:///{client.entity}/{client.project}/op/my_op:{digest}"
     )
     assert fetched_call == weave.trace.call.Call(
         _op_name=expected_name,
-        project_id=f"{client.entity}/{client.project}",
+        project_id=to_project_id(client.entity, client.project),
         trace_id=fetched_call.trace_id,
         parent_id=None,
         id=fetched_call.id,
@@ -3394,8 +3396,8 @@ def test_objects_and_keys_with_special_characters(client):
     weave.publish(obj)
     assert obj.ref is not None
 
-    entity, project = client._project_id().split("/")
-    project_id = f"{entity}/{project}"
+    entity, project = from_project_id(client._project_id())
+    project_id = to_project_id(entity, project)
     ref_base = f"weave:///{project_id}"
     exp_name = sanitize_object_name(name_with_special_characters)
     assert exp_name == "n-a_m.e-100"
@@ -3425,7 +3427,7 @@ def test_objects_and_keys_with_special_characters(client):
     gotten_res = weave.ref(found_ref).get()
     assert gotten_res == "hello world"
 
-    exp_op_digest = "xEPCVKKjDWxKzqaCxxU09jD82FGGf5WcNy2fC9VUF3M"
+    exp_op_digest = "qlezedpwj0O4lZYB3vcgSYj0eQvQDdStowLaGBCEmaI"
     exp_op_ref = f"{ref_base}/op/{exp_name}:{exp_op_digest}"
 
     found_ref = test.ref.uri()
@@ -5938,7 +5940,7 @@ def test_thread_api_with_auto_generation(client):
 
 def test_calls_query_filter_contains_in_message_array(client):
     @weave.op
-    def op1(extra_message: Optional[str] = None):
+    def op1(extra_message: str | None = None):
         messages = ["hello", "world"]
         if extra_message:
             messages.append(extra_message)

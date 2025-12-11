@@ -25,12 +25,6 @@ _Important:_ For OpenAI Codex agents (most likely you!), your environment does n
   - `weave/` - Python package implementation
   - `weave/trace_server` - Backend server implementation
 
-### Legacy Code
-
-- `weave_query/` - Legacy codebase (DO NOT EDIT)
-  - Marked for future refactoring
-  - Avoid making changes to this directory
-
 ## Python Testing Guidelines
 
 ### Test Framework
@@ -64,27 +58,55 @@ _Important:_ Since you don't have internet access, you must run `nox` with `--no
 **Test paths must be relative to the repository root**, not the `tests/` directory.
 
 Examples:
+
 - ✅ CORRECT: `-- tests/trace/test_dataset.py::test_basic_dataset_lifecycle`
 - ❌ WRONG: `-- trace/test_dataset.py::test_basic_dataset_lifecycle`
 
 #### Backend Selection
 
+The `--trace-server` flag controls which **backend** (database) is used for testing:
+
 **SQLite (Default/Recommended for Development):**
+
 ```bash
 nox --no-install -e "tests-3.12(shard='trace')" -- tests/trace/test_client_trace.py::test_simple_op --trace-server=sqlite
 ```
 
 **ClickHouse (Required for Full Testing):**
+
 ```bash
 nox --no-install -e "tests-3.12(shard='trace')" -- tests/trace/test_client_trace.py::test_simple_op --trace-server=clickhouse --clickhouse-process=true
 ```
 
 **Note:** ClickHouse tests require Docker to be running. If Docker is not available or you encounter Docker connection errors, use SQLite backend with `--trace-server=sqlite`.
 
+#### Remote HTTP Trace Server Implementation Selection
+
+The `--remote-http-trace-server` flag controls which **remote HTTP trace server implementation** is used for testing trace server bindings:
+
+**RemoteHTTPTraceServer (Default):**
+
+```bash
+nox --no-install -e "tests-3.12(shard='trace_server_bindings')" -- tests/trace_server_bindings/test_trace_server_bindings.py --remote-http-trace-server=remote
+```
+
+**StainlessRemoteHTTPTraceServer:**
+
+```bash
+nox --no-install -e "tests-3.12(shard='trace_server_bindings')" -- tests/trace_server_bindings/test_trace_server_bindings.py --remote-http-trace-server=stainless
+```
+
+**Important Notes:**
+
+- The `--trace-server` flag is for **backend selection** (SQLite vs ClickHouse)
+- The `--remote-http-trace-server` flag is for **trace server binding implementation** (RemoteHTTPTraceServer vs StainlessRemoteHTTPTraceServer)
+- Both implementations share the same test file; the flag determines which server class is used
+
 #### Environment Issues
 
 **Color Flag Conflicts:**
 If you encounter an error like `Can not specify both --no-color and --force-color`, this is due to conflicting environment variables. Unset them before running nox:
+
 ```bash
 unset NO_COLOR FORCE_COLOR && nox --no-install -e "tests-3.12(shard='trace')" -- tests/trace/test_dataset.py::test_basic_dataset_lifecycle --trace-server=sqlite
 ```
@@ -92,6 +114,7 @@ unset NO_COLOR FORCE_COLOR && nox --no-install -e "tests-3.12(shard='trace')" --
 #### Reinstalling Dependencies
 
 If you encounter import errors or missing modules, reinstall the test shard environment:
+
 ```bash
 nox --install-only -e "tests-3.12(shard='trace')"
 ```
@@ -103,13 +126,18 @@ Then run your tests with `--no-install` as usual.
 The langchain integration tests work fully on macOS including chromadb/vector store tests.
 
 **Running LangChain Tests:**
+
 ```bash
 nox --no-install -e "tests-3.12(shard='langchain')" -- tests/integrations/langchain/ --trace-server=sqlite
 ```
 
 ## Typescript Testing Guidelines
 
-TODO: need to fill this out
+```
+cd sdks/node
+npm i
+npm run test
+```
 
 ## Code Review & PR Guidelines
 

@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Any
 
 import jsonschema
 from pydantic import BaseModel, Field, create_model, field_validator, model_validator
@@ -36,7 +36,7 @@ class AnnotationSpec(base_object_def.BaseObject):
     # TODO
     # If provided, this feedback type will only be shown
     # when a call is generated from the given op ref
-    op_scope: Optional[list[str]] = Field(
+    op_scope: list[str] | None = Field(
         default=None,
         examples=[
             ["weave:///entity/project/op/name:digest"],

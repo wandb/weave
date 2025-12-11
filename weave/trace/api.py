@@ -4,10 +4,8 @@ from __future__ import annotations
 
 import contextlib
 import logging
-import sys
-import warnings
 from collections.abc import Iterator
-from typing import Any, Union, cast
+from typing import Any, cast
 
 # TODO: type_handlers is imported here to trigger registration of the image serializer.
 # There is probably a better place for this, but including here for now to get the fix in.
@@ -56,7 +54,7 @@ def init(
     Logging is initialized globally, so you do not need to keep a reference
     to the return value of init.
 
-    Following init, calls of weave.op() decorated functions will be logged
+    Following init, calls of weave.op decorated functions will be logged
     to the specified project.
 
     Args:
@@ -81,13 +79,6 @@ def init(
         raise ValueError("project_name must be non-empty")
 
     configure_logger()
-
-    if sys.version_info < (3, 10):
-        warnings.warn(
-            "Python 3.9 will reach end of life in October 2025, after which weave will drop support for it.  Please upgrade to Python 3.10 or later!",
-            DeprecationWarning,
-            stacklevel=2,
-        )
 
     # Check if deprecated autopatch_settings is used
     if autopatch_settings is not None:
@@ -137,8 +128,6 @@ def publish(obj: Any, name: str | None = None) -> ObjectRef:
     Returns:
         A Weave Ref to the saved object.
     """
-    client = weave_client_context.require_weave_client()
-
     save_name: str
     if name:
         save_name = name
@@ -146,6 +135,17 @@ def publish(obj: Any, name: str | None = None) -> ObjectRef:
         save_name = n
     else:
         save_name = obj.__class__.__name__
+
+    # If weave is disabled, return a dummy ref without making network calls
+    if should_disable_weave():
+        return weave_client.ObjectRef(
+            entity="DISABLED",
+            project="DISABLED",
+            name=save_name,
+            _digest="DISABLED",
+        )
+
+    client = weave_client_context.require_weave_client()
 
     ref = client._save_object(obj, save_name, "latest")
 
@@ -372,7 +372,7 @@ def thread(thread_id: str | None | object = _AUTO_GENERATE) -> Iterator[ThreadCo
         actual_thread_id = generate_id()
     else:
         # Explicit thread_id (string or None)
-        actual_thread_id = cast(Union[str, None], thread_id)
+        actual_thread_id = cast(str | None, thread_id)
 
     # Create context object
     context = ThreadContext(actual_thread_id)
@@ -386,7 +386,7 @@ def thread(thread_id: str | None | object = _AUTO_GENERATE) -> Iterator[ThreadCo
 def finish() -> None:
     """Stops logging to weave.
 
-    Following finish, calls of weave.op() decorated functions will no longer be logged. You will need to run weave.init() again to resume logging.
+    Following finish, calls of weave.op decorated functions will no longer be logged. You will need to run weave.init() again to resume logging.
 
     """
     weave_init.finish()

@@ -3,8 +3,9 @@ import logging
 import textwrap
 import time
 import traceback
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable, Optional, Union
+from typing import Any
 
 from weave.object.obj import Object
 from weave.trace.call import Call
@@ -37,7 +38,7 @@ class Model(Object):
         attribute1: str
         attribute2: int
 
-        @weave.op()
+        @weave.op
         def predict(self, input_data: str) -> dict:
             # Model logic goes here
             prediction = self.attribute1 + ' ' + input_data
@@ -61,7 +62,7 @@ def get_infer_method(model: Model) -> Op:
         if (infer_method := getattr(model, name, None)) is not None:
             if not is_op(infer_method):
                 raise ValueError(
-                    f"Model {model} must implement `{name}` as a weave.op() decorated function."
+                    f"Model {model} must implement `{name}` as a weave.op decorated function."
                 )
             return infer_method
     raise MissingInferenceMethodError(
@@ -82,14 +83,14 @@ class ApplyModelError:
     model_latency: float
 
 
-ApplyModelResult = Union[ApplyModelSuccess, ApplyModelError]
+ApplyModelResult = ApplyModelSuccess | ApplyModelError
 PreprocessModelInput = Callable[[dict], dict]
 
 
 async def apply_model_async(
-    model: Union[Op, Model],
+    model: Op | Model,
     example: dict,
-    preprocess_model_input: Optional[PreprocessModelInput] = None,
+    preprocess_model_input: PreprocessModelInput | None = None,
 ) -> ApplyModelResult:
     """Asynchronously applies a model (class or operation) to a given example.
 

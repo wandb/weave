@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Union
+from typing import TYPE_CHECKING, Any
 
 from pydantic import Field, PrivateAttr, validate_call
 
@@ -131,7 +131,7 @@ class WeaveToxicityScorerV1(RollingWindowScorer):
 
         self._tokenizer = AutoTokenizer.from_pretrained(self._local_model_path)
 
-    def predict_chunk(self, input_ids: "Tensor") -> list[Union[int, float]]:
+    def predict_chunk(self, input_ids: "Tensor") -> list[int | float]:
         """Predict toxicity scores for a chunk of tokenized input.
 
         Args:
@@ -161,7 +161,7 @@ class WeaveToxicityScorerV1(RollingWindowScorer):
             passed = False
 
         return WeaveScorerResult(
-            metadata=dict(zip(self._categories, predictions)),
+            metadata=dict(zip(self._categories, predictions, strict=False)),
             passed=passed,
         )
 
@@ -252,7 +252,9 @@ class WeaveBiasScorerV1(RollingWindowScorer):
         predictions = self._predict(output)
         scores = [o >= self.threshold for o in predictions]
         categories = {}
-        for category, pred, score in zip(self._categories, predictions, scores):
+        for category, pred, score in zip(
+            self._categories, predictions, scores, strict=False
+        ):
             base_name = category.lower()
             categories[f"{base_name}_score"] = float(pred)
             categories[base_name] = score

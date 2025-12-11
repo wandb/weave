@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Annotated, Callable, NamedTuple
+from collections.abc import Callable
+from typing import Annotated, NamedTuple
 
 from fastapi import APIRouter, Depends, Form, UploadFile
 from fastapi.params import Header
@@ -8,6 +9,7 @@ from fastapi.responses import StreamingResponse
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.trace_service import ServerInfoRes, TraceService
+from weave.utils.project_id import to_project_id
 
 SERVICE_TAG_NAME = "Service"
 CALLS_TAG_NAME = "Calls"
@@ -130,7 +132,7 @@ def generate_v2_routes(
         service: TraceService = Depends(get_service),  # noqa: B008
     ) -> tsi.OpCreateRes:
         """Create an op object."""
-        project_id = f"{entity}/{project}"
+        project_id = to_project_id(entity, project)
         req = tsi.OpCreateReq(project_id=project_id, **body.model_dump())
         return service.trace_server_interface.op_create(req)
 
@@ -147,7 +149,7 @@ def generate_v2_routes(
         service: TraceService = Depends(get_service),  # noqa: B008
     ) -> tsi.OpReadRes:
         """Get an op object."""
-        project_id = f"{entity}/{project}"
+        project_id = to_project_id(entity, project)
         req = tsi.OpReadReq(project_id=project_id, object_id=object_id, digest=digest)
         return service.trace_server_interface.op_read(req)
 
@@ -178,7 +180,7 @@ def generate_v2_routes(
         service: TraceService = Depends(get_service),  # noqa: B008
     ) -> StreamingResponse:
         """List op objects."""
-        project_id = f"{entity}/{project}"
+        project_id = to_project_id(entity, project)
         req = tsi.OpListReq(project_id=project_id, limit=limit, offset=offset)
         return StreamingResponse(
             service.trace_server_interface.op_list(req),
@@ -198,7 +200,7 @@ def generate_v2_routes(
         service: TraceService = Depends(get_service),  # noqa: B008
     ) -> tsi.OpDeleteRes:
         """Delete an op object. If digests are provided, only those versions are deleted. Otherwise, all versions are deleted."""
-        project_id = f"{entity}/{project}"
+        project_id = to_project_id(entity, project)
         req = tsi.OpDeleteReq(
             project_id=project_id, object_id=object_id, digests=digests
         )
@@ -216,7 +218,7 @@ def generate_v2_routes(
         service: TraceService = Depends(get_service),  # noqa: B008
     ) -> tsi.DatasetCreateRes:
         """Create a dataset object."""
-        project_id = f"{entity}/{project}"
+        project_id = to_project_id(entity, project)
         req = tsi.DatasetCreateReq(project_id=project_id, **body.model_dump())
         return service.trace_server_interface.dataset_create(req)
 
@@ -233,7 +235,7 @@ def generate_v2_routes(
         service: TraceService = Depends(get_service),  # noqa: B008
     ) -> tsi.DatasetReadRes:
         """Get a dataset object."""
-        project_id = f"{entity}/{project}"
+        project_id = to_project_id(entity, project)
         req = tsi.DatasetReadReq(
             project_id=project_id, object_id=object_id, digest=digest
         )
@@ -266,7 +268,7 @@ def generate_v2_routes(
         service: TraceService = Depends(get_service),  # noqa: B008
     ) -> StreamingResponse:
         """List dataset objects."""
-        project_id = f"{entity}/{project}"
+        project_id = to_project_id(entity, project)
         req = tsi.DatasetListReq(project_id=project_id, limit=limit, offset=offset)
         return StreamingResponse(
             service.trace_server_interface.dataset_list(req),
@@ -286,7 +288,7 @@ def generate_v2_routes(
         service: TraceService = Depends(get_service),  # noqa: B008
     ) -> tsi.DatasetDeleteRes:
         """Delete a dataset object."""
-        project_id = f"{entity}/{project}"
+        project_id = to_project_id(entity, project)
         req = tsi.DatasetDeleteReq(
             project_id=project_id, object_id=object_id, digests=digests
         )
@@ -304,7 +306,7 @@ def generate_v2_routes(
         service: TraceService = Depends(get_service),  # noqa: B008
     ) -> tsi.ScorerCreateRes:
         """Create a scorer object."""
-        project_id = f"{entity}/{project}"
+        project_id = to_project_id(entity, project)
         req = tsi.ScorerCreateReq(project_id=project_id, **body.model_dump())
         return service.trace_server_interface.scorer_create(req)
 
@@ -321,7 +323,7 @@ def generate_v2_routes(
         service: TraceService = Depends(get_service),  # noqa: B008
     ) -> tsi.ScorerReadRes:
         """Get a scorer object."""
-        project_id = f"{entity}/{project}"
+        project_id = to_project_id(entity, project)
         req = tsi.ScorerReadReq(
             project_id=project_id, object_id=object_id, digest=digest
         )
@@ -354,7 +356,7 @@ def generate_v2_routes(
         service: TraceService = Depends(get_service),  # noqa: B008
     ) -> StreamingResponse:
         """List scorer objects."""
-        project_id = f"{entity}/{project}"
+        project_id = to_project_id(entity, project)
         req = tsi.ScorerListReq(project_id=project_id, limit=limit, offset=offset)
         return StreamingResponse(
             service.trace_server_interface.scorer_list(req),
@@ -374,7 +376,7 @@ def generate_v2_routes(
         service: TraceService = Depends(get_service),  # noqa: B008
     ) -> tsi.ScorerDeleteRes:
         """Delete a scorer object."""
-        project_id = f"{entity}/{project}"
+        project_id = to_project_id(entity, project)
         req = tsi.ScorerDeleteReq(
             project_id=project_id, object_id=object_id, digests=digests
         )
@@ -405,7 +407,7 @@ def generate_v2_routes(
         service: TraceService = Depends(get_service),  # noqa: B008
     ) -> tsi.EvaluationReadRes:
         """Get an evaluation object."""
-        project_id = f"{entity}/{project}"
+        project_id = to_project_id(entity, project)
         req = tsi.EvaluationReadReq(
             project_id=project_id, object_id=object_id, digest=digest
         )
@@ -438,7 +440,7 @@ def generate_v2_routes(
         service: TraceService = Depends(get_service),  # noqa: B008
     ) -> StreamingResponse:
         """List evaluation objects."""
-        project_id = f"{entity}/{project}"
+        project_id = to_project_id(entity, project)
         req = tsi.EvaluationListReq(project_id=project_id, limit=limit, offset=offset)
         return StreamingResponse(
             service.trace_server_interface.evaluation_list(req),
@@ -458,7 +460,7 @@ def generate_v2_routes(
         service: TraceService = Depends(get_service),  # noqa: B008
     ) -> tsi.EvaluationDeleteRes:
         """Delete an evaluation object."""
-        project_id = f"{entity}/{project}"
+        project_id = to_project_id(entity, project)
         req = tsi.EvaluationDeleteReq(
             project_id=project_id, object_id=object_id, digests=digests
         )
@@ -476,7 +478,7 @@ def generate_v2_routes(
         service: TraceService = Depends(get_service),  # noqa: B008
     ) -> tsi.EvaluationRunCreateRes:
         """Create an evaluation run."""
-        project_id = f"{entity}/{project}"
+        project_id = to_project_id(entity, project)
         req = tsi.EvaluationRunCreateReq(project_id=project_id, **body.model_dump())
         return service.trace_server_interface.evaluation_run_create(req)
 
@@ -492,7 +494,7 @@ def generate_v2_routes(
         service: TraceService = Depends(get_service),  # noqa: B008
     ) -> tsi.EvaluationRunReadRes:
         """Get an evaluation run."""
-        project_id = f"{entity}/{project}"
+        project_id = to_project_id(entity, project)
         req = tsi.EvaluationRunReadReq(
             project_id=project_id, evaluation_run_id=evaluation_run_id
         )
@@ -527,7 +529,7 @@ def generate_v2_routes(
         service: TraceService = Depends(get_service),  # noqa: B008
     ) -> StreamingResponse:
         """List evaluation runs."""
-        project_id = f"{entity}/{project}"
+        project_id = to_project_id(entity, project)
         req = tsi.EvaluationRunListReq(
             project_id=project_id, limit=limit, offset=offset
         )
@@ -548,7 +550,7 @@ def generate_v2_routes(
         service: TraceService = Depends(get_service),  # noqa: B008
     ) -> tsi.EvaluationRunDeleteRes:
         """Delete evaluation runs."""
-        project_id = f"{entity}/{project}"
+        project_id = to_project_id(entity, project)
         req = tsi.EvaluationRunDeleteReq(
             project_id=project_id, evaluation_run_ids=evaluation_run_ids
         )
@@ -567,7 +569,7 @@ def generate_v2_routes(
         service: TraceService = Depends(get_service),  # noqa: B008
     ) -> tsi.EvaluationRunFinishRes:
         """Finish an evaluation run."""
-        project_id = f"{entity}/{project}"
+        project_id = to_project_id(entity, project)
         req = tsi.EvaluationRunFinishReq(
             project_id=project_id,
             evaluation_run_id=evaluation_run_id,
@@ -587,7 +589,7 @@ def generate_v2_routes(
         service: TraceService = Depends(get_service),  # noqa: B008
     ) -> tsi.ModelCreateRes:
         """Create a model object."""
-        project_id = f"{entity}/{project}"
+        project_id = to_project_id(entity, project)
         req = tsi.ModelCreateReq(project_id=project_id, **body.model_dump())
         return service.trace_server_interface.model_create(req)
 
@@ -604,7 +606,7 @@ def generate_v2_routes(
         service: TraceService = Depends(get_service),  # noqa: B008
     ) -> tsi.ModelReadRes:
         """Get a model object."""
-        project_id = f"{entity}/{project}"
+        project_id = to_project_id(entity, project)
         req = tsi.ModelReadReq(
             project_id=project_id, object_id=object_id, digest=digest
         )
@@ -637,7 +639,7 @@ def generate_v2_routes(
         service: TraceService = Depends(get_service),  # noqa: B008
     ) -> StreamingResponse:
         """List model objects."""
-        project_id = f"{entity}/{project}"
+        project_id = to_project_id(entity, project)
         req = tsi.ModelListReq(project_id=project_id, limit=limit, offset=offset)
         return StreamingResponse(
             service.trace_server_interface.model_list(req),
@@ -657,7 +659,7 @@ def generate_v2_routes(
         service: TraceService = Depends(get_service),  # noqa: B008
     ) -> tsi.ModelDeleteRes:
         """Delete a model object. If digests are provided, only those versions are deleted. Otherwise, all versions are deleted."""
-        project_id = f"{entity}/{project}"
+        project_id = to_project_id(entity, project)
         req = tsi.ModelDeleteReq(
             project_id=project_id, object_id=object_id, digests=digests
         )
@@ -677,7 +679,7 @@ def generate_v2_routes(
         service: TraceService = Depends(get_service),  # noqa: B008
     ) -> tsi.PredictionCreateRes:
         """Create a prediction."""
-        project_id = f"{entity}/{project}"
+        project_id = to_project_id(entity, project)
         req = tsi.PredictionCreateReq(project_id=project_id, **body.model_dump())
         return service.trace_server_interface.prediction_create(req)
 
@@ -693,7 +695,7 @@ def generate_v2_routes(
         service: TraceService = Depends(get_service),  # noqa: B008
     ) -> tsi.PredictionReadRes:
         """Get a prediction."""
-        project_id = f"{entity}/{project}"
+        project_id = to_project_id(entity, project)
         req = tsi.PredictionReadReq(project_id=project_id, prediction_id=prediction_id)
         return service.trace_server_interface.prediction_read(req)
 
@@ -725,7 +727,7 @@ def generate_v2_routes(
         service: TraceService = Depends(get_service),  # noqa: B008
     ) -> StreamingResponse:
         """List predictions."""
-        project_id = f"{entity}/{project}"
+        project_id = to_project_id(entity, project)
         req = tsi.PredictionListReq(
             project_id=project_id,
             evaluation_run_id=evaluation_run_id,
@@ -749,7 +751,7 @@ def generate_v2_routes(
         service: TraceService = Depends(get_service),  # noqa: B008
     ) -> tsi.PredictionDeleteRes:
         """Delete predictions."""
-        project_id = f"{entity}/{project}"
+        project_id = to_project_id(entity, project)
         req = tsi.PredictionDeleteReq(
             project_id=project_id, prediction_ids=prediction_ids
         )
@@ -770,7 +772,7 @@ def generate_v2_routes(
         print(
             f"DEBUG REST: prediction_finish called with prediction_id={prediction_id}"
         )
-        project_id = f"{entity}/{project}"
+        project_id = to_project_id(entity, project)
         req = tsi.PredictionFinishReq(
             project_id=project_id, prediction_id=prediction_id
         )
@@ -793,7 +795,7 @@ def generate_v2_routes(
         service: TraceService = Depends(get_service),  # noqa: B008
     ) -> tsi.ScoreCreateRes:
         """Create a score."""
-        project_id = f"{entity}/{project}"
+        project_id = to_project_id(entity, project)
         req = tsi.ScoreCreateReq(project_id=project_id, **body.model_dump())
         return service.trace_server_interface.score_create(req)
 
@@ -809,7 +811,7 @@ def generate_v2_routes(
         service: TraceService = Depends(get_service),  # noqa: B008
     ) -> tsi.ScoreReadRes:
         """Get a score."""
-        project_id = f"{entity}/{project}"
+        project_id = to_project_id(entity, project)
         req = tsi.ScoreReadReq(project_id=project_id, score_id=score_id)
         return service.trace_server_interface.score_read(req)
 
@@ -841,7 +843,7 @@ def generate_v2_routes(
         service: TraceService = Depends(get_service),  # noqa: B008
     ) -> StreamingResponse:
         """List scores."""
-        project_id = f"{entity}/{project}"
+        project_id = to_project_id(entity, project)
         req = tsi.ScoreListReq(
             project_id=project_id,
             evaluation_run_id=evaluation_run_id,
@@ -865,7 +867,7 @@ def generate_v2_routes(
         service: TraceService = Depends(get_service),  # noqa: B008
     ) -> tsi.ScoreDeleteRes:
         """Delete scores."""
-        project_id = f"{entity}/{project}"
+        project_id = to_project_id(entity, project)
         req = tsi.ScoreDeleteReq(project_id=project_id, score_ids=score_ids)
         return service.trace_server_interface.score_delete(req)
 

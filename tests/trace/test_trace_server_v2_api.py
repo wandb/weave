@@ -14,6 +14,7 @@ The tests run against both SQLite and ClickHouse backends.
 """
 
 from weave.trace_server import trace_server_interface as tsi
+from weave.utils.project_id import from_project_id
 
 
 class TestOpsV2API:
@@ -384,7 +385,7 @@ class TestEvaluationsV2API:
         dataset_res = client.server.dataset_create(dataset_req)
 
         # Create dataset ref
-        entity, project = project_id.split("/")
+        entity, project = from_project_id(project_id)
         dataset_ref = f"weave:///{entity}/{project}/object/{dataset_res.object_id}:{dataset_res.digest}"
 
         # Create an evaluation
@@ -416,7 +417,7 @@ class TestEvaluationsV2API:
         )
         dataset_res = client.server.dataset_create(dataset_req)
 
-        entity, project = project_id.split("/")
+        entity, project = from_project_id(project_id)
         dataset_ref = f"weave:///{entity}/{project}/object/{dataset_res.object_id}:{dataset_res.digest}"
 
         eval_req = tsi.EvaluationCreateReq(
@@ -465,7 +466,7 @@ class TestEvaluationsV2API:
         )
         dataset_res = client.server.dataset_create(dataset_req)
 
-        entity, project = project_id.split("/")
+        entity, project = from_project_id(project_id)
         dataset_ref = f"weave:///{entity}/{project}/object/{dataset_res.object_id}:{dataset_res.digest}"
 
         # Create multiple evaluations
@@ -501,7 +502,7 @@ class TestEvaluationsV2API:
         )
         dataset_res = client.server.dataset_create(dataset_req)
 
-        entity, project = project_id.split("/")
+        entity, project = from_project_id(project_id)
         dataset_ref = f"weave:///{entity}/{project}/object/{dataset_res.object_id}:{dataset_res.digest}"
 
         eval_req = tsi.EvaluationCreateReq(
@@ -551,7 +552,7 @@ class TestEvaluationsV2API:
         scorer_res2 = client.server.scorer_create(scorer_req2)
 
         # Build refs
-        entity, project = project_id.split("/")
+        entity, project = from_project_id(project_id)
         dataset_ref = f"weave:///{entity}/{project}/object/{dataset_res.object_id}:{dataset_res.digest}"
         scorer_ref1 = f"weave:///{entity}/{project}/object/{scorer_res1.object_id}:{scorer_res1.digest}"
         scorer_ref2 = f"weave:///{entity}/{project}/object/{scorer_res2.object_id}:{scorer_res2.digest}"
@@ -584,7 +585,7 @@ class TestV2APIIntegration:
     def test_complete_evaluation_workflow(self, client):
         """Test a complete workflow: create dataset, scorers, and evaluation."""
         project_id = client._project_id()
-        entity, project = project_id.split("/")
+        entity, project = from_project_id(project_id)
 
         # Step 1: Create a dataset
         dataset_req = tsi.DatasetCreateReq(
@@ -727,7 +728,7 @@ class TestModelsV2API:
 class TestModel(weave.Model):
     temperature: float = 0.7
 
-    @weave.op()
+    @weave.op
     def predict(self, input: str) -> dict:
         return {"output": f"Processed: {input}"}
 """,
@@ -751,7 +752,7 @@ class TestModel(weave.Model):
 class MyTestModel(weave.Model):
     prompt: str = "Hello"
 
-    @weave.op()
+    @weave.op
     def predict(self, input: str) -> str:
         return f"{self.prompt} {input}"
 """
@@ -795,7 +796,7 @@ class MyTestModel(weave.Model):
                 source_code=f"""import weave
 
 class ListTestModel{i}(weave.Model):
-    @weave.op()
+    @weave.op
     def predict(self):
         return {i}
 """,
@@ -824,7 +825,7 @@ class ListTestModel{i}(weave.Model):
             source_code="""import weave
 
 class DeletableModel(weave.Model):
-    @weave.op()
+    @weave.op
     def predict(self):
         pass
 """,
@@ -857,7 +858,7 @@ class DeletableModel(weave.Model):
 class MultiVersionModel(weave.Model):
     version: int = {i}
 
-    @weave.op()
+    @weave.op
     def predict(self):
         return {i}
 """,
@@ -883,7 +884,7 @@ class TestEvaluationRunsV2API:
     def test_evaluation_run_create(self, client):
         """Test creating an evaluation run via V2 API."""
         project_id = client._project_id()
-        entity, project = project_id.split("/")
+        entity, project = from_project_id(project_id)
 
         # Create dataset
         dataset_req = tsi.DatasetCreateReq(
@@ -910,7 +911,7 @@ class TestEvaluationRunsV2API:
             source_code="""import weave
 
 class EvalRunModel(weave.Model):
-    @weave.op()
+    @weave.op
     def predict(self, input: str) -> str:
         return "prediction"
 """,
@@ -931,7 +932,7 @@ class EvalRunModel(weave.Model):
     def test_evaluation_run_read(self, client):
         """Test reading an evaluation run via V2 API."""
         project_id = client._project_id()
-        entity, project = project_id.split("/")
+        entity, project = from_project_id(project_id)
 
         # Create necessary components
         dataset_req = tsi.DatasetCreateReq(
@@ -956,7 +957,7 @@ class EvalRunModel(weave.Model):
             source_code="""import weave
 
 class ReadEvalRunModel(weave.Model):
-    @weave.op()
+    @weave.op
     def predict(self, input):
         return "output"
 """,
@@ -986,7 +987,7 @@ class ReadEvalRunModel(weave.Model):
     def test_evaluation_run_list(self, client):
         """Test listing evaluation runs via V2 API."""
         project_id = client._project_id()
-        entity, project = project_id.split("/")
+        entity, project = from_project_id(project_id)
 
         # Create dataset
         dataset_req = tsi.DatasetCreateReq(
@@ -1015,7 +1016,7 @@ class ReadEvalRunModel(weave.Model):
                 source_code=f"""import weave
 
 class ListEvalRunModel{i}(weave.Model):
-    @weave.op()
+    @weave.op
     def predict(self, input):
         return {i}
 """,
@@ -1043,7 +1044,7 @@ class ListEvalRunModel{i}(weave.Model):
     def test_evaluation_run_delete(self, client):
         """Test deleting evaluation runs via V2 API."""
         project_id = client._project_id()
-        entity, project = project_id.split("/")
+        entity, project = from_project_id(project_id)
 
         # Create dataset
         dataset_req = tsi.DatasetCreateReq(
@@ -1070,7 +1071,7 @@ class ListEvalRunModel{i}(weave.Model):
             source_code="""import weave
 
 class DeleteEvalRunModel(weave.Model):
-    @weave.op()
+    @weave.op
     def predict(self, input):
         return "output"
 """,
@@ -1098,7 +1099,7 @@ class DeleteEvalRunModel(weave.Model):
     def test_evaluation_run_finish(self, client):
         """Test finishing an evaluation run via V2 API."""
         project_id = client._project_id()
-        entity, project = project_id.split("/")
+        entity, project = from_project_id(project_id)
 
         # Create dataset
         dataset_req = tsi.DatasetCreateReq(
@@ -1125,7 +1126,7 @@ class DeleteEvalRunModel(weave.Model):
             source_code="""import weave
 
 class FinishEvalRunModel(weave.Model):
-    @weave.op()
+    @weave.op
     def predict(self, input):
         return "output"
 """,
@@ -1158,7 +1159,7 @@ class TestPredictionsV2API:
     def test_prediction_create(self, client):
         """Test creating a prediction via V2 API."""
         project_id = client._project_id()
-        entity, project = project_id.split("/")
+        entity, project = from_project_id(project_id)
 
         # Create model
         model_req = tsi.ModelCreateReq(
@@ -1167,7 +1168,7 @@ class TestPredictionsV2API:
             source_code="""import weave
 
 class PredictionTestModel(weave.Model):
-    @weave.op()
+    @weave.op
     def predict(self, input: str) -> str:
         return f"prediction for {input}"
 """,
@@ -1189,7 +1190,7 @@ class PredictionTestModel(weave.Model):
     def test_prediction_read(self, client):
         """Test reading a prediction via V2 API."""
         project_id = client._project_id()
-        entity, project = project_id.split("/")
+        entity, project = from_project_id(project_id)
 
         # Create model
         model_req = tsi.ModelCreateReq(
@@ -1198,7 +1199,7 @@ class PredictionTestModel(weave.Model):
             source_code="""import weave
 
 class ReadPredictionModel(weave.Model):
-    @weave.op()
+    @weave.op
     def predict(self, input: str) -> str:
         return "result"
 """,
@@ -1230,7 +1231,7 @@ class ReadPredictionModel(weave.Model):
     def test_prediction_list(self, client):
         """Test listing predictions via V2 API."""
         project_id = client._project_id()
-        entity, project = project_id.split("/")
+        entity, project = from_project_id(project_id)
 
         # Create model
         model_req = tsi.ModelCreateReq(
@@ -1239,7 +1240,7 @@ class ReadPredictionModel(weave.Model):
             source_code="""import weave
 
 class ListPredictionModel(weave.Model):
-    @weave.op()
+    @weave.op
     def predict(self, input):
         return "output"
 """,
@@ -1271,7 +1272,7 @@ class ListPredictionModel(weave.Model):
     def test_prediction_delete(self, client):
         """Test deleting predictions via V2 API."""
         project_id = client._project_id()
-        entity, project = project_id.split("/")
+        entity, project = from_project_id(project_id)
 
         # Create model
         model_req = tsi.ModelCreateReq(
@@ -1280,7 +1281,7 @@ class ListPredictionModel(weave.Model):
             source_code="""import weave
 
 class DeletePredictionModel(weave.Model):
-    @weave.op()
+    @weave.op
     def predict(self, input):
         return "output"
 """,
@@ -1312,7 +1313,7 @@ class DeletePredictionModel(weave.Model):
     def test_prediction_with_evaluation_run(self, client):
         """Test creating a prediction linked to an evaluation run."""
         project_id = client._project_id()
-        entity, project = project_id.split("/")
+        entity, project = from_project_id(project_id)
 
         # Create dataset
         dataset_req = tsi.DatasetCreateReq(
@@ -1339,7 +1340,7 @@ class DeletePredictionModel(weave.Model):
             source_code="""import weave
 
 class PredEvalRunModel(weave.Model):
-    @weave.op()
+    @weave.op
     def predict(self, input):
         return "output"
 """,
@@ -1415,7 +1416,7 @@ class TestScoresV2API:
     def test_score_create(self, client):
         """Test creating a score via V2 API."""
         project_id = client._project_id()
-        entity, project = project_id.split("/")
+        entity, project = from_project_id(project_id)
 
         # Create scorer
         scorer_req = tsi.ScorerCreateReq(
@@ -1433,7 +1434,7 @@ class TestScoresV2API:
             source_code="""import weave
 
 class ScoreTestModel(weave.Model):
-    @weave.op()
+    @weave.op
     def predict(self, input):
         return "output"
 """,
@@ -1464,7 +1465,7 @@ class ScoreTestModel(weave.Model):
     def test_score_read(self, client):
         """Test reading a score via V2 API."""
         project_id = client._project_id()
-        entity, project = project_id.split("/")
+        entity, project = from_project_id(project_id)
 
         # Create scorer
         scorer_req = tsi.ScorerCreateReq(
@@ -1482,7 +1483,7 @@ class ScoreTestModel(weave.Model):
             source_code="""import weave
 
 class ReadScoreModel(weave.Model):
-    @weave.op()
+    @weave.op
     def predict(self, input):
         return "output"
 """,
@@ -1522,7 +1523,7 @@ class ReadScoreModel(weave.Model):
     def test_score_list(self, client):
         """Test listing scores via V2 API."""
         project_id = client._project_id()
-        entity, project = project_id.split("/")
+        entity, project = from_project_id(project_id)
 
         # Create scorer
         scorer_req = tsi.ScorerCreateReq(
@@ -1540,7 +1541,7 @@ class ReadScoreModel(weave.Model):
             source_code="""import weave
 
 class ListScoreModel(weave.Model):
-    @weave.op()
+    @weave.op
     def predict(self, input):
         return "output"
 """,
@@ -1580,7 +1581,7 @@ class ListScoreModel(weave.Model):
     def test_score_delete(self, client):
         """Test deleting scores via V2 API."""
         project_id = client._project_id()
-        entity, project = project_id.split("/")
+        entity, project = from_project_id(project_id)
 
         # Create scorer
         scorer_req = tsi.ScorerCreateReq(
@@ -1598,7 +1599,7 @@ class ListScoreModel(weave.Model):
             source_code="""import weave
 
 class DeleteScoreModel(weave.Model):
-    @weave.op()
+    @weave.op
     def predict(self, input):
         return "output"
 """,
@@ -1638,7 +1639,7 @@ class DeleteScoreModel(weave.Model):
     def test_score_with_evaluation_run(self, client):
         """Test creating a score linked to an evaluation run."""
         project_id = client._project_id()
-        entity, project = project_id.split("/")
+        entity, project = from_project_id(project_id)
 
         # Create dataset
         dataset_req = tsi.DatasetCreateReq(
@@ -1674,7 +1675,7 @@ class DeleteScoreModel(weave.Model):
             source_code="""import weave
 
 class ScoreEvalRunModel(weave.Model):
-    @weave.op()
+    @weave.op
     def predict(self, input):
         return "output"
 """,

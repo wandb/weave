@@ -12,6 +12,9 @@ _global_weave_client: WeaveClient | None = None
 lock = threading.Lock()
 
 
+class WeaveInitError(Exception): ...
+
+
 def set_weave_client_global(client: WeaveClient | None) -> None:
     global _global_weave_client
 
@@ -36,9 +39,6 @@ def get_weave_client() -> WeaveClient | None:
     # if (context_client := context_state._graph_client.get()) is not None:
     #     return context_client
     return _global_weave_client
-
-
-class WeaveInitError(Exception): ...
 
 
 def require_weave_client() -> WeaveClient:

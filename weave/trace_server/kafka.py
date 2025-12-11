@@ -1,17 +1,18 @@
 import logging
 import socket
-from typing import Any, Optional
+from typing import Any
 
-import ddtrace
 from confluent_kafka import Consumer as ConfluentKafkaConsumer
 from confluent_kafka import Producer as ConfluentKafkaProducer
 
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.datadog import set_root_span_dd_tags
 from weave.trace_server.environment import (
     kafka_broker_host,
     kafka_broker_port,
     kafka_client_password,
     kafka_client_user,
+    kafka_partition_by_project_id,
     kafka_producer_max_buffer_size,
 )
 
@@ -39,7 +40,7 @@ class KafkaProducer(ConfluentKafkaProducer):
     @classmethod
     def from_env(
         cls,
-        additional_kafka_config: Optional[dict[str, Any]] = None,
+        additional_kafka_config: dict[str, Any] | None = None,
     ) -> "KafkaProducer":
         if additional_kafka_config is None:
             additional_kafka_config = {}
@@ -87,8 +88,7 @@ class KafkaProducer(ConfluentKafkaProducer):
                     "call_id": call_end.id,
                 },
             )
-            if root_span := ddtrace.tracer.current_root_span():
-                root_span.set_tags({"kafka.producer.buffer_size": buffer_size})
+            set_root_span_dd_tags({"kafka.producer.buffer_size": buffer_size})
 
             # Drop the message - do not produce
             return
@@ -104,17 +104,21 @@ class KafkaProducer(ConfluentKafkaProducer):
                     "buffer_percentage": buffer_percentage,
                 },
             )
-            if root_span := ddtrace.tracer.current_root_span():
-                root_span.set_tags(
-                    {
-                        "kafka.producer.buffer_size": buffer_size,
-                        "kafka.producer.buffer_percentage": buffer_percentage,
-                    }
-                )
+            set_root_span_dd_tags(
+                {
+                    "kafka.producer.buffer_size": buffer_size,
+                    "kafka.producer.buffer_percentage": buffer_percentage,
+                }
+            )
+
+        publish_key = None
+        if kafka_partition_by_project_id():
+            publish_key = call_end.project_id
 
         self.produce(
             topic=CALL_ENDED_TOPIC,
             value=call_end.model_dump_json(),
+            key=publish_key,
         )
 
         if flush_immediately:
@@ -131,7 +135,7 @@ class KafkaConsumer(ConfluentKafkaConsumer):
 
     @classmethod
     def from_env(
-        cls, group_id: str, additional_kafka_config: Optional[dict[str, Any]] = None
+        cls, group_id: str, additional_kafka_config: dict[str, Any] | None = None
     ) -> "KafkaConsumer":
         if additional_kafka_config is None:
             additional_kafka_config = {}
@@ -153,7 +157,7 @@ def _make_broker_host() -> str:
     return f"{kafka_broker_host()}:{kafka_broker_port()}"
 
 
-def _make_auth_config() -> dict[str, Optional[str]]:
+def _make_auth_config() -> dict[str, str | None]:
     username = kafka_client_user()
 
     if username is None:

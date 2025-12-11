@@ -13,7 +13,7 @@ If True, all weave ops will behave like regular functions and no network request
 import os
 from contextvars import ContextVar
 from pathlib import Path
-from typing import Any, Literal, Optional, Union
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, PrivateAttr
 
@@ -103,7 +103,7 @@ class UserSettings(BaseModel):
     capture_system_info: bool = True
     """Toggles capture of system information (OS name and version) for ops."""
 
-    client_parallelism: Optional[int] = None
+    client_parallelism: int | None = None
     """
     Sets the number of workers to use for background operations.
     If not set, automatically adjusts based on the number of cores.
@@ -131,7 +131,7 @@ class UserSettings(BaseModel):
     Can be overridden with the environment variable `WEAVE_SERVER_CACHE_SIZE_LIMIT`
     """
 
-    server_cache_dir: Optional[str] = None
+    server_cache_dir: str | None = None
     """
     Sets the directory for the server cache, defaults to None (temporary cache)
     Ignored if `use_server_cache` is False.
@@ -187,6 +187,25 @@ class UserSettings(BaseModel):
     Can be overridden with the environment variable `WEAVE_USE_PARALLEL_TABLE_UPLOAD`
     """
 
+    http_timeout: float = 30.0
+    """
+    Sets the HTTP request timeout in seconds. Defaults to 30 seconds.
+
+    This timeout applies to all HTTP requests made by the Weave client,
+    including initialization calls and API requests.
+
+    Can be overridden with the environment variable `WEAVE_HTTP_TIMEOUT`
+    """
+
+    use_stainless_server: bool = False
+    """
+    Toggles use of the stainless-generated HTTP client for trace server communication.
+
+    If True, uses StainlessRemoteHTTPTraceServer instead of RemoteHTTPTraceServer.
+    This provides better type safety and automatic client generation from OpenAPI specs.
+    Can be overridden with the environment variable `WEAVE_USE_STAINLESS_SERVER`
+    """
+
     model_config = ConfigDict(extra="forbid")
     _is_first_apply: bool = PrivateAttr(True)
 
@@ -238,7 +257,7 @@ def should_capture_system_info() -> bool:
     return _should("capture_system_info")
 
 
-def client_parallelism() -> Optional[int]:
+def client_parallelism() -> int | None:
     return _optional_int("client_parallelism")
 
 
@@ -258,7 +277,7 @@ def server_cache_size_limit() -> int:
     return _optional_int("server_cache_size_limit") or 1_000_000_000
 
 
-def server_cache_dir() -> Optional[str]:
+def server_cache_dir() -> str | None:
     return _optional_str("server_cache_dir")
 
 
@@ -304,8 +323,21 @@ def should_implicitly_patch_integrations() -> bool:
     return _should("implicitly_patch_integrations")
 
 
+def http_timeout() -> float:
+    """Returns the HTTP request timeout in seconds."""
+    timeout = _optional_float("http_timeout")
+    if timeout is None:
+        return 30.0
+    return timeout
+
+
+def should_use_stainless_server() -> bool:
+    """Returns whether the stainless-generated HTTP client should be used."""
+    return _should("use_stainless_server")
+
+
 def parse_and_apply_settings(
-    settings: Optional[Union[UserSettings, dict[str, Any]]] = None,
+    settings: UserSettings | dict[str, Any] | None = None,
 ) -> None:
     if isinstance(settings, UserSettings):
         user_settings = settings
@@ -333,7 +365,7 @@ def _should(name: str) -> bool:
     return _context_vars[name].get()
 
 
-def _optional_int(name: str) -> Optional[int]:
+def _optional_int(name: str) -> int | None:
     if env := os.getenv(f"{SETTINGS_PREFIX}{name.upper()}"):
         return int(env)
     return _context_vars[name].get()
@@ -345,13 +377,13 @@ def _list_str(name: str) -> list[str]:
     return _context_vars[name].get() or []
 
 
-def _optional_str(name: str) -> Optional[str]:
+def _optional_str(name: str) -> str | None:
     if env := os.getenv(f"{SETTINGS_PREFIX}{name.upper()}"):
         return env
     return _context_vars[name].get()
 
 
-def _optional_float(name: str) -> Optional[float]:
+def _optional_float(name: str) -> float | None:
     if env := os.getenv(f"{SETTINGS_PREFIX}{name.upper()}"):
         return float(env)
     return _context_vars[name].get()

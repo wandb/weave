@@ -4,6 +4,8 @@ from unittest.mock import Mock, patch
 import pytest
 from pydantic import ValidationError
 
+from weave import publish
+from weave.prompt.prompt import MessagesPrompt
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.interface.builtin_object_classes.llm_structured_model import (
@@ -11,7 +13,6 @@ from weave.trace_server.interface.builtin_object_classes.llm_structured_model im
     LLMStructuredCompletionModelDefaultParams,
     Message,
     _prepare_llm_messages,
-    _substitute_template_variables,
     cast_to_message,
     cast_to_message_list,
     parse_params_to_litellm_params,
@@ -444,40 +445,6 @@ def test_llm_structured_completion_model_predict_error_handling(
         model.predict(user_input="Test")
 
 
-def test_substitute_template_variables():
-    """Test the _substitute_template_variables helper function."""
-    # Test basic substitution
-    messages = [
-        Message(role="system", content="You are {assistant_name}"),
-        Message(role="user", content="Hello {user_name}, how are you?"),
-    ]
-
-    template_vars = {"assistant_name": "Claude", "user_name": "Alice"}
-    result = _substitute_template_variables(messages, template_vars)
-
-    assert len(result) == 2
-    assert result[0].content == "You are Claude"
-    assert result[1].content == "Hello Alice, how are you?"
-    assert result[0].role == "system"
-    assert result[1].role == "user"
-
-    # Test missing template variable
-    with pytest.raises(ValueError, match="Template variable"):
-        _substitute_template_variables(
-            [Message(role="user", content="Hello {missing_var}")],
-            {"other_var": "value"},
-        )
-
-    # Test message without content
-    messages_no_content = [
-        Message(role="system", content=None),
-        Message(role="user", content="Hello {name}"),
-    ]
-    result = _substitute_template_variables(messages_no_content, {"name": "World"})
-    assert result[0].content is None
-    assert result[1].content == "Hello World"
-
-
 def test_prepare_llm_messages():
     """Test the _prepare_llm_messages helper function."""
     # Test with template and user input
@@ -566,6 +533,20 @@ def test_parse_params_to_litellm_params():
     assert "temperature" not in result_none
     assert result_none["max_tokens"] == 100
 
+    # Test that messages_template is excluded but prompt is included
+    params_with_prompt = LLMStructuredCompletionModelDefaultParams(
+        temperature=0.5,
+        prompt="weave:///entity/project/object/my_prompt:latest",
+        messages_template=[Message(role="system", content="Test")],
+    )
+    result_with_prompt = parse_params_to_litellm_params(params_with_prompt)
+    assert (
+        result_with_prompt["prompt"]
+        == "weave:///entity/project/object/my_prompt:latest"
+    )
+    assert "messages_template" not in result_with_prompt
+    assert result_with_prompt["temperature"] == 0.5
+
 
 def test_cast_to_message_list():
     """Test the cast_to_message_list function."""
@@ -629,6 +610,141 @@ def test_cast_to_message():
     # Test invalid type
     with pytest.raises(TypeError):
         cast_to_message(123)
+
+
+@patch(
+    "weave.trace_server.interface.builtin_object_classes.llm_structured_model.get_weave_client"
+)
+def test_llm_structured_completion_model_predict_with_prompt(
+    mock_get_client, client: WeaveClient
+):
+    """Test the predict function with a prompt that references a MessagesPrompt object.
+
+    With the current architecture, the model passes the prompt reference and template_vars
+    to the completions endpoint, which handles resolution and substitution.
+    """
+    # Create and publish a MessagesPrompt
+    messages_prompt = MessagesPrompt(
+        messages=[
+            {"role": "system", "content": "You are {assistant_name}, a helpful AI."},
+            {"role": "user", "content": "Hello, my name is {user_name}"},
+        ]
+    )
+    prompt_ref = publish(messages_prompt, name="test_messages_prompt")
+
+    # Setup mock client
+    mock_client = Mock()
+    mock_client.entity = client.entity
+    mock_client.project = client.project
+
+    mock_response = tsi.CompletionsCreateRes(
+        response={
+            "choices": [
+                {
+                    "message": {
+                        "role": "assistant",
+                        "content": "Hello Alice! I'm Claude, nice to meet you.",
+                    }
+                }
+            ]
+        }
+    )
+    mock_client.server.completions_create.return_value = mock_response
+    mock_get_client.return_value = mock_client
+
+    # Create model with prompt
+    model = LLMStructuredCompletionModel(
+        llm_model_id="claude-3",
+        default_params=LLMStructuredCompletionModelDefaultParams(
+            prompt=prompt_ref.uri(),
+            response_format="text",
+        ),
+    )
+
+    # Test predict with template variables
+    result = model.predict(
+        user_input=[Message(role="user", content="What's your name?")],
+        assistant_name="Claude",
+        user_name="Alice",
+    )
+
+    # Verify result
+    assert result == "Hello Alice! I'm Claude, nice to meet you."
+
+    # Verify the prompt reference and template_vars were passed to completions_create
+    # The model no longer does prompt resolution - it delegates to the completions endpoint
+    call_args = mock_client.server.completions_create.call_args[1]["req"]
+
+    # Should have the prompt reference and template_vars in the request
+    assert call_args.inputs.prompt == prompt_ref.uri()
+    assert call_args.inputs.template_vars == {
+        "assistant_name": "Claude",
+        "user_name": "Alice",
+    }
+
+    # Should have only the user_input messages (prompt resolution happens in completions endpoint)
+    expected_messages = [
+        {"role": "user", "content": "What's your name?"},
+    ]
+    assert call_args.inputs.messages == expected_messages
+
+
+@patch(
+    "weave.trace_server.interface.builtin_object_classes.llm_structured_model.get_weave_client"
+)
+def test_llm_structured_completion_model_prompt_takes_precedence(
+    mock_get_client, client: WeaveClient
+):
+    """Test that prompt takes precedence over messages_template when both are provided.
+
+    When prompt is set, the model passes it to completions_create and ignores messages_template.
+    """
+    # Create and publish a MessagesPrompt
+    messages_prompt = MessagesPrompt(
+        messages=[
+            {"role": "system", "content": "Message from prompt: {var}"},
+        ]
+    )
+    prompt_ref = publish(messages_prompt, name="test_precedence_prompt")
+
+    # Setup mock client
+    mock_client = Mock()
+    mock_client.entity = client.entity
+    mock_client.project = client.project
+
+    mock_response = tsi.CompletionsCreateRes(
+        response={
+            "choices": [{"message": {"role": "assistant", "content": "Response"}}]
+        }
+    )
+    mock_client.server.completions_create.return_value = mock_response
+    mock_get_client.return_value = mock_client
+
+    # Create model with both prompt and messages_template
+    model = LLMStructuredCompletionModel(
+        llm_model_id="gpt-4",
+        default_params=LLMStructuredCompletionModelDefaultParams(
+            prompt=prompt_ref.uri(),
+            messages_template=[
+                Message(role="system", content="Message from template: {var}"),
+            ],
+            response_format="text",
+        ),
+    )
+
+    # Test predict
+    result = model.predict(var="test_value")
+
+    # Verify that prompt was passed (not messages_template)
+    call_args = mock_client.server.completions_create.call_args[1]["req"]
+
+    # Should have prompt reference and template_vars
+    assert call_args.inputs.prompt == prompt_ref.uri()
+    assert call_args.inputs.template_vars == {"var": "test_value"}
+
+    # Should NOT have messages from messages_template (prompt takes precedence)
+    # Messages should be empty since no user_input was provided
+    assert call_args.inputs.messages == []
 
 
 def test_llm_structured_completion_model_schema_validation(client: WeaveClient):

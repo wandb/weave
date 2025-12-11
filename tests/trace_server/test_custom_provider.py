@@ -2,7 +2,6 @@ import os
 import uuid
 from contextlib import contextmanager
 from datetime import datetime
-from typing import Optional
 from unittest.mock import patch
 
 from litellm.types.utils import ModelResponse
@@ -43,7 +42,7 @@ def create_provider_obj(
     provider_id: str,
     base_url: str = "https://api.example.com",
     api_key_name: str = "EXAMPLE_API_KEY",
-    extra_headers: Optional[dict] = None,
+    extra_headers: dict | None = None,
     return_type: str = "openai",
 ) -> tsi.ObjSchema:
     """Create a Provider object for testing.
@@ -85,7 +84,7 @@ def create_provider_model_obj(
     project_id: str,
     provider_id: str,
     model_id: str,
-    model_name: Optional[str] = None,
+    model_name: str | None = None,
     max_tokens: int = 4096,
 ) -> tsi.ObjSchema:
     """Create a ProviderModel object for testing.
@@ -153,6 +152,7 @@ def create_mock_completion_response(
                     "role": "assistant",
                     "tool_calls": None,
                     "function_call": None,
+                    "provider_specific_fields": None,
                 },
             }
         ],

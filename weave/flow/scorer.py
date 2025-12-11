@@ -1,10 +1,10 @@
 import inspect
 import math
 import textwrap
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from numbers import Number
-from typing import Any, Callable, Optional, Union, cast
+from typing import Any, cast
 
 from pydantic import BaseModel, Field
 from typing_extensions import Self
@@ -19,7 +19,7 @@ from weave.trace.vals import WeaveObject
 from weave.trace.weave_client import sanitize_object_name
 
 
-def _import_numpy() -> Optional[Any]:
+def _import_numpy() -> Any | None:
     try:
         import numpy
     except ImportError:
@@ -28,7 +28,7 @@ def _import_numpy() -> Optional[Any]:
 
 
 class Scorer(Object):
-    column_map: Optional[dict[str, str]] = Field(
+    column_map: dict[str, str] | None = Field(
         default=None,
         description="A mapping from column names in the dataset to the names expected by the scorer",
     )
@@ -42,7 +42,7 @@ class Scorer(Object):
         raise NotImplementedError
 
     @op
-    def summarize(self, score_rows: list) -> Optional[dict]:
+    def summarize(self, score_rows: list) -> dict | None:
         return auto_summarize(score_rows)
 
     @classmethod
@@ -55,7 +55,7 @@ class Scorer(Object):
         return cls(**field_values)
 
 
-def _validate_scorer_signature(scorer: Union[Callable, Op, Scorer]) -> bool:
+def _validate_scorer_signature(scorer: Callable | Op | Scorer) -> bool:
     """Validate that the scorer signature does not have both `output` and `model_output`.
 
     Having both `output` and `model_output` in the scorer signature causes
@@ -79,7 +79,7 @@ def _validate_scorer_signature(scorer: Union[Callable, Op, Scorer]) -> bool:
     return True
 
 
-def variance(data: Sequence[Union[int, float]]) -> float:
+def variance(data: Sequence[int | float]) -> float:
     """Calculate the variance of a sequence of numeric values.
 
     Args:
@@ -103,7 +103,7 @@ def variance(data: Sequence[Union[int, float]]) -> float:
     return sum((x - mean) ** 2 for x in data) / len(data)
 
 
-def stderr(data: Sequence[Union[int, float]]) -> float:
+def stderr(data: Sequence[int | float]) -> float:
     """Calculate the standard error of the mean for a sequence of numeric values.
 
     Args:
@@ -131,7 +131,7 @@ def stderr(data: Sequence[Union[int, float]]) -> float:
         return float(math.sqrt(sample_variance / len(data)))  # type: ignore
 
 
-def auto_summarize(data: list) -> Optional[dict[str, Any]]:
+def auto_summarize(data: list) -> dict[str, Any] | None:
     """Automatically summarize a list of (potentially nested) dicts.
 
     Computes:
@@ -194,7 +194,7 @@ class ScorerAttributes:
 
 
 def get_scorer_attributes(
-    scorer: Union[Op, Scorer],
+    scorer: Op | Scorer,
 ) -> ScorerAttributes:
     score_op: Op
     scorer_name: str
@@ -206,14 +206,14 @@ def get_scorer_attributes(
         try:
             if not is_op(scorer.score):
                 raise TypeError(
-                    f"Scorer {scorer_name} must implement `score` as a weave.op() decorated function."
+                    f"Scorer {scorer_name} must implement `score` as a weave.op decorated function."
                 )
             score_op = as_op(scorer.score)
             summarize_fn = scorer.summarize  # type: ignore
 
         except AttributeError:
             raise ValueError(
-                f"Scorer {scorer_name} must implement score and summarize methods. Did you forget to wrap with @weave.op()?"
+                f"Scorer {scorer_name} must implement score and summarize methods. Did you forget to wrap with @weave.op?"
             ) from None
     elif is_op(scorer):
         scorer = as_op(scorer)
@@ -231,7 +231,7 @@ def get_scorer_attributes(
     )
 
 
-def _has_oldstyle_scorers(scorers: list[Union[Op, Scorer]]) -> bool:
+def _has_oldstyle_scorers(scorers: list[Op | Scorer]) -> bool:
     """Check if any scorers use the deprecated 'model_output' parameter."""
     for scorer in scorers:
         scorer_attributes = get_scorer_attributes(scorer)
@@ -253,7 +253,7 @@ ApplyScorerResult = ApplyScorerSuccess
 
 
 def prepare_scorer_op_args(
-    scorer: Union[Op, Scorer], example: dict[str, Any], model_output: Any
+    scorer: Op | Scorer, example: dict[str, Any], model_output: Any
 ) -> tuple[Op, dict[str, Any]]:
     # Extract the core components of the scorer
     scorer_attributes = get_scorer_attributes(scorer)
@@ -376,7 +376,7 @@ def prepare_scorer_op_args(
 
 
 async def apply_scorer_async(
-    scorer: Union[Op, Scorer], example: dict[str, Any], model_output: Any
+    scorer: Op | Scorer, example: dict[str, Any], model_output: Any
 ) -> ApplyScorerResult:
     """Apply a scoring function to model output and example data asynchronously.
 

@@ -16,6 +16,8 @@ gha-creds-*.json
 .pytest_cache
 .coverage
 .nox
+.venv
+.weave_client_dropped_items_log.jsonl
 *.log
 */file::memory:?cache=shared
 tests/weave_models/
