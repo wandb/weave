@@ -10,23 +10,25 @@ import (
 
 // BatchConfig configures the batcher behavior
 type BatchConfig struct {
-	MaxBatchSize    int           // Maximum number of items per batch
-	MaxBatchBytes   int           // Maximum bytes per batch (for HTTP limit)
-	FlushInterval   time.Duration // How often to flush batches
-	MaxRetries      int           // Maximum retries for failed batches
-	RetryBackoff    time.Duration // Initial backoff between retries
-	MaxRetryBackoff time.Duration // Maximum backoff between retries
+	MaxBatchSize       int           // Maximum number of items per batch
+	MaxBatchBytes      int           // Maximum bytes per batch (for HTTP limit)
+	FlushInterval      time.Duration // How often to flush batches
+	MaxRetries         int           // Maximum retries for failed batches
+	RetryBackoff       time.Duration // Initial backoff between retries
+	MaxRetryBackoff    time.Duration // Maximum backoff between retries
+	MaxConcurrentSends int           // Maximum concurrent HTTP requests
 }
 
 // DefaultBatchConfig returns sensible defaults
 func DefaultBatchConfig() BatchConfig {
 	return BatchConfig{
-		MaxBatchSize:    0,                // 0 = unlimited, byte limit is the real constraint
-		MaxBatchBytes:   31 * 1024 * 1024, // 31 MiB (server limit is 32)
-		FlushInterval:   time.Second,
-		MaxRetries:      3,
-		RetryBackoff:    100 * time.Millisecond,
-		MaxRetryBackoff: 5 * time.Second,
+		MaxBatchSize:       0,                // 0 = unlimited, byte limit is the real constraint
+		MaxBatchBytes:      31 * 1024 * 1024, // 31 MiB (server limit is 32)
+		FlushInterval:      time.Second,
+		MaxRetries:         3,
+		RetryBackoff:       100 * time.Millisecond,
+		MaxRetryBackoff:    5 * time.Second,
+		MaxConcurrentSends: 4, // Limit concurrent HTTP requests to avoid overwhelming server
 	}
 }
 
@@ -159,12 +161,20 @@ func (b *Batcher) flushAll() {
 	b.inFlight += len(batches)
 	b.inFlightMu.Unlock()
 
-	// Send all batches concurrently
+	// Send batches with concurrency limit using a semaphore
+	maxConcurrent := b.config.MaxConcurrentSends
+	if maxConcurrent <= 0 {
+		maxConcurrent = 4 // Default fallback
+	}
+	sem := make(chan struct{}, maxConcurrent)
+
 	var wg sync.WaitGroup
 	for _, batch := range batches {
 		wg.Add(1)
+		sem <- struct{}{} // Acquire semaphore slot
 		go func(batch Batch) {
 			defer wg.Done()
+			defer func() { <-sem }() // Release semaphore slot
 			b.sendBatch(batch)
 		}(batch)
 	}
