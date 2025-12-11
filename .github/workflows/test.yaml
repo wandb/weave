@@ -221,6 +221,15 @@ jobs:
         run: |
           nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- \
             -m "trace_server and not skip_clickhouse_client"
+      - name: Run nox (Mock Trace Server)
+        env:
+          WEAVE_SENTRY_ENV: ci
+          CI: 1
+          DD_TRACE_ENABLED: false
+        run: |
+          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- \
+            -m "trace_server" \
+            --mock
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
         with:
