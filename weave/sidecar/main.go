@@ -191,10 +191,24 @@ func (s *Sidecar) getPendingCount() int {
 }
 
 func (s *Sidecar) enqueue(item BatchItem) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	itemSize := len(item.Req) + 50 // rough estimate for JSON overhead
+
+	s.mu.Lock()
+
+	// Back-pressure: if batch is way over limit (4x), wait for in-flight flushes
+	// This prevents runaway growth when HTTP requests are slow
+	for len(s.batch) >= s.config.FlushMaxCount*4 || s.batchSize >= s.config.FlushMaxBytes*4 {
+		// Signal flush if not already pending
+		select {
+		case s.flushChan <- struct{}{}:
+		default:
+		}
+		// Release lock and wait for some flushes to complete
+		s.mu.Unlock()
+		s.sendWg.Wait()
+		s.mu.Lock()
+	}
+
 	s.batch = append(s.batch, item)
 	s.batchSize += itemSize
 
@@ -206,6 +220,7 @@ func (s *Sidecar) enqueue(item BatchItem) {
 			// Flush already pending
 		}
 	}
+	s.mu.Unlock()
 }
 
 func (s *Sidecar) flushLoop() {
@@ -390,8 +405,8 @@ func main() {
 	backendURL := flag.String("backend", "", "Backend trace server URL (required)")
 	apiKey := flag.String("api-key", "", "API key for authentication (or set WANDB_API_KEY env var)")
 	flushInterval := flag.Duration("flush-interval", 1*time.Second, "Flush interval")
-	flushMaxCount := flag.Int("flush-max-count", 2000, "Max items before flush")
-	flushMaxBytes := flag.Int("flush-max-bytes", 10*1024*1024, "Max bytes before flush (10MB default)")
+	flushMaxCount := flag.Int("flush-max-count", 500, "Max items before flush")
+	flushMaxBytes := flag.Int("flush-max-bytes", 5*1024*1024, "Max bytes before flush (5MB default)")
 	requestTimeout := flag.Duration("request-timeout", 30*time.Second, "HTTP request timeout")
 
 	flag.Parse()

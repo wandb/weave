@@ -637,8 +637,8 @@ my_function(5)
 | `--backend` | (required) | Backend trace server URL |
 | `--api-key` | `$WANDB_API_KEY` | API key for authentication |
 | `--flush-interval` | `1s` | Time interval for flushing batches |
-| `--flush-max-count` | `2000` | Max items before triggering flush |
-| `--flush-max-bytes` | `10485760` (10MB) | Max batch size in bytes |
+| `--flush-max-count` | `500` | Max items before triggering flush |
+| `--flush-max-bytes` | `5242880` (5MB) | Max batch size in bytes |
 | `--request-timeout` | `30s` | HTTP request timeout |
 
 ### Python Environment Variables
@@ -671,8 +671,8 @@ The sidecar uses a simple newline-delimited JSON protocol over Unix domain socke
 
 The sidecar flushes batches when **any** of these conditions are met:
 - **Time**: 1 second since last flush (configurable via `--flush-interval`)
-- **Count**: 2000 items in batch (configurable via `--flush-max-count`)
-- **Size**: 10MB of data (configurable via `--flush-max-bytes`)
+- **Count**: 500 items in batch (configurable via `--flush-max-count`)
+- **Size**: 5MB of data (configurable via `--flush-max-bytes`)
 
 ### Graceful Degradation
 
@@ -721,6 +721,6 @@ When the sidecar receives `SIGINT` or `SIGTERM`:
 
 | Metric | Without Sidecar | With Sidecar |
 |--------|-----------------|--------------|
-| HTTP requests to backend | 1 per call (or batch) | 1 per batch of up to 2000 |
+| HTTP requests to backend | 1 per call (or batch) | 1 per batch of up to 500 |
 | Latency per trace call | ~1-5ms | ~100μs |
 | CPU overhead at 1k ops/sec | 5-10% | <2% |

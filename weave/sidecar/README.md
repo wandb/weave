@@ -28,8 +28,8 @@ go build -o weave-sidecar .
 | `--backend` | (required) | Backend trace server URL |
 | `--api-key` | `$WANDB_API_KEY` | API key for authentication |
 | `--flush-interval` | `1s` | Time interval for flushing batches |
-| `--flush-max-count` | `2000` | Max items before triggering flush |
-| `--flush-max-bytes` | `10485760` (10MB) | Max batch size in bytes before flush |
+| `--flush-max-count` | `500` | Max items before triggering flush |
+| `--flush-max-bytes` | `5242880` (5MB) | Max batch size in bytes before flush |
 | `--request-timeout` | `30s` | HTTP request timeout for backend calls |
 
 ### Authentication
