@@ -422,10 +422,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # Convert calls to CH insertable format and then to rows for batch insertion
         batch_rows = []
         for start_call, end_call in calls:
-            ch_start = _start_call_for_insert_to_ch_insertable_start_call(
-                start_call, self
-            )
-            ch_end = _end_call_for_insert_to_ch_insertable_end_call(end_call, self)
+            ch_start = _start_call_for_insert_to_ch_insertable_start_call(start_call)
+            ch_end = _end_call_for_insert_to_ch_insertable_end_call(end_call)
             batch_rows.append(_ch_call_to_row(ch_start))
             batch_rows.append(_ch_call_to_row(ch_end))
 
