@@ -23,6 +23,12 @@ from weave.trace_server_bindings.caching_middleware_trace_server import (
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface
 from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
 
+# Sidecar configuration
+WEAVE_USE_SIDECAR = os.environ.get("WEAVE_USE_SIDECAR", "").lower() == "true"
+WEAVE_SIDECAR_SOCKET = os.environ.get(
+    "WEAVE_SIDECAR_SOCKET", "/tmp/weave_sidecar.sock"
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -146,6 +152,16 @@ def init_weave(
     server: TraceServerClientInterface = remote_server
     if use_server_cache():
         server = CachingMiddlewareTraceServer.from_env(server)
+
+    # Optionally wrap with sidecar for improved performance
+    if WEAVE_USE_SIDECAR:
+        from weave.trace_server_bindings.sidecar_trace_server import SidecarTraceServer
+
+        logger.info(f"Using sidecar at {WEAVE_SIDECAR_SOCKET}")
+        server = SidecarTraceServer(
+            backend_server=server,
+            socket_path=WEAVE_SIDECAR_SOCKET,
+        )
 
     client = weave_client.WeaveClient(
         entity_name, project_name, server, ensure_project_exists
