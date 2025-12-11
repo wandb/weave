@@ -6,6 +6,10 @@ from unittest.mock import patch
 
 import pytest
 
+# Skip all tests in this module when running with mock backend
+# as these tests require ClickHouse-specific features (table_routing_resolver, ch_client)
+pytestmark = pytest.mark.skip_mock_client
+
 from tests.trace.util import client_is_sqlite
 from weave.trace_server.project_version.clickhouse_project_version import (
     get_project_data_residence,

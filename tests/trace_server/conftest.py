@@ -79,6 +79,13 @@ def pytest_collection_modifyitems(config, items):
     # 1. All tests in the trace_server directory (regardless of fixture usage)
     # 2. All tests that use the trace_server fixture (for tests outside this directory)
     # Note: Filtering based on remote-http-trace-server flag is handled in tests/trace_server_bindings/conftest.py
+
+    # Check if running with --mock flag
+    using_mock = config.getoption("--mock", default=False) or config.getoption(
+        "--trace-server", default=""
+    ) == "mock"
+    skip_mock = pytest.mark.skip(reason="Test not supported with mock backend")
+
     for item in items:
         # Check if the test is in the trace_server directory by checking parent directories
         if "trace_server" in item.path.parts:
@@ -86,6 +93,10 @@ def pytest_collection_modifyitems(config, items):
         # Also mark tests that use the trace_server fixture (for tests outside this dir)
         elif "trace_server" in item.fixturenames:
             item.add_marker(pytest.mark.trace_server)
+
+        # Skip tests marked with skip_mock_client when running with --mock
+        if using_mock and item.get_closest_marker("skip_mock_client"):
+            item.add_marker(skip_mock)
 
 
 def get_trace_server_flag(request):

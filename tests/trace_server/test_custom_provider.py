@@ -4,6 +4,7 @@ from contextlib import contextmanager
 from datetime import datetime
 from unittest.mock import patch
 
+import pytest
 from litellm.types.utils import ModelResponse
 
 from tests.trace.util import client_is_sqlite
@@ -260,6 +261,7 @@ def test_custom_provider_model_classes():
     )
 
 
+@pytest.mark.skip_mock_client
 def test_custom_provider_completions_create(client):
     """Test the completions_create endpoint with a custom provider.
 
@@ -397,6 +399,7 @@ def test_custom_provider_completions_create(client):
             _secret_fetcher_context.reset(token)
 
 
+@pytest.mark.skip_mock_client
 def test_custom_provider_ollama_model(client):
     """Test handling of ollama models that need special prefixing."""
     is_sqlite = client_is_sqlite(client)
@@ -519,6 +522,7 @@ def test_get_custom_provider_info():
         _secret_fetcher_context.reset(token)
 
 
+@pytest.mark.skip_mock_client
 def test_error_handling_custom_provider(client):
     """Test error handling for custom provider."""
     is_sqlite = client_is_sqlite(client)
@@ -568,6 +572,7 @@ def test_error_handling_custom_provider(client):
             _secret_fetcher_context.reset(token)
 
 
+@pytest.mark.skip_mock_client
 def test_custom_provider_invalid_model_format(client):
     """Test error handling for invalid model format."""
     is_sqlite = client_is_sqlite(client)
