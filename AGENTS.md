@@ -207,8 +207,7 @@ object identity and deduplication across client/server:
 - **`ref_aware_json_digest`**: hashes JSON-like data after **stabilizing ref strings** (so owner/entity
   prefixes don’t “pollute” the digest) and uses `json.dumps(..., sort_keys=True)` so dict insertion order
   does not affect the digest.
-- **`set` handling**: since sets aren’t JSON-serializable, they are encoded deterministically as a tagged
-  object (`{"__weave_set__": [...]}`) with items sorted by a stable JSON representation.
+- **`set` handling**: sets are **not supported** and will raise; callers must convert to a list/tuple.
 
 Changes to digest behavior can invalidate historical identities—treat modifications here as a migration-level change.
 

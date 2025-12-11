@@ -1,5 +1,7 @@
 import re
 
+import pytest
+
 from weave.trace_server.client_server_common.digest_builder import (
     bytes_digest,
     ref_aware_json_digest,
@@ -100,6 +102,32 @@ def test_ref_unaware_json_digest_is_stable_to_dict_insertion_order():
     assert ref_unaware_json_digest(v1) == ref_unaware_json_digest(v2)
 
 
+def test_ref_unaware_json_digest_recursively_orders_nested_dict_keys():
+    # This specifically targets recursive ordering in deeply nested structures,
+    # not just top-level insertion order.
+    v1 = {
+        "outer": {
+            "b": {"z": 1, "a": 2},
+            "a": [{"k2": 2, "k1": 1}, {"x": 1, "y": 2}],
+        }
+    }
+    v2 = {
+        "outer": {
+            "a": [{"k1": 1, "k2": 2}, {"y": 2, "x": 1}],
+            "b": {"a": 2, "z": 1},
+        }
+    }
+    assert ref_unaware_json_digest(v1) == ref_unaware_json_digest(v2)
+
+
+def test_ref_unaware_json_digest_is_stable_for_mixed_key_types():
+    # JSON serialization allows non-string keys (they become strings). Ensure our
+    # canonicalization produces a stable digest even when keys are mixed types.
+    v1 = {1: "a", "2": "b", 3: {"10": 1, 2: 2}}
+    v2 = {"2": "b", 1: "a", 3: {2: 2, "10": 1}}
+    assert ref_unaware_json_digest(v1) == ref_unaware_json_digest(v2)
+
+
 def test_ref_unaware_json_digest_is_ref_unaware_but_ref_aware_json_digest_is_ref_aware():
     payload_digest = ref_unaware_json_digest({"x": 1, "y": 2})
     ext = {"ref": f"weave:///entity/proj/object/Foo:{payload_digest}/attr/bar"}
@@ -114,9 +142,11 @@ def test_ref_unaware_json_digest_is_ref_unaware_but_ref_aware_json_digest_is_ref
 
 
 def test_ref_aware_json_digest_handles_sets_deterministically():
-    v1 = {"s": {3, 1, 2}}
-    v2 = {"s": {2, 3, 1}}
-    assert ref_aware_json_digest(v1) == ref_aware_json_digest(v2)
+    v = {"s": {3, 1, 2}}
+    with pytest.raises(TypeError):
+        ref_aware_json_digest(v)
+    with pytest.raises(TypeError):
+        ref_unaware_json_digest(v)
 
 
 def test_ref_aware_json_digest_does_not_stabilize_malformed_refs():

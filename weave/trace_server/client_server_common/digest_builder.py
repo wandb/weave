@@ -179,17 +179,32 @@ def _canonicalize_json_like(obj: Any) -> Any:
     containers (dict/list/tuple/set) so that stable hashing is possible.
     """
     if isinstance(obj, dict):
-        # Sorting happens in json.dumps(sort_keys=True), but we still canonicalize values.
-        return {k: _canonicalize_json_like(v) for k, v in obj.items()}
+        # Canonicalize in a deterministic key order *recursively*.
+        # We still keep json.dumps(sort_keys=True) in _json_digest as an extra guardrail.
+        return {
+            k: _canonicalize_json_like(obj[k])
+            for k in sorted(obj.keys(), key=_stable_json_sort_key)
+        }
     if isinstance(obj, list):
         return [_canonicalize_json_like(v) for v in obj]
     if isinstance(obj, tuple):
         return [_canonicalize_json_like(v) for v in obj]
     if isinstance(obj, set):
-        items = [_canonicalize_json_like(v) for v in obj]
-        items.sort(key=lambda v: json.dumps(v, sort_keys=True))
-        return {"__weave_set__": items}
+        # Sets are inherently unordered; hashing them would be sensitive to unstable
+        # iteration order. Require callers to convert sets to an ordered type first.
+        raise TypeError(
+            "Cannot hash set values in digest_builder; convert to a list/tuple first."
+        )
     return obj
+
+
+def _stable_json_sort_key(val: Any) -> str:
+    """Return a stable string sort key for JSON-like values."""
+    try:
+        return json.dumps(val, sort_keys=True)
+    except TypeError:
+        # Fallback: make a best-effort stable ordering for unexpected key types.
+        return repr(val)
 
 
 def _make_stabilized_ref_str(stable_content_address: str) -> str:
