@@ -2,13 +2,22 @@ package main
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"sync"
 	"time"
 )
+
+// Pool of gzip writers to reduce allocations
+var gzipWriterPool = sync.Pool{
+	New: func() interface{} {
+		return gzip.NewWriter(nil)
+	},
+}
 
 // HTTPSender handles sending batches to the Weave server
 type HTTPSender struct {
@@ -38,7 +47,7 @@ func DefaultHTTPSenderConfig(baseURL string) HTTPSenderConfig {
 	return HTTPSenderConfig{
 		BaseURL:        baseURL,
 		Timeout:        30 * time.Second,
-		MaxConnections: 10,
+		MaxConnections: 16, // Match concurrent sends capacity
 	}
 }
 

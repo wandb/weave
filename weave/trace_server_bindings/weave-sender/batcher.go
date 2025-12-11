@@ -28,7 +28,7 @@ func DefaultBatchConfig() BatchConfig {
 		MaxRetries:         3,
 		RetryBackoff:       100 * time.Millisecond,
 		MaxRetryBackoff:    5 * time.Second,
-		MaxConcurrentSends: 4, // Limit concurrent HTTP requests to avoid overwhelming server
+		MaxConcurrentSends: 8, // Concurrent HTTP requests (with gzip, can push more)
 	}
 }
 
