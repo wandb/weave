@@ -577,16 +577,9 @@ def test_auto_mode_start_batch_creates_started_calls(
 
 
 def test_auto_mode_start_batch_with_complete_mode(
-    clickhouse_client, server, project_id, auto_mode, request
+    clickhouse_client, server, project_id, auto_mode
 ):
     """Test calls_start_batch with complete mode creates finished calls in AUTO mode."""
-    if clickhouse_client is None:
-        pytest.skip("Skipping test for sqlite clients")
-
-    # Apply the auto_mode fixture
-    request.getfixturevalue("auto_mode")
-
-    # Setup project residence state for EMPTY (new project)
     setup_project_residence(clickhouse_client, project_id, ProjectDataResidence.EMPTY)
 
     call_id = generate_id()
@@ -640,16 +633,9 @@ def test_auto_mode_start_batch_with_complete_mode(
 
 
 def test_auto_mode_mixed_start_and_complete(
-    clickhouse_client, server, project_id, auto_mode, request
+    clickhouse_client, server, project_id, auto_mode
 ):
     """Test calls_start_batch with multiple starts and completes interleaved in AUTO mode."""
-    if clickhouse_client is None:
-        pytest.skip("Skipping test for sqlite clients")
-
-    # Apply the auto_mode fixture
-    request.getfixturevalue("auto_mode")
-
-    # Setup project residence state for EMPTY (new project)
     setup_project_residence(clickhouse_client, project_id, ProjectDataResidence.EMPTY)
 
     # Create multiple starts and completes interleaved
@@ -789,16 +775,9 @@ def test_auto_mode_mixed_start_and_complete(
 
 
 def test_auto_mode_end_batch_updates_started_calls(
-    clickhouse_client, server, project_id, auto_mode, request
+    clickhouse_client, server, project_id, auto_mode
 ):
     """Test calls_end_batch updates existing started calls in AUTO mode."""
-    if clickhouse_client is None:
-        pytest.skip("Skipping test for sqlite clients")
-
-    # Apply the auto_mode fixture
-    request.getfixturevalue("auto_mode")
-
-    # Setup project residence state for EMPTY (new project)
     setup_project_residence(clickhouse_client, project_id, ProjectDataResidence.EMPTY)
 
     # First create start calls
@@ -903,17 +882,8 @@ def test_auto_mode_end_batch_updates_started_calls(
     assert json.loads(call_2_after["inputs_dump"]) == {"y": 20}
 
 
-def test_auto_mode_calls_delete(
-    clickhouse_client, server, project_id, auto_mode, request
-):
+def test_auto_mode_calls_delete(clickhouse_client, server, project_id, auto_mode):
     """Test calls_delete soft-deletes calls in AUTO mode."""
-    if clickhouse_client is None:
-        pytest.skip("Skipping test for sqlite clients")
-
-    # Apply the auto_mode fixture
-    request.getfixturevalue("auto_mode")
-
-    # Setup project residence state for EMPTY (new project)
     setup_project_residence(clickhouse_client, project_id, ProjectDataResidence.EMPTY)
 
     # Create some calls
@@ -978,16 +948,9 @@ def test_auto_mode_calls_delete(
 
 
 def test_auto_mode_call_update_display_name(
-    clickhouse_client, server, project_id, auto_mode, request
+    clickhouse_client, server, project_id, auto_mode
 ):
     """Test call_update updates display name in AUTO mode."""
-    if clickhouse_client is None:
-        pytest.skip("Skipping test for sqlite clients")
-
-    # Apply the auto_mode fixture
-    request.getfixturevalue("auto_mode")
-
-    # Setup project residence state for EMPTY (new project)
     setup_project_residence(clickhouse_client, project_id, ProjectDataResidence.EMPTY)
 
     # Create a call
@@ -1029,16 +992,8 @@ def test_auto_mode_call_update_display_name(
     assert rows_after[0]["updated_at"] is not None
 
 
-def test_auto_mode_metadata_fields(
-    clickhouse_client, server, project_id, auto_mode, request
-):
+def test_auto_mode_metadata_fields(clickhouse_client, server, project_id, auto_mode):
     """Test calls with refs, W&B metadata, and thread/turn IDs in AUTO mode."""
-    if clickhouse_client is None:
-        pytest.skip("Skipping test for sqlite clients")
-
-    # Apply the auto_mode fixture
-    request.getfixturevalue("auto_mode")
-
     # Setup project residence state for EMPTY (new project)
     setup_project_residence(clickhouse_client, project_id, ProjectDataResidence.EMPTY)
 
@@ -1152,16 +1107,9 @@ def test_auto_mode_metadata_fields(
 
 
 def test_auto_mode_batch_operations_multiple_calls(
-    clickhouse_client, server, project_id, auto_mode, request
+    clickhouse_client, server, project_id, auto_mode
 ):
     """Test batch operations with multiple calls in AUTO mode."""
-    if clickhouse_client is None:
-        pytest.skip("Skipping test for sqlite clients")
-
-    # Apply the auto_mode fixture
-    request.getfixturevalue("auto_mode")
-
-    # Setup project residence state for EMPTY (new project)
     setup_project_residence(clickhouse_client, project_id, ProjectDataResidence.EMPTY)
 
     # Create 5 start calls
