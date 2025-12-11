@@ -249,6 +249,22 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
                 return tsi.CallReadRes(call=call.to_call_schema())
             return tsi.CallReadRes(call=None)
 
+    def _matches_op_name_filter(self, call_op_name: str, filter_op_names: list[str]) -> bool:
+        """Check if call's op_name matches any of the filter op_names.
+
+        Supports wildcard patterns where :* at the end matches any digest.
+        E.g., "weave:///entity/project/op/name:*" matches any version of that op.
+        """
+        for filter_op in filter_op_names:
+            if filter_op.endswith(":*"):
+                # Wildcard match: check if call_op_name starts with the prefix
+                prefix = filter_op[:-1]  # Remove the "*", keep the ":"
+                if call_op_name.startswith(prefix):
+                    return True
+            elif call_op_name == filter_op:
+                return True
+        return False
+
     def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
         with self._lock:
             project_calls = self._get_project_calls(req.project_id)
@@ -264,10 +280,24 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
                         continue
                     if req.filter.trace_ids and call.trace_id not in req.filter.trace_ids:
                         continue
-                    if req.filter.op_names and call.op_name not in req.filter.op_names:
+                    if req.filter.op_names and not self._matches_op_name_filter(
+                        call.op_name, req.filter.op_names
+                    ):
                         continue
                     if req.filter.parent_ids and call.parent_id not in req.filter.parent_ids:
                         continue
+                    # Check input_refs filter - call must have at least one matching ref
+                    if req.filter.input_refs:
+                        if not any(
+                            ref in call.input_refs for ref in req.filter.input_refs
+                        ):
+                            continue
+                    # Check output_refs filter - call must have at least one matching ref
+                    if req.filter.output_refs:
+                        if not any(
+                            ref in call.output_refs for ref in req.filter.output_refs
+                        ):
+                            continue
 
                 results.append(call.to_call_schema())
 
@@ -515,24 +545,50 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
                 payload=req.payload or {},
             )
 
+    def _extract_weave_ref_from_query(self, query: tsi.Query | None) -> str | None:
+        """Extract weave_ref filter value from a Query if it's a simple equality filter."""
+        if query is None:
+            return None
+        # Handle the common case: {"$expr": {"$eq": [{"$getField": "weave_ref"}, {"$literal": ref}]}}
+        expr = query.expr_
+        if hasattr(expr, "eq_"):
+            eq_args = expr.eq_
+            if len(eq_args) == 2:
+                # Check both orderings of field and literal
+                for i, j in [(0, 1), (1, 0)]:
+                    if hasattr(eq_args[i], "get_field_") and hasattr(
+                        eq_args[j], "literal_"
+                    ):
+                        if eq_args[i].get_field_ == "weave_ref":
+                            return eq_args[j].literal_
+        return None
+
     def feedback_query(self, req: tsi.FeedbackQueryReq) -> tsi.FeedbackQueryRes:
         with self._lock:
             if req.project_id not in self._feedback:
                 return tsi.FeedbackQueryRes(result=[])
 
+            # Extract weave_ref filter if present
+            weave_ref_filter = self._extract_weave_ref_from_query(req.query)
+
             results = []
             for fb in self._feedback[req.project_id].values():
+                # Apply weave_ref filter if present
+                if weave_ref_filter is not None and fb["weave_ref"] != weave_ref_filter:
+                    continue
+
+                # FeedbackQueryRes expects list[dict], not list[Feedback]
                 results.append(
-                    tsi.Feedback(
-                        id=fb["id"],
-                        project_id=fb["project_id"],
-                        weave_ref=fb["weave_ref"],
-                        feedback_type=fb["feedback_type"],
-                        payload=fb["payload"],
-                        creator=fb.get("creator"),
-                        created_at=fb["created_at"],
-                        wb_user_id=fb.get("wb_user_id"),
-                    )
+                    {
+                        "id": fb["id"],
+                        "project_id": fb["project_id"],
+                        "weave_ref": fb["weave_ref"],
+                        "feedback_type": fb["feedback_type"],
+                        "payload": fb["payload"],
+                        "creator": fb.get("creator"),
+                        "created_at": fb["created_at"],
+                        "wb_user_id": fb.get("wb_user_id"),
+                    }
                 )
 
             return tsi.FeedbackQueryRes(result=results)
