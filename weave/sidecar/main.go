@@ -68,6 +68,7 @@ type Sidecar struct {
 	flushChan chan struct{}
 	stopChan  chan struct{}
 	wg        sync.WaitGroup
+	sendWg    sync.WaitGroup // tracks in-flight batch sends for flushSync
 }
 
 func NewSidecar(config Config) *Sidecar {
@@ -238,7 +239,10 @@ func (s *Sidecar) flush() {
 	batch := s.batch
 	s.batch = make([]BatchItem, 0, s.config.FlushMaxCount)
 	s.batchSize = 0
+	s.sendWg.Add(1) // Track this send BEFORE releasing lock
 	s.mu.Unlock()
+
+	defer s.sendWg.Done() // Mark complete when done
 
 	log.Printf("Flushing %d items to backend...", len(batch))
 
@@ -255,13 +259,15 @@ func (s *Sidecar) flush() {
 	}
 }
 
-// flushSync flushes all pending items synchronously and waits for completion
+// flushSync flushes all pending items synchronously and waits for completion.
+// It also waits for any in-flight async flushes to complete before returning.
 func (s *Sidecar) flushSync() {
+	// First, process any items in the current batch
 	for {
 		s.mu.Lock()
 		if len(s.batch) == 0 {
 			s.mu.Unlock()
-			return
+			break
 		}
 
 		// Take the current batch and reset
@@ -279,6 +285,11 @@ func (s *Sidecar) flushSync() {
 			log.Printf("Sync flush: successfully sent %d items", len(batch))
 		}
 	}
+
+	// Wait for any in-flight async flushes to complete
+	// This handles the case where async flush() grabbed the batch before we got here
+	s.sendWg.Wait()
+	log.Printf("Sync flush: complete, all sends finished")
 }
 
 func (s *Sidecar) sendBatch(batch []BatchItem) error {
