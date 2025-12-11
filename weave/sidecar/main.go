@@ -238,7 +238,6 @@ func (s *Sidecar) flush() {
 	batch := s.batch
 	s.batch = make([]BatchItem, 0, s.config.FlushMaxCount)
 	s.batchSize = 0
-	remaining := len(s.batch)
 	s.mu.Unlock()
 
 	log.Printf("Flushing %d items to backend...", len(batch))
@@ -248,6 +247,10 @@ func (s *Sidecar) flush() {
 		log.Printf("Failed to send batch of %d items: %v", len(batch), err)
 		// TODO: Could implement retry logic or disk fallback here
 	} else {
+		// Check if more items arrived while we were flushing
+		s.mu.Lock()
+		remaining := len(s.batch)
+		s.mu.Unlock()
 		log.Printf("Successfully flushed %d items to backend (remaining: %d)", len(batch), remaining)
 	}
 }
