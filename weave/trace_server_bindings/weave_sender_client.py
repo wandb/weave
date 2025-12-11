@@ -77,7 +77,11 @@ class WeaveSenderClient:
         client.disconnect()
     """
 
-    def __init__(self, socket_path: str | Path | None = None):
+    def __init__(
+        self,
+        socket_path: str | Path | None = None,
+        batch_size: int = 100,
+    ):
         self._socket_path = Path(socket_path) if socket_path else _DEFAULT_SOCKET_PATH
         self._socket: socket.socket | None = None
         self._lock = threading.Lock()
@@ -85,6 +89,13 @@ class WeaveSenderClient:
         self._connected = False
         self._initialized = False
         self._process: subprocess.Popen | None = None
+
+        # Batching configuration
+        self._batch_size = batch_size
+
+        # Batch buffer (list of raw JSON strings)
+        self._batch_buffer: list[str] = []
+        self._batch_lock = threading.Lock()
 
     def _ensure_sidecar_running(self) -> None:
         """Ensure the sidecar process is running."""
@@ -302,8 +313,8 @@ class WeaveSenderClient:
     def enqueue_raw_async(self, item_type: str, payload_json: str) -> None:
         """Enqueue a single item with pre-serialized JSON payload (fastest path).
 
-        This avoids double JSON serialization by accepting an already-serialized
-        payload string and embedding it directly in the request.
+        This uses client-side batching to reduce UDS round-trips.
+        Items are buffered and sent in batches when batch_size is reached.
 
         Args:
             item_type: "start" or "end"
@@ -312,28 +323,69 @@ class WeaveSenderClient:
         if not self._initialized:
             raise RuntimeError("Client not initialized. Call init() first.")
 
+        # Build the item JSON string
+        item_json = f'{{"type":"{item_type}","payload":{payload_json}}}'
+
+        items_to_send: list[str] | None = None
+
+        with self._batch_lock:
+            self._batch_buffer.append(item_json)
+
+            # Check if we should flush due to size
+            if len(self._batch_buffer) >= self._batch_size:
+                items_to_send = self._batch_buffer
+                self._batch_buffer = []
+
+        # Send outside the lock to avoid holding it during I/O
+        if items_to_send:
+            self._send_batch_items(items_to_send)
+
+    def _send_batch_items(self, items: list[str]) -> None:
+        """Send a list of pre-built item JSON strings to the Go sidecar."""
+        if not items:
+            return
+
+        items_json = ",".join(items)
+
         with self._lock:
             if not self._connected:
                 self._connect()
 
             if self._socket is None:
-                raise RuntimeError("Not connected to sidecar")
+                return  # Silently drop if not connected
 
             self._request_id += 1
 
-            # Build request manually to embed raw JSON without re-serialization
             request_str = (
                 f'{{"id":{self._request_id},"method":"enqueue",'
-                f'"params":{{"items":[{{"type":"{item_type}","payload":{payload_json}}}]}},'
+                f'"params":{{"items":[{items_json}]}},'
                 f'"no_reply":true}}\n'
             )
-            self._socket.sendall(request_str.encode("utf-8"))
+            try:
+                self._socket.sendall(request_str.encode("utf-8"))
+            except Exception:
+                # Silently drop on error (fire-and-forget)
+                pass
+
+    def _flush_batch(self) -> None:
+        """Flush the current batch to the Go sidecar."""
+        with self._batch_lock:
+            if not self._batch_buffer:
+                return
+            items = self._batch_buffer
+            self._batch_buffer = []
+
+        self._send_batch_items(items)
 
     def flush(self) -> None:
         """Force flush all pending items."""
         if not self._initialized:
             raise RuntimeError("Client not initialized. Call init() first.")
 
+        # First flush the client-side batch
+        self._flush_batch()
+
+        # Then flush the Go sidecar
         self._send_request("flush")
 
     def wait_queue_empty(self) -> None:
@@ -346,6 +398,9 @@ class WeaveSenderClient:
         if not self._initialized:
             raise RuntimeError("Client not initialized. Call init() first.")
 
+        # First flush the client-side batch
+        self._flush_batch()
+
         self._send_request("wait_queue_empty")
 
     def wait_idle(self) -> None:
@@ -356,6 +411,9 @@ class WeaveSenderClient:
         """
         if not self._initialized:
             raise RuntimeError("Client not initialized. Call init() first.")
+
+        # First flush the client-side batch
+        self._flush_batch()
 
         self._send_request("wait_idle")
 
