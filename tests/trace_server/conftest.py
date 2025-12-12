@@ -63,6 +63,13 @@ def pytest_addoption(parser):
             default="remote",
             help="Specify the remote HTTP trace server implementation: remote or stainless",
         )
+        parser.addoption(
+            "--calls-storage-mode",
+            action="store",
+            default="calls_merged",
+            choices=["calls_merged", "calls_complete"],
+            help="Storage mode for calls: 'calls_merged' (legacy) or 'calls_complete' (new)",
+        )
     except ValueError:
         pass
 
@@ -106,6 +113,15 @@ def get_remote_http_trace_server_flag(request):
         str: Either 'remote' for RemoteHTTPTraceServer or 'stainless' for StainlessRemoteHTTPTraceServer
     """
     return request.config.getoption("--remote-http-trace-server")
+
+
+def get_calls_storage_mode(request):
+    """Get the calls storage mode to use.
+
+    Returns:
+        str: Either 'calls_merged' (legacy) or 'calls_complete' (new)
+    """
+    return request.config.getoption("--calls-storage-mode")
 
 
 def _get_worker_db_suffix(request) -> str:
