@@ -5,7 +5,11 @@ import pytest
 
 from weave.trace_server import clickhouse_trace_server_batched as chts
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.project_version.types import CallsStorageServerMode, WriteTarget
+from weave.trace_server.project_version.types import (
+    CallsStorageServerMode,
+    ReadTable,
+    WriteTarget,
+)
 from weave.trace_server.secret_fetcher_context import secret_fetcher_context
 
 
@@ -24,6 +28,14 @@ def test_clickhouse_storage_size_query_generation():
             autospec=True,
         ) as mock_cq,
         patch.object(chts.ClickHouseTraceServer, "_query_stream") as mock_query_stream,
+        patch(
+            "weave.trace_server.project_version.project_version.TableRoutingResolver.resolve_read_table",
+            return_value=ReadTable.CALLS_MERGED,
+        ),
+        patch(
+            "weave.trace_server.project_version.project_version.TableRoutingResolver.resolve_write_target",
+            return_value=WriteTarget.CALLS_MERGED,
+        ),
     ):
         # Create a mock CallsQuery instance
         mock_calls_query = Mock()
@@ -42,8 +54,11 @@ def test_clickhouse_storage_size_query_generation():
             include_total_storage_size=True,
         )
 
-        # Create server instance
+        # Create server instance and mock the ch_client property
         server = chts.ClickHouseTraceServer(host="test_host")
+        # Mock ch_client to prevent actual connection
+        server._thread_local = Mock()
+        server._thread_local.ch_client = Mock()
 
         # Call the method that generates the query and consume the generator
         list(server.calls_query_stream(req))
