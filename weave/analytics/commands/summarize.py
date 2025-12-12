@@ -1,0 +1,271 @@
+"""Summarize command for LLM-powered trace analysis."""
+
+import json
+import sys
+
+import click
+import litellm
+
+from weave.analytics.commands.setup import load_config
+from weave.analytics.header import get_compact_header_for_rich
+from weave.analytics.url_parser import build_trace_url, parse_weave_url
+
+
+def load_env_from_config() -> None:
+    """Load configuration into environment variables."""
+    import os
+
+    config = load_config()
+    for key, value in config.items():
+        if key not in os.environ:
+            os.environ[key] = value
+
+
+def get_api_key_for_model(model: str) -> str:
+    """Get the appropriate API key based on the model provider."""
+    import os
+
+    provider = model.split("/")[0].lower() if "/" in model else "openai"
+
+    provider_env_map = {
+        "openai": "OPENAI_API_KEY",
+        "anthropic": "ANTHROPIC_API_KEY",
+        "claude": "ANTHROPIC_API_KEY",
+        "gemini": "GOOGLE_API_KEY",
+        "google": "GOOGLE_API_KEY",
+    }
+
+    env_var = provider_env_map.get(provider, "OPENAI_API_KEY")
+    api_key = os.getenv(env_var)
+
+    if not api_key:
+        raise ValueError(f"{env_var} not set. Run 'weave analytics setup' first.")
+
+    return api_key
+
+
+@click.command("summarize")
+@click.argument("url")
+@click.option(
+    "--model",
+    default=None,
+    help="LiteLLM model name (default: from config)",
+)
+@click.option(
+    "--depth",
+    default=5,
+    type=int,
+    help="Maximum depth to traverse nested traces",
+)
+@click.option(
+    "--pretty",
+    is_flag=True,
+    help="Pretty print with Rich formatting",
+)
+@click.option(
+    "--output",
+    "-o",
+    type=click.Path(),
+    help="Output file path (default: stdout)",
+)
+def summarize(
+    url: str,
+    model: str | None,
+    depth: int,
+    pretty: bool,
+    output: str | None,
+) -> None:
+    """Generate an LLM-powered summary of a trace.
+
+    Analyzes a trace including its execution tree, latency, token usage,
+    cost, and feedback to provide actionable insights.
+
+    URL should be an individual call URL:
+    https://wandb.ai/entity/project/weave/calls/abc123
+
+    \b
+    Examples:
+        # Summarize a trace
+        weave analytics summarize "https://wandb.ai/my-team/my-project/weave/calls/abc123"
+
+    \b
+        # Use a specific model
+        weave analytics summarize "..." --model openai/gpt-4o
+
+    \b
+        # Save summary to file
+        weave analytics summarize "..." -o summary.md
+    """
+    from rich.console import Console
+    from rich.markdown import Markdown
+    from rich.panel import Panel
+
+    from weave.analytics.clustering import (
+        calculate_duration,
+        extract_cost,
+        extract_token_usage,
+        format_trace_as_tree,
+        get_op_short_name,
+        get_trace_status,
+    )
+    from weave.analytics.prompts import TRACE_SUMMARY_SYSTEM_PROMPT, TRACE_SUMMARY_USER_PROMPT
+    from weave.analytics.spinner import AnalyticsSpinner
+    from weave.analytics.weave_client import AnalyticsWeaveClient, WeaveClientConfig
+
+    # Load config
+    load_env_from_config()
+    config = load_config()
+
+    if model is None:
+        model = config.get("LLM_MODEL", "gemini/gemini-2.5-flash")
+
+    console = Console(stderr=True)
+
+    if pretty:
+        console.print(get_compact_header_for_rich())
+        console.print()
+
+    # Parse URL
+    try:
+        parsed_url = parse_weave_url(url)
+    except ValueError as e:
+        console.print(f"[red]Error:[/red] {e}")
+        sys.exit(1)
+
+    if parsed_url.url_type != "call" or not parsed_url.trace_id:
+        console.print("[red]Error:[/red] Please provide a single call URL (not a trace list URL)")
+        sys.exit(1)
+
+    trace_id = parsed_url.trace_id
+
+    if pretty:
+        console.print(f"[bold cyan]Analyzing trace:[/bold cyan] {trace_id[:20]}...")
+
+    # Initialize Weave client
+    try:
+        client_config = WeaveClientConfig(
+            entity=parsed_url.entity,
+            project=parsed_url.project,
+        )
+        client = AnalyticsWeaveClient(client_config)
+    except ValueError as e:
+        console.print(f"[red]Error:[/red] {e}")
+        sys.exit(1)
+
+    # Fetch the trace and descendants
+    if pretty:
+        spinner = AnalyticsSpinner("Fetching trace data")
+        spinner.start()
+
+    try:
+        traces = client.query_by_call_id(trace_id)
+        if not traces:
+            if pretty:
+                spinner.stop("Trace not found", success=False)
+            console.print(f"[red]Error:[/red] Trace not found: {trace_id}")
+            sys.exit(1)
+        root_trace = traces[0]
+
+        descendants = client.query_descendants_recursive(
+            parent_id=trace_id,
+            max_depth=depth,
+        )
+        all_traces = descendants.get("traces", [])
+        if not any(t["id"] == trace_id for t in all_traces):
+            all_traces.append(root_trace)
+
+        if pretty:
+            spinner.stop(f"Found {len(all_traces)} traces", success=True)
+
+    except Exception as e:
+        if pretty:
+            spinner.stop("Failed to fetch trace", success=False)
+        console.print(f"[red]Error:[/red] {e}")
+        sys.exit(1)
+
+    # Format as tree
+    tree = format_trace_as_tree(
+        root_trace=root_trace,
+        all_traces=all_traces,
+        max_depth=depth,
+        include_inputs=True,
+        include_outputs=True,
+    )
+
+    # Extract metadata
+    op_name = get_op_short_name(root_trace.get("op_name", ""))
+    duration_str, _ = calculate_duration(root_trace)
+    status = get_trace_status(root_trace)
+    token_usage = extract_token_usage(root_trace)
+    cost = extract_cost(root_trace)
+    feedback = root_trace.get("feedback")
+
+    # Build info sections
+    token_info = f"- **Token Usage**: {json.dumps(token_usage)}" if token_usage else ""
+    cost_info = f"- **Cost**: {json.dumps(cost)}" if cost else ""
+    feedback_info = f"- **Feedback**: {json.dumps(feedback)}" if feedback else ""
+
+    # Generate LLM summary
+    if pretty:
+        spinner = AnalyticsSpinner("Generating summary with LLM")
+        spinner.start()
+
+    try:
+        api_key = get_api_key_for_model(model)
+
+        prompt = TRACE_SUMMARY_USER_PROMPT.format(
+            trace_id=trace_id,
+            op_name=op_name,
+            duration=duration_str or "N/A",
+            status=status,
+            token_info=token_info,
+            cost_info=cost_info,
+            feedback_info=feedback_info,
+            execution_trace=tree[:15000],  # Limit tree size
+        )
+
+        response = litellm.completion(
+            model=model,
+            messages=[
+                {"role": "system", "content": TRACE_SUMMARY_SYSTEM_PROMPT},
+                {"role": "user", "content": prompt},
+            ],
+            api_key=api_key,
+        )
+
+        summary = response.choices[0].message.content
+
+        if pretty:
+            spinner.stop("Summary generated", success=True)
+
+    except Exception as e:
+        if pretty:
+            spinner.stop("Failed to generate summary", success=False)
+        console.print(f"[red]Error generating summary:[/red] {e}")
+        sys.exit(1)
+
+    # Output
+    if output:
+        with open(output, "w") as f:
+            f.write(f"# Trace Summary: {trace_id}\n\n")
+            f.write(f"**URL**: {build_trace_url(parsed_url.entity, parsed_url.project, trace_id)}\n\n")
+            f.write(summary)
+        if pretty:
+            console.print(f"\n[green]✓[/green] Saved to [cyan]{output}[/cyan]")
+    else:
+        if pretty:
+            # Show metadata panel
+            meta_info = f"""[bold]Trace ID:[/bold] {trace_id}
+[bold]Operation:[/bold] {op_name}
+[bold]Duration:[/bold] {duration_str or 'N/A'}
+[bold]Status:[/bold] {'[green]success[/green]' if status == 'success' else f'[red]{status}[/red]'}
+[bold]Traces:[/bold] {len(all_traces)}"""
+
+            console.print(Panel(meta_info, title="Trace Info", border_style="cyan"))
+            console.print()
+
+            # Show summary as markdown
+            console.print(Panel(Markdown(summary), title="LLM Summary", border_style="bright_magenta"))
+        else:
+            print(summary)
+
