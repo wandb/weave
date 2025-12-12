@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 """Entry point for Claude Code hook invocations.
 
-This module is invoked by Claude Code hooks to enable real-time
-Weave tracing of sessions. It reads hook events from stdin and
-dispatches to the appropriate handler.
+This module is invoked by Claude Code hooks. It relays events to the
+daemon process, starting the daemon if necessary.
 
 Usage (via hook configuration):
     python -m weave.integrations.claude_plugin.hook
@@ -11,18 +10,7 @@ Usage (via hook configuration):
 Configuration:
     WEAVE_PROJECT: Required. Weave project in "entity/project" format.
     WEAVE_HOOK_DISABLED: Optional. Set to any value to disable tracing.
-    DEBUG: Optional. Set to "1" to enable debug logging to stderr.
-
-Hook events are received as JSON on stdin with the structure:
-    {
-        "hook_event_name": "SessionStart|UserPromptSubmit|Stop|SessionEnd",
-        "session_id": "uuid",
-        "transcript_path": "/path/to/session.jsonl",
-        "cwd": "/working/directory",
-        ...
-    }
-
-Responses (if any) are written to stdout as JSON.
+    DEBUG: Optional. Set to "1" to enable debug logging.
 """
 
 from __future__ import annotations
@@ -34,7 +22,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-# Debug log file - written when DEBUG=1 since Claude Code doesn't capture hook stderr
+# Debug log file
 DEBUG_LOG_FILE = Path("/tmp/weave-claude-debug.log")
 
 
@@ -42,19 +30,14 @@ def setup_logging() -> logging.Logger:
     """Configure logging with optional file output for debugging."""
     level = logging.DEBUG if os.environ.get("DEBUG") else logging.WARNING
 
-    # Create logger for this module
     logger = logging.getLogger(__name__)
     logger.setLevel(level)
-
-    # Clear any existing handlers
     logger.handlers.clear()
 
-    # Always add stderr handler
     stderr_handler = logging.StreamHandler(sys.stderr)
     stderr_handler.setFormatter(logging.Formatter("%(levelname)s: %(message)s"))
     logger.addHandler(stderr_handler)
 
-    # Add file handler in debug mode
     if os.environ.get("DEBUG"):
         try:
             file_handler = logging.FileHandler(DEBUG_LOG_FILE, mode="a")
@@ -63,7 +46,7 @@ def setup_logging() -> logging.Logger:
             )
             logger.addHandler(file_handler)
         except Exception:
-            pass  # Don't fail if we can't write to /tmp
+            pass
 
     return logger
 
@@ -84,11 +67,8 @@ def main() -> None:
     # Get project from environment
     project = os.environ.get("WEAVE_PROJECT")
     if not project:
-        # Silent exit if not configured - don't spam user's terminal
         logger.debug("WEAVE_PROJECT not set, skipping")
         sys.exit(0)
-
-    logger.debug(f"WEAVE_PROJECT: {project}")
 
     # Read hook payload from stdin
     try:
@@ -98,64 +78,83 @@ def main() -> None:
         sys.exit(1)
 
     event_name = payload.get("hook_event_name")
-    session_id = payload.get("session_id", "unknown")
+    session_id = payload.get("session_id")
 
     if not event_name:
         logger.error("Missing hook_event_name in payload")
         sys.exit(1)
 
+    if not session_id:
+        logger.error("Missing session_id in payload")
+        sys.exit(1)
+
     logger.debug(f"Event: {event_name} | Session: {session_id}")
-    logger.debug(f"Payload keys: {list(payload.keys())}")
 
-    # Log additional payload details for UserPromptSubmit to understand image handling
-    if event_name == "UserPromptSubmit":
-        prompt = payload.get("prompt", "")
-        logger.debug(f"UserPromptSubmit prompt preview: {prompt[:100]!r}...")
-        # Check for any image-related keys
-        for key in payload.keys():
-            if "image" in key.lower() or "content" in key.lower() or "pasted" in key.lower():
-                val = payload.get(key)
-                logger.debug(f"  {key}: {type(val).__name__}, len={len(val) if hasattr(val, '__len__') else 'N/A'}")
-
-    # Import handlers here to avoid startup overhead when disabled
-    from weave.integrations.claude_plugin.handlers import (
-        handle_session_end,
-        handle_session_start,
-        handle_stop,
-        handle_subagent_stop,
-        handle_user_prompt_submit,
+    # Import here to avoid startup overhead
+    from weave.integrations.claude_plugin.socket_client import (
+        DaemonClient,
+        ensure_daemon_running,
+    )
+    from weave.integrations.claude_plugin.state import (
+        StateManager,
+        create_session_data,
     )
 
-    handlers = {
-        "SessionStart": handle_session_start,
-        "UserPromptSubmit": handle_user_prompt_submit,
-        "Stop": handle_stop,
-        "SubagentStop": handle_subagent_stop,
-        "SessionEnd": handle_session_end,
-    }
+    # For SessionStart, initialize state before starting daemon
+    if event_name == "SessionStart":
+        transcript_path = payload.get("transcript_path")
+        cwd = payload.get("cwd")
 
-    handler = handlers.get(event_name)
-    if not handler:
-        logger.debug(f"No handler for event: {event_name}")
-        sys.exit(0)
+        with StateManager() as state:
+            existing = state.get_session(session_id)
+            if not existing:
+                session_data = create_session_data(
+                    project=project,
+                    transcript_path=transcript_path,
+                )
+                state.save_session(session_id, session_data, cwd=cwd)
+                logger.debug(f"Initialized state for {session_id}")
 
+    # Get daemon PID from state for liveness check
+    daemon_pid = None
+    with StateManager() as state:
+        session_data = state.get_session(session_id)
+        if session_data:
+            daemon_pid = session_data.get("daemon_pid")
+
+    # Ensure daemon is running
     try:
-        result = handler(payload, project)
-        if result:
-            # Output JSON response for hooks that support it
-            logger.debug(f"Handler returned response: {result}")
-            print(json.dumps(result))
-        else:
-            logger.debug("Handler completed (no response)")
+        client = ensure_daemon_running(session_id, daemon_pid)
     except Exception as e:
-        logger.error(f"Handler error for {event_name}: {e}")
+        logger.error(f"Failed to connect to daemon: {e}")
+        sys.exit(1)
+
+    # Send event to daemon
+    try:
+        # Wait for response on UserPromptSubmit (need trace URL)
+        wait_response = event_name in ("SessionStart", "UserPromptSubmit")
+        response = client.send_event(event_name, payload, wait_response=wait_response)
+
+        if response:
+            logger.debug(f"Daemon response: {response}")
+
+            # Return trace URL for UserPromptSubmit
+            if event_name == "UserPromptSubmit" and response.get("trace_url"):
+                result = {
+                    "hookSpecificOutput": {
+                        "hookEventName": "UserPromptSubmit",
+                        "additionalContext": f"Weave tracing active: {response['trace_url']}",
+                    }
+                }
+                print(json.dumps(result))
+        else:
+            logger.warning("No response from daemon")
+
+    except Exception as e:
+        logger.error(f"Error sending event to daemon: {e}")
         if os.environ.get("DEBUG"):
             import traceback
-
             traceback.print_exc(file=sys.stderr)
-            # Also write to debug log file
-            with open(DEBUG_LOG_FILE, "a") as f:
-                traceback.print_exc(file=f)
         sys.exit(1)
 
 
