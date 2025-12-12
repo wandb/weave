@@ -31,6 +31,7 @@ from weave.analytics.prompts import (
     TRACE_COMPACTION_SYSTEM_PROMPT,
     TRACE_COMPACTION_USER_PROMPT,
     build_execution_trace_section,
+    build_existing_clusters_section,
     build_human_annotations_section,
 )
 from weave.analytics.spinner import AnalyticsSpinner
@@ -580,6 +581,9 @@ async def draft_categorization(
     execution_trace: str | None,
     model: str,
     semaphore: Semaphore,
+    debug: bool = False,
+    console: Any = None,
+    existing_clusters: dict | None = None,
 ) -> dict[str, Any]:
     """Perform first-pass categorization of a single trace."""
     async with semaphore:
@@ -591,13 +595,14 @@ async def draft_categorization(
             trace_metadata = json.dumps(trace_metadata, indent=2, default=str)
 
         execution_trace_section = build_execution_trace_section(execution_trace)
+        existing_clusters_section = build_existing_clusters_section(existing_clusters)
 
         prompt = FIRST_PASS_PROMPT.format(
             trace_input=trace_input,
             trace_output=trace_output,
             trace_metadata=trace_metadata,
             user_context=user_context,
-            human_annotations_section=annotation_section,
+            existing_clusters_section=existing_clusters_section,
             execution_trace_section=execution_trace_section,
         )
 
@@ -627,11 +632,19 @@ async def run_draft_categorization(
     annotation_summary: dict[str, Any],
     deep_trace_analysis: bool = False,
     max_concurrent: int = 10,
+    debug: bool = False,
+    console: Any = None,
+    existing_clusters: dict | None = None,
 ) -> list[dict[str, Any]]:
     """Run first-pass categorization on all traces."""
     semaphore = Semaphore(max_concurrent)
 
     annotation_section = build_human_annotations_section(annotation_summary)
+
+    if debug and console:
+        console.print(f"[dim]Starting draft categorization for {len(traces)} traces with max_concurrent={max_concurrent}[/dim]")
+        if existing_clusters and "clusters" in existing_clusters:
+            console.print(f"[dim]Using {len(existing_clusters['clusters'])} existing cluster definitions[/dim]")
 
     tasks = [
         draft_categorization(
@@ -644,6 +657,9 @@ async def run_draft_categorization(
             execution_trace=trace.get("execution_trace") if deep_trace_analysis else None,
             model=model,
             semaphore=semaphore,
+            debug=debug,
+            console=console,
+            existing_clusters=existing_clusters,
         )
         for trace in traces
     ]
@@ -655,6 +671,8 @@ async def run_draft_categorization(
 async def aggregate_categorizations(
     draft_results: list[dict[str, Any]],
     model: str,
+    debug: bool = False,
+    console: Any = None,
 ) -> ClusteringCategories:
     """Aggregate draft categorizations into clusters."""
     # Build the draft categorizations string
@@ -669,24 +687,38 @@ async def aggregate_categorizations(
 
     num_traces = len(draft_results)
 
+    if debug and console:
+        console.print(f"[dim]Aggregating categorizations from {num_traces} traces...[/dim]")
+
     system_prompt = CLUSTERING_SYSTEM_PROMPT.format(num_traces=num_traces)
     prompt = CLUSTERING_PROMPT.format(
         num_traces=num_traces,
         draft_categorizations_and_notes=draft_str,
     )
 
-    response = await litellm.acompletion(
-        model=model,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": prompt},
-        ],
-        response_format=ClusteringCategories,
-        api_key=get_api_key_for_model(model),
-    )
+    if debug and console:
+        console.print(f"[dim]Calling LLM for clustering aggregation...[/dim]")
 
-    result = json.loads(response.choices[0].message.content)
-    return ClusteringCategories(**result)
+    try:
+        response = await litellm.acompletion(
+            model=model,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt},
+            ],
+            response_format=ClusteringCategories,
+            api_key=get_api_key_for_model(model),
+        )
+
+        if debug and console:
+            console.print(f"[dim]✓ Clustering aggregation complete[/dim]")
+
+        result = json.loads(response.choices[0].message.content)
+        return ClusteringCategories(**result)
+    except Exception as e:
+        if debug and console:
+            console.print(f"[red]✗ Error during clustering aggregation: {e}[/red]")
+        raise
 
 
 @weave.op
@@ -701,9 +733,14 @@ async def final_classification(
     categories_str: str,
     model: str,
     semaphore: Semaphore,
+    debug: bool = False,
+    console: Any = None,
 ) -> dict[str, Any]:
     """Perform final classification of a trace into categories."""
     async with semaphore:
+        if debug and console:
+            console.print(f"[dim]  → Classifying trace {trace_id[:8]}...[/dim]")
+
         if isinstance(trace_input, dict):
             trace_input = json.dumps(trace_input, indent=2, default=str)
         if isinstance(trace_output, dict):
@@ -736,7 +773,7 @@ async def final_classification(
         result = json.loads(response.choices[0].message.content)
         return {
             "trace_id": trace_id,
-            "pattern_category": result.get("pattern_category", "other"),
+            "pattern_categories": result.get("pattern_categories", []),
             "categorization_reason": result.get("categorization_reason", ""),
             "thinking": result.get("thinking", ""),
         }
@@ -751,6 +788,8 @@ async def run_final_classification(
     annotation_summary: dict[str, Any],
     deep_trace_analysis: bool = False,
     max_concurrent: int = 10,
+    debug: bool = False,
+    console: Any = None,
 ) -> list[dict[str, Any]]:
     """Run final classification on all traces."""
     semaphore = Semaphore(max_concurrent)
@@ -764,6 +803,9 @@ async def run_final_classification(
         categories_str += f"**Definition:** {cat.pattern_category_definition}\n"
         categories_str += f"**Notes:** {cat.pattern_category_notes}\n"
 
+    if debug and console:
+        console.print(f"[dim]Starting final classification for {len(traces)} traces with {len(categories)} categories[/dim]")
+
     tasks = [
         final_classification(
             trace_id=trace.get("id", ""),
@@ -776,6 +818,8 @@ async def run_final_classification(
             categories_str=categories_str,
             model=model,
             semaphore=semaphore,
+            debug=debug,
+            console=console,
         )
         for trace in traces
     ]
@@ -878,6 +922,8 @@ async def run_clustering_pipeline(
     nesting_depth: int = 3,
     compaction_model: str | None = None,
     max_trace_tokens: int = 10000,
+    existing_clusters: dict | None = None,
+    url: str = "",
 ) -> ClusterOutput:
     """Run the full clustering pipeline.
 
@@ -901,6 +947,16 @@ async def run_clustering_pipeline(
     """
     use_console = console is not None
     compaction_model = compaction_model or model
+
+    # Debug output for configuration
+    if debug and console:
+        console.print(f"\n[dim]═══ Clustering Pipeline Configuration ═══[/dim]")
+        console.print(f"[dim]Model: {model}[/dim]")
+        console.print(f"[dim]Max concurrent: {max_concurrent}[/dim]")
+        console.print(f"[dim]Deep trace analysis: {deep_trace_analysis}[/dim]")
+        if existing_clusters:
+            console.print(f"[dim]Existing clusters loaded: {len(existing_clusters.get('clusters', []))}[/dim]")
+        console.print(f"[dim]═══════════════════════════════════════[/dim]\n")
 
     # If no user context provided, use a generic one
     if not user_context:
@@ -953,10 +1009,26 @@ async def run_clustering_pipeline(
         annotation_summary=annotation_summary,
         deep_trace_analysis=deep_trace_analysis,
         max_concurrent=max_concurrent,
+        debug=debug,
+        console=console if debug else None,
+        existing_clusters=existing_clusters,
     )
 
     if use_console:
         spinner.stop(f"Completed {len(draft_results)} draft categorizations", success=True)
+
+    # Load existing cluster definitions if provided
+    existing_categories = []
+    if existing_clusters and "clusters" in existing_clusters:
+        for cluster in existing_clusters["clusters"]:
+            existing_categories.append(
+                Category(
+                    thinking="Existing cluster definition from input file",
+                    pattern_category_name=cluster.get("cluster_name", ""),
+                    pattern_category_definition=cluster.get("cluster_definition", ""),
+                    pattern_category_notes=f"Predefined cluster from {existing_clusters.get('name', 'input file')}",
+                )
+            )
 
     # Collect unique candidate categories
     unique_categories: set[str] = set()
@@ -964,7 +1036,7 @@ async def run_clustering_pipeline(
         for cat in result.get("categories", []):
             unique_categories.add(cat.get("category_name", "unknown"))
 
-    # Step 2: Aggregate into clusters
+    # Step 2: Aggregate into clusters (to discover new categories)
     if use_console:
         console.print("\n[bold cyan]Step 4: Review & Clustering[/bold cyan]")
         console.print(
@@ -976,20 +1048,15 @@ async def run_clustering_pipeline(
     clustering_result = await aggregate_categorizations(
         draft_results=draft_results,
         model=model,
+        debug=debug,
+        console=console if debug else None,
     )
 
     if use_console:
         spinner.stop("Review completed successfully", success=True)
 
-    # Add "other" category
-    all_categories = clustering_result.pattern_categories + [
-        Category(
-            thinking="Default category",
-            pattern_category_name="other",
-            pattern_category_definition="Traces that don't fit other categories",
-            pattern_category_notes="Default fallback category",
-        )
-    ]
+    # Merge existing and newly discovered categories
+    all_categories = existing_categories + clustering_result.pattern_categories
 
     # Show discovered categories in debug mode
     if debug and use_console:
@@ -1013,28 +1080,34 @@ async def run_clustering_pipeline(
         annotation_summary=annotation_summary,
         deep_trace_analysis=deep_trace_analysis,
         max_concurrent=max_concurrent,
+        debug=debug,
+        console=console if debug else None,
     )
 
     if use_console:
         spinner.stop("Classification complete", success=True)
 
-    # Build output structure
+    # Build output structure - traces can belong to multiple clusters
     clusters_by_category: dict[str, list[ClusterResult]] = {}
     category_info: dict[str, Category] = {cat.pattern_category_name: cat for cat in all_categories}
 
     for result in classification_results:
-        cat_name = result["pattern_category"]
-        if cat_name not in clusters_by_category:
-            clusters_by_category[cat_name] = []
+        # Each trace can have multiple categories
+        categories = result.get("pattern_categories", [])
 
-        clusters_by_category[cat_name].append(
-            ClusterResult(
-                trace_id=result["trace_id"],
-                pattern_category=cat_name,
-                categorization_reason=result["categorization_reason"],
-                trace_url=build_trace_url(entity, project, result["trace_id"]),
+        # If the trace has categories, add it to each one
+        for cat_name in categories:
+            if cat_name not in clusters_by_category:
+                clusters_by_category[cat_name] = []
+
+            clusters_by_category[cat_name].append(
+                ClusterResult(
+                    trace_id=result["trace_id"],
+                    pattern_category=cat_name,
+                    categorization_reason=result["categorization_reason"],
+                    trace_url=build_trace_url(entity, project, result["trace_id"]),
+                )
             )
-        )
 
     # Create cluster groups sorted by count
     total_traces = len(traces)

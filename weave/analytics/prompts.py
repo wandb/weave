@@ -92,7 +92,7 @@ you better understand what the user is trying to achieve with their AI system.
 {user_context}
 </user_context>
 
-{human_annotations_section}
+{existing_clusters_section}
 
 ## Trace Data
 
@@ -186,18 +186,19 @@ FINAL_CLASSIFICATION_SYSTEM_PROMPT = """
 
 You are a helpful assistant that classifies traces into predefined pattern categories.
 
-Your task is to analyze a single trace and classify it into one of the provided pattern categories.
+Your task is to analyze a single trace and classify it into zero or more of the provided pattern categories.
 
 ## Important Notes:
-- You must select exactly ONE category from the provided list
-- If the trace doesn't clearly fit into any of the predefined categories, classify it as "other"
+- A trace can belong to MULTIPLE categories if it exhibits multiple patterns
+- If the trace has NO ERRORS or issues, the pattern_categories list should be EMPTY
+- Only assign categories that are clearly supported by the trace data
 - Base your classification on the actual trace data, not on assumptions
 - Consider the user context to better understand the nature of the behavior or issue
 """
 
 FINAL_CLASSIFICATION_PROMPT = """
 Given the following trace data and the list of available pattern categories, \
-classify this specific trace into the most appropriate category.
+classify this specific trace into zero or more appropriate categories.
 
 ## User Context
 
@@ -232,8 +233,12 @@ classify this specific trace into the most appropriate category.
 
 ## Task
 
-Analyze the above trace and classify it into ONE of the available categories. \
-If none of the categories are appropriate, classify it as "other".
+Analyze the above trace and classify it into ZERO or MORE of the available categories.
+
+Important:
+- A trace can belong to multiple categories if it exhibits multiple patterns
+- If the trace has NO ERRORS or issues, return an empty list for pattern_categories
+- Only assign categories that are clearly supported by the evidence in the trace data
 """
 
 # =============================================================================
@@ -370,3 +375,36 @@ def build_execution_trace_section(execution_trace: str | None) -> str:
         return ""
 
     return EXECUTION_TRACE_SECTION.format(execution_trace=execution_trace)
+
+
+def build_existing_clusters_section(existing_clusters: dict | None) -> str:
+    """Build the existing clusters section for prompts.
+
+    Args:
+        existing_clusters: Dictionary containing existing cluster definitions, or None
+
+    Returns:
+        Formatted string for the existing clusters section, or empty string if no clusters
+    """
+    if not existing_clusters or "clusters" not in existing_clusters:
+        return ""
+
+    clusters_list = existing_clusters["clusters"]
+    if not clusters_list:
+        return ""
+
+    section = """
+## Existing Cluster Definitions
+
+The following cluster definitions already exist. When categorizing traces, prefer using these \
+existing categories if the trace clearly matches one of them. You can still create new categories \
+if the trace exhibits a distinct pattern not covered by the existing ones.
+
+"""
+    for i, cluster in enumerate(clusters_list):
+        cluster_name = cluster.get("cluster_name", "unknown")
+        cluster_def = cluster.get("cluster_definition", "")
+        section += f"### Existing Category {i + 1}: {cluster_name}\n"
+        section += f"{cluster_def}\n\n"
+
+    return section
