@@ -1,0 +1,8 @@
+{
+  "name": "weave-tracing",
+  "version": "0.1.0",
+  "description": "Real-time Weave tracing for Claude Code sessions",
+  "author": {
+    "name": "Weights & Biases"
+  }
+}
