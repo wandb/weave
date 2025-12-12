@@ -81,3 +81,45 @@ class TestDaemonClient:
 
         # Non-existent PID should not be alive
         assert not client.is_process_alive(999999999)
+
+
+class TestSubagentTracker:
+    """Test SubagentTracker dataclass."""
+
+    def test_subagent_tracker_is_tailing_false_when_no_call_id(self):
+        """SubagentTracker.is_tailing returns False until subagent_call_id is set."""
+        from datetime import datetime, timezone
+
+        from weave.integrations.claude_plugin.daemon import SubagentTracker
+
+        tracker = SubagentTracker(
+            tool_use_id="tool-123",
+            turn_call_id="turn-456",
+            detected_at=datetime.now(timezone.utc),
+            parent_session_id="session-789",
+        )
+
+        assert tracker.is_tailing is False
+        assert tracker.agent_id is None
+        assert tracker.transcript_path is None
+
+    def test_subagent_tracker_is_tailing_true_when_call_id_set(self):
+        """SubagentTracker.is_tailing returns True once subagent_call_id is set."""
+        from datetime import datetime, timezone
+        from pathlib import Path
+
+        from weave.integrations.claude_plugin.daemon import SubagentTracker
+
+        tracker = SubagentTracker(
+            tool_use_id="tool-123",
+            turn_call_id="turn-456",
+            detected_at=datetime.now(timezone.utc),
+            parent_session_id="session-789",
+        )
+
+        # Simulate finding the file
+        tracker.agent_id = "abc12345"
+        tracker.transcript_path = Path("/tmp/agent-abc12345.jsonl")
+        tracker.subagent_call_id = "weave-call-xyz"
+
+        assert tracker.is_tailing is True

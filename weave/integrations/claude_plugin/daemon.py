@@ -58,10 +58,12 @@ logger = setup_logging()
 # Import after logging setup
 import weave
 from weave.trace.context.weave_client_context import require_weave_client
+from weave.trace.view_utils import set_call_view
 
 from weave.integrations.claude_plugin.session_parser import (
     Session,
     Turn,
+    is_system_message,
     parse_session_file,
 )
 from weave.integrations.claude_plugin.socket_client import get_socket_path
@@ -72,9 +74,33 @@ from weave.integrations.claude_plugin.utils import (
     truncate,
 )
 from weave.integrations.claude_plugin.diff_view import generate_turn_diff_html
+from dataclasses import dataclass
+from datetime import datetime, timezone
 
 # Inactivity timeout (10 minutes)
 INACTIVITY_TIMEOUT = 600
+
+
+@dataclass
+class SubagentTracker:
+    """Tracks a subagent through its lifecycle: pending -> tailing -> finished."""
+
+    # Set at detection time (Task tool with subagent_type)
+    tool_use_id: str
+    turn_call_id: str
+    detected_at: datetime
+    parent_session_id: str
+
+    # Set once file is found and matched
+    agent_id: str | None = None
+    transcript_path: Path | None = None
+    subagent_call_id: str | None = None
+    last_processed_line: int = 0
+
+    @property
+    def is_tailing(self) -> bool:
+        """True if we've found the file and started tailing."""
+        return self.subagent_call_id is not None
 
 
 class WeaveDaemon:
@@ -103,6 +129,8 @@ class WeaveDaemon:
         self.total_tool_calls: int = 0
         self.tool_counts: dict[str, int] = {}
         self._current_turn_tool_calls: list[str] = []
+        # Track pending subagent Task tool calls: tool_use_id -> turn_call_id
+        self._pending_subagent_tasks: dict[str, str] = {}
 
     async def start(self) -> None:
         """Start the daemon."""
@@ -158,11 +186,20 @@ class WeaveDaemon:
             session_data["daemon_pid"] = os.getpid()
             state.save_session(self.session_id, session_data)
 
-        logger.debug(f"Loaded state: project={self.project}, transcript={self.transcript_path}")
+        logger.info(
+            f"Loaded state: project={self.project}, "
+            f"last_processed_line={self.last_processed_line}, "
+            f"turn_number={self.turn_number}, "
+            f"session_call_id={self.session_call_id}"
+        )
         return True
 
     def _save_state(self) -> None:
         """Save current state to file."""
+        logger.info(
+            f"Saving state: last_processed_line={self.last_processed_line}, "
+            f"turn_number={self.turn_number}"
+        )
         with StateManager() as state:
             session_data = state.get_session(self.session_id) or {}
             session_data.update({
@@ -289,6 +326,17 @@ class WeaveDaemon:
         user_prompt = payload.get("prompt", "")
         cwd = payload.get("cwd")
 
+        # If prompt is empty or system-like (warmup subagent), find real first user prompt
+        # This handles the case where Claude fires warmup subagents before the actual user prompt
+        if not user_prompt or is_system_message(user_prompt):
+            if self.transcript_path and self.transcript_path.exists():
+                session = parse_session_file(self.transcript_path)
+                if session:
+                    real_prompt = session.first_user_prompt()
+                    if real_prompt:
+                        user_prompt = real_prompt
+                        logger.debug(f"Using real first prompt from transcript: {user_prompt[:50]!r}")
+
         # Generate session name
         display_name, suggested_branch = generate_session_name(user_prompt)
 
@@ -323,7 +371,10 @@ class WeaveDaemon:
         return {"status": "ok", "trace_url": self.trace_url}
 
     async def _handle_stop(self, payload: dict[str, Any]) -> dict[str, Any]:
-        """Handle Stop - finish current turn with full data."""
+        """Handle Stop - finish current turn with full data.
+
+        In DEBUG mode, also triggers daemon shutdown to pick up code changes.
+        """
         # Process remaining lines from session file to capture turn data
         await self._process_session_file()
 
@@ -332,16 +383,209 @@ class WeaveDaemon:
             await self._finish_current_turn()
 
         self._save_state()
+
+        # In DEBUG mode, shutdown after each turn to pick up code changes
+        if os.environ.get("DEBUG"):
+            logger.info("DEBUG mode: shutting down daemon to reload code")
+            self.running = False
+
         return {"status": "ok"}
 
     async def _handle_subagent_stop(self, payload: dict[str, Any]) -> dict[str, Any]:
-        """Handle SubagentStop - process subagent transcript."""
-        transcript_path = payload.get("transcript_path")
-        if not transcript_path:
-            return {"status": "error", "message": "No transcript_path"}
+        """Handle SubagentStop - process subagent transcript and create trace.
 
-        # TODO: Implement subagent processing
-        logger.debug(f"SubagentStop for {transcript_path}")
+        Creates a subagent call as a child of the TURN (not session) with:
+        - For simple subagents (single turn): tool calls directly under subagent
+        - For complex subagents (multiple turns/user interaction): turn hierarchy preserved
+        - Final response captured in output
+        """
+        # Claude Code sends agent_transcript_path for the subagent's file
+        # (transcript_path is the parent session's file)
+        transcript_path = payload.get("agent_transcript_path")
+        agent_id_from_payload = payload.get("agent_id")
+        logger.info(f"SubagentStop: agent_transcript_path={transcript_path}, agent_id={agent_id_from_payload}")
+
+        if not transcript_path:
+            logger.warning("SubagentStop: missing agent_transcript_path in payload")
+            return {"status": "error", "message": "No agent_transcript_path"}
+
+        # Verify the file exists and log its name
+        path = Path(transcript_path)
+        logger.info(f"SubagentStop: file exists={path.exists()}, filename={path.name}")
+
+        # Parse the subagent transcript
+        agent_session = parse_session_file(path)
+        if not agent_session:
+            logger.warning(f"SubagentStop: failed to parse {transcript_path}")
+            return {"status": "ok"}
+
+        # Log what we parsed to help debug
+        logger.info(
+            f"SubagentStop: parsed session_id={agent_session.session_id}, "
+            f"agent_id={agent_session.agent_id}, "
+            f"is_sidechain={agent_session.is_sidechain}, "
+            f"turns={len(agent_session.turns)}"
+        )
+        first_prompt_preview = (agent_session.first_user_prompt() or "")[:100]
+        logger.info(f"SubagentStop: first_prompt={first_prompt_preview!r}")
+
+        if not agent_session.turns:
+            logger.debug(f"SubagentStop: no turns in {transcript_path}")
+            return {"status": "ok"}
+
+        if not self.weave_client or not self.session_call_id:
+            return {"status": "error", "message": "No active session"}
+
+        # Build display name: "SubAgent: {prompt}"
+        # Use agent_id from payload as fallback (more reliable than parsed)
+        agent_id = agent_session.agent_id or agent_id_from_payload or "unknown"
+        first_prompt = agent_session.first_user_prompt() or ""
+        if first_prompt:
+            display_name = f"SubAgent: {truncate(first_prompt, 50)}"
+        else:
+            display_name = f"SubAgent: {agent_id}"
+
+        from weave.trace.call import Call
+
+        # Determine parent: prefer current turn, fall back to session
+        # This attaches the subagent to the turn that spawned it, not the session
+        parent_id = self.current_turn_call_id or self.session_call_id
+        parent_call = Call(
+            _op_name="",
+            project_id=self.weave_client._project_id(),
+            trace_id=self.trace_id,
+            parent_id=self.session_call_id if self.current_turn_call_id else None,
+            inputs={},
+            id=parent_id,
+        )
+
+        # Create subagent call as child of turn (or session if no turn)
+        subagent_call = self.weave_client.create_call(
+            op="claude_code.subagent",
+            inputs={
+                "agent_id": agent_id,
+                "prompt": truncate(first_prompt, 2000),
+            },
+            parent=parent_call,
+            display_name=display_name,
+            attributes={"agent_id": agent_id, "is_sidechain": True},
+            use_stack=False,
+        )
+
+        # Collect all tool calls and counts
+        tool_counts: dict[str, int] = {}
+
+        # Check if this is a "simple" subagent (single turn, no user interaction)
+        # Simple subagents get a flat structure: tool calls directly under subagent
+        # Complex subagents (multiple turns) preserve the turn hierarchy
+        is_simple_subagent = len(agent_session.turns) == 1
+
+        if is_simple_subagent:
+            # Flat structure: tool calls directly under subagent
+            turn = agent_session.turns[0]
+            for tool_call in turn.all_tool_calls():
+                tool_name = tool_call.name
+
+                # Sanitize input
+                sanitized_input = {}
+                for k, v in tool_call.input.items():
+                    if isinstance(v, str) and len(v) > 5000:
+                        sanitized_input[k] = truncate(v)
+                    else:
+                        sanitized_input[k] = v
+
+                tool_display = get_tool_display_name(tool_name, tool_call.input)
+
+                weave.log_call(
+                    op=f"claude_code.tool.{tool_name}",
+                    inputs=sanitized_input,
+                    output={"result": truncate(str(tool_call.result), 5000)} if tool_call.result else None,
+                    attributes={"tool_name": tool_name},
+                    display_name=tool_display,
+                    parent=subagent_call,
+                    use_stack=False,
+                )
+                tool_counts[tool_name] = tool_counts.get(tool_name, 0) + 1
+        else:
+            # Complex subagent: preserve turn hierarchy
+            for turn_idx, turn in enumerate(agent_session.turns, 1):
+                turn_prompt = turn.user_message.content if turn.user_message else ""
+                turn_preview = truncate(turn_prompt, 50) or f"Turn {turn_idx}"
+
+                # Create turn call as child of subagent
+                turn_call = self.weave_client.create_call(
+                    op="claude_code.turn",
+                    inputs={"user_message": truncate(turn_prompt, 5000)},
+                    parent=subagent_call,
+                    display_name=f"Turn {turn_idx}: {turn_preview}",
+                    attributes={"turn_number": turn_idx},
+                    use_stack=False,
+                )
+
+                # Log tool calls as children of turn
+                for tool_call in turn.all_tool_calls():
+                    tool_name = tool_call.name
+
+                    # Sanitize input
+                    sanitized_input = {}
+                    for k, v in tool_call.input.items():
+                        if isinstance(v, str) and len(v) > 5000:
+                            sanitized_input[k] = truncate(v)
+                        else:
+                            sanitized_input[k] = v
+
+                    tool_display = get_tool_display_name(tool_name, tool_call.input)
+
+                    weave.log_call(
+                        op=f"claude_code.tool.{tool_name}",
+                        inputs=sanitized_input,
+                        output={"result": truncate(str(tool_call.result), 5000)} if tool_call.result else None,
+                        attributes={"tool_name": tool_name},
+                        display_name=tool_display,
+                        parent=turn_call,
+                        use_stack=False,
+                    )
+                    tool_counts[tool_name] = tool_counts.get(tool_name, 0) + 1
+
+                # Finish turn call with response and usage
+                turn_response = None
+                if turn.assistant_messages:
+                    turn_response = turn.assistant_messages[-1].get_text()
+
+                turn_usage = turn.total_usage()
+                self.weave_client.finish_call(
+                    turn_call,
+                    output={
+                        "response": truncate(turn_response, 5000) if turn_response else None,
+                        "usage": turn_usage.to_weave_usage() if turn_usage else None,
+                        "tool_call_count": len(turn.all_tool_calls()),
+                    },
+                )
+
+        # Get final assistant output for subagent summary
+        final_output = None
+        if agent_session.turns:
+            last_turn = agent_session.turns[-1]
+            if last_turn.assistant_messages:
+                final_output = last_turn.assistant_messages[-1].get_text()
+
+        # Aggregate token usage across all turns
+        total_usage = agent_session.total_usage()
+
+        # Finish subagent call with aggregated output
+        self.weave_client.finish_call(
+            subagent_call,
+            output={
+                "response": truncate(final_output, 10000) if final_output else None,
+                "turn_count": len(agent_session.turns),
+                "tool_call_count": sum(tool_counts.values()),
+                "tool_counts": tool_counts,
+                "usage": total_usage.to_weave_usage() if total_usage else None,
+            },
+        )
+        self.weave_client.flush()
+
+        logger.info(f"Created subagent trace: {agent_id} with {sum(tool_counts.values())} tool calls")
         return {"status": "ok"}
 
     async def _handle_session_end(self, payload: dict[str, Any]) -> dict[str, Any]:
@@ -446,12 +690,7 @@ class WeaveDaemon:
         if not self.weave_client or not self.session_call_id:
             return
 
-        # Check for interrupted previous turn
-        if self.current_turn_call_id:
-            # Previous turn was interrupted - finish it
-            await self._finish_current_turn(interrupted=True)
-
-        # Parse user content and images
+        # Parse user content and images first to check if this is a real prompt
         msg_data = obj.get("message", {})
         content = msg_data.get("content", "")
         user_text = ""
@@ -478,9 +717,14 @@ class WeaveDaemon:
                             logger.debug(f"Failed to parse image: {e}")
             user_text = "\n".join(text_parts)
 
-        # Skip if no real content (tool results only)
+        # Skip if no real content (tool results only) - don't trigger interruption check
         if not user_text.strip():
             return
+
+        # Check for interrupted previous turn - only for actual new user prompts
+        if self.current_turn_call_id:
+            # Previous turn was interrupted - finish it
+            await self._finish_current_turn(interrupted=True)
 
         # Increment turn number
         self.turn_number += 1
@@ -552,6 +796,14 @@ class WeaveDaemon:
                 tool_input = c.get("input", {})
                 tool_id = c.get("id", "")
 
+                # Skip Task tools with subagent_type - they'll be handled by SubagentStop
+                # This prevents duplicate logging (once as tool, once as subagent)
+                if tool_name == "Task" and tool_input.get("subagent_type"):
+                    # Track this for SubagentStop to know which turn to attach to
+                    self._pending_subagent_tasks[tool_id] = self.current_turn_call_id
+                    logger.debug(f"Skipping Task tool with subagent_type, will be handled by SubagentStop: {tool_id}")
+                    continue
+
                 # Sanitize input
                 sanitized_input = {}
                 for k, v in tool_input.items():
@@ -584,7 +836,7 @@ class WeaveDaemon:
                 logger.debug(f"Created tool call: {tool_name}")
 
     async def _finish_current_turn(self, interrupted: bool = False) -> None:
-        """Finish the current turn call."""
+        """Finish the current turn call with file snapshots and diff view."""
         if not self.weave_client or not self.current_turn_call_id:
             return
 
@@ -599,20 +851,80 @@ class WeaveDaemon:
             id=self.current_turn_call_id,
         )
 
-        # Parse session file to get turn data
-        turn_data = await self._get_current_turn_data()
+        # Parse session file to get turn and session data
+        session, turn, turn_index = await self._get_current_turn_data()
 
         output: dict[str, Any] = {}
         if interrupted:
             output["interrupted"] = True
+            output["status"] = "[interrupted]"
 
-        if turn_data:
+        if turn:
+            usage = turn.total_usage()
+
+            # Collect assistant text
+            assistant_text = ""
+            for msg in turn.assistant_messages:
+                text = msg.get_text()
+                if text:
+                    assistant_text += text + "\n"
+
             output.update({
-                "model": turn_data.get("model"),
-                "usage": turn_data.get("usage"),
-                "response": turn_data.get("response"),
-                "tool_call_count": turn_data.get("tool_call_count", 0),
+                "model": turn.primary_model(),
+                "usage": usage.to_weave_usage(),
+                "response": truncate(assistant_text.strip()),
+                "tool_call_count": len(turn.all_tool_calls()),
+                "duration_ms": turn.duration_ms(),
             })
+
+            # Load file backups as Content objects
+            # Only include backups created DURING this turn (by backup_time)
+            if turn.file_backups and session:
+                from weave.type_wrappers.Content.content import Content
+                file_snapshots: dict[str, Content] = {}
+                turn_start = turn.started_at()
+                # Get next turn's start time as upper bound, or use a far future date
+                next_turn_start = None
+                if turn_index + 1 < len(session.turns):
+                    next_turn_start = session.turns[turn_index + 1].started_at()
+
+                for fb in turn.file_backups:
+                    # Filter: only include backups created during this turn's window
+                    if fb.backup_time < turn_start:
+                        continue  # Backup from before this turn
+                    if next_turn_start and fb.backup_time >= next_turn_start:
+                        continue  # Backup from a later turn
+
+                    content = fb.load_content(session.session_id)
+                    if content:
+                        file_snapshots[fb.file_path] = content
+
+                if file_snapshots:
+                    output["file_snapshots"] = file_snapshots
+                    logger.debug(f"Captured {len(file_snapshots)} file snapshots")
+
+            # Generate diff HTML for summary view
+            if session:
+                diff_html = generate_turn_diff_html(
+                    turn=turn,
+                    turn_index=turn_index,
+                    all_turns=session.turns,
+                    session_id=session.session_id,
+                    turn_number=turn_index + 1,  # Display as 1-based
+                    tool_count=len(turn.all_tool_calls()),
+                    model=turn.primary_model(),
+                )
+
+                if diff_html:
+                    set_call_view(
+                        call=turn_call,
+                        client=self.weave_client,
+                        name="file_changes",
+                        content=diff_html,
+                        extension="html",
+                        mimetype="text/html",
+                    )
+                    logger.debug("Attached diff HTML view to turn")
 
         self.weave_client.finish_call(turn_call, output=output)
         self.weave_client.flush()
@@ -620,33 +932,25 @@ class WeaveDaemon:
         logger.debug(f"Finished turn {self.turn_number}")
         self.current_turn_call_id = None
 
-    async def _get_current_turn_data(self) -> dict[str, Any] | None:
-        """Get data for the current turn from the session file."""
+    async def _get_current_turn_data(self) -> tuple[Session | None, Turn | None, int]:
+        """Get data for the current turn from the session file.
+
+        Returns:
+            Tuple of (session, turn, turn_index) where turn_index is 0-based
+        """
         if not self.transcript_path:
-            return None
+            return None, None, 0
 
         # Re-parse session file to get latest turn data
         session = parse_session_file(self.transcript_path)
         if not session or not session.turns:
-            return None
+            return None, None, 0
 
         # Get the latest turn (should be current)
-        turn = session.turns[-1]
-        usage = turn.total_usage()
+        turn_index = len(session.turns) - 1
+        turn = session.turns[turn_index]
 
-        # Collect assistant text
-        assistant_text = ""
-        for msg in turn.assistant_messages:
-            text = msg.get_text()
-            if text:
-                assistant_text += text + "\n"
-
-        return {
-            "model": turn.primary_model(),
-            "usage": usage.to_weave_usage(),
-            "response": truncate(assistant_text.strip()),
-            "tool_call_count": len(turn.all_tool_calls()),
-        }
+        return session, turn, turn_index
 
     async def _run_inactivity_checker(self) -> None:
         """Check for inactivity and shutdown if idle too long."""
