@@ -606,3 +606,38 @@ class TestCleanupStaleSubagentTrackers:
         assert "stale-tool" not in daemon._subagent_trackers
         # Fresh tracker should remain
         assert "fresh-tool" in daemon._subagent_trackers
+
+
+class TestCleanupIntegration:
+    """Test cleanup integration in file tailer loop."""
+
+    @pytest.mark.anyio
+    async def test_file_tailer_calls_cleanup(self):
+        """File tailer loop calls _cleanup_stale_subagent_trackers."""
+        from pathlib import Path
+
+        from weave.integrations.claude_plugin.daemon import WeaveDaemon
+
+        daemon = WeaveDaemon("test-session")
+        daemon.transcript_path = Path("/tmp/test.jsonl")
+        daemon.running = True
+
+        cleanup_calls = []
+
+        def mock_cleanup():
+            cleanup_calls.append(1)
+
+        async def mock_process():
+            # Stop daemon after first iteration
+            daemon.running = False
+
+        async def noop():
+            pass
+
+        daemon._cleanup_stale_subagent_trackers = mock_cleanup
+        daemon._process_session_file = mock_process
+        daemon._scan_for_subagent_files = noop
+
+        await daemon._run_file_tailer()
+
+        assert len(cleanup_calls) == 1
