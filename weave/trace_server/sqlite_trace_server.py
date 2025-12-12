@@ -713,6 +713,11 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
         return iter(self.calls_query(req).calls)
 
+    def calls_export_parquet_stream(
+        self, req: tsi.CallsExportParquetReq
+    ) -> Iterator[bytes]:
+        raise NotImplementedError("Parquet export requires ClickHouse backend")
+
     def calls_query_stats(self, req: tsi.CallsQueryStatsReq) -> tsi.CallsQueryStatsRes:
         if req.limit is not None and req.limit < 1:
             raise ValueError("Limit must be a positive integer")

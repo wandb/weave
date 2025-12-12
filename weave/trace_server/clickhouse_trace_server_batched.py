@@ -757,6 +757,115 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                             val["_ref"] = ref.uri()
                         set_nested_key(calls[i], col, val)
 
+    def _raw_query_stream(
+        self,
+        query: str,
+        parameters: dict[str, Any],
+        fmt: str = "Parquet",
+        settings: dict[str, Any] | None = None,
+    ) -> Iterator[bytes]:
+        """Stream raw bytes from ClickHouse in specified format.
+
+        This bypasses Python object conversion and streams the raw format
+        directly from ClickHouse (e.g., Parquet, Arrow, CSV).
+        """
+        if not settings:
+            settings = {}
+        settings.update(ch_settings.CLICKHOUSE_DEFAULT_QUERY_SETTINGS)
+
+        parameters = _process_parameters(parameters)
+        try:
+            stream = self.ch_client.raw_stream(
+                query,
+                parameters=parameters,
+                settings=settings,
+                fmt=fmt,
+            )
+            # Yield chunks from the stream
+            chunk_size = 64 * 1024  # 64KB chunks
+            while True:
+                chunk = stream.read(chunk_size)
+                if not chunk:
+                    break
+                yield chunk
+        except Exception as e:
+            logger.exception(
+                "clickhouse_raw_stream_error",
+                extra={"error_str": str(e), "query": query, "format": fmt},
+            )
+            handle_clickhouse_query_error(e)
+
+    @ddtrace.tracer.wrap(
+        name="clickhouse_trace_server_batched.calls_export_parquet_stream"
+    )
+    def calls_export_parquet_stream(
+        self, req: tsi.CallsExportParquetReq
+    ) -> Iterator[bytes]:
+        """Stream calls as native Parquet format directly from ClickHouse.
+
+        This uses ClickHouse's native FORMAT Parquet capability, which is
+        significantly more efficient than Python-side conversion.
+
+        Supports include_costs=True (computed in SQL via CTEs).
+        Does NOT support include_feedback or expand_columns (require Python).
+        """
+        # Build the query using existing CallsQuery infrastructure
+        cq = CallsQuery(
+            project_id=req.project_id,
+            include_costs=req.include_costs or False,
+        )
+
+        # Determine columns to select
+        columns: list[str] = (
+            list(req.columns) if req.columns else list(ALL_CALL_SELECT_COLUMNS)
+        )
+        columns = [col.split(".")[0] for col in columns]  # Handle nested columns
+        columns = list(set(list(REQUIRED_CALL_COLUMNS) + columns))
+        columns = sorted(columns)
+
+        # Handle cost columns ordering (must be last for cost computation)
+        if req.include_costs:
+            summary_columns = ["summary", "summary_dump"]
+            columns = [
+                *[col for col in columns if col not in summary_columns],
+                "summary_dump",
+            ]
+
+        for col in columns:
+            cq.add_field(col)
+
+        if req.filter is not None:
+            cq.set_hardcoded_filter(HardCodedFilter(filter=req.filter))
+        if req.query is not None:
+            cq.add_condition(req.query.expr_)
+        if req.sort_by is not None:
+            for sort_by in req.sort_by:
+                cq.add_order(sort_by.field, sort_by.direction)
+            if not any(s.field == "id" for s in req.sort_by):
+                cq.add_order("id", "asc")
+        else:
+            cq.add_order("started_at", "asc")
+            cq.add_order("id", "asc")
+
+        if req.limit is not None:
+            cq.set_limit(req.limit)
+        if req.offset is not None:
+            cq.set_offset(req.offset)
+
+        pb = ParamBuilder()
+        sql = cq.as_sql(pb)
+
+        logger.info(
+            "calls_export_parquet_stream",
+            extra={
+                "project_id": req.project_id,
+                "columns": columns,
+                "include_costs": req.include_costs,
+            },
+        )
+
+        yield from self._raw_query_stream(sql, pb.get_params(), fmt="Parquet")
+
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.calls_delete")
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
         assert_non_null_wb_user_id(req)
