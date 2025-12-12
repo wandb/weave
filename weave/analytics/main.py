@@ -2,6 +2,7 @@
 
 import click
 
+from weave.analytics.commands.annotate import annotate
 from weave.analytics.commands.cluster import cluster
 from weave.analytics.commands.setup import setup
 from weave.analytics.commands.summarize import summarize
@@ -18,12 +19,14 @@ def analytics() -> None:
     Commands:
         setup     - Configure API keys and settings
         cluster   - Cluster traces into pattern categories
+        annotate  - Add cluster annotations to traces
         summarize - Generate an LLM summary of a trace
 
     \b
     Examples:
         weave analytics setup
         weave analytics cluster "https://wandb.ai/entity/project/weave/traces?..."
+        weave analytics annotate data.json
         weave analytics summarize "https://wandb.ai/entity/project/weave/calls/abc123"
     """
     pass
@@ -31,6 +34,7 @@ def analytics() -> None:
 
 analytics.add_command(setup)
 analytics.add_command(cluster)
+analytics.add_command(annotate)
 analytics.add_command(summarize)
 
 

@@ -488,6 +488,8 @@ def get_api_key_for_model(model: str) -> str:
         "claude": "ANTHROPIC_API_KEY",
         "gemini": "GOOGLE_API_KEY",
         "google": "GOOGLE_API_KEY",
+        "wandb": "WANDB_INFERENCE_API_KEY",
+        "wandb_ai": "WANDB_INFERENCE_API_KEY",
     }
 
     env_var = provider_env_map.get(provider, "OPENAI_API_KEY")

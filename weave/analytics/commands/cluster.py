@@ -137,12 +137,9 @@ def cluster(
     if model is None:
         model = config.get("LLM_MODEL", "gemini/gemini-2.5-pro")
 
-    # Debug mode: faster model, limited samples, Weave tracing
+    # Debug mode: limited samples, Weave tracing
     if debug:
         console.print("[bold red]🔍 DEBUG MODE ENABLED[/bold red]")
-        debug_model = "gemini/gemini-2.5-flash"
-        console.print(f"[dim]  Switching to faster model: {debug_model}[/dim]")
-        model = debug_model
 
         if limit is None:
             limit = 5
