@@ -189,6 +189,49 @@ class AnalyticsWeaveClient:
                     "substr": {"$literal": value}
                 }
             }
+        elif "(string): in" in operator:
+            # Handle 'in' operator - value can be a single string or comma-separated list
+            if isinstance(value, str):
+                # Check if it's a comma-separated list
+                values = [v.strip() for v in value.split(",")]
+                if len(values) == 1:
+                    # Single value - use equality
+                    return {
+                        "$eq": [
+                            {"$getField": field},
+                            {"$literal": value}
+                        ]
+                    }
+                else:
+                    # Multiple values - use $or with equality checks
+                    return {
+                        "$or": [
+                            {"$eq": [{"$getField": field}, {"$literal": v}]}
+                            for v in values
+                        ]
+                    }
+            elif isinstance(value, list):
+                if len(value) == 1:
+                    return {
+                        "$eq": [
+                            {"$getField": field},
+                            {"$literal": value[0]}
+                        ]
+                    }
+                else:
+                    return {
+                        "$or": [
+                            {"$eq": [{"$getField": field}, {"$literal": v}]}
+                            for v in value
+                        ]
+                    }
+            # Fallback to equality
+            return {
+                "$eq": [
+                    {"$getField": field},
+                    {"$literal": value}
+                ]
+            }
         elif "(string): equals" in operator or operator == "=":
             return {
                 "$eq": [

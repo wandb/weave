@@ -93,7 +93,16 @@ def _parse_trace_filters(query_string: str) -> dict[str, Any] | None:
 
     params = parse_qs(query_string)
 
-    # Check for filter parameter (JSON encoded)
+    # Check for 'filters' parameter (plural - used by Weave UI for filter items)
+    # Format: ?filters={"items":[{"field":"...", "operator":"...", "value":"..."}], "logicOperator":"and"}
+    if "filters" in params:
+        try:
+            filters_json = unquote(params["filters"][0])
+            return json.loads(filters_json)
+        except (json.JSONDecodeError, IndexError):
+            pass
+
+    # Check for 'filter' parameter (singular - legacy format)
     if "filter" in params:
         try:
             filter_json = unquote(params["filter"][0])
