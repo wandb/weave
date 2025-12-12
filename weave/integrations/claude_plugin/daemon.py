@@ -74,7 +74,7 @@ from weave.integrations.claude_plugin.utils import (
     truncate,
 )
 from weave.integrations.claude_plugin.diff_view import generate_turn_diff_html
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
 # Inactivity timeout (10 minutes)
@@ -96,6 +96,7 @@ class SubagentTracker:
     transcript_path: Path | None = None
     subagent_call_id: str | None = None
     last_processed_line: int = 0
+    logged_tool_ids: set[str] = field(default_factory=set)
 
     @property
     def is_tailing(self) -> bool:
@@ -221,6 +222,7 @@ class WeaveDaemon:
             self.session_call_id = session_data.get("session_call_id")
             self.trace_id = session_data.get("trace_id")
             self.trace_url = session_data.get("trace_url")
+            self.current_turn_call_id = session_data.get("turn_call_id")
             self.turn_number = session_data.get("turn_number", 0)
             self.total_tool_calls = session_data.get("total_tool_calls", 0)
             self.tool_counts = session_data.get("tool_counts", {})
@@ -233,7 +235,8 @@ class WeaveDaemon:
             f"Loaded state: project={self.project}, "
             f"last_processed_line={self.last_processed_line}, "
             f"turn_number={self.turn_number}, "
-            f"session_call_id={self.session_call_id}"
+            f"session_call_id={self.session_call_id}, "
+            f"current_turn_call_id={self.current_turn_call_id}"
         )
         return True
 
@@ -397,6 +400,11 @@ class WeaveDaemon:
         # For simple subagents (single turn), log flat under subagent
         for turn in session.turns:
             for tool_call in turn.all_tool_calls():
+                # Skip if already logged
+                if tool_call.id in tracker.logged_tool_ids:
+                    continue
+                tracker.logged_tool_ids.add(tool_call.id)
+
                 tool_name = tool_call.name
 
                 # Sanitize input
@@ -881,6 +889,7 @@ class WeaveDaemon:
                     f.readline()
 
                 # Process new lines
+                old_line_num = self.last_processed_line
                 line_num = self.last_processed_line
                 for line in f:
                     line = line.strip()
@@ -895,6 +904,10 @@ class WeaveDaemon:
                         pass
 
                 self.last_processed_line = line_num
+
+                # Save state after processing to prevent duplicate calls on restart
+                if line_num > old_line_num:
+                    self._save_state()
 
         except Exception as e:
             logger.error(f"Error reading session file: {e}")

@@ -366,3 +366,98 @@ class TestStartTailingSubagent:
         call_kwargs = daemon.weave_client.create_call.call_args.kwargs
         assert call_kwargs["op"] == "claude_code.subagent"
         assert "abc123" in call_kwargs["inputs"]["agent_id"]
+
+
+class TestProcessSubagentUpdates:
+    """Test _process_subagent_updates method."""
+
+    @pytest.mark.anyio
+    async def test_process_subagent_updates_logs_tool_calls_once(self, tmp_path):
+        """_process_subagent_updates logs tool calls only once, not duplicated on re-processing."""
+        from datetime import datetime, timezone
+        from unittest.mock import patch
+
+        from weave.integrations.claude_plugin.daemon import WeaveDaemon, SubagentTracker
+
+        daemon = WeaveDaemon("parent-session-uuid")
+        daemon.session_id = "parent-session-uuid"
+        daemon.weave_client = MagicMock()
+        daemon.weave_client._project_id.return_value = "test-project"
+        daemon.trace_id = "trace-123"
+        daemon.session_call_id = "session-call-456"
+
+        # Create a tracker in tailing state
+        tracker = SubagentTracker(
+            tool_use_id="tool-123",
+            turn_call_id="turn-call-789",
+            detected_at=datetime.now(timezone.utc),
+            parent_session_id="parent-session-uuid",
+        )
+        tracker.agent_id = "abc123"
+        tracker.subagent_call_id = "subagent-call-xyz"
+
+        # Create an agent file with tool calls
+        agent_file = tmp_path / "agent-abc123.jsonl"
+        agent_file.write_text(json.dumps({
+            "type": "assistant",
+            "sessionId": "parent-session-uuid",
+            "agentId": "abc123",
+            "isSidechain": True,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "message": {
+                "id": "msg-1",
+                "model": "claude-opus-4",
+                "role": "assistant",
+                "content": [
+                    {
+                        "type": "tool_use",
+                        "id": "tool-call-1",
+                        "name": "Read",
+                        "input": {"file_path": "/tmp/test.py"}
+                    }
+                ]
+            }
+        }) + "\n" + json.dumps({
+            "type": "tool_result",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "message": {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "tool_result",
+                        "tool_use_id": "tool-call-1",
+                        "content": "file contents"
+                    }
+                ]
+            }
+        }) + "\n")
+
+        tracker.transcript_path = agent_file
+        daemon._subagent_trackers["tool-123"] = tracker
+
+        # Track weave.log_call invocations
+        log_call_count = 0
+        logged_tool_ids = []
+
+        def mock_log_call(**kwargs):
+            nonlocal log_call_count
+            log_call_count += 1
+            # Extract tool_use_id from attributes if present
+            if "attributes" in kwargs:
+                logged_tool_ids.append(kwargs.get("op", "unknown"))
+
+        # Call _process_subagent_updates TWICE
+        with patch("weave.integrations.claude_plugin.daemon.weave.log_call", side_effect=mock_log_call):
+            await daemon._process_subagent_updates(tracker)
+            first_call_count = log_call_count
+
+            # Second call should not log duplicates
+            await daemon._process_subagent_updates(tracker)
+            second_call_count = log_call_count
+
+        # Verify tool calls are only logged ONCE (not duplicated)
+        assert first_call_count == 1, f"Expected 1 tool call logged on first processing, got {first_call_count}"
+        assert second_call_count == 1, f"Expected still 1 tool call total after second processing, got {second_call_count}"
+
+        # Verify the tracker tracked the tool ID
+        assert "tool-call-1" in tracker.logged_tool_ids
