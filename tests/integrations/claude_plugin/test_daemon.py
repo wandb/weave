@@ -138,3 +138,47 @@ class TestWeaveDaemonTrackerDicts:
         assert hasattr(daemon, '_subagent_by_agent_id')
         assert isinstance(daemon._subagent_trackers, dict)
         assert isinstance(daemon._subagent_by_agent_id, dict)
+
+
+class TestTaskToolWithSubagentType:
+    """Test Task tool with subagent_type creates tracker."""
+
+    @pytest.mark.anyio
+    async def test_task_tool_with_subagent_type_creates_tracker(self):
+        """Task tool with subagent_type creates SubagentTracker."""
+        from weave.integrations.claude_plugin.daemon import WeaveDaemon, SubagentTracker
+
+        daemon = WeaveDaemon("test-session-123")
+        daemon.weave_client = MagicMock()
+        daemon.current_turn_call_id = "turn-call-456"
+        daemon.session_call_id = "session-call-789"
+        daemon.trace_id = "trace-abc"
+
+        # Simulate assistant message with Task tool containing subagent_type
+        obj = {
+            "type": "assistant",
+            "message": {
+                "content": [
+                    {
+                        "type": "tool_use",
+                        "id": "tool-use-xyz",
+                        "name": "Task",
+                        "input": {
+                            "prompt": "Search the codebase",
+                            "subagent_type": "Explore",
+                        }
+                    }
+                ]
+            }
+        }
+
+        await daemon._handle_assistant_message(obj, line_num=10)
+
+        # Verify tracker was created
+        assert "tool-use-xyz" in daemon._subagent_trackers
+        tracker = daemon._subagent_trackers["tool-use-xyz"]
+        assert isinstance(tracker, SubagentTracker)
+        assert tracker.tool_use_id == "tool-use-xyz"
+        assert tracker.turn_call_id == "turn-call-456"
+        assert tracker.parent_session_id == "test-session-123"
+        assert tracker.is_tailing is False  # Not yet found file
