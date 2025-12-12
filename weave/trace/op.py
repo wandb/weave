@@ -59,6 +59,36 @@ from weave.trace.util import log_once
 if TYPE_CHECKING:
     from weave.trace.call import Call, CallsIter, NoOpCall
 
+
+# Lazy import to avoid circular dependencies
+def _get_widget_values_for_current_context(
+    func: Callable[..., Any],
+) -> dict[str, Any] | None:
+    """Try to get widget values from context, return None if not available."""
+    try:
+        from weave.type_wrappers.Marimo.marimo import (
+            _combined_widgets_context,
+            get_widget_values_for_function,
+        )
+
+        combined_widgets = _combined_widgets_context.get()
+        if combined_widgets is None:
+            return None
+        return get_widget_values_for_function(combined_widgets, func)
+    except (ImportError, RuntimeError):
+        return None
+
+
+def _get_control_values_for_injection() -> dict[str, Any] | None:
+    """Get control values for injection into function namespace."""
+    try:
+        from weave.type_wrappers.Marimo.marimo import _control_values_context
+
+        return _control_values_context.get()
+    except (ImportError, RuntimeError):
+        return None
+
+
 S = TypeVar("S")
 V = TypeVar("V")
 
@@ -398,6 +428,18 @@ def _call_sync_func(
     func = op.resolve_fn
     call = placeholder_call()
 
+    # Inject control values into kwargs if available and not already provided
+    # This allows functions to receive control values as parameters
+    control_values = _get_control_values_for_injection()
+    if control_values:
+        # Only inject values that aren't already in kwargs and match function parameters
+        import inspect
+
+        sig = inspect.signature(func)
+        for key, value in control_values.items():
+            if key not in kwargs and key in sig.parameters:
+                kwargs[key] = value
+
     # Handle all of the possible cases where we would skip tracing.
     if is_tracing_setting_disabled() or should_skip_tracing_for_op(op):
         res = func(*args, **kwargs)
@@ -542,6 +584,18 @@ async def _call_async_func(
 ) -> tuple[Any, Call]:
     func = op.resolve_fn
     call = placeholder_call()
+
+    # Inject control values into kwargs if available and not already provided
+    # This allows functions to receive control values as parameters
+    control_values = _get_control_values_for_injection()
+    if control_values:
+        # Only inject values that aren't already in kwargs and match function parameters
+        import inspect
+
+        sig = inspect.signature(func)
+        for key, value in control_values.items():
+            if key not in kwargs and key in sig.parameters:
+                kwargs[key] = value
 
     # Handle all of the possible cases where we would skip tracing.
     if is_tracing_setting_disabled() or should_skip_tracing_for_op(op):
@@ -1191,6 +1245,11 @@ def op(
 
                 @wraps(func)
                 async def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:  # pyright: ignore[reportRedeclaration]
+                    # Auto-inject widget values if no arguments provided and context available
+                    if not args and not kwargs:
+                        widget_values = _get_widget_values_for_current_context(func)
+                        if widget_values:
+                            kwargs = widget_values  # type: ignore
                     res, _ = await _call_async_func(
                         cast(Op[P, R], wrapper), *args, __should_raise=True, **kwargs
                     )
@@ -1199,6 +1258,11 @@ def op(
 
                 @wraps(func)
                 def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:  # pyright: ignore[reportRedeclaration]
+                    # Auto-inject widget values if no arguments provided and context available
+                    if not args and not kwargs:
+                        widget_values = _get_widget_values_for_current_context(func)
+                        if widget_values:
+                            kwargs = widget_values  # type: ignore
                     res, _ = _call_sync_gen(
                         cast(Op[P, R], wrapper), *args, __should_raise=True, **kwargs
                     )
@@ -1209,6 +1273,11 @@ def op(
                 async def wrapper(  # pyright: ignore[reportRedeclaration]
                     *args: P.args, **kwargs: P.kwargs
                 ) -> AsyncGenerator[R]:
+                    # Auto-inject widget values if no arguments provided and context available
+                    if not args and not kwargs:
+                        widget_values = _get_widget_values_for_current_context(func)
+                        if widget_values:
+                            kwargs = widget_values  # type: ignore
                     res, _ = await _call_async_gen(
                         cast(Op[P, R], wrapper), *args, __should_raise=True, **kwargs
                     )
@@ -1218,6 +1287,11 @@ def op(
 
                 @wraps(func)
                 def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+                    # Auto-inject widget values if no arguments provided and context available
+                    if not args and not kwargs:
+                        widget_values = _get_widget_values_for_current_context(func)
+                        if widget_values:
+                            kwargs = widget_values  # type: ignore
                     res, _ = _call_sync_func(
                         cast(Op[P, R], wrapper), *args, __should_raise=True, **kwargs
                     )
