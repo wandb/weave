@@ -2519,7 +2519,6 @@ def build_calls_complete_batch_update_query(
     project_id_param = param_slot(pb.add_param(project_id), "String")
 
     # Construct the final UPDATE command
-    set_sql = ",\n        ".join(set_clauses)
     raw_sql = f"""
     UPDATE calls_complete
     SET
