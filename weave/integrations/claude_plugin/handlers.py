@@ -42,6 +42,7 @@ from weave.integrations.claude_plugin.utils import (
     extract_slash_command,
     generate_session_name,
     get_tool_display_name,
+    get_turn_display_name,
     is_command_output,
     truncate,
 )
@@ -49,28 +50,6 @@ from weave.integrations.claude_plugin.utils import (
 # Use the same logger setup as hook.py for consistent debug output
 # Test edit to verify diff view is working correctly
 logger = logging.getLogger("weave.integrations.claude_plugin.hook")
-
-
-def _get_turn_display_name(turn_number: int, user_prompt: str) -> str:
-    """Generate a clean display name for a turn.
-
-    Handles special cases like slash commands to avoid showing raw XML tags.
-
-    Args:
-        turn_number: The turn number (1-indexed)
-        user_prompt: The raw user prompt text
-
-    Returns:
-        Display name like "Turn 1: /plugin" or "Turn 2: Fix the bug..."
-    """
-    # Check if this is a slash command message
-    slash_command = extract_slash_command(user_prompt)
-    if slash_command:
-        return f"Turn {turn_number}: {slash_command}"
-
-    # Regular prompt - truncate to 50 chars
-    turn_preview = truncate(user_prompt, 50) or f"Turn {turn_number}"
-    return f"Turn {turn_number}: {turn_preview}"
 
 
 def _find_turn_by_prompt(session: Session, prompt_prefix: str) -> Turn | None:
@@ -414,7 +393,7 @@ def handle_user_prompt_submit(
                 attributes={
                     "turn_number": turn_number,
                 },
-                display_name=_get_turn_display_name(turn_number, user_prompt),
+                display_name=get_turn_display_name(turn_number, user_prompt),
                 use_stack=False,
             )
 
@@ -478,7 +457,7 @@ def handle_user_prompt_submit(
                 attributes={
                     "turn_number": turn_number,
                 },
-                display_name=_get_turn_display_name(turn_number, user_prompt),
+                display_name=get_turn_display_name(turn_number, user_prompt),
                 use_stack=False,
             )
 
