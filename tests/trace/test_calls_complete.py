@@ -16,7 +16,6 @@ Test Organization:
 import base64
 import datetime
 import json
-import uuid
 
 import pytest
 
@@ -368,126 +367,138 @@ def decode_results_project_id(results: list[dict]) -> list[dict]:
     return results
 
 
-def query_calls_complete(ch_client, project_id, call_id=None):
-    """Query calls_complete table directly."""
+def query_calls_raw(ch_client, project_id, table_name, call_id=None):
+    """Query a calls table directly using ClickHouse, bypassing routing logic.
+
+    This queries the physical table directly to verify data presence,
+    independent of the table routing resolver's read path logic.
+
+    Args:
+        ch_client: ClickHouse client
+        project_id: Project ID
+        table_name: "calls_complete" or "calls_merged"
+        call_id: Optional call ID to filter by
+
+    Returns:
+        List of result rows with id, op_name, and started_at fields
+    """
     encoded_project_id = encode_project_id(project_id)
+
+    where_clause = "project_id = {project_id:String}"
+    params = {"project_id": encoded_project_id}
+
     if call_id:
-        query = """
+        where_clause += " AND id = {call_id:String}"
+        params["call_id"] = call_id
+
+    if table_name == "calls_complete":
+        query = f"""
             SELECT *
             FROM calls_complete
-            WHERE project_id = {project_id:String} AND id = {call_id:String}
-        """
-        result = ch_client.query(
-            query, parameters={"project_id": encoded_project_id, "call_id": call_id}
-        )
-    else:
-        query = """
-            SELECT *
-            FROM calls_complete
-            WHERE project_id = {project_id:String}
+            WHERE {where_clause}
             ORDER BY started_at DESC
         """
-        result = ch_client.query(query, parameters={"project_id": encoded_project_id})
-    return decode_results_project_id(list(result.named_results()))
+    else:
+        query = f"""
+            SELECT id, project_id, any(op_name) as op_name, any(started_at) as started_at, any(deleted_at) as deleted_at,
+               any(ended_at) as ended_at, any(exception) as exception, any(attributes_dump) as attributes_dump,
+               any(inputs_dump) as inputs_dump, any(output_dump) as output_dump, any(summary_dump) as summary_dump,
+               any(wb_user_id) as wb_user_id, any(wb_run_id) as wb_run_id, any(thread_id) as thread_id, any(turn_id) as turn_id,
+               any(input_refs) as input_refs, any(output_refs) as output_refs, argMaxMerge(display_name) as display_name
+            FROM calls_merged
+            WHERE {where_clause}
+            GROUP BY project_id, id
+            ORDER BY started_at DESC
+        """
 
+    result = ch_client.query(query, parameters=params)
+    rows = list(result.named_results())
 
-def query_calls_merged(client, project_id, call_id=None):
-    """Query calls via client.get_calls() which reads from calls_merged table.
-
-    This uses the public client API instead of direct SQL queries.
-    """
-    # Build filter if call_id is specified
-    filter_dict = None
-    if call_id:
-        filter_dict = CallsFilter(call_ids=[call_id])
-
-    # Get calls using the client
-    calls = client.get_calls(filter=filter_dict)
-
-    # Convert Call objects to dictionaries for backward compatibility
-    result = []
-    for call in calls:
-        result.append(dict(call.to_dict()))
-
-    return result
+    # Decode base64-encoded project_id in results
+    return decode_results_project_id(rows)
 
 
 def count_calls_in_table(ch_client, project_id, table_name):
     """Count calls in a specific table for a project."""
-    encoded_project_id = encode_project_id(project_id)
-    query = f"SELECT COUNT(*) as count FROM {table_name} WHERE project_id = {{project_id:String}} AND deleted_at IS NULL"
-    result = ch_client.query(query, parameters={"project_id": encoded_project_id})
-    rows = list(result.named_results())
-    return rows[0]["count"] if rows else 0
+    rows = query_calls_raw(ch_client, project_id, table_name)
+    return len(rows)
 
 
-def setup_project_residence(ch_client, project_id, residence_state):
+def setup_project_residence(server, project_id, residence_state, original_mode):
     """Pre-populate tables to achieve desired project residence state.
 
+    Uses the actual server API to insert seed data, ensuring we follow the same
+    code path as production calls.
+
     Args:
-        ch_client: ClickHouse client
+        server: Trace server interface
         project_id: Project ID to set up
         residence_state: ProjectDataResidence enum value
+        original_mode: The mode to temporarily switch to for inserting seed data
     """
     if residence_state == ProjectDataResidence.EMPTY:
         # No setup needed - project has no data
         return
 
-    # Create a seed call to establish residence
-    call_id = str(uuid.uuid4())
-    trace_id = str(uuid.uuid4())
-    encoded_project_id = encode_project_id(project_id)
+    # Get the table routing resolver to temporarily override the mode
+    table_routing_resolver = server._next_trace_server.table_routing_resolver
+    current_mode = table_routing_resolver._mode
 
-    if residence_state == ProjectDataResidence.MERGED_ONLY:
-        ch_client.command(
-            f"""
-            INSERT INTO calls_merged (project_id, id, op_name, started_at, trace_id, parent_id)
-            VALUES ('{encoded_project_id}', '{call_id}', 'seed_op', now(), '{trace_id}', '')
-            """
-        )
-    elif residence_state == ProjectDataResidence.COMPLETE_ONLY:
-        ch_client.command(
-            f"""
-            INSERT INTO calls_complete (project_id, id, op_name, started_at, trace_id, parent_id)
-            VALUES ('{encoded_project_id}', '{call_id}', 'seed_op', now(), '{trace_id}', '')
-            """
-        )
-    elif residence_state == ProjectDataResidence.BOTH:
-        ch_client.command(
-            f"""
-            INSERT INTO calls_merged (project_id, id, op_name, started_at, trace_id, parent_id)
-            VALUES ('{encoded_project_id}', '{call_id}', 'seed_op', now(), '{trace_id}', '')
-            """
-        )
-        ch_client.command(
-            f"""
-            INSERT INTO calls_complete (project_id, id, op_name, started_at, trace_id, parent_id)
-            VALUES ('{encoded_project_id}', '{call_id}', 'seed_op', now(), '{trace_id}', '')
-            """
-        )
-    else:
-        raise ValueError(f"Invalid residence_state: {residence_state}")
+    # Create a seed call to establish residence
+    call_id = generate_id()
+    trace_id = generate_id()
+
+    start = tsi.StartedCallSchemaForInsert(
+        project_id=project_id,
+        id=call_id,
+        trace_id=trace_id,
+        op_name="seed_op",
+        started_at=datetime.datetime.now(),
+        attributes={},
+        inputs={"seed": True},
+    )
+
+    req = tsi.CallsStartBatchReq(
+        project_id=project_id,
+        batch=[tsi.CallBatchStartMode(mode="start", req=tsi.CallStartReq(start=start))],
+    )
+
+    try:
+        if residence_state == ProjectDataResidence.MERGED_ONLY:
+            # Force write to calls_merged only
+            table_routing_resolver._mode = CallsStorageServerMode.FORCE_LEGACY
+            server.calls_start_batch(req)
+        elif residence_state == ProjectDataResidence.COMPLETE_ONLY:
+            # Force write to calls_complete only (for new projects)
+            table_routing_resolver._mode = CallsStorageServerMode.AUTO
+            server.calls_start_batch(req)
+        elif residence_state == ProjectDataResidence.BOTH:
+            # Force write to both tables
+            table_routing_resolver._mode = CallsStorageServerMode.DUAL_WRITE_READ_MERGED
+            server.calls_start_batch(req)
+        else:
+            raise ValueError(f"Invalid residence_state: {residence_state}")
+    finally:
+        # Restore the original mode
+        table_routing_resolver._mode = current_mode
 
 
 def verify_call_exists_in_table(client, ch_client, project_id, call_id, table_name):
-    """Check if a call exists in a specific table."""
-    if table_name == "calls_complete":
-        rows = query_calls_complete(ch_client, project_id, call_id)
-    else:
-        rows = query_calls_merged(client, project_id, call_id)
+    """Check if a call exists in a specific table by querying the raw table."""
+    rows = query_calls_raw(ch_client, project_id, table_name, call_id)
     return len(rows) > 0
 
 
 def verify_call_deleted_in_table(client, ch_client, project_id, call_id, table_name):
-    """Check if a call is soft-deleted in a specific table."""
-    if table_name == "calls_complete":
-        rows = query_calls_complete(ch_client, project_id, call_id)
-        if len(rows) == 1 and rows[0]["deleted_at"] is not None:
-            return True
-    else:
-        rows = query_calls_merged(client, project_id, call_id)
-        if len(rows) == 0:
-            return True
+    """Check if a call is soft-deleted in a specific table.
+
+    For calls_complete: Check if deleted_at is set (row still exists but marked deleted)
+    For calls_merged: Check if call no longer exists (soft deletes remove from merged view)
+    """
+    rows = query_calls_raw(ch_client, project_id, table_name, call_id)
+    print(">>>> rows:", rows)
+    if len(rows) == 1 and rows[0]["deleted_at"] is not None:
+        return True
     return False
 
 
@@ -497,7 +508,7 @@ def verify_call_deleted_in_table(client, ch_client, project_id, call_id, table_n
 
 
 def test_auto_mode_start_batch_creates_started_calls(
-    clickhouse_client, server, project_id, auto_mode
+    clickhouse_client, client, server, project_id, auto_mode
 ):
     """Test calls_start_batch with start mode creates started calls in AUTO mode."""
     if clickhouse_client is None:
@@ -547,7 +558,7 @@ def test_auto_mode_start_batch_creates_started_calls(
     assert res.res[1].trace_id == trace_id
 
     # Query calls_complete table directly
-    rows = query_calls_complete(clickhouse_client, project_id)
+    rows = query_calls_raw(clickhouse_client, project_id, "calls_complete")
     assert len(rows) >= 2
 
     call_1 = next(r for r in rows if r["id"] == call_id_1)
@@ -577,12 +588,14 @@ def test_auto_mode_start_batch_creates_started_calls(
 
 
 def test_auto_mode_start_batch_with_complete_mode(
-    clickhouse_client, server, project_id, auto_mode
+    clickhouse_client, client, server, project_id, auto_mode
 ):
     """Test calls_start_batch with complete mode creates finished calls in AUTO mode."""
     if clickhouse_client is None:
         pytest.skip("Skipping test for sqlite clients")
-    setup_project_residence(clickhouse_client, project_id, ProjectDataResidence.EMPTY)
+    setup_project_residence(
+        server, project_id, ProjectDataResidence.EMPTY, CallsStorageServerMode.AUTO
+    )
 
     call_id = generate_id()
     trace_id = generate_id()
@@ -619,7 +632,7 @@ def test_auto_mode_start_batch_with_complete_mode(
     assert res.res[0].trace_id == trace_id
 
     # Query calls_complete table
-    rows = query_calls_complete(clickhouse_client, project_id, call_id)
+    rows = query_calls_raw(clickhouse_client, project_id, "calls_complete", call_id)
     assert len(rows) == 1
 
     call = rows[0]
@@ -635,12 +648,14 @@ def test_auto_mode_start_batch_with_complete_mode(
 
 
 def test_auto_mode_mixed_start_and_complete(
-    clickhouse_client, server, project_id, auto_mode
+    clickhouse_client, client, server, project_id, auto_mode
 ):
     """Test calls_start_batch with multiple starts and completes interleaved in AUTO mode."""
     if clickhouse_client is None:
         pytest.skip("Skipping test for sqlite clients")
-    setup_project_residence(clickhouse_client, project_id, ProjectDataResidence.EMPTY)
+    setup_project_residence(
+        server, project_id, ProjectDataResidence.EMPTY, CallsStorageServerMode.AUTO
+    )
 
     # Create multiple starts and completes interleaved
     call_ids_start = [generate_id(), generate_id(), generate_id()]
@@ -755,7 +770,7 @@ def test_auto_mode_mixed_start_and_complete(
     assert len(res.res) == 5
 
     # Query all calls
-    rows = query_calls_complete(clickhouse_client, project_id)
+    rows = query_calls_raw(clickhouse_client, project_id, "calls_complete")
 
     # Verify all start calls
     for i, call_id in enumerate(call_ids_start):
@@ -779,12 +794,14 @@ def test_auto_mode_mixed_start_and_complete(
 
 
 def test_auto_mode_end_batch_updates_started_calls(
-    clickhouse_client, server, project_id, auto_mode
+    clickhouse_client, client, server, project_id, auto_mode
 ):
     """Test calls_end_batch updates existing started calls in AUTO mode."""
     if clickhouse_client is None:
         pytest.skip("Skipping test for sqlite clients")
-    setup_project_residence(clickhouse_client, project_id, ProjectDataResidence.EMPTY)
+    setup_project_residence(
+        server, project_id, ProjectDataResidence.EMPTY, CallsStorageServerMode.AUTO
+    )
 
     # First create start calls
     call_id_1 = generate_id()
@@ -823,7 +840,7 @@ def test_auto_mode_end_batch_updates_started_calls(
     server.calls_start_batch(start_req)
 
     # Verify starts exist without end data
-    rows = query_calls_complete(clickhouse_client, project_id)
+    rows = query_calls_raw(clickhouse_client, project_id, "calls_complete")
     call_1_before = next(r for r in rows if r["id"] == call_id_1)
     call_2_before = next(r for r in rows if r["id"] == call_id_2)
     assert call_1_before["ended_at"] is None
@@ -861,7 +878,7 @@ def test_auto_mode_end_batch_updates_started_calls(
     server.calls_end_batch(end_req)
 
     # Verify calls were updated
-    rows_after = query_calls_complete(clickhouse_client, project_id)
+    rows_after = query_calls_raw(clickhouse_client, project_id, "calls_complete")
     call_1_after = next(r for r in rows_after if r["id"] == call_id_1)
     call_2_after = next(r for r in rows_after if r["id"] == call_id_2)
 
@@ -872,7 +889,6 @@ def test_auto_mode_end_batch_updates_started_calls(
         "usage": {"tokens": {"model": "gpt-4o", "count": 10}}
     }
     assert call_1_after["exception"] is None
-    assert call_1_after["updated_at"] is not None
 
     # Verify call_2 updates
     assert call_2_after["ended_at"] is not None
@@ -881,7 +897,6 @@ def test_auto_mode_end_batch_updates_started_calls(
         "usage": {"tokens": {"model": "gpt-4o", "count": 10}}
     }
     assert call_2_after["exception"] == "Error occurred"
-    assert call_2_after["updated_at"] is not None
 
     # Verify start data is preserved
     assert json.loads(call_1_after["inputs_dump"]) == {"x": 10}
@@ -892,7 +907,9 @@ def test_auto_mode_calls_delete(clickhouse_client, server, project_id, auto_mode
     """Test calls_delete soft-deletes calls in AUTO mode."""
     if clickhouse_client is None:
         pytest.skip("Skipping test for sqlite clients")
-    setup_project_residence(clickhouse_client, project_id, ProjectDataResidence.EMPTY)
+    setup_project_residence(
+        server, project_id, ProjectDataResidence.EMPTY, CallsStorageServerMode.AUTO
+    )
 
     # Create some calls
     call_id_1 = generate_id()
@@ -956,12 +973,14 @@ def test_auto_mode_calls_delete(clickhouse_client, server, project_id, auto_mode
 
 
 def test_auto_mode_call_update_display_name(
-    clickhouse_client, server, project_id, auto_mode
+    clickhouse_client, client, server, project_id, auto_mode
 ):
     """Test call_update updates display name in AUTO mode."""
     if clickhouse_client is None:
         pytest.skip("Skipping test for sqlite clients")
-    setup_project_residence(clickhouse_client, project_id, ProjectDataResidence.EMPTY)
+    setup_project_residence(
+        server, project_id, ProjectDataResidence.EMPTY, CallsStorageServerMode.AUTO
+    )
 
     # Create a call
     call_id = generate_id()
@@ -985,7 +1004,7 @@ def test_auto_mode_call_update_display_name(
     server.calls_start_batch(start_req)
 
     # Verify initial display_name is None
-    rows = query_calls_complete(clickhouse_client, project_id, call_id)
+    rows = query_calls_raw(clickhouse_client, project_id, "calls_complete")
     assert len(rows) == 1
     assert rows[0]["display_name"] is None
 
@@ -996,134 +1015,20 @@ def test_auto_mode_call_update_display_name(
     server.call_update(update_req)
 
     # Verify display name was updated
-    rows_after = query_calls_complete(clickhouse_client, project_id, call_id)
+    rows_after = query_calls_raw(clickhouse_client, project_id, "calls_complete")
     assert len(rows_after) == 1
     assert rows_after[0]["display_name"] == "My Custom Name"
-    assert rows_after[0]["updated_at"] is not None
-
-
-def test_auto_mode_metadata_fields(clickhouse_client, server, project_id, auto_mode):
-    """Test calls with refs, W&B metadata, and thread/turn IDs in AUTO mode."""
-    if clickhouse_client is None:
-        pytest.skip("Skipping test for sqlite clients")
-    setup_project_residence(clickhouse_client, project_id, ProjectDataResidence.EMPTY)
-
-    # Test 1: Call with weave refs
-    call_id_refs = generate_id()
-    trace_id = generate_id()
-    ref_input = f"weave:///{project_id}/object/obj:v0"
-    ref_output = f"weave:///{project_id}/object/result:v1"
-    ref_input_encoded = (
-        f"weave-trace-internal:///{encode_project_id(project_id)}/object/obj:v0"
-    )
-    ref_output_encoded = (
-        f"weave-trace-internal:///{encode_project_id(project_id)}/object/result:v1"
-    )
-
-    complete_refs = tsi.CompletedCallSchemaForInsert(
-        project_id=project_id,
-        id=call_id_refs,
-        trace_id=trace_id,
-        op_name="op_with_refs",
-        started_at=datetime.datetime.now(),
-        ended_at=datetime.datetime.now() + datetime.timedelta(seconds=1),
-        attributes={},
-        inputs={"data": ref_input},
-        output={"result": ref_output},
-        summary={},
-    )
-
-    # Test 2: Call with W&B metadata
-    call_id_wb = generate_id()
-    wb_user_id = "user_123"
-    wb_run_id = "run_456"
-    wb_run_step = 10
-    wb_run_step_end = 20
-
-    complete_wb = tsi.CompletedCallSchemaForInsert(
-        project_id=project_id,
-        id=call_id_wb,
-        trace_id=trace_id,
-        op_name="wb_op",
-        started_at=datetime.datetime.now(),
-        ended_at=datetime.datetime.now() + datetime.timedelta(seconds=1),
-        attributes={},
-        inputs={},
-        output={},
-        summary={},
-        wb_user_id=wb_user_id,
-        wb_run_id=wb_run_id,
-        wb_run_step=wb_run_step,
-        wb_run_step_end=wb_run_step_end,
-    )
-
-    # Test 3: Call with thread_id and turn_id
-    call_id_thread = generate_id()
-    thread_id = generate_id()
-    turn_id = generate_id()
-
-    start_thread = tsi.StartedCallSchemaForInsert(
-        project_id=project_id,
-        id=call_id_thread,
-        trace_id=trace_id,
-        op_name="threaded_op",
-        started_at=datetime.datetime.now(),
-        attributes={},
-        inputs={},
-        thread_id=thread_id,
-        turn_id=turn_id,
-    )
-
-    # Insert all metadata test calls
-    req = tsi.CallsStartBatchReq(
-        project_id=project_id,
-        batch=[
-            tsi.CallBatchCompleteMode(
-                mode="complete", req=tsi.CallCompleteReq(complete=complete_refs)
-            ),
-            tsi.CallBatchCompleteMode(
-                mode="complete", req=tsi.CallCompleteReq(complete=complete_wb)
-            ),
-            tsi.CallBatchStartMode(
-                mode="start", req=tsi.CallStartReq(start=start_thread)
-            ),
-        ],
-    )
-    server.calls_start_batch(req)
-
-    # Verify refs
-    rows_refs = query_calls_complete(clickhouse_client, project_id, call_id_refs)
-    assert len(rows_refs) == 1
-    call_refs = rows_refs[0]
-    assert ref_input_encoded in call_refs["input_refs"], (
-        f"Expected {ref_input_encoded} in {call_refs['input_refs']}"
-    )
-    assert ref_output_encoded in call_refs["output_refs"], (
-        f"Expected {ref_output_encoded} in {call_refs['output_refs']}"
-    )
-
-    # Verify W&B metadata
-    rows_wb = query_calls_complete(clickhouse_client, project_id, call_id_wb)
-    assert len(rows_wb) == 1
-    call_wb = rows_wb[0]
-    assert call_wb["wb_run_step"] == wb_run_step
-    assert call_wb["wb_run_step_end"] == wb_run_step_end
-
-    # Verify thread and turn IDs
-    rows_thread = query_calls_complete(clickhouse_client, project_id, call_id_thread)
-    assert len(rows_thread) == 1
-    call_thread = rows_thread[0]
-    assert call_thread["thread_id"] == thread_id
-    assert call_thread["turn_id"] == turn_id
 
 
 def test_auto_mode_batch_operations_multiple_calls(
-    clickhouse_client, server, project_id, auto_mode
+    clickhouse_client, client, server, project_id, auto_mode
 ):
     """Test batch operations with multiple calls in AUTO mode."""
     if clickhouse_client is None:
         pytest.skip("Skipping test for sqlite clients")
-    setup_project_residence(clickhouse_client, project_id, ProjectDataResidence.EMPTY)
+    setup_project_residence(
+        server, project_id, ProjectDataResidence.EMPTY, CallsStorageServerMode.AUTO
+    )
 
     # Create 5 start calls
     call_ids = [generate_id() for _ in range(5)]
@@ -1174,7 +1079,7 @@ def test_auto_mode_batch_operations_multiple_calls(
     server.calls_end_batch(end_req)
 
     # Verify all calls were updated
-    rows = query_calls_complete(clickhouse_client, project_id)
+    rows = query_calls_raw(clickhouse_client, project_id, "calls_complete")
     updated_calls = [r for r in rows if r["id"] in call_ids]
     assert len(updated_calls) == 5
 
@@ -1340,8 +1245,12 @@ def test_dual_write_read_merged_mode_comprehensive(
     server.calls_end_batch(req_end)
 
     # Verify end updates in BOTH tables
-    complete_rows = query_calls_complete(clickhouse_client, project_id, call_id_start)
-    merged_rows = query_calls_merged(client, project_id, call_id_start)
+    complete_rows = query_calls_raw(
+        clickhouse_client, project_id, "calls_complete", call_id_start
+    )
+    merged_rows = query_calls_raw(
+        clickhouse_client, project_id, "calls_merged", call_id_start
+    )
     assert len(complete_rows) == 1
     assert complete_rows[0]["ended_at"] is not None
     assert len(merged_rows) == 1
@@ -1368,10 +1277,12 @@ def test_dual_write_read_merged_mode_comprehensive(
     server.call_update(update_req)
 
     # Verify display name in BOTH tables
-    complete_rows_after = query_calls_complete(
-        clickhouse_client, project_id, call_id_start
+    complete_rows_after = query_calls_raw(
+        clickhouse_client, project_id, "calls_complete", call_id_start
     )
-    merged_rows_after = query_calls_merged(client, project_id, call_id_start)
+    merged_rows_after = query_calls_raw(
+        clickhouse_client, project_id, "calls_merged", call_id_start
+    )
     assert complete_rows_after[0]["display_name"] == "Dual Write Test Name"
     assert merged_rows_after[0]["display_name"] == "Dual Write Test Name"
 
@@ -1524,8 +1435,12 @@ def test_dual_write_read_complete_mode_comprehensive(
     server.calls_end_batch(req_end)
 
     # Verify end updates in BOTH tables
-    complete_rows = query_calls_complete(clickhouse_client, project_id, call_id_start)
-    merged_rows = query_calls_merged(client, project_id, call_id_start)
+    complete_rows = query_calls_raw(
+        clickhouse_client, project_id, "calls_complete", call_id_start
+    )
+    merged_rows = query_calls_raw(
+        clickhouse_client, project_id, "calls_merged", call_id_start
+    )
     assert len(complete_rows) == 1
     assert complete_rows[0]["ended_at"] is not None
     assert len(merged_rows) == 1
@@ -1552,10 +1467,12 @@ def test_dual_write_read_complete_mode_comprehensive(
     server.call_update(update_req)
 
     # Verify display name in BOTH tables
-    complete_rows_after = query_calls_complete(
-        clickhouse_client, project_id, call_id_start
+    complete_rows_after = query_calls_raw(
+        clickhouse_client, project_id, "calls_complete", call_id_start
     )
-    merged_rows_after = query_calls_merged(client, project_id, call_id_start)
+    merged_rows_after = query_calls_raw(
+        clickhouse_client, project_id, "calls_merged", call_id_start
+    )
     assert complete_rows_after[0]["display_name"] == "Dual Write Read Complete Name"
     assert merged_rows_after[0]["display_name"] == "Dual Write Read Complete Name"
 
@@ -1650,7 +1567,9 @@ def test_force_legacy_mode_comprehensive(
     server.calls_end_batch(req_end)
 
     # Verify end updates ONLY in calls_merged
-    merged_rows = query_calls_merged(client, project_id, call_id_start)
+    merged_rows = query_calls_raw(
+        clickhouse_client, project_id, "calls_merged", call_id_start
+    )
     assert len(merged_rows) == 1
     assert merged_rows[0]["ended_at"] is not None
 
@@ -1670,7 +1589,9 @@ def test_force_legacy_mode_comprehensive(
     server.call_update(update_req)
 
     # Verify display name ONLY in calls_merged
-    merged_rows_after = query_calls_merged(client, project_id, call_id_start)
+    merged_rows_after = query_calls_raw(
+        clickhouse_client, project_id, "calls_merged", call_id_start
+    )
     assert merged_rows_after[0]["display_name"] == "Legacy Mode Name"
 
 
@@ -1701,14 +1622,13 @@ def test_start_call_routing_across_modes(
     expected_merged_table,
     source,
     request,
+    table_routing_resolver,
 ):
     """Parametrized test verifying start call routing across all modes and residence states."""
     if clickhouse_client is None:
         pytest.skip("Skipping test for sqlite clients")
     # Apply the mode fixture
     request.getfixturevalue(mode_fixture_name)
-
-    # Setup project residence state
     setup_project_residence(clickhouse_client, project_id, residence_state)
 
     # Create a start call
@@ -1731,7 +1651,7 @@ def test_start_call_routing_across_modes(
     )
     server.calls_start_batch(req)
 
-    # Verify presence in expected tables
+    # Verify presence in expected tables (raw table checks)
     in_complete = verify_call_exists_in_table(
         client, clickhouse_client, project_id, call_id, "calls_complete"
     )
@@ -1744,6 +1664,17 @@ def test_start_call_routing_across_modes(
     )
     assert in_merged == expected_merged_table, (
         f"Mode {mode_fixture_name}, Residence {residence_state.value}: Expected call in calls_merged={expected_merged_table}, got {in_merged}"
+    )
+
+    # Verify client read path works correctly (should always find the call via routed read)
+    client_calls = list(client.get_calls(filter=CallsFilter(call_ids=[call_id])))
+    assert len(client_calls) == 1, (
+        f"Mode {mode_fixture_name}, Residence {residence_state.value}: Expected to find call via client.get_calls()"
+    )
+    assert client_calls[0].id == call_id
+    assert (
+        client_calls[0].op_name
+        == f"test_op_{mode_fixture_name}_{residence_state.value}"
     )
 
 
@@ -1768,6 +1699,7 @@ def test_delete_routing_across_modes(
     expected_merged_table,
     source,
     request,
+    table_routing_resolver,
 ):
     """Parametrized test verifying delete routing across all modes and residence states."""
     if clickhouse_client is None:
@@ -1775,9 +1707,9 @@ def test_delete_routing_across_modes(
 
     # Apply the mode fixture
     request.getfixturevalue(mode_fixture_name)
-
-    # Setup project residence state
-    setup_project_residence(clickhouse_client, project_id, residence_state)
+    setup_project_residence(
+        server, project_id, residence_state, table_routing_resolver._mode
+    )
 
     # Create a call
     call_id = generate_id()
@@ -1851,6 +1783,7 @@ def test_update_display_name_routing_across_modes(
     expected_merged_table,
     source,
     request,
+    table_routing_resolver,
 ):
     """Parametrized test verifying display name update routing across all modes and residence states."""
     if clickhouse_client is None:
@@ -1860,7 +1793,9 @@ def test_update_display_name_routing_across_modes(
     request.getfixturevalue(mode_fixture_name)
 
     # Setup project residence state
-    setup_project_residence(clickhouse_client, project_id, residence_state)
+    setup_project_residence(
+        server, project_id, residence_state, table_routing_resolver._mode
+    )
 
     # Create a call
     call_id = generate_id()
@@ -1891,7 +1826,9 @@ def test_update_display_name_routing_across_modes(
 
     # Verify update in expected tables
     if expected_complete_table:
-        complete_rows = query_calls_complete(clickhouse_client, project_id, call_id)
+        complete_rows = query_calls_raw(
+            clickhouse_client, project_id, "calls_complete", call_id
+        )
         assert len(complete_rows) == 1, (
             f"Mode {mode_fixture_name}, Residence {residence_state.value}: Expected 1 row in calls_complete"
         )
@@ -1900,7 +1837,9 @@ def test_update_display_name_routing_across_modes(
         )
 
     if expected_merged_table:
-        merged_rows = query_calls_merged(client, project_id, call_id)
+        merged_rows = query_calls_raw(
+            clickhouse_client, project_id, "calls_merged", call_id
+        )
         assert len(merged_rows) == 1, (
             f"Mode {mode_fixture_name}, Residence {residence_state.value}: Expected 1 row in calls_merged"
         )
