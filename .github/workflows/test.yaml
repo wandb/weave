@@ -103,7 +103,7 @@ jobs:
   trace-tests:
     name: Trace nox tests
     timeout-minutes: 15
-    runs-on: ${{ matrix.nox-shard == 'trace' && 'ubuntu-latest-8-cores' || 'ubuntu-latest' }}
+    runs-on: ${{ (matrix.nox-shard == 'trace' || matrix.nox-shard == 'trace_dual_write_read_complete') && 'ubuntu-latest-8-cores' || 'ubuntu-latest' }}
     strategy:
       matrix:
         python-version-major: ["3"]
@@ -115,6 +115,7 @@ jobs:
           ]
         nox-shard: [
             "trace",
+            "trace_dual_write_read_complete",
             "flow",
             "trace_server",
             "trace_server_bindings",
@@ -298,6 +299,7 @@ jobs:
           ]
         nox-shard: [
             "trace",
+            "trace_dual_write_read_complete",
             "flow",
             "trace_server",
             "trace_server_bindings",
