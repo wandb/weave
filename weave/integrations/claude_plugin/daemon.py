@@ -968,6 +968,9 @@ class WeaveDaemon:
                     if tracker.is_tailing:
                         await self._process_subagent_updates(tracker)
 
+                # Clean up stale trackers (file never appeared)
+                self._cleanup_stale_subagent_trackers()
+
             except Exception as e:
                 logger.error(f"Error processing session file: {e}")
 
