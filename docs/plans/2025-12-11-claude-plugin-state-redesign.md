@@ -17,7 +17,8 @@ Consolidate to a single state file at `~/.cache/weave/claude-plugin.json` with:
 {
   "sessions": {
     "session-uuid-1": {
-      "project": "wandb_fc/claude-code-plugin-test",
+      "project": "claude-code-plugin-test",
+      "entity": "wandb_fc",
       "session_call_id": "019b0fb7-90ec-...",
       "trace_id": "019b0fb7-90ec-...",
       "turn_call_id": "019b0fb8-1234-...",
@@ -40,6 +41,7 @@ Consolidate to a single state file at `~/.cache/weave/claude-plugin.json` with:
 - `session_call_id`: Weave call ID for the session (root trace)
 - `trace_id`: Weave trace ID (shared by all calls in session)
 - `turn_call_id`: Current turn's Weave call ID (null between turns)
+- `entity`: Weave entity that was resolved when creating the session (for trace URL construction)
 
 **Cached for visibility** (derived from transcript, stored for human debugging):
 - `project`: Weave project in "entity/project" format
@@ -129,6 +131,64 @@ Update to use new `StateManager`:
 - Cache derived values in state for human visibility
 - Update `cwds` index when session starts
 
+## Handling Interrupted Turns
+
+When a user presses Escape to interrupt Claude, no `Stop` hook fires. This leaves the turn in an incomplete state (`turn_call_id` is set but never cleared).
+
+We detect and handle this on the next `UserPromptSubmit`:
+
+```python
+def handle_user_prompt_submit(payload, project):
+    state = load_session(session_id)
+
+    # Check for interrupted previous turn
+    if state and state.get("turn_call_id"):
+        # Previous turn was interrupted - finish it with data from transcript
+        finish_interrupted_turn(state, payload.get("transcript_path"))
+
+    # Now start the new turn as normal
+    ...
+```
+
+The `finish_interrupted_turn` function:
+1. Parses the transcript to find the interrupted turn's data
+2. Creates tool call traces for any tools that ran before interruption
+3. Finishes the turn call with `interrupted: true` in the output
+4. Clears `turn_call_id` from state
+
+This ensures we don't lose trace data from interrupted turns, and the trace shows the turn was interrupted rather than just being incomplete.
+
+## Debug Logging
+
+When `DEBUG=1` is set, the hook writes logs to `/tmp/weave-claude-debug.log` in addition to stderr. This provides visibility into hook execution since Claude Code doesn't capture hook stderr in its debug logs.
+
+```python
+import logging
+from pathlib import Path
+
+DEBUG_LOG_FILE = Path("/tmp/weave-claude-debug.log")
+
+def setup_logging():
+    """Configure logging with optional file output for debugging."""
+    level = logging.DEBUG if os.environ.get("DEBUG") else logging.WARNING
+
+    handlers = [logging.StreamHandler(sys.stderr)]
+
+    if os.environ.get("DEBUG"):
+        # Also log to file for easier debugging
+        file_handler = logging.FileHandler(DEBUG_LOG_FILE, mode='a')
+        file_handler.setFormatter(logging.Formatter(
+            '%(asctime)s %(levelname)s: %(message)s'
+        ))
+        handlers.append(file_handler)
+
+    logging.basicConfig(
+        level=level,
+        format="%(levelname)s: %(message)s",
+        handlers=handlers,
+    )
+```
+
 ## Benefits
 
 1. **Bounded growth**: Single file with automatic 30-day cleanup
@@ -136,3 +196,4 @@ Update to use new `StateManager`:
 3. **Directory lookup**: Quickly see which sessions touched a repo
 4. **Simpler cleanup**: No directory of files to manage
 5. **Proper location**: `~/.cache` is the standard location for application caches
+6. **Entity tracking**: Stores resolved entity to avoid confusion about which W&B account traces go to
