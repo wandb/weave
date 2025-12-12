@@ -55,6 +55,9 @@ type Response struct {
 	Pending int    `json:"pending,omitempty"` // Number of items still pending
 }
 
+// Number of parallel flush workers
+const numFlushWorkers = 4
+
 // Sidecar is the main server
 type Sidecar struct {
 	config     Config
@@ -65,7 +68,8 @@ type Sidecar struct {
 	batch     []BatchItem
 	batchSize int // current size in bytes
 
-	flushChan chan struct{}
+	// batchChan receives batches ready to be sent to backend
+	batchChan chan []BatchItem
 	stopChan  chan struct{}
 	wg        sync.WaitGroup
 	sendWg    sync.WaitGroup // tracks in-flight batch sends for flushSync
@@ -77,13 +81,13 @@ func NewSidecar(config Config) *Sidecar {
 		httpClient: &http.Client{
 			Timeout: config.RequestTimeout,
 			Transport: &http.Transport{
-				MaxIdleConns:        10,
-				MaxIdleConnsPerHost: 10,
+				MaxIdleConns:        100,
+				MaxIdleConnsPerHost: 100,
 				IdleConnTimeout:     90 * time.Second,
 			},
 		},
 		batch:     make([]BatchItem, 0, config.FlushMaxCount),
-		flushChan: make(chan struct{}, 1),
+		batchChan: make(chan []BatchItem, numFlushWorkers*2), // buffered to allow some queuing
 		stopChan:  make(chan struct{}),
 	}
 }
@@ -108,12 +112,18 @@ func (s *Sidecar) Start() error {
 
 	log.Printf("Sidecar listening on %s", s.config.SocketPath)
 	log.Printf("Backend URL: %s", s.config.BackendURL)
-	log.Printf("Flush config: interval=%v, maxCount=%d, maxBytes=%d",
-		s.config.FlushInterval, s.config.FlushMaxCount, s.config.FlushMaxBytes)
+	log.Printf("Flush config: interval=%v, maxCount=%d, maxBytes=%d, workers=%d",
+		s.config.FlushInterval, s.config.FlushMaxCount, s.config.FlushMaxBytes, numFlushWorkers)
 
-	// Start background flush goroutine
+	// Start flush workers (parallel HTTP senders)
+	for i := 0; i < numFlushWorkers; i++ {
+		s.wg.Add(1)
+		go s.flushWorker(i)
+	}
+
+	// Start batch collector (collects items and dispatches batches to workers)
 	s.wg.Add(1)
-	go s.flushLoop()
+	go s.batchCollector()
 
 	// Accept connections
 	s.wg.Add(1)
@@ -194,36 +204,26 @@ func (s *Sidecar) enqueue(item BatchItem) {
 	itemSize := len(item.Req) + 50 // rough estimate for JSON overhead
 
 	s.mu.Lock()
-
-	// Back-pressure: if batch is way over limit (4x), wait for it to drain
-	// This prevents runaway growth when HTTP requests are slow
-	for len(s.batch) >= s.config.FlushMaxCount*4 || s.batchSize >= s.config.FlushMaxBytes*4 {
-		// Signal flush if not already pending
-		select {
-		case s.flushChan <- struct{}{}:
-		default:
-		}
-		// Release lock, sleep briefly, and check again
-		s.mu.Unlock()
-		time.Sleep(10 * time.Millisecond)
-		s.mu.Lock()
-	}
-
 	s.batch = append(s.batch, item)
 	s.batchSize += itemSize
 
-	// Check if we should trigger a flush
+	// Check if we should dispatch this batch to workers
 	if len(s.batch) >= s.config.FlushMaxCount || s.batchSize >= s.config.FlushMaxBytes {
-		select {
-		case s.flushChan <- struct{}{}:
-		default:
-			// Flush already pending
-		}
+		batch := s.batch
+		s.batch = make([]BatchItem, 0, s.config.FlushMaxCount)
+		s.batchSize = 0
+		s.sendWg.Add(1) // Track this batch
+		s.mu.Unlock()
+
+		// Send batch to workers (may block if workers are busy - this is back-pressure)
+		s.batchChan <- batch
+		return
 	}
 	s.mu.Unlock()
 }
 
-func (s *Sidecar) flushLoop() {
+// batchCollector periodically flushes partial batches that haven't reached the size threshold
+func (s *Sidecar) batchCollector() {
 	defer s.wg.Done()
 
 	ticker := time.NewTicker(s.config.FlushInterval)
@@ -232,77 +232,57 @@ func (s *Sidecar) flushLoop() {
 	for {
 		select {
 		case <-s.stopChan:
-			// Final flush on shutdown
-			s.flush()
+			// Final flush on shutdown - dispatch any remaining items
+			s.dispatchCurrentBatch()
 			return
 		case <-ticker.C:
-			s.flush()
-		case <-s.flushChan:
-			s.flush()
+			s.dispatchCurrentBatch()
 		}
 	}
 }
 
-func (s *Sidecar) flush() {
+// dispatchCurrentBatch sends the current batch to workers if non-empty
+func (s *Sidecar) dispatchCurrentBatch() {
 	s.mu.Lock()
 	if len(s.batch) == 0 {
 		s.mu.Unlock()
 		return
 	}
 
-	// Take the current batch and reset
 	batch := s.batch
 	s.batch = make([]BatchItem, 0, s.config.FlushMaxCount)
 	s.batchSize = 0
-	s.sendWg.Add(1) // Track this send BEFORE releasing lock
+	s.sendWg.Add(1)
 	s.mu.Unlock()
 
-	defer s.sendWg.Done() // Mark complete when done
+	// Send to workers
+	s.batchChan <- batch
+}
 
-	log.Printf("Flushing %d items to backend...", len(batch))
+// flushWorker processes batches from batchChan and sends them to the backend
+func (s *Sidecar) flushWorker(id int) {
+	defer s.wg.Done()
 
-	// Send to backend
-	if err := s.sendBatch(batch); err != nil {
-		log.Printf("Failed to send batch of %d items: %v", len(batch), err)
-		// TODO: Could implement retry logic or disk fallback here
-	} else {
-		// Check if more items arrived while we were flushing
-		s.mu.Lock()
-		remaining := len(s.batch)
-		s.mu.Unlock()
-		log.Printf("Successfully flushed %d items to backend (remaining: %d)", len(batch), remaining)
+	for batch := range s.batchChan {
+		log.Printf("[worker %d] Sending %d items to backend...", id, len(batch))
+
+		if err := s.sendBatch(batch); err != nil {
+			log.Printf("[worker %d] Failed to send %d items: %v", id, len(batch), err)
+		} else {
+			log.Printf("[worker %d] Successfully sent %d items", id, len(batch))
+		}
+
+		s.sendWg.Done() // Mark this batch complete
 	}
 }
 
 // flushSync flushes all pending items synchronously and waits for completion.
-// It also waits for any in-flight async flushes to complete before returning.
+// It dispatches remaining items to workers and waits for all in-flight batches to complete.
 func (s *Sidecar) flushSync() {
-	// First, process any items in the current batch
-	for {
-		s.mu.Lock()
-		if len(s.batch) == 0 {
-			s.mu.Unlock()
-			break
-		}
+	// Dispatch any remaining items in current batch
+	s.dispatchCurrentBatch()
 
-		// Take the current batch and reset
-		batch := s.batch
-		s.batch = make([]BatchItem, 0, s.config.FlushMaxCount)
-		s.batchSize = 0
-		s.mu.Unlock()
-
-		log.Printf("Sync flush: sending %d items to backend...", len(batch))
-
-		// Send to backend
-		if err := s.sendBatch(batch); err != nil {
-			log.Printf("Sync flush failed for %d items: %v", len(batch), err)
-		} else {
-			log.Printf("Sync flush: successfully sent %d items", len(batch))
-		}
-	}
-
-	// Wait for any in-flight async flushes to complete
-	// This handles the case where async flush() grabbed the batch before we got here
+	// Wait for all in-flight batches to complete
 	s.sendWg.Wait()
 	log.Printf("Sync flush: complete, all sends finished")
 }
@@ -349,7 +329,7 @@ func (s *Sidecar) sendBatch(batch []BatchItem) error {
 func (s *Sidecar) Stop() {
 	log.Println("Shutting down sidecar...")
 
-	// Signal stop
+	// Signal stop to batchCollector
 	close(s.stopChan)
 
 	// Close listener to stop accepting new connections
@@ -357,7 +337,13 @@ func (s *Sidecar) Stop() {
 		s.listener.Close()
 	}
 
-	// Wait for goroutines to finish (includes final flush)
+	// Wait briefly for batchCollector to dispatch final batch
+	time.Sleep(100 * time.Millisecond)
+
+	// Close batchChan to signal workers to exit after processing remaining batches
+	close(s.batchChan)
+
+	// Wait for all goroutines to finish
 	s.wg.Wait()
 
 	// Cleanup socket file
