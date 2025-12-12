@@ -304,16 +304,19 @@ class WeaveDaemon:
             return {"status": "error", "message": f"Unknown event: {event}"}
 
     async def _handle_session_start(self, payload: dict[str, Any]) -> dict[str, Any]:
-        """Handle SessionStart - create session trace if needed."""
+        """Handle SessionStart - initialize state but don't create session call yet.
+
+        Session call is created on UserPromptSubmit when the actual user prompt
+        is available in the payload. Creating it here would result in empty
+        first_prompt since no user message exists at SessionStart time.
+        """
         # Update transcript path from payload
         transcript_path = payload.get("transcript_path")
         if transcript_path:
             self.transcript_path = Path(transcript_path)
 
-        # Create session call if not exists
-        if not self.session_call_id:
-            return await self._create_session_call(payload)
-
+        # Don't create session call here - wait for UserPromptSubmit
+        # which has the actual user prompt in the payload
         return {"status": "ok", "trace_url": self.trace_url}
 
     async def _handle_user_prompt_submit(self, payload: dict[str, Any]) -> dict[str, Any]:
@@ -807,7 +810,17 @@ class WeaveDaemon:
                 if tool_name == "Task" and tool_input.get("subagent_type"):
                     # Track this for SubagentStop to know which turn to attach to
                     self._pending_subagent_tasks[tool_id] = self.current_turn_call_id
-                    logger.debug(f"Skipping Task tool with subagent_type, will be handled by SubagentStop: {tool_id}")
+
+                    # NEW: Create full lifecycle tracker for proactive tailing
+                    tracker = SubagentTracker(
+                        tool_use_id=tool_id,
+                        turn_call_id=self.current_turn_call_id,
+                        detected_at=datetime.now(timezone.utc),
+                        parent_session_id=self.session_id,
+                    )
+                    self._subagent_trackers[tool_id] = tracker
+
+                    logger.debug(f"Subagent detected: tool_id={tool_id}, will scan for file")
                     continue
 
                 # Sanitize input
