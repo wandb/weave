@@ -9,8 +9,6 @@ import typing
 from dataclasses import dataclass
 from typing import TypeAlias
 
-from pydantic import BaseModel
-
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.interface import query as tsi_query
 
@@ -207,7 +205,8 @@ class Table:
 Action = typing.Literal["SELECT", "DELETE"]
 
 
-class PreparedSelect(BaseModel):
+@dataclass
+class PreparedSelect:
     sql: str
     parameters: dict[str, typing.Any]
     fields: list[str]
@@ -431,7 +430,8 @@ class Select:
         return PreparedSelect(sql=sql, parameters=parameters, fields=fieldnames)
 
 
-class PreparedInsert(BaseModel):
+@dataclass
+class PreparedInsert:
     sql: str
     column_names: list[str]
     data: typing.Sequence[typing.Sequence[typing.Any]]
