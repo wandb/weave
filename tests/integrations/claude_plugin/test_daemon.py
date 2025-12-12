@@ -496,3 +496,71 @@ class TestFileTailerIntegration:
         # The current implementation doesn't call scan yet, so this should fail
         assert len(scan_calls) == 1
         assert len(process_calls) == 1
+
+
+class TestSubagentStopFastPath:
+    """Test SubagentStop fast path when already tailing."""
+
+    @pytest.mark.anyio
+    async def test_subagent_stop_fast_path_when_tailing(self, tmp_path):
+        """SubagentStop uses fast path when already tailing."""
+        from datetime import datetime, timezone
+        from unittest.mock import AsyncMock
+
+        from weave.integrations.claude_plugin.daemon import WeaveDaemon, SubagentTracker
+
+        daemon = WeaveDaemon("parent-session-uuid")
+        daemon.weave_client = MagicMock()
+        daemon.weave_client._project_id.return_value = "test-project"
+        daemon.trace_id = "trace-123"
+        daemon.session_call_id = "session-call-456"
+
+        # Create agent file
+        agent_file = tmp_path / "agent-abc123.jsonl"
+        agent_file.write_text(json.dumps({
+            "type": "assistant",
+            "sessionId": "parent-session-uuid",
+            "agentId": "abc123",
+            "isSidechain": True,
+            "uuid": "msg-1",
+            "timestamp": "2025-01-01T10:00:00Z",
+            "message": {
+                "role": "assistant",
+                "content": [{"type": "text", "text": "Done!"}],
+                "usage": {"input_tokens": 100, "output_tokens": 50}
+            }
+        }) + "\n")
+
+        # Create tracker in tailing state
+        tracker = SubagentTracker(
+            tool_use_id="tool-123",
+            turn_call_id="turn-456",
+            detected_at=datetime.now(timezone.utc),
+            parent_session_id="parent-session-uuid",
+        )
+        tracker.agent_id = "abc123"
+        tracker.transcript_path = agent_file
+        tracker.subagent_call_id = "subagent-call-xyz"
+        tracker.last_processed_line = 1
+
+        daemon._subagent_trackers["tool-123"] = tracker
+        daemon._subagent_by_agent_id["abc123"] = tracker
+
+        # Mock process_subagent_updates
+        daemon._process_subagent_updates = AsyncMock()
+
+        payload = {
+            "agent_transcript_path": str(agent_file),
+            "agent_id": "abc123",
+        }
+
+        result = await daemon._handle_subagent_stop(payload)
+
+        # Verify fast path was used
+        assert result["status"] == "ok"
+        daemon._process_subagent_updates.assert_called_once_with(tracker)
+        daemon.weave_client.finish_call.assert_called_once()
+
+        # Verify cleanup
+        assert "tool-123" not in daemon._subagent_trackers
+        assert "abc123" not in daemon._subagent_by_agent_id
