@@ -328,8 +328,8 @@ def format_trace_as_tree(
                 else:
                     lines.append(f"{child_prefix}├── output: {formatted_output}")
 
-        if trace.get("exception"):
-            lines.append(f"{child_prefix}├── [ERROR] {trace.get('exception')[:200]}")
+        if exc := trace.get("exception"):
+            lines.append(f"{child_prefix}├── [ERROR] {str(exc)[:200]}")
 
         children = children_map.get(trace_id, [])
         for i, child in enumerate(children):
@@ -369,8 +369,8 @@ def format_trace_as_tree(
             else:
                 lines.append(f"├── output: {formatted_output}")
 
-    if root_trace.get("exception"):
-        lines.append(f"├── [ERROR] {root_trace.get('exception')[:200]}")
+    if exc := root_trace.get("exception"):
+        lines.append(f"├── [ERROR] {str(exc)[:200]}")
 
     root_id = root_trace.get("id", "")
     children = children_map.get(root_id, [])
