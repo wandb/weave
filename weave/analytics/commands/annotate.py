@@ -1,30 +1,208 @@
-"""Annotate command for adding cluster results to traces."""
+"""Annotate command for classifying traces and adding failure analysis annotations."""
 
+import asyncio
 import json
+import os
 import sys
+from asyncio import Semaphore
+from pathlib import Path
+from typing import Any
 
 import click
+import yaml
 
+import weave
+from weave.analytics.clustering import (
+    extract_human_annotations,
+    extract_metadata,
+    final_classification,
+    get_api_key_for_model,
+)
 from weave.analytics.commands.setup import load_config
-from weave.analytics.models import ClusterOutput
+from weave.analytics.header import get_header_for_rich
+from weave.analytics.models import YAMLCluster
+from weave.analytics.prompts import build_human_annotations_section
+from weave.analytics.spinner import AnalyticsSpinner
+from weave.analytics.url_parser import build_trace_url, parse_weave_url
+from weave.analytics.weave_client import AnalyticsWeaveClient, WeaveClientConfig
 
 
 def load_env_from_config() -> None:
     """Load configuration into environment variables."""
-    import os
-
     config = load_config()
     for key, value in config.items():
         if key not in os.environ:
             os.environ[key] = value
 
 
+def load_categories_yaml(yaml_path: Path) -> dict[str, Any]:
+    """Load and validate categories from YAML file.
+
+    Args:
+        yaml_path: Path to the categories YAML file
+
+    Returns:
+        Dictionary with categories config
+
+    Raises:
+        ValueError: If the YAML file is invalid or doesn't exist
+    """
+    if not yaml_path.exists():
+        raise ValueError(f"Categories file not found: {yaml_path}")
+
+    with open(yaml_path) as f:
+        data = yaml.safe_load(f)
+
+    # Validate required fields
+    if "clusters" not in data:
+        raise ValueError("Categories YAML must contain 'clusters' field")
+
+    if not isinstance(data["clusters"], list):
+        raise ValueError("'clusters' must be a list")
+
+    # Validate each cluster
+    for i, cluster in enumerate(data["clusters"]):
+        if "cluster_name" not in cluster:
+            raise ValueError(f"Cluster {i} missing 'cluster_name'")
+        if "cluster_definition" not in cluster:
+            raise ValueError(f"Cluster {i} missing 'cluster_definition'")
+
+    return data
+
+
+@weave.op
+async def classify_trace_into_category(
+    trace_id: str,
+    trace_input: dict | str,
+    trace_output: dict | str,
+    trace_metadata: dict | str,
+    user_context: str,
+    annotation_section: str,
+    categories_str: str,
+    model: str,
+    semaphore: Semaphore,
+) -> dict[str, Any]:
+    """Classify a single trace into one of the predefined categories.
+
+    Args:
+        trace_id: The trace ID
+        trace_input: Input data for the trace
+        trace_output: Output data for the trace
+        trace_metadata: Metadata for the trace
+        user_context: User-provided context
+        annotation_section: Human annotation summary
+        categories_str: String representation of available categories
+        model: LLM model to use
+        semaphore: Concurrency limiter
+
+    Returns:
+        Dictionary with trace_id and assigned category
+    """
+    # Use the existing final_classification function
+    result = await final_classification(
+        trace_id=trace_id,
+        trace_input=trace_input,
+        trace_output=trace_output,
+        trace_metadata=trace_metadata,
+        user_context=user_context,
+        annotation_section=annotation_section,
+        execution_trace=None,
+        categories_str=categories_str,
+        model=model,
+        semaphore=semaphore,
+    )
+
+    # Get the primary category (first one if multiple)
+    pattern_categories = result.get("pattern_categories", [])
+    primary_category = pattern_categories[0] if pattern_categories else "uncategorized"
+
+    return {
+        "trace_id": trace_id,
+        "category": primary_category,
+        "all_categories": pattern_categories,
+        "reason": result.get("categorization_reason", ""),
+        "thinking": result.get("thinking", ""),
+    }
+
+
+async def run_classification_for_annotation(
+    traces: list[dict[str, Any]],
+    categories: list[dict[str, str]],
+    model: str,
+    user_context: str,
+    annotation_summary: dict[str, Any],
+    max_concurrent: int = 10,
+) -> list[dict[str, Any]]:
+    """Run classification on all traces for annotation.
+
+    Args:
+        traces: List of trace dictionaries
+        categories: List of category definitions
+        model: LLM model to use
+        user_context: User-provided context
+        annotation_summary: Human annotation summary
+        max_concurrent: Maximum concurrent LLM calls
+
+    Returns:
+        List of classification results
+    """
+    semaphore = Semaphore(max_concurrent)
+    annotation_section = build_human_annotations_section(annotation_summary)
+
+    # Build categories string for LLM prompt
+    categories_str = ""
+    for i, cat in enumerate(categories):
+        categories_str += f"\n### Category {i + 1}: {cat['name']}\n"
+        categories_str += f"**Definition:** {cat['definition']}\n"
+
+    tasks = [
+        classify_trace_into_category(
+            trace_id=trace.get("id", ""),
+            trace_input=trace.get("inputs", {}),
+            trace_output=trace.get("output", {}),
+            trace_metadata=extract_metadata(trace),
+            user_context=user_context,
+            annotation_section=annotation_section,
+            categories_str=categories_str,
+            model=model,
+            semaphore=semaphore,
+        )
+        for trace in traces
+    ]
+
+    return await asyncio.gather(*tasks)
+
+
 @click.command()
-@click.argument("cluster_output_file", type=click.Path(exists=True))
+@click.argument("url")
+@click.option(
+    "--categories",
+    "-c",
+    default="categories.yaml",
+    type=click.Path(path_type=Path),
+    help="Path to categories YAML file (default: categories.yaml in current directory)",
+)
+@click.option(
+    "--model",
+    default=None,
+    help="LiteLLM model name (default: from config or gemini/gemini-2.5-pro)",
+)
+@click.option(
+    "--limit",
+    default=None,
+    type=int,
+    help="Maximum number of traces to annotate",
+)
+@click.option(
+    "--max-concurrent",
+    default=10,
+    type=int,
+    help="Maximum concurrent LLM calls",
+)
 @click.option(
     "--annotation-name",
-    default="cluster_category",
-    help="Name for the annotation field (default: cluster_category)",
+    default="failure_analysis",
+    help="Name for the annotation field (default: failure_analysis)",
 )
 @click.option(
     "--dry-run",
@@ -32,283 +210,507 @@ def load_env_from_config() -> None:
     help="Show what would be annotated without making changes",
 )
 @click.option(
-    "--include-reason",
+    "--pretty",
     is_flag=True,
-    help="Include categorization reason in annotation payload",
+    help="Enable structured console output",
+)
+@click.option(
+    "--output",
+    "-o",
+    type=click.Path(),
+    help="Output file path for results JSON (default: stdout)",
+)
+@click.option(
+    "--context",
+    default="",
+    help="User context about the AI system being analyzed",
 )
 def annotate(
-    cluster_output_file: str,
+    url: str,
+    categories: Path,
+    model: str | None,
+    limit: int | None,
+    max_concurrent: int,
     annotation_name: str,
     dry_run: bool,
-    include_reason: bool,
+    pretty: bool,
+    output: str | None,
+    context: str,
 ) -> None:
-    """Add structured annotations from cluster output to traces.
+    """Classify traces and add failure analysis annotations.
 
-    Reads cluster output (from cluster command) and adds annotations
-    to each trace with its assigned category and metadata.
+    Fetches traces from the given URL, classifies each into one of the
+    predefined categories from the YAML file, and adds annotations to Weave.
+
+    \b
+    URL can be either:
+    - A trace list URL with filters: https://wandb.ai/entity/project/weave/traces?filter=...
+    - An individual call URL: https://wandb.ai/entity/project/weave/calls/abc123
+
+    \b
+    The categories YAML file should have the structure output by 'weave analytics cluster':
+    name: Project Trace Clusters
+    weave_project: my-project
+    weave_entity: my-entity
+    last_clustering: '2025-12-12'
+    trace_list: <trace-url>
+    clusters:
+      - cluster_name: authentication_issues
+        cluster_definition: >
+          Traces related to users being unable to log in...
+        sample_traces:
+          - <trace-url>
 
     \b
     Examples:
-        # Annotate traces with cluster categories
-        weave analytics annotate data.json
+        # Annotate traces using local categories.yaml
+        weave analytics annotate "https://wandb.ai/my-team/my-project/weave/traces?..."
 
     \b
-        # Dry run to preview annotations
-        weave analytics annotate data.json --dry-run
+        # Use specific categories file
+        weave analytics annotate "..." --categories my-categories.yaml
 
     \b
-        # Include categorization reason in annotations
-        weave analytics annotate data.json --include-reason
+        # Dry run to preview classifications
+        weave analytics annotate "..." --dry-run
 
     \b
-        # Custom annotation name
-        weave analytics annotate data.json --annotation-name "failure_pattern"
+        # Limit to 20 traces
+        weave analytics annotate "..." --limit 20 --pretty
     """
     # Import rich here to avoid slow startup
     from rich.console import Console
     from rich.panel import Panel
     from rich.table import Table
 
-    import weave
-    from weave.analytics.header import get_header_for_rich
-    from weave.analytics.spinner import AnalyticsSpinner
-
     # Load config
     load_env_from_config()
 
     # Create console
     console = Console(stderr=True)
-    console.print(get_header_for_rich())
-    console.print()
 
-    # Load cluster output
+    if pretty or dry_run:
+        console.print(get_header_for_rich())
+        console.print()
+
+    # Load categories
     try:
-        with open(cluster_output_file) as f:
-            cluster_data = json.load(f)
-        cluster_output = ClusterOutput(**cluster_data)
-    except Exception as e:
-        console.print(f"[red]Error loading cluster output:[/red] {e}")
+        categories_config = load_categories_yaml(categories)
+    except ValueError as e:
+        console.print(f"[red]Error loading categories:[/red] {e}")
         sys.exit(1)
 
+    # Get model from config or use default
+    config = load_config()
+    if model is None:
+        model = config.get("LLM_MODEL", "gemini/gemini-2.5-pro")
+
+    # Parse URL
+    try:
+        parsed_url = parse_weave_url(url)
+    except ValueError as e:
+        console.print(f"[red]Error:[/red] {e}")
+        sys.exit(1)
+
+    # Build category list
+    category_list = []
+    category_definitions = {}
+    for cluster in categories_config["clusters"]:
+        name = cluster["cluster_name"]
+        definition = cluster["cluster_definition"]
+        category_list.append({"name": name, "definition": definition})
+        category_definitions[name] = definition
+
     # Show configuration
-    config_info = f"""[bold]Entity:[/bold] {cluster_output.entity}
-[bold]Project:[/bold] {cluster_output.project}
-[bold]Total Traces:[/bold] {cluster_output.total_traces}
+    if pretty or dry_run:
+        config_info = f"""[bold]Entity:[/bold] {parsed_url.entity}
+[bold]Project:[/bold] {parsed_url.project}
+[bold]Model:[/bold] {model}
+[bold]Categories:[/bold] {len(category_list)}
 [bold]Annotation Name:[/bold] {annotation_name}
-[bold]Include Reason:[/bold] {include_reason}
+[bold]Limit:[/bold] {limit or 'all'}
 [bold]Dry Run:[/bold] {dry_run}"""
-    console.print(Panel(config_info, title="Configuration", border_style="cyan"))
-    console.print()
+        console.print(Panel(config_info, title="Configuration", border_style="cyan"))
+        console.print()
 
-    # Show cluster summary
-    console.print("[bold cyan]Cluster Summary[/bold cyan]")
-    summary_table = Table(show_header=True, header_style="bold cyan", box=None)
-    summary_table.add_column("Category", style="bright_magenta")
-    summary_table.add_column("Count", justify="right")
-    summary_table.add_column("Percentage", justify="right")
+        # Show categories
+        categories_table = Table(show_header=True, header_style="bold cyan", box=None)
+        categories_table.add_column("Category", style="bright_magenta")
+        categories_table.add_column("Definition", style="white")
 
-    for cluster_group in cluster_output.clusters:
-        pct = cluster_group.percentage
-        if pct >= 30:
-            pct_style = "bright_magenta"
-        elif pct >= 10:
-            pct_style = "yellow"
+        for cat in category_list:
+            definition_short = cat["definition"][:60] + "..." if len(cat["definition"]) > 60 else cat["definition"]
+            categories_table.add_row(cat["name"], definition_short)
+
+        console.print(Panel(
+            categories_table,
+            title=f"Categories from {categories}",
+            border_style="cyan",
+        ))
+        console.print()
+
+    # Initialize analytics client for fetching traces
+    try:
+        client_config = WeaveClientConfig(
+            entity=parsed_url.entity,
+            project=parsed_url.project,
+        )
+        analytics_client = AnalyticsWeaveClient(client_config)
+    except ValueError as e:
+        console.print(f"[red]Error:[/red] {e}")
+        console.print("[dim]Run 'weave analytics setup' to configure your credentials.[/dim]")
+        sys.exit(1)
+
+    # Step 1: Fetch traces
+    if pretty or dry_run:
+        console.print("[bold cyan]Step 1: Fetching Traces[/bold cyan]")
+        spinner = AnalyticsSpinner("Fetching traces from Weave")
+        spinner.start()
+
+    try:
+        if parsed_url.url_type == "call" and parsed_url.trace_id:
+            traces = analytics_client.query_by_call_id(parsed_url.trace_id)
         else:
-            pct_style = "white"
+            traces = analytics_client.query_traces_with_filters(
+                filters=parsed_url.filters,
+                limit=limit,
+            )
+    except Exception as e:
+        if pretty or dry_run:
+            spinner.stop("Failed to fetch traces", success=False)
+        console.print(f"[red]Error fetching traces:[/red] {e}")
+        sys.exit(1)
 
-        summary_table.add_row(
-            cluster_group.category_name.replace("_", " ").title(),
-            str(cluster_group.count),
-            f"[{pct_style}]{pct:.1f}%[/{pct_style}]",
+    if pretty or dry_run:
+        spinner.stop(f"Found {len(traces)} traces", success=True)
+
+    if not traces:
+        console.print("[yellow]No traces found matching the criteria.[/yellow]")
+        sys.exit(1)
+
+    # Step 2: Resolve references
+    if pretty or dry_run:
+        console.print("\n[bold cyan]Step 2: Resolving References[/bold cyan]")
+        spinner = AnalyticsSpinner("Resolving Weave references")
+        spinner.start()
+
+    all_refs = []
+    for trace in traces:
+        all_refs.extend(analytics_client.collect_refs(trace))
+
+    if all_refs:
+        try:
+            resolved = analytics_client.read_refs_batch(list(set(all_refs)))
+            ref_map = dict(zip(set(all_refs), resolved))
+            traces = [analytics_client.replace_refs(t, ref_map) for t in traces]
+            if pretty or dry_run:
+                spinner.stop(f"Resolved {len(set(all_refs))} references", success=True)
+        except Exception as e:
+            if pretty or dry_run:
+                spinner.stop(f"Warning: Could not resolve refs: {e}", success=False)
+    elif pretty or dry_run:
+        spinner.stop("No references to resolve", success=True)
+
+    # Fetch feedback for annotations
+    if pretty or dry_run:
+        console.print("\n[bold cyan]Step 3: Fetching Feedback[/bold cyan]")
+        spinner = AnalyticsSpinner("Fetching feedback")
+        spinner.start()
+
+    try:
+        traces = analytics_client.fetch_feedback_for_traces(traces)
+        traces_with_feedback = sum(1 for t in traces if t.get("feedback"))
+        if pretty or dry_run:
+            spinner.stop(f"Found feedback for {traces_with_feedback} traces", success=True)
+    except Exception as e:
+        if pretty or dry_run:
+            spinner.stop(f"Warning: {e}", success=False)
+
+    # Extract human annotations
+    annotation_examples = []
+    for trace in traces:
+        annotations = extract_human_annotations(trace)
+        if annotations:
+            annotation_examples.append({"trace_id": trace.get("id"), "annotations": annotations})
+
+    annotation_summary = {
+        "has_annotations": len(annotation_examples) > 0,
+        "examples": annotation_examples[:5],
+    }
+
+    # Build user context
+    if not context:
+        context = (
+            f"This is an AI system in the '{parsed_url.project}' project. "
+            f"We are classifying traces into {len(category_list)} predefined failure categories."
         )
 
-    console.print(summary_table)
-    console.print()
+    # Step 4: Classify traces using LLM
+    if pretty or dry_run:
+        console.print("\n[bold cyan]Step 4: Classifying Traces[/bold cyan]")
+        spinner = AnalyticsSpinner(f"Classifying {len(traces)} traces")
+        spinner.start()
 
+    try:
+        classifications = asyncio.run(
+            run_classification_for_annotation(
+                traces=traces,
+                categories=category_list,
+                model=model,
+                user_context=context,
+                annotation_summary=annotation_summary,
+                max_concurrent=max_concurrent,
+            )
+        )
+    except Exception as e:
+        if pretty or dry_run:
+            spinner.stop("Classification failed", success=False)
+        console.print(f"[red]Error during classification:[/red] {e}")
+        import traceback
+        console.print(f"[dim]{traceback.format_exc()}[/dim]")
+        sys.exit(1)
+
+    if pretty or dry_run:
+        spinner.stop(f"Classified {len(classifications)} traces", success=True)
+
+    # Build histogram of categories
+    category_counts: dict[str, int] = {}
+    classification_map: dict[str, dict[str, Any]] = {}
+
+    for classification in classifications:
+        trace_id = classification["trace_id"]
+        category = classification["category"]
+        classification_map[trace_id] = classification
+
+        if category not in category_counts:
+            category_counts[category] = 0
+        category_counts[category] += 1
+
+    # Sort by count descending
+    sorted_categories = sorted(category_counts.items(), key=lambda x: x[1], reverse=True)
+
+    # Display histogram
+    if pretty or dry_run:
+        console.print("\n[bold cyan]Classification Distribution (Histogram)[/bold cyan]")
+
+        histogram_table = Table(show_header=True, header_style="bold cyan", box=None)
+        histogram_table.add_column("Category", style="bright_magenta")
+        histogram_table.add_column("Count", justify="right")
+        histogram_table.add_column("Percentage", justify="right")
+        histogram_table.add_column("Bar", style="green")
+
+        max_count = max(category_counts.values()) if category_counts else 1
+
+        for category, count in sorted_categories:
+            pct = (count / len(traces)) * 100
+            bar_length = int((count / max_count) * 30)
+            bar = "█" * bar_length
+
+            if pct >= 30:
+                pct_style = "bright_magenta"
+            elif pct >= 10:
+                pct_style = "yellow"
+            else:
+                pct_style = "white"
+
+            histogram_table.add_row(
+                category,
+                str(count),
+                f"[{pct_style}]{pct:.1f}%[/{pct_style}]",
+                bar,
+            )
+
+        console.print(histogram_table)
+        console.print()
+
+    # Dry run - show sample annotations
     if dry_run:
         console.print("[yellow]DRY RUN MODE - No changes will be made[/yellow]")
         console.print()
 
-        # Show sample annotations for each cluster
-        for cluster_group in cluster_output.clusters[:3]:
-            console.print(f"[bold]{cluster_group.category_name}[/bold]")
-            console.print(f"[dim]{cluster_group.category_definition}[/dim]")
+        # Show sample classifications
+        console.print("[bold]Sample Classifications:[/bold]")
+        for i, classification in enumerate(classifications[:5]):
+            trace_id = classification["trace_id"]
+            category = classification["category"]
+            reason = classification["reason"]
 
-            for trace in cluster_group.traces[:2]:
-                console.print(f"  • Trace: {trace.trace_id}")
-                console.print(f"    URL: {trace.trace_url}")
+            console.print(f"\n  [bold]Trace {i + 1}:[/bold] {trace_id[:16]}...")
+            console.print(f"    [bright_magenta]Category:[/bright_magenta] {category}")
+            console.print(f"    [dim]Reason:[/dim] {reason[:100]}..." if len(reason) > 100 else f"    [dim]Reason:[/dim] {reason}")
 
-                annotation_payload = {
-                    "category": cluster_group.category_name,
-                    "category_definition": cluster_group.category_definition,
-                }
-                if include_reason:
-                    annotation_payload["categorization_reason"] = trace.categorization_reason
-
-                console.print(f"    Annotation: {json.dumps(annotation_payload, indent=2)}")
-            console.print()
-
-        console.print("[green]✓[/green] Dry run complete. Use without --dry-run to apply annotations.")
+        console.print("\n[green]✓[/green] Dry run complete. Remove --dry-run to apply annotations.")
         return
 
-    # Initialize Weave client
+    # Step 5: Apply annotations to Weave
+    if pretty:
+        console.print("\n[bold cyan]Step 5: Applying Annotations to Weave[/bold cyan]")
+
+    # Initialize Weave client for annotations
     try:
-        project_path = f"{cluster_output.entity}/{cluster_output.project}"
-        client = weave.init(project_path)
+        project_path = f"{parsed_url.entity}/{parsed_url.project}"
+        weave_client = weave.init(project_path)
     except Exception as e:
         console.print(f"[red]Error initializing Weave client:[/red] {e}")
-        console.print("[dim]Run 'weave analytics setup' to configure your credentials.[/dim]")
         sys.exit(1)
 
-    # Create AnnotationSpec objects for human annotations
-    console.print("[bold cyan]Creating Annotation Specs[/bold cyan]")
-    spinner = AnalyticsSpinner("Creating annotation specs")
-    spinner.start()
+    # Create AnnotationSpec for the failure analysis field
+    if pretty:
+        spinner = AnalyticsSpinner("Creating annotation spec")
+        spinner.start()
 
     try:
         from weave import AnnotationSpec
 
-        # Get all unique categories from the cluster output
-        all_categories = sorted(set(
-            cluster_group.category_name
-            for cluster_group in cluster_output.clusters
-        ))
+        # Get all unique categories
+        all_categories = sorted(set(category_counts.keys()))
 
-        # Create annotation spec for category (enum of all categories)
-        category_spec = AnnotationSpec(
+        # Build description with category definitions for reference
+        category_descriptions = "\n".join([
+            f"• {cat['name']}: {cat['definition'][:100]}..."
+            if len(cat['definition']) > 100
+            else f"• {cat['name']}: {cat['definition']}"
+            for cat in category_list
+        ])
+
+        # Create annotation spec with name, description, and enum schema
+        # Following the pattern from Weave docs:
+        # https://docs.wandb.ai/weave/guides/tracking/feedback#create-a-human-annotation-scorer-using-the-api
+        failure_spec = AnnotationSpec(
+            name="Failure Analysis",
+            description=(
+                f"AI-powered failure categorization generated by `weave analytics annotate`. "
+                f"Categories were discovered using `weave analytics cluster` on {categories_config.get('last_clustering', 'unknown date')}. "
+                f"Source categories file: {categories}. "
+                f"\n\nAvailable categories:\n{category_descriptions}"
+            ),
             field_schema={
                 "type": "string",
                 "enum": all_categories,
-                "description": "The cluster category this trace belongs to",
-            }
+            },
         )
 
-        # Create annotation spec for definition (string)
-        definition_spec = AnnotationSpec(
-            field_schema={
-                "type": "string",
-                "description": "Definition of the cluster category",
-            }
-        )
+        # Publish the annotation spec
+        failure_ref = weave.publish(failure_spec, name=annotation_name)
 
-        # Publish annotation specs
-        category_ref = weave.publish(category_spec, name=f"{annotation_name}_category")
-        definition_ref = weave.publish(definition_spec, name=f"{annotation_name}_definition")
-
-        annotation_refs = {
-            "category": category_ref,
-            "definition": definition_ref,
-        }
-
-        if include_reason:
-            # Create annotation spec for reason (string)
-            reason_spec = AnnotationSpec(
-                field_schema={
-                    "type": "string",
-                    "description": "Explanation for why this trace was categorized this way",
-                }
-            )
-            reason_ref = weave.publish(reason_spec, name=f"{annotation_name}_reason")
-            annotation_refs["reason"] = reason_ref
-
-        spinner.stop(
-            f"Created {len(annotation_refs)} annotation spec(s): {', '.join(annotation_refs.keys())}",
-            success=True,
-        )
+        if pretty:
+            spinner.stop(f"Created annotation spec: {annotation_name}", success=True)
     except Exception as e:
-        spinner.stop(f"Failed to create annotation specs: {e}", success=False)
-        console.print(f"[red]Error:[/red] {e}")
+        if pretty:
+            spinner.stop(f"Failed: {e}", success=False)
+        console.print(f"[red]Error creating annotation spec:[/red] {e}")
         sys.exit(1)
 
-    # Add annotations
-    console.print("\n[bold cyan]Adding Annotations[/bold cyan]")
-    spinner = AnalyticsSpinner(f"Annotating {cluster_output.total_traces} traces")
-    spinner.start()
-
-    success_count = 0
-    error_count = 0
+    # Apply annotations to each trace
+    if pretty:
+        spinner = AnalyticsSpinner(f"Annotating {len(traces)} traces")
+        spinner.start()
 
     from weave.trace_server.interface.feedback_types import ANNOTATION_FEEDBACK_TYPE_PREFIX
     from weave.trace_server.trace_server_interface import FeedbackCreateReq
 
-    # Prepare annotation data for each field
-    annotation_data = {
-        "category": {},
-        "definition": {},
+    success_count = 0
+    error_count = 0
+    annotation_ref_uri = str(failure_ref.uri())
+    feedback_type = f"{ANNOTATION_FEEDBACK_TYPE_PREFIX}.{annotation_name}"
+
+    for trace in traces:
+        trace_id = trace.get("id", "")
+        classification = classification_map.get(trace_id, {})
+        category = classification.get("category", "uncategorized")
+
+        try:
+            # Build weave ref for the trace
+            weave_ref = f"weave:///{parsed_url.entity}/{parsed_url.project}/call/{trace_id}"
+
+            # Create feedback payload with the category value
+            payload = {"value": category}
+
+            # Create feedback as annotation
+            feedback_req = FeedbackCreateReq(
+                project_id=project_path,
+                weave_ref=weave_ref,
+                feedback_type=feedback_type,
+                payload=payload,
+                annotation_ref=annotation_ref_uri,
+            )
+
+            weave_client.server.feedback_create(feedback_req)
+            success_count += 1
+
+        except Exception as e:
+            error_count += 1
+            if error_count <= 3:
+                console.print(f"[yellow]Warning: Failed to annotate {trace_id}: {e}[/yellow]")
+
+    if pretty:
+        spinner.stop(
+            f"Annotated {success_count} traces ({error_count} errors)",
+            success=error_count == 0,
+        )
+
+    # Build output results
+    output_results = []
+    for trace in traces:
+        trace_id = trace.get("id", "")
+        classification = classification_map.get(trace_id, {})
+
+        output_results.append({
+            "trace_id": trace_id,
+            "trace_url": build_trace_url(parsed_url.entity, parsed_url.project, trace_id),
+            "category": classification.get("category", "uncategorized"),
+            "all_categories": classification.get("all_categories", []),
+            "reason": classification.get("reason", ""),
+        })
+
+    final_output = {
+        "total_traces": len(traces),
+        "entity": parsed_url.entity,
+        "project": parsed_url.project,
+        "annotation_name": annotation_name,
+        "annotations_created": success_count,
+        "annotations_failed": error_count,
+        "category_distribution": [
+            {
+                "category": cat,
+                "count": count,
+                "percentage": (count / len(traces)) * 100,
+            }
+            for cat, count in sorted_categories
+        ],
+        "results": output_results,
     }
-    if include_reason:
-        annotation_data["reason"] = {}
 
-    for cluster_group in cluster_output.clusters:
-        for trace in cluster_group.traces:
-            annotation_data["category"][trace.trace_id] = cluster_group.category_name
-            annotation_data["definition"][trace.trace_id] = cluster_group.category_definition
-            if include_reason:
-                annotation_data["reason"][trace.trace_id] = trace.categorization_reason
+    # Output results
+    result_json = json.dumps(final_output, indent=2 if pretty else None)
 
-    # Create feedback for each field/annotation spec separately
-    for field_name, annotation_ref in annotation_refs.items():
-        annotation_ref_uri = str(annotation_ref.uri())
-        feedback_type = f"{ANNOTATION_FEEDBACK_TYPE_PREFIX}.{annotation_name}_{field_name}"
-
-        for trace_id, value in annotation_data[field_name].items():
-            try:
-                # Payload for annotation feedback - must use {"value": ...} format
-                payload = {"value": value}
-
-                # Build weave ref for the trace
-                weave_ref = (
-                    f"weave:///{cluster_output.entity}/{cluster_output.project}/call/{trace_id}"
-                )
-
-                # Create feedback as annotation (shows up in Annotations/Feedback)
-                feedback_req = FeedbackCreateReq(
-                    project_id=project_path,
-                    weave_ref=weave_ref,
-                    feedback_type=feedback_type,
-                    payload=payload,
-                    annotation_ref=annotation_ref_uri,
-                )
-
-                client.server.feedback_create(feedback_req)
-                success_count += 1
-
-            except Exception as e:
-                error_count += 1
-                if error_count <= 3:
-                    console.print(
-                        f"[yellow]Warning: Failed to annotate {trace_id} for {field_name}: {e}[/yellow]"
-                    )
-
-    total_feedbacks = success_count
-    total_traces = cluster_output.total_traces
-    fields_per_trace = len(annotation_refs)
-
-    spinner.stop(
-        f"Created {total_feedbacks} annotation entries ({error_count} errors)",
-        success=error_count == 0,
-    )
+    if output:
+        with open(output, "w") as f:
+            f.write(result_json)
+        if pretty:
+            console.print(f"\n[green]✓[/green] Results saved to [cyan]{output}[/cyan]")
+    else:
+        # Print JSON to stdout
+        print(result_json)
 
     # Final summary
-    console.print()
-    if error_count == 0:
-        console.print(
-            Panel(
-                f"[green]✓ Successfully added {fields_per_trace} annotation field(s) to {total_traces} traces[/green]",
-                border_style="green",
-            )
-        )
-    else:
-        console.print(
-            Panel(
-                f"[yellow]⚠ Created {success_count} annotation entries with {error_count} errors[/yellow]",
-                border_style="yellow",
-            )
-        )
-        console.print(
-            "[dim]Some traces may already have annotations or may no longer exist.[/dim]"
-        )
+    if pretty:
+        console.print()
+        console.print(Panel(
+            f"""[green]✓ Annotation Complete[/green]
 
-    console.print(
-        f"\n[dim]View annotated traces at: https://wandb.ai/{cluster_output.entity}/{cluster_output.project}/weave/traces[/dim]"
-    )
+[bold]Traces Annotated:[/bold] {success_count}/{len(traces)}
+[bold]Annotation Field:[/bold] {annotation_name}
+[bold]Categories Found:[/bold] {len(category_counts)}
+
+[bold]Top Categories:[/bold]""" + "".join([
+    f"\n  • {cat}: {count} ({(count/len(traces))*100:.1f}%)"
+    for cat, count in sorted_categories[:5]
+]),
+            title="Summary",
+            border_style="green",
+        ))
+
+        console.print(
+            f"\n[dim]View annotated traces at: https://wandb.ai/{parsed_url.entity}/{parsed_url.project}/weave/traces[/dim]"
+        )
