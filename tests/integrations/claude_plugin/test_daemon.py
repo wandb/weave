@@ -123,3 +123,18 @@ class TestSubagentTracker:
         tracker.subagent_call_id = "weave-call-xyz"
 
         assert tracker.is_tailing is True
+
+
+class TestWeaveDaemonTrackerDicts:
+    """Test WeaveDaemon tracker dictionaries."""
+
+    def test_daemon_has_subagent_tracker_dicts(self):
+        """WeaveDaemon has dictionaries for tracking subagents."""
+        from weave.integrations.claude_plugin.daemon import WeaveDaemon
+
+        daemon = WeaveDaemon("test-session-123")
+
+        assert hasattr(daemon, '_subagent_trackers')
+        assert hasattr(daemon, '_subagent_by_agent_id')
+        assert isinstance(daemon._subagent_trackers, dict)
+        assert isinstance(daemon._subagent_by_agent_id, dict)
