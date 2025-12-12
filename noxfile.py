@@ -227,7 +227,7 @@ def tests(session: nox.Session, shard: str):
     elif shard == "trace_calls_complete":
         # Run trace tests with calls_complete table instead of legacy calls_merged table
         pytest_args.extend(
-            ["-m", "trace_server", "--calls-storage-mode=calls_complete"]
+            ["-m", "trace_server", "--calls-storage-mode=dual_write_read_complete"]
         )
     elif shard == "stainless":
         pytest_args.extend(["--remote-http-trace-server=stainless"])
