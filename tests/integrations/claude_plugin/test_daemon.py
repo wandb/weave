@@ -564,3 +564,45 @@ class TestSubagentStopFastPath:
         # Verify cleanup
         assert "tool-123" not in daemon._subagent_trackers
         assert "abc123" not in daemon._subagent_by_agent_id
+
+
+class TestCleanupStaleSubagentTrackers:
+    """Test cleanup of stale subagent trackers."""
+
+    @pytest.mark.anyio
+    async def test_cleanup_stale_subagent_trackers(self):
+        """Stale subagent trackers are cleaned up after timeout."""
+        from datetime import datetime, timezone, timedelta
+
+        from weave.integrations.claude_plugin.daemon import (
+            WeaveDaemon,
+            SubagentTracker,
+            SUBAGENT_DETECTION_TIMEOUT,
+        )
+
+        daemon = WeaveDaemon("test-session")
+
+        # Create a stale tracker (detected 15 seconds ago, beyond 10s timeout)
+        stale_tracker = SubagentTracker(
+            tool_use_id="stale-tool",
+            turn_call_id="turn-456",
+            detected_at=datetime.now(timezone.utc) - timedelta(seconds=15),
+            parent_session_id="test-session",
+        )
+        daemon._subagent_trackers["stale-tool"] = stale_tracker
+
+        # Create a fresh tracker (detected 2 seconds ago)
+        fresh_tracker = SubagentTracker(
+            tool_use_id="fresh-tool",
+            turn_call_id="turn-789",
+            detected_at=datetime.now(timezone.utc) - timedelta(seconds=2),
+            parent_session_id="test-session",
+        )
+        daemon._subagent_trackers["fresh-tool"] = fresh_tracker
+
+        daemon._cleanup_stale_subagent_trackers()
+
+        # Stale tracker should be removed
+        assert "stale-tool" not in daemon._subagent_trackers
+        # Fresh tracker should remain
+        assert "fresh-tool" in daemon._subagent_trackers
