@@ -995,15 +995,22 @@ class WeaveDaemon:
                 "end_reason": payload.get("reason", "unknown"),
             }
 
-            # Generate session-level diff view showing all file changes
-            if self.transcript_path:
+            # Parse session for additional data and diff view
+            if self.transcript_path and self.transcript_path.exists():
                 session = parse_session_file(self.transcript_path)
                 if session:
+                    # Add aggregated usage from session
+                    total_usage = session.total_usage()
+                    output["model"] = session.primary_model()
+                    output["usage"] = total_usage.to_weave_usage()
+                    output["duration_ms"] = session.duration_ms()
+
                     # Get cwd from session for resolving relative paths
                     cwd = session.cwd
                     # Get sessions directory for finding subagent files
                     sessions_dir = self.transcript_path.parent
 
+                    # Generate session-level diff view showing all file changes
                     diff_html = generate_session_diff_html(
                         session, cwd=cwd, sessions_dir=sessions_dir
                     )
@@ -1017,6 +1024,25 @@ class WeaveDaemon:
                             mimetype="text/html",
                         )
                         logger.debug("Attached session diff HTML view")
+                    else:
+                        logger.debug("No session diff HTML generated (no file changes)")
+
+                # Attach session JSONL file as Content object
+                try:
+                    from weave.type_wrappers.Content.content import Content
+                    session_content = Content.from_path(
+                        self.transcript_path,
+                        metadata={
+                            "session_id": self.session_id,
+                            "filename": self.transcript_path.name,
+                        },
+                    )
+                    output["file_snapshots"] = {
+                        "session.jsonl": session_content,
+                    }
+                    logger.debug(f"Attached session file: {self.transcript_path.name}")
+                except Exception as e:
+                    logger.debug(f"Failed to attach session file: {e}")
 
             self.weave_client.finish_call(session_call, output=output)
             self.weave_client.flush()

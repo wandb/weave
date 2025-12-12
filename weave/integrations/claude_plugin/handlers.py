@@ -23,7 +23,10 @@ from weave.trace.context.weave_client_context import require_weave_client
 from weave.trace.view_utils import set_call_view
 from weave.type_wrappers.Content.content import Content
 
-from weave.integrations.claude_plugin.diff_view import generate_turn_diff_html
+from weave.integrations.claude_plugin.diff_view import (
+    generate_session_diff_html,
+    generate_turn_diff_html,
+)
 from weave.integrations.claude_plugin.session_parser import (
     Session,
     ToolCall,
@@ -35,14 +38,39 @@ from weave.integrations.claude_plugin.state import (
     create_session_data,
 )
 from weave.integrations.claude_plugin.utils import (
+    extract_command_output,
+    extract_slash_command,
     generate_session_name,
     get_tool_display_name,
+    is_command_output,
     truncate,
 )
 
 # Use the same logger setup as hook.py for consistent debug output
 # Test edit to verify diff view is working correctly
 logger = logging.getLogger("weave.integrations.claude_plugin.hook")
+
+
+def _get_turn_display_name(turn_number: int, user_prompt: str) -> str:
+    """Generate a clean display name for a turn.
+
+    Handles special cases like slash commands to avoid showing raw XML tags.
+
+    Args:
+        turn_number: The turn number (1-indexed)
+        user_prompt: The raw user prompt text
+
+    Returns:
+        Display name like "Turn 1: /plugin" or "Turn 2: Fix the bug..."
+    """
+    # Check if this is a slash command message
+    slash_command = extract_slash_command(user_prompt)
+    if slash_command:
+        return f"Turn {turn_number}: {slash_command}"
+
+    # Regular prompt - truncate to 50 chars
+    turn_preview = truncate(user_prompt, 50) or f"Turn {turn_number}"
+    return f"Turn {turn_number}: {turn_preview}"
 
 
 def _find_turn_by_prompt(session: Session, prompt_prefix: str) -> Turn | None:
@@ -144,6 +172,7 @@ def _build_turn_output(
     turn: Turn | None,
     session: Session | None = None,
     interrupted: bool = False,
+    command_output: str | None = None,
 ) -> dict[str, Any]:
     """Build the output dict for a turn call.
 
@@ -151,6 +180,7 @@ def _build_turn_output(
         turn: The turn data (may be None if not found in transcript)
         session: The session data (for loading file backups)
         interrupted: Whether the turn was interrupted by user
+        command_output: Output from a slash command to include in response
 
     Returns:
         Output dict for the turn call
@@ -159,6 +189,9 @@ def _build_turn_output(
 
     if interrupted:
         output["interrupted"] = True
+
+    if command_output:
+        output["command_output"] = command_output
 
     if turn:
         turn_usage = turn.total_usage()
@@ -372,7 +405,6 @@ def handle_user_prompt_submit(
 
             # Create first turn call
             # Note: Images are captured at Stop time when transcript is complete
-            turn_preview = truncate(user_prompt, 50) or "Turn 1"
             turn_call = client.create_call(
                 op="claude_code.turn",
                 inputs={
@@ -382,7 +414,7 @@ def handle_user_prompt_submit(
                 attributes={
                     "turn_number": turn_number,
                 },
-                display_name=f"Turn {turn_number}: {turn_preview}",
+                display_name=_get_turn_display_name(turn_number, user_prompt),
                 use_stack=False,
             )
 
@@ -407,6 +439,25 @@ def handle_user_prompt_submit(
             }
 
         else:
+            # Check if this is command output that should be merged with previous turn
+            if is_command_output(user_prompt):
+                # Don't create a new turn for command output
+                # The output will be attached to the previous command turn at Stop time
+                logger.debug(
+                    f"UserPromptSubmit: skipping turn creation for command output"
+                )
+                # Decrement turn number since we didn't actually create a turn
+                session_data["turn_number"] = turn_number - 1
+                # Store the command output to merge with previous turn
+                prev_output = session_data.get("pending_command_output", "")
+                cmd_output = extract_command_output(user_prompt)
+                if cmd_output:
+                    session_data["pending_command_output"] = (
+                        prev_output + "\n" + cmd_output if prev_output else cmd_output
+                    )
+                state.save_session(session_id, session_data, cwd=cwd)
+                return None
+
             # Subsequent turn - reconstruct session call as parent
             session_call = _reconstruct_parent_call(
                 client._project_id(),
@@ -418,7 +469,6 @@ def handle_user_prompt_submit(
             # Note: Images are captured at Stop time when transcript is complete
             # We don't parse transcript here because the current turn's message
             # may not be written yet when UserPromptSubmit fires
-            turn_preview = truncate(user_prompt, 50) or f"Turn {turn_number}"
             turn_call = client.create_call(
                 op="claude_code.turn",
                 inputs={
@@ -428,13 +478,15 @@ def handle_user_prompt_submit(
                 attributes={
                     "turn_number": turn_number,
                 },
-                display_name=f"Turn {turn_number}: {turn_preview}",
+                display_name=_get_turn_display_name(turn_number, user_prompt),
                 use_stack=False,
             )
 
             session_data["turn_call_id"] = turn_call.id
             # Store prompt prefix to identify this turn at Stop time
             session_data["turn_prompt_prefix"] = user_prompt[:200] if user_prompt else ""
+            # Clear any pending command output since this is a new turn
+            session_data["pending_command_output"] = None
             state.save_session(session_id, session_data, cwd=cwd)
 
             client.flush()
@@ -534,8 +586,17 @@ def handle_stop(payload: dict[str, Any], project: str) -> dict[str, Any] | None:
         if turn:
             _log_tool_calls(turn, turn_call, session_data)
 
+        # Get any pending command output to include in turn output
+        pending_command_output = session_data.get("pending_command_output")
+
         # Build turn output with file snapshots
-        output = _build_turn_output(turn, session=session)
+        output = _build_turn_output(
+            turn, session=session, command_output=pending_command_output
+        )
+
+        # Clear pending command output after using it
+        if pending_command_output:
+            session_data["pending_command_output"] = None
 
         # Generate diff HTML for summary view
         if turn and session:
@@ -771,6 +832,44 @@ def handle_session_end(payload: dict[str, Any], project: str) -> dict[str, Any] 
             session_output["model"] = session.primary_model()
             session_output["usage"] = total_usage.to_weave_usage()
             session_output["duration_ms"] = session.duration_ms()
+
+        # Parse session for diff view and attach session file
+        transcript_file_path = Path(transcript_path) if transcript_path else None
+        if transcript_file_path and transcript_file_path.exists():
+            if session:
+                # Generate session-level diff view showing all file changes
+                diff_html = generate_session_diff_html(
+                    session,
+                    cwd=session.cwd,
+                    sessions_dir=transcript_file_path.parent,
+                )
+
+                if diff_html:
+                    set_call_view(
+                        call=session_call,
+                        client=client,
+                        name="file_changes",
+                        content=diff_html,
+                        extension="html",
+                        mimetype="text/html",
+                    )
+                    logger.debug("Attached session diff HTML view")
+
+            # Attach session JSONL file as Content object
+            try:
+                session_content = Content.from_path(
+                    transcript_file_path,
+                    metadata={
+                        "session_id": session_id,
+                        "filename": transcript_file_path.name,
+                    },
+                )
+                session_output["file_snapshots"] = {
+                    "session.jsonl": session_content,
+                }
+                logger.debug(f"Attached session file: {transcript_file_path.name}")
+            except Exception as e:
+                logger.debug(f"Failed to attach session file: {e}")
 
         # Finish the session call
         client.finish_call(session_call, output=session_output)
