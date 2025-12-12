@@ -130,7 +130,13 @@ class WeaveDaemon:
         self.tool_counts: dict[str, int] = {}
         self._current_turn_tool_calls: list[str] = []
         # Track pending subagent Task tool calls: tool_use_id -> turn_call_id
-        self._pending_subagent_tasks: dict[str, str] = {}
+        self._pending_subagent_tasks: dict[str, str] = {}  # Keep for backwards compat
+
+        # NEW: Full lifecycle tracking for proactive subagent tailing
+        # Primary index: tool_use_id (known at detection)
+        self._subagent_trackers: dict[str, SubagentTracker] = {}
+        # Secondary index: agent_id (known once file found, for SubagentStop lookup)
+        self._subagent_by_agent_id: dict[str, SubagentTracker] = {}
 
     async def start(self) -> None:
         """Start the daemon."""
