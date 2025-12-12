@@ -103,6 +103,39 @@ class SubagentTracker:
         return self.subagent_call_id is not None
 
 
+@dataclass
+class InlineParentTracker:
+    """Tracks inline parent calls (Skill, PlanMode) through their lifecycle.
+
+    These are tools that create a parent container for subsequent tool calls,
+    similar to subagents but without a separate transcript file.
+    """
+
+    tool_use_id: str
+    parent_type: str  # "skill" or "plan_mode"
+    name: str  # skill name or "PlanMode"
+    parent_turn_call_id: str
+    detected_at: datetime
+    call_id: str | None = None  # Set when activated (first turn detected)
+
+    @property
+    def is_active(self) -> bool:
+        """True if the inline parent call has been created."""
+        return self.call_id is not None
+
+    @property
+    def op_name(self) -> str:
+        """The Weave op name for this inline parent type."""
+        return f"claude_code.{self.parent_type}"
+
+    @property
+    def display_name(self) -> str:
+        """The display name for the Weave call."""
+        if self.parent_type == "skill":
+            return f"Skill: {self.name}"
+        return "PlanMode"
+
+
 class WeaveDaemon:
     """Daemon for real-time Weave tracing of Claude Code sessions."""
 
@@ -137,6 +170,10 @@ class WeaveDaemon:
         self._subagent_trackers: dict[str, SubagentTracker] = {}
         # Secondary index: agent_id (known once file found, for SubagentStop lookup)
         self._subagent_by_agent_id: dict[str, SubagentTracker] = {}
+
+        # Inline parent tracking (Skill, PlanMode)
+        # Only one inline parent can be active at a time
+        self._pending_inline_parent: InlineParentTracker | None = None
 
     async def start(self) -> None:
         """Start the daemon."""
@@ -262,6 +299,128 @@ class WeaveDaemon:
 
             except Exception as e:
                 logger.debug(f"Error checking agent file {agent_file}: {e}")
+
+    async def _start_tailing_subagent(self, session: Session, agent_file: Path) -> None:
+        """Create subagent call and start tailing the file."""
+        if not self.weave_client:
+            return
+
+        # Find the tracker (match by parent session)
+        tracker = next(
+            (t for t in self._subagent_trackers.values()
+             if not t.is_tailing and t.parent_session_id == session.session_id),
+            None
+        )
+        if not tracker:
+            logger.debug(f"No pending tracker for subagent file {agent_file}")
+            return
+
+        # Update tracker with file info
+        tracker.agent_id = session.agent_id
+        tracker.transcript_path = agent_file
+        self._subagent_by_agent_id[session.agent_id] = tracker
+
+        # Build display name
+        first_prompt = session.first_user_prompt() or ""
+        if first_prompt:
+            display_name = f"SubAgent: {truncate(first_prompt, 50)}"
+        else:
+            display_name = f"SubAgent: {session.agent_id}"
+
+        # Determine parent: prefer current turn, fall back to session
+        from weave.trace.call import Call
+        parent_id = tracker.turn_call_id or self.session_call_id
+        parent_call = Call(
+            _op_name="",
+            project_id=self.weave_client._project_id(),
+            trace_id=self.trace_id,
+            parent_id=self.session_call_id if tracker.turn_call_id else None,
+            inputs={},
+            id=parent_id,
+        )
+
+        # Create subagent call (eager creation)
+        subagent_call = self.weave_client.create_call(
+            op="claude_code.subagent",
+            inputs={
+                "agent_id": session.agent_id,
+                "prompt": truncate(first_prompt, 2000),
+            },
+            parent=parent_call,
+            display_name=display_name,
+            attributes={"agent_id": session.agent_id, "is_sidechain": True},
+            use_stack=False,
+        )
+
+        tracker.subagent_call_id = subagent_call.id
+
+        logger.info(f"Started tailing subagent {session.agent_id}: {subagent_call.id}")
+
+        # Process any existing content
+        await self._process_subagent_updates(tracker)
+
+    async def _process_subagent_updates(self, tracker: SubagentTracker) -> None:
+        """Process new lines in subagent transcript file."""
+        if not tracker.transcript_path or not tracker.subagent_call_id:
+            return
+
+        if not tracker.transcript_path.exists():
+            return
+
+        # Count lines in file
+        with open(tracker.transcript_path) as f:
+            lines = f.readlines()
+        total_lines = len(lines)
+
+        # Skip if no new lines
+        if total_lines <= tracker.last_processed_line:
+            return
+
+        # Re-parse the full file to get session data
+        # (Could be optimized to parse incrementally, but this is simpler)
+        session = parse_session_file(tracker.transcript_path)
+        if not session:
+            return
+
+        # Reconstruct subagent call as parent
+        from weave.trace.call import Call
+        subagent_call = Call(
+            _op_name="",
+            project_id=self.weave_client._project_id(),
+            trace_id=self.trace_id,
+            parent_id=tracker.turn_call_id,
+            inputs={},
+            id=tracker.subagent_call_id,
+        )
+
+        # Log tool calls from all turns
+        # For simple subagents (single turn), log flat under subagent
+        for turn in session.turns:
+            for tool_call in turn.all_tool_calls():
+                tool_name = tool_call.name
+
+                # Sanitize input
+                sanitized_input = {}
+                for k, v in tool_call.input.items():
+                    if isinstance(v, str) and len(v) > 5000:
+                        sanitized_input[k] = truncate(v)
+                    else:
+                        sanitized_input[k] = v
+
+                tool_display = get_tool_display_name(tool_name, tool_call.input)
+
+                weave.log_call(
+                    op=f"claude_code.tool.{tool_name}",
+                    inputs=sanitized_input,
+                    output={"result": truncate(str(tool_call.result), 5000)} if tool_call.result else None,
+                    attributes={"tool_name": tool_name},
+                    display_name=tool_display,
+                    parent=subagent_call,
+                    use_stack=False,
+                )
+
+        tracker.last_processed_line = total_lines
+        logger.debug(f"Processed subagent {tracker.agent_id} up to line {total_lines}")
 
     def _handle_shutdown(self) -> None:
         """Handle shutdown signal."""
@@ -428,6 +587,15 @@ class WeaveDaemon:
         """
         # Process remaining lines from session file to capture turn data
         await self._process_session_file()
+
+        # Finish active skill inline parent if present
+        # (PlanMode is finished by ExitPlanMode, not Stop)
+        if (
+            self._pending_inline_parent
+            and self._pending_inline_parent.is_active
+            and self._pending_inline_parent.parent_type == "skill"
+        ):
+            await self._finish_inline_parent()
 
         # Finish current turn if open
         if self.current_turn_call_id:
@@ -644,6 +812,10 @@ class WeaveDaemon:
         # Process any remaining data
         await self._process_session_file()
 
+        # Finish any active inline parent
+        if self._pending_inline_parent and self._pending_inline_parent.is_active:
+            await self._finish_inline_parent()
+
         # Finish any open turn
         if self.current_turn_call_id:
             await self._finish_current_turn()
@@ -772,8 +944,19 @@ class WeaveDaemon:
         if not user_text.strip():
             return
 
+        # Check for pending inline parent (Skill or PlanMode) that needs activation
+        # The first user message after detecting the tool is the inline parent's "first turn"
+        if self._pending_inline_parent and not self._pending_inline_parent.is_active:
+            # This user message is the inline parent's first turn - activate it
+            await self._activate_inline_parent(user_text)
+            return  # Don't create a new turn, the inline parent is now active
+
         # Check for interrupted previous turn - only for actual new user prompts
         if self.current_turn_call_id:
+            # If there's an active inline parent, finish it first (interrupted)
+            if self._pending_inline_parent and self._pending_inline_parent.is_active:
+                await self._finish_inline_parent(output={"interrupted": True})
+
             # Previous turn was interrupted - finish it
             await self._finish_current_turn(interrupted=True)
 
@@ -865,6 +1048,46 @@ class WeaveDaemon:
                     logger.debug(f"Subagent detected: tool_id={tool_id}, will scan for file")
                     continue
 
+                # Handle Skill tool - creates inline parent container
+                if tool_name == "Skill":
+                    skill_name = tool_input.get("skill", "unknown")
+                    self._pending_inline_parent = InlineParentTracker(
+                        tool_use_id=tool_id,
+                        parent_type="skill",
+                        name=skill_name,
+                        parent_turn_call_id=self.current_turn_call_id,
+                        detected_at=datetime.now(timezone.utc),
+                    )
+                    logger.debug(f"Skill detected: {skill_name}, waiting for first turn")
+                    continue
+
+                # Handle EnterPlanMode tool - creates inline parent container
+                if tool_name == "EnterPlanMode":
+                    self._pending_inline_parent = InlineParentTracker(
+                        tool_use_id=tool_id,
+                        parent_type="plan_mode",
+                        name="PlanMode",
+                        parent_turn_call_id=self.current_turn_call_id,
+                        detected_at=datetime.now(timezone.utc),
+                    )
+                    logger.debug("EnterPlanMode detected, waiting for first turn")
+                    continue
+
+                # Handle ExitPlanMode tool - finishes plan mode inline parent
+                if tool_name == "ExitPlanMode":
+                    if (
+                        self._pending_inline_parent
+                        and self._pending_inline_parent.is_active
+                        and self._pending_inline_parent.parent_type == "plan_mode"
+                    ):
+                        # Capture plan from ExitPlanMode input for output
+                        plan = tool_input.get("plan")
+                        await self._finish_inline_parent(
+                            output={"plan": plan} if plan else {}
+                        )
+                        logger.debug("ExitPlanMode: finished plan mode inline parent")
+                    continue
+
                 # Sanitize input
                 sanitized_input = {}
                 for k, v in tool_input.items():
@@ -874,6 +1097,21 @@ class WeaveDaemon:
                         sanitized_input[k] = v
 
                 tool_display = get_tool_display_name(tool_name, tool_input)
+
+                # Determine parent: inline parent if active, otherwise turn
+                if self._pending_inline_parent and self._pending_inline_parent.is_active:
+                    # Parent to active inline parent (Skill or PlanMode)
+                    tool_parent = Call(
+                        _op_name="",
+                        project_id=self.weave_client._project_id(),
+                        trace_id=self.trace_id,
+                        parent_id=self._pending_inline_parent.parent_turn_call_id,
+                        inputs={},
+                        id=self._pending_inline_parent.call_id,
+                    )
+                else:
+                    # Parent to current turn
+                    tool_parent = turn_call
 
                 # Create tool call (we'll finish it when we see the result)
                 # For now, log it immediately since we may not see results in order
@@ -886,7 +1124,7 @@ class WeaveDaemon:
                         "tool_use_id": tool_id,
                     },
                     display_name=tool_display,
-                    parent=turn_call,
+                    parent=tool_parent,
                     use_stack=False,
                 )
 
@@ -992,6 +1230,79 @@ class WeaveDaemon:
 
         logger.debug(f"Finished turn {self.turn_number}")
         self.current_turn_call_id = None
+
+    async def _activate_inline_parent(self, prompt: str) -> None:
+        """Activate a pending inline parent (Skill or PlanMode) with its first turn content.
+
+        This creates the Weave call for the inline parent, making it the active
+        container for subsequent tool calls.
+        """
+        if not self._pending_inline_parent or not self.weave_client:
+            return
+
+        tracker = self._pending_inline_parent
+
+        from weave.trace.call import Call
+
+        # Reconstruct parent turn call
+        parent_turn = Call(
+            _op_name="",
+            project_id=self.weave_client._project_id(),
+            trace_id=self.trace_id,
+            parent_id=self.session_call_id,
+            inputs={},
+            id=tracker.parent_turn_call_id,
+        )
+
+        # Create the inline parent call as child of the turn
+        inline_parent_call = self.weave_client.create_call(
+            op=tracker.op_name,
+            inputs={
+                "name": tracker.name,
+                "prompt": truncate(prompt, 2000),
+            },
+            parent=parent_turn,
+            display_name=tracker.display_name,
+            attributes={"parent_type": tracker.parent_type},
+            use_stack=False,
+        )
+
+        # Mark as active
+        tracker.call_id = inline_parent_call.id
+
+        logger.debug(f"Activated inline parent: {tracker.display_name}")
+
+    async def _finish_inline_parent(self, output: dict[str, Any] | None = None) -> None:
+        """Finish the active inline parent call.
+
+        Args:
+            output: Optional output data to include in the finished call.
+        """
+        if not self._pending_inline_parent or not self._pending_inline_parent.is_active:
+            return
+
+        if not self.weave_client:
+            self._pending_inline_parent = None
+            return
+
+        tracker = self._pending_inline_parent
+
+        from weave.trace.call import Call
+
+        # Reconstruct the inline parent call
+        inline_parent_call = Call(
+            _op_name="",
+            project_id=self.weave_client._project_id(),
+            trace_id=self.trace_id,
+            parent_id=tracker.parent_turn_call_id,
+            inputs={},
+            id=tracker.call_id,
+        )
+
+        self.weave_client.finish_call(inline_parent_call, output=output or {})
+
+        logger.debug(f"Finished inline parent: {tracker.display_name}")
+        self._pending_inline_parent = None
 
     async def _get_current_turn_data(self) -> tuple[Session | None, Turn | None, int]:
         """Get data for the current turn from the session file.
