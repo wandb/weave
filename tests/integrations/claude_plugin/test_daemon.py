@@ -418,7 +418,7 @@ class TestProcessSubagentUpdates:
                 ]
             }
         }) + "\n" + json.dumps({
-            "type": "tool_result",
+            "type": "user",
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "message": {
                 "role": "user",
@@ -734,7 +734,9 @@ class TestParentTurnAggregatesSubagentFileBackups:
             }
         }
 
-        await daemon._finish_current_turn()
+        # Mock weave.log_call since _log_turn_tool_calls uses it directly
+        with patch("weave.integrations.claude_plugin.daemon.weave.log_call"):
+            await daemon._finish_current_turn()
 
         # Verify finish_call was called with file_snapshots from subagent
         daemon.weave_client.finish_call.assert_called_once()

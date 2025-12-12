@@ -420,11 +420,19 @@ class WeaveDaemon:
 
         # Log tool calls from all turns
         # For simple subagents (single turn), log flat under subagent
+        # Only log tool calls that have results - we may see tool_use before
+        # tool_result is written to the file
         for turn in session.turns:
             for tool_call in turn.all_tool_calls():
                 # Skip if already logged
                 if tool_call.id in tracker.logged_tool_ids:
                     continue
+
+                # Skip if no result yet - we'll log it on the next iteration
+                # when the tool_result has been written to the file
+                if not tool_call.result:
+                    continue
+
                 tracker.logged_tool_ids.add(tool_call.id)
 
                 tool_name = tool_call.name
@@ -442,8 +450,12 @@ class WeaveDaemon:
                 weave.log_call(
                     op=f"claude_code.tool.{tool_name}",
                     inputs=sanitized_input,
-                    output={"result": truncate(str(tool_call.result), 5000)} if tool_call.result else None,
-                    attributes={"tool_name": tool_name},
+                    output={"result": truncate(str(tool_call.result), 5000)},
+                    attributes={
+                        "tool_name": tool_name,
+                        "tool_use_id": tool_call.id,
+                        "duration_ms": tool_call.duration_ms(),
+                    },
                     display_name=tool_display,
                     parent=subagent_call,
                     use_stack=False,
@@ -568,7 +580,7 @@ class WeaveDaemon:
 
         # Don't create session call here - wait for UserPromptSubmit
         # which has the actual user prompt in the payload
-        return {"status": "ok", "trace_url": self.trace_url}
+        return {"status": "ok", "trace_url": self.trace_url, "session_id": self.session_id}
 
     async def _handle_user_prompt_submit(self, payload: dict[str, Any]) -> dict[str, Any]:
         """Handle UserPromptSubmit - ensure session exists, return trace URL."""
@@ -576,7 +588,7 @@ class WeaveDaemon:
         if not self.session_call_id:
             return await self._create_session_call(payload)
 
-        return {"status": "ok", "trace_url": self.trace_url}
+        return {"status": "ok", "trace_url": self.trace_url, "session_id": self.session_id}
 
     async def _create_session_call(self, payload: dict[str, Any]) -> dict[str, Any]:
         """Create the session-level Weave call."""
@@ -628,7 +640,7 @@ class WeaveDaemon:
         self.weave_client.flush()
 
         logger.info(f"Created session call: {self.session_call_id}")
-        return {"status": "ok", "trace_url": self.trace_url}
+        return {"status": "ok", "trace_url": self.trace_url, "session_id": self.session_id}
 
     async def _handle_stop(self, payload: dict[str, Any]) -> dict[str, Any]:
         """Handle Stop - finish current turn with full data.
@@ -859,7 +871,11 @@ class WeaveDaemon:
                     op=f"claude_code.tool.{tool_name}",
                     inputs=sanitized_input,
                     output={"result": truncate(str(tool_call.result), 5000)} if tool_call.result else None,
-                    attributes={"tool_name": tool_name},
+                    attributes={
+                        "tool_name": tool_name,
+                        "tool_use_id": tool_call.id,
+                        "duration_ms": tool_call.duration_ms(),
+                    },
                     display_name=tool_display,
                     parent=subagent_call,
                     use_stack=False,
@@ -899,7 +915,11 @@ class WeaveDaemon:
                         op=f"claude_code.tool.{tool_name}",
                         inputs=sanitized_input,
                         output={"result": truncate(str(tool_call.result), 5000)} if tool_call.result else None,
-                        attributes={"tool_name": tool_name},
+                        attributes={
+                            "tool_name": tool_name,
+                            "tool_use_id": tool_call.id,
+                            "duration_ms": tool_call.duration_ms(),
+                        },
                         display_name=tool_display,
                         parent=turn_call,
                         use_stack=False,

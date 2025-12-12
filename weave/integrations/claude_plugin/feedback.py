@@ -59,6 +59,7 @@ def main() -> int:
         print(f"Error: {response.get('message', 'Unknown error')}", file=sys.stderr)
         return 1
 
+    print(f"Feedback sent: {emoji}")
     return 0
 
 
