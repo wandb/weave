@@ -12,6 +12,7 @@ from weave.trace_server.interface.builtin_object_classes.leaderboard import Lead
 from weave.trace_server.interface.builtin_object_classes.llm_structured_model import (
     LLMStructuredCompletionModel,
 )
+from weave.trace_server.interface.builtin_object_classes.op_view import OpView
 from weave.trace_server.interface.builtin_object_classes.provider import (
     Provider,
     ProviderModel,
@@ -50,3 +51,4 @@ register_base_object(SavedView)
 register_base_object(ComparisonView)
 register_base_object(LLMStructuredCompletionModel)
 register_base_object(ChartConfig)
+register_base_object(OpView)
