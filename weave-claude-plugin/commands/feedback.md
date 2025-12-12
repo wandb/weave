@@ -78,6 +78,12 @@ Then run this command:
 python -m weave.integrations.claude_plugin.feedback "<SESSION_ID>" "<EMOJI>" "<NOTE>"
 ```
 
+If the python command fails (weave not installed), fall back to uvx:
+
+```bash
+uvx --from "weave>=0.52.23" python -m weave.integrations.claude_plugin.feedback "<SESSION_ID>" "<EMOJI>" "<NOTE>"
+```
+
 - Replace `<SESSION_ID>` with the UUID from "Weave session_id:" in context
 - Replace `<EMOJI>` with the emoji (🤩, 😊, 😕, 🤮, or custom)
 - Replace `<NOTE>` with the note text, or omit the argument entirely if no note
