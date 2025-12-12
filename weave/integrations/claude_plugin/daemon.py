@@ -619,19 +619,84 @@ class WeaveDaemon:
         return {"status": "ok"}
 
     async def _handle_subagent_stop(self, payload: dict[str, Any]) -> dict[str, Any]:
-        """Handle SubagentStop - process subagent transcript and create trace.
+        """Handle SubagentStop - finish existing call or fall back to full processing.
 
-        Creates a subagent call as a child of the TURN (not session) with:
-        - For simple subagents (single turn): tool calls directly under subagent
-        - For complex subagents (multiple turns/user interaction): turn hierarchy preserved
-        - Final response captured in output
+        Uses fast path if we're already tailing the subagent, otherwise falls back
+        to the original behavior of processing the entire file at once.
         """
-        # Claude Code sends agent_transcript_path for the subagent's file
-        # (transcript_path is the parent session's file)
-        transcript_path = payload.get("agent_transcript_path")
         agent_id_from_payload = payload.get("agent_id")
-        logger.info(f"SubagentStop: agent_transcript_path={transcript_path}, agent_id={agent_id_from_payload}")
+        transcript_path = payload.get("agent_transcript_path")
 
+        logger.info(f"SubagentStop: agent_id={agent_id_from_payload}, transcript={transcript_path}")
+
+        # Check if we're already tailing this subagent (FAST PATH)
+        tracker = self._subagent_by_agent_id.get(agent_id_from_payload)
+
+        if tracker and tracker.is_tailing:
+            logger.info(f"SubagentStop: fast path for tailed subagent {agent_id_from_payload}")
+
+            # Process any remaining content
+            await self._process_subagent_updates(tracker)
+
+            # Finish the subagent call
+            from weave.trace.call import Call
+            subagent_call = Call(
+                _op_name="",
+                project_id=self.weave_client._project_id(),
+                trace_id=self.trace_id,
+                parent_id=tracker.turn_call_id,
+                inputs={},
+                id=tracker.subagent_call_id,
+            )
+
+            # Parse file for final output
+            session = parse_session_file(tracker.transcript_path)
+            final_output = None
+            total_usage = None
+            tool_counts: dict[str, int] = {}
+
+            if session:
+                # Get final response
+                if session.turns:
+                    last_turn = session.turns[-1]
+                    if last_turn.assistant_messages:
+                        final_output = last_turn.assistant_messages[-1].get_text()
+
+                # Aggregate usage and tool counts
+                total_usage = session.total_usage()
+                for turn in session.turns:
+                    for tc in turn.all_tool_calls():
+                        tool_counts[tc.name] = tool_counts.get(tc.name, 0) + 1
+
+            self.weave_client.finish_call(
+                subagent_call,
+                output={
+                    "response": truncate(final_output, 10000) if final_output else None,
+                    "turn_count": len(session.turns) if session else 0,
+                    "tool_call_count": sum(tool_counts.values()),
+                    "tool_counts": tool_counts,
+                    "usage": total_usage.to_weave_usage() if total_usage else None,
+                },
+            )
+            self.weave_client.flush()
+
+            # Cleanup trackers
+            if tracker.tool_use_id in self._subagent_trackers:
+                del self._subagent_trackers[tracker.tool_use_id]
+            if agent_id_from_payload in self._subagent_by_agent_id:
+                del self._subagent_by_agent_id[agent_id_from_payload]
+
+            logger.info(f"SubagentStop: finished tailed subagent {agent_id_from_payload}")
+            return {"status": "ok"}
+
+        # FALLBACK PATH: Not tailing, use original behavior
+        logger.info(f"SubagentStop: fallback path for {agent_id_from_payload} (not tailed)")
+
+        # Clean up any orphaned tracker
+        if tracker and tracker.tool_use_id in self._subagent_trackers:
+            del self._subagent_trackers[tracker.tool_use_id]
+
+        # Original implementation continues below...
         if not transcript_path:
             logger.warning("SubagentStop: missing agent_transcript_path in payload")
             return {"status": "error", "message": "No agent_transcript_path"}
@@ -1235,6 +1300,8 @@ class WeaveDaemon:
                     turn_number=turn_index + 1,  # Display as 1-based
                     tool_count=len(turn.all_tool_calls()),
                     model=turn.primary_model(),
+                    cwd=session.cwd,
+                    user_prompt=turn.user_message.content,
                 )
 
                 if diff_html:
