@@ -427,14 +427,14 @@ def create_client(
 def configure_calls_storage_mode(request):
     """Auto-configure calls storage mode for the entire test session via environment variable."""
     calls_storage_mode = get_calls_storage_mode(request)
-    original_value = os.environ.get("WEAVE_CALLS_STORAGE_MODE")
-    os.environ["WEAVE_CALLS_STORAGE_MODE"] = calls_storage_mode
+    original_value = os.environ.get("PROJECT_VERSION_MODE")
+    os.environ["PROJECT_VERSION_MODE"] = calls_storage_mode
     yield
     # Restore original value
     if original_value is None:
-        os.environ.pop("WEAVE_CALLS_STORAGE_MODE", None)
+        os.environ.pop("PROJECT_VERSION_MODE", None)
     else:
-        os.environ["WEAVE_CALLS_STORAGE_MODE"] = original_value
+        os.environ["PROJECT_VERSION_MODE"] = original_value
 
 
 @pytest.fixture
