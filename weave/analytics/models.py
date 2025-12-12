@@ -82,12 +82,16 @@ class FinalClassification(BaseModel):
 
     thinking: str = Field(
         description="A detailed reasoning process explaining why this specific trace "
-        "belongs to the selected category. Consider the trace characteristics, the category "
-        "definitions, and why this is the best match among all available categories."
+        "belongs to the selected categories. Consider the trace characteristics, the category "
+        "definitions, and why these are the best matches among all available categories. "
+        "Traces can belong to multiple categories if they exhibit multiple patterns. "
+        "If the trace has no errors or issues, the pattern_categories list should be empty."
     )
-    pattern_category: str = Field(
-        description="The selected category name from the available pattern categories. "
-        "Must be one of the provided category names or 'other'."
+    pattern_categories: list[str] = Field(
+        description="List of selected category names from the available pattern categories. "
+        "Each category should be one of the provided category names. "
+        "A trace can belong to multiple categories if it exhibits multiple patterns. "
+        "If the trace has no errors or issues, this should be an empty list."
     )
     categorization_reason: str = Field(
         description="Brief notes explaining any specific aspects of this trace "
@@ -182,3 +186,28 @@ class DeepTraceOutput(BaseModel):
     token_usage: dict | None = None
     cost: dict | None = None
     feedback: dict | None = None
+
+
+# =============================================================================
+# YAML Output Models (for cluster command)
+# =============================================================================
+
+
+class YAMLCluster(BaseModel):
+    """A single cluster in YAML format."""
+
+    cluster_name: str
+    cluster_definition: str
+    sample_traces: list[str] = Field(default_factory=list)
+
+
+class YAMLClustersOutput(BaseModel):
+    """Output format for cluster command in YAML."""
+
+    name: str
+    description: str | None = None
+    weave_project: str
+    weave_entity: str
+    last_clustering: str
+    trace_list: str
+    clusters: list[YAMLCluster]

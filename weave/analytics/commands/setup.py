@@ -44,7 +44,7 @@ def save_config(config: dict) -> None:
         f.write("\n# LLM Configuration\n")
         if "LLM_MODEL" in config:
             f.write(f"LLM_MODEL={config['LLM_MODEL']}\n")
-        for key in ["GOOGLE_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY"]:
+        for key in ["GOOGLE_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "WANDB_INFERENCE_API_KEY"]:
             if key in config:
                 f.write(f"{key}={config[key]}\n")
 
@@ -72,7 +72,7 @@ def save_config(config: dict) -> None:
 )
 @click.option(
     "--llm-provider",
-    type=click.Choice(["google", "openai", "anthropic", "auto"]),
+    type=click.Choice(["google", "openai", "anthropic", "wandb", "auto"]),
     default="auto",
     help="LLM provider (auto-detected from model name if not specified)",
 )
@@ -168,10 +168,12 @@ def setup(
             detected_provider = "openai"
         elif new_model.startswith("anthropic/") or new_model.startswith("claude"):
             detected_provider = "anthropic"
+        elif new_model.startswith("wandb/") or new_model.startswith("wandb_ai/"):
+            detected_provider = "wandb"
         else:
             detected_provider = click.prompt(
                 "  LLM provider",
-                type=click.Choice(["google", "openai", "anthropic"]),
+                type=click.Choice(["google", "openai", "anthropic", "wandb"]),
             )
 
     # Get the appropriate API key environment variable
@@ -179,6 +181,7 @@ def setup(
         "google": "GOOGLE_API_KEY",
         "openai": "OPENAI_API_KEY",
         "anthropic": "ANTHROPIC_API_KEY",
+        "wandb": "WANDB_INFERENCE_API_KEY",
     }
     env_var = provider_env_map.get(detected_provider, "OPENAI_API_KEY")
 

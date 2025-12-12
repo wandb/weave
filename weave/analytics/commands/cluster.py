@@ -4,8 +4,10 @@ import asyncio
 import json
 import os
 import sys
+from datetime import datetime
 
 import click
+import yaml
 
 from weave.analytics.commands.setup import get_config_path, load_config
 from weave.analytics.header import get_header_for_rich
@@ -19,6 +21,26 @@ def load_env_from_config() -> None:
     for key, value in config.items():
         if key not in os.environ:
             os.environ[key] = value
+
+
+def load_existing_clusters(clusters_file: str) -> dict | None:
+    """Load existing clusters from YAML file.
+
+    Args:
+        clusters_file: Path to the YAML file containing existing clusters
+
+    Returns:
+        Dictionary containing the cluster definitions or None if file doesn't exist
+    """
+    if not clusters_file:
+        return None
+
+    try:
+        with open(clusters_file, "r") as f:
+            data = yaml.safe_load(f)
+            return data
+    except Exception as e:
+        raise ValueError(f"Failed to load clusters file: {e}")
 
 
 @click.command()
@@ -67,6 +89,11 @@ def load_env_from_config() -> None:
     default="",
     help="User context about the AI system being analyzed",
 )
+@click.option(
+    "--clusters-file",
+    type=click.Path(exists=True),
+    help="Path to existing clusters YAML file to use as base definitions",
+)
 def cluster(
     url: str,
     model: str | None,
@@ -77,6 +104,7 @@ def cluster(
     debug: bool,
     depth: int,
     context: str,
+    clusters_file: str | None,
 ) -> None:
     """Cluster traces from a Weave URL into pattern categories.
 
@@ -98,8 +126,12 @@ def cluster(
         weave analytics cluster "..." --limit 50 --pretty
 
     \b
-        # Save to file
-        weave analytics cluster "..." -o clusters.json
+        # Save to YAML file
+        weave analytics cluster "..." -o clusters.yaml
+
+    \b
+        # Use existing cluster definitions and discover new ones
+        weave analytics cluster "..." --clusters-file existing_clusters.yaml -o updated_clusters.yaml
 
     \b
         # Debug mode (traces LLM calls to Weave)
@@ -124,6 +156,16 @@ def cluster(
     # Load config
     load_env_from_config()
 
+    # Load existing clusters if provided
+    existing_clusters_data = None
+    if clusters_file:
+        try:
+            existing_clusters_data = load_existing_clusters(clusters_file)
+        except ValueError as e:
+            console = Console(stderr=True)
+            console.print(f"[red]Error:[/red] {e}")
+            sys.exit(1)
+
     # Create console for stderr output
     console = Console(stderr=True)
 
@@ -137,12 +179,9 @@ def cluster(
     if model is None:
         model = config.get("LLM_MODEL", "gemini/gemini-2.5-pro")
 
-    # Debug mode: faster model, limited samples, Weave tracing
+    # Debug mode: limited samples, Weave tracing
     if debug:
         console.print("[bold red]🔍 DEBUG MODE ENABLED[/bold red]")
-        debug_model = "gemini/gemini-2.5-flash"
-        console.print(f"[dim]  Switching to faster model: {debug_model}[/dim]")
-        model = debug_model
 
         if limit is None:
             limit = 5
@@ -288,6 +327,8 @@ def cluster(
                 deep_trace_analysis=depth > 0,
                 client=client if depth > 0 else None,
                 nesting_depth=depth,
+                existing_clusters=existing_clusters_data,
+                url=url,
             )
         )
     except Exception as e:
@@ -297,17 +338,42 @@ def cluster(
             console.print(f"[dim]{traceback.format_exc()}[/dim]")
         sys.exit(1)
 
-    # Output results
-    result_json = result.model_dump_json(indent=2 if pretty else None)
+    # Output results in YAML format
+    from weave.analytics.models import YAMLClustersOutput, YAMLCluster
+
+    # Convert result to YAML format
+    yaml_clusters = []
+    for cluster_group in result.clusters:
+        # Get sample traces (up to 3)
+        sample_traces = [trace.trace_url for trace in cluster_group.traces[:3]]
+        yaml_clusters.append(YAMLCluster(
+            cluster_name=cluster_group.category_name,
+            cluster_definition=cluster_group.category_definition,
+            sample_traces=sample_traces,
+        ))
+
+    yaml_output = YAMLClustersOutput(
+        name=existing_clusters_data.get("name", f"{parsed_url.project} Trace Clusters") if existing_clusters_data else f"{parsed_url.project} Trace Clusters",
+        description=existing_clusters_data.get("description") if existing_clusters_data else None,
+        weave_project=parsed_url.project,
+        weave_entity=parsed_url.entity,
+        last_clustering=datetime.now().strftime("%Y-%m-%d"),
+        trace_list=url,
+        clusters=yaml_clusters,
+    )
+
+    # Convert to dict and then to YAML
+    yaml_dict = yaml_output.model_dump(exclude_none=True)
+    result_output = yaml.dump(yaml_dict, default_flow_style=False, sort_keys=False)
 
     if output:
         with open(output, "w") as f:
-            f.write(result_json)
+            f.write(result_output)
         if pretty or debug:
             console.print(f"\n[green]✓[/green] Results saved to [cyan]{output}[/cyan]")
     else:
-        # Print JSON to stdout (console output goes to stderr)
-        print(result_json)
+        # Print to stdout (console output goes to stderr)
+        print(result_output)
 
     # Final summary panel in pretty/debug mode
     if pretty or debug:
