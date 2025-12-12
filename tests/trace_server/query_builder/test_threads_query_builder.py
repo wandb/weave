@@ -1,18 +1,62 @@
 import datetime
 
 import pytest
+import sqlparse
 
-from tests.trace_server.query_builder.utils import (
-    assert_clickhouse_sql,
-    assert_sqlite_sql,
-)
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.orm import ParamBuilder
+from weave.trace_server.project_version.types import ReadTable
 from weave.trace_server.threads_query_builder import (
     _validate_and_map_sort_field,
     make_threads_query,
     make_threads_query_sqlite,
 )
+
+
+def assert_clickhouse_sql(expected_query: str, expected_params: dict, **kwargs) -> None:
+    """Helper to test ClickHouse query generation for threads.
+
+    Args:
+        expected_query: The expected SQL query string
+        expected_params: The expected parameter dictionary
+        **kwargs: Arguments to pass to make_threads_query
+    """
+    pb = ParamBuilder("pb")
+    read_table = ReadTable.CALLS_MERGED
+    query = make_threads_query(pb=pb, read_table=read_table, **kwargs)
+    params = pb.get_params()
+
+    expected_formatted = sqlparse.format(expected_query, reindent=True)
+    found_formatted = sqlparse.format(query, reindent=True)
+
+    assert expected_formatted == found_formatted, (
+        f"Query mismatch:\nExpected:\n{expected_formatted}\n\nFound:\n{found_formatted}"
+    )
+    assert expected_params == params, (
+        f"Params mismatch:\nExpected: {expected_params}\nFound: {params}"
+    )
+
+
+def assert_sqlite_sql(expected_query: str, expected_params: list, **kwargs) -> None:
+    """Helper to test SQLite query generation for threads.
+
+    Args:
+        expected_query: The expected SQL query string
+        expected_params: The expected parameter list
+        **kwargs: Arguments to pass to make_threads_query_sqlite
+    """
+    query, params = make_threads_query_sqlite(**kwargs)
+
+    expected_formatted = sqlparse.format(expected_query, reindent=True)
+    found_formatted = sqlparse.format(query, reindent=True)
+
+    assert expected_formatted == found_formatted, (
+        f"Query mismatch:\nExpected:\n{expected_formatted}\n\nFound:\n{found_formatted}"
+    )
+    assert expected_params == params, (
+        f"Params mismatch:\nExpected: {expected_params}\nFound: {params}"
+    )
+
 
 # Basic Functionality Tests
 
@@ -949,8 +993,12 @@ def test_thread_id_filter_no_match():
     """Test that thread_id filter doesn't break query even if no threads match."""
     # This test verifies that the SQL generation doesn't break with thread_id filter
     pb = ParamBuilder("pb")
+    read_table = ReadTable.CALLS_MERGED
     query = make_threads_query(
-        project_id="test_project", pb=pb, thread_ids=["nonexistent_thread"]
+        project_id="test_project",
+        pb=pb,
+        thread_ids=["nonexistent_thread"],
+        read_table=read_table,
     )
 
     # Should contain the thread filter
@@ -967,8 +1015,12 @@ def test_thread_id_filter_consistency():
     pb = ParamBuilder("pb")
 
     # Generate both queries with same parameters
+    read_table = ReadTable.CALLS_MERGED
     clickhouse_query = make_threads_query(
-        project_id="test_project", pb=pb, thread_ids=["consistency_test"]
+        project_id="test_project",
+        pb=pb,
+        thread_ids=["consistency_test"],
+        read_table=read_table,
     )
     sqlite_query, sqlite_params = make_threads_query_sqlite(
         project_id="test_project", thread_ids=["consistency_test"]
@@ -991,7 +1043,8 @@ def test_query_structure_documentation():
     and why it's structured the way it is.
     """
     pb = ParamBuilder("pb")
-    query = make_threads_query(project_id="test_project", pb=pb)
+    read_table = ReadTable.CALLS_MERGED
+    query = make_threads_query(project_id="test_project", pb=pb, read_table=read_table)
 
     # Should be a two-level aggregation for ClickHouse
     assert "SELECT" in query  # Outer query
