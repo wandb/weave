@@ -243,6 +243,8 @@ def import_session_to_weave(
             tool_count=len(turn.all_tool_calls()),
             model=turn_model,
             historic_mode=True,
+            cwd=session.cwd,
+            user_prompt=user_content,
         )
 
         # Create turn call using create_call + finish_call to allow setting summary views

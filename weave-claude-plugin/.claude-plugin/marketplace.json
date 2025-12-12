@@ -5,7 +5,7 @@
     },
     "plugins": [
         {
-            "name": "weave-tracing",
+            "name": "weave",
             "source": "./",
             "description": "Weave tracing for Claude Code sessions"
         }

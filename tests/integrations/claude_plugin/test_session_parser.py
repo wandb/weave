@@ -26,6 +26,164 @@ def create_session_jsonl(messages: list[dict]) -> Path:
     return Path(tmp.name)
 
 
+class TestThinkingContent:
+    """Tests for parsing thinking content from assistant messages."""
+
+    def test_assistant_message_with_thinking_extracts_content(self):
+        """Assistant messages with thinking blocks should have thinking content extracted."""
+        session_jsonl = create_session_jsonl([
+            {
+                "type": "user",
+                "uuid": "msg-1",
+                "timestamp": "2025-01-01T10:00:00Z",
+                "sessionId": "test-session",
+                "message": {
+                    "role": "user",
+                    "content": "What is 2 + 2?",
+                },
+            },
+            {
+                "type": "assistant",
+                "uuid": "msg-2",
+                "timestamp": "2025-01-01T10:00:01Z",
+                "message": {
+                    "role": "assistant",
+                    "model": "claude-opus-4-5-20251101",
+                    "content": [
+                        {
+                            "type": "thinking",
+                            "thinking": "The user is asking for a simple arithmetic calculation. 2 + 2 = 4.",
+                            "signature": "abc123signature",
+                        },
+                        {"type": "text", "text": "2 + 2 = 4"},
+                    ],
+                    "usage": {"input_tokens": 100, "output_tokens": 10},
+                },
+            },
+        ])
+
+        try:
+            session = parse_session_file(session_jsonl)
+
+            assert session is not None
+            assert len(session.turns) == 1
+
+            turn = session.turns[0]
+            assert len(turn.assistant_messages) == 1
+
+            assistant_msg = turn.assistant_messages[0]
+
+            # Text content should still be extracted
+            assert assistant_msg.get_text() == "2 + 2 = 4"
+
+            # Thinking content should be extracted
+            assert hasattr(assistant_msg, "thinking_content"), "AssistantMessage should have 'thinking_content' attribute"
+            assert assistant_msg.thinking_content == "The user is asking for a simple arithmetic calculation. 2 + 2 = 4."
+        finally:
+            session_jsonl.unlink()
+
+    def test_assistant_message_without_thinking_has_none(self):
+        """Assistant messages without thinking blocks should have None thinking content."""
+        session_jsonl = create_session_jsonl([
+            {
+                "type": "user",
+                "uuid": "msg-1",
+                "timestamp": "2025-01-01T10:00:00Z",
+                "sessionId": "test-session",
+                "message": {
+                    "role": "user",
+                    "content": "Hello",
+                },
+            },
+            {
+                "type": "assistant",
+                "uuid": "msg-2",
+                "timestamp": "2025-01-01T10:00:01Z",
+                "message": {
+                    "role": "assistant",
+                    "model": "claude-sonnet-4-20250514",
+                    "content": [{"type": "text", "text": "Hi there!"}],
+                    "usage": {"input_tokens": 10, "output_tokens": 5},
+                },
+            },
+        ])
+
+        try:
+            session = parse_session_file(session_jsonl)
+
+            assert session is not None
+            turn = session.turns[0]
+            assistant_msg = turn.assistant_messages[0]
+
+            assert hasattr(assistant_msg, "thinking_content")
+            assert assistant_msg.thinking_content is None
+        finally:
+            session_jsonl.unlink()
+
+    def test_multiple_assistant_messages_with_thinking(self):
+        """Multiple assistant messages in a turn can each have thinking content."""
+        session_jsonl = create_session_jsonl([
+            {
+                "type": "user",
+                "uuid": "msg-1",
+                "timestamp": "2025-01-01T10:00:00Z",
+                "sessionId": "test-session",
+                "message": {
+                    "role": "user",
+                    "content": "Help me with this task",
+                },
+            },
+            {
+                "type": "assistant",
+                "uuid": "msg-2",
+                "timestamp": "2025-01-01T10:00:01Z",
+                "message": {
+                    "role": "assistant",
+                    "model": "claude-opus-4-5-20251101",
+                    "content": [
+                        {
+                            "type": "thinking",
+                            "thinking": "First thinking block",
+                            "signature": "sig1",
+                        },
+                        {"type": "text", "text": "First response"},
+                    ],
+                    "usage": {"input_tokens": 50, "output_tokens": 5},
+                },
+            },
+            {
+                "type": "assistant",
+                "uuid": "msg-3",
+                "timestamp": "2025-01-01T10:00:02Z",
+                "message": {
+                    "role": "assistant",
+                    "model": "claude-opus-4-5-20251101",
+                    "content": [
+                        {
+                            "type": "thinking",
+                            "thinking": "Second thinking block",
+                            "signature": "sig2",
+                        },
+                        {"type": "text", "text": "Second response"},
+                    ],
+                    "usage": {"input_tokens": 60, "output_tokens": 6},
+                },
+            },
+        ])
+
+        try:
+            session = parse_session_file(session_jsonl)
+
+            assert session is not None
+            turn = session.turns[0]
+            assert len(turn.assistant_messages) == 2
+
+            assert turn.assistant_messages[0].thinking_content == "First thinking block"
+            assert turn.assistant_messages[1].thinking_content == "Second thinking block"
+        finally:
+            session_jsonl.unlink()
+
+
 class TestUserMessageImages:
     """Tests for parsing images from user messages."""
 
