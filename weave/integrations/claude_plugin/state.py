@@ -269,10 +269,14 @@ def create_session_data(
     entity: str | None = None,
     session_call_id: str | None = None,
     trace_id: str | None = None,
+    trace_url: str | None = None,
     turn_call_id: str | None = None,
     turn_number: int = 0,
     total_tool_calls: int = 0,
     tool_counts: dict[str, int] | None = None,
+    daemon_pid: int | None = None,
+    last_processed_line: int = 0,
+    transcript_path: str | None = None,
 ) -> dict[str, Any]:
     """Create a new session data dict with all fields.
 
@@ -281,10 +285,14 @@ def create_session_data(
         entity: Weave entity (resolved from API)
         session_call_id: Weave call ID for the session
         trace_id: Weave trace ID
+        trace_url: Weave trace URL for additionalContext
         turn_call_id: Current turn's call ID
         turn_number: Number of turns
         total_tool_calls: Total tool call count
         tool_counts: Tool counts by name
+        daemon_pid: PID of the daemon process for this session
+        last_processed_line: Line number in session file processed up to
+        transcript_path: Path to the session JSONL file
 
     Returns:
         Session data dict
@@ -294,9 +302,13 @@ def create_session_data(
         "entity": entity,
         "session_call_id": session_call_id,
         "trace_id": trace_id,
+        "trace_url": trace_url,
         "turn_call_id": turn_call_id,
         "turn_number": turn_number,
         "total_tool_calls": total_tool_calls,
         "tool_counts": tool_counts or {},
+        "daemon_pid": daemon_pid,
+        "last_processed_line": last_processed_line,
+        "transcript_path": transcript_path,
         "last_updated": _now_iso(),
     }
