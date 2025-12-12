@@ -64,6 +64,7 @@ SHARDS_WITHOUT_EXTRAS = {
     "trace_no_server",
     "trace_server",
     "trace_server_bindings",
+    "trace_calls_complete",  # Same as trace but with calls_complete table
     "openai_realtime",
     "autogen_tests",
     "verifiers_test",
@@ -113,6 +114,7 @@ SHARDS_WITHOUT_EXTRAS = {
         "autogen_tests",
         "trace",
         "trace_no_server",
+        "trace_calls_complete",
         "stainless",
     ],
 )
@@ -187,6 +189,12 @@ def tests(session: nox.Session, shard: str):
             "tests/wandb_interface/",
         ],
         "trace_no_server": ["tests/trace/"],
+        "trace_calls_complete": [
+            "tests/trace/",
+            "tests/compat/",
+            "tests/utils/",
+            "tests/wandb_interface/",
+        ],
     }
 
     test_dirs = test_dirs_dict.get(shard, default_test_dirs)
@@ -195,14 +203,12 @@ def tests(session: nox.Session, shard: str):
         if not os.path.exists(test_dir):
             raise ValueError(f"Test directory {test_dir} does not exist")
 
-    # Each worker gets its own isolated database namespace
-    # Only use parallel workers for the trace shard if we have more than 1 CPU core
-    if shard == "trace":
+    # Enable parallel workers for trace shards (each worker gets isolated database namespace)
+    if shard in ("trace", "trace_calls_complete"):
         cpu_count = os.cpu_count()
         if cpu_count is not None and cpu_count > 1:
             session.posargs.insert(0, f"-n{cpu_count}")
 
-    # Add sharding logic for trace1, trace2, trace3
     pytest_args = [
         "pytest",
         "--durations=20",
@@ -213,14 +219,17 @@ def tests(session: nox.Session, shard: str):
         "--cov-branch",
     ]
 
+    # Shard-specific pytest arguments
     if shard == "trace":
         pytest_args.extend(["-m", "trace_server"])
-
-    if shard == "trace_no_server":
+    elif shard == "trace_no_server":
         pytest_args.extend(["-m", "not trace_server"])
-
-    # Set trace-server flag for stainless shard
-    if shard == "stainless":
+    elif shard == "trace_calls_complete":
+        # Run trace tests with calls_complete table instead of legacy calls_merged table
+        pytest_args.extend(
+            ["-m", "trace_server", "--calls-storage-mode=calls_complete"]
+        )
+    elif shard == "stainless":
         pytest_args.extend(["--remote-http-trace-server=stainless"])
 
     if shard == "verifiers_test":
