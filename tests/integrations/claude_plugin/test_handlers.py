@@ -39,8 +39,15 @@ def create_session_jsonl(messages: list[dict], filename: str | None = None) -> P
 
 
 class TestHandlerImageExtraction:
-    """Tests for extracting images in handlers."""
+    """Tests for extracting images in handlers.
 
+    Note: These tests are for the legacy handlers.py architecture.
+    The new daemon architecture (daemon.py) handles image extraction
+    by tailing the session file, which correctly captures images
+    after they appear in the transcript.
+    """
+
+    @pytest.mark.skip(reason="Legacy handlers.py replaced by daemon architecture - images now captured by daemon.py")
     def test_turn_inputs_include_images_from_transcript(self):
         """Turn inputs should include images extracted from the transcript."""
         # Create a session file with an image in the user message
@@ -121,6 +128,7 @@ class TestHandlerImageExtraction:
         finally:
             session_jsonl.unlink()
 
+    @pytest.mark.skip(reason="Legacy handlers.py replaced by daemon architecture - images now captured by daemon.py")
     def test_turn_inputs_empty_images_when_no_images_in_transcript(self):
         """Turn inputs should have empty images list when transcript has no images."""
         session_jsonl = create_session_jsonl([
