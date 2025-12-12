@@ -692,7 +692,10 @@ def test_turn_filtering_explanation():
 
     # Verify this is present in both query builders
     pb = ParamBuilder("pb")
-    clickhouse_query = make_threads_query(project_id="test", pb=pb)
+    read_table = ReadTable.CALLS_MERGED
+    clickhouse_query = make_threads_query(
+        project_id="test", pb=pb, read_table=read_table
+    )
     sqlite_query, _ = make_threads_query_sqlite(project_id="test")
 
     # Check that turn filtering is present
