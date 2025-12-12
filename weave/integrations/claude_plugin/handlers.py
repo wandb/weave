@@ -398,11 +398,11 @@ def handle_user_prompt_submit(
                 f"UserPromptSubmit: created session {session_call.id} and turn {turn_call.id}"
             )
 
-            # Return trace URL for first turn
+            # Return trace URL and session_id for first turn
             return {
                 "hookSpecificOutput": {
                     "hookEventName": "UserPromptSubmit",
-                    "additionalContext": f"Weave tracing active: {session_call.ui_url}",
+                    "additionalContext": f"Weave tracing active: {session_call.ui_url}\nWeave session_id: {session_id}",
                 }
             }
 
@@ -440,7 +440,14 @@ def handle_user_prompt_submit(
             client.flush()
 
             logger.debug(f"UserPromptSubmit: created turn {turn_call.id}")
-            return None
+
+            # Return session_id for feedback commands
+            return {
+                "hookSpecificOutput": {
+                    "hookEventName": "UserPromptSubmit",
+                    "additionalContext": f"Weave tracing active: {session_call.ui_url}\nWeave session_id: {session_id}",
+                }
+            }
 
 
 def handle_stop(payload: dict[str, Any], project: str) -> dict[str, Any] | None:

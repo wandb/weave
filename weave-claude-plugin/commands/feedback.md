@@ -1,5 +1,5 @@
 ---
-description: Rate your Claude Code session experience with Weave feedback
+description: Rate your session: 1=great, 4=crap, also accepts optional note.
 ---
 
 Collect feedback about this Claude Code session and send it to Weave.
@@ -70,12 +70,15 @@ If they select "Skip", set note to null.
 
 ## Send Feedback
 
-Run this command to send feedback to Weave:
+First, find the Weave session_id from the conversation context. Look for a system reminder containing "Weave session_id:" - extract that UUID.
+
+Then run this command:
 
 ```bash
-"${CLAUDE_PLUGIN_ROOT}/hooks-handlers/feedback.sh" "${CLAUDE_SESSION_ID}" "<EMOJI>" "<NOTE>"
+python -m weave.integrations.claude_plugin.feedback "<SESSION_ID>" "<EMOJI>" "<NOTE>"
 ```
 
+- Replace `<SESSION_ID>` with the UUID from "Weave session_id:" in context
 - Replace `<EMOJI>` with the emoji (🤩, 😊, 😕, 🤮, or custom)
 - Replace `<NOTE>` with the note text, or omit the argument entirely if no note
 
@@ -83,12 +86,12 @@ Run this command to send feedback to Weave:
 
 With note:
 ```bash
-"${CLAUDE_PLUGIN_ROOT}/hooks-handlers/feedback.sh" "${CLAUDE_SESSION_ID}" "🤩" "Great collaboration on this feature!"
+python -m weave.integrations.claude_plugin.feedback "abc-123-def" "🤩" "Great collaboration!"
 ```
 
 Without note:
 ```bash
-"${CLAUDE_PLUGIN_ROOT}/hooks-handlers/feedback.sh" "${CLAUDE_SESSION_ID}" "😊"
+python -m weave.integrations.claude_plugin.feedback "abc-123-def" "😊"
 ```
 
 ## Confirm
