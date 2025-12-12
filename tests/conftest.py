@@ -15,7 +15,11 @@ from fastapi.testclient import TestClient
 import weave
 from tests.trace.util import DummyTestException, client_is_sqlite
 from tests.trace_server.conftest import *
-from tests.trace_server.conftest import TEST_ENTITY, get_trace_server_flag
+from tests.trace_server.conftest import (
+    TEST_ENTITY,
+    get_calls_storage_mode,
+    get_trace_server_flag,
+)
 from weave.trace import weave_client, weave_init
 from weave.trace.context import weave_client_context
 from weave.trace.context.call_context import set_call_stack
@@ -417,6 +421,20 @@ def create_client(
         weave.trace.api._global_attributes = global_attributes
 
     return client
+
+
+@pytest.fixture(scope="session", autouse=True)
+def configure_calls_storage_mode(request):
+    """Auto-configure calls storage mode for the entire test session via environment variable."""
+    calls_storage_mode = get_calls_storage_mode(request)
+    original_value = os.environ.get("WEAVE_CALLS_STORAGE_MODE")
+    os.environ["WEAVE_CALLS_STORAGE_MODE"] = calls_storage_mode
+    yield
+    # Restore original value
+    if original_value is None:
+        os.environ.pop("WEAVE_CALLS_STORAGE_MODE", None)
+    else:
+        os.environ["WEAVE_CALLS_STORAGE_MODE"] = original_value
 
 
 @pytest.fixture
