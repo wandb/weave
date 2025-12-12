@@ -221,6 +221,12 @@ class WeaveDaemon:
             })
             state.save_session(self.session_id, session_data)
 
+    def _get_sessions_directory(self) -> Path | None:
+        """Get the sessions directory containing transcript files."""
+        if not self.transcript_path:
+            return None
+        return self.transcript_path.parent
+
     def _handle_shutdown(self) -> None:
         """Handle shutdown signal."""
         logger.info("Shutdown signal received")

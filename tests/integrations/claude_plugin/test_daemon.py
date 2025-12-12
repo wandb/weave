@@ -182,3 +182,31 @@ class TestTaskToolWithSubagentType:
         assert tracker.turn_call_id == "turn-call-456"
         assert tracker.parent_session_id == "test-session-123"
         assert tracker.is_tailing is False  # Not yet found file
+
+
+class TestSessionsDirectoryHelper:
+    """Test sessions directory helper method."""
+
+    def test_daemon_get_sessions_directory(self):
+        """WeaveDaemon can determine the sessions directory from transcript path."""
+        from pathlib import Path
+
+        from weave.integrations.claude_plugin.daemon import WeaveDaemon
+
+        daemon = WeaveDaemon("test-session-123")
+        daemon.transcript_path = Path("/Users/test/.claude/projects/abc123/session-xyz.jsonl")
+
+        sessions_dir = daemon._get_sessions_directory()
+
+        assert sessions_dir == Path("/Users/test/.claude/projects/abc123")
+
+    def test_daemon_get_sessions_directory_none_when_no_transcript(self):
+        """WeaveDaemon returns None when no transcript path set."""
+        from weave.integrations.claude_plugin.daemon import WeaveDaemon
+
+        daemon = WeaveDaemon("test-session-123")
+        daemon.transcript_path = None
+
+        sessions_dir = daemon._get_sessions_directory()
+
+        assert sessions_dir is None
