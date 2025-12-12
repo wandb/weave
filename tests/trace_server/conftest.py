@@ -119,7 +119,7 @@ def get_calls_storage_mode(request):
     """Get the calls storage mode to use.
 
     Returns:
-        str: Either 'calls_merged' (legacy) or 'calls_complete' (new)
+        str: Either 'auto', 'force_legacy', 'dual_write_read_merged', 'dual_write_read_complete', or 'off'
     """
     return request.config.getoption("--calls-storage-mode")
 
