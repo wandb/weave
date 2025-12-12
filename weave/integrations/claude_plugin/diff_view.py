@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from weave.integrations.claude_plugin.session_parser import FileBackup, Turn
+    from weave.integrations.claude_plugin.session_parser import FileBackup, Session, Turn
 
 # File extension to highlight.js language mapping
 EXT_TO_HLJS_LANG: dict[str, str] = {
@@ -79,10 +79,12 @@ DIFF_HTML_STYLES = """
 .line-hunk{background:#ddf4ff;color:#0969da;font-weight:500}
 .line-hunk td{padding:8px 12px;background:#ddf4ff}
 .line-ctx .line-marker{color:#8c959f}
-.diff-footer{padding:12px 20px;background:#f6f8fa;border-top:1px solid #d1d9e0;font-size:12px;color:#656d76;display:flex;align-items:center;gap:12px}
-.footer-dot{color:#d1d9e0}
 .hljs{background:transparent!important;padding:0!important}
 code{font-family:inherit;display:block}
+.prompt-section{padding:16px 20px;background:#fff;border-bottom:1px solid #d1d9e0}
+.prompt-label{font-size:11px;font-weight:600;color:#656d76;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.prompt-label svg{width:14px;height:14px;fill:#656d76}
+.prompt-bubble{background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:#fff;padding:12px 16px;border-radius:18px 18px 18px 4px;font-size:14px;line-height:1.5;max-width:85%;word-wrap:break-word;white-space:pre-wrap;box-shadow:0 2px 8px rgba(102,126,234,0.25)}
 </style>
 """
 
@@ -107,6 +109,8 @@ def generate_turn_diff_html(
     tool_count: int,
     model: str,
     historic_mode: bool = False,
+    cwd: str | None = None,
+    user_prompt: str | None = None,
 ) -> str | None:
     """Generate HTML showing file changes for this turn with syntax highlighting.
 
@@ -135,6 +139,10 @@ def generate_turn_diff_html(
         model: Model name used for this turn
         historic_mode: If True, compare backup to previous turn's backup (for imports).
                        If False, compare backup to current file on disk (for live hooks).
+        cwd: Current working directory of the session. Used in live mode to resolve
+             relative file paths.
+        user_prompt: The user's prompt that initiated this turn. Displayed as a chat
+             bubble at the top of the diff view for context.
 
     Returns:
         HTML string with diff view, or None if no file changes
@@ -145,13 +153,27 @@ def generate_turn_diff_html(
     if not turn.file_backups:
         return None
 
+    # Get time bounds for this turn to filter backups
+    turn_start = turn.started_at()
+    next_turn_start = None
+    if turn_index + 1 < len(all_turns):
+        next_turn_start = all_turns[turn_index + 1].started_at()
+
     # Build map of current turn's file -> latest backup (state BEFORE edits)
+    # Include backups from file-history-snapshot events during this turn's window
     current_backups: dict[str, FileBackup] = {}
     for fb in turn.file_backups:
-        if fb.backup_filename:
-            existing = current_backups.get(fb.file_path)
-            if not existing or fb.version > existing.version:
-                current_backups[fb.file_path] = fb
+        if not fb.backup_filename:
+            continue
+        # Only include backups created during this turn's window
+        if fb.backup_time < turn_start:
+            continue  # Backup from before this turn
+        if next_turn_start and fb.backup_time >= next_turn_start:
+            continue  # Backup from a later turn
+
+        existing = current_backups.get(fb.file_path)
+        if not existing or fb.version > existing.version:
+            current_backups[fb.file_path] = fb
 
     if not current_backups:
         return None
@@ -266,8 +288,12 @@ def generate_turn_diff_html(
             try:
                 disk_path = Path(file_path)
                 if not disk_path.is_absolute():
-                    # file_path might be relative, skip
-                    continue
+                    # Try to resolve relative path using session cwd
+                    if cwd:
+                        disk_path = Path(cwd) / file_path
+                    else:
+                        # No cwd available, skip relative path
+                        continue
                 if not disk_path.exists():
                     # File was deleted - show as removal
                     diff_lines = list(
@@ -364,13 +390,29 @@ def generate_turn_diff_html(
     # Main container
     html_parts.append('<div class="diff-view">')
 
-    # Header with stats
+    # User prompt chat bubble at the very top (if provided)
+    if user_prompt:
+        # Truncate very long prompts for display
+        display_prompt = user_prompt[:2000] + "..." if len(user_prompt) > 2000 else user_prompt
+        html_parts.append('<div class="prompt-section">')
+        html_parts.append('<div class="prompt-label">')
+        # User icon SVG
+        html_parts.append(
+            '<svg viewBox="0 0 16 16"><path fill-rule="evenodd" d="M10.5 5a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0zm.061 3.073a4 4 0 10-5.123 0 6.004 6.004 0 00-3.431 5.142.75.75 0 001.498.07 4.5 4.5 0 018.99 0 .75.75 0 101.498-.07 6.005 6.005 0 00-3.432-5.142z"></path></svg>'
+        )
+        html_parts.append("User Prompt</div>")
+        html_parts.append(f'<div class="prompt-bubble">{_html_escape(display_prompt)}</div>')
+        html_parts.append("</div>")
+
+    # Header with title and all metadata
     html_parts.append('<div class="diff-header">')
-    html_parts.append('<div class="diff-title">File Changes</div>')
+    html_parts.append(f'<div class="diff-title">File Changes for Turn {turn_number}</div>')
     html_parts.append('<div class="diff-stats">')
     html_parts.append(f"{len(file_diffs)} file{'s' if len(file_diffs) != 1 else ''}")
-    html_parts.append(f' · <span class="add">+{total_added}</span>')
-    html_parts.append(f' · <span class="del">−{total_removed}</span>')
+    html_parts.append(f' <span class="add">+{total_added}</span>')
+    html_parts.append(f' <span class="del">−{total_removed}</span>')
+    html_parts.append(f" · {tool_count} tool call{'s' if tool_count != 1 else ''}")
+    html_parts.append(f" · {model}")
     html_parts.append("</div></div>")
 
     # File diffs
@@ -480,18 +522,291 @@ def generate_turn_diff_html(
         html_parts.append("</table></div>")
         html_parts.append("</div>")  # Close diff-file
 
-    # Footer
-    html_parts.append('<div class="diff-footer">')
-    html_parts.append(f"<span>Turn {turn_number}</span>")
-    html_parts.append('<span class="footer-dot">·</span>')
-    html_parts.append(f"<span>{tool_count} tool calls</span>")
-    html_parts.append('<span class="footer-dot">·</span>')
-    html_parts.append(f"<span>{model}</span>")
-    html_parts.append("</div>")
-
     html_parts.append("</div>")  # Close diff-view
 
     # Initialize highlight.js
+    html_parts.append("<script>")
+    html_parts.append("document.addEventListener('DOMContentLoaded',()=>{")
+    html_parts.append("document.querySelectorAll('code[class*=language-]').forEach(el=>{")
+    html_parts.append("try{hljs.highlightElement(el)}catch(e){}});});")
+    html_parts.append("</script>")
+
+    html_parts.append("</body></html>")
+
+    return "".join(html_parts)
+
+
+def generate_session_diff_html(
+    session: "Session",
+    *,
+    cwd: str | None = None,
+    sessions_dir: Path | None = None,
+) -> str | None:
+    """Generate HTML showing all file changes for an entire session.
+
+    Creates a GitHub-style diff view aggregating all file changes across all turns,
+    including changes made by subagents. For each modified file, shows the diff
+    from the earliest backup (state before first edit) to the current file on disk
+    (state at session end).
+
+    Args:
+        session: The session to generate diff for
+        cwd: Current working directory for resolving relative paths
+        sessions_dir: Directory containing session files (for finding subagent files)
+
+    Returns:
+        HTML string with session diff view, or None if no file changes
+    """
+    from weave.integrations.claude_plugin.session_parser import (
+        FileBackup,
+        parse_session_file,
+    )
+
+    if not session.turns:
+        return None
+
+    # Collect all sessions to process (main session + subagents)
+    all_sessions = [session]
+
+    # Find and parse subagent session files
+    if sessions_dir and sessions_dir.exists():
+        for agent_file in sessions_dir.glob("agent-*.jsonl"):
+            agent_session = parse_session_file(agent_file)
+            if agent_session:
+                all_sessions.append(agent_session)
+
+    # Collect earliest backup for each file across all sessions and turns
+    # This represents the state BEFORE the first edit to each file
+    earliest_backups: dict[str, FileBackup] = {}
+
+    for sess in all_sessions:
+        for turn in sess.turns:
+            for fb in turn.file_backups:
+                if not fb.backup_filename:
+                    continue
+                existing = earliest_backups.get(fb.file_path)
+                # Keep the earliest backup (lowest version or earliest time)
+                if not existing or fb.backup_time < existing.backup_time:
+                    earliest_backups[fb.file_path] = fb
+
+    if not earliest_backups:
+        return None
+
+    # Generate diffs comparing earliest backup -> current file on disk
+    file_diffs: list[dict[str, Any]] = []
+    total_added = 0
+    total_removed = 0
+
+    for file_path in sorted(earliest_backups.keys()):
+        backup_fb = earliest_backups[file_path]
+
+        # Load backup content (state BEFORE first edit)
+        backup_content = backup_fb.load_content(session.session_id)
+        if not backup_content:
+            continue
+
+        try:
+            backup_text = backup_content.as_string()
+        except Exception:
+            continue  # Skip binary files
+
+        backup_lines = backup_text.splitlines(keepends=True)
+        if backup_lines and not backup_lines[-1].endswith("\n"):
+            backup_lines[-1] += "\n"
+
+        # Detect language from file extension
+        ext = Path(file_path).suffix.lower()
+        lang = EXT_TO_HLJS_LANG.get(ext, "plaintext")
+
+        # Compare backup to current file on disk
+        try:
+            disk_path = Path(file_path)
+            if not disk_path.is_absolute():
+                if cwd:
+                    disk_path = Path(cwd) / file_path
+                else:
+                    continue
+
+            if not disk_path.exists():
+                # File was deleted - show as removal
+                diff_lines = list(
+                    difflib.unified_diff(
+                        backup_lines,
+                        [],
+                        fromfile=f"a/{file_path}",
+                        tofile=f"b/{file_path}",
+                        n=3,
+                    )
+                )
+                if diff_lines:
+                    removed = len(backup_lines)
+                    total_removed += removed
+                    file_diffs.append(
+                        {
+                            "path": file_path,
+                            "lang": lang,
+                            "is_new": False,
+                            "is_deleted": True,
+                            "diff_lines": diff_lines[2:],
+                            "added": 0,
+                            "removed": removed,
+                        }
+                    )
+                continue
+
+            current_text = disk_path.read_text()
+            current_lines = current_text.splitlines(keepends=True)
+            if current_lines and not current_lines[-1].endswith("\n"):
+                current_lines[-1] += "\n"
+
+            # Generate diff: earliest backup -> current
+            diff_lines = list(
+                difflib.unified_diff(
+                    backup_lines,
+                    current_lines,
+                    fromfile=f"a/{file_path}",
+                    tofile=f"b/{file_path}",
+                    n=3,
+                )
+            )
+
+            if diff_lines:
+                added = sum(
+                    1
+                    for line in diff_lines
+                    if line.startswith("+") and not line.startswith("+++")
+                )
+                removed = sum(
+                    1
+                    for line in diff_lines
+                    if line.startswith("-") and not line.startswith("---")
+                )
+                total_added += added
+                total_removed += removed
+
+                file_diffs.append(
+                    {
+                        "path": file_path,
+                        "lang": lang,
+                        "is_new": False,
+                        "is_deleted": False,
+                        "diff_lines": diff_lines[2:],
+                        "added": added,
+                        "removed": removed,
+                    }
+                )
+        except Exception:
+            continue
+
+    if not file_diffs:
+        return None
+
+    # Build HTML (similar structure to turn diff but with session-level header)
+    html_parts: list[str] = []
+
+    html_parts.append("<!DOCTYPE html>")
+    html_parts.append('<html lang="en"><head>')
+    html_parts.append('<meta charset="utf-8">')
+    html_parts.append(
+        '<meta name="viewport" content="width=device-width,initial-scale=1">'
+    )
+    html_parts.append(DIFF_HTML_STYLES)
+    html_parts.append(
+        '<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github.min.css">'
+    )
+    html_parts.append(
+        '<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>'
+    )
+    html_parts.append("</head><body>")
+
+    html_parts.append('<div class="diff-view">')
+
+    # Session-level header
+    html_parts.append('<div class="diff-header">')
+    html_parts.append('<div class="diff-title">Session File Changes</div>')
+    html_parts.append('<div class="diff-stats">')
+    html_parts.append(f"{len(file_diffs)} file{'s' if len(file_diffs) != 1 else ''} changed")
+    html_parts.append(f' <span class="add">+{total_added}</span>')
+    html_parts.append(f' <span class="del">−{total_removed}</span>')
+    html_parts.append(f" · {len(session.turns)} turn{'s' if len(session.turns) != 1 else ''}")
+    html_parts.append("</div></div>")
+
+    # File diffs (reuse same structure as turn diff)
+    for file_diff in file_diffs:
+        file_path = file_diff["path"]
+        lang = file_diff["lang"]
+        is_deleted = file_diff.get("is_deleted", False)
+
+        html_parts.append('<div class="diff-file">')
+        html_parts.append('<div class="file-header">')
+        html_parts.append(
+            '<svg class="file-icon" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M3.75 1.5a.25.25 0 00-.25.25v12.5c0 .138.112.25.25.25h9.5a.25.25 0 00.25-.25V4.664a.25.25 0 00-.073-.177l-2.914-2.914a.25.25 0 00-.177-.073H3.75zM2 1.75C2 .784 2.784 0 3.75 0h6.586c.464 0 .909.184 1.237.513l2.914 2.914c.329.328.513.773.513 1.237v9.586A1.75 1.75 0 0113.25 16h-9.5A1.75 1.75 0 012 14.25V1.75z"></path></svg>'
+        )
+        html_parts.append(f'<span class="file-name">{_html_escape(file_path)}</span>')
+        if is_deleted:
+            html_parts.append('<span class="file-badge" style="background:#ffebe9;color:#d1242f">DELETED</span>')
+        html_parts.append("</div>")
+
+        html_parts.append('<div class="diff-table-wrap">')
+        html_parts.append('<table class="diff-table">')
+
+        # Render diff lines
+        diff_lines = file_diff["diff_lines"]
+        old_line = 0
+        new_line = 0
+
+        for line in diff_lines:
+            if line.startswith("@@"):
+                # Parse hunk header for line numbers
+                match = re.match(r"@@ -(\d+)", line)
+                if match:
+                    old_line = int(match.group(1)) - 1
+                match = re.match(r"@@ -\d+(?:,\d+)? \+(\d+)", line)
+                if match:
+                    new_line = int(match.group(1)) - 1
+                html_parts.append('<tr class="line-hunk">')
+                html_parts.append(f'<td colspan="4">{_html_escape(line.strip())}</td>')
+                html_parts.append("</tr>")
+            elif line.startswith("+"):
+                new_line += 1
+                content = _html_escape(line[1:].rstrip("\n\r"))
+                html_parts.append('<tr class="line-add">')
+                html_parts.append('<td class="line-num"></td>')
+                html_parts.append(f'<td class="line-num">{new_line}</td>')
+                html_parts.append('<td class="line-marker">+</td>')
+                html_parts.append(
+                    f'<td class="line-content"><code class="language-{lang}">{content}</code></td>'
+                )
+                html_parts.append("</tr>")
+            elif line.startswith("-"):
+                old_line += 1
+                content = _html_escape(line[1:].rstrip("\n\r"))
+                html_parts.append('<tr class="line-del">')
+                html_parts.append(f'<td class="line-num">{old_line}</td>')
+                html_parts.append('<td class="line-num"></td>')
+                html_parts.append('<td class="line-marker">−</td>')
+                html_parts.append(
+                    f'<td class="line-content"><code class="language-{lang}">{content}</code></td>'
+                )
+                html_parts.append("</tr>")
+            else:
+                old_line += 1
+                new_line += 1
+                content = _html_escape(line[1:].rstrip("\n\r") if line else "")
+                html_parts.append('<tr class="line-ctx">')
+                html_parts.append(f'<td class="line-num">{old_line}</td>')
+                html_parts.append(f'<td class="line-num">{new_line}</td>')
+                html_parts.append('<td class="line-marker"></td>')
+                html_parts.append(
+                    f'<td class="line-content"><code class="language-{lang}">{content}</code></td>'
+                )
+                html_parts.append("</tr>")
+
+        html_parts.append("</table></div>")
+        html_parts.append("</div>")
+
+    html_parts.append("</div>")
+
     html_parts.append("<script>")
     html_parts.append("document.addEventListener('DOMContentLoaded',()=>{")
     html_parts.append("document.querySelectorAll('code[class*=language-]').forEach(el=>{")

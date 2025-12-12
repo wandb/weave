@@ -62,6 +62,7 @@ from weave.trace.view_utils import set_call_view
 
 from weave.integrations.claude_plugin.session_parser import (
     Session,
+    TokenUsage,
     Turn,
     is_system_message,
     parse_session_file,
@@ -73,7 +74,10 @@ from weave.integrations.claude_plugin.utils import (
     get_tool_display_name,
     truncate,
 )
-from weave.integrations.claude_plugin.diff_view import generate_turn_diff_html
+from weave.integrations.claude_plugin.diff_view import (
+    generate_session_diff_html,
+    generate_turn_diff_html,
+)
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
@@ -179,6 +183,16 @@ class WeaveDaemon:
         # Only one inline parent can be active at a time
         self._pending_inline_parent: InlineParentTracker | None = None
 
+        # Question tracking for Q&A flows
+        # Text-based: stores the question from previous turn's output
+        self._pending_question: str | None = None
+        # AskUserQuestion tool: maps tool_use_id -> (call_id, questions)
+        self._pending_question_calls: dict[str, tuple[str, list[dict[str, Any]]]] = {}
+
+        # Subagent file snapshots to aggregate into parent turn
+        # Maps turn_call_id -> {file_path -> Content}
+        self._subagent_file_snapshots: dict[str, dict[str, Any]] = {}
+
     async def start(self) -> None:
         """Start the daemon."""
         logger.info(f"Starting daemon for session {self.session_id}")
@@ -230,6 +244,9 @@ class WeaveDaemon:
             self.total_tool_calls = session_data.get("total_tool_calls", 0)
             self.tool_counts = session_data.get("tool_counts", {})
 
+            # Restore pending question for Q&A context tracking
+            self._pending_question = session_data.get("pending_question")
+
             # Update daemon PID in state
             session_data["daemon_pid"] = os.getpid()
             state.save_session(self.session_id, session_data)
@@ -261,6 +278,7 @@ class WeaveDaemon:
                 "tool_counts": self.tool_counts,
                 "last_processed_line": self.last_processed_line,
                 "daemon_pid": os.getpid(),
+                "pending_question": self._pending_question,
             })
             state.save_session(self.session_id, session_data)
 
@@ -678,6 +696,9 @@ class WeaveDaemon:
             total_usage = None
             tool_counts: dict[str, int] = {}
 
+            # Collect file snapshots from all subagent turns
+            file_snapshots: dict[str, Any] = {}
+
             if session:
                 # Get final response
                 if session.turns:
@@ -691,15 +712,37 @@ class WeaveDaemon:
                     for tc in turn.all_tool_calls():
                         tool_counts[tc.name] = tool_counts.get(tc.name, 0) + 1
 
+                # Load file backups from all turns
+                from weave.type_wrappers.Content.content import Content
+                for turn in session.turns:
+                    for fb in turn.file_backups:
+                        content = fb.load_content(session.session_id)
+                        if content:
+                            file_snapshots[fb.file_path] = content
+
+            # Build output
+            output: dict[str, Any] = {
+                "response": truncate(final_output, 10000) if final_output else None,
+                "turn_count": len(session.turns) if session else 0,
+                "tool_call_count": sum(tool_counts.values()),
+                "tool_counts": tool_counts,
+                "usage": total_usage.to_weave_usage() if total_usage else None,
+            }
+
+            if file_snapshots:
+                output["file_snapshots"] = file_snapshots
+                logger.debug(f"Subagent captured {len(file_snapshots)} file snapshots")
+
+                # Store file snapshots for parent turn aggregation
+                turn_call_id = tracker.turn_call_id
+                if turn_call_id not in self._subagent_file_snapshots:
+                    self._subagent_file_snapshots[turn_call_id] = {}
+                self._subagent_file_snapshots[turn_call_id].update(file_snapshots)
+                logger.debug(f"Stored {len(file_snapshots)} file snapshots for parent turn {turn_call_id}")
+
             self.weave_client.finish_call(
                 subagent_call,
-                output={
-                    "response": truncate(final_output, 10000) if final_output else None,
-                    "turn_count": len(session.turns) if session else 0,
-                    "tool_call_count": sum(tool_counts.values()),
-                    "tool_counts": tool_counts,
-                    "usage": total_usage.to_weave_usage() if total_usage else None,
-                },
+                output=output,
             )
             self.weave_client.flush()
 
@@ -887,16 +930,32 @@ class WeaveDaemon:
         # Aggregate token usage across all turns
         total_usage = agent_session.total_usage()
 
+        # Collect file snapshots from all subagent turns
+        from weave.type_wrappers.Content.content import Content
+        file_snapshots: dict[str, Content] = {}
+        for turn in agent_session.turns:
+            for fb in turn.file_backups:
+                content = fb.load_content(agent_session.session_id)
+                if content:
+                    file_snapshots[fb.file_path] = content
+
+        # Build output
+        subagent_output: dict[str, Any] = {
+            "response": truncate(final_output, 10000) if final_output else None,
+            "turn_count": len(agent_session.turns),
+            "tool_call_count": sum(tool_counts.values()),
+            "tool_counts": tool_counts,
+            "usage": total_usage.to_weave_usage() if total_usage else None,
+        }
+
+        if file_snapshots:
+            subagent_output["file_snapshots"] = file_snapshots
+            logger.debug(f"Subagent captured {len(file_snapshots)} file snapshots")
+
         # Finish subagent call with aggregated output
         self.weave_client.finish_call(
             subagent_call,
-            output={
-                "response": truncate(final_output, 10000) if final_output else None,
-                "turn_count": len(agent_session.turns),
-                "tool_call_count": sum(tool_counts.values()),
-                "tool_counts": tool_counts,
-                "usage": total_usage.to_weave_usage() if total_usage else None,
-            },
+            output=subagent_output,
         )
         self.weave_client.flush()
 
@@ -935,6 +994,29 @@ class WeaveDaemon:
                 "tool_call_breakdown": self.tool_counts,
                 "end_reason": payload.get("reason", "unknown"),
             }
+
+            # Generate session-level diff view showing all file changes
+            if self.transcript_path:
+                session = parse_session_file(self.transcript_path)
+                if session:
+                    # Get cwd from session for resolving relative paths
+                    cwd = session.cwd
+                    # Get sessions directory for finding subagent files
+                    sessions_dir = self.transcript_path.parent
+
+                    diff_html = generate_session_diff_html(
+                        session, cwd=cwd, sessions_dir=sessions_dir
+                    )
+                    if diff_html:
+                        set_call_view(
+                            call=session_call,
+                            client=self.weave_client,
+                            name="file_changes",
+                            content=diff_html,
+                            extension="html",
+                            mimetype="text/html",
+                        )
+                        logger.debug("Attached session diff HTML view")
 
             self.weave_client.finish_call(session_call, output=output)
             self.weave_client.flush()
@@ -1079,6 +1161,11 @@ class WeaveDaemon:
                             user_images.append(image_content)
                         except Exception as e:
                             logger.debug(f"Failed to parse image: {e}")
+                elif c.get("type") == "tool_result":
+                    # Handle tool results - check for pending question calls
+                    tool_use_id = c.get("tool_use_id", "")
+                    if tool_use_id in self._pending_question_calls:
+                        await self._finish_question_call(tool_use_id, c)
             user_text = "\n".join(text_parts)
 
         # Skip if no real content (tool results only) - don't trigger interruption check
@@ -1119,13 +1206,19 @@ class WeaveDaemon:
 
         turn_preview = truncate(user_text, 50) or f"Turn {self.turn_number}"
 
-        # Build inputs with images
+        # Build inputs with images and pending question context
         turn_inputs: dict[str, Any] = {
             "user_message": truncate(user_text, 5000),
         }
         if user_images:
             turn_inputs["images"] = user_images
             logger.debug(f"Turn {self.turn_number} has {len(user_images)} images")
+
+        # Include pending question from previous turn for Q&A context
+        if self._pending_question:
+            turn_inputs["in_response_to"] = self._pending_question
+            logger.debug(f"Added question context: {self._pending_question[:50]}...")
+            self._pending_question = None  # Clear after using
 
         turn_call = self.weave_client.create_call(
             op="claude_code.turn",
@@ -1229,6 +1322,38 @@ class WeaveDaemon:
                         logger.debug("ExitPlanMode: finished plan mode inline parent")
                     continue
 
+                # Handle AskUserQuestion tool - creates Q&A sub-call
+                if tool_name == "AskUserQuestion":
+                    questions = tool_input.get("questions", [])
+                    if questions:
+                        # Extract question text for display
+                        question_texts = []
+                        for q in questions:
+                            q_text = q.get("question", "")
+                            if q_text:
+                                question_texts.append(q_text)
+
+                        display_name = question_texts[0][:50] if question_texts else "Question"
+                        if len(question_texts) > 1:
+                            display_name += f" (+{len(question_texts) - 1} more)"
+
+                        # Create question call as child of current turn
+                        question_call = self.weave_client.create_call(
+                            op="claude_code.question",
+                            inputs={"questions": questions},
+                            parent=turn_call,
+                            display_name=f"Q: {display_name}",
+                            use_stack=False,
+                        )
+
+                        # Track for later completion when tool_result arrives
+                        self._pending_question_calls[tool_id] = (
+                            question_call.id,
+                            questions,
+                        )
+                        logger.debug(f"Created question call for {len(questions)} questions")
+                    continue
+
                 # Sanitize input
                 sanitized_input = {}
                 for k, v in tool_input.items():
@@ -1302,12 +1427,30 @@ class WeaveDaemon:
         if turn:
             usage = turn.total_usage()
 
-            # Collect assistant text
+            # Collect assistant text and thinking content
             assistant_text = ""
+            thinking_content_parts = []
+            thinking_usage = TokenUsage(requests=0)
             for msg in turn.assistant_messages:
                 text = msg.get_text()
                 if text:
                     assistant_text += text + "\n"
+                if msg.thinking_content:
+                    thinking_content_parts.append(msg.thinking_content)
+                    thinking_usage = thinking_usage + msg.usage
+
+            # Create thinking trace if there's thinking content
+            if thinking_content_parts:
+                aggregated_thinking = "\n\n".join(thinking_content_parts)
+                weave.log_call(
+                    op="claude_code.thinking",
+                    inputs={"content": aggregated_thinking},
+                    output={"usage": thinking_usage.to_weave_usage()},
+                    display_name="Thinking...",
+                    parent=turn_call,
+                    use_stack=False,
+                )
+                logger.debug(f"Created thinking trace with {len(thinking_content_parts)} blocks")
 
             output.update({
                 "model": turn.primary_model(),
@@ -1317,19 +1460,28 @@ class WeaveDaemon:
                 "duration_ms": turn.duration_ms(),
             })
 
+            # Detect if turn ends with a question (for Q&A context tracking)
+            # Store it so the next turn can include it as context
+            pending_q = self._extract_question_from_text(assistant_text)
+            if pending_q and not interrupted:
+                self._pending_question = pending_q
+                output["ends_with_question"] = truncate(pending_q, 500)
+                logger.debug(f"Detected trailing question: {pending_q[:50]}...")
+
             # Load file backups as Content objects
-            # Only include backups created DURING this turn (by backup_time)
+            # Include all backups from file-history-snapshot events during this turn's window
+            from weave.type_wrappers.Content.content import Content
+            file_snapshots: dict[str, Content] = {}
+
             if turn.file_backups and session:
-                from weave.type_wrappers.Content.content import Content
-                file_snapshots: dict[str, Content] = {}
                 turn_start = turn.started_at()
-                # Get next turn's start time as upper bound, or use a far future date
+                # Get next turn's start time as upper bound
                 next_turn_start = None
                 if turn_index + 1 < len(session.turns):
                     next_turn_start = session.turns[turn_index + 1].started_at()
 
                 for fb in turn.file_backups:
-                    # Filter: only include backups created during this turn's window
+                    # Only include backups created during this turn's window
                     if fb.backup_time < turn_start:
                         continue  # Backup from before this turn
                     if next_turn_start and fb.backup_time >= next_turn_start:
@@ -1339,9 +1491,15 @@ class WeaveDaemon:
                     if content:
                         file_snapshots[fb.file_path] = content
 
-                if file_snapshots:
-                    output["file_snapshots"] = file_snapshots
-                    logger.debug(f"Captured {len(file_snapshots)} file snapshots")
+            # Merge file snapshots from subagents that ran during this turn
+            if self.current_turn_call_id in self._subagent_file_snapshots:
+                subagent_snapshots = self._subagent_file_snapshots.pop(self.current_turn_call_id)
+                file_snapshots.update(subagent_snapshots)
+                logger.debug(f"Merged {len(subagent_snapshots)} file snapshots from subagents")
+
+            if file_snapshots:
+                output["file_snapshots"] = file_snapshots
+                logger.debug(f"Captured {len(file_snapshots)} total file snapshots")
 
             # Generate diff HTML for summary view
             if session:
@@ -1446,6 +1604,106 @@ class WeaveDaemon:
 
         logger.debug(f"Finished inline parent: {tracker.display_name}")
         self._pending_inline_parent = None
+
+    def _extract_question_from_text(self, text: str) -> str | None:
+        """Extract the trailing question from assistant text output.
+
+        Looks for a question mark in the last paragraph and extracts
+        everything up to and including the first "?" as the question.
+        Handles cases where additional text follows the question.
+
+        Returns:
+            The extracted question text, or None if no question found.
+        """
+        if not text or not text.strip():
+            return None
+
+        text = text.strip()
+
+        # Split into paragraphs (double newline separated)
+        paragraphs = text.split("\n\n")
+        last_para = paragraphs[-1].strip()
+
+        # Look for question mark anywhere in the last paragraph
+        if "?" not in last_para:
+            return None
+
+        # Extract everything up to and including the first "?"
+        question_end = last_para.index("?") + 1
+        question = last_para[:question_end].strip()
+
+        # Clean up markdown formatting but keep the text
+        # Remove leading ** if present (bold markdown)
+        if question.startswith("**"):
+            question = question[2:]
+        # Remove all ** markers
+        if "**" in question:
+            question = question.replace("**", "")
+
+        return question.strip() if question.strip() else None
+
+    async def _finish_question_call(
+        self, tool_use_id: str, tool_result: dict[str, Any]
+    ) -> None:
+        """Finish a pending AskUserQuestion call with the user's answers.
+
+        Args:
+            tool_use_id: The ID of the tool_use that created the question call.
+            tool_result: The tool_result content from the user message.
+        """
+        if tool_use_id not in self._pending_question_calls:
+            return
+
+        if not self.weave_client:
+            del self._pending_question_calls[tool_use_id]
+            return
+
+        call_id, questions = self._pending_question_calls[tool_use_id]
+
+        # Parse the answers from the tool result
+        # Format: "User has answered your questions: \"Q1\"=\"A1\". \"Q2\"=\"A2\"..."
+        result_content = tool_result.get("content", "")
+        answers: list[str] = []
+
+        if isinstance(result_content, str):
+            import re
+
+            # Match patterns like: "Question text"="Answer text"
+            pattern = r'"([^"]+)"="([^"]+)"'
+            matches = re.findall(pattern, result_content)
+
+            # Build answers array in order matching the questions
+            question_to_answer = {q: a for q, a in matches}
+            for q in questions:
+                q_text = q.get("question", "")
+                if q_text in question_to_answer:
+                    answers.append(question_to_answer[q_text])
+                else:
+                    # Fallback: if we can't match, use empty string
+                    answers.append("")
+
+            # If no matches at all, store raw content as single answer
+            if not matches:
+                answers = [result_content]
+
+        from weave.trace.call import Call
+
+        question_call = Call(
+            _op_name="",
+            project_id=self.weave_client._project_id(),
+            trace_id=self.trace_id,
+            parent_id=self.current_turn_call_id,
+            inputs={},
+            id=call_id,
+        )
+
+        self.weave_client.finish_call(
+            question_call,
+            output={"answers": answers},
+        )
+
+        logger.debug(f"Finished question call with {len(answers)} answers")
+        del self._pending_question_calls[tool_use_id]
 
     async def _get_current_turn_data(self) -> tuple[Session | None, Turn | None, int]:
         """Get data for the current turn from the session file.

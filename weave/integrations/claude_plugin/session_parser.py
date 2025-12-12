@@ -66,12 +66,18 @@ def parse_timestamp(ts: str) -> datetime.datetime:
 
 @dataclass
 class TokenUsage:
-    """Token usage from Claude API response."""
+    """Token usage from Claude API response.
+
+    Each instance represents usage from one or more API requests. The `requests`
+    field tracks how many requests contributed to this usage, which is important
+    for accurate aggregation when summing usage across multiple assistant messages.
+    """
 
     input_tokens: int = 0
     output_tokens: int = 0
     cache_creation_input_tokens: int = 0
     cache_read_input_tokens: int = 0
+    requests: int = 1  # Number of API requests this usage represents
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> TokenUsage:
@@ -93,17 +99,27 @@ class TokenUsage:
         return self.total_input() + self.output_tokens
 
     def to_weave_usage(self) -> dict[str, int]:
-        """Convert to Weave's expected usage format for automatic tracking."""
+        """Convert to Weave's expected usage format for automatic tracking.
+
+        Important: prompt_tokens/input_tokens should only include non-cached tokens
+        for accurate cost calculation. Weave calculates cost as:
+            prompt_tokens * prompt_token_cost + completion_tokens * completion_token_cost
+
+        Cache tokens have different pricing (cache_read is ~10x cheaper) and are
+        included as separate fields for informational purposes.
+        """
         return {
-            "input_tokens": self.total_input(),
+            # For cost calculation: only non-cached input tokens
+            "input_tokens": self.input_tokens,
             "output_tokens": self.output_tokens,
-            "total_tokens": self.total(),
-            # Include detailed breakdown
-            "prompt_tokens": self.total_input(),
+            "total_tokens": self.total(),  # Informational: all tokens processed
+            # Standard naming aliases
+            "prompt_tokens": self.input_tokens,
             "completion_tokens": self.output_tokens,
+            # Cache breakdown (informational, not used in cost calc)
             "cache_creation_input_tokens": self.cache_creation_input_tokens,
             "cache_read_input_tokens": self.cache_read_input_tokens,
-            "requests": 1,
+            "requests": self.requests,
         }
 
     def __add__(self, other: TokenUsage) -> TokenUsage:
@@ -114,6 +130,7 @@ class TokenUsage:
             + other.cache_creation_input_tokens,
             cache_read_input_tokens=self.cache_read_input_tokens
             + other.cache_read_input_tokens,
+            requests=self.requests + other.requests,
         )
 
 
@@ -194,6 +211,7 @@ class AssistantMessage:
     tool_calls: list[ToolCall]
     usage: TokenUsage
     timestamp: datetime.datetime
+    thinking_content: str | None = None
 
     def get_text(self) -> str:
         return "\n".join(self.text_content)
@@ -222,7 +240,7 @@ class Turn:
 
     def total_usage(self) -> TokenUsage:
         """Aggregate token usage across all assistant messages in this turn."""
-        total = TokenUsage()
+        total = TokenUsage(requests=0)  # Start with zero for proper accumulation
         for msg in self.assistant_messages:
             total = total + msg.usage
         return total
@@ -357,7 +375,7 @@ class Session:
         return None
 
     def total_usage(self) -> TokenUsage:
-        total = TokenUsage()
+        total = TokenUsage(requests=0)  # Start with zero for proper accumulation
         for turn in self.turns:
             total = total + turn.total_usage()
         return total
@@ -547,11 +565,14 @@ def parse_session_file(path: Path) -> Session | None:
 
             text_content = []
             tool_calls = []
+            thinking_content = None
 
             if isinstance(content, list):
                 for c in content:
                     if c.get("type") == "text":
                         text_content.append(c.get("text", ""))
+                    elif c.get("type") == "thinking":
+                        thinking_content = c.get("thinking", "")
                     elif c.get("type") == "tool_use":
                         tc = ToolCall(
                             id=c.get("id", ""),
@@ -569,6 +590,7 @@ def parse_session_file(path: Path) -> Session | None:
                 tool_calls=tool_calls,
                 usage=TokenUsage.from_dict(usage_data),
                 timestamp=timestamp,
+                thinking_content=thinking_content,
             )
             current_turn.assistant_messages.append(assistant_msg)
             current_turn.raw_messages.append(msg)  # Collect raw payload
