@@ -301,3 +301,68 @@ class TestScanForSubagentFiles:
 
         # Should NOT have started tailing - wrong session
         assert len(start_tailing_called) == 0
+
+
+class TestStartTailingSubagent:
+    """Test _start_tailing_subagent method."""
+
+    @pytest.mark.anyio
+    async def test_start_tailing_subagent_creates_weave_call(self, tmp_path):
+        """_start_tailing_subagent creates Weave call and updates tracker."""
+        from datetime import datetime, timezone
+        from unittest.mock import AsyncMock
+
+        from weave.integrations.claude_plugin.daemon import WeaveDaemon, SubagentTracker
+        from weave.integrations.claude_plugin.session_parser import Session
+
+        daemon = WeaveDaemon("parent-session-uuid")
+        daemon.session_id = "parent-session-uuid"
+        daemon.weave_client = MagicMock()
+        daemon.weave_client._project_id.return_value = "test-project"
+        daemon.trace_id = "trace-123"
+        daemon.session_call_id = "session-call-456"
+        daemon.current_turn_call_id = "turn-call-789"
+
+        # Mock create_call to return a call with an id
+        mock_call = MagicMock()
+        mock_call.id = "subagent-call-xyz"
+        daemon.weave_client.create_call.return_value = mock_call
+
+        # Create a pending tracker
+        tracker = SubagentTracker(
+            tool_use_id="tool-123",
+            turn_call_id="turn-call-789",
+            detected_at=datetime.now(timezone.utc),
+            parent_session_id="parent-session-uuid",
+        )
+        daemon._subagent_trackers["tool-123"] = tracker
+
+        # Create mock session
+        session = MagicMock(spec=Session)
+        session.session_id = "parent-session-uuid"
+        session.agent_id = "abc123"
+        session.turns = []
+        session.first_user_prompt.return_value = "Search the codebase"
+
+        agent_file = tmp_path / "agent-abc123.jsonl"
+        agent_file.touch()
+
+        # Mock _process_subagent_updates to avoid needing to implement it yet
+        daemon._process_subagent_updates = AsyncMock()
+
+        await daemon._start_tailing_subagent(session, agent_file)
+
+        # Verify tracker was updated
+        assert tracker.agent_id == "abc123"
+        assert tracker.transcript_path == agent_file
+        assert tracker.subagent_call_id == "subagent-call-xyz"
+        assert tracker.is_tailing is True
+
+        # Verify secondary index was populated
+        assert daemon._subagent_by_agent_id["abc123"] is tracker
+
+        # Verify Weave call was created
+        daemon.weave_client.create_call.assert_called_once()
+        call_kwargs = daemon.weave_client.create_call.call_args.kwargs
+        assert call_kwargs["op"] == "claude_code.subagent"
+        assert "abc123" in call_kwargs["inputs"]["agent_id"]
