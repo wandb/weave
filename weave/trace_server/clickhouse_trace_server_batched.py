@@ -568,6 +568,36 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             total_storage_size_bytes=res_dict.get("total_storage_size_bytes"),
         )
 
+    def trace_tree_aggregate(
+        self, req: tsi.TraceTreeAggregateReq
+    ) -> tsi.TraceTreeAggregateRes:
+        """Aggregate feedback scores across a call tree using recursive CTE.
+
+        This method traverses the call tree starting from the specified call_id
+        and aggregates all feedback scores from the call and its descendants.
+
+        Requires ClickHouse 24.4+ with enable_analyzer setting.
+        """
+        from weave.trace_server.trace_tree_aggregation import (
+            build_trace_tree_aggregate_query,
+            parse_aggregate_results,
+        )
+
+        pb = ParamBuilder()
+        query, columns = build_trace_tree_aggregate_query(req, pb)
+
+        # Execute with enable_analyzer setting required for recursive CTEs
+        raw_res = self._query(
+            query,
+            pb.get_params(),
+            settings={"enable_analyzer": 1},
+        )
+
+        return parse_aggregate_results(
+            list(raw_res.result_rows) if raw_res.result_rows else [],
+            columns,
+        )
+
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.calls_query_stream")
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
         """Returns a stream of calls that match the given query."""

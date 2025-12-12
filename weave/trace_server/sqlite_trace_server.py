@@ -734,6 +734,14 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             ),
         )
 
+    def trace_tree_aggregate(
+        self, req: tsi.TraceTreeAggregateReq
+    ) -> tsi.TraceTreeAggregateRes:
+        """Not implemented for SQLite - use ClickHouse for trace tree aggregation."""
+        raise NotImplementedError(
+            "trace_tree_aggregate is only supported with ClickHouse backend"
+        )
+
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
         assert_non_null_wb_user_id(req)
         # update row with a deleted_at field set to now

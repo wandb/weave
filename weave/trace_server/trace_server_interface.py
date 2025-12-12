@@ -514,6 +514,50 @@ class CallsQueryStatsRes(BaseModel):
     total_storage_size_bytes: int | None = None
 
 
+# --- Trace Tree Aggregation ---
+
+
+class FeedbackAggregation(BaseModel):
+    """Aggregated feedback statistics for a feedback type."""
+
+    feedback_type: str
+    total_count: int
+    true_count: int | None = None  # For boolean feedback
+    false_count: int | None = None  # For boolean feedback
+    true_percentage: float | None = None  # For boolean feedback
+    avg_value: float | None = None  # For numeric feedback
+    min_value: float | None = None  # For numeric feedback
+    max_value: float | None = None  # For numeric feedback
+    sum_value: float | None = None  # For numeric feedback
+
+
+class TraceTreeAggregateReq(BaseModelStrict):
+    """Request to aggregate data across a trace tree (call and all descendants)."""
+
+    project_id: str = Field(description="The project containing the call")
+    call_id: str = Field(description="The root call ID to start aggregation from")
+    max_depth: int = Field(
+        default=50,
+        ge=1,
+        le=100,
+        description="Maximum depth to traverse (safety limit)",
+    )
+    feedback_types: list[str] | None = Field(
+        default=None,
+        description="Filter to specific feedback types. If None, aggregates all types.",
+    )
+
+
+class TraceTreeAggregateRes(BaseModel):
+    """Response containing aggregated data from a trace tree."""
+
+    total_calls: int = Field(description="Total number of calls in the subtree")
+    max_depth_reached: int = Field(description="Maximum depth reached in traversal")
+    feedback: list[FeedbackAggregation] = Field(
+        default_factory=list, description="Aggregated feedback by type"
+    )
+
+
 class CallUpdateReq(BaseModelStrict):
     # required for all updates
     project_id: str
@@ -1975,6 +2019,9 @@ class TraceServerInterface(Protocol):
     def calls_query_stream(self, req: CallsQueryReq) -> Iterator[CallSchema]: ...
     def calls_delete(self, req: CallsDeleteReq) -> CallsDeleteRes: ...
     def calls_query_stats(self, req: CallsQueryStatsReq) -> CallsQueryStatsRes: ...
+    def trace_tree_aggregate(
+        self, req: TraceTreeAggregateReq
+    ) -> TraceTreeAggregateRes: ...
     def call_update(self, req: CallUpdateReq) -> CallUpdateRes: ...
     def call_start_batch(self, req: CallCreateBatchReq) -> CallCreateBatchRes: ...
 
