@@ -2314,7 +2314,6 @@ def _is_minimal_filter(filter: tsi.CallsFilter | None) -> bool:
 ######### BATCH UPDATE QUERY HANDLING ##########
 
 
-<<<<<<< HEAD
 def _build_grouped_case_statements(
     call_values: list[tuple[str, Any]],
     clickhouse_type: str,
@@ -2431,91 +2430,6 @@ def _build_array_value_clause(
         return f"[{', '.join(params)}]"
     else:
         return f"CAST([], 'Array({array_element_type})')"
-=======
-def _format_value_to_sql(
-    value: Any,
-    pb: ParamBuilder,
-    clickhouse_type: str,
-    format_value_fn: Callable[[Any, ParamBuilder], str] | None = None,
-) -> str:
-    """Format a value into SQL, either using a custom formatter or standard parameterization.
-
-    Args:
-        value: The value to format
-        pb: Parameter builder for query parameterization
-        clickhouse_type: ClickHouse type for parameterization
-        format_value_fn: Optional custom function to format the value
-
-    Returns:
-        SQL string representation of the value
-    """
-    if format_value_fn:
-        return format_value_fn(value, pb)
-
-    if value is None:
-        return "NULL"
-
-    param = pb.add_param(value)
-    return param_slot(param, clickhouse_type)
-
-
-def _format_output_refs(refs_tuple: tuple[str, ...], pb: ParamBuilder) -> str:
-    """Format output_refs tuple into ClickHouse array syntax.
-
-    Args:
-        refs_tuple: Tuple of reference strings
-        pb: Parameter builder for query parameterization
-
-    Returns:
-        SQL array literal string
-    """
-    if not refs_tuple:
-        return "[]"
-    refs_params = [param_slot(pb.add_param(ref), "String") for ref in refs_tuple]
-    return f"[{', '.join(refs_params)}]"
-
-
-def _build_field_assignment(
-    field_name: str,
-    values: list[Any],
-    call_ids: list[str],
-    clickhouse_type: str,
-    pb: ParamBuilder,
-    format_value_fn: Callable[[Any, ParamBuilder], str] | None = None,
-) -> str:
-    """Build a field assignment - simple if all values are the same, CASE if they differ.
-
-    Args:
-        field_name: The database field name
-        values: List of values (one per call)
-        call_ids: List of call IDs (for CASE conditions)
-        clickhouse_type: ClickHouse type for parameterization
-        pb: Parameter builder for query parameterization
-        format_value_fn: Optional function to format value into SQL (for complex types)
-
-    Returns:
-        SQL assignment expression (e.g., "field = value" or "field = CASE ... END")
-    """
-    # Check if all values are the same
-    first_value = values[0]
-    all_same = all(v == first_value for v in values)
-
-    if all_same:
-        value_sql = _format_value_to_sql(
-            first_value, pb, clickhouse_type, format_value_fn
-        )
-        return f"{field_name} = {value_sql}"
-
-    # CASE statement needed
-    cases = []
-    for call_id, value in zip(call_ids, values, strict=False):
-        id_param = pb.add_param(call_id)
-        value_sql = _format_value_to_sql(value, pb, clickhouse_type, format_value_fn)
-        cases.append(f"WHEN id = {param_slot(id_param, 'String')} THEN {value_sql}")
-
-    case_expr = "\n                ".join(cases)
-    return f"{field_name} = CASE {case_expr} ELSE {field_name} END"
->>>>>>> 5a1e3a256f (better)
 
 
 def build_calls_complete_batch_update_query(
