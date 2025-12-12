@@ -59,13 +59,12 @@ Map the selection to emoji:
 
 Use AskUserQuestion to collect an optional note:
 
-Question: "Any feedback you'd like to share? (optional)"
+Question: "Any feedback you'd like to share?"
 Header: "Note"
 Options:
-1. Label: "Skip", Description: "No additional feedback"
-2. Label: "Add note", Description: "I have something to share"
+1. Label: "Skip", Description: "No additional comments"
 
-If they select "Add note" or provide text via "Other", capture that as the note.
+If they provide text via "Other", use that as the note.
 If they select "Skip", set note to null.
 
 ## Send Feedback
