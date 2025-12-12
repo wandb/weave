@@ -461,3 +461,38 @@ class TestProcessSubagentUpdates:
 
         # Verify the tracker tracked the tool ID
         assert "tool-call-1" in tracker.logged_tool_ids
+
+
+class TestFileTailerIntegration:
+    """Test file tailer loop integration with subagent scanning."""
+
+    @pytest.mark.anyio
+    async def test_file_tailer_calls_scan_for_subagent_files(self):
+        """File tailer loop calls _scan_for_subagent_files."""
+        from pathlib import Path
+
+        from weave.integrations.claude_plugin.daemon import WeaveDaemon
+
+        daemon = WeaveDaemon("test-session")
+        daemon.transcript_path = Path("/tmp/test.jsonl")
+        daemon.running = True
+
+        scan_calls = []
+        process_calls = []
+
+        async def mock_scan():
+            scan_calls.append(1)
+
+        async def mock_process():
+            process_calls.append(1)
+            # Stop after first iteration (after process is called)
+            daemon.running = False
+
+        daemon._scan_for_subagent_files = mock_scan
+        daemon._process_session_file = mock_process
+
+        await daemon._run_file_tailer()
+
+        # The current implementation doesn't call scan yet, so this should fail
+        assert len(scan_calls) == 1
+        assert len(process_calls) == 1

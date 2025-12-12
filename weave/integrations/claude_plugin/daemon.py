@@ -871,7 +871,17 @@ class WeaveDaemon:
 
         while self.running:
             try:
+                # Process parent session transcript
                 await self._process_session_file()
+
+                # Scan for subagent files (only if pending trackers)
+                await self._scan_for_subagent_files()
+
+                # Process updates for all tailing subagents
+                for tracker in list(self._subagent_trackers.values()):
+                    if tracker.is_tailing:
+                        await self._process_subagent_updates(tracker)
+
             except Exception as e:
                 logger.error(f"Error processing session file: {e}")
 
