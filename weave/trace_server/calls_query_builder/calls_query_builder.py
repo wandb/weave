@@ -663,7 +663,7 @@ class CallsQuery(BaseModel):
     """Critical to be injection safe!"""
 
     project_id: str
-    select_fields: list[CallsMergedField] = Field(default_factory=list)
+    select_fields: list[QueryBuilderField] = Field(default_factory=list)
     query_conditions: list[Condition] = Field(default_factory=list)
     hardcoded_filter: HardCodedFilter | None = None
     order_fields: list[OrderField] = Field(default_factory=list)
@@ -737,6 +737,7 @@ class CallsQuery(BaseModel):
             hardcoded_filter=self.hardcoded_filter,
             limit=self.limit,
             offset=self.offset,
+            project_version=self.project_version,
         )
 
     def set_include_costs(self, include_costs: bool) -> "CallsQuery":
@@ -2212,6 +2213,7 @@ def build_calls_stats_query(
     inner_query = cq.as_sql(param_builder)
     calls_query_sql = f"SELECT {', '.join(aggregated_columns[k] for k in aggregated_columns)} FROM ({inner_query})"
 
+
     return (calls_query_sql, aggregated_columns.keys())
 
 
@@ -2458,7 +2460,6 @@ def build_calls_complete_batch_update_query(
     if not end_calls:
         return ""
 
-    # All calls should be from the same project
     project_id = end_calls[0].project_id
     call_ids = []
 
