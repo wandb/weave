@@ -11,10 +11,10 @@ Examples:
 
 from __future__ import annotations
 
-import json
 import sys
 
 from weave.integrations.claude_plugin.socket_client import DaemonClient
+from weave.integrations.claude_plugin.state import StateManager
 
 
 def main() -> int:
@@ -31,8 +31,19 @@ def main() -> int:
     client = DaemonClient(session_id)
 
     if not client.is_daemon_running():
-        print(f"Error: No daemon running for session {session_id}", file=sys.stderr)
-        return 1
+        # Check if we have state for this session to start daemon
+        with StateManager() as state:
+            session_data = state.get_session(session_id)
+
+        if not session_data:
+            print(f"Error: No session state found for {session_id}", file=sys.stderr)
+            return 1
+
+        # Start the daemon
+        print(f"Starting daemon for session {session_id}...", file=sys.stderr)
+        if not client.start_daemon():
+            print(f"Error: Failed to start daemon for session {session_id}", file=sys.stderr)
+            return 1
 
     payload = {"emoji": emoji}
     if note:

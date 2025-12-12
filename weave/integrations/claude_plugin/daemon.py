@@ -72,6 +72,7 @@ from weave.integrations.claude_plugin.state import StateManager
 from weave.integrations.claude_plugin.utils import (
     generate_session_name,
     get_tool_display_name,
+    get_turn_display_name,
     truncate,
 )
 from weave.integrations.claude_plugin.diff_view import (
@@ -1230,8 +1231,6 @@ class WeaveDaemon:
             id=self.session_call_id,
         )
 
-        turn_preview = truncate(user_text, 50) or f"Turn {self.turn_number}"
-
         # Build inputs with images and pending question context
         turn_inputs: dict[str, Any] = {
             "user_message": truncate(user_text, 5000),
@@ -1253,7 +1252,7 @@ class WeaveDaemon:
             attributes={
                 "turn_number": self.turn_number,
             },
-            display_name=f"Turn {self.turn_number}: {turn_preview}",
+            display_name=get_turn_display_name(self.turn_number, user_text),
             use_stack=False,
         )
 
@@ -1380,51 +1379,13 @@ class WeaveDaemon:
                         logger.debug(f"Created question call for {len(questions)} questions")
                     continue
 
-                # Sanitize input
-                sanitized_input = {}
-                for k, v in tool_input.items():
-                    if isinstance(v, str) and len(v) > 5000:
-                        sanitized_input[k] = truncate(v)
-                    else:
-                        sanitized_input[k] = v
+                # Track tool call for logging at turn finish (when results are available)
+                # Tool calls are logged in _finish_current_turn() using parsed turn data
+                # which has the tool_result linked, rather than logging eagerly here
+                # without the output.
+                self._current_turn_tool_calls.append(tool_id)
 
-                tool_display = get_tool_display_name(tool_name, tool_input)
-
-                # Determine parent: inline parent if active, otherwise turn
-                if self._pending_inline_parent and self._pending_inline_parent.is_active:
-                    # Parent to active inline parent (Skill or PlanMode)
-                    tool_parent = Call(
-                        _op_name="",
-                        project_id=self.weave_client._project_id(),
-                        trace_id=self.trace_id,
-                        parent_id=self._pending_inline_parent.parent_turn_call_id,
-                        inputs={},
-                        id=self._pending_inline_parent.call_id,
-                    )
-                else:
-                    # Parent to current turn
-                    tool_parent = turn_call
-
-                # Create tool call (we'll finish it when we see the result)
-                # For now, log it immediately since we may not see results in order
-                weave.log_call(
-                    op=f"claude_code.tool.{tool_name}",
-                    inputs=sanitized_input,
-                    output=None,  # Will be updated when we see tool_result
-                    attributes={
-                        "tool_name": tool_name,
-                        "tool_use_id": tool_id,
-                    },
-                    display_name=tool_display,
-                    parent=tool_parent,
-                    use_stack=False,
-                )
-
-                # Update counts
-                self.tool_counts[tool_name] = self.tool_counts.get(tool_name, 0) + 1
-                self.total_tool_calls += 1
-
-                logger.debug(f"Created tool call: {tool_name}")
+                logger.debug(f"Tracked tool call: {tool_name} ({tool_id})")
 
     async def _finish_current_turn(self, interrupted: bool = False) -> None:
         """Finish the current turn call with file snapshots and diff view."""
@@ -1444,6 +1405,10 @@ class WeaveDaemon:
 
         # Parse session file to get turn and session data
         session, turn, turn_index = await self._get_current_turn_data()
+
+        # Log tool calls from the parsed turn (which has results linked)
+        if turn:
+            await self._log_turn_tool_calls(turn, turn_call)
 
         output: dict[str, Any] = {}
         if interrupted:
@@ -1557,6 +1522,80 @@ class WeaveDaemon:
 
         logger.debug(f"Finished turn {self.turn_number}")
         self.current_turn_call_id = None
+
+    async def _log_turn_tool_calls(self, turn: Turn, turn_call: "Call") -> None:
+        """Log all tool calls from a turn with their results.
+
+        This is called at turn finish time when the session file has been parsed
+        and tool_use/tool_result have been linked together, so we have the actual
+        output for each tool call.
+
+        Args:
+            turn: The parsed Turn object containing tool calls with results
+            turn_call: The parent turn call to attach tool calls to
+        """
+        if not self.weave_client:
+            return
+
+        from weave.trace.call import Call
+
+        for tc in turn.all_tool_calls():
+            tool_name = tc.name
+
+            # Skip Task tools with subagent_type - handled by SubagentStop
+            if tool_name == "Task" and tc.input.get("subagent_type"):
+                continue
+
+            # Skip special tools handled elsewhere
+            if tool_name in ("Skill", "EnterPlanMode", "ExitPlanMode", "AskUserQuestion"):
+                continue
+
+            # Sanitize input - truncate large values
+            sanitized_input = {}
+            for k, v in tc.input.items():
+                if isinstance(v, str) and len(v) > 5000:
+                    sanitized_input[k] = truncate(v)
+                else:
+                    sanitized_input[k] = v
+
+            tool_display = get_tool_display_name(tool_name, tc.input)
+
+            # Determine parent: inline parent if active, otherwise turn
+            if self._pending_inline_parent and self._pending_inline_parent.is_active:
+                tool_parent = Call(
+                    _op_name="",
+                    project_id=self.weave_client._project_id(),
+                    trace_id=self.trace_id,
+                    parent_id=self._pending_inline_parent.parent_turn_call_id,
+                    inputs={},
+                    id=self._pending_inline_parent.call_id,
+                )
+            else:
+                tool_parent = turn_call
+
+            # Log tool call with output (result is now available from parsed turn)
+            weave.log_call(
+                op=f"claude_code.tool.{tool_name}",
+                inputs=sanitized_input,
+                output={"result": truncate(tc.result, 10000)} if tc.result else None,
+                attributes={
+                    "tool_name": tool_name,
+                    "tool_use_id": tc.id,
+                    "duration_ms": tc.duration_ms(),
+                },
+                display_name=tool_display,
+                parent=tool_parent,
+                use_stack=False,
+            )
+
+            # Update counts
+            self.tool_counts[tool_name] = self.tool_counts.get(tool_name, 0) + 1
+            self.total_tool_calls += 1
+
+            logger.debug(f"Logged tool call: {tool_name} (result={'yes' if tc.result else 'no'})")
+
+        # Clear tracked tool calls for this turn
+        self._current_turn_tool_calls = []
 
     async def _activate_inline_parent(self, prompt: str) -> None:
         """Activate a pending inline parent (Skill or PlanMode) with its first turn content.

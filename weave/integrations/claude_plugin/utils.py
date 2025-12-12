@@ -7,12 +7,114 @@ handlers and the batch import script.
 from __future__ import annotations
 
 import logging
+import re
 import subprocess
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
+
+
+# Regex patterns for extracting command info from XML-tagged messages
+_COMMAND_NAME_PATTERN = re.compile(r"<command-name>([^<]+)</command-name>")
+_COMMAND_MESSAGE_PATTERN = re.compile(r"<command-message>([^<]+)</command-message>")
+_COMMAND_OUTPUT_PATTERN = re.compile(
+    r"<local-command-(stdout|stderr)>([^<]*)</local-command-(?:stdout|stderr)>"
+)
+
+
+def extract_slash_command(text: str) -> str | None:
+    """Extract slash command name from XML-tagged message.
+
+    Tries <command-name> first, then falls back to <command-message>.
+    Handles formats like:
+    - <command-name>/weave:feedback</command-name>
+    - <command-message>weave:feedback is running...</command-message>
+
+    Args:
+        text: Message content that may contain command XML tags
+
+    Returns:
+        The command name (e.g., "/weave:feedback") or None if not a command message
+    """
+    if not text:
+        return None
+
+    # Try <command-name> first (contains the actual /command)
+    match = _COMMAND_NAME_PATTERN.search(text)
+    if match:
+        return match.group(1).strip()
+
+    # Fall back to <command-message> (may need to add / prefix)
+    match = _COMMAND_MESSAGE_PATTERN.search(text)
+    if match:
+        cmd = match.group(1).strip()
+        # Remove "is running..." suffix if present
+        if " is running" in cmd:
+            cmd = cmd.split(" is running")[0].strip()
+        # Add / prefix if not present
+        if cmd and not cmd.startswith("/"):
+            cmd = "/" + cmd
+        return cmd
+
+    return None
+
+
+def get_turn_display_name(turn_number: int, user_prompt: str) -> str:
+    """Generate a clean display name for a turn.
+
+    Handles special cases like slash commands to avoid showing raw XML tags.
+
+    Args:
+        turn_number: The turn number (1-indexed)
+        user_prompt: The raw user prompt text
+
+    Returns:
+        Display name like "Turn 1: /plugin" or "Turn 2: Fix the bug..."
+    """
+    # Check if this is a slash command message
+    slash_command = extract_slash_command(user_prompt)
+    if slash_command:
+        return f"Turn {turn_number}: {slash_command}"
+
+    # Regular prompt - truncate to 50 chars
+    turn_preview = truncate(user_prompt, 50) or f"Turn {turn_number}"
+    return f"Turn {turn_number}: {turn_preview}"
+
+
+def is_command_output(text: str) -> bool:
+    """Check if text is a command output message.
+
+    Args:
+        text: Message content to check
+
+    Returns:
+        True if this is a <local-command-stdout> or <local-command-stderr> message
+    """
+    if not text:
+        return False
+    text_stripped = text.strip()
+    return text_stripped.startswith(
+        ("<local-command-stdout>", "<local-command-stderr>")
+    )
+
+
+def extract_command_output(text: str) -> str:
+    """Extract content from command output XML tags.
+
+    Args:
+        text: Message with <local-command-stdout>content</local-command-stdout>
+
+    Returns:
+        The extracted content, or empty string if no match
+    """
+    if not text:
+        return ""
+    match = _COMMAND_OUTPUT_PATTERN.search(text)
+    if match:
+        return match.group(2).strip()
+    return ""
 
 
 def truncate(s: str | None, max_len: int = 5000) -> str | None:
