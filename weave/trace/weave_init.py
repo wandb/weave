@@ -10,6 +10,7 @@ from weave.trace import env, init_message, weave_client
 from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace.settings import (
     should_redact_pii,
+    should_use_go_sender,
     should_use_stainless_server,
     use_server_cache,
 )
@@ -230,7 +231,13 @@ def init_weave_get_server(
     should_batch: bool = True,
 ) -> TraceServerClientInterface:
     res: TraceServerClientInterface
-    if should_use_stainless_server():
+    if should_use_go_sender():
+        from weave.trace_server_bindings.go_sender_trace_server import (
+            GoSenderTraceServer,
+        )
+
+        res = GoSenderTraceServer.from_env(should_batch)
+    elif should_use_stainless_server():
         from weave.trace_server_bindings.stainless_remote_http_trace_server import (
             StainlessRemoteHTTPTraceServer,
         )
