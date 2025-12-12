@@ -92,34 +92,48 @@ def _parse_trace_filters(query_string: str) -> dict[str, Any] | None:
         return None
 
     params = parse_qs(query_string)
+    result: dict[str, Any] = {}
+
+    # Check for 'filter' parameter (singular - contains opVersionRefs, etc.)
+    # Format: ?filter={"opVersionRefs":["weave:///..."]}
+    if "filter" in params:
+        try:
+            filter_json = unquote(params["filter"][0])
+            filter_data = json.loads(filter_json)
+            result.update(filter_data)
+        except (json.JSONDecodeError, IndexError):
+            pass
 
     # Check for 'filters' parameter (plural - used by Weave UI for filter items)
     # Format: ?filters={"items":[{"field":"...", "operator":"...", "value":"..."}], "logicOperator":"and"}
     if "filters" in params:
         try:
             filters_json = unquote(params["filters"][0])
-            return json.loads(filters_json)
-        except (json.JSONDecodeError, IndexError):
-            pass
-
-    # Check for 'filter' parameter (singular - legacy format)
-    if "filter" in params:
-        try:
-            filter_json = unquote(params["filter"][0])
-            return json.loads(filter_json)
+            filters_data = json.loads(filters_json)
+            # Merge with existing result
+            if "items" in filters_data:
+                if "items" not in result:
+                    result["items"] = []
+                result["items"].extend(filters_data["items"])
+            if "logicOperator" in filters_data:
+                result["logicOperator"] = filters_data["logicOperator"]
+            # Copy any other keys
+            for key, value in filters_data.items():
+                if key not in result:
+                    result[key] = value
         except (json.JSONDecodeError, IndexError):
             pass
 
     # Check for individual filter items (alternative format)
     # Format: ?traceFilter=[{"field":"op_name","operator":"=","value":"MyOp"}]
-    if "traceFilter" in params:
+    if "traceFilter" in params and not result:
         try:
             filter_json = unquote(params["traceFilter"][0])
             return json.loads(filter_json)
         except (json.JSONDecodeError, IndexError):
             pass
 
-    return None
+    return result if result else None
 
 
 def build_trace_url(entity: str, project: str, trace_id: str) -> str:

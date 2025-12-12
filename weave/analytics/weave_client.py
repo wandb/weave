@@ -149,6 +149,33 @@ class AnalyticsWeaveClient:
 
         # Convert Weave UI filters to API format
         if filters:
+            # Handle opVersionRefs filter (matches op_name patterns)
+            op_version_refs = filters.get("opVersionRefs", [])
+            if op_version_refs:
+                op_conditions = []
+                for ref in op_version_refs:
+                    # Extract op name pattern from ref like "weave:///entity/project/op/OpName:*"
+                    if "/op/" in ref:
+                        op_pattern = ref.split("/op/")[-1]
+                        # Remove version suffix (e.g., ":*" or ":abc123")
+                        if ":" in op_pattern:
+                            op_name = op_pattern.split(":")[0]
+                        else:
+                            op_name = op_pattern
+                        # Match op_name containing this pattern
+                        op_conditions.append({
+                            "$contains": {
+                                "input": {"$getField": "op_name"},
+                                "substr": {"$literal": op_name}
+                            }
+                        })
+                if op_conditions:
+                    if len(op_conditions) == 1:
+                        expr_conditions.append(op_conditions[0])
+                    else:
+                        expr_conditions.append({"$or": op_conditions})
+
+            # Handle filter items (field/operator/value format)
             filter_items = filters.get("items", [])
             for item in filter_items:
                 field = item.get("field")
@@ -255,6 +282,19 @@ class AnalyticsWeaveClient:
                     ]
                 }]
             }
+        elif "(date):" in operator:
+            # Date filters are not fully supported by the Weave query API
+            # Skip them and let the client-side filtering handle it, or warn user
+            # For now, return None to skip this filter
+            import warnings
+            warnings.warn(
+                f"Date filter '{operator}' on field '{field}' is not fully supported "
+                "by the Weave query API and will be skipped. Results may include "
+                "traces outside the specified date range.",
+                UserWarning,
+                stacklevel=3,
+            )
+            return None
         # Default equality
         return {
             "$eq": [
