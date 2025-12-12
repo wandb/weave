@@ -529,6 +529,8 @@ class WeaveDaemon:
             return await self._handle_subagent_stop(payload)
         elif event == "SessionEnd":
             return await self._handle_session_end(payload)
+        elif event == "Feedback":
+            return await self._handle_feedback(payload)
         else:
             logger.warning(f"Unknown event: {event}")
             return {"status": "error", "message": f"Unknown event: {event}"}
@@ -946,6 +948,33 @@ class WeaveDaemon:
         # Trigger shutdown
         self.running = False
         return {"status": "ok"}
+
+    async def _handle_feedback(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """Handle Feedback - add reaction/note to session call."""
+        if not self.weave_client or not self.session_call_id:
+            return {"status": "error", "message": "No active session"}
+
+        emoji = payload.get("emoji")
+        note = payload.get("note")
+
+        try:
+            # Get the session call
+            session_call = self.weave_client.get_call(self.session_call_id)
+
+            # Add reaction
+            if emoji:
+                session_call.feedback.add_reaction(emoji, creator="user")
+
+            # Add note if provided
+            if note:
+                session_call.feedback.add_note(note, creator="user")
+
+            logger.info(f"Added feedback to session: emoji={emoji}, has_note={bool(note)}")
+            return {"status": "ok"}
+
+        except Exception as e:
+            logger.error(f"Failed to add feedback: {e}")
+            return {"status": "error", "message": str(e)}
 
     async def _run_file_tailer(self) -> None:
         """Tail the session file for new content."""
