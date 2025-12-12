@@ -8,6 +8,7 @@ import logging
 import os
 import platform
 import re
+import secrets
 import sys
 import time
 from collections.abc import Callable, Sequence
@@ -759,7 +760,11 @@ class WeaveClient:
             current_wb_run_id = None
             current_wb_run_step = None
 
-        started_at = datetime.datetime.now(tz=datetime.timezone.utc)
+        # Pick a ranom time within the last week
+        started_at = datetime.datetime.now(
+            tz=datetime.timezone.utc
+        ) - datetime.timedelta(seconds=3 * secrets.randbelow(60 * 60 * 24 * 7))
+        # started_at = datetime.datetime.now(tz=datetime.timezone.utc)
         project_id = self._project_id()
 
         should_print_call_link_ = should_print_call_link()
