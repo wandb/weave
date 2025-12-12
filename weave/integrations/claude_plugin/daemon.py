@@ -227,6 +227,42 @@ class WeaveDaemon:
             return None
         return self.transcript_path.parent
 
+    async def _scan_for_subagent_files(self) -> None:
+        """Scan for agent-*.jsonl files matching pending subagents."""
+        # Get pending (non-tailing) trackers
+        pending = [t for t in self._subagent_trackers.values() if not t.is_tailing]
+        if not pending:
+            return
+
+        sessions_dir = self._get_sessions_directory()
+        if not sessions_dir or not sessions_dir.exists():
+            return
+
+        # Get earliest detection time for filtering
+        earliest = min(t.detected_at for t in pending)
+
+        for agent_file in sessions_dir.glob("agent-*.jsonl"):
+            try:
+                # Skip files created before any pending subagent
+                file_ctime = agent_file.stat().st_ctime
+                if file_ctime < earliest.timestamp():
+                    continue
+
+                # Parse first few lines to check sessionId
+                session = parse_session_file(agent_file)
+                if not session:
+                    continue
+
+                # Verify sessionId matches our parent session
+                if session.session_id != self.session_id:
+                    continue
+
+                # Match! Start tailing
+                await self._start_tailing_subagent(session, agent_file)
+
+            except Exception as e:
+                logger.debug(f"Error checking agent file {agent_file}: {e}")
+
     def _handle_shutdown(self) -> None:
         """Handle shutdown signal."""
         logger.info("Shutdown signal received")

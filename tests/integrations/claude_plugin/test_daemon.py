@@ -210,3 +210,94 @@ class TestSessionsDirectoryHelper:
         sessions_dir = daemon._get_sessions_directory()
 
         assert sessions_dir is None
+
+
+class TestScanForSubagentFiles:
+    """Test _scan_for_subagent_files method."""
+
+    @pytest.mark.anyio
+    async def test_scan_for_subagent_files_finds_matching_file(self, tmp_path):
+        """_scan_for_subagent_files finds and matches subagent files by sessionId."""
+        from datetime import datetime, timezone
+        import time
+
+        from weave.integrations.claude_plugin.daemon import WeaveDaemon, SubagentTracker
+
+        daemon = WeaveDaemon("parent-session-uuid")
+        daemon.session_id = "parent-session-uuid"
+        daemon.transcript_path = tmp_path / "session.jsonl"
+        daemon.transcript_path.touch()
+
+        # Create a pending tracker
+        tracker = SubagentTracker(
+            tool_use_id="tool-123",
+            turn_call_id="turn-456",
+            detected_at=datetime.now(timezone.utc),
+            parent_session_id="parent-session-uuid",
+        )
+        daemon._subagent_trackers["tool-123"] = tracker
+
+        # Wait a tiny bit so file will be "after" detection
+        time.sleep(0.01)
+
+        # Create a subagent file with matching sessionId
+        agent_file = tmp_path / "agent-abc123.jsonl"
+        agent_file.write_text(json.dumps({
+            "type": "assistant",
+            "sessionId": "parent-session-uuid",
+            "agentId": "abc123",
+            "isSidechain": True,
+            "message": {"content": [{"type": "text", "text": "Hello"}]}
+        }) + "\n")
+
+        # Mock _start_tailing_subagent to track if it gets called
+        start_tailing_called = []
+        async def mock_start_tailing(session, path):
+            start_tailing_called.append((session.agent_id, path))
+        daemon._start_tailing_subagent = mock_start_tailing
+
+        await daemon._scan_for_subagent_files()
+
+        assert len(start_tailing_called) == 1
+        assert start_tailing_called[0][0] == "abc123"
+
+    @pytest.mark.anyio
+    async def test_scan_for_subagent_files_ignores_other_sessions(self, tmp_path):
+        """_scan_for_subagent_files ignores files from other sessions."""
+        from datetime import datetime, timezone
+
+        from weave.integrations.claude_plugin.daemon import WeaveDaemon, SubagentTracker
+
+        daemon = WeaveDaemon("parent-session-uuid")
+        daemon.session_id = "parent-session-uuid"
+        daemon.transcript_path = tmp_path / "session.jsonl"
+        daemon.transcript_path.touch()
+
+        # Create a pending tracker
+        tracker = SubagentTracker(
+            tool_use_id="tool-123",
+            turn_call_id="turn-456",
+            detected_at=datetime.now(timezone.utc),
+            parent_session_id="parent-session-uuid",
+        )
+        daemon._subagent_trackers["tool-123"] = tracker
+
+        # Create a subagent file with DIFFERENT sessionId
+        agent_file = tmp_path / "agent-other.jsonl"
+        agent_file.write_text(json.dumps({
+            "type": "assistant",
+            "sessionId": "different-session-uuid",
+            "agentId": "other",
+            "isSidechain": True,
+            "message": {"content": [{"type": "text", "text": "Hello"}]}
+        }) + "\n")
+
+        start_tailing_called = []
+        async def mock_start_tailing(session, path):
+            start_tailing_called.append((session.agent_id, path))
+        daemon._start_tailing_subagent = mock_start_tailing
+
+        await daemon._scan_for_subagent_files()
+
+        # Should NOT have started tailing - wrong session
+        assert len(start_tailing_called) == 0
