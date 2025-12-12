@@ -189,12 +189,7 @@ def tests(session: nox.Session, shard: str):
             "tests/wandb_interface/",
         ],
         "trace_no_server": ["tests/trace/"],
-        "trace_calls_complete": [
-            "tests/trace/",
-            "tests/compat/",
-            "tests/utils/",
-            "tests/wandb_interface/",
-        ],
+        "trace_calls_complete": ["tests/trace/"],
     }
 
     test_dirs = test_dirs_dict.get(shard, default_test_dirs)
