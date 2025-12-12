@@ -80,6 +80,9 @@ from datetime import datetime, timezone
 # Inactivity timeout (10 minutes)
 INACTIVITY_TIMEOUT = 600
 
+# Timeout for subagent file detection (10 seconds)
+SUBAGENT_DETECTION_TIMEOUT = 10
+
 
 @dataclass
 class SubagentTracker:
@@ -429,6 +432,24 @@ class WeaveDaemon:
 
         tracker.last_processed_line = total_lines
         logger.debug(f"Processed subagent {tracker.agent_id} up to line {total_lines}")
+
+    def _cleanup_stale_subagent_trackers(self) -> None:
+        """Clean up trackers for subagents whose files never appeared."""
+        now = datetime.now(timezone.utc)
+        stale_tool_ids = [
+            tracker.tool_use_id
+            for tracker in self._subagent_trackers.values()
+            if not tracker.is_tailing
+            and (now - tracker.detected_at).total_seconds() > SUBAGENT_DETECTION_TIMEOUT
+        ]
+
+        for tool_id in stale_tool_ids:
+            tracker = self._subagent_trackers.pop(tool_id, None)
+            if tracker:
+                logger.warning(
+                    f"Subagent file not found after {SUBAGENT_DETECTION_TIMEOUT}s: "
+                    f"tool_id={tool_id}"
+                )
 
     def _handle_shutdown(self) -> None:
         """Handle shutdown signal."""
