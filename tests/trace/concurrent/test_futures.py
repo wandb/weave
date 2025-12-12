@@ -67,6 +67,51 @@ def test_then_multiple_futures() -> None:
     assert future_result.result() == 15
 
 
+def test_then_multiple_futures_ordering() -> None:
+    executor: FutureExecutor = FutureExecutor()
+
+    def fetch_data1() -> list[int]:
+        time.sleep(5)
+        return [1, 2, 3]
+
+    def fetch_data2() -> list[int]:
+        return [4, 5]
+
+    def process_multiple_data(data_list: list[list[int]]) -> int:
+        final = []
+        for data in data_list:
+            final.extend(data)
+        return final
+
+    future_data2: Future[list[int]] = executor.defer(fetch_data2)
+    future_data1: Future[list[int]] = executor.defer(fetch_data1)
+    future_result: Future[list[int]] = executor.then(
+        [future_data1, future_data2], process_multiple_data
+    )
+
+    assert future_result.result() == [1, 2, 3, 4, 5]
+
+
+def test_then_multiple_futures_duplicate() -> None:
+    executor: FutureExecutor = FutureExecutor()
+
+    def fetch_data1() -> list[int]:
+        return [1, 2, 3]
+
+    def process_multiple_data(data_list: list[list[int]]) -> int:
+        final = []
+        for data in data_list:
+            final.extend(data)
+        return final
+
+    future_data1: Future[list[int]] = executor.defer(fetch_data1)
+    future_result: Future[list[int]] = executor.then(
+        [future_data1, future_data1], process_multiple_data
+    )
+
+    assert future_result.result() == [1, 2, 3, 1, 2, 3]
+
+
 @pytest.mark.disable_logging_error_check
 def test_then_with_exception_in_future(log_collector) -> None:
     executor: FutureExecutor = FutureExecutor()

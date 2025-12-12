@@ -1,5 +1,7 @@
 """Helpers for printing HTTP requests and responses."""
 
+from __future__ import annotations
+
 import datetime
 import json
 import os
@@ -154,9 +156,17 @@ class LoggingHTTPTransport(httpx.HTTPTransport):
         return response
 
 
+def _get_http_timeout() -> float:
+    """Get the HTTP timeout from settings."""
+    # Import here to avoid circular imports
+    from weave.trace.settings import http_timeout
+
+    return http_timeout()
+
+
 client = httpx.Client(
     transport=LoggingHTTPTransport(),
-    timeout=None,
+    timeout=_get_http_timeout(),
     limits=httpx.Limits(max_connections=None, max_keepalive_connections=None),
 )
 
@@ -170,8 +180,10 @@ def get(
 ) -> Response:
     """Send a GET request with optional logging."""
     if stream:
+        # Extract auth since build_request doesn't accept it
+        auth = kwargs.pop("auth", None)
         request = client.build_request("GET", url, params=params, **kwargs)
-        return client.send(request, stream=True)
+        return client.send(request, auth=auth, stream=True)
     return client.get(url, params=params, **kwargs)
 
 
@@ -185,8 +197,10 @@ def post(
 ) -> Response:
     """Send a POST request with optional logging."""
     if stream:
+        # Extract auth since build_request doesn't accept it
+        auth = kwargs.pop("auth", None)
         request = client.build_request("POST", url, data=data, json=json, **kwargs)
-        return client.send(request, stream=True)
+        return client.send(request, auth=auth, stream=True)
     return client.post(url, data=data, json=json, **kwargs)
 
 
@@ -199,6 +213,8 @@ def delete(
 ) -> Response:
     """Send a DELETE request with optional logging."""
     if stream:
+        # Extract auth since build_request doesn't accept it
+        auth = kwargs.pop("auth", None)
         request = client.build_request("DELETE", url, params=params, **kwargs)
-        return client.send(request, stream=True)
+        return client.send(request, auth=auth, stream=True)
     return client.delete(url, params=params, **kwargs)

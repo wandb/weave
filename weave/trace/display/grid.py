@@ -66,12 +66,22 @@ def get_terminal_height() -> int:
     return os.get_terminal_size().lines - 5  # Adjust for headers & padding
 
 
+_HAS_TERMIOS = False
 if os.name == "nt":  # Windows
     # TODO: Implement a Windows-compatible implementation
     pass
 else:  # Unix/Linux/MacOS
-    import termios
-    import tty
+    try:
+        import termios
+        import tty
+    except ImportError:
+        # termios not available (e.g., in Pyodide/browser environments)
+        pass
+    else:
+        _HAS_TERMIOS = True
+
+
+if _HAS_TERMIOS:
 
     def get_key() -> str:
         """Reads a single keypress from the user without requiring Enter."""
@@ -542,10 +552,11 @@ class Grid:
         return pydantic_util.table_to_str(table)
 
     def show(self, rows_per_page: int | None = None) -> None:
-        if os.name == "nt":  # Windows
-            raise NotImplementedError(
-                "Interactive grid pagination is not yet supported on Windows."
-            )
+        if not _HAS_TERMIOS:
+            # No interactive input available (Windows or Pyodide/browser)
+            # Fall back to non-interactive output
+            print(self.to_rich_table_str())
+            return
 
         height = get_terminal_height()
         if self.num_rows < height:

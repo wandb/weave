@@ -1341,20 +1341,20 @@ def is_op(obj: Any) -> TypeIs[Op]:
 
 
 def as_op(fn: Callable[P, R]) -> Op[P, R]:
-    """Given a @weave.op() decorated function, return its Op.
+    """Given a @weave.op decorated function, return its Op.
 
-    @weave.op() decorated functions are instances of Op already, so this
+    @weave.op decorated functions are instances of Op already, so this
     function should be a no-op at runtime. But you can use it to satisfy type checkers
     if you need to access OpDef attributes in a typesafe way.
 
     Args:
-        fn: A weave.op() decorated function.
+        fn: A weave.op decorated function.
 
     Returns:
         The Op of the function.
     """
     if not is_op(fn):
-        raise ValueError("fn must be a weave.op() decorated function")
+        raise ValueError("fn must be a weave.op decorated function")
 
     # The unbinding is necessary for methods because `MethodType` is applied after the
     # func is decorated into an Op.
@@ -1627,7 +1627,7 @@ def _add_accumulator(
     The intended usage is:
 
     ```
-    @weave.op()
+    @weave.op
     def fn():
         size = 10
         while size > 0:

@@ -80,12 +80,12 @@ class Evaluation(Object):
     ]
 
     # Define any custom scoring function
-    @weave.op()
+    @weave.op
     def match_score1(expected: str, model_output: dict) -> dict:
         # Here is where you'd define the logic to score the model output
         return {'match': expected == model_output['generated_text']}
 
-    @weave.op()
+    @weave.op
     def function_to_evaluate(question: str):
         # here's where you would add your LLM call and return the output
         return  {'generated_text': 'Paris'}

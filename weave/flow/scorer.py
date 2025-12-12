@@ -206,14 +206,14 @@ def get_scorer_attributes(
         try:
             if not is_op(scorer.score):
                 raise TypeError(
-                    f"Scorer {scorer_name} must implement `score` as a weave.op() decorated function."
+                    f"Scorer {scorer_name} must implement `score` as a weave.op decorated function."
                 )
             score_op = as_op(scorer.score)
             summarize_fn = scorer.summarize  # type: ignore
 
         except AttributeError:
             raise ValueError(
-                f"Scorer {scorer_name} must implement score and summarize methods. Did you forget to wrap with @weave.op()?"
+                f"Scorer {scorer_name} must implement score and summarize methods. Did you forget to wrap with @weave.op?"
             ) from None
     elif is_op(scorer):
         scorer = as_op(scorer)

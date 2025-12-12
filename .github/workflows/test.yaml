@@ -90,8 +90,7 @@ jobs:
           pip install nox uv
       - name: Run nox (Non Trace Server)
         run: |
-          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- \
-            -m "not trace_server"
+          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- -m "not trace_server"
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
         with:
@@ -114,8 +113,7 @@ jobs:
             "13",
             #
           ]
-        nox-shard:
-          [
+        nox-shard: [
             "trace",
             "flow",
             "trace_server",
@@ -135,11 +133,13 @@ jobs:
             "mistral",
             "notdiamond",
             "openai",
+            "openai_agents",
             "verifiers_test",
             "vertexai",
             "pandas_test",
             "mcp",
             "smolagents",
+            # "stainless",
             "autogen_tests",
           ]
       fail-fast: false
@@ -167,7 +167,7 @@ jobs:
         ports:
           - "10000:10000"
       weave_clickhouse:
-        image: clickhouse/clickhouse-server:25.4
+        image: clickhouse/clickhouse-server:25.11.2.24
         env:
           CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
           CLICKHOUSE_USER: default
@@ -296,8 +296,7 @@ jobs:
             "13",
             #
           ]
-        nox-shard:
-          [
+        nox-shard: [
             "trace",
             "flow",
             "trace_server",
@@ -322,6 +321,7 @@ jobs:
             "pandas_test",
             "mcp",
             "smolagents",
+            # "stainless",
             "autogen_tests",
           ]
       fail-fast: false

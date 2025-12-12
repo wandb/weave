@@ -1,6 +1,6 @@
 {
   "name": "weave",
-  "version": "0.10.1",
+  "version": "0.11.0",
   "description": "AI development toolkit",
   "types": "dist/index.d.ts",
   "main": "dist/index.js",
@@ -143,13 +143,13 @@
   "dependencies": {
     "cli-progress": "^3.12.0",
     "cross-spawn": "^7.0.5",
+    "form-data": "^4.0.4",
     "import-in-the-middle": "^1.13.2",
     "ini": "^5.0.0",
     "module-details-from-path": "^1.0.4",
     "openai": "^4.68.4",
     "semifies": "^1.0.0",
-    "uuidv7": "^1.0.1",
-    "form-data": "^4.0.4"
+    "uuidv7": "^1.0.1"
   },
   "devDependencies": {
     "@types/cli-progress": "^3.11.6",
@@ -162,6 +162,7 @@
     "source-map-support": "^0.5.21",
     "swagger-typescript-api": "^13.0.22",
     "ts-jest": "^29.2.5",
+    "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
     "tsx": "^4.19.1",
     "typedoc": "^0.28",
