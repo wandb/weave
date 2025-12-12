@@ -71,16 +71,16 @@ If they select "Skip", set note to null.
 
 First, find the Weave session_id from the conversation context. Look for a system reminder containing "Weave session_id:" - extract that UUID.
 
-Then run this command:
+Then run this command (use `2>&1` to capture both stdout and stderr):
 
 ```bash
-python -m weave.integrations.claude_plugin.feedback "<SESSION_ID>" "<EMOJI>" "<NOTE>"
+python -m weave.integrations.claude_plugin.feedback "<SESSION_ID>" "<EMOJI>" "<NOTE>" 2>&1
 ```
 
 If the python command fails (weave not installed), fall back to uvx:
 
 ```bash
-uvx --from "weave>=0.52.23" python -m weave.integrations.claude_plugin.feedback "<SESSION_ID>" "<EMOJI>" "<NOTE>"
+uvx --from "weave>=0.52.23" python -m weave.integrations.claude_plugin.feedback "<SESSION_ID>" "<EMOJI>" "<NOTE>" 2>&1
 ```
 
 - Replace `<SESSION_ID>` with the UUID from "Weave session_id:" in context

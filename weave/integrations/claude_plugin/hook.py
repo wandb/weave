@@ -140,10 +140,17 @@ def main() -> None:
 
             # Return trace URL for UserPromptSubmit
             if event_name == "UserPromptSubmit" and response.get("trace_url"):
+                # Include session_id so feedback commands can find the session
+                trace_url = response["trace_url"]
+                session_id = response.get("session_id", "")
+                context_parts = [f"Weave tracing active: {trace_url}"]
+                if session_id:
+                    context_parts.append(f"Weave session_id: {session_id}")
+
                 result = {
                     "hookSpecificOutput": {
                         "hookEventName": "UserPromptSubmit",
-                        "additionalContext": f"Weave tracing active: {response['trace_url']}",
+                        "additionalContext": "\n".join(context_parts),
                     }
                 }
                 print(json.dumps(result))
