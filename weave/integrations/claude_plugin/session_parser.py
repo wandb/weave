@@ -13,10 +13,9 @@ import logging
 from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
-if TYPE_CHECKING:
-    from weave.type_wrappers.Content.content import Content
+from weave.type_wrappers.Content.content import Content
 
 logger = logging.getLogger(__name__)
 
@@ -207,6 +206,7 @@ class UserMessage:
     uuid: str
     content: str
     timestamp: datetime.datetime
+    images: list[Content] = field(default_factory=list)
 
 
 @dataclass
@@ -317,6 +317,9 @@ class Session:
     cwd: str | None
     version: str | None
     turns: list[Turn] = field(default_factory=list)
+    # Subagent-specific fields (only set for agent-*.jsonl files)
+    agent_id: str | None = None  # e.g., "abc12345" from agent-abc12345.jsonl
+    is_sidechain: bool = False  # True if this is a subagent session
 
     def first_user_prompt(self) -> str:
         """Get the first real user prompt (not system messages)."""
@@ -443,6 +446,9 @@ def parse_session_file(path: Path) -> Session | None:
                         "gitBranch": obj.get("gitBranch"),
                         "cwd": obj.get("cwd"),
                         "version": obj.get("version"),
+                        # Subagent-specific fields
+                        "agentId": obj.get("agentId"),
+                        "isSidechain": obj.get("isSidechain", False),
                     }
 
                 messages.append(obj)
@@ -459,6 +465,8 @@ def parse_session_file(path: Path) -> Session | None:
         git_branch=session_info.get("gitBranch"),
         cwd=session_info.get("cwd"),
         version=session_info.get("version"),
+        agent_id=session_info.get("agentId"),
+        is_sidechain=session_info.get("isSidechain", False),
     )
 
     pending_tool_calls: dict[str, ToolCall] = {}
@@ -470,6 +478,7 @@ def parse_session_file(path: Path) -> Session | None:
 
         if msg_type == "user":
             user_content = ""
+            user_images: list[Content] = []
             msg_data = msg.get("message", {})
             content = msg_data.get("content", "")
 
@@ -480,6 +489,18 @@ def parse_session_file(path: Path) -> Session | None:
                 for c in content:
                     if c.get("type") == "text":
                         text_parts.append(c.get("text", ""))
+                    elif c.get("type") == "image":
+                        # Extract image from base64 source
+                        source = c.get("source", {})
+                        if source.get("type") == "base64" and source.get("data"):
+                            try:
+                                image_content = Content.from_base64(
+                                    source["data"],
+                                    mimetype=source.get("media_type"),
+                                )
+                                user_images.append(image_content)
+                            except Exception as e:
+                                logger.debug(f"Failed to parse image: {e}")
                     elif c.get("type") == "tool_result":
                         tool_use_id = c.get("tool_use_id")
                         if tool_use_id in pending_tool_calls:
@@ -500,6 +521,7 @@ def parse_session_file(path: Path) -> Session | None:
                         uuid=msg.get("uuid", ""),
                         content=user_content,
                         timestamp=timestamp,
+                        images=user_images,
                     ),
                     raw_messages=[msg],  # Start collecting raw payloads
                 )

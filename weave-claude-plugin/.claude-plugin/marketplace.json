@@ -1,0 +1,13 @@
+{
+    "name": "wandb",
+    "owner": {
+        "name": "Weights & Biases"
+    },
+    "plugins": [
+        {
+            "name": "weave-tracing",
+            "source": "./",
+            "description": "Weave tracing for Claude Code sessions"
+        }
+    ]
+}

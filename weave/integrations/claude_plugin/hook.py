@@ -105,12 +105,24 @@ def main() -> None:
         sys.exit(1)
 
     logger.debug(f"Event: {event_name} | Session: {session_id}")
+    logger.debug(f"Payload keys: {list(payload.keys())}")
+
+    # Log additional payload details for UserPromptSubmit to understand image handling
+    if event_name == "UserPromptSubmit":
+        prompt = payload.get("prompt", "")
+        logger.debug(f"UserPromptSubmit prompt preview: {prompt[:100]!r}...")
+        # Check for any image-related keys
+        for key in payload.keys():
+            if "image" in key.lower() or "content" in key.lower() or "pasted" in key.lower():
+                val = payload.get(key)
+                logger.debug(f"  {key}: {type(val).__name__}, len={len(val) if hasattr(val, '__len__') else 'N/A'}")
 
     # Import handlers here to avoid startup overhead when disabled
     from weave.integrations.claude_plugin.handlers import (
         handle_session_end,
         handle_session_start,
         handle_stop,
+        handle_subagent_stop,
         handle_user_prompt_submit,
     )
 
@@ -118,6 +130,7 @@ def main() -> None:
         "SessionStart": handle_session_start,
         "UserPromptSubmit": handle_user_prompt_submit,
         "Stop": handle_stop,
+        "SubagentStop": handle_subagent_stop,
         "SessionEnd": handle_session_end,
     }
 

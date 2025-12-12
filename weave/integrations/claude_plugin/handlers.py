@@ -13,14 +13,20 @@ to disk between invocations.
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 from typing import Any
 
 import weave
 from weave.trace.call import Call
 from weave.trace.context.weave_client_context import require_weave_client
+from weave.trace.view_utils import set_call_view
+from weave.type_wrappers.Content.content import Content
 
+from weave.integrations.claude_plugin.diff_view import generate_turn_diff_html
 from weave.integrations.claude_plugin.session_parser import (
+    Session,
+    ToolCall,
     Turn,
     parse_session_file,
 )
@@ -34,7 +40,31 @@ from weave.integrations.claude_plugin.utils import (
     truncate,
 )
 
-logger = logging.getLogger(__name__)
+# Use the same logger setup as hook.py for consistent debug output
+# Test edit to verify diff view is working correctly
+logger = logging.getLogger("weave.integrations.claude_plugin.hook")
+
+
+def _find_turn_by_prompt(session: Session, prompt_prefix: str) -> Turn | None:
+    """Find a turn in the session by matching the user prompt prefix.
+
+    Args:
+        session: Parsed session object
+        prompt_prefix: First N characters of the user prompt to match
+
+    Returns:
+        The matching Turn, or None if not found
+    """
+    if not session or not session.turns or not prompt_prefix:
+        return None
+
+    # Search from the end since we want the most recent matching turn
+    for turn in reversed(session.turns):
+        turn_text = turn.user_message.content or ""
+        if turn_text.startswith(prompt_prefix):
+            return turn
+
+    return None
 
 
 def _reconstruct_parent_call(
@@ -110,11 +140,16 @@ def _log_tool_calls(
         session_data["total_tool_calls"] = session_data.get("total_tool_calls", 0) + 1
 
 
-def _build_turn_output(turn: Turn | None, interrupted: bool = False) -> dict[str, Any]:
+def _build_turn_output(
+    turn: Turn | None,
+    session: Session | None = None,
+    interrupted: bool = False,
+) -> dict[str, Any]:
     """Build the output dict for a turn call.
 
     Args:
         turn: The turn data (may be None if not found in transcript)
+        session: The session data (for loading file backups)
         interrupted: Whether the turn was interrupted by user
 
     Returns:
@@ -142,6 +177,23 @@ def _build_turn_output(turn: Turn | None, interrupted: bool = False) -> dict[str
                 "duration_ms": turn.duration_ms(),
             }
         )
+
+        # Include images from user message
+        # Images are captured here at Stop time because they're not reliably
+        # in the transcript when UserPromptSubmit fires
+        if turn.user_message.images:
+            output["images"] = turn.user_message.images
+            logger.debug(f"_build_turn_output: captured {len(turn.user_message.images)} images")
+
+        # Load file backups as Content objects
+        if turn.file_backups and session:
+            file_snapshots: dict[str, Content] = {}
+            for fb in turn.file_backups:
+                content = fb.load_content(session.session_id)
+                if content:
+                    file_snapshots[fb.file_path] = content
+            if file_snapshots:
+                output["file_snapshots"] = file_snapshots
 
     return output
 
@@ -171,11 +223,13 @@ def _finish_interrupted_turn(
     logger.debug(f"Finishing interrupted turn {turn_number}")
 
     # Parse transcript to get the interrupted turn's data
+    # Use latest turn since turn_number in state may not match parsed turn count
     turn = None
+    session = None
     if transcript_path:
         session = parse_session_file(Path(transcript_path))
-        if session and session.turns and turn_number <= len(session.turns):
-            turn = session.turns[turn_number - 1]
+        if session and session.turns:
+            turn = session.turns[-1]
 
     # Reconstruct turn call
     turn_call = _reconstruct_parent_call(
@@ -189,7 +243,7 @@ def _finish_interrupted_turn(
         _log_tool_calls(turn, turn_call, session_data)
 
     # Finish the turn with interrupted flag
-    output = _build_turn_output(turn, interrupted=True)
+    output = _build_turn_output(turn, session=session, interrupted=True)
     client.finish_call(turn_call, output=output)
 
     # Clear turn state
@@ -290,16 +344,10 @@ def handle_user_prompt_submit(
         trace_id = session_data.get("trace_id")
 
         if not session_call_id or not trace_id:
-            # Parse transcript to get session metadata
-            session = None
-            if transcript_path:
-                session = parse_session_file(Path(transcript_path))
-
-            # Generate session name
-            prompt_for_naming = user_prompt or (
-                session.first_user_prompt() if session else ""
-            )
-            display_name, suggested_branch = generate_session_name(prompt_for_naming)
+            # Generate session name from the prompt
+            # Note: We don't parse transcript here because the current turn's
+            # message may not be written yet when UserPromptSubmit fires
+            display_name, suggested_branch = generate_session_name(user_prompt)
 
             # Create session call
             session_call = client.create_call(
@@ -308,7 +356,7 @@ def handle_user_prompt_submit(
                     "session_id": session_id,
                     "cwd": cwd,
                     "suggested_branch_name": suggested_branch or None,
-                    "first_prompt": truncate(prompt_for_naming, 1000),
+                    "first_prompt": truncate(user_prompt, 1000),
                 },
                 attributes={
                     "session_id": session_id,
@@ -323,6 +371,7 @@ def handle_user_prompt_submit(
             session_data["entity"] = entity
 
             # Create first turn call
+            # Note: Images are captured at Stop time when transcript is complete
             turn_preview = truncate(user_prompt, 50) or "Turn 1"
             turn_call = client.create_call(
                 op="claude_code.turn",
@@ -338,6 +387,8 @@ def handle_user_prompt_submit(
             )
 
             session_data["turn_call_id"] = turn_call.id
+            # Store prompt prefix to identify this turn at Stop time
+            session_data["turn_prompt_prefix"] = user_prompt[:200] if user_prompt else ""
             state.save_session(session_id, session_data, cwd=cwd)
 
             # Flush to ensure calls are sent
@@ -364,6 +415,9 @@ def handle_user_prompt_submit(
             )
 
             # Create turn call
+            # Note: Images are captured at Stop time when transcript is complete
+            # We don't parse transcript here because the current turn's message
+            # may not be written yet when UserPromptSubmit fires
             turn_preview = truncate(user_prompt, 50) or f"Turn {turn_number}"
             turn_call = client.create_call(
                 op="claude_code.turn",
@@ -379,6 +433,8 @@ def handle_user_prompt_submit(
             )
 
             session_data["turn_call_id"] = turn_call.id
+            # Store prompt prefix to identify this turn at Stop time
+            session_data["turn_prompt_prefix"] = user_prompt[:200] if user_prompt else ""
             state.save_session(session_id, session_data, cwd=cwd)
 
             client.flush()
@@ -391,7 +447,8 @@ def handle_stop(payload: dict[str, Any], project: str) -> dict[str, Any] | None:
     """Handle Stop hook event.
 
     Parses the transcript to get full turn data (tool calls, tokens, response)
-    and finishes the current turn call.
+    and finishes the current turn call. Also loads file backups and generates
+    diff HTML for the summary view.
 
     Args:
         payload: Hook payload with session_id, transcript_path
@@ -424,18 +481,44 @@ def handle_stop(payload: dict[str, Any], project: str) -> dict[str, Any] | None:
         # Initialize Weave
         weave.init(project)
         client = require_weave_client()
+        project_id = client._project_id()
 
         # Parse transcript to get current turn data
+        # Find our turn by matching the prompt prefix stored at UserPromptSubmit
         turn = None
+        session = None
+        turn_index = 0
         turn_number = session_data.get("turn_number", 0)
+        turn_prompt_prefix = session_data.get("turn_prompt_prefix", "")
         if transcript_path:
             session = parse_session_file(Path(transcript_path))
-            if session and session.turns and turn_number <= len(session.turns):
-                turn = session.turns[turn_number - 1]
+            if session and session.turns:
+                # Find our turn by matching the stored prompt prefix
+                turn = _find_turn_by_prompt(session, turn_prompt_prefix)
+                if turn:
+                    # Find the index of our turn for diff view
+                    try:
+                        turn_index = session.turns.index(turn)
+                    except ValueError:
+                        turn_index = len(session.turns) - 1
+                    logger.debug(
+                        f"Stop: turn_number={turn_number}, parsed_turns={len(session.turns)}, "
+                        f"matched_turn_index={turn_index}, "
+                        f"tool_calls={len(turn.all_tool_calls())}, "
+                        f"images={len(turn.user_message.images)}"
+                    )
+                else:
+                    # Fallback to latest turn if no match
+                    turn = session.turns[-1]
+                    turn_index = len(session.turns) - 1
+                    logger.debug(
+                        f"Stop: turn_number={turn_number}, parsed_turns={len(session.turns)}, "
+                        f"no match found, falling back to latest turn"
+                    )
 
         # Reconstruct turn call to finish it
         turn_call = _reconstruct_parent_call(
-            client._project_id(),
+            project_id,
             turn_call_id,
             trace_id,
         )
@@ -444,12 +527,39 @@ def handle_stop(payload: dict[str, Any], project: str) -> dict[str, Any] | None:
         if turn:
             _log_tool_calls(turn, turn_call, session_data)
 
-        # Build and finish turn
-        output = _build_turn_output(turn)
+        # Build turn output with file snapshots
+        output = _build_turn_output(turn, session=session)
+
+        # Generate diff HTML for summary view
+        if turn and session:
+            # turn_index was computed above when finding our turn
+            diff_html = generate_turn_diff_html(
+                turn=turn,
+                turn_index=turn_index,
+                all_turns=session.turns,
+                session_id=session.session_id,
+                turn_number=turn_index + 1,  # Display as 1-based
+                tool_count=len(turn.all_tool_calls()),
+                model=turn.primary_model(),
+            )
+
+            if diff_html:
+                # Use the official set_call_view utility to properly attach the view
+                set_call_view(
+                    call=turn_call,
+                    client=client,
+                    name="file_changes",
+                    content=diff_html,
+                    extension="html",
+                    mimetype="text/html",
+                )
+
+        # Finish the turn call
         client.finish_call(turn_call, output=output)
 
         # Clear turn state (but keep session state)
         session_data["turn_call_id"] = None
+        session_data["turn_prompt_prefix"] = None
         state.save_session(session_id, session_data)
 
         client.flush()
@@ -458,6 +568,132 @@ def handle_stop(payload: dict[str, Any], project: str) -> dict[str, Any] | None:
             f"Stop: finished turn {turn_number} with {output.get('tool_call_count', 0)} tool calls"
         )
         return None
+
+
+def handle_subagent_stop(payload: dict[str, Any], project: str) -> dict[str, Any] | None:
+    """Handle SubagentStop hook event.
+
+    Creates a trace for the completed subagent as a child of the parent session.
+    Subagents are spawned by the Task tool and run in separate processes.
+
+    The subagent's transcript file contains:
+    - sessionId: The PARENT session's UUID (not the subagent's own ID)
+    - agentId: The subagent's short ID (e.g., "abc12345")
+    - isSidechain: true (marks this as a subagent)
+
+    Args:
+        payload: Hook payload with session_id, transcript_path
+        project: Weave project in "entity/project" format
+
+    Returns:
+        None
+    """
+    session_id = payload.get("session_id")
+    transcript_path = payload.get("transcript_path")
+
+    if not session_id or not transcript_path:
+        logger.warning("SubagentStop missing session_id or transcript_path")
+        return None
+
+    # Parse the subagent transcript
+    agent_session = parse_session_file(Path(transcript_path))
+    if not agent_session:
+        logger.debug(f"SubagentStop: could not parse transcript {transcript_path}")
+        return None
+
+    # Get agent metadata from the first message
+    agent_id = agent_session.agent_id
+    parent_session_id = agent_session.session_id  # Points to parent
+
+    if not parent_session_id:
+        logger.debug(f"SubagentStop: no parent session ID in {transcript_path}")
+        return None
+
+    with StateManager() as state:
+        # Look up the PARENT session's state (not the subagent's)
+        parent_state = state.get_session(parent_session_id)
+        if not parent_state:
+            logger.debug(f"SubagentStop: no state for parent session {parent_session_id}")
+            return None
+
+        session_call_id = parent_state.get("session_call_id")
+        trace_id = parent_state.get("trace_id")
+
+        if not session_call_id or not trace_id:
+            logger.debug(f"SubagentStop: parent session {parent_session_id} not traced")
+            return None
+
+        # Initialize Weave
+        weave.init(project)
+        client = require_weave_client()
+
+        # Reconstruct parent session call for hierarchy
+        parent_session_call = _reconstruct_parent_call(
+            client._project_id(),
+            session_call_id,
+            trace_id,
+        )
+
+        # Create the subagent call as a child of the session
+        agent_display_name = f"Subagent: {agent_id}"
+        if agent_session.turns:
+            # Use first turn's user message as display hint
+            first_prompt = agent_session.first_user_prompt()
+            if first_prompt:
+                agent_display_name = f"Subagent: {truncate(first_prompt, 40)}"
+
+        subagent_call = client.create_call(
+            op="claude_code.subagent",
+            inputs={
+                "agent_id": agent_id,
+                "turn_count": len(agent_session.turns),
+            },
+            parent=parent_session_call,
+            attributes={
+                "agent_id": agent_id,
+                "is_sidechain": True,
+            },
+            display_name=agent_display_name,
+            use_stack=False,
+        )
+
+        # Log tool calls from all turns in the subagent
+        total_tool_calls = 0
+        for turn in agent_session.turns:
+            for tool_call in turn.all_tool_calls():
+                total_tool_calls += 1
+                _log_single_tool_call(tool_call, subagent_call)
+
+        # Calculate totals
+        total_usage = agent_session.total_usage()
+
+        # Finish the subagent call
+        output = {
+            "turn_count": len(agent_session.turns),
+            "tool_call_count": total_tool_calls,
+            "input_tokens": total_usage.input_tokens,
+            "output_tokens": total_usage.output_tokens,
+        }
+        client.finish_call(subagent_call, output=output)
+
+        client.flush()
+
+        logger.debug(
+            f"SubagentStop: logged subagent {agent_id} with {len(agent_session.turns)} turns, "
+            f"{total_tool_calls} tool calls"
+        )
+        return None
+
+
+def _log_single_tool_call(tool_call: "ToolCall", parent_call: Any) -> None:
+    """Log a single tool call using weave.log_call."""
+    weave.log_call(
+        op_name=f"claude_code.tool.{tool_call.name}",
+        inputs=tool_call.input or {},
+        output={"result": truncate(tool_call.result, 5000) if tool_call.result else None},
+        parent=parent_call,
+        display_name=tool_call.name,
+    )
 
 
 def handle_session_end(payload: dict[str, Any], project: str) -> dict[str, Any] | None:

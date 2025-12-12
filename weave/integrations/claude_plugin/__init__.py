@@ -62,6 +62,9 @@ from weave.integrations.claude_plugin.utils import (
     get_tool_display_name,
     truncate,
 )
+from weave.integrations.claude_plugin.diff_view import (
+    generate_turn_diff_html,
+)
 
 __all__ = [
     # Session parser
@@ -93,4 +96,6 @@ __all__ = [
     "truncate",
     "get_tool_display_name",
     "generate_session_name",
+    # Diff view
+    "generate_turn_diff_html",
 ]
