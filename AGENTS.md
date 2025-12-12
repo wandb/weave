@@ -122,11 +122,24 @@ nox --no-install -e "tests-3.12(shard='trace_server_bindings')" -- tests/trace_s
 nox --no-install -e "tests-3.12(shard='trace_server_bindings')" -- tests/trace_server_bindings/test_trace_server_bindings.py --remote-http-trace-server=stainless
 ```
 
+#### Calls Storage Mode Selection
+
+The `--calls-storage-mode` flag controls which **table** is used for calls storage during testing. This is used for testing the migration from the legacy `calls_merged` table to the new `calls_complete` table.
+
+**Running Entire Test Suite with Calls Complete:**
+
+```bash
+# Python 3.13 shard that automatically uses calls_complete
+nox --no-install -e "tests-3.13(shard='trace_calls_complete')"
+```
+
 **Important Notes:**
 
 - The `--trace-server` flag is for **backend selection** (SQLite vs ClickHouse)
 - The `--remote-http-trace-server` flag is for **trace server binding implementation** (RemoteHTTPTraceServer vs StainlessRemoteHTTPTraceServer)
-- Both implementations share the same test file; the flag determines which server class is used
+- The `--calls-storage-mode` flag is for **calls table selection** (calls_merged vs calls_complete)
+- The `trace_calls_complete` shard runs the same tests as `trace` but with `calls_complete` enabled
+- The storage mode is set via the `WEAVE_CALLS_STORAGE_MODE` environment variable
 
 #### Environment Issues
 
