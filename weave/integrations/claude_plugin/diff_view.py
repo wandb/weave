@@ -153,24 +153,13 @@ def generate_turn_diff_html(
     if not turn.file_backups:
         return None
 
-    # Get time bounds for this turn to filter backups
-    turn_start = turn.started_at()
-    next_turn_start = None
-    if turn_index + 1 < len(all_turns):
-        next_turn_start = all_turns[turn_index + 1].started_at()
-
     # Build map of current turn's file -> latest backup (state BEFORE edits)
-    # Include backups from file-history-snapshot events during this turn's window
+    # Backups are already correctly linked to turns via messageId in session_parser,
+    # so we trust that association rather than timestamp filtering
     current_backups: dict[str, FileBackup] = {}
     for fb in turn.file_backups:
         if not fb.backup_filename:
             continue
-        # Only include backups created during this turn's window
-        if fb.backup_time < turn_start:
-            continue  # Backup from before this turn
-        if next_turn_start and fb.backup_time >= next_turn_start:
-            continue  # Backup from a later turn
-
         existing = current_backups.get(fb.file_path)
         if not existing or fb.version > existing.version:
             current_backups[fb.file_path] = fb
