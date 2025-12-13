@@ -49,8 +49,8 @@ from weave.trace.object_record import (
 from weave.trace.objectify import maybe_objectify
 from weave.trace.op import (
     as_op,
+    is_noop_call,
     is_op,
-    is_placeholder_call,
     is_tracing_setting_disabled,
     maybe_unbind_method,
     should_skip_tracing_for_op,
@@ -838,7 +838,7 @@ class WeaveClient:
         if (
             is_tracing_setting_disabled()
             or (op is not None and should_skip_tracing_for_op(op))
-            or is_placeholder_call(call)
+            or is_noop_call(call)
         ):
             return None
 

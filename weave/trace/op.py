@@ -360,7 +360,7 @@ def _should_sample_traces(op: Op) -> bool:
     return False
 
 
-def is_placeholder_call(call: Call) -> bool:
+def is_noop_call(call: Call) -> bool:
     """Check if a call is a placeholder (no-op) call.
 
     Args:
