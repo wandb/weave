@@ -22,6 +22,7 @@ import logging
 import os
 import signal
 import sys
+import time
 from pathlib import Path
 from typing import Any
 
@@ -152,7 +153,7 @@ class WeaveDaemon:
         self.session_id = session_id
         self.socket_path = get_socket_path(session_id)
         self.running = False
-        self.last_activity = asyncio.get_event_loop().time()
+        self.last_activity = time.monotonic()
 
         # State from file
         self.project: str | None = None
@@ -506,7 +507,7 @@ class WeaveDaemon:
         writer: asyncio.StreamWriter,
     ) -> None:
         """Handle a socket connection from a hook."""
-        self.last_activity = asyncio.get_event_loop().time()
+        self.last_activity = time.monotonic()
 
         try:
             data = await asyncio.wait_for(reader.readline(), timeout=5.0)
@@ -538,7 +539,7 @@ class WeaveDaemon:
         payload: dict[str, Any],
     ) -> dict[str, Any]:
         """Handle a hook event."""
-        self.last_activity = asyncio.get_event_loop().time()
+        self.last_activity = time.monotonic()
 
         if event == "SessionStart":
             return await self._handle_session_start(payload)
@@ -1853,7 +1854,7 @@ class WeaveDaemon:
         while self.running:
             await asyncio.sleep(60)  # Check every minute
 
-            current_time = asyncio.get_event_loop().time()
+            current_time = time.monotonic()
             idle_time = current_time - self.last_activity
 
             if idle_time > INACTIVITY_TIMEOUT:

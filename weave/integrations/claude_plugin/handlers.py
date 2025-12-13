@@ -77,6 +77,10 @@ def _find_turn_by_prompt(session: Session, prompt_prefix: str) -> Turn | None:
     return None
 
 
+# Tool calls to skip when logging (not useful for tracing)
+IGNORED_TOOL_CALLS = {"TaskOutput"}
+
+
 def _log_tool_calls(
     turn: Turn,
     parent_call: Call,
@@ -90,6 +94,10 @@ def _log_tool_calls(
         session_data: Session data dict to update tool counts
     """
     for tc in turn.all_tool_calls():
+        # Skip tool calls that aren't useful for tracing
+        if tc.name in IGNORED_TOOL_CALLS:
+            continue
+
         log_tool_call(
             tool_name=tc.name,
             tool_input=tc.input,

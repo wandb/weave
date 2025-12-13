@@ -273,11 +273,13 @@ class TestSubagentStopHandler:
             mock_client.create_call.return_value = mock_subagent_call
 
             with patch("weave.integrations.claude_plugin.handlers.weave") as mock_weave, \
+                 patch("weave.integrations.claude_plugin.utils.weave") as mock_utils_weave, \
                  patch("weave.integrations.claude_plugin.handlers.require_weave_client") as mock_require_client, \
                  patch("weave.integrations.claude_plugin.handlers.StateManager") as mock_state_manager:
 
                 mock_weave.init = MagicMock()
                 mock_weave.log_call = MagicMock()
+                mock_utils_weave.log_call = MagicMock()
                 mock_require_client.return_value = mock_client
 
                 # Parent session state exists
@@ -308,8 +310,8 @@ class TestSubagentStopHandler:
             subagent_call_args = mock_client.create_call.call_args
             assert subagent_call_args.kwargs.get("op") == "claude_code.subagent"
 
-            # Verify tool calls were logged
-            assert mock_weave.log_call.called, "Should log tool calls from the subagent"
+            # Verify tool calls were logged (via utils.log_tool_call)
+            assert mock_utils_weave.log_call.called, "Should log tool calls from the subagent"
 
         finally:
             agent_jsonl.unlink()

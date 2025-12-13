@@ -34,6 +34,8 @@ _COMMAND_MESSAGE_PATTERN = re.compile(r"<command-message>([^<]+)</command-messag
 _COMMAND_OUTPUT_PATTERN = re.compile(
     r"<local-command-(stdout|stderr)>([^<]*)</local-command-(?:stdout|stderr)>"
 )
+# Pattern to extract content from any XML tag for display names
+_XML_TAG_CONTENT_PATTERN = re.compile(r"<([a-z-]+)>([^<]*)</\1>")
 
 
 def extract_slash_command(text: str) -> str | None:
@@ -73,10 +75,38 @@ def extract_slash_command(text: str) -> str | None:
     return None
 
 
+def extract_xml_tag_content(text: str) -> str | None:
+    """Extract content from XML-tagged messages for display.
+
+    Handles messages like:
+    - <local-command-stdout>See ya!</local-command-stdout>
+    - <command-message>weave:feedback is running...</command-message>
+
+    Args:
+        text: Message content that may contain XML tags
+
+    Returns:
+        The extracted content, or None if not an XML-tagged message
+    """
+    if not text:
+        return None
+
+    text_stripped = text.strip()
+    if not text_stripped.startswith("<"):
+        return None
+
+    match = _XML_TAG_CONTENT_PATTERN.search(text_stripped)
+    if match:
+        return match.group(2).strip()
+
+    return None
+
+
 def get_turn_display_name(turn_number: int, user_prompt: str) -> str:
     """Generate a clean display name for a turn.
 
-    Handles special cases like slash commands to avoid showing raw XML tags.
+    Handles special cases like slash commands and XML tags to avoid showing
+    raw XML in display names.
 
     Args:
         turn_number: The turn number (1-indexed)
@@ -89,6 +119,12 @@ def get_turn_display_name(turn_number: int, user_prompt: str) -> str:
     slash_command = extract_slash_command(user_prompt)
     if slash_command:
         return f"Turn {turn_number}: {slash_command}"
+
+    # Check if this is an XML-tagged message (e.g., <local-command-stdout>)
+    xml_content = extract_xml_tag_content(user_prompt)
+    if xml_content:
+        turn_preview = truncate(xml_content, 50) or f"Turn {turn_number}"
+        return f"Turn {turn_number}: {turn_preview}"
 
     # Regular prompt - truncate to 50 chars
     turn_preview = truncate(user_prompt, 50) or f"Turn {turn_number}"
