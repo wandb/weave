@@ -130,12 +130,12 @@ def verify_git_state(
 
 
 def restore_files(
-    file_snapshots: dict[str, Any], cwd: str, skip_session_jsonl: bool = True
+    file_snapshots: list[Any], cwd: str, skip_session_jsonl: bool = True
 ) -> int:
     """Restore files from snapshots to the working directory.
 
     Args:
-        file_snapshots: Dict mapping relative paths to Content objects
+        file_snapshots: List of Content objects with relative_path in metadata
         cwd: Working directory to restore files into
         skip_session_jsonl: If True, skip session.jsonl (default True)
 
@@ -145,7 +145,15 @@ def restore_files(
     cwd_path = Path(cwd)
     count = 0
 
-    for rel_path, content in file_snapshots.items():
+    for content in file_snapshots:
+        # Get relative path from metadata
+        metadata = getattr(content, "metadata", {}) or {}
+        rel_path = metadata.get("relative_path", "")
+
+        if not rel_path:
+            logger.warning("File snapshot missing relative_path in metadata")
+            continue
+
         # Skip session.jsonl - it goes elsewhere
         if skip_session_jsonl and rel_path == "session.jsonl":
             continue
@@ -243,6 +251,7 @@ def fetch_session_from_weave(
             "call_id": call.id,
             "inputs": dict(call.inputs) if call.inputs else {},
             "output": dict(call.output) if call.output else {},
+            "summary": dict(call.summary) if call.summary else {},
             "attributes": dict(call.attributes) if call.attributes else {},
         }
     except Exception as e:
@@ -273,6 +282,7 @@ def teleport(
         return False, f"Session {session_id} not found in Weave"
 
     output = session_data.get("output", {})
+    summary = session_data.get("summary", {})
 
     # Check if session has ended
     if not output.get("end_reason"):
@@ -289,13 +299,19 @@ def teleport(
         for warning in warnings:
             logger.warning(warning)
 
-    # Get file snapshots
-    file_snapshots = output.get("file_snapshots", {})
+    # Get file snapshots from summary (list of Content objects)
+    file_snapshots = summary.get("file_snapshots", [])
     if not file_snapshots:
         return False, "Session has no file snapshots to restore"
 
-    # Download session file
-    session_content = file_snapshots.get("session.jsonl")
+    # Find session.jsonl from the list
+    session_content = None
+    for content in file_snapshots:
+        metadata = getattr(content, "metadata", {}) or {}
+        if metadata.get("relative_path") == "session.jsonl":
+            session_content = content
+            break
+
     if session_content:
         session_path = download_session_file(session_id, cwd, session_content)
     else:

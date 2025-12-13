@@ -141,14 +141,16 @@ class TestRestoreFiles:
         from weave.integrations.claude_plugin.teleport import restore_files
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            # Create mock file snapshots
-            mock_content = MagicMock()
-            mock_content.to_bytes.return_value = b"file content"
+            # Create mock file snapshots as list with metadata
+            mock_content1 = MagicMock()
+            mock_content1.to_bytes.return_value = b"file content"
+            mock_content1.metadata = {"relative_path": "src/app.py"}
 
-            file_snapshots = {
-                "src/app.py": mock_content,
-                "tests/test_app.py": mock_content,
-            }
+            mock_content2 = MagicMock()
+            mock_content2.to_bytes.return_value = b"file content"
+            mock_content2.metadata = {"relative_path": "tests/test_app.py"}
+
+            file_snapshots = [mock_content1, mock_content2]
 
             count = restore_files(file_snapshots, tmpdir)
 
@@ -162,13 +164,15 @@ class TestRestoreFiles:
         from weave.integrations.claude_plugin.teleport import restore_files
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            mock_content = MagicMock()
-            mock_content.to_bytes.return_value = b"content"
+            mock_content1 = MagicMock()
+            mock_content1.to_bytes.return_value = b"content"
+            mock_content1.metadata = {"relative_path": "session.jsonl"}
 
-            file_snapshots = {
-                "session.jsonl": mock_content,
-                "src/app.py": mock_content,
-            }
+            mock_content2 = MagicMock()
+            mock_content2.to_bytes.return_value = b"content"
+            mock_content2.metadata = {"relative_path": "src/app.py"}
+
+            file_snapshots = [mock_content1, mock_content2]
 
             count = restore_files(file_snapshots, tmpdir)
 
@@ -183,10 +187,9 @@ class TestRestoreFiles:
         with tempfile.TemporaryDirectory() as tmpdir:
             mock_content = MagicMock()
             mock_content.to_bytes.return_value = b"content"
+            mock_content.metadata = {"relative_path": "deeply/nested/path/file.py"}
 
-            file_snapshots = {
-                "deeply/nested/path/file.py": mock_content,
-            }
+            file_snapshots = [mock_content]
 
             count = restore_files(file_snapshots, tmpdir)
 

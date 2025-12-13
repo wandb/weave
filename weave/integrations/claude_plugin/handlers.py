@@ -803,22 +803,6 @@ def handle_session_end(payload: dict[str, Any], project: str) -> dict[str, Any] 
                     )
                     logger.debug("Attached session diff HTML view")
 
-            # Attach session JSONL file as Content object
-            try:
-                session_content = Content.from_path(
-                    transcript_file_path,
-                    metadata={
-                        "session_id": session_id,
-                        "filename": transcript_file_path.name,
-                    },
-                )
-                session_output["file_snapshots"] = {
-                    "session.jsonl": session_content,
-                }
-                logger.debug(f"Attached session file: {transcript_file_path.name}")
-            except Exception as e:
-                logger.debug(f"Failed to attach session file: {e}")
-
             # Capture git info for teleport feature
             if session and session.cwd:
                 git_info = get_git_info(session.cwd)
@@ -826,10 +810,29 @@ def handle_session_end(payload: dict[str, Any], project: str) -> dict[str, Any] 
                     session_output["git"] = git_info
                     logger.debug(f"Attached git info: branch={git_info.get('branch')}")
 
-                # Capture final state of all changed files
+            # Collect file snapshots as a list for summary
+            # Includes: session.jsonl + all modified/created files
+            file_snapshots_list: list[Any] = []
+
+            # Add session JSONL file
+            try:
+                session_content = Content.from_path(
+                    transcript_file_path,
+                    metadata={
+                        "session_id": session_id,
+                        "filename": transcript_file_path.name,
+                        "relative_path": "session.jsonl",
+                    },
+                )
+                file_snapshots_list.append(session_content)
+                logger.debug(f"Attached session file: {transcript_file_path.name}")
+            except Exception as e:
+                logger.debug(f"Failed to attach session file: {e}")
+
+            # Add final state of all changed files
+            if session and session.cwd:
                 all_changed = session.get_all_changed_files()
                 if all_changed:
-                    file_snapshots = session_output.get("file_snapshots", {})
                     cwd_path = Path(session.cwd)
                     for file_path in all_changed:
                         try:
@@ -839,9 +842,9 @@ def handle_session_end(payload: dict[str, Any], project: str) -> dict[str, Any] 
                                 try:
                                     rel_path = abs_path.relative_to(cwd_path)
                                 except ValueError:
-                                    rel_path = abs_path.name
+                                    rel_path = Path(abs_path.name)
                             else:
-                                rel_path = file_path
+                                rel_path = Path(file_path)
                                 abs_path = cwd_path / file_path
 
                             if abs_path.exists():
@@ -852,12 +855,18 @@ def handle_session_end(payload: dict[str, Any], project: str) -> dict[str, Any] 
                                         "relative_path": str(rel_path),
                                     },
                                 )
-                                file_snapshots[str(rel_path)] = file_content
+                                file_snapshots_list.append(file_content)
                                 logger.debug(f"Attached file snapshot: {rel_path}")
                         except Exception as e:
                             logger.debug(f"Failed to attach file {file_path}: {e}")
-                    session_output["file_snapshots"] = file_snapshots
-                    logger.debug(f"Attached {len(all_changed)} file snapshots for teleport")
+
+            # Store file snapshots on summary (not output)
+            # Initialize summary if needed, preserving any existing values
+            if file_snapshots_list:
+                if session_call.summary is None:
+                    session_call.summary = {}
+                session_call.summary["file_snapshots"] = file_snapshots_list
+                logger.debug(f"Attached {len(file_snapshots_list)} file snapshots to summary")
 
         # Finish the session call
         client.finish_call(session_call, output=session_output)
