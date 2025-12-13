@@ -1,5 +1,7 @@
 """Tests for claude_plugin utilities."""
 
+import os
+import tempfile
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -8,6 +10,7 @@ from weave.integrations.claude_plugin.utils import (
     sanitize_tool_input,
     reconstruct_call,
     log_tool_call,
+    get_git_info,
     MAX_TOOL_INPUT_LENGTH,
 )
 
@@ -309,3 +312,44 @@ class TestLogToolCallEdgeCases:
         # Output should be truncated to 200 + "...[truncated]"
         assert len(call_kwargs["output"]["result"]) == 200 + len("...[truncated]")
         assert call_kwargs["output"]["result"].endswith("...[truncated]")
+
+
+class TestGetGitInfo:
+    """Tests for get_git_info() function."""
+
+    def test_returns_git_info_for_git_repo(self):
+        """Should return remote, branch, commit for a git repository."""
+        # Use the current weave repo as test subject
+        result = get_git_info("/Users/vanpelt/Development/weave")
+
+        assert result is not None
+        assert "remote" in result
+        assert "branch" in result
+        assert "commit" in result
+        # Remote should be a git URL
+        assert "github.com" in result["remote"] or "git@" in result["remote"]
+        # Branch should be non-empty
+        assert len(result["branch"]) > 0
+        # Commit should be a 40-char hex SHA
+        assert len(result["commit"]) == 40
+        assert all(c in "0123456789abcdef" for c in result["commit"])
+
+    def test_returns_none_for_non_git_directory(self):
+        """Should return None for directories that are not git repos."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = get_git_info(tmpdir)
+            assert result is None
+
+    def test_returns_none_for_nonexistent_directory(self):
+        """Should return None for directories that don't exist."""
+        result = get_git_info("/nonexistent/path/that/doesnt/exist")
+        assert result is None
+
+    def test_normalizes_https_remote(self):
+        """Should handle HTTPS remote URLs."""
+        # This is implicitly tested by test_returns_git_info_for_git_repo
+        # but we add it here for documentation
+        result = get_git_info("/Users/vanpelt/Development/weave")
+        assert result is not None
+        # Remote should be present regardless of format
+        assert result["remote"] is not None

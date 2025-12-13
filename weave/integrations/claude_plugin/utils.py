@@ -417,6 +417,66 @@ def get_tool_display_name(tool_name: str, tool_input: dict[str, Any]) -> str:
     return tool_name
 
 
+def get_git_info(cwd: str) -> dict[str, str] | None:
+    """Get git remote, branch, and commit for a directory.
+
+    Args:
+        cwd: Directory path to check for git info
+
+    Returns:
+        Dict with 'remote', 'branch', 'commit' keys, or None if not a git repo
+    """
+    try:
+        # Check if directory exists
+        if not Path(cwd).exists():
+            return None
+
+        # Get origin remote URL
+        remote_result = subprocess.run(
+            ["git", "remote", "get-url", "origin"],
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if remote_result.returncode != 0:
+            return None
+        remote = remote_result.stdout.strip()
+
+        # Get current branch
+        branch_result = subprocess.run(
+            ["git", "branch", "--show-current"],
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if branch_result.returncode != 0:
+            return None
+        branch = branch_result.stdout.strip()
+
+        # Get HEAD commit SHA
+        commit_result = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if commit_result.returncode != 0:
+            return None
+        commit = commit_result.stdout.strip()
+
+        return {
+            "remote": remote,
+            "branch": branch,
+            "commit": commit,
+        }
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as e:
+        logger.debug(f"Failed to get git info for {cwd}: {e}")
+        return None
+
+
 def generate_session_name(
     user_prompt: str,
     ollama_model: str = "hf.co/vanpelt/catnip-summarizer:latest",

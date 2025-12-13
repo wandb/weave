@@ -401,6 +401,49 @@ class Session:
         """Total number of tool calls."""
         return sum(len(t.all_tool_calls()) for t in self.turns)
 
+    def get_modified_files(self) -> set[str]:
+        """Get file paths that were modified during the session.
+
+        Modified files are those that have file backups, meaning they existed
+        before the session and were changed.
+
+        Returns:
+            Set of file paths that were modified
+        """
+        modified: set[str] = set()
+        for turn in self.turns:
+            for fb in turn.file_backups:
+                modified.add(fb.file_path)
+        return modified
+
+    def get_created_files(self) -> set[str]:
+        """Get file paths that were created during the session.
+
+        Created files are those written via the Write tool that did NOT have
+        a backup (meaning they didn't exist before the session).
+
+        Returns:
+            Set of file paths that were created
+        """
+        modified = self.get_modified_files()
+        created: set[str] = set()
+
+        for turn in self.turns:
+            for tc in turn.all_tool_calls():
+                if tc.name == "Write":
+                    file_path = tc.input.get("file_path", "")
+                    if file_path and file_path not in modified:
+                        created.add(file_path)
+        return created
+
+    def get_all_changed_files(self) -> set[str]:
+        """Get all file paths that were created or modified during the session.
+
+        Returns:
+            Set of all changed file paths (union of created and modified)
+        """
+        return self.get_created_files() | self.get_modified_files()
+
 
 def parse_session_file(path: Path) -> Session | None:
     """Parse a Claude session JSONL file into a Session object.

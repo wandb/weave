@@ -379,3 +379,254 @@ class TestUserMessageImages:
             assert turn.user_message.images == []
         finally:
             session_jsonl.unlink()
+
+
+class TestGetCreatedAndModifiedFiles:
+    """Tests for Session.get_created_files() and get_modified_files() methods."""
+
+    def test_get_created_files_returns_files_from_write_without_backup(self):
+        """get_created_files should return files created via Write tool that have no backup."""
+        session_jsonl = create_session_jsonl([
+            {
+                "type": "user",
+                "uuid": "msg-1",
+                "timestamp": "2025-01-01T10:00:00Z",
+                "sessionId": "test-session",
+                "message": {"role": "user", "content": "Create a new file"},
+            },
+            {
+                "type": "assistant",
+                "uuid": "msg-2",
+                "timestamp": "2025-01-01T10:00:01Z",
+                "message": {
+                    "role": "assistant",
+                    "model": "claude-sonnet-4-20250514",
+                    "content": [
+                        {
+                            "type": "tool_use",
+                            "id": "tool-1",
+                            "name": "Write",
+                            "input": {
+                                "file_path": "/path/to/new_file.py",
+                                "content": "print('hello')",
+                            },
+                        },
+                    ],
+                    "usage": {"input_tokens": 10, "output_tokens": 5},
+                },
+            },
+        ])
+
+        try:
+            session = parse_session_file(session_jsonl)
+            assert session is not None
+
+            created = session.get_created_files()
+            assert "/path/to/new_file.py" in created
+            assert len(created) == 1
+        finally:
+            session_jsonl.unlink()
+
+    def test_get_created_files_excludes_files_with_backup(self):
+        """get_created_files should exclude files that have a backup (were modified, not created)."""
+        session_jsonl = create_session_jsonl([
+            {
+                "type": "user",
+                "uuid": "msg-1",
+                "timestamp": "2025-01-01T10:00:00Z",
+                "sessionId": "test-session",
+                "message": {"role": "user", "content": "Edit file"},
+            },
+            {
+                "type": "assistant",
+                "uuid": "msg-2",
+                "timestamp": "2025-01-01T10:00:01Z",
+                "message": {
+                    "role": "assistant",
+                    "model": "claude-sonnet-4-20250514",
+                    "content": [
+                        {
+                            "type": "tool_use",
+                            "id": "tool-1",
+                            "name": "Write",
+                            "input": {
+                                "file_path": "/path/to/existing.py",
+                                "content": "modified content",
+                            },
+                        },
+                    ],
+                    "usage": {"input_tokens": 10, "output_tokens": 5},
+                },
+            },
+            # File backup indicates this file existed before
+            {
+                "type": "file-history-snapshot",
+                "snapshot": {
+                    "messageId": "msg-2",
+                    "trackedFileBackups": {
+                        "/path/to/existing.py": {
+                            "backupFileName": "abc123@v1",
+                            "version": 1,
+                            "backupTime": "2025-01-01T10:00:00Z",
+                        }
+                    },
+                },
+            },
+        ])
+
+        try:
+            session = parse_session_file(session_jsonl)
+            assert session is not None
+
+            created = session.get_created_files()
+            # File has backup, so not "created"
+            assert "/path/to/existing.py" not in created
+            assert len(created) == 0
+        finally:
+            session_jsonl.unlink()
+
+    def test_get_modified_files_returns_files_with_backup(self):
+        """get_modified_files should return files that have backups."""
+        session_jsonl = create_session_jsonl([
+            {
+                "type": "user",
+                "uuid": "msg-1",
+                "timestamp": "2025-01-01T10:00:00Z",
+                "sessionId": "test-session",
+                "message": {"role": "user", "content": "Edit file"},
+            },
+            {
+                "type": "assistant",
+                "uuid": "msg-2",
+                "timestamp": "2025-01-01T10:00:01Z",
+                "message": {
+                    "role": "assistant",
+                    "model": "claude-sonnet-4-20250514",
+                    "content": [{"type": "text", "text": "Done"}],
+                    "usage": {"input_tokens": 10, "output_tokens": 5},
+                },
+            },
+            {
+                "type": "file-history-snapshot",
+                "snapshot": {
+                    "messageId": "msg-2",
+                    "trackedFileBackups": {
+                        "/path/to/modified.py": {
+                            "backupFileName": "xyz789@v1",
+                            "version": 1,
+                            "backupTime": "2025-01-01T10:00:00Z",
+                        }
+                    },
+                },
+            },
+        ])
+
+        try:
+            session = parse_session_file(session_jsonl)
+            assert session is not None
+
+            modified = session.get_modified_files()
+            assert "/path/to/modified.py" in modified
+            assert len(modified) == 1
+        finally:
+            session_jsonl.unlink()
+
+    def test_get_created_files_handles_multiple_writes_to_same_file(self):
+        """Multiple writes to same new file should only appear once in created files."""
+        session_jsonl = create_session_jsonl([
+            {
+                "type": "user",
+                "uuid": "msg-1",
+                "timestamp": "2025-01-01T10:00:00Z",
+                "sessionId": "test-session",
+                "message": {"role": "user", "content": "Create and edit"},
+            },
+            {
+                "type": "assistant",
+                "uuid": "msg-2",
+                "timestamp": "2025-01-01T10:00:01Z",
+                "message": {
+                    "role": "assistant",
+                    "model": "claude-sonnet-4-20250514",
+                    "content": [
+                        {
+                            "type": "tool_use",
+                            "id": "tool-1",
+                            "name": "Write",
+                            "input": {"file_path": "/new.py", "content": "v1"},
+                        },
+                        {
+                            "type": "tool_use",
+                            "id": "tool-2",
+                            "name": "Write",
+                            "input": {"file_path": "/new.py", "content": "v2"},
+                        },
+                    ],
+                    "usage": {"input_tokens": 10, "output_tokens": 5},
+                },
+            },
+        ])
+
+        try:
+            session = parse_session_file(session_jsonl)
+            assert session is not None
+
+            created = session.get_created_files()
+            assert "/new.py" in created
+            assert len(created) == 1  # Only one entry even though written twice
+        finally:
+            session_jsonl.unlink()
+
+    def test_get_all_changed_files_combines_created_and_modified(self):
+        """get_all_changed_files should return union of created and modified files."""
+        session_jsonl = create_session_jsonl([
+            {
+                "type": "user",
+                "uuid": "msg-1",
+                "timestamp": "2025-01-01T10:00:00Z",
+                "sessionId": "test-session",
+                "message": {"role": "user", "content": "Work on files"},
+            },
+            {
+                "type": "assistant",
+                "uuid": "msg-2",
+                "timestamp": "2025-01-01T10:00:01Z",
+                "message": {
+                    "role": "assistant",
+                    "model": "claude-sonnet-4-20250514",
+                    "content": [
+                        {
+                            "type": "tool_use",
+                            "id": "tool-1",
+                            "name": "Write",
+                            "input": {"file_path": "/created.py", "content": "new"},
+                        },
+                    ],
+                    "usage": {"input_tokens": 10, "output_tokens": 5},
+                },
+            },
+            {
+                "type": "file-history-snapshot",
+                "snapshot": {
+                    "messageId": "msg-2",
+                    "trackedFileBackups": {
+                        "/modified.py": {
+                            "backupFileName": "abc@v1",
+                            "version": 1,
+                            "backupTime": "2025-01-01T10:00:00Z",
+                        }
+                    },
+                },
+            },
+        ])
+
+        try:
+            session = parse_session_file(session_jsonl)
+            assert session is not None
+
+            all_changed = session.get_all_changed_files()
+            assert "/created.py" in all_changed
+            assert "/modified.py" in all_changed
+            assert len(all_changed) == 2
+        finally:
+            session_jsonl.unlink()
