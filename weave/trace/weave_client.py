@@ -114,6 +114,7 @@ from weave.trace_server.trace_server_interface import (
     FeedbackCreateReq,
     FileCreateReq,
     FileCreateRes,
+    FullTraceServerInterface,
     ObjCreateReq,
     ObjCreateRes,
     ObjDeleteReq,
@@ -132,7 +133,6 @@ from weave.trace_server.trace_server_interface import (
     TableCreateRes,
     TableSchemaForInsert,
     TableUpdateReq,
-    TraceServerInterface,
     TraceStatus,
 )
 from weave.trace_server_bindings.http_utils import (
@@ -289,7 +289,7 @@ MAX_TRACE_PAYLOAD_SIZE = int(3.5 * 1024 * 1024)  # 3.5 MiB
 
 
 class WeaveClient:
-    server: TraceServerInterface
+    server: FullTraceServerInterface
 
     # Main future executor, handling deferred tasks for the client
     future_executor: FutureExecutor
@@ -317,7 +317,7 @@ class WeaveClient:
         self,
         entity: str,
         project: str,
-        server: TraceServerInterface,
+        server: FullTraceServerInterface,
         ensure_project_exists: bool = True,
     ):
         self.entity = entity
