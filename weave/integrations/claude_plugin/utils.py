@@ -15,6 +15,16 @@ from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
 
+# Truncation limits for tool call logging
+MAX_TOOL_INPUT_LENGTH = 5000
+MAX_TOOL_OUTPUT_LENGTH = 10000
+MAX_PROMPT_LENGTH = 2000
+
+# Timeout values (seconds)
+DAEMON_STARTUP_TIMEOUT = 3.0
+INACTIVITY_TIMEOUT = 600
+SUBAGENT_DETECTION_TIMEOUT = 10
+
 
 # Regex patterns for extracting command info from XML-tagged messages
 _COMMAND_NAME_PATTERN = re.compile(r"<command-name>([^<]+)</command-name>")
@@ -117,7 +127,7 @@ def extract_command_output(text: str) -> str:
     return ""
 
 
-def truncate(s: str | None, max_len: int = 5000) -> str | None:
+def truncate(s: str | None, max_len: int = MAX_TOOL_INPUT_LENGTH) -> str | None:
     """Truncate a string to max_len characters.
 
     Args:
