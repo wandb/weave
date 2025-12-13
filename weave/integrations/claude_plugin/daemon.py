@@ -77,6 +77,13 @@ from weave.integrations.claude_plugin.utils import (
     get_tool_display_name,
     get_turn_display_name,
     truncate,
+    sanitize_tool_input,
+    reconstruct_call,
+    log_tool_call,
+    MAX_TOOL_INPUT_LENGTH,
+    MAX_TOOL_OUTPUT_LENGTH,
+    INACTIVITY_TIMEOUT,
+    SUBAGENT_DETECTION_TIMEOUT,
 )
 from weave.integrations.claude_plugin.diff_view import (
     generate_session_diff_html,
@@ -84,12 +91,6 @@ from weave.integrations.claude_plugin.diff_view import (
 )
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-
-# Inactivity timeout (10 minutes)
-INACTIVITY_TIMEOUT = 600
-
-# Timeout for subagent file detection (10 seconds)
-SUBAGENT_DETECTION_TIMEOUT = 10
 
 
 @dataclass
@@ -363,15 +364,12 @@ class WeaveDaemon:
             display_name = f"SubAgent: {session.agent_id}"
 
         # Determine parent: prefer current turn, fall back to session
-        from weave.trace.call import Call
         parent_id = tracker.turn_call_id or self.session_call_id
-        parent_call = Call(
-            _op_name="",
+        parent_call = reconstruct_call(
             project_id=self.weave_client._project_id(),
+            call_id=parent_id,
             trace_id=self.trace_id,
             parent_id=self.session_call_id if tracker.turn_call_id else None,
-            inputs={},
-            id=parent_id,
         )
 
         # Create subagent call (eager creation)
@@ -418,14 +416,11 @@ class WeaveDaemon:
             return
 
         # Reconstruct subagent call as parent
-        from weave.trace.call import Call
-        subagent_call = Call(
-            _op_name="",
+        subagent_call = reconstruct_call(
             project_id=self.weave_client._project_id(),
+            call_id=tracker.subagent_call_id,
             trace_id=self.trace_id,
             parent_id=tracker.turn_call_id,
-            inputs={},
-            id=tracker.subagent_call_id,
         )
 
         # Log tool calls from all turns
@@ -447,28 +442,13 @@ class WeaveDaemon:
 
                 tool_name = tool_call.name
 
-                # Sanitize input
-                sanitized_input = {}
-                for k, v in tool_call.input.items():
-                    if isinstance(v, str) and len(v) > 5000:
-                        sanitized_input[k] = truncate(v)
-                    else:
-                        sanitized_input[k] = v
-
-                tool_display = get_tool_display_name(tool_name, tool_call.input)
-
-                weave.log_call(
-                    op=f"claude_code.tool.{tool_name}",
-                    inputs=sanitized_input,
-                    output={"result": truncate(str(tool_call.result), 5000)},
-                    attributes={
-                        "tool_name": tool_name,
-                        "tool_use_id": tool_call.id,
-                        "duration_ms": tool_call.duration_ms(),
-                    },
-                    display_name=tool_display,
+                log_tool_call(
+                    tool_name=tool_name,
+                    tool_input=tool_call.input,
+                    tool_output=str(tool_call.result) if tool_call.result else None,
+                    tool_use_id=tool_call.id,
+                    duration_ms=tool_call.duration_ms(),
                     parent=subagent_call,
-                    use_stack=False,
                 )
 
         tracker.last_processed_line = total_lines
@@ -696,14 +676,11 @@ class WeaveDaemon:
             await self._process_subagent_updates(tracker)
 
             # Finish the subagent call
-            from weave.trace.call import Call
-            subagent_call = Call(
-                _op_name="",
+            subagent_call = reconstruct_call(
                 project_id=self.weave_client._project_id(),
+                call_id=tracker.subagent_call_id,
                 trace_id=self.trace_id,
                 parent_id=tracker.turn_call_id,
-                inputs={},
-                id=tracker.subagent_call_id,
             )
 
             # Parse file for final output
@@ -819,18 +796,14 @@ class WeaveDaemon:
         else:
             display_name = f"SubAgent: {agent_id}"
 
-        from weave.trace.call import Call
-
         # Determine parent: prefer current turn, fall back to session
         # This attaches the subagent to the turn that spawned it, not the session
         parent_id = self.current_turn_call_id or self.session_call_id
-        parent_call = Call(
-            _op_name="",
+        parent_call = reconstruct_call(
             project_id=self.weave_client._project_id(),
+            call_id=parent_id,
             trace_id=self.trace_id,
             parent_id=self.session_call_id if self.current_turn_call_id else None,
-            inputs={},
-            id=parent_id,
         )
 
         # Create subagent call as child of turn (or session if no turn)
@@ -860,28 +833,13 @@ class WeaveDaemon:
             for tool_call in turn.all_tool_calls():
                 tool_name = tool_call.name
 
-                # Sanitize input
-                sanitized_input = {}
-                for k, v in tool_call.input.items():
-                    if isinstance(v, str) and len(v) > 5000:
-                        sanitized_input[k] = truncate(v)
-                    else:
-                        sanitized_input[k] = v
-
-                tool_display = get_tool_display_name(tool_name, tool_call.input)
-
-                weave.log_call(
-                    op=f"claude_code.tool.{tool_name}",
-                    inputs=sanitized_input,
-                    output={"result": truncate(str(tool_call.result), 5000)} if tool_call.result else None,
-                    attributes={
-                        "tool_name": tool_name,
-                        "tool_use_id": tool_call.id,
-                        "duration_ms": tool_call.duration_ms(),
-                    },
-                    display_name=tool_display,
+                log_tool_call(
+                    tool_name=tool_name,
+                    tool_input=tool_call.input,
+                    tool_output=str(tool_call.result) if tool_call.result else None,
+                    tool_use_id=tool_call.id,
+                    duration_ms=tool_call.duration_ms(),
                     parent=subagent_call,
-                    use_stack=False,
                 )
                 tool_counts[tool_name] = tool_counts.get(tool_name, 0) + 1
         else:
@@ -904,28 +862,13 @@ class WeaveDaemon:
                 for tool_call in turn.all_tool_calls():
                     tool_name = tool_call.name
 
-                    # Sanitize input
-                    sanitized_input = {}
-                    for k, v in tool_call.input.items():
-                        if isinstance(v, str) and len(v) > 5000:
-                            sanitized_input[k] = truncate(v)
-                        else:
-                            sanitized_input[k] = v
-
-                    tool_display = get_tool_display_name(tool_name, tool_call.input)
-
-                    weave.log_call(
-                        op=f"claude_code.tool.{tool_name}",
-                        inputs=sanitized_input,
-                        output={"result": truncate(str(tool_call.result), 5000)} if tool_call.result else None,
-                        attributes={
-                            "tool_name": tool_name,
-                            "tool_use_id": tool_call.id,
-                            "duration_ms": tool_call.duration_ms(),
-                        },
-                        display_name=tool_display,
+                    log_tool_call(
+                        tool_name=tool_name,
+                        tool_input=tool_call.input,
+                        tool_output=str(tool_call.result) if tool_call.result else None,
+                        tool_use_id=tool_call.id,
+                        duration_ms=tool_call.duration_ms(),
                         parent=turn_call,
-                        use_stack=False,
                     )
                     tool_counts[tool_name] = tool_counts.get(tool_name, 0) + 1
 
@@ -1001,15 +944,11 @@ class WeaveDaemon:
 
         # Finish session call
         if self.session_call_id and self.weave_client:
-            from weave.trace.call import Call
-
-            session_call = Call(
-                _op_name="",
+            session_call = reconstruct_call(
                 project_id=self.weave_client._project_id(),
+                call_id=self.session_call_id,
                 trace_id=self.trace_id,
                 parent_id=None,
-                inputs={},
-                id=self.session_call_id,
             )
 
             output = {
@@ -1251,16 +1190,12 @@ class WeaveDaemon:
         self.turn_number += 1
 
         # Create turn call
-        from weave.trace.call import Call
-
         # Reconstruct session call as parent
-        session_call = Call(
-            _op_name="",
+        session_call = reconstruct_call(
             project_id=self.weave_client._project_id(),
+            call_id=self.session_call_id,
             trace_id=self.trace_id,
             parent_id=None,
-            inputs={},
-            id=self.session_call_id,
         )
 
         # Build inputs with images and pending question context
@@ -1305,14 +1240,11 @@ class WeaveDaemon:
             return
 
         # Reconstruct turn call as parent
-        from weave.trace.call import Call
-        turn_call = Call(
-            _op_name="",
+        turn_call = reconstruct_call(
             project_id=self.weave_client._project_id(),
+            call_id=self.current_turn_call_id,
             trace_id=self.trace_id,
             parent_id=self.session_call_id,
-            inputs={},
-            id=self.current_turn_call_id,
         )
 
         for c in content:
@@ -1424,15 +1356,11 @@ class WeaveDaemon:
         if not self.weave_client or not self.current_turn_call_id:
             return
 
-        from weave.trace.call import Call
-
-        turn_call = Call(
-            _op_name="",
+        turn_call = reconstruct_call(
             project_id=self.weave_client._project_id(),
+            call_id=self.current_turn_call_id,
             trace_id=self.trace_id,
             parent_id=self.session_call_id,
-            inputs={},
-            id=self.current_turn_call_id,
         )
 
         # Parse session file to get turn and session data
@@ -1558,8 +1486,6 @@ class WeaveDaemon:
         if not self.weave_client:
             return
 
-        from weave.trace.call import Call
-
         for tc in turn.all_tool_calls():
             tool_name = tc.name
 
@@ -1575,42 +1501,26 @@ class WeaveDaemon:
             if tool_name in ("EnterPlanMode", "ExitPlanMode", "AskUserQuestion", "Skill", "SlashCommand"):
                 continue
 
-            # Sanitize input - truncate large values
-            sanitized_input = {}
-            for k, v in tc.input.items():
-                if isinstance(v, str) and len(v) > 5000:
-                    sanitized_input[k] = truncate(v)
-                else:
-                    sanitized_input[k] = v
-
-            tool_display = get_tool_display_name(tool_name, tc.input)
-
             # Determine parent: inline parent if active, otherwise turn
             if self._pending_inline_parent and self._pending_inline_parent.is_active:
-                tool_parent = Call(
-                    _op_name="",
+                tool_parent = reconstruct_call(
                     project_id=self.weave_client._project_id(),
+                    call_id=self._pending_inline_parent.call_id,
                     trace_id=self.trace_id,
                     parent_id=self._pending_inline_parent.parent_turn_call_id,
-                    inputs={},
-                    id=self._pending_inline_parent.call_id,
                 )
             else:
                 tool_parent = turn_call
 
             # Log tool call with output (result is now available from parsed turn)
-            weave.log_call(
-                op=f"claude_code.tool.{tool_name}",
-                inputs=sanitized_input,
-                output={"result": truncate(tc.result, 10000)} if tc.result else None,
-                attributes={
-                    "tool_name": tool_name,
-                    "tool_use_id": tc.id,
-                    "duration_ms": tc.duration_ms(),
-                },
-                display_name=tool_display,
+            log_tool_call(
+                tool_name=tool_name,
+                tool_input=tc.input,
+                tool_output=tc.result,
+                tool_use_id=tc.id,
+                duration_ms=tc.duration_ms(),
                 parent=tool_parent,
-                use_stack=False,
+                max_output_length=10000,
             )
 
             # Update counts
@@ -1637,16 +1547,12 @@ class WeaveDaemon:
             self._pending_skill_calls.clear()
             return
 
-        from weave.trace.call import Call
-
         # Reconstruct turn call as parent
-        turn_call = Call(
-            _op_name="",
+        turn_call = reconstruct_call(
             project_id=self.weave_client._project_id(),
+            call_id=self.current_turn_call_id,
             trace_id=self.trace_id,
             parent_id=self.session_call_id,
-            inputs={},
-            id=self.current_turn_call_id,
         )
 
         # Log each pending skill call with its expansion
@@ -1658,20 +1564,15 @@ class WeaveDaemon:
             # Determine tool type from skill_name (Skill vs SlashCommand)
             is_slash_command = skill_name.startswith("/")
             tool_type = "SlashCommand" if is_slash_command else "Skill"
-            display_name = f"{tool_type}: {skill_name}"
 
-            weave.log_call(
-                op=f"claude_code.tool.{tool_type}",
-                inputs={"skill": skill_name} if not is_slash_command else {"command": skill_name},
-                output={"result": truncate(skill_content, 10000)},
-                attributes={
-                    "tool_name": tool_type,
-                    "tool_use_id": tool_id,
-                    "duration_ms": duration_ms,
-                },
-                display_name=display_name,
+            log_tool_call(
+                tool_name=tool_type,
+                tool_input={"skill": skill_name} if not is_slash_command else {"command": skill_name},
+                tool_output=skill_content,
+                tool_use_id=tool_id,
+                duration_ms=duration_ms,
                 parent=turn_call,
-                use_stack=False,
+                max_output_length=10000,
             )
 
             # Update counts
@@ -1700,16 +1601,12 @@ class WeaveDaemon:
 
         tracker = self._pending_inline_parent
 
-        from weave.trace.call import Call
-
         # Reconstruct parent turn call
-        parent_turn = Call(
-            _op_name="",
+        parent_turn = reconstruct_call(
             project_id=self.weave_client._project_id(),
+            call_id=tracker.parent_turn_call_id,
             trace_id=self.trace_id,
             parent_id=self.session_call_id,
-            inputs={},
-            id=tracker.parent_turn_call_id,
         )
 
         # Create the inline parent call as child of the turn
@@ -1743,16 +1640,12 @@ class WeaveDaemon:
 
         tracker = self._pending_inline_parent
 
-        from weave.trace.call import Call
-
         # Reconstruct the inline parent call
-        inline_parent_call = Call(
-            _op_name="",
+        inline_parent_call = reconstruct_call(
             project_id=self.weave_client._project_id(),
+            call_id=tracker.call_id,
             trace_id=self.trace_id,
             parent_id=tracker.parent_turn_call_id,
-            inputs={},
-            id=tracker.call_id,
         )
 
         self.weave_client.finish_call(inline_parent_call, output=output or {})
@@ -1841,15 +1734,11 @@ class WeaveDaemon:
             if not matches:
                 answers = [result_content]
 
-        from weave.trace.call import Call
-
-        question_call = Call(
-            _op_name="",
+        question_call = reconstruct_call(
             project_id=self.weave_client._project_id(),
+            call_id=call_id,
             trace_id=self.trace_id,
             parent_id=self.current_turn_call_id,
-            inputs={},
-            id=call_id,
         )
 
         self.weave_client.finish_call(
@@ -1895,51 +1784,31 @@ class WeaveDaemon:
         ended_at = datetime.now(timezone.utc)
         duration_ms = int((ended_at - started_at).total_seconds() * 1000)
 
-        # Sanitize input - truncate large values
-        sanitized_input = {}
-        for k, v in tool_input.items():
-            if isinstance(v, str) and len(v) > 5000:
-                sanitized_input[k] = truncate(v)
-            else:
-                sanitized_input[k] = v
-
-        tool_display = get_tool_display_name(tool_name, tool_input)
-
         # Determine parent: inline parent if active, otherwise turn
-        from weave.trace.call import Call
-
         if self._pending_inline_parent and self._pending_inline_parent.is_active:
-            tool_parent = Call(
-                _op_name="",
+            tool_parent = reconstruct_call(
                 project_id=self.weave_client._project_id(),
+                call_id=self._pending_inline_parent.call_id,
                 trace_id=self.trace_id,
                 parent_id=self._pending_inline_parent.parent_turn_call_id,
-                inputs={},
-                id=self._pending_inline_parent.call_id,
             )
         else:
-            tool_parent = Call(
-                _op_name="",
+            tool_parent = reconstruct_call(
                 project_id=self.weave_client._project_id(),
+                call_id=self.current_turn_call_id,
                 trace_id=self.trace_id,
                 parent_id=self.session_call_id,
-                inputs={},
-                id=self.current_turn_call_id,
             )
 
         # Log the tool call
-        weave.log_call(
-            op=f"claude_code.tool.{tool_name}",
-            inputs=sanitized_input,
-            output={"result": truncate(result_content, 10000)} if result_content else None,
-            attributes={
-                "tool_name": tool_name,
-                "tool_use_id": tool_use_id,
-                "duration_ms": duration_ms,
-            },
-            display_name=tool_display,
+        log_tool_call(
+            tool_name=tool_name,
+            tool_input=tool_input,
+            tool_output=result_content,
+            tool_use_id=tool_use_id,
+            duration_ms=duration_ms,
             parent=tool_parent,
-            use_stack=False,
+            max_output_length=10000,
         )
 
         # Update counts
