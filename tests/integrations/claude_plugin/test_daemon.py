@@ -1,0 +1,1017 @@
+"""Tests for Claude plugin daemon."""
+
+import asyncio
+import json
+import tempfile
+from pathlib import Path
+from unittest.mock import MagicMock, patch
+
+import pytest
+
+
+class TestWeaveDaemon:
+    """Test the WeaveDaemon class."""
+
+    def test_socket_path_generation(self):
+        """Test socket path is generated correctly."""
+        from weave.integrations.claude_plugin.socket_client import get_socket_path
+
+        path = get_socket_path("test-session-123")
+        assert path.name == "daemon-test-session-123.sock"
+        assert ".cache/weave" in str(path)
+
+    def test_daemon_client_not_running(self):
+        """Test daemon client detects when daemon is not running."""
+        from weave.integrations.claude_plugin.socket_client import DaemonClient
+
+        client = DaemonClient("nonexistent-session")
+        assert not client.is_daemon_running()
+
+    def test_state_manager_with_new_fields(self):
+        """Test state manager handles new daemon fields."""
+        from weave.integrations.claude_plugin.state import (
+            StateManager,
+            create_session_data,
+        )
+
+        session_data = create_session_data(
+            project="test/project",
+            daemon_pid=12345,
+            last_processed_line=100,
+            transcript_path="/path/to/session.jsonl",
+            trace_url="https://example.com/trace",
+        )
+
+        assert session_data["daemon_pid"] == 12345
+        assert session_data["last_processed_line"] == 100
+        assert session_data["transcript_path"] == "/path/to/session.jsonl"
+        assert session_data["trace_url"] == "https://example.com/trace"
+
+
+class TestDaemonClient:
+    """Test the DaemonClient class."""
+
+    def test_cleanup_stale_socket(self, tmp_path):
+        """Test cleanup of stale socket files."""
+        from weave.integrations.claude_plugin.socket_client import DaemonClient
+
+        # Create a fake socket file
+        with patch(
+            "weave.integrations.claude_plugin.socket_client.SOCKET_DIR",
+            tmp_path,
+        ):
+            client = DaemonClient("test-session")
+            client.socket_path = tmp_path / "daemon-test-session.sock"
+            client.socket_path.touch()
+
+            assert client.socket_path.exists()
+            client.cleanup_stale_socket()
+            assert not client.socket_path.exists()
+
+    def test_is_process_alive(self):
+        """Test process liveness check."""
+        import os
+
+        from weave.integrations.claude_plugin.socket_client import DaemonClient
+
+        client = DaemonClient("test")
+
+        # Current process should be alive
+        assert client.is_process_alive(os.getpid())
+
+        # Non-existent PID should not be alive
+        assert not client.is_process_alive(999999999)
+
+
+class TestSubagentTracker:
+    """Test SubagentTracker dataclass."""
+
+    def test_subagent_tracker_is_tailing_false_when_no_call_id(self):
+        """SubagentTracker.is_tailing returns False until subagent_call_id is set."""
+        from datetime import datetime, timezone
+
+        from weave.integrations.claude_plugin.daemon import SubagentTracker
+
+        tracker = SubagentTracker(
+            tool_use_id="tool-123",
+            turn_call_id="turn-456",
+            detected_at=datetime.now(timezone.utc),
+            parent_session_id="session-789",
+        )
+
+        assert tracker.is_tailing is False
+        assert tracker.agent_id is None
+        assert tracker.transcript_path is None
+
+    def test_subagent_tracker_is_tailing_true_when_call_id_set(self):
+        """SubagentTracker.is_tailing returns True once subagent_call_id is set."""
+        from datetime import datetime, timezone
+        from pathlib import Path
+
+        from weave.integrations.claude_plugin.daemon import SubagentTracker
+
+        tracker = SubagentTracker(
+            tool_use_id="tool-123",
+            turn_call_id="turn-456",
+            detected_at=datetime.now(timezone.utc),
+            parent_session_id="session-789",
+        )
+
+        # Simulate finding the file
+        tracker.agent_id = "abc12345"
+        tracker.transcript_path = Path("/tmp/agent-abc12345.jsonl")
+        tracker.subagent_call_id = "weave-call-xyz"
+
+        assert tracker.is_tailing is True
+
+
+class TestWeaveDaemonTrackerDicts:
+    """Test WeaveDaemon tracker dictionaries."""
+
+    def test_daemon_has_subagent_tracker_dicts(self):
+        """WeaveDaemon has dictionaries for tracking subagents."""
+        from weave.integrations.claude_plugin.daemon import WeaveDaemon
+
+        daemon = WeaveDaemon("test-session-123")
+
+        assert hasattr(daemon, '_subagent_trackers')
+        assert hasattr(daemon, '_subagent_by_agent_id')
+        assert isinstance(daemon._subagent_trackers, dict)
+        assert isinstance(daemon._subagent_by_agent_id, dict)
+
+
+class TestTaskToolWithSubagentType:
+    """Test Task tool with subagent_type creates tracker."""
+
+    @pytest.mark.anyio
+    async def test_task_tool_with_subagent_type_creates_tracker(self):
+        """Task tool with subagent_type creates SubagentTracker."""
+        from weave.integrations.claude_plugin.daemon import WeaveDaemon, SubagentTracker
+
+        daemon = WeaveDaemon("test-session-123")
+        daemon.weave_client = MagicMock()
+        daemon.current_turn_call_id = "turn-call-456"
+        daemon.session_call_id = "session-call-789"
+        daemon.trace_id = "trace-abc"
+
+        # Simulate assistant message with Task tool containing subagent_type
+        obj = {
+            "type": "assistant",
+            "message": {
+                "content": [
+                    {
+                        "type": "tool_use",
+                        "id": "tool-use-xyz",
+                        "name": "Task",
+                        "input": {
+                            "prompt": "Search the codebase",
+                            "subagent_type": "Explore",
+                        }
+                    }
+                ]
+            }
+        }
+
+        await daemon._handle_assistant_message(obj, line_num=10)
+
+        # Verify tracker was created
+        assert "tool-use-xyz" in daemon._subagent_trackers
+        tracker = daemon._subagent_trackers["tool-use-xyz"]
+        assert isinstance(tracker, SubagentTracker)
+        assert tracker.tool_use_id == "tool-use-xyz"
+        assert tracker.turn_call_id == "turn-call-456"
+        assert tracker.parent_session_id == "test-session-123"
+        assert tracker.is_tailing is False  # Not yet found file
+
+
+class TestSessionsDirectoryHelper:
+    """Test sessions directory helper method."""
+
+    def test_daemon_get_sessions_directory(self):
+        """WeaveDaemon can determine the sessions directory from transcript path."""
+        from pathlib import Path
+
+        from weave.integrations.claude_plugin.daemon import WeaveDaemon
+
+        daemon = WeaveDaemon("test-session-123")
+        daemon.transcript_path = Path("/Users/test/.claude/projects/abc123/session-xyz.jsonl")
+
+        sessions_dir = daemon._get_sessions_directory()
+
+        assert sessions_dir == Path("/Users/test/.claude/projects/abc123")
+
+    def test_daemon_get_sessions_directory_none_when_no_transcript(self):
+        """WeaveDaemon returns None when no transcript path set."""
+        from weave.integrations.claude_plugin.daemon import WeaveDaemon
+
+        daemon = WeaveDaemon("test-session-123")
+        daemon.transcript_path = None
+
+        sessions_dir = daemon._get_sessions_directory()
+
+        assert sessions_dir is None
+
+
+class TestScanForSubagentFiles:
+    """Test _scan_for_subagent_files method."""
+
+    @pytest.mark.anyio
+    async def test_scan_for_subagent_files_finds_matching_file(self, tmp_path):
+        """_scan_for_subagent_files finds and matches subagent files by sessionId."""
+        from datetime import datetime, timezone
+        import time
+
+        from weave.integrations.claude_plugin.daemon import WeaveDaemon, SubagentTracker
+
+        daemon = WeaveDaemon("parent-session-uuid")
+        daemon.session_id = "parent-session-uuid"
+        daemon.transcript_path = tmp_path / "session.jsonl"
+        daemon.transcript_path.touch()
+
+        # Create a pending tracker
+        tracker = SubagentTracker(
+            tool_use_id="tool-123",
+            turn_call_id="turn-456",
+            detected_at=datetime.now(timezone.utc),
+            parent_session_id="parent-session-uuid",
+        )
+        daemon._subagent_trackers["tool-123"] = tracker
+
+        # Wait a tiny bit so file will be "after" detection
+        time.sleep(0.01)
+
+        # Create a subagent file with matching sessionId
+        agent_file = tmp_path / "agent-abc123.jsonl"
+        agent_file.write_text(json.dumps({
+            "type": "assistant",
+            "sessionId": "parent-session-uuid",
+            "agentId": "abc123",
+            "isSidechain": True,
+            "message": {"content": [{"type": "text", "text": "Hello"}]}
+        }) + "\n")
+
+        # Mock _start_tailing_subagent to track if it gets called
+        start_tailing_called = []
+        async def mock_start_tailing(session, path):
+            start_tailing_called.append((session.agent_id, path))
+        daemon._start_tailing_subagent = mock_start_tailing
+
+        await daemon._scan_for_subagent_files()
+
+        assert len(start_tailing_called) == 1
+        assert start_tailing_called[0][0] == "abc123"
+
+    @pytest.mark.anyio
+    async def test_scan_for_subagent_files_ignores_other_sessions(self, tmp_path):
+        """_scan_for_subagent_files ignores files from other sessions."""
+        from datetime import datetime, timezone
+
+        from weave.integrations.claude_plugin.daemon import WeaveDaemon, SubagentTracker
+
+        daemon = WeaveDaemon("parent-session-uuid")
+        daemon.session_id = "parent-session-uuid"
+        daemon.transcript_path = tmp_path / "session.jsonl"
+        daemon.transcript_path.touch()
+
+        # Create a pending tracker
+        tracker = SubagentTracker(
+            tool_use_id="tool-123",
+            turn_call_id="turn-456",
+            detected_at=datetime.now(timezone.utc),
+            parent_session_id="parent-session-uuid",
+        )
+        daemon._subagent_trackers["tool-123"] = tracker
+
+        # Create a subagent file with DIFFERENT sessionId
+        agent_file = tmp_path / "agent-other.jsonl"
+        agent_file.write_text(json.dumps({
+            "type": "assistant",
+            "sessionId": "different-session-uuid",
+            "agentId": "other",
+            "isSidechain": True,
+            "message": {"content": [{"type": "text", "text": "Hello"}]}
+        }) + "\n")
+
+        start_tailing_called = []
+        async def mock_start_tailing(session, path):
+            start_tailing_called.append((session.agent_id, path))
+        daemon._start_tailing_subagent = mock_start_tailing
+
+        await daemon._scan_for_subagent_files()
+
+        # Should NOT have started tailing - wrong session
+        assert len(start_tailing_called) == 0
+
+
+class TestStartTailingSubagent:
+    """Test _start_tailing_subagent method."""
+
+    @pytest.mark.anyio
+    async def test_start_tailing_subagent_creates_weave_call(self, tmp_path):
+        """_start_tailing_subagent creates Weave call and updates tracker."""
+        from datetime import datetime, timezone
+        from unittest.mock import AsyncMock
+
+        from weave.integrations.claude_plugin.daemon import WeaveDaemon, SubagentTracker
+        from weave.integrations.claude_plugin.session_parser import Session
+
+        daemon = WeaveDaemon("parent-session-uuid")
+        daemon.session_id = "parent-session-uuid"
+        daemon.weave_client = MagicMock()
+        daemon.weave_client._project_id.return_value = "test-project"
+        daemon.trace_id = "trace-123"
+        daemon.session_call_id = "session-call-456"
+        daemon.current_turn_call_id = "turn-call-789"
+
+        # Mock create_call to return a call with an id
+        mock_call = MagicMock()
+        mock_call.id = "subagent-call-xyz"
+        daemon.weave_client.create_call.return_value = mock_call
+
+        # Create a pending tracker
+        tracker = SubagentTracker(
+            tool_use_id="tool-123",
+            turn_call_id="turn-call-789",
+            detected_at=datetime.now(timezone.utc),
+            parent_session_id="parent-session-uuid",
+        )
+        daemon._subagent_trackers["tool-123"] = tracker
+
+        # Create mock session
+        session = MagicMock(spec=Session)
+        session.session_id = "parent-session-uuid"
+        session.agent_id = "abc123"
+        session.turns = []
+        session.first_user_prompt.return_value = "Search the codebase"
+
+        agent_file = tmp_path / "agent-abc123.jsonl"
+        agent_file.touch()
+
+        # Mock _process_subagent_updates to avoid needing to implement it yet
+        daemon._process_subagent_updates = AsyncMock()
+
+        await daemon._start_tailing_subagent(session, agent_file)
+
+        # Verify tracker was updated
+        assert tracker.agent_id == "abc123"
+        assert tracker.transcript_path == agent_file
+        assert tracker.subagent_call_id == "subagent-call-xyz"
+        assert tracker.is_tailing is True
+
+        # Verify secondary index was populated
+        assert daemon._subagent_by_agent_id["abc123"] is tracker
+
+        # Verify Weave call was created
+        daemon.weave_client.create_call.assert_called_once()
+        call_kwargs = daemon.weave_client.create_call.call_args.kwargs
+        assert call_kwargs["op"] == "claude_code.subagent"
+        assert "abc123" in call_kwargs["inputs"]["agent_id"]
+
+
+class TestProcessSubagentUpdates:
+    """Test _process_subagent_updates method."""
+
+    @pytest.mark.anyio
+    async def test_process_subagent_updates_logs_tool_calls_once(self, tmp_path):
+        """_process_subagent_updates logs tool calls only once, not duplicated on re-processing."""
+        from datetime import datetime, timezone
+        from unittest.mock import patch
+
+        from weave.integrations.claude_plugin.daemon import WeaveDaemon, SubagentTracker
+
+        daemon = WeaveDaemon("parent-session-uuid")
+        daemon.session_id = "parent-session-uuid"
+        daemon.weave_client = MagicMock()
+        daemon.weave_client._project_id.return_value = "test-project"
+        daemon.trace_id = "trace-123"
+        daemon.session_call_id = "session-call-456"
+
+        # Create a tracker in tailing state
+        tracker = SubagentTracker(
+            tool_use_id="tool-123",
+            turn_call_id="turn-call-789",
+            detected_at=datetime.now(timezone.utc),
+            parent_session_id="parent-session-uuid",
+        )
+        tracker.agent_id = "abc123"
+        tracker.subagent_call_id = "subagent-call-xyz"
+
+        # Create an agent file with tool calls
+        agent_file = tmp_path / "agent-abc123.jsonl"
+        agent_file.write_text(json.dumps({
+            "type": "assistant",
+            "sessionId": "parent-session-uuid",
+            "agentId": "abc123",
+            "isSidechain": True,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "message": {
+                "id": "msg-1",
+                "model": "claude-opus-4",
+                "role": "assistant",
+                "content": [
+                    {
+                        "type": "tool_use",
+                        "id": "tool-call-1",
+                        "name": "Read",
+                        "input": {"file_path": "/tmp/test.py"}
+                    }
+                ]
+            }
+        }) + "\n" + json.dumps({
+            "type": "user",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "message": {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "tool_result",
+                        "tool_use_id": "tool-call-1",
+                        "content": "file contents"
+                    }
+                ]
+            }
+        }) + "\n")
+
+        tracker.transcript_path = agent_file
+        daemon._subagent_trackers["tool-123"] = tracker
+
+        # Track weave.log_call invocations
+        log_call_count = 0
+        logged_tool_ids = []
+
+        def mock_log_call(**kwargs):
+            nonlocal log_call_count
+            log_call_count += 1
+            # Extract tool_use_id from attributes if present
+            if "attributes" in kwargs:
+                logged_tool_ids.append(kwargs.get("op", "unknown"))
+
+        # Call _process_subagent_updates TWICE
+        with patch("weave.integrations.claude_plugin.daemon.weave.log_call", side_effect=mock_log_call):
+            await daemon._process_subagent_updates(tracker)
+            first_call_count = log_call_count
+
+            # Second call should not log duplicates
+            await daemon._process_subagent_updates(tracker)
+            second_call_count = log_call_count
+
+        # Verify tool calls are only logged ONCE (not duplicated)
+        assert first_call_count == 1, f"Expected 1 tool call logged on first processing, got {first_call_count}"
+        assert second_call_count == 1, f"Expected still 1 tool call total after second processing, got {second_call_count}"
+
+        # Verify the tracker tracked the tool ID
+        assert "tool-call-1" in tracker.logged_tool_ids
+
+
+class TestFileTailerIntegration:
+    """Test file tailer loop integration with subagent scanning."""
+
+    @pytest.mark.anyio
+    async def test_file_tailer_calls_scan_for_subagent_files(self):
+        """File tailer loop calls _scan_for_subagent_files."""
+        from pathlib import Path
+
+        from weave.integrations.claude_plugin.daemon import WeaveDaemon
+
+        daemon = WeaveDaemon("test-session")
+        daemon.transcript_path = Path("/tmp/test.jsonl")
+        daemon.running = True
+
+        scan_calls = []
+        process_calls = []
+
+        async def mock_scan():
+            scan_calls.append(1)
+
+        async def mock_process():
+            process_calls.append(1)
+            # Stop after first iteration (after process is called)
+            daemon.running = False
+
+        daemon._scan_for_subagent_files = mock_scan
+        daemon._process_session_file = mock_process
+
+        await daemon._run_file_tailer()
+
+        # The current implementation doesn't call scan yet, so this should fail
+        assert len(scan_calls) == 1
+        assert len(process_calls) == 1
+
+
+class TestSubagentStopFastPath:
+    """Test SubagentStop fast path when already tailing."""
+
+    @pytest.mark.anyio
+    async def test_subagent_stop_fast_path_when_tailing(self, tmp_path):
+        """SubagentStop uses fast path when already tailing."""
+        from datetime import datetime, timezone
+        from unittest.mock import AsyncMock
+
+        from weave.integrations.claude_plugin.daemon import WeaveDaemon, SubagentTracker
+
+        daemon = WeaveDaemon("parent-session-uuid")
+        daemon.weave_client = MagicMock()
+        daemon.weave_client._project_id.return_value = "test-project"
+        daemon.trace_id = "trace-123"
+        daemon.session_call_id = "session-call-456"
+
+        # Create agent file
+        agent_file = tmp_path / "agent-abc123.jsonl"
+        agent_file.write_text(json.dumps({
+            "type": "assistant",
+            "sessionId": "parent-session-uuid",
+            "agentId": "abc123",
+            "isSidechain": True,
+            "uuid": "msg-1",
+            "timestamp": "2025-01-01T10:00:00Z",
+            "message": {
+                "role": "assistant",
+                "content": [{"type": "text", "text": "Done!"}],
+                "usage": {"input_tokens": 100, "output_tokens": 50}
+            }
+        }) + "\n")
+
+        # Create tracker in tailing state
+        tracker = SubagentTracker(
+            tool_use_id="tool-123",
+            turn_call_id="turn-456",
+            detected_at=datetime.now(timezone.utc),
+            parent_session_id="parent-session-uuid",
+        )
+        tracker.agent_id = "abc123"
+        tracker.transcript_path = agent_file
+        tracker.subagent_call_id = "subagent-call-xyz"
+        tracker.last_processed_line = 1
+
+        daemon._subagent_trackers["tool-123"] = tracker
+        daemon._subagent_by_agent_id["abc123"] = tracker
+
+        # Mock process_subagent_updates
+        daemon._process_subagent_updates = AsyncMock()
+
+        payload = {
+            "agent_transcript_path": str(agent_file),
+            "agent_id": "abc123",
+        }
+
+        result = await daemon._handle_subagent_stop(payload)
+
+        # Verify fast path was used
+        assert result["status"] == "ok"
+        daemon._process_subagent_updates.assert_called_once_with(tracker)
+        daemon.weave_client.finish_call.assert_called_once()
+
+        # Verify cleanup
+        assert "tool-123" not in daemon._subagent_trackers
+        assert "abc123" not in daemon._subagent_by_agent_id
+
+
+class TestSubagentFileBackups:
+    """Test file backup handling for subagents."""
+
+    @pytest.mark.anyio
+    async def test_subagent_stop_includes_file_snapshots(self, tmp_path):
+        """SubagentStop should include file snapshots and diff view in output."""
+        from datetime import datetime, timezone
+        from unittest.mock import AsyncMock
+
+        from weave.integrations.claude_plugin.daemon import WeaveDaemon, SubagentTracker
+
+        daemon = WeaveDaemon("parent-session-uuid")
+        daemon.session_id = "parent-session-uuid"
+        daemon.weave_client = MagicMock()
+        daemon.weave_client._project_id.return_value = "test-project"
+        daemon.trace_id = "trace-123"
+        daemon.session_call_id = "session-call-456"
+        daemon.current_turn_call_id = "turn-789"
+
+        # Create file-history directory structure
+        file_history_dir = tmp_path / ".claude" / "file-history" / "parent-session-uuid"
+        file_history_dir.mkdir(parents=True)
+
+        # Create a backup file
+        backup_file = file_history_dir / "abc123hash@v1"
+        backup_file.write_text("# Original content\nprint('hello')")
+
+        # Create agent file with file-history-snapshot
+        agent_file = tmp_path / "agent-abc123.jsonl"
+        agent_file.write_text(
+            json.dumps({
+                "type": "user",
+                "sessionId": "parent-session-uuid",
+                "agentId": "abc123",
+                "isSidechain": True,
+                "uuid": "user-msg-1",
+                "timestamp": "2025-01-01T10:00:00Z",
+                "message": {"role": "user", "content": "Edit the file"}
+            }) + "\n" +
+            json.dumps({
+                "type": "assistant",
+                "sessionId": "parent-session-uuid",
+                "agentId": "abc123",
+                "isSidechain": True,
+                "uuid": "msg-1",
+                "timestamp": "2025-01-01T10:00:01Z",
+                "message": {
+                    "role": "assistant",
+                    "model": "claude-sonnet-4-20250514",
+                    "content": [
+                        {"type": "tool_use", "id": "tool-1", "name": "Edit", "input": {"file_path": "/tmp/test.py"}}
+                    ],
+                    "usage": {"input_tokens": 100, "output_tokens": 50}
+                }
+            }) + "\n" +
+            json.dumps({
+                "type": "file-history-snapshot",
+                "snapshot": {
+                    "messageId": "msg-1",
+                    "trackedFileBackups": {
+                        "/tmp/test.py": {
+                            "backupFileName": "abc123hash@v1",
+                            "version": 1,
+                            "backupTime": "2025-01-01T10:00:01Z"
+                        }
+                    }
+                }
+            }) + "\n"
+        )
+
+        # Create tracker in tailing state
+        tracker = SubagentTracker(
+            tool_use_id="tool-123",
+            turn_call_id="turn-789",
+            detected_at=datetime.now(timezone.utc),
+            parent_session_id="parent-session-uuid",
+        )
+        tracker.agent_id = "abc123"
+        tracker.transcript_path = agent_file
+        tracker.subagent_call_id = "subagent-call-xyz"
+        tracker.last_processed_line = 3
+
+        daemon._subagent_trackers["tool-123"] = tracker
+        daemon._subagent_by_agent_id["abc123"] = tracker
+
+        # Mock process_subagent_updates
+        daemon._process_subagent_updates = AsyncMock()
+
+        payload = {
+            "agent_transcript_path": str(agent_file),
+            "agent_id": "abc123",
+        }
+
+        # Patch FileBackup.load_content to use our tmp_path
+        from weave.integrations.claude_plugin.session_parser import FileBackup
+        original_load_content = FileBackup.load_content
+
+        def patched_load_content(self, session_id, claude_dir=None):
+            return original_load_content(self, session_id, claude_dir=tmp_path / ".claude")
+
+        with patch.object(FileBackup, "load_content", patched_load_content):
+            result = await daemon._handle_subagent_stop(payload)
+
+        # Verify finish_call was called with file_snapshots in output
+        assert result["status"] == "ok"
+        daemon.weave_client.finish_call.assert_called_once()
+
+        # Get the output from finish_call
+        call_args = daemon.weave_client.finish_call.call_args
+        output = call_args.kwargs.get("output") or call_args[1].get("output", {})
+
+        # Should have file_snapshots
+        assert "file_snapshots" in output, f"Expected file_snapshots in output, got: {output.keys()}"
+        assert "/tmp/test.py" in output["file_snapshots"]
+
+
+class TestParentTurnAggregatesSubagentFileBackups:
+    """Test that parent turns aggregate file backups from subagents."""
+
+    @pytest.mark.anyio
+    async def test_finish_turn_includes_subagent_file_snapshots(self, tmp_path):
+        """When finishing a turn, file snapshots from subagents should be included."""
+        from weave.integrations.claude_plugin.daemon import WeaveDaemon
+
+        daemon = WeaveDaemon("test-session-123")
+        daemon.session_id = "test-session-123"
+        daemon.weave_client = MagicMock()
+        daemon.weave_client._project_id.return_value = "test-project"
+        daemon.trace_id = "trace-abc"
+        daemon.session_call_id = "session-call-456"
+        daemon.current_turn_call_id = "turn-call-789"
+        daemon.turn_number = 1
+
+        # Create a parent session file (no file edits directly in parent)
+        session_file = tmp_path / "session.jsonl"
+        session_file.write_text(
+            json.dumps({
+                "type": "user",
+                "uuid": "msg-1",
+                "timestamp": "2025-01-01T10:00:00Z",
+                "sessionId": "test-session-123",
+                "message": {"role": "user", "content": "Edit some files"},
+            }) + "\n" +
+            json.dumps({
+                "type": "assistant",
+                "uuid": "msg-2",
+                "timestamp": "2025-01-01T10:00:01Z",
+                "message": {
+                    "role": "assistant",
+                    "model": "claude-sonnet-4-20250514",
+                    "content": [
+                        {"type": "tool_use", "id": "task-1", "name": "Task", "input": {"prompt": "Edit the file"}}
+                    ],
+                    "usage": {"input_tokens": 50, "output_tokens": 10},
+                },
+            }) + "\n"
+        )
+        daemon.transcript_path = session_file
+
+        # Simulate that a subagent finished and stored file snapshots for this turn
+        from weave.type_wrappers.Content.content import Content
+        mock_content = MagicMock(spec=Content)
+        daemon._subagent_file_snapshots = {
+            "turn-call-789": {
+                "/tmp/edited_by_subagent.py": mock_content,
+            }
+        }
+
+        # Mock weave.log_call since _log_turn_tool_calls uses it directly
+        with patch("weave.integrations.claude_plugin.daemon.weave.log_call"):
+            await daemon._finish_current_turn()
+
+        # Verify finish_call was called with file_snapshots from subagent
+        daemon.weave_client.finish_call.assert_called_once()
+        call_args = daemon.weave_client.finish_call.call_args
+        output = call_args.kwargs.get("output") or call_args[1].get("output", {})
+
+        assert "file_snapshots" in output, f"Expected file_snapshots in output, got: {output.keys()}"
+        assert "/tmp/edited_by_subagent.py" in output["file_snapshots"]
+
+        # Verify the subagent file snapshots were cleaned up
+        assert "turn-call-789" not in daemon._subagent_file_snapshots
+
+
+class TestCleanupStaleSubagentTrackers:
+    """Test cleanup of stale subagent trackers."""
+
+    @pytest.mark.anyio
+    async def test_cleanup_stale_subagent_trackers(self):
+        """Stale subagent trackers are cleaned up after timeout."""
+        from datetime import datetime, timezone, timedelta
+
+        from weave.integrations.claude_plugin.daemon import (
+            WeaveDaemon,
+            SubagentTracker,
+            SUBAGENT_DETECTION_TIMEOUT,
+        )
+
+        daemon = WeaveDaemon("test-session")
+
+        # Create a stale tracker (detected 15 seconds ago, beyond 10s timeout)
+        stale_tracker = SubagentTracker(
+            tool_use_id="stale-tool",
+            turn_call_id="turn-456",
+            detected_at=datetime.now(timezone.utc) - timedelta(seconds=15),
+            parent_session_id="test-session",
+        )
+        daemon._subagent_trackers["stale-tool"] = stale_tracker
+
+        # Create a fresh tracker (detected 2 seconds ago)
+        fresh_tracker = SubagentTracker(
+            tool_use_id="fresh-tool",
+            turn_call_id="turn-789",
+            detected_at=datetime.now(timezone.utc) - timedelta(seconds=2),
+            parent_session_id="test-session",
+        )
+        daemon._subagent_trackers["fresh-tool"] = fresh_tracker
+
+        daemon._cleanup_stale_subagent_trackers()
+
+        # Stale tracker should be removed
+        assert "stale-tool" not in daemon._subagent_trackers
+        # Fresh tracker should remain
+        assert "fresh-tool" in daemon._subagent_trackers
+
+
+class TestThinkingTraceCreation:
+    """Test thinking trace creation in daemon."""
+
+    @pytest.mark.anyio
+    async def test_finish_turn_creates_thinking_trace_when_present(self, tmp_path):
+        """When a turn has thinking content, a thinking trace is created as child of turn."""
+        from weave.integrations.claude_plugin.daemon import WeaveDaemon
+
+        daemon = WeaveDaemon("test-session-123")
+        daemon.weave_client = MagicMock()
+        daemon.weave_client._project_id.return_value = "test-project"
+        daemon.trace_id = "trace-abc"
+        daemon.session_call_id = "session-call-456"
+        daemon.current_turn_call_id = "turn-call-789"
+        daemon.turn_number = 1
+
+        # Create a session file with thinking content in assistant message
+        session_file = tmp_path / "session.jsonl"
+        session_file.write_text(
+            json.dumps({
+                "type": "user",
+                "uuid": "msg-1",
+                "timestamp": "2025-01-01T10:00:00Z",
+                "sessionId": "test-session-123",
+                "message": {
+                    "role": "user",
+                    "content": "What is 2 + 2?",
+                },
+            }) + "\n" +
+            json.dumps({
+                "type": "assistant",
+                "uuid": "msg-2",
+                "timestamp": "2025-01-01T10:00:01Z",
+                "message": {
+                    "role": "assistant",
+                    "model": "claude-opus-4-5-20251101",
+                    "content": [
+                        {
+                            "type": "thinking",
+                            "thinking": "Let me calculate: 2 + 2 = 4. This is basic arithmetic.",
+                            "signature": "abc123",
+                        },
+                        {"type": "text", "text": "2 + 2 = 4"},
+                    ],
+                    "usage": {"input_tokens": 100, "output_tokens": 10},
+                },
+            }) + "\n"
+        )
+        daemon.transcript_path = session_file
+
+        # Track log_call invocations
+        log_call_invocations = []
+        with patch("weave.integrations.claude_plugin.daemon.weave.log_call") as mock_log_call:
+            mock_log_call.side_effect = lambda **kwargs: log_call_invocations.append(kwargs)
+            await daemon._finish_current_turn()
+
+        # Verify thinking trace was created
+        thinking_calls = [c for c in log_call_invocations if c.get("op") == "claude_code.thinking"]
+        assert len(thinking_calls) == 1, f"Expected 1 thinking trace, got {len(thinking_calls)}"
+
+        thinking_call = thinking_calls[0]
+        assert thinking_call["inputs"]["content"] == "Let me calculate: 2 + 2 = 4. This is basic arithmetic."
+        assert thinking_call["display_name"] == "Thinking..."
+        # Verify usage data is included
+        assert "output" in thinking_call
+        assert "usage" in thinking_call["output"]
+        assert thinking_call["output"]["usage"]["input_tokens"] == 100
+        assert thinking_call["output"]["usage"]["output_tokens"] == 10
+
+    @pytest.mark.anyio
+    async def test_finish_turn_no_thinking_trace_when_absent(self, tmp_path):
+        """When a turn has no thinking content, no thinking trace is created."""
+        from weave.integrations.claude_plugin.daemon import WeaveDaemon
+
+        daemon = WeaveDaemon("test-session-123")
+        daemon.weave_client = MagicMock()
+        daemon.weave_client._project_id.return_value = "test-project"
+        daemon.trace_id = "trace-abc"
+        daemon.session_call_id = "session-call-456"
+        daemon.current_turn_call_id = "turn-call-789"
+        daemon.turn_number = 1
+
+        # Create a session file WITHOUT thinking content
+        session_file = tmp_path / "session.jsonl"
+        session_file.write_text(
+            json.dumps({
+                "type": "user",
+                "uuid": "msg-1",
+                "timestamp": "2025-01-01T10:00:00Z",
+                "sessionId": "test-session-123",
+                "message": {
+                    "role": "user",
+                    "content": "Hello",
+                },
+            }) + "\n" +
+            json.dumps({
+                "type": "assistant",
+                "uuid": "msg-2",
+                "timestamp": "2025-01-01T10:00:01Z",
+                "message": {
+                    "role": "assistant",
+                    "model": "claude-sonnet-4-20250514",
+                    "content": [
+                        {"type": "text", "text": "Hi there!"},
+                    ],
+                    "usage": {"input_tokens": 10, "output_tokens": 5},
+                },
+            }) + "\n"
+        )
+        daemon.transcript_path = session_file
+
+        # Track log_call invocations
+        log_call_invocations = []
+        with patch("weave.integrations.claude_plugin.daemon.weave.log_call") as mock_log_call:
+            mock_log_call.side_effect = lambda **kwargs: log_call_invocations.append(kwargs)
+            await daemon._finish_current_turn()
+
+        # Verify NO thinking trace was created
+        thinking_calls = [c for c in log_call_invocations if c.get("op") == "claude_code.thinking"]
+        assert len(thinking_calls) == 0, f"Expected 0 thinking traces, got {len(thinking_calls)}"
+
+    @pytest.mark.anyio
+    async def test_multiple_assistant_messages_aggregates_thinking(self, tmp_path):
+        """Multiple assistant messages with thinking should aggregate thinking content."""
+        from weave.integrations.claude_plugin.daemon import WeaveDaemon
+
+        daemon = WeaveDaemon("test-session-123")
+        daemon.weave_client = MagicMock()
+        daemon.weave_client._project_id.return_value = "test-project"
+        daemon.trace_id = "trace-abc"
+        daemon.session_call_id = "session-call-456"
+        daemon.current_turn_call_id = "turn-call-789"
+        daemon.turn_number = 1
+
+        # Create a session file with multiple assistant messages with thinking
+        session_file = tmp_path / "session.jsonl"
+        session_file.write_text(
+            json.dumps({
+                "type": "user",
+                "uuid": "msg-1",
+                "timestamp": "2025-01-01T10:00:00Z",
+                "sessionId": "test-session-123",
+                "message": {"role": "user", "content": "Help me"},
+            }) + "\n" +
+            json.dumps({
+                "type": "assistant",
+                "uuid": "msg-2",
+                "timestamp": "2025-01-01T10:00:01Z",
+                "message": {
+                    "role": "assistant",
+                    "model": "claude-opus-4-5-20251101",
+                    "content": [
+                        {"type": "thinking", "thinking": "First thought", "signature": "sig1"},
+                        {"type": "text", "text": "First response"},
+                    ],
+                    "usage": {"input_tokens": 50, "output_tokens": 5},
+                },
+            }) + "\n" +
+            json.dumps({
+                "type": "assistant",
+                "uuid": "msg-3",
+                "timestamp": "2025-01-01T10:00:02Z",
+                "message": {
+                    "role": "assistant",
+                    "model": "claude-opus-4-5-20251101",
+                    "content": [
+                        {"type": "thinking", "thinking": "Second thought", "signature": "sig2"},
+                        {"type": "text", "text": "Second response"},
+                    ],
+                    "usage": {"input_tokens": 60, "output_tokens": 6},
+                },
+            }) + "\n"
+        )
+        daemon.transcript_path = session_file
+
+        log_call_invocations = []
+        with patch("weave.integrations.claude_plugin.daemon.weave.log_call") as mock_log_call:
+            mock_log_call.side_effect = lambda **kwargs: log_call_invocations.append(kwargs)
+            await daemon._finish_current_turn()
+
+        # Should create ONE thinking trace with aggregated content
+        thinking_calls = [c for c in log_call_invocations if c.get("op") == "claude_code.thinking"]
+        assert len(thinking_calls) == 1, f"Expected 1 aggregated thinking trace, got {len(thinking_calls)}"
+
+        thinking_call = thinking_calls[0]
+        # Content should include both thinking blocks
+        assert "First thought" in thinking_call["inputs"]["content"]
+        assert "Second thought" in thinking_call["inputs"]["content"]
+
+
+class TestCleanupIntegration:
+    """Test cleanup integration in file tailer loop."""
+
+    @pytest.mark.anyio
+    async def test_file_tailer_calls_cleanup(self):
+        """File tailer loop calls _cleanup_stale_subagent_trackers."""
+        from pathlib import Path
+
+        from weave.integrations.claude_plugin.daemon import WeaveDaemon
+
+        daemon = WeaveDaemon("test-session")
+        daemon.transcript_path = Path("/tmp/test.jsonl")
+        daemon.running = True
+
+        cleanup_calls = []
+
+        def mock_cleanup():
+            cleanup_calls.append(1)
+
+        async def mock_process():
+            # Stop daemon after first iteration
+            daemon.running = False
+
+        async def noop():
+            pass
+
+        daemon._cleanup_stale_subagent_trackers = mock_cleanup
+        daemon._process_session_file = mock_process
+        daemon._scan_for_subagent_files = noop
+
+        await daemon._run_file_tailer()
+
+        assert len(cleanup_calls) == 1
