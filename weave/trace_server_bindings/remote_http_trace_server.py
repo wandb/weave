@@ -29,7 +29,6 @@ from weave.trace_server_bindings.models import (
     ServerInfoRes,
     StartBatchItem,
 )
-from weave.utils import http_requests
 from weave.utils.project_id import from_project_id
 from weave.utils.retry import get_current_retry_id, with_retry
 from weave.wandb_interface import project_creator
@@ -101,7 +100,7 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
     def get(self, url: str, *args: Any, **kwargs: Any) -> httpx.Response:
         headers = self._build_dynamic_request_headers()
 
-        return http_requests.get(
+        return httpx.get(
             self.trace_server_url + url,
             *args,
             auth=self._auth,
@@ -112,7 +111,7 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
     def post(self, url: str, *args: Any, **kwargs: Any) -> httpx.Response:
         headers = self._build_dynamic_request_headers()
 
-        return http_requests.post(
+        return httpx.post(
             self.trace_server_url + url,
             *args,
             auth=self._auth,
@@ -123,7 +122,7 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
     def delete(self, url: str, *args: Any, **kwargs: Any) -> httpx.Response:
         headers = self._build_dynamic_request_headers()
 
-        return http_requests.delete(
+        return httpx.delete(
             self.trace_server_url + url,
             *args,
             auth=self._auth,
