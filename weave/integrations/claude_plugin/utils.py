@@ -144,6 +144,28 @@ def truncate(s: str | None, max_len: int = MAX_TOOL_INPUT_LENGTH) -> str | None:
     return s[:max_len] + "...[truncated]"
 
 
+def sanitize_tool_input(
+    tool_input: dict[str, Any],
+    max_length: int = MAX_TOOL_INPUT_LENGTH,
+) -> dict[str, Any]:
+    """Sanitize tool input by truncating long string values.
+
+    Args:
+        tool_input: Dictionary of tool input parameters
+        max_length: Maximum length for string values (default MAX_TOOL_INPUT_LENGTH)
+
+    Returns:
+        New dictionary with long strings truncated
+    """
+    sanitized = {}
+    for k, v in tool_input.items():
+        if isinstance(v, str) and len(v) > max_length:
+            sanitized[k] = truncate(v, max_length)
+        else:
+            sanitized[k] = v
+    return sanitized
+
+
 def _generate_session_name_claude(user_prompt: str) -> str | None:
     """Generate session name using Claude API (same as Claude Code CLI).
 
