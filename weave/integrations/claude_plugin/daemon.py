@@ -190,6 +190,13 @@ class WeaveDaemon:
         # AskUserQuestion tool: maps tool_use_id -> (call_id, questions)
         self._pending_question_calls: dict[str, tuple[str, list[dict[str, Any]]]] = {}
 
+        # Pending tool calls waiting for results: tool_use_id -> (name, inputs, timestamp)
+        # Used for real-time tool call logging when tool_result arrives
+        self._pending_tool_calls: dict[str, tuple[str, dict[str, Any], datetime]] = {}
+
+        # Tool calls already logged in real-time (to avoid duplicate logging at turn finish)
+        self._logged_tool_call_ids: set[str] = set()
+
         # Subagent file snapshots to aggregate into parent turn
         # Maps turn_call_id -> {file_path -> Content}
         self._subagent_file_snapshots: dict[str, dict[str, Any]] = {}
@@ -1209,10 +1216,13 @@ class WeaveDaemon:
                         except Exception as e:
                             logger.debug(f"Failed to parse image: {e}")
                 elif c.get("type") == "tool_result":
-                    # Handle tool results - check for pending question calls
                     tool_use_id = c.get("tool_use_id", "")
+                    # Handle AskUserQuestion results
                     if tool_use_id in self._pending_question_calls:
                         await self._finish_question_call(tool_use_id, c)
+                    # Handle regular tool results - log in real-time
+                    elif tool_use_id in self._pending_tool_calls:
+                        await self._log_pending_tool_call(tool_use_id, c)
             user_text = "\n".join(text_parts)
 
         # Skip if no real content (tool results only) - don't trigger interruption check
@@ -1399,13 +1409,16 @@ class WeaveDaemon:
                         logger.debug(f"Created question call for {len(questions)} questions")
                     continue
 
-                # Track tool call for logging at turn finish (when results are available)
-                # Tool calls are logged in _finish_current_turn() using parsed turn data
-                # which has the tool_result linked, rather than logging eagerly here
-                # without the output.
+                # Track pending tool call with full info for real-time logging
+                # when the tool_result arrives in a subsequent user message
+                self._pending_tool_calls[tool_id] = (
+                    tool_name,
+                    tool_input,
+                    datetime.now(timezone.utc),
+                )
                 self._current_turn_tool_calls.append(tool_id)
 
-                logger.debug(f"Tracked tool call: {tool_name} ({tool_id})")
+                logger.debug(f"Tracked pending tool call: {tool_name} ({tool_id})")
 
     async def _finish_current_turn(self, interrupted: bool = False) -> None:
         """Finish the current turn call with file snapshots and diff view."""
@@ -1562,6 +1575,10 @@ class WeaveDaemon:
         for tc in turn.all_tool_calls():
             tool_name = tc.name
 
+            # Skip tool calls already logged in real-time
+            if tc.id in self._logged_tool_call_ids:
+                continue
+
             # Skip Task tools with subagent_type - handled by SubagentStop
             if tool_name == "Task" and tc.input.get("subagent_type"):
                 continue
@@ -1616,6 +1633,8 @@ class WeaveDaemon:
 
         # Clear tracked tool calls for this turn
         self._current_turn_tool_calls = []
+        self._logged_tool_call_ids.clear()
+        self._pending_tool_calls.clear()
 
     async def _activate_inline_parent(self, prompt: str) -> None:
         """Activate a pending inline parent (Skill or PlanMode) with its first turn content.
@@ -1789,6 +1808,105 @@ class WeaveDaemon:
 
         logger.debug(f"Finished question call with {len(answers)} answers")
         del self._pending_question_calls[tool_use_id]
+
+    async def _log_pending_tool_call(
+        self, tool_use_id: str, tool_result: dict[str, Any]
+    ) -> None:
+        """Log a pending tool call now that its result has arrived.
+
+        This enables real-time streaming of tool calls - they appear in the trace
+        as soon as their results are available, rather than waiting for turn finish.
+
+        Args:
+            tool_use_id: The ID of the tool_use.
+            tool_result: The tool_result content from the user message.
+        """
+        if tool_use_id not in self._pending_tool_calls:
+            return
+
+        if not self.weave_client or not self.current_turn_call_id:
+            del self._pending_tool_calls[tool_use_id]
+            return
+
+        tool_name, tool_input, started_at = self._pending_tool_calls[tool_use_id]
+
+        # Extract result content
+        result_content = tool_result.get("content", "")
+        if isinstance(result_content, list):
+            # Handle structured content (e.g., images, multiple blocks)
+            text_parts = []
+            for item in result_content:
+                if isinstance(item, dict) and item.get("type") == "text":
+                    text_parts.append(item.get("text", ""))
+            result_content = "\n".join(text_parts)
+
+        # Calculate duration
+        ended_at = datetime.now(timezone.utc)
+        duration_ms = int((ended_at - started_at).total_seconds() * 1000)
+
+        # Sanitize input - truncate large values
+        sanitized_input = {}
+        for k, v in tool_input.items():
+            if isinstance(v, str) and len(v) > 5000:
+                sanitized_input[k] = truncate(v)
+            else:
+                sanitized_input[k] = v
+
+        tool_display = get_tool_display_name(tool_name, tool_input)
+
+        # Determine parent: inline parent if active, otherwise turn
+        from weave.trace.call import Call
+
+        if self._pending_inline_parent and self._pending_inline_parent.is_active:
+            tool_parent = Call(
+                _op_name="",
+                project_id=self.weave_client._project_id(),
+                trace_id=self.trace_id,
+                parent_id=self._pending_inline_parent.parent_turn_call_id,
+                inputs={},
+                id=self._pending_inline_parent.call_id,
+            )
+        else:
+            tool_parent = Call(
+                _op_name="",
+                project_id=self.weave_client._project_id(),
+                trace_id=self.trace_id,
+                parent_id=self.session_call_id,
+                inputs={},
+                id=self.current_turn_call_id,
+            )
+
+        # Log the tool call
+        weave.log_call(
+            op=f"claude_code.tool.{tool_name}",
+            inputs=sanitized_input,
+            output={"result": truncate(result_content, 10000)} if result_content else None,
+            attributes={
+                "tool_name": tool_name,
+                "tool_use_id": tool_use_id,
+                "duration_ms": duration_ms,
+            },
+            display_name=tool_display,
+            parent=tool_parent,
+            use_stack=False,
+        )
+
+        # Update counts
+        self.tool_counts[tool_name] = self.tool_counts.get(tool_name, 0) + 1
+        self.total_tool_calls += 1
+
+        # Remove from pending and mark as logged
+        del self._pending_tool_calls[tool_use_id]
+        # Track that we've logged this tool call (to avoid duplicate at turn finish)
+        self._logged_tool_call_ids.add(tool_use_id)
+        # Remove from current turn tool calls since we've already logged it
+        if tool_use_id in self._current_turn_tool_calls:
+            self._current_turn_tool_calls.remove(tool_use_id)
+
+        # Flush to ensure the call is sent immediately
+        self.weave_client.flush()
+
+        logger.debug(f"Logged tool call in real-time: {tool_name} ({tool_use_id})")
 
     async def _get_current_turn_data(self) -> tuple[Session | None, Turn | None, int]:
         """Get data for the current turn from the session file.
