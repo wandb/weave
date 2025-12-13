@@ -19,8 +19,7 @@ class TraceService(Protocol):
     server health.
 
     The intent is to provide a simple interface for weave clients to interact
-    with the trace server.  We also have tooling in `weave/trace_server/reference`
-    that consumes this interface and provides a convenient FastAPI router.
+    with the trace server.
     """
 
     trace_server_interface: FullTraceServerInterface
