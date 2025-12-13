@@ -11,12 +11,12 @@ from weave.trace.object_record import ObjectRecord
 from weave.trace.refs import ObjectRef, Ref, TableRef
 from weave.trace.serialization import custom_objs
 from weave.trace.serialization.dictifiable import try_to_dict
+from weave.trace_server.client_server_common.digest_builder import safe_digest
 from weave.trace_server.trace_server_interface import (
     FileContentReadReq,
     FileCreateReq,
     TraceServerInterface,
 )
-from weave.trace_server.trace_server_interface_util import bytes_digest
 from weave.utils.sanitize import REDACTED_VALUE, should_redact
 
 if TYPE_CHECKING:
@@ -130,7 +130,7 @@ def _build_result_from_encoded(
         contents_as_bytes = val
         if isinstance(contents_as_bytes, str):
             contents_as_bytes = contents_as_bytes.encode("utf-8")
-        digest = bytes_digest(contents_as_bytes)
+        digest = safe_digest(contents_as_bytes)
         file_digests[name] = digest
 
     result: EncodedCustomObjDictWithFilesAsDigests = {
