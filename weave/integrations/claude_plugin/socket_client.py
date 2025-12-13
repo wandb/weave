@@ -54,14 +54,20 @@ class DaemonClient:
         if not self.socket_path.exists():
             return False
 
+        sock = None
         try:
             sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
             sock.settimeout(1.0)
             sock.connect(str(self.socket_path))
-            sock.close()
             return True
         except (socket.error, OSError):
             return False
+        finally:
+            if sock:
+                try:
+                    sock.close()
+                except Exception:
+                    pass
 
     def is_process_alive(self, pid: int) -> bool:
         """Check if a process with given PID is alive."""
@@ -141,6 +147,7 @@ class DaemonClient:
             "payload": payload,
         }
 
+        sock = None
         try:
             sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
             sock.settimeout(self.timeout)
@@ -160,12 +167,9 @@ class DaemonClient:
                     if b"\n" in response_data:
                         break
 
-                sock.close()
-
                 if response_data:
                     return json.loads(response_data.decode().strip())
 
-            sock.close()
             return {"status": "ok"}
 
         except socket.timeout:
@@ -177,6 +181,12 @@ class DaemonClient:
         except json.JSONDecodeError as e:
             logger.warning(f"Invalid response from daemon: {e}")
             return None
+        finally:
+            if sock:
+                try:
+                    sock.close()
+                except Exception:
+                    pass
 
 
 def ensure_daemon_running(session_id: str, daemon_pid: int | None = None) -> DaemonClient:
