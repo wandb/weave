@@ -94,6 +94,16 @@ from weave.integrations.claude_plugin.diff_view import (
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
+# Compaction message prefix - Claude uses this when context is compacted
+COMPACTION_PREFIX = "This session is being continued from a previous conversation"
+
+
+def is_compaction_message(content: str) -> bool:
+    """Check if a message is a context compaction/continuation message."""
+    if not content:
+        return False
+    return content.strip().startswith(COMPACTION_PREFIX)
+
 
 @dataclass
 class SubagentTracker:
@@ -207,6 +217,9 @@ class WeaveDaemon:
         # Maps turn_call_id -> {file_path -> Content}
         self._subagent_file_snapshots: dict[str, dict[str, Any]] = {}
 
+        # Compaction tracking - count how many times context was compacted
+        self.compaction_count: int = 0
+
     async def start(self) -> None:
         """Start the daemon."""
         logger.info(f"Starting daemon for session {self.session_id}")
@@ -261,6 +274,9 @@ class WeaveDaemon:
             # Restore pending question for Q&A context tracking
             self._pending_question = session_data.get("pending_question")
 
+            # Restore compaction count
+            self.compaction_count = session_data.get("compaction_count", 0)
+
             # Update daemon PID in state
             session_data["daemon_pid"] = os.getpid()
             state.save_session(self.session_id, session_data)
@@ -293,6 +309,7 @@ class WeaveDaemon:
                 "last_processed_line": self.last_processed_line,
                 "daemon_pid": os.getpid(),
                 "pending_question": self._pending_question,
+                "compaction_count": self.compaction_count,
             })
             state.save_session(self.session_id, session_data)
 
@@ -960,6 +977,10 @@ class WeaveDaemon:
                 "end_reason": payload.get("reason", "unknown"),
             }
 
+            # Include compaction count if any compactions occurred
+            if self.compaction_count > 0:
+                output["compaction_count"] = self.compaction_count
+
             # Parse session for additional data and diff view
             if self.transcript_path and self.transcript_path.exists():
                 session = parse_session_file(self.transcript_path)
@@ -1050,12 +1071,10 @@ class WeaveDaemon:
                             except Exception as e:
                                 logger.debug(f"Failed to attach file {file_path}: {e}")
 
-                # Store file snapshots on attributes (rich objects like Content work there)
+                # Store file snapshots in output (Content objects are properly serialized there)
                 if file_snapshots_list:
-                    if session_call.attributes is None:
-                        session_call.attributes = {}
-                    session_call.attributes["file_snapshots"] = file_snapshots_list
-                    logger.debug(f"Attached {len(file_snapshots_list)} file snapshots to attributes")
+                    output["file_snapshots"] = file_snapshots_list
+                    logger.debug(f"Attached {len(file_snapshots_list)} file snapshots to output")
 
             self.weave_client.finish_call(session_call, output=output)
             self.weave_client.flush()
@@ -1137,15 +1156,15 @@ class WeaveDaemon:
                 for _ in range(self.last_processed_line):
                     f.readline()
 
-                # Process new lines
+                # Process new lines - count ALL lines (including empty) to match skip logic
                 old_line_num = self.last_processed_line
                 line_num = self.last_processed_line
                 for line in f:
+                    line_num += 1  # Count every physical line to match f.readline() skip
                     line = line.strip()
                     if not line:
-                        continue
+                        continue  # Skip processing but line was counted
 
-                    line_num += 1
                     try:
                         obj = json.loads(line)
                         await self._process_session_line(obj, line_num)
@@ -1214,6 +1233,10 @@ class WeaveDaemon:
         if not user_text.strip():
             return
 
+        # Skip system-generated messages (Caveat:, XML tags, etc.)
+        if is_system_message(user_text):
+            return
+
         # Check for skill expansion - don't create new turn for these
         # Skill expansions start with "Base directory for this skill:"
         if self._pending_skill_calls and user_text.strip().startswith("Base directory for this skill:"):
@@ -1248,6 +1271,12 @@ class WeaveDaemon:
             parent_id=None,
         )
 
+        # Check for compaction (context continuation)
+        is_compacted = is_compaction_message(user_text)
+        if is_compacted:
+            self.compaction_count += 1
+            logger.debug(f"Detected compaction event #{self.compaction_count}")
+
         # Build inputs with images and pending question context
         turn_inputs: dict[str, Any] = {
             "user_message": truncate(user_text, 5000),
@@ -1262,14 +1291,25 @@ class WeaveDaemon:
             logger.debug(f"Added question context: {self._pending_question[:50]}...")
             self._pending_question = None  # Clear after using
 
+        # Build attributes
+        turn_attributes: dict[str, Any] = {
+            "turn_number": self.turn_number,
+        }
+        if is_compacted:
+            turn_attributes["compacted"] = True
+
+        # Use special display name for compaction turns
+        if is_compacted:
+            display_name = f"Turn {self.turn_number}: Compacted, resuming..."
+        else:
+            display_name = get_turn_display_name(self.turn_number, user_text)
+
         turn_call = self.weave_client.create_call(
             op="claude_code.turn",
             inputs=turn_inputs,
             parent=session_call,
-            attributes={
-                "turn_number": self.turn_number,
-            },
-            display_name=get_turn_display_name(self.turn_number, user_text),
+            attributes=turn_attributes,
+            display_name=display_name,
             use_stack=False,
         )
 

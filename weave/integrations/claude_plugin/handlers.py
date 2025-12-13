@@ -860,12 +860,10 @@ def handle_session_end(payload: dict[str, Any], project: str) -> dict[str, Any] 
                         except Exception as e:
                             logger.debug(f"Failed to attach file {file_path}: {e}")
 
-            # Store file snapshots on attributes (rich objects like Content work there)
+            # Store file snapshots in output (Content objects are properly serialized there)
             if file_snapshots_list:
-                if session_call.attributes is None:
-                    session_call.attributes = {}
-                session_call.attributes["file_snapshots"] = file_snapshots_list
-                logger.debug(f"Attached {len(file_snapshots_list)} file snapshots to attributes")
+                session_output["file_snapshots"] = file_snapshots_list
+                logger.debug(f"Attached {len(file_snapshots_list)} file snapshots to output")
 
         # Finish the session call
         client.finish_call(session_call, output=session_output)

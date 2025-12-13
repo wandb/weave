@@ -282,7 +282,6 @@ def teleport(
         return False, f"Session {session_id} not found in Weave"
 
     output = session_data.get("output", {})
-    attributes = session_data.get("attributes", {})
 
     # Check if session has ended
     if not output.get("end_reason"):
@@ -299,8 +298,8 @@ def teleport(
         for warning in warnings:
             logger.warning(warning)
 
-    # Get file snapshots from attributes (list of Content objects)
-    file_snapshots = attributes.get("file_snapshots", [])
+    # Get file snapshots from output (list of Content objects)
+    file_snapshots = output.get("file_snapshots", [])
     if not file_snapshots:
         return False, "Session has no file snapshots to restore"
 
