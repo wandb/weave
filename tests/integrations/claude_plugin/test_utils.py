@@ -4,6 +4,7 @@ import pytest
 
 from weave.integrations.claude_plugin.utils import (
     sanitize_tool_input,
+    reconstruct_call,
     MAX_TOOL_INPUT_LENGTH,
 )
 
@@ -38,3 +39,36 @@ class TestSanitizeToolInput:
     def test_empty_dict(self):
         """Empty dict should return empty dict."""
         assert sanitize_tool_input({}) == {}
+
+
+class TestReconstructCall:
+    def test_creates_call_with_required_fields(self):
+        """Should create Call with all required fields."""
+        call = reconstruct_call(
+            project_id="test/project",
+            call_id="call-123",
+            trace_id="trace-456",
+        )
+        assert call.id == "call-123"
+        assert call.trace_id == "trace-456"
+        assert call.project_id == "test/project"
+        assert call.parent_id is None
+
+    def test_creates_call_with_parent_id(self):
+        """Should include parent_id when provided."""
+        call = reconstruct_call(
+            project_id="test/project",
+            call_id="call-123",
+            trace_id="trace-456",
+            parent_id="parent-789",
+        )
+        assert call.parent_id == "parent-789"
+
+    def test_call_has_empty_inputs(self):
+        """Reconstructed calls should have empty inputs."""
+        call = reconstruct_call(
+            project_id="test/project",
+            call_id="call-123",
+            trace_id="trace-456",
+        )
+        assert call.inputs == {}

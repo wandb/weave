@@ -166,6 +166,39 @@ def sanitize_tool_input(
     return sanitized
 
 
+def reconstruct_call(
+    project_id: str,
+    call_id: str,
+    trace_id: str,
+    parent_id: str | None = None,
+) -> "Call":
+    """Reconstruct a minimal Call object for use as a parent reference.
+
+    This creates a Call object that can be used as a parent for weave.log_call()
+    without needing the full call data. Used when logging child calls to an
+    existing trace.
+
+    Args:
+        project_id: Weave project ID (e.g., "entity/project")
+        call_id: The call ID to reconstruct
+        trace_id: The trace ID this call belongs to
+        parent_id: Optional parent call ID
+
+    Returns:
+        Call object suitable for use as parent in weave.log_call()
+    """
+    from weave.trace.call import Call
+
+    return Call(
+        _op_name="",
+        project_id=project_id,
+        trace_id=trace_id,
+        parent_id=parent_id,
+        inputs={},
+        id=call_id,
+    )
+
+
 def _generate_session_name_claude(user_prompt: str) -> str | None:
     """Generate session name using Claude API (same as Claude Code CLI).
 
