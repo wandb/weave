@@ -335,7 +335,6 @@ def handle_user_prompt_submit(
                 inputs={
                     "session_id": session_id,
                     "cwd": cwd,
-                    "suggested_branch_name": suggested_branch or None,
                     "first_prompt": truncate(user_prompt, 1000),
                 },
                 attributes={
@@ -767,8 +766,11 @@ def handle_session_end(payload: dict[str, Any], project: str) -> dict[str, Any] 
             trace_id=trace_id,
         )
 
-        # Build session output with aggregated stats
-        session_output: dict[str, Any] = {
+        # Build session output (for Content objects like file_snapshots)
+        session_output: dict[str, Any] = {}
+
+        # Build session summary with aggregated stats
+        session_summary: dict[str, Any] = {
             "turn_count": session_data.get("turn_number", 0),
             "tool_call_count": session_data.get("total_tool_calls", 0),
             "tool_call_breakdown": session_data.get("tool_counts", {}),
@@ -777,9 +779,9 @@ def handle_session_end(payload: dict[str, Any], project: str) -> dict[str, Any] 
 
         if session:
             total_usage = session.total_usage()
-            session_output["model"] = session.primary_model()
-            session_output["usage"] = total_usage.to_weave_usage()
-            session_output["duration_ms"] = session.duration_ms()
+            session_summary["model"] = session.primary_model()
+            session_summary["usage"] = total_usage.to_weave_usage()
+            session_summary["duration_ms"] = session.duration_ms()
 
         # Parse session for diff view and attach session file
         transcript_file_path = Path(transcript_path) if transcript_path else None
@@ -807,7 +809,7 @@ def handle_session_end(payload: dict[str, Any], project: str) -> dict[str, Any] 
             if session and session.cwd:
                 git_info = get_git_info(session.cwd)
                 if git_info:
-                    session_output["git"] = git_info
+                    session_summary["git"] = git_info
                     logger.debug(f"Attached git info: branch={git_info.get('branch')}")
 
             # Collect file snapshots as a list for summary
@@ -866,7 +868,7 @@ def handle_session_end(payload: dict[str, Any], project: str) -> dict[str, Any] 
                 logger.debug(f"Attached {len(file_snapshots_list)} file snapshots to output")
 
         # Finish the session call
-        client.finish_call(session_call, output=session_output)
+        client.finish_call(session_call, output=session_output, summary=session_summary)
 
         # Clean up state
         state.delete_session(session_id)
