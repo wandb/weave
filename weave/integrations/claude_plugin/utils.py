@@ -253,6 +253,14 @@ def get_tool_display_name(tool_name: str, tool_input: dict[str, Any]) -> str:
         query = tool_input.get("query", "")
         if query:
             return f"WebSearch: {query[:30]}"
+    elif tool_name == "Skill":
+        skill = tool_input.get("skill", "")
+        if skill:
+            return f"Skill: {skill}"
+    elif tool_name == "SlashCommand":
+        command = tool_input.get("command", "")
+        if command:
+            return f"SlashCommand: {command[:30]}"
 
     return tool_name
 
