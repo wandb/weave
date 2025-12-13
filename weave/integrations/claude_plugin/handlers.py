@@ -45,6 +45,9 @@ from weave.integrations.claude_plugin.utils import (
     get_turn_display_name,
     is_command_output,
     truncate,
+    sanitize_tool_input,
+    reconstruct_call,
+    log_tool_call,
 )
 
 # Use the same logger setup as hook.py for consistent debug output
@@ -74,35 +77,6 @@ def _find_turn_by_prompt(session: Session, prompt_prefix: str) -> Turn | None:
     return None
 
 
-def _reconstruct_parent_call(
-    project_id: str,
-    call_id: str,
-    trace_id: str,
-) -> Call:
-    """Reconstruct a minimal Call object for use as a parent reference.
-
-    When creating child calls across process boundaries, we need to provide
-    a Call object with the correct id and trace_id so the child inherits
-    the trace_id and has the correct parent_id.
-
-    Args:
-        project_id: Weave project ID
-        call_id: The parent call's ID
-        trace_id: The trace ID (shared across all calls in the trace)
-
-    Returns:
-        A minimal Call object suitable for use as a parent
-    """
-    return Call(
-        _op_name="",
-        project_id=project_id,
-        trace_id=trace_id,
-        parent_id=None,
-        inputs={},
-        id=call_id,
-    )
-
-
 def _log_tool_calls(
     turn: Turn,
     parent_call: Call,
@@ -116,28 +90,13 @@ def _log_tool_calls(
         session_data: Session data dict to update tool counts
     """
     for tc in turn.all_tool_calls():
-        tool_display = get_tool_display_name(tc.name, tc.input)
-
-        # Sanitize input - truncate large values
-        sanitized_input = {}
-        for k, v in tc.input.items():
-            if isinstance(v, str) and len(v) > 5000:
-                sanitized_input[k] = truncate(v)
-            else:
-                sanitized_input[k] = v
-
-        weave.log_call(
-            op=f"claude_code.tool.{tc.name}",
-            inputs=sanitized_input,
-            output={"result": truncate(tc.result, 10000)} if tc.result else None,
-            attributes={
-                "tool_name": tc.name,
-                "tool_use_id": tc.id,
-                "duration_ms": tc.duration_ms(),
-            },
-            display_name=tool_display,
+        log_tool_call(
+            tool_name=tc.name,
+            tool_input=tc.input,
+            tool_output=tc.result,
+            tool_use_id=tc.id,
+            duration_ms=tc.duration_ms(),
             parent=parent_call,
-            use_stack=False,
         )
 
         # Update tool counts
@@ -244,10 +203,10 @@ def _finish_interrupted_turn(
             turn = session.turns[-1]
 
     # Reconstruct turn call
-    turn_call = _reconstruct_parent_call(
-        client._project_id(),
-        turn_call_id,
-        trace_id,
+    turn_call = reconstruct_call(
+        project_id=client._project_id(),
+        call_id=turn_call_id,
+        trace_id=trace_id,
     )
 
     # Log any tool calls that happened before interruption
@@ -438,10 +397,10 @@ def handle_user_prompt_submit(
                 return None
 
             # Subsequent turn - reconstruct session call as parent
-            session_call = _reconstruct_parent_call(
-                client._project_id(),
-                session_call_id,
-                trace_id,
+            session_call = reconstruct_call(
+                project_id=client._project_id(),
+                call_id=session_call_id,
+                trace_id=trace_id,
             )
 
             # Create turn call
@@ -555,10 +514,10 @@ def handle_stop(payload: dict[str, Any], project: str) -> dict[str, Any] | None:
                     )
 
         # Reconstruct turn call to finish it
-        turn_call = _reconstruct_parent_call(
-            project_id,
-            turn_call_id,
-            trace_id,
+        turn_call = reconstruct_call(
+            project_id=project_id,
+            call_id=turn_call_id,
+            trace_id=trace_id,
         )
 
         # Log tool calls
@@ -675,10 +634,10 @@ def handle_subagent_stop(payload: dict[str, Any], project: str) -> dict[str, Any
         client = require_weave_client()
 
         # Reconstruct parent session call for hierarchy
-        parent_session_call = _reconstruct_parent_call(
-            client._project_id(),
-            session_call_id,
-            trace_id,
+        parent_session_call = reconstruct_call(
+            project_id=client._project_id(),
+            call_id=session_call_id,
+            trace_id=trace_id,
         )
 
         # Create the subagent call as a child of the session
@@ -733,13 +692,14 @@ def handle_subagent_stop(payload: dict[str, Any], project: str) -> dict[str, Any
 
 
 def _log_single_tool_call(tool_call: "ToolCall", parent_call: Any) -> None:
-    """Log a single tool call using weave.log_call."""
-    weave.log_call(
-        op_name=f"claude_code.tool.{tool_call.name}",
-        inputs=tool_call.input or {},
-        output={"result": truncate(tool_call.result, 5000) if tool_call.result else None},
+    """Log a single tool call using the shared log_tool_call utility."""
+    log_tool_call(
+        tool_name=tool_call.name,
+        tool_input=tool_call.input or {},
+        tool_output=tool_call.result,
+        tool_use_id=tool_call.id,
+        duration_ms=tool_call.duration_ms(),
         parent=parent_call,
-        display_name=tool_call.name,
     )
 
 
@@ -792,10 +752,10 @@ def handle_session_end(payload: dict[str, Any], project: str) -> dict[str, Any] 
             session = parse_session_file(Path(transcript_path))
 
         # Reconstruct session call to finish it
-        session_call = _reconstruct_parent_call(
-            client._project_id(),
-            session_call_id,
-            trace_id,
+        session_call = reconstruct_call(
+            project_id=client._project_id(),
+            call_id=session_call_id,
+            trace_id=trace_id,
         )
 
         # Build session output with aggregated stats
