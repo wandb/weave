@@ -193,6 +193,7 @@ class OpKwargs(TypedDict, total=False):
     tracing_sample_rate: float
     enable_code_capture: bool
     accumulator: Callable[[Any | None, Any], Any] | None
+    kind: str | None
 
 
 def setup_dunder_weave_dict(d: WeaveKwargs | None = None) -> WeaveKwargs:
@@ -323,6 +324,12 @@ def _create_call(
 
     if call_attrs is not None:
         attributes = {**attributes, **call_attrs}
+
+    # Add kind to weave namespace in attributes if the op has a kind specified
+    if hasattr(func, "_kind") and func._kind is not None:
+        if "weave" not in attributes:
+            attributes["weave"] = {}
+        attributes["weave"]["kind"] = func._kind
 
     return client.create_call(
         func,
@@ -1169,6 +1176,7 @@ def op(
     tracing_sample_rate: float = 1.0,
     enable_code_capture: bool = True,
     accumulator: Callable[[Any | None, Any], Any] | None = None,
+    kind: str | None = None,
 ) -> Callable[[Callable[P, R]], Op[P, R]] | Op[P, R]:
     """A decorator to weave op-ify a function or method. Works for both sync and async.
     Automatically detects iterator functions and applies appropriate behavior.
@@ -1259,6 +1267,7 @@ def op(
             wrapper.tracing_sample_rate = tracing_sample_rate  # type: ignore
 
             wrapper._accumulator = accumulator  # type: ignore
+            wrapper._kind = kind  # type: ignore
 
             wrapper.get_captured_code = partial(get_captured_code, wrapper)  # type: ignore
             wrapper._code_capture_enabled = enable_code_capture  # type: ignore
