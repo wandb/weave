@@ -259,6 +259,20 @@ class Call:
             wc._send_score_call(self, score_call, scorer_ref)
         return apply_scorer_result
 
+    @classmethod
+    def as_noop(cls) -> Call:
+        """Create a no-op call with default empty values.
+
+        Returns:
+            A Call instance with empty op_name, trace_id, project_id, and inputs.
+
+        Examples:
+            >>> call = Call.no_op()
+            >>> call.op_name
+            ''
+        """
+        return cls(_op_name="", trace_id="", project_id="", parent_id=None, inputs={})
+
     def to_dict(self) -> CallDict:
         if callable(display_name := self.display_name):
             display_name = "Callable Display Name (not called yet)"
@@ -280,13 +294,6 @@ class Call:
             deleted_at=self.deleted_at,
             thread_id=self.thread_id,
             turn_id=self.turn_id,
-        )
-
-
-class NoOpCall(Call):
-    def __init__(self) -> None:
-        super().__init__(
-            _op_name="", trace_id="", project_id="", parent_id=None, inputs={}
         )
 
 

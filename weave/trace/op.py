@@ -57,7 +57,7 @@ from weave.trace.op_protocol import (
 from weave.trace.util import log_once
 
 if TYPE_CHECKING:
-    from weave.trace.call import Call, CallsIter, NoOpCall
+    from weave.trace.call import Call, CallsIter
 
 S = TypeVar("S")
 V = TypeVar("V")
@@ -360,17 +360,22 @@ def _should_sample_traces(op: Op) -> bool:
     return False
 
 
-def placeholder_call() -> Call:
-    # Import here to avoid circular dependency
-    from weave.trace.call import NoOpCall
+def is_placeholder_call(call: Call) -> bool:
+    """Check if a call is a placeholder (no-op) call.
 
-    return NoOpCall()
+    Args:
+        call: The call to check.
 
-
-def is_placeholder_call(call: Call) -> TypeIs[NoOpCall]:
-    from weave.trace.call import NoOpCall
-
-    return isinstance(call, NoOpCall)
+    Returns:
+        True if the call is a placeholder call with default empty values.
+    """
+    return (
+        call._op_name == ""
+        and call.trace_id == ""
+        and call.project_id == ""
+        and call.parent_id is None
+        and call.inputs == {}
+    )
 
 
 def _set_python_function_type_on_weave_dict(
@@ -396,7 +401,10 @@ def _call_sync_func(
     **kwargs: Any,
 ) -> tuple[Any, Call]:
     func = op.resolve_fn
-    call = placeholder_call()
+    # Import here to avoid circular dependency
+    from weave.trace.call import Call
+
+    call = Call.as_noop()
 
     # Handle all of the possible cases where we would skip tracing.
     if is_tracing_setting_disabled() or should_skip_tracing_for_op(op):
@@ -541,7 +549,10 @@ async def _call_async_func(
     **kwargs: Any,
 ) -> tuple[Any, Call]:
     func = op.resolve_fn
-    call = placeholder_call()
+    # Import here to avoid circular dependency
+    from weave.trace.call import Call
+
+    call = Call.as_noop()
 
     # Handle all of the possible cases where we would skip tracing.
     if is_tracing_setting_disabled() or should_skip_tracing_for_op(op):
@@ -672,7 +683,10 @@ def _call_sync_gen(
     **kwargs: Any,
 ) -> tuple[Generator[Any], Call]:
     func = op.resolve_fn
-    call = placeholder_call()
+    # Import here to avoid circular dependency
+    from weave.trace.call import Call
+
+    call = Call.as_noop()
 
     # Handle all of the possible cases where we would skip tracing.
     if should_skip_tracing_for_op(op):
@@ -882,7 +896,10 @@ async def _call_async_gen(
     **kwargs: Any,
 ) -> tuple[AsyncIterator, Call]:
     func = op.resolve_fn
-    call = placeholder_call()
+    # Import here to avoid circular dependency
+    from weave.trace.call import Call
+
+    call = Call.as_noop()
 
     # Handle all of the possible cases where we would skip tracing.
     if should_skip_tracing_for_op(op):

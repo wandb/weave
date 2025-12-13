@@ -31,7 +31,7 @@ from weave.trace import refs, settings, table_upload_chunking, weave_client
 from weave.trace.context import call_context
 from weave.trace.context.call_context import tracing_disabled
 from weave.trace.isinstance import weave_isinstance
-from weave.trace.op import is_op
+from weave.trace.op import is_op, is_placeholder_call
 from weave.trace.refs import (
     DICT_KEY_EDGE_NAME,
     LIST_INDEX_EDGE_NAME,
@@ -2862,9 +2862,7 @@ def test_tracing_enabled_context(client):
     # Test create_call with tracing disabled
     with tracing_disabled():
         call = client.create_call(test_op, {})
-        assert isinstance(
-            call, weave.trace.call.NoOpCall
-        )  # Should be a NoOpCall instance
+        assert is_placeholder_call(call)  # Should be a placeholder call
         assert (
             len(list(client.get_calls())) == 1
         )  # Verify no additional calls were created

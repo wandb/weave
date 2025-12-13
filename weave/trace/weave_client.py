@@ -53,7 +53,6 @@ from weave.trace.op import (
     is_placeholder_call,
     is_tracing_setting_disabled,
     maybe_unbind_method,
-    placeholder_call,
     should_skip_tracing_for_op,
 )
 from weave.trace.op import op as op_deco
@@ -656,7 +655,9 @@ class WeaveClient:
         if is_tracing_setting_disabled() or (
             is_op(op) and should_skip_tracing_for_op(cast(Op, op))
         ):
-            return placeholder_call()
+            from weave.trace.call import Call
+
+            return Call.as_noop()
 
         from weave.trace.api import _global_attributes, _global_postprocess_inputs
 
