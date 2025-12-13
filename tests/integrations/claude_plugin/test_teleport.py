@@ -220,3 +220,108 @@ class TestDownloadSessionFile:
             assert path.exists()
             assert session_id in str(path)
             assert path.read_bytes() == b'{"type": "user"}'
+
+
+class TestContentDictHandling:
+    """Tests for handling Content objects returned as dicts from Weave API."""
+
+    def test_get_content_metadata_from_dict(self):
+        """Should extract metadata from dict representation of Content."""
+        from weave.integrations.claude_plugin.teleport import _get_content_metadata
+
+        content_dict = {
+            "data": b"file content",
+            "metadata": {"relative_path": "src/app.py"},
+        }
+
+        metadata = _get_content_metadata(content_dict)
+        assert metadata == {"relative_path": "src/app.py"}
+
+    def test_get_content_metadata_from_object(self):
+        """Should extract metadata from Content object."""
+        from weave.integrations.claude_plugin.teleport import _get_content_metadata
+
+        mock_content = MagicMock()
+        mock_content.metadata = {"relative_path": "src/app.py"}
+
+        metadata = _get_content_metadata(mock_content)
+        assert metadata == {"relative_path": "src/app.py"}
+
+    def test_get_content_bytes_from_dict(self):
+        """Should extract bytes from dict representation of Content."""
+        from weave.integrations.claude_plugin.teleport import _get_content_bytes
+
+        content_dict = {
+            "data": b"file content",
+            "metadata": {"relative_path": "src/app.py"},
+        }
+
+        data = _get_content_bytes(content_dict)
+        assert data == b"file content"
+
+    def test_get_content_bytes_from_base64_dict(self):
+        """Should decode base64 data from dict representation."""
+        import base64
+        from weave.integrations.claude_plugin.teleport import _get_content_bytes
+
+        original = b"file content"
+        content_dict = {
+            "data": base64.b64encode(original).decode("utf-8"),
+            "metadata": {"relative_path": "src/app.py"},
+        }
+
+        data = _get_content_bytes(content_dict)
+        assert data == original
+
+    def test_get_content_bytes_from_object(self):
+        """Should call to_bytes() on Content object."""
+        from weave.integrations.claude_plugin.teleport import _get_content_bytes
+
+        mock_content = MagicMock()
+        mock_content.to_bytes.return_value = b"file content"
+
+        data = _get_content_bytes(mock_content)
+        assert data == b"file content"
+
+    def test_restore_files_handles_dict_content(self):
+        """Should restore files when Content objects are dicts (from Weave API)."""
+        from weave.integrations.claude_plugin.teleport import restore_files
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Simulate Content objects returned as dicts from Weave
+            file_snapshots = [
+                {
+                    "data": b"app content",
+                    "metadata": {"relative_path": "src/app.py"},
+                },
+                {
+                    "data": b"test content",
+                    "metadata": {"relative_path": "tests/test_app.py"},
+                },
+            ]
+
+            count = restore_files(file_snapshots, tmpdir)
+
+            assert count == 2
+            assert (Path(tmpdir) / "src/app.py").read_bytes() == b"app content"
+            assert (Path(tmpdir) / "tests/test_app.py").read_bytes() == b"test content"
+
+    def test_download_session_file_handles_dict_content(self):
+        """Should download session file when Content is a dict."""
+        from weave.integrations.claude_plugin.teleport import download_session_file
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            content_dict = {
+                "data": b'{"type": "user"}',
+                "metadata": {"relative_path": "session.jsonl"},
+            }
+
+            claude_dir = Path(tmpdir) / ".claude"
+            session_id = "test-session-123"
+            cwd = "/Users/test/project"
+
+            with patch("weave.integrations.claude_plugin.teleport.CLAUDE_DIR", claude_dir):
+                path = download_session_file(session_id, cwd, content_dict)
+
+            assert path.exists()
+            assert path.read_bytes() == b'{"type": "user"}'

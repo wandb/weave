@@ -129,6 +129,36 @@ def verify_git_state(
     return errors, warnings
 
 
+def _get_content_metadata(content: Any) -> dict[str, Any]:
+    """Get metadata from a Content object or dict.
+
+    When Content objects are fetched from Weave via get_calls(),
+    they are returned as dicts, not Content instances.
+    """
+    if isinstance(content, dict):
+        return content.get("metadata", {}) or {}
+    return getattr(content, "metadata", {}) or {}
+
+
+def _get_content_bytes(content: Any) -> bytes:
+    """Get bytes from a Content object or dict.
+
+    When Content objects are fetched from Weave via get_calls(),
+    they are returned as dicts with 'data' as bytes or base64 string.
+    """
+    if isinstance(content, dict):
+        data = content.get("data", b"")
+        if isinstance(data, str):
+            # Data may be base64 encoded
+            import base64
+            try:
+                return base64.b64decode(data)
+            except Exception:
+                return data.encode("utf-8")
+        return data if isinstance(data, bytes) else b""
+    return content.to_bytes()
+
+
 def restore_files(
     file_snapshots: list[Any], cwd: str, skip_session_jsonl: bool = True
 ) -> int:
@@ -146,8 +176,8 @@ def restore_files(
     count = 0
 
     for content in file_snapshots:
-        # Get relative path from metadata
-        metadata = getattr(content, "metadata", {}) or {}
+        # Get relative path from metadata (handles both Content objects and dicts)
+        metadata = _get_content_metadata(content)
         rel_path = metadata.get("relative_path", "")
 
         if not rel_path:
@@ -162,8 +192,8 @@ def restore_files(
             target_path = cwd_path / rel_path
             target_path.parent.mkdir(parents=True, exist_ok=True)
 
-            # Write file content
-            file_bytes = content.to_bytes()
+            # Write file content (handles both Content objects and dicts)
+            file_bytes = _get_content_bytes(content)
             target_path.write_bytes(file_bytes)
             count += 1
             logger.debug(f"Restored file: {rel_path}")
@@ -197,9 +227,9 @@ def download_session_file(
     projects_dir = CLAUDE_DIR / "projects" / encoded_cwd
     projects_dir.mkdir(parents=True, exist_ok=True)
 
-    # Write session file
+    # Write session file (handles both Content objects and dicts)
     session_path = projects_dir / f"{session_id}.jsonl"
-    session_path.write_bytes(session_content.to_bytes())
+    session_path.write_bytes(_get_content_bytes(session_content))
 
     logger.debug(f"Downloaded session file to: {session_path}")
     return session_path
@@ -219,9 +249,9 @@ def fetch_session_from_weave(
     """
     import weave
     from weave.trace.context.weave_client_context import require_weave_client
-    from weave.trace.weave_client import CallsFilter
 
-    weave.init(project)
+    # Suppress init messages - we control output in CLI commands
+    weave.init(project, settings={"log_level": "WARNING"})
     client = require_weave_client()
 
     # Query calls with session_id in attributes (more efficient than inputs)
@@ -303,10 +333,10 @@ def teleport(
     if not file_snapshots:
         return False, "Session has no file snapshots to restore"
 
-    # Find session.jsonl from the list
+    # Find session.jsonl from the list (handles both Content objects and dicts)
     session_content = None
     for content in file_snapshots:
-        metadata = getattr(content, "metadata", {}) or {}
+        metadata = _get_content_metadata(content)
         if metadata.get("relative_path") == "session.jsonl":
             session_content = content
             break
