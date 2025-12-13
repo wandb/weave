@@ -1,3 +1,4 @@
+import copy
 from collections.abc import Callable
 from datetime import datetime
 from typing import Any
@@ -24,14 +25,66 @@ class SpanEvent(dict):
     dropped_attributes_count: int
 
 
+def _insert_event(events_tree: dict[str, Any], name: str, attributes: dict[str, Any]) -> None:
+    """Insert an OTEL span event into the nested events tree."""
+    parts = name.split(".")
+    current = events_tree
+    for part in parts[:-1]:
+        next_value = current.get(part)
+        if not isinstance(next_value, dict):
+            next_value = {}
+            current[part] = next_value
+        current = next_value
+    leaf = parts[-1]
+    existing = current.get(leaf)
+    if existing is None:
+        current[leaf] = [copy.deepcopy(attributes)]
+    elif isinstance(existing, list):
+        existing.append(copy.deepcopy(attributes))
+    elif isinstance(existing, dict):
+        existing.setdefault("__events__", []).append(copy.deepcopy(attributes))
+    else:
+        current[leaf] = [copy.deepcopy(attributes)]
+
+
+def _build_events_tree(events: list[SpanEvent] | None) -> dict[str, Any]:
+    """Convert OTEL span events into a nested dict for attribute lookups."""
+    if not events:
+        return {}
+
+    events_tree: dict[str, Any] = {}
+    for event in events:
+        if not isinstance(event, dict):
+            continue
+        name = event.get("name")
+        event_attributes = event.get("attributes")
+        if not name or not isinstance(event_attributes, dict):
+            continue
+        _insert_event(events_tree, name, event_attributes)
+
+    if not events_tree:
+        return {}
+
+    return {"events": events_tree}
+
+
 def parse_weave_values(
     attributes: dict[str, Any],
     key_mapping: list[str]
     | dict[str, list[str]]
     | list[tuple[str, Callable[..., Any]]]
     | dict[str, list[tuple[str, Callable[..., Any]]]],
+    events: list[SpanEvent] | None = None,
 ) -> dict[str, Any]:
     result = {}
+    events_tree = _build_events_tree(events) if events else None
+
+    def _get_value(key: str) -> Any:
+        value = get_attribute(attributes, key)
+        if value is None and events_tree:
+            value = get_attribute(events_tree, key)
+        return value
+
     # If list use the attribute as the key - Prevents synthetic attributes under input and output
 
     if isinstance(key_mapping, list):
@@ -41,8 +94,8 @@ def parse_weave_values(
                 attribute_key, handler = attribute_key_or_tuple
             else:
                 attribute_key = attribute_key_or_tuple
-            value = get_attribute(attributes, attribute_key)
-            if value:
+            value = _get_value(attribute_key)
+            if value is not None:
                 # Handler should never raise - Always use a try in handler and default to passed in value
                 if handler:
                     value = handler(value)
@@ -61,8 +114,8 @@ def parse_weave_values(
             else:
                 attribute_key = attribute_key_or_tuple
 
-            value = get_attribute(attributes, attribute_key)
-            if value:
+            value = _get_value(attribute_key)
+            if value is not None:
                 if handler:
                     # Handler should never raise - Always use a try in handler and default to passed in value
                     value = handler(value)
@@ -101,14 +154,14 @@ def get_weave_usage(attributes: dict[str, Any]) -> dict[str, Any]:
     return usage
 
 
-# Pass events here even though they are unused because some libraries put input in event attributes
-def get_weave_inputs(_: list[SpanEvent], attributes: dict[str, Any]) -> dict[str, Any]:
-    return parse_weave_values(attributes, INPUT_KEYS)
+# Some providers (e.g. Bedrock agents) encode inputs inside span events
+def get_weave_inputs(events: list[SpanEvent], attributes: dict[str, Any]) -> dict[str, Any]:
+    return parse_weave_values(attributes, INPUT_KEYS, events)
 
 
-# Pass events here even though they are unused because some libraries put output in event attributes
-def get_weave_outputs(_: list[SpanEvent], attributes: dict[str, Any]) -> dict[str, Any]:
-    return parse_weave_values(attributes, OUTPUT_KEYS)
+# Some providers (e.g. Bedrock agents) encode outputs inside span events
+def get_weave_outputs(events: list[SpanEvent], attributes: dict[str, Any]) -> dict[str, Any]:
+    return parse_weave_values(attributes, OUTPUT_KEYS, events)
 
 
 # Custom attributes for weave to enable setting fields like wb_user_id otherwise unavailable in OTEL Traces
