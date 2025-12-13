@@ -627,7 +627,6 @@ class WeaveDaemon:
             inputs={
                 "session_id": self.session_id,
                 "cwd": cwd,
-                "suggested_branch_name": suggested_branch or None,
                 "first_prompt": truncate(user_prompt, 1000),
             },
             attributes={
@@ -970,7 +969,11 @@ class WeaveDaemon:
                 parent_id=None,
             )
 
-            output = {
+            # Build session output (for Content objects like file_snapshots)
+            session_output: dict[str, Any] = {}
+
+            # Build session summary with aggregated stats
+            session_summary: dict[str, Any] = {
                 "turn_count": self.turn_number,
                 "tool_call_count": self.total_tool_calls,
                 "tool_call_breakdown": self.tool_counts,
@@ -979,7 +982,7 @@ class WeaveDaemon:
 
             # Include compaction count if any compactions occurred
             if self.compaction_count > 0:
-                output["compaction_count"] = self.compaction_count
+                session_summary["compaction_count"] = self.compaction_count
 
             # Parse session for additional data and diff view
             if self.transcript_path and self.transcript_path.exists():
@@ -987,9 +990,9 @@ class WeaveDaemon:
                 if session:
                     # Add aggregated usage from session
                     total_usage = session.total_usage()
-                    output["model"] = session.primary_model()
-                    output["usage"] = total_usage.to_weave_usage()
-                    output["duration_ms"] = session.duration_ms()
+                    session_summary["model"] = session.primary_model()
+                    session_summary["usage"] = total_usage.to_weave_usage()
+                    session_summary["duration_ms"] = session.duration_ms()
 
                     # Get cwd from session for resolving relative paths
                     cwd = session.cwd
@@ -1017,10 +1020,10 @@ class WeaveDaemon:
                 if session and session.cwd:
                     git_info = get_git_info(session.cwd)
                     if git_info:
-                        output["git"] = git_info
+                        session_summary["git"] = git_info
                         logger.debug(f"Attached git info: branch={git_info.get('branch')}")
 
-                # Collect file snapshots as a list for summary
+                # Collect file snapshots as a list for output
                 # Includes: session.jsonl + all modified/created files
                 file_snapshots_list: list[Any] = []
 
@@ -1073,10 +1076,10 @@ class WeaveDaemon:
 
                 # Store file snapshots in output (Content objects are properly serialized there)
                 if file_snapshots_list:
-                    output["file_snapshots"] = file_snapshots_list
+                    session_output["file_snapshots"] = file_snapshots_list
                     logger.debug(f"Attached {len(file_snapshots_list)} file snapshots to output")
 
-            self.weave_client.finish_call(session_call, output=output)
+            self.weave_client.finish_call(session_call, output=session_output, summary=session_summary)
             self.weave_client.flush()
 
             logger.info(f"Finished session call: {self.session_call_id}")
