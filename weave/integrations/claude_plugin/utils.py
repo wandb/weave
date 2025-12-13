@@ -13,6 +13,8 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
+import weave
+
 logger = logging.getLogger(__name__)
 
 # Truncation limits for tool call logging
@@ -196,6 +198,55 @@ def reconstruct_call(
         parent_id=parent_id,
         inputs={},
         id=call_id,
+    )
+
+
+def log_tool_call(
+    tool_name: str,
+    tool_input: dict[str, Any],
+    tool_output: str | None,
+    tool_use_id: str,
+    duration_ms: int,
+    parent: Any,
+    max_input_length: int = MAX_TOOL_INPUT_LENGTH,
+    max_output_length: int = MAX_TOOL_OUTPUT_LENGTH,
+) -> None:
+    """Log a tool call to Weave with standardized formatting.
+
+    This is the single source of truth for tool call logging format.
+    All tool calls (daemon, handlers, real-time, turn finish) should use this.
+
+    Args:
+        tool_name: Name of the tool (e.g., "Read", "Grep", "Bash")
+        tool_input: Tool input parameters
+        tool_output: Tool output/result (can be None)
+        tool_use_id: Unique ID for this tool invocation
+        duration_ms: How long the tool call took in milliseconds
+        parent: Parent Call object for trace hierarchy
+        max_input_length: Max length for input string values
+        max_output_length: Max length for output string
+    """
+    # Sanitize inputs
+    sanitized_input = sanitize_tool_input(tool_input, max_input_length)
+
+    # Generate display name
+    tool_display = get_tool_display_name(tool_name, tool_input)
+
+    # Build output dict
+    output = {"result": truncate(tool_output, max_output_length)} if tool_output else None
+
+    weave.log_call(
+        op=f"claude_code.tool.{tool_name}",
+        inputs=sanitized_input,
+        output=output,
+        attributes={
+            "tool_name": tool_name,
+            "tool_use_id": tool_use_id,
+            "duration_ms": duration_ms,
+        },
+        display_name=tool_display,
+        parent=parent,
+        use_stack=False,
     )
 
 
