@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Daemon process for Claude Code Weave tracing.
 
+Note: File backup timestamp filtering was removed in favor of messageId-based
+linking from session_parser. See diff_view.py for the same fix.
+
 This daemon:
 1. Listens on a Unix socket for hook events
 2. Tails the session JSONL file for real-time data
@@ -114,15 +117,13 @@ class SubagentTracker:
 
 @dataclass
 class InlineParentTracker:
-    """Tracks inline parent calls (Skill, PlanMode) through their lifecycle.
+    """Tracks PlanMode through its lifecycle.
 
-    These are tools that create a parent container for subsequent tool calls,
+    PlanMode creates a parent container for subsequent tool calls during planning,
     similar to subagents but without a separate transcript file.
     """
 
     tool_use_id: str
-    parent_type: str  # "skill" or "plan_mode"
-    name: str  # skill name or "PlanMode"
     parent_turn_call_id: str
     detected_at: datetime
     call_id: str | None = None  # Set when activated (first turn detected)
@@ -134,14 +135,12 @@ class InlineParentTracker:
 
     @property
     def op_name(self) -> str:
-        """The Weave op name for this inline parent type."""
-        return f"claude_code.{self.parent_type}"
+        """The Weave op name for PlanMode."""
+        return "claude_code.plan_mode"
 
     @property
     def display_name(self) -> str:
         """The display name for the Weave call."""
-        if self.parent_type == "skill":
-            return f"Skill: {self.name}"
         return "PlanMode"
 
 
@@ -180,7 +179,7 @@ class WeaveDaemon:
         # Secondary index: agent_id (known once file found, for SubagentStop lookup)
         self._subagent_by_agent_id: dict[str, SubagentTracker] = {}
 
-        # Inline parent tracking (Skill, PlanMode)
+        # Inline parent tracking (PlanMode only)
         # Only one inline parent can be active at a time
         self._pending_inline_parent: InlineParentTracker | None = None
 
@@ -657,14 +656,7 @@ class WeaveDaemon:
         # Process remaining lines from session file to capture turn data
         await self._process_session_file()
 
-        # Finish active skill inline parent if present
-        # (PlanMode is finished by ExitPlanMode, not Stop)
-        if (
-            self._pending_inline_parent
-            and self._pending_inline_parent.is_active
-            and self._pending_inline_parent.parent_type == "skill"
-        ):
-            await self._finish_inline_parent()
+        # Note: PlanMode inline parents are finished by ExitPlanMode, not Stop
 
         # Finish current turn if open
         if self.current_turn_call_id:
@@ -1229,8 +1221,8 @@ class WeaveDaemon:
         if not user_text.strip():
             return
 
-        # Check for pending inline parent (Skill or PlanMode) that needs activation
-        # The first user message after detecting the tool is the inline parent's "first turn"
+        # Check for pending PlanMode that needs activation
+        # The first user message after detecting EnterPlanMode is the plan's "first turn"
         if self._pending_inline_parent and not self._pending_inline_parent.is_active:
             # This user message is the inline parent's first turn - activate it
             await self._activate_inline_parent(user_text)
@@ -1337,25 +1329,10 @@ class WeaveDaemon:
                     logger.debug(f"Subagent detected: tool_id={tool_id}, will scan for file")
                     continue
 
-                # Handle Skill tool - creates inline parent container
-                if tool_name == "Skill":
-                    skill_name = tool_input.get("skill", "unknown")
-                    self._pending_inline_parent = InlineParentTracker(
-                        tool_use_id=tool_id,
-                        parent_type="skill",
-                        name=skill_name,
-                        parent_turn_call_id=self.current_turn_call_id,
-                        detected_at=datetime.now(timezone.utc),
-                    )
-                    logger.debug(f"Skill detected: {skill_name}, waiting for first turn")
-                    continue
-
                 # Handle EnterPlanMode tool - creates inline parent container
                 if tool_name == "EnterPlanMode":
                     self._pending_inline_parent = InlineParentTracker(
                         tool_use_id=tool_id,
-                        parent_type="plan_mode",
-                        name="PlanMode",
                         parent_turn_call_id=self.current_turn_call_id,
                         detected_at=datetime.now(timezone.utc),
                     )
@@ -1364,11 +1341,7 @@ class WeaveDaemon:
 
                 # Handle ExitPlanMode tool - finishes plan mode inline parent
                 if tool_name == "ExitPlanMode":
-                    if (
-                        self._pending_inline_parent
-                        and self._pending_inline_parent.is_active
-                        and self._pending_inline_parent.parent_type == "plan_mode"
-                    ):
+                    if self._pending_inline_parent and self._pending_inline_parent.is_active:
                         # Capture plan from ExitPlanMode input for output
                         plan = tool_input.get("plan")
                         await self._finish_inline_parent(
@@ -1493,24 +1466,13 @@ class WeaveDaemon:
                 logger.debug(f"Detected trailing question: {pending_q[:50]}...")
 
             # Load file backups as Content objects
-            # Include all backups from file-history-snapshot events during this turn's window
+            # Backups are already linked to turns via messageId in session_parser,
+            # so we trust that association rather than timestamp filtering
             from weave.type_wrappers.Content.content import Content
             file_snapshots: dict[str, Content] = {}
 
             if turn.file_backups and session:
-                turn_start = turn.started_at()
-                # Get next turn's start time as upper bound
-                next_turn_start = None
-                if turn_index + 1 < len(session.turns):
-                    next_turn_start = session.turns[turn_index + 1].started_at()
-
                 for fb in turn.file_backups:
-                    # Only include backups created during this turn's window
-                    if fb.backup_time < turn_start:
-                        continue  # Backup from before this turn
-                    if next_turn_start and fb.backup_time >= next_turn_start:
-                        continue  # Backup from a later turn
-
                     content = fb.load_content(session.session_id)
                     if content:
                         file_snapshots[fb.file_path] = content
@@ -1584,7 +1546,7 @@ class WeaveDaemon:
                 continue
 
             # Skip special tools handled elsewhere
-            if tool_name in ("Skill", "EnterPlanMode", "ExitPlanMode", "AskUserQuestion"):
+            if tool_name in ("EnterPlanMode", "ExitPlanMode", "AskUserQuestion"):
                 continue
 
             # Sanitize input - truncate large values
@@ -1637,10 +1599,10 @@ class WeaveDaemon:
         self._pending_tool_calls.clear()
 
     async def _activate_inline_parent(self, prompt: str) -> None:
-        """Activate a pending inline parent (Skill or PlanMode) with its first turn content.
+        """Activate a pending PlanMode with its first turn content.
 
-        This creates the Weave call for the inline parent, making it the active
-        container for subsequent tool calls.
+        This creates the Weave call for the PlanMode, making it the active
+        container for subsequent tool calls during planning.
         """
         if not self._pending_inline_parent or not self.weave_client:
             return
@@ -1663,12 +1625,10 @@ class WeaveDaemon:
         inline_parent_call = self.weave_client.create_call(
             op=tracker.op_name,
             inputs={
-                "name": tracker.name,
                 "prompt": truncate(prompt, 2000),
             },
             parent=parent_turn,
             display_name=tracker.display_name,
-            attributes={"parent_type": tracker.parent_type},
             use_stack=False,
         )
 
