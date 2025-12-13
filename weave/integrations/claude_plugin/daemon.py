@@ -196,6 +196,10 @@ class WeaveDaemon:
         # Tool calls already logged in real-time (to avoid duplicate logging at turn finish)
         self._logged_tool_call_ids: set[str] = set()
 
+        # Pending Skill tool calls: tool_use_id -> (skill_name, started_at)
+        # Used to detect skill expansions and attach them to the Skill call
+        self._pending_skill_calls: dict[str, tuple[str, datetime]] = {}
+
         # Subagent file snapshots to aggregate into parent turn
         # Maps turn_call_id -> {file_path -> Content}
         self._subagent_file_snapshots: dict[str, dict[str, Any]] = {}
@@ -1221,6 +1225,12 @@ class WeaveDaemon:
         if not user_text.strip():
             return
 
+        # Check for skill expansion - don't create new turn for these
+        # Skill expansions start with "Base directory for this skill:"
+        if self._pending_skill_calls and user_text.strip().startswith("Base directory for this skill:"):
+            await self._handle_skill_expansion(user_text)
+            return
+
         # Check for pending PlanMode that needs activation
         # The first user message after detecting EnterPlanMode is the plan's "first turn"
         if self._pending_inline_parent and not self._pending_inline_parent.is_active:
@@ -1348,6 +1358,22 @@ class WeaveDaemon:
                             output={"plan": plan} if plan else {}
                         )
                         logger.debug("ExitPlanMode: finished plan mode inline parent")
+                    continue
+
+                # Handle Skill tool - track for skill expansion detection
+                if tool_name == "Skill":
+                    skill = tool_input.get("skill", "unknown")
+                    self._pending_skill_calls[tool_id] = (skill, datetime.now(timezone.utc))
+                    logger.debug(f"Skill tool detected: {skill} ({tool_id})")
+                    # Don't track as pending tool call - handled specially
+                    continue
+
+                # Handle SlashCommand tool - similar to Skill
+                if tool_name == "SlashCommand":
+                    command = tool_input.get("command", "unknown")
+                    # Track as skill expansion (slash commands expand similarly)
+                    self._pending_skill_calls[tool_id] = (command, datetime.now(timezone.utc))
+                    logger.debug(f"SlashCommand tool detected: {command} ({tool_id})")
                     continue
 
                 # Handle AskUserQuestion tool - creates Q&A sub-call
@@ -1546,7 +1572,7 @@ class WeaveDaemon:
                 continue
 
             # Skip special tools handled elsewhere
-            if tool_name in ("EnterPlanMode", "ExitPlanMode", "AskUserQuestion"):
+            if tool_name in ("EnterPlanMode", "ExitPlanMode", "AskUserQuestion", "Skill", "SlashCommand"):
                 continue
 
             # Sanitize input - truncate large values
@@ -1597,6 +1623,71 @@ class WeaveDaemon:
         self._current_turn_tool_calls = []
         self._logged_tool_call_ids.clear()
         self._pending_tool_calls.clear()
+
+    async def _handle_skill_expansion(self, skill_content: str) -> None:
+        """Handle a skill expansion message - log Skill tool call without creating new turn.
+
+        Skill expansions are sent as user messages but should be attached to the
+        Skill tool call that triggered them, not create a new turn.
+
+        Args:
+            skill_content: The skill expansion content (markdown documentation)
+        """
+        if not self.weave_client or not self.current_turn_call_id:
+            self._pending_skill_calls.clear()
+            return
+
+        from weave.trace.call import Call
+
+        # Reconstruct turn call as parent
+        turn_call = Call(
+            _op_name="",
+            project_id=self.weave_client._project_id(),
+            trace_id=self.trace_id,
+            parent_id=self.session_call_id,
+            inputs={},
+            id=self.current_turn_call_id,
+        )
+
+        # Log each pending skill call with its expansion
+        for tool_id, (skill_name, started_at) in self._pending_skill_calls.items():
+            # Calculate duration
+            ended_at = datetime.now(timezone.utc)
+            duration_ms = int((ended_at - started_at).total_seconds() * 1000)
+
+            # Determine tool type from skill_name (Skill vs SlashCommand)
+            is_slash_command = skill_name.startswith("/")
+            tool_type = "SlashCommand" if is_slash_command else "Skill"
+            display_name = f"{tool_type}: {skill_name}"
+
+            weave.log_call(
+                op=f"claude_code.tool.{tool_type}",
+                inputs={"skill": skill_name} if not is_slash_command else {"command": skill_name},
+                output={"result": truncate(skill_content, 10000)},
+                attributes={
+                    "tool_name": tool_type,
+                    "tool_use_id": tool_id,
+                    "duration_ms": duration_ms,
+                },
+                display_name=display_name,
+                parent=turn_call,
+                use_stack=False,
+            )
+
+            # Update counts
+            self.tool_counts[tool_type] = self.tool_counts.get(tool_type, 0) + 1
+            self.total_tool_calls += 1
+
+            # Mark as logged to avoid duplicate logging at turn finish
+            self._logged_tool_call_ids.add(tool_id)
+
+            logger.debug(f"Logged skill expansion: {display_name}")
+
+        # Clear pending skills
+        self._pending_skill_calls.clear()
+
+        # Flush to ensure calls are sent
+        self.weave_client.flush()
 
     async def _activate_inline_parent(self, prompt: str) -> None:
         """Activate a pending PlanMode with its first turn content.
