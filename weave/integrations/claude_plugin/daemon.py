@@ -1050,13 +1050,12 @@ class WeaveDaemon:
                             except Exception as e:
                                 logger.debug(f"Failed to attach file {file_path}: {e}")
 
-                # Store file snapshots on summary (not output)
-                # Initialize summary if needed, preserving any existing values
+                # Store file snapshots on attributes (rich objects like Content work there)
                 if file_snapshots_list:
-                    if session_call.summary is None:
-                        session_call.summary = {}
-                    session_call.summary["file_snapshots"] = file_snapshots_list
-                    logger.debug(f"Attached {len(file_snapshots_list)} file snapshots to summary")
+                    if session_call.attributes is None:
+                        session_call.attributes = {}
+                    session_call.attributes["file_snapshots"] = file_snapshots_list
+                    logger.debug(f"Attached {len(file_snapshots_list)} file snapshots to attributes")
 
             self.weave_client.finish_call(session_call, output=output)
             self.weave_client.flush()
