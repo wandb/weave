@@ -75,6 +75,7 @@ from weave.integrations.claude_plugin.socket_client import get_socket_path
 from weave.integrations.claude_plugin.state import StateManager
 from weave.integrations.claude_plugin.utils import (
     generate_session_name,
+    get_git_info,
     get_tool_display_name,
     get_turn_display_name,
     truncate,
@@ -1007,6 +1008,47 @@ class WeaveDaemon:
                     logger.debug(f"Attached session file: {self.transcript_path.name}")
                 except Exception as e:
                     logger.debug(f"Failed to attach session file: {e}")
+
+                # Capture git info for teleport feature
+                if session and session.cwd:
+                    git_info = get_git_info(session.cwd)
+                    if git_info:
+                        output["git"] = git_info
+                        logger.debug(f"Attached git info: branch={git_info.get('branch')}")
+
+                    # Capture final state of all changed files
+                    all_changed = session.get_all_changed_files()
+                    if all_changed:
+                        file_snapshots = output.get("file_snapshots", {})
+                        cwd_path = Path(session.cwd)
+                        for file_path in all_changed:
+                            try:
+                                # Handle both absolute and relative paths
+                                if Path(file_path).is_absolute():
+                                    abs_path = Path(file_path)
+                                    # Compute relative path for storage key
+                                    try:
+                                        rel_path = abs_path.relative_to(cwd_path)
+                                    except ValueError:
+                                        rel_path = abs_path.name
+                                else:
+                                    rel_path = file_path
+                                    abs_path = cwd_path / file_path
+
+                                if abs_path.exists():
+                                    file_content = Content.from_path(
+                                        abs_path,
+                                        metadata={
+                                            "original_path": str(file_path),
+                                            "relative_path": str(rel_path),
+                                        },
+                                    )
+                                    file_snapshots[str(rel_path)] = file_content
+                                    logger.debug(f"Attached file snapshot: {rel_path}")
+                            except Exception as e:
+                                logger.debug(f"Failed to attach file {file_path}: {e}")
+                        output["file_snapshots"] = file_snapshots
+                        logger.debug(f"Attached {len(all_changed)} file snapshots for teleport")
 
             self.weave_client.finish_call(session_call, output=output)
             self.weave_client.flush()
