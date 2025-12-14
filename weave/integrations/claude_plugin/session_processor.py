@@ -354,3 +354,85 @@ class SessionProcessor:
                 extension="html",
                 mimetype="text/html",
             )
+
+    def finish_session_call(
+        self,
+        session_call: Any,
+        session: Any,
+        sessions_dir: Path,
+        *,
+        end_reason: str | None = None,
+        extra_summary: dict[str, Any] | None = None,
+    ) -> None:
+        """Finish session call with summary, file snapshots, and diff view.
+
+        Args:
+            session_call: The call to finish (may be reconstructed)
+            session: Parsed session data
+            sessions_dir: Directory containing session files (for subagent lookup)
+            end_reason: Optional reason (e.g., "user_exit", "timeout")
+            extra_summary: Additional summary fields (compaction_count, redacted_secrets)
+        """
+        # Build summary
+        usage = session.total_usage()
+        model = session.primary_model()
+
+        summary: dict[str, Any] = {
+            "turn_count": len(session.turns),
+            "tool_call_count": session.total_tool_calls(),
+            "tool_call_breakdown": session.tool_call_counts(),
+            "duration_ms": session.duration_ms(),
+            "model": model,
+        }
+        if model and usage:
+            summary["usage"] = {model: usage.to_weave_usage()}
+        if end_reason:
+            summary["end_reason"] = end_reason
+        if extra_summary:
+            summary.update(extra_summary)
+
+        # Collect file snapshots
+        output: dict[str, Any] = {}
+        file_snapshots = self._collect_session_file_snapshots(session, sessions_dir)
+        if file_snapshots:
+            output["file_snapshots"] = file_snapshots
+
+        # Set summary before attaching view
+        session_call.summary = summary
+
+        # Attach diff view
+        self._attach_session_diff_view(session_call, session, sessions_dir)
+
+        # Finish
+        self.client.finish_call(session_call, output=output)
+
+    def _attach_session_diff_view(
+        self,
+        session_call: Any,
+        session: Any,
+        sessions_dir: Path,
+    ) -> None:
+        """Generate and attach session-level diff HTML view."""
+        from weave.integrations.claude_plugin.diff_view import (
+            generate_session_diff_html,
+        )
+
+        # Try file-history-based diff
+        diff_html = generate_session_diff_html(
+            session,
+            cwd=session.cwd,
+            sessions_dir=sessions_dir,
+            project=self.project,
+        )
+
+        # TODO: Add fallback to Edit data in future enhancement
+
+        if diff_html:
+            set_call_view(
+                call=session_call,
+                client=self.client,
+                name="file_changes",
+                content=diff_html,
+                extension="html",
+                mimetype="text/html",
+            )

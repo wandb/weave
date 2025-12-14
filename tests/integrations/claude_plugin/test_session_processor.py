@@ -381,3 +381,78 @@ class TestFinishTurnCall:
         )
 
         assert result is None
+
+
+class TestFinishSessionCall:
+    """Test SessionProcessor.finish_session_call()."""
+
+    def test_finish_session_call_builds_summary(self):
+        """Verify finish_session_call builds correct summary structure."""
+        from weave.integrations.claude_plugin.session_processor import SessionProcessor
+
+        mock_client = MagicMock()
+        processor = SessionProcessor(client=mock_client, project="entity/project")
+
+        mock_session_call = MagicMock()
+        mock_session = MagicMock()
+        mock_session.session_id = "session-123"
+        mock_session.turns = []
+        mock_session.total_tool_calls.return_value = 5
+        mock_session.tool_call_counts.return_value = {"Read": 3, "Edit": 2}
+        mock_session.duration_ms.return_value = 10000
+        mock_session.primary_model.return_value = "claude-3"
+        mock_session.total_usage.return_value = None
+        mock_session.cwd = None
+        mock_session.get_all_changed_files.return_value = []
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            sessions_dir = Path(tmpdir)
+
+            processor.finish_session_call(
+                session_call=mock_session_call,
+                session=mock_session,
+                sessions_dir=sessions_dir,
+            )
+
+        # Verify summary was set
+        assert mock_session_call.summary is not None
+        summary = mock_session_call.summary
+        assert summary["turn_count"] == 0
+        assert summary["tool_call_count"] == 5
+        assert summary["tool_call_breakdown"] == {"Read": 3, "Edit": 2}
+
+        # Verify finish_call was called
+        mock_client.finish_call.assert_called_once()
+
+    def test_finish_session_call_with_extra_summary(self):
+        """Verify extra_summary fields are merged."""
+        from weave.integrations.claude_plugin.session_processor import SessionProcessor
+
+        mock_client = MagicMock()
+        processor = SessionProcessor(client=mock_client, project="entity/project")
+
+        mock_session_call = MagicMock()
+        mock_session = MagicMock()
+        mock_session.session_id = "session-123"
+        mock_session.turns = []
+        mock_session.total_tool_calls.return_value = 0
+        mock_session.tool_call_counts.return_value = {}
+        mock_session.duration_ms.return_value = 1000
+        mock_session.primary_model.return_value = "claude-3"
+        mock_session.total_usage.return_value = None
+        mock_session.cwd = None
+        mock_session.get_all_changed_files.return_value = []
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            sessions_dir = Path(tmpdir)
+
+            processor.finish_session_call(
+                session_call=mock_session_call,
+                session=mock_session,
+                sessions_dir=sessions_dir,
+                extra_summary={"compaction_count": 2, "redacted_secrets": 5},
+            )
+
+        summary = mock_session_call.summary
+        assert summary["compaction_count"] == 2
+        assert summary["redacted_secrets"] == 5
