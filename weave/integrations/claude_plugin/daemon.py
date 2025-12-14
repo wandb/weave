@@ -1094,8 +1094,23 @@ class WeaveDaemon:
 
             # Set summary on call object before finishing (finish_call deep-merges call.summary)
             session_call.summary = session_summary
+            logger.debug(f"Calling finish_call for session {self.session_call_id}")
+            logger.debug(f"Session output keys: {list(session_output.keys())}")
+            logger.debug(f"Session summary keys: {list(session_summary.keys())}")
             self.weave_client.finish_call(session_call, output=session_output)
+            logger.debug("finish_call completed, calling flush")
+
+            # Log pending jobs before flush
+            if hasattr(self.weave_client, '_get_pending_jobs'):
+                jobs = self.weave_client._get_pending_jobs()
+                logger.debug(f"Pending jobs before flush: {jobs}")
+
             self.weave_client.flush()
+
+            # Log pending jobs after flush
+            if hasattr(self.weave_client, '_get_pending_jobs'):
+                jobs = self.weave_client._get_pending_jobs()
+                logger.debug(f"Pending jobs after flush: {jobs}")
 
             logger.info(f"Finished session call: {self.session_call_id}")
 
