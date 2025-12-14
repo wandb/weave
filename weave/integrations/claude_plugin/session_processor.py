@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any
 
 from weave.integrations.claude_plugin.utils import (
     generate_session_name,
+    get_turn_display_name,
     truncate,
 )
 
@@ -86,6 +87,56 @@ class SessionProcessor:
                 "git_branch": git_branch,
                 "source": f"claude-code-{self.source}",
             },
+            display_name=display_name,
+            use_stack=False,
+        )
+
+    def create_turn_call(
+        self,
+        parent: Any,
+        turn_number: int,
+        user_message: str,
+        *,
+        pending_question: str | None = None,
+        images: list[Any] | None = None,
+        is_compacted: bool = False,
+    ) -> Any:
+        """Create a turn call as child of session.
+
+        Args:
+            parent: Session call (or reconstructed call with trace_id)
+            turn_number: 1-based turn number
+            user_message: The user's prompt
+            pending_question: Question from previous turn (for Q&A context)
+            images: Image Content objects from user message
+            is_compacted: True if this is a context compaction turn
+
+        Returns:
+            Created Call object
+        """
+        inputs: dict[str, Any] = {
+            "user_message": truncate(user_message, 5000),
+        }
+        if images:
+            inputs["images"] = images
+        if pending_question:
+            inputs["in_response_to"] = pending_question
+
+        display_name = (
+            f"Turn {turn_number}: Compacted, resuming..."
+            if is_compacted
+            else get_turn_display_name(turn_number, user_message)
+        )
+
+        attributes: dict[str, Any] = {"turn_number": turn_number}
+        if is_compacted:
+            attributes["compacted"] = True
+
+        return self.client.create_call(
+            op="claude_code.turn",
+            inputs=inputs,
+            parent=parent,
+            attributes=attributes,
             display_name=display_name,
             use_stack=False,
         )

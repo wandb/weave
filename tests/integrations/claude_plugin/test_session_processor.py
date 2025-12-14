@@ -101,3 +101,69 @@ class TestCreateSessionCall:
 
         call_kwargs = mock_client.create_call.call_args.kwargs
         assert call_kwargs["attributes"]["source"] == "claude-code-import"
+
+
+class TestCreateTurnCall:
+    """Test SessionProcessor.create_turn_call()."""
+
+    def test_create_turn_call_basic(self):
+        """Verify create_turn_call creates turn with correct structure."""
+        from weave.integrations.claude_plugin.session_processor import SessionProcessor
+
+        mock_client = MagicMock()
+        mock_client.create_call.return_value = MagicMock()
+        mock_parent = MagicMock()
+
+        processor = SessionProcessor(client=mock_client, project="entity/project")
+
+        processor.create_turn_call(
+            parent=mock_parent,
+            turn_number=1,
+            user_message="Help me fix this bug",
+        )
+
+        call_kwargs = mock_client.create_call.call_args.kwargs
+        assert call_kwargs["op"] == "claude_code.turn"
+        assert call_kwargs["parent"] is mock_parent
+        assert call_kwargs["inputs"]["user_message"] == "Help me fix this bug"
+        assert call_kwargs["attributes"]["turn_number"] == 1
+        assert "Turn 1:" in call_kwargs["display_name"]
+
+    def test_create_turn_call_with_pending_question(self):
+        """Verify pending_question is added to inputs."""
+        from weave.integrations.claude_plugin.session_processor import SessionProcessor
+
+        mock_client = MagicMock()
+        mock_client.create_call.return_value = MagicMock()
+
+        processor = SessionProcessor(client=mock_client, project="entity/project")
+
+        processor.create_turn_call(
+            parent=MagicMock(),
+            turn_number=2,
+            user_message="Yes, use TypeScript",
+            pending_question="Which language should I use?",
+        )
+
+        call_kwargs = mock_client.create_call.call_args.kwargs
+        assert call_kwargs["inputs"]["in_response_to"] == "Which language should I use?"
+
+    def test_create_turn_call_compacted(self):
+        """Verify compacted turns get special display name."""
+        from weave.integrations.claude_plugin.session_processor import SessionProcessor
+
+        mock_client = MagicMock()
+        mock_client.create_call.return_value = MagicMock()
+
+        processor = SessionProcessor(client=mock_client, project="entity/project")
+
+        processor.create_turn_call(
+            parent=MagicMock(),
+            turn_number=5,
+            user_message="This session is being continued...",
+            is_compacted=True,
+        )
+
+        call_kwargs = mock_client.create_call.call_args.kwargs
+        assert "Compacted" in call_kwargs["display_name"]
+        assert call_kwargs["attributes"]["compacted"] is True
