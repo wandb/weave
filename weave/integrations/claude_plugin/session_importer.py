@@ -27,14 +27,18 @@ import logging
 import re
 import time
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import weave
 from weave.trace.context.weave_client_context import require_weave_client
 
 from .diff_utils import extract_edit_data_from_raw_messages
 from .session_parser import Session, parse_session_file
+from .state import load_session as get_session_state
 from .utils import generate_session_name, log_tool_call, reconstruct_call
+
+if TYPE_CHECKING:
+    from .cli_output import ImportResult
 
 logger = logging.getLogger(__name__)
 
@@ -299,6 +303,132 @@ def _import_session_to_weave(
     )
 
     return len(session.turns), total_tool_calls, calls_created
+
+
+def init_weave_quiet(project: str) -> None:
+    """Initialize Weave without verbose output.
+
+    Args:
+        project: Weave project in "entity/project" format
+    """
+    weave.init(project)
+
+
+def import_session_with_result(
+    session_path: Path,
+    dry_run: bool = False,
+    use_ollama: bool = True,
+) -> "ImportResult":
+    """Import a single session file and return structured result.
+
+    Args:
+        session_path: Path to the session JSONL file
+        dry_run: If True, show what would be imported without importing
+        use_ollama: Whether to use Ollama for generating display names
+
+    Returns:
+        ImportResult with session details and success/error status
+    """
+    from .cli_output import ImportResult
+
+    try:
+        session = parse_session_file(session_path)
+        if not session:
+            return ImportResult(
+                session_name=session_path.name,
+                session_id="",
+                turns=0,
+                tool_calls=0,
+                weave_calls=0,
+                tokens=0,
+                display_name="",
+                success=False,
+                error="Failed to parse session file",
+            )
+
+        if not session.turns:
+            return ImportResult(
+                session_name=session_path.name,
+                session_id=session.session_id,
+                turns=0,
+                tool_calls=0,
+                weave_calls=0,
+                tokens=0,
+                display_name="",
+                success=False,
+                error="No turns found in session",
+            )
+
+        # Check if session is currently being traced by daemon (active session)
+        session_state = get_session_state(session.session_id)
+        if session_state and not session_state.get("session_ended"):
+            return ImportResult(
+                session_name=session_path.name,
+                session_id=session.session_id,
+                turns=len(session.turns),
+                tool_calls=session.total_tool_calls(),
+                weave_calls=0,
+                tokens=session.total_usage().total(),
+                display_name="",
+                success=False,
+                error="Session is currently active (being traced by daemon)",
+            )
+
+        turns = len(session.turns)
+        tool_calls = session.total_tool_calls()
+        usage = session.total_usage()
+
+        # Generate display name
+        first_prompt = session.first_user_prompt()
+        if use_ollama and first_prompt:
+            display_name, _ = generate_session_name(first_prompt)
+        else:
+            display_name = session.session_id
+
+        if dry_run:
+            # Estimate calls: 1 session + turns + tool_calls
+            calls = 1 + turns + tool_calls
+            return ImportResult(
+                session_name=session_path.name,
+                session_id=session.session_id,
+                turns=turns,
+                tool_calls=tool_calls,
+                weave_calls=calls,
+                tokens=usage.total(),
+                display_name=display_name,
+                success=True,
+            )
+        else:
+            # Actually import using weave.log_call()
+            turns, tool_calls, calls = _import_session_to_weave(
+                session,
+                session_file_path=session_path,
+                use_ollama=use_ollama,
+            )
+            return ImportResult(
+                session_name=session_path.name,
+                session_id=session.session_id,
+                turns=turns,
+                tool_calls=tool_calls,
+                weave_calls=calls,
+                tokens=usage.total(),
+                display_name=display_name,
+                success=True,
+            )
+
+    except Exception as e:
+        logger.debug(f"Error importing {session_path.name}: {e}")
+        return ImportResult(
+            session_name=session_path.name,
+            session_id="",
+            turns=0,
+            tool_calls=0,
+            weave_calls=0,
+            tokens=0,
+            display_name="",
+            success=False,
+            error=str(e),
+        )
 
 
 def import_session(
