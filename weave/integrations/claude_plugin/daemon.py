@@ -63,6 +63,16 @@ def setup_logging(session_id: str | None = None) -> logging.Logger:
                 logging.Formatter("%(asctime)s [%(name)s] %(levelname)s: %(message)s")
             )
             logger.addHandler(file_handler)
+
+            # Also capture weave.trace warnings/errors (batch processor, future executor)
+            # These are critical for debugging session sync issues like validation errors
+            weave_trace_handler = logging.FileHandler(log_path, mode="a")
+            weave_trace_handler.setFormatter(
+                logging.Formatter("%(asctime)s [%(name)s] %(levelname)s: %(message)s")
+            )
+            weave_trace_handler.setLevel(logging.WARNING)  # Only WARNING+ to avoid noise
+            logging.getLogger("weave.trace").addHandler(weave_trace_handler)
+
             # Log the session start marker for easy identification
             logger.info(f"=== Daemon started for session {session_id} ===")
         except Exception:
@@ -1003,8 +1013,13 @@ class WeaveDaemon:
                 if session:
                     # Add aggregated usage from session
                     total_usage = session.total_usage()
-                    session_summary["model"] = session.primary_model()
-                    session_summary["usage"] = total_usage.to_weave_usage()
+                    model_name = session.primary_model()
+                    session_summary["model"] = model_name
+                    # Usage in summary must be model-keyed for Weave schema
+                    if model_name and total_usage:
+                        session_summary["usage"] = {
+                            model_name: total_usage.to_weave_usage()
+                        }
                     session_summary["duration_ms"] = session.duration_ms()
 
                     # Get cwd from session for resolving relative paths

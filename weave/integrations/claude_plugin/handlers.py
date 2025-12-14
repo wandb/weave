@@ -779,8 +779,13 @@ def handle_session_end(payload: dict[str, Any], project: str) -> dict[str, Any] 
 
         if session:
             total_usage = session.total_usage()
-            session_summary["model"] = session.primary_model()
-            session_summary["usage"] = total_usage.to_weave_usage()
+            model_name = session.primary_model()
+            session_summary["model"] = model_name
+            # Usage in summary must be model-keyed for Weave schema
+            if model_name and total_usage:
+                session_summary["usage"] = {
+                    model_name: total_usage.to_weave_usage()
+                }
             session_summary["duration_ms"] = session.duration_ms()
 
         # Parse session for diff view and attach session file
