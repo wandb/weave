@@ -116,6 +116,7 @@ from weave.integrations.claude_plugin.diff_view import (
     generate_session_diff_html,
     generate_turn_diff_html,
 )
+from weave.integrations.claude_plugin.secret_scanner import get_secret_scanner
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
@@ -244,6 +245,9 @@ class WeaveDaemon:
 
         # Compaction tracking - count how many times context was compacted
         self.compaction_count: int = 0
+
+        # Track redacted secrets count
+        self._redacted_count: int = 0
 
     async def start(self) -> None:
         """Start the daemon."""
@@ -1001,6 +1005,7 @@ class WeaveDaemon:
                 "tool_call_count": self.total_tool_calls,
                 "tool_call_breakdown": self.tool_counts,
                 "end_reason": payload.get("reason", "unknown"),
+                "redacted_secrets": self._redacted_count,
             }
 
             # Include compaction count if any compactions occurred
@@ -1008,6 +1013,7 @@ class WeaveDaemon:
                 session_summary["compaction_count"] = self.compaction_count
 
             # Parse session for additional data and diff view
+            diff_html: str | None = None  # Will be set if session has file changes
             if self.transcript_path and self.transcript_path.exists():
                 session = parse_session_file(self.transcript_path)
                 if session:
@@ -1028,19 +1034,13 @@ class WeaveDaemon:
                     sessions_dir = self.transcript_path.parent
 
                     # Generate session-level diff view showing all file changes
+                    # NOTE: Defer set_call_view until after session_call.summary is assigned
+                    # to avoid the summary assignment overwriting the views
                     diff_html = generate_session_diff_html(
                         session, cwd=cwd, sessions_dir=sessions_dir, project=self.project
                     )
                     if diff_html:
-                        set_call_view(
-                            call=session_call,
-                            client=self.weave_client,
-                            name="file_changes",
-                            content=diff_html,
-                            extension="html",
-                            mimetype="text/html",
-                        )
-                        logger.debug("Attached session diff HTML view")
+                        logger.debug("Generated session diff HTML view (will attach after summary assignment)")
                     else:
                         logger.debug("No session diff HTML generated (no file changes)")
 
@@ -1066,6 +1066,11 @@ class WeaveDaemon:
                             "relative_path": "session.jsonl",
                         },
                     )
+                    # Scan session content for secrets
+                    scanner = get_secret_scanner()
+                    if scanner:
+                        session_content, count = scanner.scan_content(session_content)
+                        self._redacted_count += count
                     file_snapshots_list.append(session_content)
                     logger.debug(f"Attached session file: {self.transcript_path.name}")
                 except Exception as e:
@@ -1097,6 +1102,11 @@ class WeaveDaemon:
                                             "relative_path": str(rel_path),
                                         },
                                     )
+                                    # Scan file content for secrets
+                                    scanner = get_secret_scanner()
+                                    if scanner:
+                                        file_content, count = scanner.scan_content(file_content)
+                                        self._redacted_count += count
                                     file_snapshots_list.append(file_content)
                                     logger.debug(f"Attached file snapshot: {rel_path}")
                             except Exception as e:
@@ -1109,6 +1119,19 @@ class WeaveDaemon:
 
             # Set summary on call object before finishing (finish_call deep-merges call.summary)
             session_call.summary = session_summary
+
+            # Attach HTML view AFTER summary assignment to avoid being overwritten
+            if diff_html:
+                set_call_view(
+                    call=session_call,
+                    client=self.weave_client,
+                    name="file_changes",
+                    content=diff_html,
+                    extension="html",
+                    mimetype="text/html",
+                )
+                logger.debug("Attached session diff HTML view to summary.weave.views")
+
             logger.debug(f"Calling finish_call for session {self.session_call_id}")
             logger.debug(f"Session output keys: {list(session_output.keys())}")
             logger.debug(f"Session summary keys: {list(session_summary.keys())}")
