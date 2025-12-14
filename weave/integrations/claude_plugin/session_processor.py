@@ -14,6 +14,7 @@ from weave.integrations.claude_plugin.utils import (
     get_turn_display_name,
     truncate,
 )
+from weave.type_wrappers.Content.content import Content
 
 if TYPE_CHECKING:
     from weave.trace.weave_client import WeaveClient
@@ -160,4 +161,68 @@ class SessionProcessor:
             content = fb.load_content(session_id)
             if content:
                 snapshots.append(content)
+        return snapshots
+
+    def _collect_session_file_snapshots(
+        self,
+        session: Any,
+        sessions_dir: Path,
+    ) -> list[Any]:
+        """Collect file snapshots for session output.
+
+        Includes:
+        - Session JSONL file itself
+        - Final state of all changed files (from disk)
+
+        Args:
+            session: Session object with session_id, cwd, get_all_changed_files()
+            sessions_dir: Directory containing session files
+
+        Returns:
+            List of Content objects
+        """
+        snapshots: list[Any] = []
+
+        # Add session JSONL file
+        session_file = sessions_dir / f"{session.session_id}.jsonl"
+        if session_file.exists():
+            try:
+                content = Content.from_path(
+                    session_file,
+                    metadata={
+                        "session_id": session.session_id,
+                        "filename": session_file.name,
+                        "relative_path": "session.jsonl",
+                    },
+                )
+                snapshots.append(content)
+            except Exception:
+                pass
+
+        # Add final state of changed files
+        if session.cwd:
+            cwd_path = Path(session.cwd)
+            for file_path in session.get_all_changed_files():
+                try:
+                    abs_path = Path(file_path)
+                    if not abs_path.is_absolute():
+                        abs_path = cwd_path / file_path
+
+                    if abs_path.exists():
+                        try:
+                            rel_path = abs_path.relative_to(cwd_path)
+                        except ValueError:
+                            rel_path = Path(abs_path.name)
+
+                        content = Content.from_path(
+                            abs_path,
+                            metadata={
+                                "original_path": str(file_path),
+                                "relative_path": str(rel_path),
+                            },
+                        )
+                        snapshots.append(content)
+                except Exception:
+                    pass
+
         return snapshots

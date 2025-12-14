@@ -215,3 +215,52 @@ class TestFileSnapshotCollection:
 
         assert len(result) == 1
         assert result[0] is mock_content
+
+    def test_collect_session_file_snapshots_includes_session_file(self):
+        """Verify session JSONL file is included."""
+        from weave.integrations.claude_plugin.session_processor import SessionProcessor
+
+        mock_client = MagicMock()
+        processor = SessionProcessor(client=mock_client, project="entity/project")
+
+        # Create temp directory with session file
+        with tempfile.TemporaryDirectory() as tmpdir:
+            sessions_dir = Path(tmpdir)
+            session_file = sessions_dir / "session-123.jsonl"
+            session_file.write_text('{"type": "test"}')
+
+            mock_session = MagicMock()
+            mock_session.session_id = "session-123"
+            mock_session.cwd = None
+            mock_session.get_all_changed_files.return_value = []
+
+            result = processor._collect_session_file_snapshots(mock_session, sessions_dir)
+
+            # Should have at least the session file
+            assert len(result) >= 1
+
+    def test_collect_session_file_snapshots_includes_changed_files(self):
+        """Verify changed files from disk are included."""
+        from weave.integrations.claude_plugin.session_processor import SessionProcessor
+
+        mock_client = MagicMock()
+        processor = SessionProcessor(client=mock_client, project="entity/project")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            sessions_dir = Path(tmpdir)
+            cwd = Path(tmpdir) / "project"
+            cwd.mkdir()
+
+            # Create a "changed" file
+            changed_file = cwd / "test.py"
+            changed_file.write_text("print('hello')")
+
+            mock_session = MagicMock()
+            mock_session.session_id = "session-123"
+            mock_session.cwd = str(cwd)
+            mock_session.get_all_changed_files.return_value = ["test.py"]
+
+            result = processor._collect_session_file_snapshots(mock_session, sessions_dir)
+
+            # Should include the changed file
+            assert len(result) >= 1
