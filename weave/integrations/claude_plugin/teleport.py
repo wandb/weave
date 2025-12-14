@@ -156,7 +156,8 @@ def _get_content_bytes(content: Any) -> bytes:
             except Exception:
                 return data.encode("utf-8")
         return data if isinstance(data, bytes) else b""
-    return content.to_bytes()
+    # Content objects store bytes in the .data attribute
+    return content.data
 
 
 def restore_files(
@@ -250,8 +251,9 @@ def fetch_session_from_weave(
     import weave
     from weave.trace.context.weave_client_context import require_weave_client
 
-    # Suppress init messages - we control output in CLI commands
-    weave.init(project, settings={"log_level": "WARNING"})
+    # Suppress init messages - set env var before init so logger is configured with WARNING level
+    os.environ["WEAVE_LOG_LEVEL"] = "WARNING"
+    weave.init(project)
     client = require_weave_client()
 
     # Query calls with session_id in attributes (more efficient than inputs)
