@@ -695,6 +695,13 @@ def handle_subagent_stop(payload: dict[str, Any], project: str) -> dict[str, Any
         total_usage = agent_session.total_usage()
         model = agent_session.primary_model()
 
+        # Get last assistant response as output
+        final_response = None
+        if agent_session.turns:
+            last_turn = agent_session.turns[-1]
+            if last_turn.assistant_messages:
+                final_response = last_turn.assistant_messages[-1].get_text()
+
         # Set summary (metadata)
         subagent_call.summary = {
             "turn_count": len(agent_session.turns),
@@ -704,8 +711,11 @@ def handle_subagent_stop(payload: dict[str, Any], project: str) -> dict[str, Any
         if model and total_usage:
             subagent_call.summary["usage"] = {model: total_usage.to_weave_usage()}
 
-        # Finish the subagent call with empty output (no actual results to return)
-        client.finish_call(subagent_call, output={})
+        # Finish the subagent call with last assistant response as output
+        output = {}
+        if final_response:
+            output["response"] = truncate(final_response, 10000)
+        client.finish_call(subagent_call, output=output)
 
         client.flush()
 
