@@ -511,6 +511,12 @@ def parse_session_file(path: Path) -> Session | None:
                         "agentId": obj.get("agentId"),
                         "isSidechain": obj.get("isSidechain", False),
                     }
+                elif session_info:
+                    # Update fields that may have been None in the first message
+                    if not session_info.get("cwd") and obj.get("cwd"):
+                        session_info["cwd"] = obj.get("cwd")
+                    if not session_info.get("gitBranch") and obj.get("gitBranch"):
+                        session_info["gitBranch"] = obj.get("gitBranch")
 
                 messages.append(obj)
             except json.JSONDecodeError:

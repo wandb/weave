@@ -899,8 +899,10 @@ def handle_session_end(payload: dict[str, Any], project: str) -> dict[str, Any] 
         # Finish the session call
         client.finish_call(session_call, output=session_output)
 
-        # Clean up state
-        state.delete_session(session_id)
+        # Mark session as ended (cleanup happens automatically after RETENTION_DAYS)
+        # Don't delete state here - session may be resumed with --continue
+        session_data["session_ended"] = True
+        state.save_session(session_id, session_data)
 
         client.flush()
         logger.debug(f"SessionEnd: finished session {session_id}")

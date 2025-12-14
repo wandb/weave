@@ -1155,9 +1155,13 @@ class WeaveDaemon:
 
             logger.info(f"Finished session call: {self.session_call_id}")
 
-        # Clean up state
+        # Update state timestamp (cleanup happens automatically after RETENTION_DAYS)
+        # Don't delete state here - session may be resumed with --continue
         with StateManager() as state:
-            state.delete_session(self.session_id)
+            session_data = state.get_session(self.session_id)
+            if session_data:
+                session_data["session_ended"] = True
+                state.save_session(self.session_id, session_data)
 
         # Trigger shutdown
         self.running = False

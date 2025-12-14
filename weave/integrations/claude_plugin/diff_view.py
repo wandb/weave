@@ -12,9 +12,12 @@ Supports two modes for diff views:
 from __future__ import annotations
 
 import difflib
+import logging
 import re
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from weave.integrations.claude_plugin.session_parser import FileBackup, Session, Turn
@@ -164,6 +167,7 @@ def generate_turn_diff_html(
     from weave.integrations.claude_plugin.session_parser import FileBackup
 
     if not turn.file_backups:
+        logger.debug("generate_turn_diff_html: no file_backups in turn")
         return None
 
     # Build map of current turn's file -> latest backup (state BEFORE edits)
@@ -172,13 +176,17 @@ def generate_turn_diff_html(
     current_backups: dict[str, FileBackup] = {}
     for fb in turn.file_backups:
         if not fb.backup_filename:
+            logger.debug(f"generate_turn_diff_html: skipping {fb.file_path} - no backup_filename")
             continue
         existing = current_backups.get(fb.file_path)
         if not existing or fb.version > existing.version:
             current_backups[fb.file_path] = fb
 
     if not current_backups:
+        logger.debug("generate_turn_diff_html: no current_backups after filtering")
         return None
+
+    logger.debug(f"generate_turn_diff_html: processing {len(current_backups)} files, cwd={cwd}")
 
     # In historic mode, build map of previous turns' file -> latest backup before this turn
     prev_backups: dict[str, FileBackup] = {}
@@ -295,6 +303,7 @@ def generate_turn_diff_html(
                         disk_path = Path(cwd) / file_path
                     else:
                         # No cwd available, skip relative path
+                        logger.debug(f"generate_turn_diff_html: skipping {file_path} - relative path and no cwd")
                         continue
                 if not disk_path.exists():
                     # File was deleted - show as removal
@@ -362,12 +371,16 @@ def generate_turn_diff_html(
                             "removed": removed,
                         }
                     )
-            except Exception:
+            except Exception as e:
                 # Can't read file from disk, skip
+                logger.debug(f"generate_turn_diff_html: error reading {file_path}: {e}")
                 continue
 
     if not file_diffs:
+        logger.debug(f"generate_turn_diff_html: no file_diffs generated for {len(current_backups)} files")
         return None
+
+    logger.debug(f"generate_turn_diff_html: generated diff for {len(file_diffs)} files")
 
     # Build HTML
     html_parts: list[str] = []

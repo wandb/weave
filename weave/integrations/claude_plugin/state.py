@@ -25,7 +25,7 @@ STATE_FILE = STATE_DIR / "claude-plugin.json"
 LOCK_FILE = STATE_DIR / "claude-plugin.lock"
 
 # Cleanup entries older than this
-RETENTION_DAYS = 30
+RETENTION_DAYS = 7
 
 
 def _now_iso() -> str:
