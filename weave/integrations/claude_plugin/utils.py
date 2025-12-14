@@ -14,6 +14,8 @@ from typing import Any
 from urllib.parse import urlparse
 
 import weave
+from weave.trace.context.weave_client_context import require_weave_client
+from weave.trace.view_utils import set_call_view
 
 logger = logging.getLogger(__name__)
 
@@ -252,6 +254,8 @@ def log_tool_call(
     This is the single source of truth for tool call logging format.
     All tool calls (daemon, handlers, real-time, turn finish) should use this.
 
+    For TodoWrite calls, also attaches an HTML view showing the todo list state.
+
     Args:
         tool_name: Name of the tool (e.g., "Read", "Grep", "Bash")
         tool_input: Tool input parameters
@@ -271,7 +275,7 @@ def log_tool_call(
     # Build output dict
     output = {"result": truncate(tool_output, max_output_length)} if tool_output else None
 
-    weave.log_call(
+    call = weave.log_call(
         op=f"claude_code.tool.{tool_name}",
         inputs=sanitized_input,
         output=output,
@@ -284,6 +288,27 @@ def log_tool_call(
         parent=parent,
         use_stack=False,
     )
+
+    # Attach HTML view for TodoWrite calls
+    if tool_name == "TodoWrite":
+        try:
+            from weave.integrations.claude_plugin.diff_view import generate_todo_html
+
+            todos = tool_input.get("todos", [])
+            if todos:
+                html = generate_todo_html(todos)
+                if html:
+                    client = require_weave_client()
+                    set_call_view(
+                        call=call,
+                        client=client,
+                        name="todos",
+                        content=html,
+                        extension="html",
+                        mimetype="text/html",
+                    )
+        except Exception as e:
+            logger.debug(f"Failed to attach todo HTML view: {e}")
 
 
 def _generate_session_name_claude(user_prompt: str) -> str | None:

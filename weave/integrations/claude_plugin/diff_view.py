@@ -1,9 +1,10 @@
 """Diff view generation for Claude Code file changes.
 
 This module provides GitHub-style diff HTML generation for visualizing
-file changes made during Claude Code turns.
+file changes made during Claude Code turns, as well as HTML views for
+TodoWrite tool calls.
 
-Supports two modes:
+Supports two modes for diff views:
 - Live mode (default): Compare file backup to current disk state
 - Historic mode: Compare file backup to previous turn's backup
 """
@@ -802,6 +803,157 @@ def generate_session_diff_html(
     html_parts.append("try{hljs.highlightElement(el)}catch(e){}});});")
     html_parts.append("</script>")
 
+    html_parts.append("</body></html>")
+
+    return "".join(html_parts)
+
+
+# Inline CSS for GitHub-style todo view (matches diff view styling)
+TODO_HTML_STYLES = """
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+.todo-view{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:14px;line-height:1.5;color:#1f2328;background:#fff;max-height:100vh;overflow:auto}
+.todo-header{padding:16px 20px;background:linear-gradient(180deg,#f6f8fa 0%,#eaeef2 100%);border-bottom:1px solid #d1d9e0}
+.todo-title{font-size:16px;font-weight:600;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.todo-title svg{width:18px;height:18px;fill:#656d76}
+.todo-stats{font-size:13px;color:#656d76;margin-bottom:12px}
+.todo-stats .completed{color:#1a7f37;font-weight:600}
+.todo-stats .in-progress{color:#9a6700;font-weight:600}
+.todo-stats .pending{color:#656d76;font-weight:600}
+.progress-bar{height:8px;background:#e1e4e8;border-radius:4px;overflow:hidden;display:flex}
+.progress-completed{background:#1a7f37;transition:width 0.3s ease}
+.progress-in-progress{background:#bf8700;transition:width 0.3s ease}
+.todo-list{padding:16px 20px}
+.todo-item{display:flex;align-items:flex-start;padding:10px 12px;border:1px solid #d1d9e0;border-radius:6px;margin-bottom:8px;background:#fff}
+.todo-item:last-child{margin-bottom:0}
+.todo-item.completed{background:#f6fef9;border-color:#aceebb}
+.todo-item.in-progress{background:#fffbeb;border-color:#f9e2af}
+.todo-checkbox{width:20px;height:20px;border-radius:4px;border:2px solid #d1d9e0;margin-right:12px;flex-shrink:0;display:flex;align-items:center;justify-content:center;margin-top:1px}
+.todo-item.completed .todo-checkbox{background:#1a7f37;border-color:#1a7f37}
+.todo-item.completed .todo-checkbox svg{display:block}
+.todo-item.in-progress .todo-checkbox{border-color:#bf8700;background:#fff}
+.todo-checkbox svg{display:none;width:12px;height:12px;fill:#fff}
+.todo-item.in-progress .todo-checkbox::after{content:'';width:8px;height:8px;background:#bf8700;border-radius:50%;animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}
+.todo-content{flex:1;min-width:0}
+.todo-text{color:#1f2328;word-wrap:break-word}
+.todo-item.completed .todo-text{color:#656d76;text-decoration:line-through}
+.todo-status{font-size:11px;font-weight:500;padding:2px 8px;border-radius:12px;margin-left:8px;white-space:nowrap}
+.todo-item.completed .todo-status{background:#dafbe1;color:#1a7f37}
+.todo-item.in-progress .todo-status{background:#fff8c5;color:#9a6700}
+.todo-item.pending .todo-status{background:#f6f8fa;color:#656d76}
+</style>
+"""
+
+
+def generate_todo_html(todos: list[dict[str, str]]) -> str:
+    """Generate HTML showing todo list state with GitHub-style styling.
+
+    Creates a clean task list view matching the diff view aesthetic with:
+    - Progress bar showing completion status
+    - Checkboxes with visual state indicators
+    - Color-coded items by status
+
+    Args:
+        todos: List of todo items, each with keys:
+            - content: The todo text
+            - status: One of "pending", "in_progress", "completed"
+            - activeForm: Present tense description (optional)
+
+    Returns:
+        HTML string with todo view
+    """
+    if not todos:
+        return ""
+
+    # Count by status
+    completed = sum(1 for t in todos if t.get("status") == "completed")
+    in_progress = sum(1 for t in todos if t.get("status") == "in_progress")
+    pending = len(todos) - completed - in_progress
+
+    # Calculate progress percentages
+    total = len(todos)
+    completed_pct = (completed / total * 100) if total > 0 else 0
+    in_progress_pct = (in_progress / total * 100) if total > 0 else 0
+
+    html_parts: list[str] = []
+
+    # Document start with styles
+    html_parts.append("<!DOCTYPE html>")
+    html_parts.append('<html lang="en"><head>')
+    html_parts.append('<meta charset="utf-8">')
+    html_parts.append(
+        '<meta name="viewport" content="width=device-width,initial-scale=1">'
+    )
+    html_parts.append(TODO_HTML_STYLES)
+    html_parts.append("</head><body>")
+
+    # Main container
+    html_parts.append('<div class="todo-view">')
+
+    # Header with stats
+    html_parts.append('<div class="todo-header">')
+    html_parts.append('<div class="todo-title">')
+    # Checklist icon SVG
+    html_parts.append(
+        '<svg viewBox="0 0 16 16"><path fill-rule="evenodd" d="M2.5 1.75a.25.25 0 01.25-.25h8.5a.25.25 0 01.25.25v7.736a.75.75 0 101.5 0V1.75A1.75 1.75 0 0011.25 0h-8.5A1.75 1.75 0 001 1.75v11.5c0 .966.784 1.75 1.75 1.75h3.17a.75.75 0 000-1.5H2.75a.25.25 0 01-.25-.25V1.75zM4.75 4a.75.75 0 000 1.5h4.5a.75.75 0 000-1.5h-4.5zM4 7.75A.75.75 0 014.75 7h2a.75.75 0 010 1.5h-2A.75.75 0 014 7.75zm11.774 3.537a.75.75 0 00-1.048-1.074l-4.226 4.12-1.685-1.642a.75.75 0 00-1.047 1.073l2.208 2.153a.75.75 0 001.048.001l4.75-4.631z"></path></svg>'
+    )
+    html_parts.append("Task Progress</div>")
+
+    # Stats line
+    html_parts.append('<div class="todo-stats">')
+    html_parts.append(f'<span class="completed">{completed} completed</span>')
+    if in_progress > 0:
+        html_parts.append(f' · <span class="in-progress">{in_progress} in progress</span>')
+    if pending > 0:
+        html_parts.append(f' · <span class="pending">{pending} pending</span>')
+    html_parts.append(f" · {total} total")
+    html_parts.append("</div>")
+
+    # Progress bar
+    html_parts.append('<div class="progress-bar">')
+    html_parts.append(
+        f'<div class="progress-completed" style="width:{completed_pct:.1f}%"></div>'
+    )
+    html_parts.append(
+        f'<div class="progress-in-progress" style="width:{in_progress_pct:.1f}%"></div>'
+    )
+    html_parts.append("</div>")
+
+    html_parts.append("</div>")  # Close header
+
+    # Todo list
+    html_parts.append('<div class="todo-list">')
+
+    for todo in todos:
+        status = todo.get("status", "pending")
+        content = todo.get("content", "")
+
+        html_parts.append(f'<div class="todo-item {status}">')
+
+        # Checkbox
+        html_parts.append('<div class="todo-checkbox">')
+        # Checkmark SVG (only visible for completed)
+        html_parts.append(
+            '<svg viewBox="0 0 12 12"><path fill-rule="evenodd" d="M10.28 2.28a.75.75 0 00-1.06-1.06L4.5 5.94 2.78 4.22a.75.75 0 00-1.06 1.06l2.25 2.25a.75.75 0 001.06 0l5.25-5.25z"></path></svg>'
+        )
+        html_parts.append("</div>")
+
+        # Content
+        html_parts.append('<div class="todo-content">')
+        html_parts.append(f'<span class="todo-text">{_html_escape(content)}</span>')
+        html_parts.append("</div>")
+
+        # Status badge
+        status_label = status.replace("_", " ").title()
+        if status == "in_progress":
+            status_label = "In Progress"
+        html_parts.append(f'<span class="todo-status">{status_label}</span>')
+
+        html_parts.append("</div>")  # Close todo-item
+
+    html_parts.append("</div>")  # Close todo-list
+    html_parts.append("</div>")  # Close todo-view
     html_parts.append("</body></html>")
 
     return "".join(html_parts)
