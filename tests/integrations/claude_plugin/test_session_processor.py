@@ -2,6 +2,9 @@
 
 import pytest
 from unittest.mock import MagicMock
+from pathlib import Path
+import tempfile
+import os
 
 
 class TestSessionProcessorInit:
@@ -167,3 +170,48 @@ class TestCreateTurnCall:
         call_kwargs = mock_client.create_call.call_args.kwargs
         assert "Compacted" in call_kwargs["display_name"]
         assert call_kwargs["attributes"]["compacted"] is True
+
+
+class TestFileSnapshotCollection:
+    """Test SessionProcessor file snapshot helpers."""
+
+    def test_collect_turn_file_snapshots(self):
+        """Verify _collect_turn_file_snapshots returns Content objects."""
+        from weave.integrations.claude_plugin.session_processor import SessionProcessor
+        from weave.integrations.claude_plugin.session_parser import Turn, FileBackup
+
+        mock_client = MagicMock()
+        processor = SessionProcessor(client=mock_client, project="entity/project")
+
+        # Create mock turn with file backups
+        mock_turn = MagicMock(spec=Turn)
+        mock_fb = MagicMock(spec=FileBackup)
+        mock_content = MagicMock()
+        mock_fb.load_content.return_value = mock_content
+        mock_turn.file_backups = [mock_fb]
+
+        result = processor._collect_turn_file_snapshots(mock_turn, "session-123")
+
+        assert len(result) == 1
+        assert result[0] is mock_content
+        mock_fb.load_content.assert_called_once_with("session-123")
+
+    def test_collect_turn_file_snapshots_skips_failed_loads(self):
+        """Verify None results from load_content are skipped."""
+        from weave.integrations.claude_plugin.session_processor import SessionProcessor
+
+        mock_client = MagicMock()
+        processor = SessionProcessor(client=mock_client, project="entity/project")
+
+        mock_turn = MagicMock()
+        mock_fb1 = MagicMock()
+        mock_fb1.load_content.return_value = None  # Failed load
+        mock_fb2 = MagicMock()
+        mock_content = MagicMock()
+        mock_fb2.load_content.return_value = mock_content
+        mock_turn.file_backups = [mock_fb1, mock_fb2]
+
+        result = processor._collect_turn_file_snapshots(mock_turn, "session-123")
+
+        assert len(result) == 1
+        assert result[0] is mock_content

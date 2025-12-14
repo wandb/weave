@@ -140,3 +140,24 @@ class SessionProcessor:
             display_name=display_name,
             use_stack=False,
         )
+
+    def _collect_turn_file_snapshots(
+        self,
+        turn: Any,
+        session_id: str,
+    ) -> list[Any]:
+        """Collect file backup snapshots for a turn.
+
+        Args:
+            turn: Turn object with file_backups
+            session_id: Session ID for loading backups
+
+        Returns:
+            List of Content objects
+        """
+        snapshots: list[Any] = []
+        for fb in turn.file_backups:
+            content = fb.load_content(session_id)
+            if content:
+                snapshots.append(content)
+        return snapshots
