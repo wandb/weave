@@ -65,6 +65,11 @@ from weave.integrations.claude_plugin.utils import (
 from weave.integrations.claude_plugin.diff_view import (
     generate_turn_diff_html,
 )
+from weave.integrations.claude_plugin.session_importer import (
+    discover_session_files,
+    import_session,
+    import_sessions,
+)
 from weave.integrations.claude_plugin.socket_client import (
     DaemonClient,
     ensure_daemon_running,
@@ -107,4 +112,8 @@ __all__ = [
     "DaemonClient",
     "ensure_daemon_running",
     "get_socket_path",
+    # Session importer
+    "discover_session_files",
+    "import_session",
+    "import_sessions",
 ]

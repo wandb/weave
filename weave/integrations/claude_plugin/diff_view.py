@@ -188,15 +188,16 @@ def generate_turn_diff_html(
 
     logger.debug(f"generate_turn_diff_html: processing {len(current_backups)} files, cwd={cwd}")
 
-    # In historic mode, build map of previous turns' file -> latest backup before this turn
+    # Build map of previous turns' file -> latest backup before this turn
+    # This is needed for both historic mode (to generate diffs) and live mode
+    # (to detect new files vs edited files)
     prev_backups: dict[str, FileBackup] = {}
-    if historic_mode:
-        for prev_turn in all_turns[:turn_index]:
-            for fb in prev_turn.file_backups:
-                if fb.backup_filename:
-                    existing = prev_backups.get(fb.file_path)
-                    if not existing or fb.version > existing.version:
-                        prev_backups[fb.file_path] = fb
+    for prev_turn in all_turns[:turn_index]:
+        for fb in prev_turn.file_backups:
+            if fb.backup_filename:
+                existing = prev_backups.get(fb.file_path)
+                if not existing or fb.version > existing.version:
+                    prev_backups[fb.file_path] = fb
 
     # Collect file diffs
     file_diffs: list[dict[str, Any]] = []
@@ -295,6 +296,9 @@ def generate_turn_diff_html(
                 )
         else:
             # Live mode: Compare backup (before) to current file on disk (after)
+            # For new files created with Write tool, the backup is the AFTER state,
+            # so we detect this by checking if there's no previous backup and
+            # the backup equals disk content.
             try:
                 disk_path = Path(file_path)
                 if not disk_path.is_absolute():
@@ -335,6 +339,29 @@ def generate_turn_diff_html(
                 current_lines = current_text.splitlines(keepends=True)
                 if current_lines and not current_lines[-1].endswith("\n"):
                     current_lines[-1] += "\n"
+
+                # Check if this is a NEW file created in this turn
+                # New files have no previous backup AND backup == disk content
+                # (because file-history captures the AFTER state for Write operations)
+                prev_fb = prev_backups.get(file_path)
+                is_new_file = prev_fb is None and backup_lines == current_lines
+
+                if is_new_file:
+                    # New file in this turn - show as new content
+                    total_added += len(current_lines)
+                    preview_lines = current_lines[:100]
+                    file_diffs.append(
+                        {
+                            "path": file_path,
+                            "lang": lang,
+                            "is_new": True,
+                            "content_lines": preview_lines,
+                            "total_lines": len(current_lines),
+                            "added": len(current_lines),
+                            "removed": 0,
+                        }
+                    )
+                    continue
 
                 # Generate diff: backup -> current
                 diff_lines = list(

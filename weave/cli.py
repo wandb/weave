@@ -4,6 +4,7 @@ Entry point for the weave command line interface.
 
 Usage:
     weave claude hook      # Handle Claude Code hook events (reads from stdin)
+    weave claude import    # Import historic Claude sessions into Weave
     weave claude teleport  # Teleport a Claude session to current machine
 """
 
@@ -110,6 +111,94 @@ def status() -> None:
 
     click.echo(f"  Effective: {'enabled' if status_info['effective'] else 'disabled'}")
     click.echo(f"  Project: {status_info['project'] or 'not set'}")
+
+
+@claude.command("import")
+@click.argument("path", type=click.Path(exists=True))
+@click.argument("project")
+@click.option(
+    "--full",
+    is_flag=True,
+    help="Import ALL sessions (default: most recent only)",
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    help="Show what would be imported without importing",
+)
+@click.option(
+    "--no-ollama",
+    is_flag=True,
+    help="Skip Ollama for display names",
+)
+@click.option(
+    "--verbose",
+    "-v",
+    is_flag=True,
+    help="Verbose output",
+)
+def import_sessions_cmd(
+    path: str,
+    project: str,
+    full: bool,
+    dry_run: bool,
+    no_ollama: bool,
+    verbose: bool,
+) -> None:
+    """Import historic Claude Code sessions into Weave.
+
+    PATH can be a single session .jsonl file or a directory containing sessions.
+    When given a directory, only UUID-named session files are imported (agent-*
+    files are skipped).
+
+    PROJECT should be in "entity/project" format (e.g., "myteam/claude-sessions").
+
+    By default, only the most recent session is imported. Use --full to import
+    all sessions in the directory.
+
+    Examples:
+
+        # Import most recent session from a directory
+        weave claude import ~/.claude/projects/myproject vanpelt/sessions
+
+        # Import a specific session file
+        weave claude import /path/to/session.jsonl vanpelt/sessions
+
+        # Import all sessions
+        weave claude import ~/.claude/projects/myproject vanpelt/sessions --full
+
+        # Dry run to see what would be imported
+        weave claude import ~/.claude/projects/myproject vanpelt/sessions --dry-run
+    """
+    import logging
+    from pathlib import Path
+
+    from weave.integrations.claude_plugin.session_importer import import_sessions
+
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
+
+    try:
+        summary = import_sessions(
+            path=Path(path),
+            project=project,
+            full=full,
+            dry_run=dry_run,
+            use_ollama=not no_ollama,
+            verbose=verbose,
+        )
+
+        if summary.get("traces_url"):
+            click.echo(f"\nView traces: {summary['traces_url']}")
+
+    except ValueError as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+    except Exception as e:
+        click.echo(f"Error: {e}", err=True)
+        if verbose:
+            import traceback
+            traceback.print_exc()
+        sys.exit(1)
 
 
 @claude.command()

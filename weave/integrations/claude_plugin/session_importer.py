@@ -1,34 +1,10 @@
-#!/usr/bin/env python
 """Import Claude Code session files into Weave as traces.
 
-This script converts Claude Code session JSONL files into Weave call traces,
-enabling rich analytics on your AI coding sessions.
-
-Usage:
-    # Import only the most recent session (default behavior)
-    python scripts/import_claude_sessions.py \
-        --project "vanpelt/claude-code-sessions" \
-        --sessions-dir ~/.claude/projects/-Users-vanpelt-Development-weave
-
-    # Import ALL sessions
-    python scripts/import_claude_sessions.py \
-        --project "vanpelt/claude-code-sessions" \
-        --sessions-dir ~/.claude/projects/-Users-vanpelt-Development-weave \
-        --full
-
-    # Import specific session files
-    python scripts/import_claude_sessions.py \
-        --project "vanpelt/claude-code-sessions" \
-        --files session1.jsonl session2.jsonl
-
-    # Dry run to see what would be imported
-    python scripts/import_claude_sessions.py \
-        --project "vanpelt/claude-code-sessions" \
-        --sessions-dir ~/.claude/projects/-Users-vanpelt-Development-weave \
-        --dry-run
+This module converts Claude Code session JSONL files into Weave call traces,
+enabling rich analytics on historic coding sessions.
 
 Trace Structure:
-    Session (trace root) - display_name from Ollama summarizer
+    Session (trace root) - display_name from summarizer
     ├── Turn 1: User prompt → Assistant response
     │   ├── Tool Call: Read
     │   ├── Tool Call: Grep
@@ -47,39 +23,21 @@ Each turn captures:
 
 from __future__ import annotations
 
-import argparse
-import datetime
 import logging
 import re
-import sys
 import time
 from pathlib import Path
 from typing import Any
-
-# Add weave to path if running from scripts directory
-sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import weave
 from weave.trace.context.weave_client_context import require_weave_client
 from weave.trace.view_utils import set_call_view
 from weave.type_wrappers.Content.content import Content
 
-# Import shared code from claude_plugin integration
-from weave.integrations.claude_plugin import (
-    FileBackup,
-    Session,
-    TokenUsage,
-    Turn,
-    generate_session_name,
-    generate_turn_diff_html,
-    get_tool_display_name,
-    is_system_message,
-    parse_session_file,
-    truncate,
-)
-from weave.integrations.claude_plugin.session_parser import CLAUDE_DIR
+from .diff_view import generate_turn_diff_html
+from .session_parser import Session, parse_session_file
+from .utils import generate_session_name, get_tool_display_name, truncate
 
-logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 
 # Regex to match UUID-style session filenames (not agent-xxxx files)
@@ -89,18 +47,43 @@ UUID_PATTERN = re.compile(
 )
 
 
-# ============================================================================
-# Weave Trace Creation using weave.log_call()
-# ============================================================================
+def is_uuid_filename(filename: str) -> bool:
+    """Check if filename matches UUID pattern (not agent-xxxx files)."""
+    return UUID_PATTERN.match(filename) is not None
 
 
-def import_session_to_weave(
+def discover_session_files(sessions_dir: Path, most_recent_only: bool = True) -> list[Path]:
+    """Find session files in a directory.
+
+    Only includes files with UUID-style names, filtering out agent-xxxx files.
+
+    Args:
+        sessions_dir: Directory to search
+        most_recent_only: If True, return only the most recently modified file
+
+    Returns:
+        List of session file paths, sorted by modification time (newest first)
+    """
+    files = [
+        f for f in sessions_dir.glob("*.jsonl")
+        if is_uuid_filename(f.name)
+    ]
+
+    # Sort by modification time, newest first
+    files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+
+    if most_recent_only and files:
+        return [files[0]]
+
+    return files
+
+
+def _import_session_to_weave(
     session: Session,
     session_file_path: Path,
     use_ollama: bool = True,
 ) -> tuple[int, int, int]:
-    """
-    Import a session using weave.log_call().
+    """Import a session using weave.log_call().
 
     Args:
         session: Parsed session data
@@ -111,7 +94,6 @@ def import_session_to_weave(
     """
     # Get the client for creating calls with summary views
     client = require_weave_client()
-    project_id = client._project_id()
 
     usage = session.total_usage()
     model = session.primary_model()
@@ -120,7 +102,7 @@ def import_session_to_weave(
     first_prompt = session.first_user_prompt()
     last_prompt = session.last_user_prompt()
 
-    # Generate display name using Ollama with the LAST prompt (more representative of session)
+    # Generate display name using Ollama with the LAST prompt (more representative)
     # Fall back to first prompt if last is empty
     prompt_for_naming = last_prompt or first_prompt
     if use_ollama and prompt_for_naming:
@@ -163,7 +145,6 @@ def import_session_to_weave(
         }
 
     # Create the session-level call (root of the trace)
-    # Use model + usage at top level for native Weave usage tracking
     session_call = weave.log_call(
         op="claude_code.session",
         inputs={
@@ -231,9 +212,6 @@ def import_session_to_weave(
             turn_output["file_snapshots"] = file_snapshots
 
         # Generate HTML diff view for this turn
-        # Note: enumerate is 1-based (i), but generate_turn_diff_html expects 0-based index
-        # Use historic_mode=True since we're importing old sessions and need to compare
-        # consecutive backups rather than backup vs current disk state
         diff_html = generate_turn_diff_html(
             turn=turn,
             turn_index=i - 1,  # Convert to 0-based
@@ -247,7 +225,7 @@ def import_session_to_weave(
             user_prompt=user_content,
         )
 
-        # Create turn call using create_call + finish_call to allow setting summary views
+        # Create turn call
         turn_call = client.create_call(
             op="claude_code.turn",
             inputs={
@@ -266,7 +244,6 @@ def import_session_to_weave(
 
         # Set summary with view content if we have diffs
         if diff_html:
-            # Use the official set_call_view utility to properly attach the view
             set_call_view(
                 call=turn_call,
                 client=client,
@@ -312,50 +289,17 @@ def import_session_to_weave(
     return len(session.turns), total_tool_calls, calls_created
 
 
-# ============================================================================
-# Main Import Logic
-# ============================================================================
-
-
-def is_uuid_filename(filename: str) -> bool:
-    """Check if filename matches UUID pattern (not agent-xxxx files)."""
-    return UUID_PATTERN.match(filename) is not None
-
-
-def discover_session_files(sessions_dir: Path, most_recent_only: bool = True) -> list[Path]:
-    """
-    Find session files in a directory.
-
-    Only includes files with UUID-style names, filtering out agent-xxxx files.
-
-    Args:
-        sessions_dir: Directory to search
-        most_recent_only: If True, return only the most recently modified file
-
-    Returns:
-        List of session file paths, sorted by modification time (newest first)
-    """
-    files = [
-        f for f in sessions_dir.glob("*.jsonl")
-        if is_uuid_filename(f.name)
-    ]
-
-    # Sort by modification time, newest first
-    files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
-
-    if most_recent_only and files:
-        return [files[0]]
-
-    return files
-
-
 def import_session(
     session_path: Path,
     dry_run: bool = False,
     use_ollama: bool = True,
 ) -> tuple[int, int, int]:
-    """
-    Import a single session file.
+    """Import a single session file.
+
+    Args:
+        session_path: Path to the session JSONL file
+        dry_run: If True, show what would be imported without importing
+        use_ollama: Whether to use Ollama for generating display names
 
     Returns: (turns, tool_calls, calls_created)
     """
@@ -373,7 +317,6 @@ def import_session(
 
     if dry_run:
         # Generate name even in dry run to show what would be used
-        # Use last prompt for naming (more representative of session)
         last_prompt = session.last_user_prompt()
         first_prompt = session.first_user_prompt()
         prompt_for_naming = last_prompt or first_prompt
@@ -397,7 +340,7 @@ def import_session(
         return turns, tool_calls, calls
     else:
         # Actually import using weave.log_call()
-        turns, tool_calls, calls = import_session_to_weave(
+        turns, tool_calls, calls = _import_session_to_weave(
             session,
             session_file_path=session_path,
             use_ollama=use_ollama,
@@ -411,85 +354,53 @@ def import_session(
         return turns, tool_calls, calls
 
 
-def main():
-    parser = argparse.ArgumentParser(
-        description="Import Claude Code sessions into Weave",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog=__doc__,
-    )
-    parser.add_argument(
-        "--project",
-        required=True,
-        help="Weave project (entity/project format)",
-    )
-    parser.add_argument(
-        "--sessions-dir",
-        type=Path,
-        help="Directory containing Claude session .jsonl files",
-    )
-    parser.add_argument(
-        "--files",
-        type=Path,
-        nargs="+",
-        help="Specific session files to import",
-    )
-    parser.add_argument(
-        "--full",
-        action="store_true",
-        help="Import ALL sessions (default: only most recent)",
-    )
-    parser.add_argument(
-        "--no-ollama",
-        action="store_true",
-        help="Skip Ollama summarizer for display names",
-    )
-    parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Parse and show what would be imported without actually importing",
-    )
-    parser.add_argument(
-        "--verbose",
-        "-v",
-        action="store_true",
-        help="Verbose output",
-    )
+def import_sessions(
+    path: Path,
+    project: str,
+    full: bool = False,
+    dry_run: bool = False,
+    use_ollama: bool = True,
+    verbose: bool = False,
+) -> dict[str, Any]:
+    """Import Claude Code sessions from a file or directory into Weave.
 
-    args = parser.parse_args()
+    Args:
+        path: Path to a session file or directory containing sessions
+        project: Weave project in "entity/project" format
+        full: If True and path is a directory, import all sessions (default: most recent only)
+        dry_run: If True, show what would be imported without importing
+        use_ollama: Whether to use Ollama for generating display names
+        verbose: If True, enable verbose logging
 
-    if args.verbose:
+    Returns:
+        Summary dict with import statistics
+    """
+    if verbose:
         logging.getLogger().setLevel(logging.DEBUG)
-
-    use_ollama = not args.no_ollama
 
     # Collect session files
     session_files: list[Path] = []
-    if args.files:
-        session_files = [p for p in args.files if p.exists()]
-    elif args.sessions_dir:
-        # Default: most recent only, unless --full is specified
-        session_files = discover_session_files(
-            args.sessions_dir,
-            most_recent_only=not args.full
-        )
+    if path.is_file():
+        session_files = [path]
+    elif path.is_dir():
+        session_files = discover_session_files(path, most_recent_only=not full)
     else:
-        parser.error("Either --sessions-dir or --files must be provided")
+        raise ValueError(f"Path does not exist: {path}")
 
     if not session_files:
-        logger.error("No session files found (only UUID-named files are imported, agent-* files are skipped)")
-        sys.exit(1)
+        raise ValueError("No session files found (only UUID-named files are imported, agent-* files are skipped)")
 
-    if args.full:
+    if full:
         logger.info(f"Found {len(session_files)} session files (--full mode, excluding agent-* files)")
     else:
         logger.info(f"Importing most recent session: {session_files[0].name}")
 
     # Initialize Weave
-    if args.dry_run:
-        logger.info(f"[DRY RUN] Would initialize Weave project: {args.project}")
+    if dry_run:
+        logger.info(f"[DRY RUN] Would initialize Weave project: {project}")
     else:
-        weave.init(args.project)
-        logger.info(f"Initialized Weave project: {args.project}")
+        weave.init(project)
+        logger.info(f"Initialized Weave project: {project}")
 
     # Import sessions
     total_turns = 0
@@ -506,7 +417,7 @@ def main():
 
             turns, tool_calls, calls = import_session(
                 session_path=session_path,
-                dry_run=args.dry_run,
+                dry_run=dry_run,
                 use_ollama=use_ollama,
             )
             if turns > 0:
@@ -516,16 +427,25 @@ def main():
                 imported += 1
 
             # Small delay between sessions in full mode to avoid overwhelming the API
-            if args.full and not args.dry_run and i < len(session_files) - 1:
+            if full and not dry_run and i < len(session_files) - 1:
                 time.sleep(0.5)
 
         except Exception as e:
             logger.error(f"Error importing {session_path.name}: {e}")
-            if args.verbose:
+            if verbose:
                 import traceback
                 traceback.print_exc()
 
-    # Summary
+    # Build summary
+    summary = {
+        "sessions_imported": imported,
+        "total_turns": total_turns,
+        "total_tool_calls": total_tool_calls,
+        "total_weave_calls": total_calls,
+        "total_tokens": total_tokens,
+    }
+
+    # Log summary
     logger.info("")
     logger.info("=" * 50)
     logger.info("Import Summary")
@@ -536,11 +456,11 @@ def main():
     logger.info(f"Total Weave calls: {total_calls}")
     logger.info(f"Total tokens: {total_tokens:,}")
 
-    if not args.dry_run and imported > 0:
-        entity, project = args.project.split("/", 1)
+    if not dry_run and imported > 0:
+        entity, proj = project.split("/", 1)
+        traces_url = f"https://wandb.ai/{entity}/{proj}/weave/traces"
+        summary["traces_url"] = traces_url
         logger.info("")
-        logger.info(f"View traces: https://wandb.ai/{entity}/{project}/weave/traces")
+        logger.info(f"View traces: {traces_url}")
 
-
-if __name__ == "__main__":
-    main()
+    return summary
