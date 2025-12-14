@@ -896,6 +896,277 @@ def generate_session_diff_html(
     return "".join(html_parts)
 
 
+def _build_file_diffs_from_edit_data(
+    edit_data_list: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Convert Edit tool data to file_diffs format used by renderers.
+
+    Aggregates multiple edits to same file, computes added/removed counts.
+
+    Args:
+        edit_data_list: List of dicts with file_path, original_file, structured_patch
+
+    Returns:
+        List of file_diff dicts in same format as generate_*_diff_html
+    """
+    from weave.integrations.claude_plugin.diff_utils import apply_structured_patch
+
+    # Aggregate by file path
+    by_file: dict[str, dict[str, Any]] = {}
+    for edit in edit_data_list:
+        file_path = edit.get("file_path")
+        if not file_path:
+            continue
+
+        if file_path not in by_file:
+            by_file[file_path] = {
+                "original": edit.get("original_file", ""),
+                "patches": [],
+            }
+        by_file[file_path]["patches"].append(edit.get("structured_patch", []))
+
+    # Build file_diffs
+    file_diffs = []
+    for file_path, data in sorted(by_file.items()):
+        original = data["original"]
+        current = original
+
+        # Apply all patches sequentially
+        for patch in data["patches"]:
+            if patch:
+                current = apply_structured_patch(current, patch)
+
+        # Generate unified diff
+        original_lines = original.splitlines(keepends=True)
+        current_lines = current.splitlines(keepends=True)
+
+        # Ensure trailing newlines
+        if original_lines and not original_lines[-1].endswith("\n"):
+            original_lines[-1] += "\n"
+        if current_lines and not current_lines[-1].endswith("\n"):
+            current_lines[-1] += "\n"
+
+        diff_lines = list(
+            difflib.unified_diff(
+                original_lines,
+                current_lines,
+                fromfile=f"a/{file_path}",
+                tofile=f"b/{file_path}",
+                n=3,
+            )
+        )
+
+        if diff_lines:
+            added = sum(
+                1 for l in diff_lines if l.startswith("+") and not l.startswith("+++")
+            )
+            removed = sum(
+                1 for l in diff_lines if l.startswith("-") and not l.startswith("---")
+            )
+
+            ext = Path(file_path).suffix.lower()
+            lang = EXT_TO_HLJS_LANG.get(ext, "plaintext")
+
+            file_diffs.append(
+                {
+                    "path": file_path,
+                    "lang": lang,
+                    "is_new": not original,
+                    "diff_lines": diff_lines[2:],  # Skip --- and +++ headers
+                    "added": added,
+                    "removed": removed,
+                }
+            )
+
+    return file_diffs
+
+
+def generate_diff_html_from_edit_data_for_turn(
+    turn: "Turn",
+    turn_number: int,
+    user_prompt: str | None = None,
+) -> str | None:
+    """Generate turn-level diff HTML from Edit tool data.
+
+    Fallback for when file-history-snapshot entries are unavailable.
+    Uses the SAME styling as generate_turn_diff_html() for visual consistency.
+
+    Args:
+        turn: Turn object with raw_messages containing Edit tool results
+        turn_number: 1-based turn number
+        user_prompt: User's prompt for display
+
+    Returns:
+        HTML string with diff view, or None if no Edit data found
+    """
+    from weave.integrations.claude_plugin.diff_utils import (
+        extract_edit_data_from_raw_messages,
+    )
+
+    if not turn.raw_messages:
+        return None
+
+    edit_data_list = extract_edit_data_from_raw_messages(turn.raw_messages)
+    if not edit_data_list:
+        return None
+
+    file_diffs = _build_file_diffs_from_edit_data(edit_data_list)
+    if not file_diffs:
+        return None
+
+    # Calculate totals
+    total_added = sum(fd["added"] for fd in file_diffs)
+    total_removed = sum(fd["removed"] for fd in file_diffs)
+
+    # Build HTML using same structure as generate_turn_diff_html
+    html_parts: list[str] = []
+
+    # Document start with styles
+    html_parts.append("<!DOCTYPE html>")
+    html_parts.append('<html lang="en"><head>')
+    html_parts.append('<meta charset="utf-8">')
+    html_parts.append(
+        '<meta name="viewport" content="width=device-width,initial-scale=1">'
+    )
+    html_parts.append(DIFF_HTML_STYLES)
+    html_parts.append(
+        '<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github.min.css">'
+    )
+    html_parts.append(
+        '<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>'
+    )
+    html_parts.append("</head><body>")
+
+    html_parts.append('<div class="diff-view">')
+
+    # User prompt bubble
+    if user_prompt:
+        display_prompt = (
+            user_prompt[:2000] + "..." if len(user_prompt) > 2000 else user_prompt
+        )
+        html_parts.append('<div class="prompt-section">')
+        html_parts.append('<div class="prompt-label">')
+        html_parts.append(
+            '<svg viewBox="0 0 16 16"><path fill-rule="evenodd" d="M10.5 5a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0zm.061 3.073a4 4 0 10-5.123 0 6.004 6.004 0 00-3.431 5.142.75.75 0 001.498.07 4.5 4.5 0 018.99 0 .75.75 0 101.498-.07 6.005 6.005 0 00-3.432-5.142z"></path></svg>'
+        )
+        html_parts.append("User Prompt</div>")
+        html_parts.append(
+            f'<div class="prompt-bubble">{_html_escape(display_prompt)}</div>'
+        )
+        html_parts.append("</div>")
+
+    # Header
+    tool_count = len(turn.all_tool_calls())
+    model = turn.primary_model() or "unknown"
+    html_parts.append('<div class="diff-header">')
+    html_parts.append(f'<div class="diff-title">File Changes for Turn {turn_number}</div>')
+    html_parts.append('<div class="diff-stats">')
+    html_parts.append(f"{len(file_diffs)} file{'s' if len(file_diffs) != 1 else ''}")
+    html_parts.append(f' <span class="add">+{total_added}</span>')
+    html_parts.append(f' <span class="del">−{total_removed}</span>')
+    html_parts.append(f" · {tool_count} tool call{'s' if tool_count != 1 else ''}")
+    html_parts.append(f" · {model}")
+    html_parts.append("</div></div>")
+
+    # Render file diffs using same structure as generate_turn_diff_html
+    for file_diff in file_diffs:
+        _render_file_diff_html(html_parts, file_diff)
+
+    html_parts.append("</div>")  # Close diff-view
+
+    # Initialize highlight.js
+    html_parts.append("<script>")
+    html_parts.append("document.addEventListener('DOMContentLoaded',()=>{")
+    html_parts.append("document.querySelectorAll('code[class*=language-]').forEach(el=>{")
+    html_parts.append("try{hljs.highlightElement(el)}catch(e){}});});")
+    html_parts.append("</script>")
+
+    html_parts.append("</body></html>")
+
+    return "".join(html_parts)
+
+
+def _render_file_diff_html(html_parts: list[str], file_diff: dict[str, Any]) -> None:
+    """Render a single file diff to HTML parts.
+
+    Shared helper for both turn and session diff rendering.
+    """
+    file_path = file_diff["path"]
+    lang = file_diff["lang"]
+    is_new = file_diff.get("is_new", False)
+
+    html_parts.append('<div class="diff-file">')
+
+    # File header
+    html_parts.append('<div class="file-header">')
+    html_parts.append(
+        '<svg class="file-icon" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M3.75 1.5a.25.25 0 00-.25.25v12.5c0 .138.112.25.25.25h9.5a.25.25 0 00.25-.25V4.664a.25.25 0 00-.073-.177l-2.914-2.914a.25.25 0 00-.177-.073H3.75zM2 1.75C2 .784 2.784 0 3.75 0h6.586c.464 0 .909.184 1.237.513l2.914 2.914c.329.328.513.773.513 1.237v9.586A1.75 1.75 0 0113.25 16h-9.5A1.75 1.75 0 012 14.25V1.75z"></path></svg>'
+    )
+    html_parts.append(f'<span class="file-name">{_html_escape(file_path)}</span>')
+    if is_new:
+        html_parts.append('<span class="file-badge new">NEW</span>')
+    html_parts.append("</div>")
+
+    # Diff content
+    html_parts.append('<div class="diff-table-wrap">')
+    html_parts.append('<table class="diff-table">')
+
+    diff_lines = file_diff.get("diff_lines", [])
+    old_line = 0
+    new_line = 0
+
+    for line in diff_lines:
+        line_text = line.rstrip("\n\r")
+
+        if line_text.startswith("@@"):
+            html_parts.append('<tr class="line-hunk">')
+            html_parts.append(f'<td colspan="4">{_html_escape(line_text)}</td>')
+            html_parts.append("</tr>")
+            match = re.search(r"@@ -(\d+)", line_text)
+            if match:
+                old_line = int(match.group(1)) - 1
+            match = re.search(r"\+(\d+)", line_text)
+            if match:
+                new_line = int(match.group(1)) - 1
+        elif line_text.startswith("+"):
+            new_line += 1
+            content = _html_escape(line_text[1:])
+            html_parts.append('<tr class="line-add">')
+            html_parts.append('<td class="line-num"></td>')
+            html_parts.append(f'<td class="line-num">{new_line}</td>')
+            html_parts.append('<td class="line-marker">+</td>')
+            html_parts.append(
+                f'<td class="line-content"><code class="language-{lang}">{content}</code></td>'
+            )
+            html_parts.append("</tr>")
+        elif line_text.startswith("-"):
+            old_line += 1
+            content = _html_escape(line_text[1:])
+            html_parts.append('<tr class="line-del">')
+            html_parts.append(f'<td class="line-num">{old_line}</td>')
+            html_parts.append('<td class="line-num"></td>')
+            html_parts.append('<td class="line-marker">−</td>')
+            html_parts.append(
+                f'<td class="line-content"><code class="language-{lang}">{content}</code></td>'
+            )
+            html_parts.append("</tr>")
+        else:
+            old_line += 1
+            new_line += 1
+            content = _html_escape(line_text[1:] if line_text else "")
+            html_parts.append('<tr class="line-ctx">')
+            html_parts.append(f'<td class="line-num">{old_line}</td>')
+            html_parts.append(f'<td class="line-num">{new_line}</td>')
+            html_parts.append('<td class="line-marker"></td>')
+            html_parts.append(
+                f'<td class="line-content"><code class="language-{lang}">{content}</code></td>'
+            )
+            html_parts.append("</tr>")
+
+    html_parts.append("</table></div>")
+    html_parts.append("</div>")  # Close diff-file
+
+
 # Inline CSS for GitHub-style todo view (matches diff view styling)
 TODO_HTML_STYLES = """
 <style>
