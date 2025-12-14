@@ -200,3 +200,62 @@ class TestContentScanning:
         )
         redacted, count = scanner.scan_content(content)
         assert redacted.metadata == metadata
+
+
+class TestIntegration:
+    """Integration tests for secret scanning in plugin flow."""
+
+    def test_session_transcript_redaction(self, tmp_path):
+        """Secrets in session.jsonl should be redacted."""
+        from weave.integrations.claude_plugin.secret_scanner import SecretScanner
+        from weave.type_wrappers.Content.content import Content
+
+        # Create a mock session.jsonl with secrets
+        session_file = tmp_path / "session.jsonl"
+        session_content = """{"type": "user", "message": "Set API key to sk-ant-abc123xyz789def456ghi"}
+{"type": "assistant", "message": "Done! I set OPENAI_API_KEY=sk-proj-xyz789abc123def456ghi012jkl"}
+"""
+        session_file.write_text(session_content)
+
+        # Load as Content and scan
+        content = Content.from_path(
+            session_file,
+            metadata={"relative_path": "session.jsonl"},
+        )
+
+        scanner = SecretScanner()
+        redacted, count = scanner.scan_content(content)
+
+        # Verify secrets were redacted
+        assert count >= 2
+        redacted_text = redacted.data.decode("utf-8")
+        assert "sk-ant" not in redacted_text
+        assert "sk-proj" not in redacted_text
+        assert "[REDACTED:" in redacted_text
+
+    def test_env_file_redaction(self, tmp_path):
+        """Secrets in .env files should be redacted."""
+        from weave.integrations.claude_plugin.secret_scanner import SecretScanner
+        from weave.type_wrappers.Content.content import Content
+
+        env_file = tmp_path / ".env"
+        env_file.write_text("""
+OPENAI_API_KEY=sk-proj-abc123xyz789def456ghi012jkl345
+ANTHROPIC_API_KEY=sk-ant-xyz789abc123def456ghi
+DATABASE_URL=postgres://localhost/mydb
+""")
+
+        content = Content.from_path(
+            env_file,
+            metadata={"relative_path": ".env"},
+        )
+
+        scanner = SecretScanner()
+        redacted, count = scanner.scan_content(content)
+
+        assert count >= 2
+        redacted_text = redacted.data.decode("utf-8")
+        assert "sk-proj" not in redacted_text
+        assert "sk-ant" not in redacted_text
+        # Non-secret should be preserved
+        assert "DATABASE_URL" in redacted_text
