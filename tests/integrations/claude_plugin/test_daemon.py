@@ -677,9 +677,13 @@ class TestSubagentFileBackups:
         call_args = daemon.weave_client.finish_call.call_args
         output = call_args.kwargs.get("output") or call_args[1].get("output", {})
 
-        # Should have file_snapshots
+        # Should have file_snapshots as a list
         assert "file_snapshots" in output, f"Expected file_snapshots in output, got: {output.keys()}"
-        assert "/tmp/test.py" in output["file_snapshots"]
+        file_snapshots = output["file_snapshots"]
+        assert isinstance(file_snapshots, list), f"Expected list, got {type(file_snapshots)}"
+        # Check that at least one Content object has the expected original_path
+        original_paths = [c.metadata.get("original_path") for c in file_snapshots if hasattr(c, "metadata")]
+        assert "/tmp/test.py" in original_paths, f"Expected /tmp/test.py in {original_paths}"
 
 
 class TestParentTurnAggregatesSubagentFileBackups:

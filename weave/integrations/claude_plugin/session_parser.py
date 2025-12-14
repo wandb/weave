@@ -237,6 +237,8 @@ class Turn:
     raw_messages: list[dict[str, Any]] = field(default_factory=list)
     # File backups associated with this turn (from file-history-snapshot)
     file_backups: list[FileBackup] = field(default_factory=list)
+    # Skill expansion content (from Skill tool call result)
+    skill_expansion: str | None = None
 
     def total_usage(self) -> TokenUsage:
         """Aggregate token usage across all assistant messages in this turn."""
@@ -323,6 +325,18 @@ def is_system_message(content: str) -> bool:
         return True
 
     return False
+
+
+def is_skill_expansion(content: str) -> bool:
+    """Check if a message is a skill expansion (not a new turn).
+
+    Skill expansions start with "Base directory for this skill:" and contain
+    the skill's documentation. They should be attached to the Skill tool call
+    that triggered them, not create a new turn.
+    """
+    if not content or not content.strip():
+        return False
+    return content.strip().startswith("Base directory for this skill:")
 
 
 @dataclass
@@ -573,14 +587,22 @@ def parse_session_file(path: Path) -> Session | None:
                         if tool_use_id in pending_tool_calls:
                             tc = pending_tool_calls[tool_use_id]
                             result_content = c.get("content", "")
+                            # Handle both string and list-format tool results
                             if isinstance(result_content, str):
                                 tc.result = result_content[:10000]
+                            elif isinstance(result_content, list):
+                                # List of content blocks - extract text from each
+                                text_parts_result = []
+                                for block in result_content:
+                                    if isinstance(block, dict) and block.get("type") == "text":
+                                        text_parts_result.append(block.get("text", ""))
+                                tc.result = "\n".join(text_parts_result)[:10000]
                             tc.result_timestamp = timestamp
                 user_content = "\n".join(text_parts)
 
             # Only create a new turn if there's actual user text content
-            # (not just tool results or empty messages)
-            if user_content.strip():
+            # (not just tool results, empty messages, system messages, or skill expansions)
+            if user_content.strip() and not is_system_message(user_content) and not is_skill_expansion(user_content):
                 if current_turn:
                     session.turns.append(current_turn)
                 current_turn = Turn(
@@ -593,8 +615,11 @@ def parse_session_file(path: Path) -> Session | None:
                     raw_messages=[msg],  # Start collecting raw payloads
                 )
             elif current_turn:
-                # Tool result messages belong to current turn
+                # Tool result messages and skill expansions belong to current turn
                 current_turn.raw_messages.append(msg)
+                # Store skill expansion content for later attachment to Skill tool call
+                if is_skill_expansion(user_content):
+                    current_turn.skill_expansion = user_content
 
         elif msg_type == "assistant":
             if not current_turn:

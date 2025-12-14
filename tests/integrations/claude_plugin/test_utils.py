@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from weave.integrations.claude_plugin.utils import (
+    extract_question_from_text,
     sanitize_tool_input,
     reconstruct_call,
     log_tool_call,
@@ -353,3 +354,123 @@ class TestGetGitInfo:
         assert result is not None
         # Remote should be present regardless of format
         assert result["remote"] is not None
+
+
+class TestExtractQuestionFromText:
+    """Tests for extract_question_from_text() function."""
+
+    def test_extracts_simple_question(self):
+        """Should extract up to and including the first question mark in last paragraph."""
+        text = "I can help you with that. What file would you like me to look at?"
+        result = extract_question_from_text(text)
+        # Extracts entire last paragraph up to first "?"
+        assert result == "I can help you with that. What file would you like me to look at?"
+
+    def test_extracts_question_from_last_paragraph(self):
+        """Should only look at the last paragraph for questions."""
+        text = """Here's what I found.
+
+The code looks good overall.
+
+Would you like me to make any changes?"""
+        result = extract_question_from_text(text)
+        assert result == "Would you like me to make any changes?"
+
+    def test_returns_none_for_no_question(self):
+        """Should return None when there's no question in the last paragraph."""
+        text = "Done! I've completed the task successfully."
+        result = extract_question_from_text(text)
+        assert result is None
+
+    def test_returns_none_for_empty_string(self):
+        """Should return None for empty input."""
+        assert extract_question_from_text("") is None
+        assert extract_question_from_text("   ") is None
+
+    def test_returns_none_for_none(self):
+        """Should return None for None input."""
+        assert extract_question_from_text(None) is None
+
+    def test_cleans_markdown_bold(self):
+        """Should remove markdown bold formatting from questions."""
+        text = "**Would you like me to proceed?**"
+        result = extract_question_from_text(text)
+        assert result == "Would you like me to proceed?"
+        assert "**" not in result
+
+    def test_cleans_partial_markdown_bold(self):
+        """Should handle partial markdown bold in questions."""
+        text = "**Important:** Should I continue?"
+        result = extract_question_from_text(text)
+        assert "**" not in result
+        assert "?" in result
+
+    def test_extracts_first_question_in_paragraph(self):
+        """Should extract up to and including the first question mark."""
+        text = "Would you like A? Or maybe B? Let me know."
+        result = extract_question_from_text(text)
+        assert result == "Would you like A?"
+
+    def test_handles_multiline_text(self):
+        """Should handle text with multiple lines and paragraphs."""
+        text = """I've analyzed the codebase and found several issues:
+
+1. The authentication module has a security vulnerability
+2. The database queries are not optimized
+3. Some tests are failing
+
+Should I fix the security issue first?"""
+        result = extract_question_from_text(text)
+        assert result == "Should I fix the security issue first?"
+
+    def test_question_with_leading_whitespace(self):
+        """Should handle questions with leading/trailing whitespace."""
+        text = "   What do you think?   "
+        result = extract_question_from_text(text)
+        assert result == "What do you think?"
+
+    def test_next_question_marker_extracts_question(self):
+        """Should extract question after **Next question:** marker."""
+        text = """I've completed the analysis.
+
+Here's what I found:
+- Issue 1
+- Issue 2
+
+**Next question:**
+Would you like me to fix issue 1 first?"""
+        result = extract_question_from_text(text)
+        assert result == "Would you like me to fix issue 1 first?"
+
+    def test_next_question_marker_case_insensitive(self):
+        """Should handle different cases of Next question marker."""
+        text = """Some content.
+
+**NEXT QUESTION:**
+Should I proceed?"""
+        result = extract_question_from_text(text)
+        assert result == "Should I proceed?"
+
+    def test_next_question_marker_with_multiple_lines_after(self):
+        """Should find first line with ? after the marker."""
+        text = """Some content.
+
+**Next question:**
+
+Here's the context for my question.
+What approach would you prefer?
+
+Some other text."""
+        result = extract_question_from_text(text)
+        assert result == "What approach would you prefer?"
+
+    def test_next_question_marker_overrides_last_paragraph(self):
+        """**Next question:** should take precedence over last paragraph."""
+        text = """Content here.
+
+**Next question:**
+Should I use option A?
+
+Additional notes and context that doesn't end with a question mark."""
+        result = extract_question_from_text(text)
+        assert result == "Should I use option A?"

@@ -381,6 +381,157 @@ class TestUserMessageImages:
             session_jsonl.unlink()
 
 
+class TestSkillExpansionDetection:
+    """Tests for detecting skill expansions and not creating new turns for them."""
+
+    def test_skill_expansion_not_new_turn(self):
+        """Messages starting with 'Base directory for this skill:' should not create turns."""
+        session_jsonl = create_session_jsonl([
+            {
+                "type": "user",
+                "uuid": "u1",
+                "timestamp": "2025-01-01T10:00:00Z",
+                "sessionId": "test-session",
+                "message": {"role": "user", "content": "Use the brainstorming skill"},
+            },
+            {
+                "type": "assistant",
+                "uuid": "a1",
+                "timestamp": "2025-01-01T10:00:01Z",
+                "message": {
+                    "role": "assistant",
+                    "model": "claude-sonnet-4-20250514",
+                    "content": [
+                        {
+                            "type": "tool_use",
+                            "id": "tool-1",
+                            "name": "Skill",
+                            "input": {"skill": "superpowers:brainstorming"},
+                        },
+                    ],
+                    "usage": {"input_tokens": 100, "output_tokens": 10},
+                },
+            },
+            # Skill expansion message - should NOT create a new turn
+            {
+                "type": "user",
+                "uuid": "u2",
+                "timestamp": "2025-01-01T10:00:02Z",
+                "sessionId": "test-session",
+                "sourceToolUseID": "tool-1",
+                "isMeta": True,
+                "message": {
+                    "role": "user",
+                    "content": "Base directory for this skill: /path/to/skill\n\n# Brainstorming\n\nThis is the skill content...",
+                },
+            },
+            {
+                "type": "assistant",
+                "uuid": "a2",
+                "timestamp": "2025-01-01T10:00:03Z",
+                "message": {
+                    "role": "assistant",
+                    "model": "claude-sonnet-4-20250514",
+                    "content": [{"type": "text", "text": "I understand the skill."}],
+                    "usage": {"input_tokens": 200, "output_tokens": 20},
+                },
+            },
+            # Real user message - should create a new turn
+            {
+                "type": "user",
+                "uuid": "u3",
+                "timestamp": "2025-01-01T10:00:04Z",
+                "sessionId": "test-session",
+                "message": {"role": "user", "content": "Now help me brainstorm"},
+            },
+            {
+                "type": "assistant",
+                "uuid": "a3",
+                "timestamp": "2025-01-01T10:00:05Z",
+                "message": {
+                    "role": "assistant",
+                    "model": "claude-sonnet-4-20250514",
+                    "content": [{"type": "text", "text": "Let me help you brainstorm."}],
+                    "usage": {"input_tokens": 300, "output_tokens": 30},
+                },
+            },
+        ])
+
+        try:
+            session = parse_session_file(session_jsonl)
+            assert session is not None
+
+            # Should have 2 turns, not 3
+            # Turn 1: "Use the brainstorming skill" (with skill expansion as metadata)
+            # Turn 2: "Now help me brainstorm"
+            assert len(session.turns) == 2, f"Expected 2 turns, got {len(session.turns)}"
+            assert "brainstorming skill" in session.turns[0].user_message.content
+            assert "help me brainstorm" in session.turns[1].user_message.content
+
+            # Turn 1 should have the skill expansion stored
+            assert hasattr(session.turns[0], "skill_expansion")
+            assert session.turns[0].skill_expansion is not None
+            assert "Base directory for this skill:" in session.turns[0].skill_expansion
+        finally:
+            session_jsonl.unlink()
+
+    def test_regular_user_message_not_skill_expansion(self):
+        """Regular user messages should still create new turns."""
+        session_jsonl = create_session_jsonl([
+            {
+                "type": "user",
+                "uuid": "u1",
+                "timestamp": "2025-01-01T10:00:00Z",
+                "sessionId": "test-session",
+                "message": {"role": "user", "content": "First question"},
+            },
+            {
+                "type": "assistant",
+                "uuid": "a1",
+                "timestamp": "2025-01-01T10:00:01Z",
+                "message": {
+                    "role": "assistant",
+                    "model": "claude-sonnet-4-20250514",
+                    "content": [{"type": "text", "text": "First answer"}],
+                    "usage": {"input_tokens": 10, "output_tokens": 5},
+                },
+            },
+            {
+                "type": "user",
+                "uuid": "u2",
+                "timestamp": "2025-01-01T10:00:02Z",
+                "sessionId": "test-session",
+                "message": {"role": "user", "content": "Second question"},
+            },
+            {
+                "type": "assistant",
+                "uuid": "a2",
+                "timestamp": "2025-01-01T10:00:03Z",
+                "message": {
+                    "role": "assistant",
+                    "model": "claude-sonnet-4-20250514",
+                    "content": [{"type": "text", "text": "Second answer"}],
+                    "usage": {"input_tokens": 10, "output_tokens": 5},
+                },
+            },
+        ])
+
+        try:
+            session = parse_session_file(session_jsonl)
+            assert session is not None
+
+            # Should have 2 turns - both are regular user messages
+            assert len(session.turns) == 2
+            assert session.turns[0].user_message.content == "First question"
+            assert session.turns[1].user_message.content == "Second question"
+
+            # Neither should have skill expansions
+            assert session.turns[0].skill_expansion is None
+            assert session.turns[1].skill_expansion is None
+        finally:
+            session_jsonl.unlink()
+
+
 class TestGetCreatedAndModifiedFiles:
     """Tests for Session.get_created_files() and get_modified_files() methods."""
 

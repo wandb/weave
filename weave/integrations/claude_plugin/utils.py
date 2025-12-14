@@ -248,13 +248,18 @@ def log_tool_call(
     parent: Any,
     max_input_length: int = MAX_TOOL_INPUT_LENGTH,
     max_output_length: int = MAX_TOOL_OUTPUT_LENGTH,
-) -> None:
+    *,
+    # Edit tool specific data for generating HTML diff views
+    original_file: str | None = None,
+    structured_patch: list[dict[str, Any]] | None = None,
+) -> Any:
     """Log a tool call to Weave with standardized formatting.
 
     This is the single source of truth for tool call logging format.
     All tool calls (daemon, handlers, real-time, turn finish) should use this.
 
     For TodoWrite calls, also attaches an HTML view showing the todo list state.
+    For Edit calls with structured patch data, generates an HTML diff view.
 
     Args:
         tool_name: Name of the tool (e.g., "Read", "Grep", "Bash")
@@ -265,6 +270,11 @@ def log_tool_call(
         parent: Parent Call object for trace hierarchy
         max_input_length: Max length for input string values
         max_output_length: Max length for output string
+        original_file: For Edit calls, the original file content before edit
+        structured_patch: For Edit calls, the structured patch data from toolUseResult
+
+    Returns:
+        The created Call object
     """
     # Sanitize inputs
     sanitized_input = sanitize_tool_input(tool_input, max_input_length)
@@ -275,12 +285,15 @@ def log_tool_call(
     # Build output dict
     output = {"result": truncate(tool_output, max_output_length)} if tool_output else None
 
-    # For TodoWrite, we need to attach the HTML view BEFORE finishing the call,
-    # so we use create_call + set_call_view + finish_call instead of log_call
-    if tool_name == "TodoWrite":
-        try:
-            from weave.integrations.claude_plugin.diff_view import generate_todo_html
+    # For tools with HTML views (TodoWrite, Edit), we need to attach the view
+    # BEFORE finishing the call, so we use create_call + set_call_view + finish_call
+    needs_html_view = (
+        tool_name == "TodoWrite"
+        or (tool_name == "Edit" and structured_patch is not None)
+    )
 
+    if needs_html_view:
+        try:
             client = require_weave_client()
 
             # Create the call (but don't finish yet)
@@ -298,14 +311,38 @@ def log_tool_call(
             )
 
             # Attach HTML view BEFORE finishing
-            todos = tool_input.get("todos", [])
-            if todos:
-                html = generate_todo_html(todos)
+            if tool_name == "TodoWrite":
+                from weave.integrations.claude_plugin.diff_view import generate_todo_html
+
+                todos = tool_input.get("todos", [])
+                if todos:
+                    html = generate_todo_html(todos)
+                    if html:
+                        set_call_view(
+                            call=call,
+                            client=client,
+                            name="todos",
+                            content=html,
+                            extension="html",
+                            mimetype="text/html",
+                        )
+
+            elif tool_name == "Edit" and structured_patch:
+                from weave.integrations.claude_plugin.diff_utils import (
+                    generate_html_from_structured_patch,
+                )
+
+                file_path = tool_input.get("file_path", "unknown")
+                html = generate_html_from_structured_patch(
+                    file_path=file_path,
+                    original_content=original_file or "",
+                    structured_patch=structured_patch,
+                )
                 if html:
                     set_call_view(
                         call=call,
                         client=client,
-                        name="todos",
+                        name="file_diff",
                         content=html,
                         extension="html",
                         mimetype="text/html",
@@ -313,10 +350,11 @@ def log_tool_call(
 
             # Now finish the call
             client.finish_call(call, output=output)
+            return call
         except Exception as e:
-            logger.debug(f"Failed to log TodoWrite with view: {e}")
+            logger.debug(f"Failed to log {tool_name} with view: {e}")
             # Fallback to regular log_call if something goes wrong
-            weave.log_call(
+            return weave.log_call(
                 op=f"claude_code.tool.{tool_name}",
                 inputs=sanitized_input,
                 output=output,
@@ -330,7 +368,7 @@ def log_tool_call(
                 use_stack=False,
             )
     else:
-        weave.log_call(
+        return weave.log_call(
             op=f"claude_code.tool.{tool_name}",
             inputs=sanitized_input,
             output=output,
@@ -534,6 +572,77 @@ def get_git_info(cwd: str) -> dict[str, str] | None:
     except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as e:
         logger.debug(f"Failed to get git info for {cwd}: {e}")
         return None
+
+
+def extract_question_from_text(text: str) -> str | None:
+    """Extract the trailing question from assistant text output.
+
+    Used for Q&A context tracking - when an assistant response ends with a
+    question, we want to capture it so it can be added as context to the
+    next turn's input (via 'in_response_to' field).
+
+    Handles two patterns:
+    1. "**Next question:**" marker - extracts the first line with "?" after this marker
+    2. Last paragraph ending with "?" - extracts up to and including the first "?"
+
+    Args:
+        text: Assistant text output
+
+    Returns:
+        The trailing question if found, or None
+    """
+    if not text or not text.strip():
+        return None
+
+    text = text.strip()
+
+    # Pattern 1: Check for "**Next question:**" marker (case-insensitive)
+    next_question_marker = "**next question:**"
+    lower_text = text.lower()
+    if next_question_marker in lower_text:
+        # Find the marker position in original text
+        marker_pos = lower_text.index(next_question_marker)
+        after_marker = text[marker_pos + len(next_question_marker) :]
+
+        # Find the first line with a question mark after the marker
+        for line in after_marker.split("\n"):
+            line = line.strip()
+            if "?" in line:
+                question_end = line.index("?") + 1
+                question = line[:question_end].strip()
+                # Clean up markdown formatting
+                question = _clean_markdown_formatting(question)
+                if question:
+                    return question
+
+    # Pattern 2: Fall back to last paragraph
+    paragraphs = text.split("\n\n")
+    last_para = paragraphs[-1].strip()
+
+    # Check if last paragraph contains a question
+    if "?" not in last_para:
+        return None
+
+    # Extract up to and including the question mark
+    question_end = last_para.index("?") + 1
+    question = last_para[:question_end].strip()
+
+    # Clean up markdown formatting
+    question = _clean_markdown_formatting(question)
+
+    return question if question else None
+
+
+def _clean_markdown_formatting(text: str) -> str:
+    """Remove markdown formatting from text."""
+    if not text:
+        return text
+    # Remove leading **
+    if text.startswith("**"):
+        text = text[2:]
+    # Remove all remaining **
+    text = text.replace("**", "")
+    return text.strip()
 
 
 def generate_session_name(
