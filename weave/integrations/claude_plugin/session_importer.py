@@ -34,7 +34,7 @@ from weave.trace.context.weave_client_context import require_weave_client
 
 from .diff_utils import extract_edit_data_from_raw_messages
 from .session_parser import Session, parse_session_file
-from .utils import generate_session_name, log_tool_call
+from .utils import generate_session_name, log_tool_call, reconstruct_call
 
 logger = logging.getLogger(__name__)
 
@@ -220,6 +220,13 @@ def _import_session_to_weave(
         claude_code_version=session.version,
     )
 
+    # Store IDs for reconstructing parent references
+    # Using reconstruct_call prevents _children accumulation which would cause
+    # sum_dict_leaves to merge turn views into session summary as arrays
+    session_call_id = session_call.id
+    trace_id = session_call.trace_id
+    project_id = client._project_id()
+
     calls_created = 1
     total_tool_calls = 0
     pending_question: str | None = None
@@ -227,9 +234,18 @@ def _import_session_to_weave(
 
     # Import each turn
     for i, turn in enumerate(session.turns):
+        # Reconstruct parent to avoid _children accumulation
+        # (same pattern as daemon.py uses)
+        parent_call = reconstruct_call(
+            project_id=project_id,
+            call_id=session_call_id,
+            trace_id=trace_id,
+            parent_id=None,
+        )
+
         # Create turn call
         turn_call = processor.create_turn_call(
-            parent=session_call,
+            parent=parent_call,
             turn_number=i + 1,
             user_message=turn.user_message.content if turn.user_message else "",
             pending_question=pending_question,
