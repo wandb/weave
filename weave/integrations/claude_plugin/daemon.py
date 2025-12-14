@@ -1029,7 +1029,7 @@ class WeaveDaemon:
 
                     # Generate session-level diff view showing all file changes
                     diff_html = generate_session_diff_html(
-                        session, cwd=cwd, sessions_dir=sessions_dir
+                        session, cwd=cwd, sessions_dir=sessions_dir, project=self.project
                     )
                     if diff_html:
                         set_call_view(

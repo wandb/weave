@@ -86,6 +86,18 @@ code{font-family:inherit;display:block}
 .prompt-label{font-size:11px;font-weight:600;color:#656d76;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;display:flex;align-items:center;gap:6px}
 .prompt-label svg{width:14px;height:14px;fill:#656d76}
 .prompt-bubble{background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:#fff;padding:12px 16px;border-radius:18px 18px 18px 4px;font-size:14px;line-height:1.5;max-width:85%;word-wrap:break-word;white-space:pre-wrap;box-shadow:0 2px 8px rgba(102,126,234,0.25)}
+.resume-section{padding:16px 20px;background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);border-bottom:1px solid #0f3460}
+.resume-label{font-size:12px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.resume-label svg{width:16px;height:16px;fill:#94a3b8}
+.resume-code-wrap{position:relative;background:#0d1117;border:1px solid #30363d;border-radius:8px;overflow:hidden}
+.resume-code{font-family:ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,monospace;font-size:13px;color:#58a6ff;padding:14px 50px 14px 16px;margin:0;white-space:nowrap;overflow-x:auto}
+.resume-copy-btn{position:absolute;top:50%;right:8px;transform:translateY(-50%);background:#21262d;border:1px solid #30363d;border-radius:6px;padding:8px;cursor:pointer;color:#8b949e;transition:all 0.15s ease}
+.resume-copy-btn:hover{background:#30363d;color:#c9d1d9;border-color:#8b949e}
+.resume-copy-btn svg{width:16px;height:16px;display:block}
+.resume-copy-btn.copied{background:#238636;border-color:#238636;color:#fff}
+.resume-copy-btn.copied svg.copy-icon{display:none}
+.resume-copy-btn svg.check-icon{display:none}
+.resume-copy-btn.copied svg.check-icon{display:block}
 </style>
 """
 
@@ -531,6 +543,7 @@ def generate_session_diff_html(
     *,
     cwd: str | None = None,
     sessions_dir: Path | None = None,
+    project: str | None = None,
 ) -> str | None:
     """Generate HTML showing all file changes for an entire session.
 
@@ -543,6 +556,7 @@ def generate_session_diff_html(
         session: The session to generate diff for
         cwd: Current working directory for resolving relative paths
         sessions_dir: Directory containing session files (for finding subagent files)
+        project: Weave project name (e.g., "entity/project") for the resume command
 
     Returns:
         HTML string with session diff view, or None if no file changes
@@ -711,6 +725,26 @@ def generate_session_diff_html(
 
     html_parts.append('<div class="diff-view">')
 
+    # Resume session section (only if project is provided)
+    if project and session.session_id:
+        teleport_cmd = f"weave teleport {session.session_id} {project}"
+        html_parts.append('<div class="resume-section">')
+        html_parts.append('<div class="resume-label">')
+        # Rocket/teleport icon SVG
+        html_parts.append(
+            '<svg viewBox="0 0 16 16"><path fill-rule="evenodd" d="M14.064 0a8.75 8.75 0 00-6.187 2.563l-.459.458c-.314.314-.616.641-.904.979H3.31a1.75 1.75 0 00-1.49.833L.11 7.607a.75.75 0 00.418 1.11l3.102.954c.037.051.079.1.124.145l2.429 2.428c.046.046.094.088.145.125l.954 3.102a.75.75 0 001.11.418l2.774-1.707a1.75 1.75 0 00.833-1.49V9.485c.338-.288.665-.59.979-.904l.458-.459A8.75 8.75 0 0016 1.936V1.75A1.75 1.75 0 0014.25 0h-.186zM10.5 10.625c-.088.06-.177.118-.266.175l-2.35 1.521.548 1.783 1.949-1.2a.25.25 0 00.119-.213v-2.066zM3.678 8.116L5.2 5.766c.058-.09.117-.178.176-.266H3.309a.25.25 0 00-.213.119l-1.2 1.95 1.782.547zm5.26-4.493A7.25 7.25 0 0114.063 1.5h.186a.25.25 0 01.25.25v.186a7.25 7.25 0 01-2.123 5.127l-.459.458a15.21 15.21 0 01-2.499 2.02l-2.317 1.5-2.143-2.143 1.5-2.317a15.25 15.25 0 012.02-2.5l.458-.458h.001zM12 5a1 1 0 11-2 0 1 1 0 012 0zm-8.44 9.56a1.5 1.5 0 10-2.12-2.12c-.734.73-1.047 2.332-1.15 3.003a.23.23 0 00.265.265c.671-.103 2.273-.416 3.005-1.148z"></path></svg>'
+        )
+        html_parts.append("Resume this session</div>")
+        html_parts.append('<div class="resume-code-wrap">')
+        html_parts.append(f'<pre class="resume-code" id="teleport-cmd">{_html_escape(teleport_cmd)}</pre>')
+        html_parts.append('<button class="resume-copy-btn" onclick="copyTeleportCmd()" title="Copy to clipboard">')
+        # Copy icon
+        html_parts.append('<svg class="copy-icon" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 010 1.5h-1.5a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-1.5a.75.75 0 011.5 0v1.5A1.75 1.75 0 019.25 16h-7.5A1.75 1.75 0 010 14.25v-7.5z"></path><path fill-rule="evenodd" d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0114.25 11h-7.5A1.75 1.75 0 015 9.25v-7.5zm1.75-.25a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-7.5a.25.25 0 00-.25-.25h-7.5z"></path></svg>')
+        # Check icon (shown after copy)
+        html_parts.append('<svg class="check-icon" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"></path></svg>')
+        html_parts.append("</button>")
+        html_parts.append("</div></div>")
+
     # Session-level header
     html_parts.append('<div class="diff-header">')
     html_parts.append('<div class="diff-title">Session File Changes</div>')
@@ -801,6 +835,20 @@ def generate_session_diff_html(
     html_parts.append("document.addEventListener('DOMContentLoaded',()=>{")
     html_parts.append("document.querySelectorAll('code[class*=language-]').forEach(el=>{")
     html_parts.append("try{hljs.highlightElement(el)}catch(e){}});});")
+    # Copy to clipboard function for teleport command
+    html_parts.append("function copyTeleportCmd(){")
+    html_parts.append("const cmd=document.getElementById('teleport-cmd');")
+    html_parts.append("const btn=document.querySelector('.resume-copy-btn');")
+    html_parts.append("if(cmd&&btn){")
+    html_parts.append("navigator.clipboard.writeText(cmd.textContent).then(()=>{")
+    html_parts.append("btn.classList.add('copied');")
+    html_parts.append("setTimeout(()=>btn.classList.remove('copied'),2000);")
+    html_parts.append("}).catch(()=>{")
+    html_parts.append("const r=document.createRange();r.selectNode(cmd);")
+    html_parts.append("window.getSelection().removeAllRanges();window.getSelection().addRange(r);")
+    html_parts.append("document.execCommand('copy');window.getSelection().removeAllRanges();")
+    html_parts.append("btn.classList.add('copied');setTimeout(()=>btn.classList.remove('copied'),2000);")
+    html_parts.append("})}}")
     html_parts.append("</script>")
 
     html_parts.append("</body></html>")

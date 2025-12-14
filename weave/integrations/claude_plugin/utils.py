@@ -275,30 +275,33 @@ def log_tool_call(
     # Build output dict
     output = {"result": truncate(tool_output, max_output_length)} if tool_output else None
 
-    call = weave.log_call(
-        op=f"claude_code.tool.{tool_name}",
-        inputs=sanitized_input,
-        output=output,
-        attributes={
-            "tool_name": tool_name,
-            "tool_use_id": tool_use_id,
-            "duration_ms": duration_ms,
-        },
-        display_name=tool_display,
-        parent=parent,
-        use_stack=False,
-    )
-
-    # Attach HTML view for TodoWrite calls
+    # For TodoWrite, we need to attach the HTML view BEFORE finishing the call,
+    # so we use create_call + set_call_view + finish_call instead of log_call
     if tool_name == "TodoWrite":
         try:
             from weave.integrations.claude_plugin.diff_view import generate_todo_html
 
+            client = require_weave_client()
+
+            # Create the call (but don't finish yet)
+            call = client.create_call(
+                op=f"claude_code.tool.{tool_name}",
+                inputs=sanitized_input,
+                attributes={
+                    "tool_name": tool_name,
+                    "tool_use_id": tool_use_id,
+                    "duration_ms": duration_ms,
+                },
+                display_name=tool_display,
+                parent=parent,
+                use_stack=False,
+            )
+
+            # Attach HTML view BEFORE finishing
             todos = tool_input.get("todos", [])
             if todos:
                 html = generate_todo_html(todos)
                 if html:
-                    client = require_weave_client()
                     set_call_view(
                         call=call,
                         client=client,
@@ -307,8 +310,39 @@ def log_tool_call(
                         extension="html",
                         mimetype="text/html",
                     )
+
+            # Now finish the call
+            client.finish_call(call, output=output)
         except Exception as e:
-            logger.debug(f"Failed to attach todo HTML view: {e}")
+            logger.debug(f"Failed to log TodoWrite with view: {e}")
+            # Fallback to regular log_call if something goes wrong
+            weave.log_call(
+                op=f"claude_code.tool.{tool_name}",
+                inputs=sanitized_input,
+                output=output,
+                attributes={
+                    "tool_name": tool_name,
+                    "tool_use_id": tool_use_id,
+                    "duration_ms": duration_ms,
+                },
+                display_name=tool_display,
+                parent=parent,
+                use_stack=False,
+            )
+    else:
+        weave.log_call(
+            op=f"claude_code.tool.{tool_name}",
+            inputs=sanitized_input,
+            output=output,
+            attributes={
+                "tool_name": tool_name,
+                "tool_use_id": tool_use_id,
+                "duration_ms": duration_ms,
+            },
+            display_name=tool_display,
+            parent=parent,
+            use_stack=False,
+        )
 
 
 def _generate_session_name_claude(user_prompt: str) -> str | None:

@@ -797,6 +797,7 @@ def handle_session_end(payload: dict[str, Any], project: str) -> dict[str, Any] 
                     session,
                     cwd=session.cwd,
                     sessions_dir=transcript_file_path.parent,
+                    project=project,
                 )
 
                 if diff_html:
