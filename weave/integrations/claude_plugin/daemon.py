@@ -27,11 +27,22 @@ from pathlib import Path
 from typing import Any
 
 # Setup logging before other imports
-DEBUG_LOG_FILE = Path("/tmp/weave-claude-daemon.log")
+DEBUG_LOG_DIR = Path("/tmp/weave-claude-logs")
 
 
-def setup_logging() -> logging.Logger:
-    """Configure logging with optional file output for debugging."""
+def get_debug_log_path(session_id: str) -> Path:
+    """Get the debug log file path for a specific session."""
+    DEBUG_LOG_DIR.mkdir(parents=True, exist_ok=True)
+    return DEBUG_LOG_DIR / f"daemon-{session_id}.log"
+
+
+def setup_logging(session_id: str | None = None) -> logging.Logger:
+    """Configure logging with optional file output for debugging.
+
+    Args:
+        session_id: Optional session ID for per-session log files in debug mode.
+                   If provided and DEBUG is set, creates a session-specific log file.
+    """
     level = logging.DEBUG if os.environ.get("DEBUG") else logging.WARNING
 
     logger = logging.getLogger("weave.integrations.claude_plugin.daemon")
@@ -43,20 +54,24 @@ def setup_logging() -> logging.Logger:
     stderr_handler.setFormatter(logging.Formatter("%(levelname)s: %(message)s"))
     logger.addHandler(stderr_handler)
 
-    # Add file handler in debug mode
-    if os.environ.get("DEBUG"):
+    # Add file handler in debug mode with session-specific log file
+    if os.environ.get("DEBUG") and session_id:
         try:
-            file_handler = logging.FileHandler(DEBUG_LOG_FILE, mode="a")
+            log_path = get_debug_log_path(session_id)
+            file_handler = logging.FileHandler(log_path, mode="a")
             file_handler.setFormatter(
                 logging.Formatter("%(asctime)s [%(name)s] %(levelname)s: %(message)s")
             )
             logger.addHandler(file_handler)
+            # Log the session start marker for easy identification
+            logger.info(f"=== Daemon started for session {session_id} ===")
         except Exception:
             pass
 
     return logger
 
 
+# Initialize with basic logging (will be reconfigured with session_id in main)
 logger = setup_logging()
 
 # Import after logging setup
@@ -1650,6 +1665,11 @@ class WeaveDaemon:
 
         # Log each pending skill call with its expansion
         for tool_id, (skill_name, started_at) in self._pending_skill_calls.items():
+            # Skip if already logged (prevents duplicates on reprocessing)
+            if tool_id in self._logged_tool_call_ids:
+                logger.debug(f"Skipping already-logged skill: {skill_name} ({tool_id})")
+                continue
+
             # Calculate duration
             ended_at = datetime.now(timezone.utc)
             duration_ms = int((ended_at - started_at).total_seconds() * 1000)
@@ -1675,7 +1695,7 @@ class WeaveDaemon:
             # Mark as logged to avoid duplicate logging at turn finish
             self._logged_tool_call_ids.add(tool_id)
 
-            logger.debug(f"Logged skill expansion: {display_name}")
+            logger.debug(f"Logged skill expansion: {skill_name}")
 
         # Clear pending skills
         self._pending_skill_calls.clear()
@@ -1957,6 +1977,10 @@ class WeaveDaemon:
 
 async def main(session_id: str) -> None:
     """Main entry point."""
+    global logger
+    # Reconfigure logging with session_id for per-session log files
+    logger = setup_logging(session_id)
+
     daemon = WeaveDaemon(session_id)
     await daemon.start()
 
