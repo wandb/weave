@@ -670,12 +670,13 @@ class TestHTMLDiffViews:
                     mock_turn_call,
                 ]
                 mock_client.return_value.finish_call = MagicMock()
+                mock_client.return_value._project_id.return_value = "test-entity/test-project"
 
                 with patch(
-                    "weave.integrations.claude_plugin.session_importer.set_call_view"
+                    "weave.integrations.claude_plugin.session_processor.set_call_view"
                 ) as mock_set_view:
                     with patch(
-                        "weave.integrations.claude_plugin.session_importer.generate_session_diff_html"
+                        "weave.integrations.claude_plugin.diff_view.generate_session_diff_html"
                     ) as mock_gen_diff:
                         mock_gen_diff.return_value = "<html>session diff</html>"
 
@@ -748,12 +749,13 @@ class TestHTMLDiffViews:
                     mock_turn_call,
                 ]
                 mock_client.return_value.finish_call = MagicMock()
+                mock_client.return_value._project_id.return_value = "test-entity/test-project"
 
                 with patch(
-                    "weave.integrations.claude_plugin.session_importer.set_call_view"
+                    "weave.integrations.claude_plugin.session_processor.set_call_view"
                 ) as mock_set_view:
                     with patch(
-                        "weave.integrations.claude_plugin.session_importer.generate_turn_diff_html"
+                        "weave.integrations.claude_plugin.diff_view.generate_turn_diff_html"
                     ) as mock_gen_diff:
                         mock_gen_diff.return_value = "<html>turn diff</html>"
 

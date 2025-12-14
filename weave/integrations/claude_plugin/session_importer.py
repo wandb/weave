@@ -31,23 +31,10 @@ from typing import Any
 
 import weave
 from weave.trace.context.weave_client_context import require_weave_client
-from weave.trace.view_utils import set_call_view
-from weave.type_wrappers.Content.content import Content
 
-from .diff_view import generate_session_diff_html, generate_turn_diff_html
-from .diff_utils import (
-    extract_edit_data_from_raw_messages,
-    generate_html_from_structured_patch,
-)
+from .diff_utils import extract_edit_data_from_raw_messages
 from .session_parser import Session, parse_session_file
-from .utils import (
-    extract_question_from_text,
-    generate_session_name,
-    get_tool_display_name,
-    get_turn_display_name,
-    log_tool_call,
-    truncate,
-)
+from .utils import generate_session_name, log_tool_call
 
 logger = logging.getLogger(__name__)
 
@@ -203,7 +190,7 @@ def _import_session_to_weave(
     session_file_path: Path,
     use_ollama: bool = True,
 ) -> tuple[int, int, int]:
-    """Import a session using weave.log_call().
+    """Import a session using SessionProcessor.
 
     Args:
         session: Parsed session data
@@ -212,350 +199,46 @@ def _import_session_to_weave(
 
     Returns: (turns, tool_calls, calls_created)
     """
-    # Get the client for creating calls with summary views
+    from weave.integrations.claude_plugin.session_processor import SessionProcessor
+
     client = require_weave_client()
-
-    usage = session.total_usage()
-    model = session.primary_model()
-
-    # Get first real user prompt for naming (matches daemon behavior)
-    first_prompt = session.first_user_prompt()
-
-    # Generate display name using the FIRST prompt (matches daemon behavior)
-    # The first prompt best represents what the session is about
-    if use_ollama and first_prompt:
-        display_name, suggested_branch = generate_session_name(first_prompt)
-    else:
-        display_name = session.session_id
-        suggested_branch = ""
-
-    # Build file_snapshots list (matches daemon format)
-    file_snapshots_list: list[Any] = []
-
-    # Determine the claude directory from the session file path
-    # Session files are in ~/.claude/projects/<project>/session.jsonl
-    claude_dir = session_file_path.parent.parent.parent  # Go up from projects/<project> to .claude
-
-    # 1. Load the session file as a Content object
-    try:
-        session_content = Content.from_path(
-            session_file_path,
-            metadata={
-                "session_id": session.session_id,
-                "filename": session.filename,
-                "relative_path": "session.jsonl",
-            },
-        )
-        file_snapshots_list.append(session_content)
-    except Exception as e:
-        logger.debug(f"Failed to load session file as Content: {e}")
-
-    # 2. Add earliest backup for each modified file (state BEFORE session)
-    from weave.integrations.claude_plugin.session_parser import FileBackup
-
-    earliest_backups: dict[str, FileBackup] = {}
-    for turn in session.turns:
-        for fb in turn.file_backups:
-            if not fb.backup_filename:
-                continue
-            existing = earliest_backups.get(fb.file_path)
-            # Keep the earliest backup (lowest version or earliest time)
-            if not existing or fb.backup_time < existing.backup_time:
-                earliest_backups[fb.file_path] = fb
-
-    for file_path, fb in sorted(earliest_backups.items()):
-        content = fb.load_content(session.session_id, claude_dir=claude_dir)
-        if content:
-            file_snapshots_list.append(content)
-
-    # 3. Add current state of all changed files (if they exist)
-    if session.cwd:
-        from pathlib import Path as PathLib
-
-        cwd_path = PathLib(session.cwd)
-        all_changed = session.get_all_changed_files()
-        for file_path in all_changed:
-            try:
-                # Handle both absolute and relative paths
-                if PathLib(file_path).is_absolute():
-                    abs_path = PathLib(file_path)
-                    try:
-                        rel_path = abs_path.relative_to(cwd_path)
-                    except ValueError:
-                        rel_path = PathLib(abs_path.name)
-                else:
-                    rel_path = PathLib(file_path)
-                    abs_path = cwd_path / file_path
-
-                if abs_path.exists():
-                    file_content = Content.from_path(
-                        abs_path,
-                        metadata={
-                            "original_path": str(file_path),
-                            "relative_path": str(rel_path),
-                        },
-                    )
-                    file_snapshots_list.append(file_content)
-            except Exception as e:
-                logger.debug(f"Failed to attach file {file_path}: {e}")
-
-    # Build session output (Content objects only, matches daemon)
-    session_output: dict[str, Any] = {}
-    if file_snapshots_list:
-        session_output["file_snapshots"] = file_snapshots_list
-
-    # Build session summary (metadata, matches daemon format)
-    session_summary: dict[str, Any] = {
-        "turn_count": len(session.turns),
-        "tool_call_count": session.total_tool_calls(),
-        "tool_call_breakdown": session.tool_call_counts(),
-        "duration_ms": session.duration_ms(),
-        "model": model,
-        "session_started_at": session.started_at().isoformat() if session.started_at() else None,
-        "session_ended_at": session.ended_at().isoformat() if session.ended_at() else None,
-    }
-
-    # Usage in summary must be model-keyed for Weave schema (matches daemon)
-    if model and usage:
-        session_summary["usage"] = {
-            model: usage.to_weave_usage()
-        }
-
-    # Create the session-level call (root of the trace)
-    # Use create_call to get mutable call object for summary/views
-    session_call = client.create_call(
-        op="claude_code.session",
-        inputs={
-            "session_id": session.session_id,
-            "cwd": session.cwd,
-            "git_branch": session.git_branch,
-            "claude_code_version": session.version,
-            "suggested_branch_name": suggested_branch or None,
-            "first_prompt": truncate(first_prompt, 1000),
-        },
-        attributes={
-            "session_id": session.session_id,
-            "filename": session.filename,
-            "git_branch": session.git_branch,
-            "source": "claude-code-import",
-            "model": model,
-        },
-        display_name=display_name,
-        use_stack=False,
+    processor = SessionProcessor(
+        client=client,
+        project=client._project_id(),
+        source="import",
     )
 
-    # Generate session-level diff view showing all file changes (matches daemon)
-    sessions_dir = session_file_path.parent
-    diff_html = generate_session_diff_html(
-        session,
+    # Get first real user prompt for naming
+    first_prompt = session.first_user_prompt() or ""
+
+    # Create session call
+    session_call = processor.create_session_call(
+        session_id=session.session_id,
+        first_prompt=first_prompt,
         cwd=session.cwd,
-        sessions_dir=sessions_dir,
+        git_branch=session.git_branch,
+        claude_code_version=session.version,
     )
-
-    # If file-history-based diff failed, try using Edit tool data as fallback
-    # Collect Edit data from all turns in the session AND subagent files
-    if not diff_html:
-        all_edit_data: list[dict[str, Any]] = []
-
-        # 1. Collect from main session turns
-        for turn in session.turns:
-            if turn.raw_messages:
-                edit_data_list = extract_edit_data_from_raw_messages(turn.raw_messages)
-                all_edit_data.extend(edit_data_list)
-
-        # 2. Collect from subagent files (Task calls with subagent_type)
-        for turn in session.turns:
-            for tc in turn.all_tool_calls():
-                if tc.name == "Task" and tc.input.get("subagent_type"):
-                    agent_id = extract_agent_id(tc.result)
-                    if agent_id:
-                        agent_file = sessions_dir / f"agent-{agent_id}.jsonl"
-                        if agent_file.exists():
-                            try:
-                                agent_session = parse_session_file(agent_file)
-                                if agent_session:
-                                    for agent_turn in agent_session.turns:
-                                        if agent_turn.raw_messages:
-                                            edit_data_list = extract_edit_data_from_raw_messages(
-                                                agent_turn.raw_messages
-                                            )
-                                            all_edit_data.extend(edit_data_list)
-                            except Exception as e:
-                                logger.debug(f"Failed to parse agent file {agent_file}: {e}")
-
-        if all_edit_data:
-            # Generate combined diff view from all Edit tool data
-            html_parts = []
-            for edit_data in all_edit_data:
-                file_path = edit_data.get("file_path", "unknown")
-                original_file = edit_data.get("original_file", "")
-                structured_patch = edit_data.get("structured_patch", [])
-                if structured_patch:
-                    edit_html = generate_html_from_structured_patch(
-                        file_path=file_path,
-                        original_content=original_file,
-                        structured_patch=structured_patch,
-                    )
-                    if edit_html:
-                        html_parts.append(edit_html)
-            if html_parts:
-                diff_html = "\n".join(html_parts)
-
-    # Set summary on call object before finishing
-    session_call.summary = session_summary
-
-    # Attach HTML view after summary assignment
-    if diff_html:
-        set_call_view(
-            call=session_call,
-            client=client,
-            name="file_changes",
-            content=diff_html,
-            extension="html",
-            mimetype="text/html",
-        )
-
-    # Finish the session call with output
-    client.finish_call(session_call, output=session_output)
 
     calls_created = 1
     total_tool_calls = 0
-
-    # Track pending question from previous turn for Q&A context
     pending_question: str | None = None
+    sessions_dir = session_file_path.parent
 
     # Import each turn
-    for i, turn in enumerate(session.turns, 1):
-        turn_model = turn.primary_model()
-        turn_usage = turn.total_usage()
-
-        # Collect assistant text
-        assistant_text = ""
-        for msg in turn.assistant_messages:
-            text = msg.get_text()
-            if text:
-                assistant_text += text + "\n"
-
-        # Get user content and display name
-        user_content = turn.user_message.content
-        turn_display_name = get_turn_display_name(i, user_content)
-
-        # Load file backups as weave.Content objects (list format, matches daemon)
-        # Determine the claude directory from the session file path
-        # Session files are in ~/.claude/projects/<project>/session.jsonl
-        claude_dir = session_file_path.parent.parent.parent  # Go up from projects/<project> to .claude
-        file_snapshots: list[Any] = []
-        for fb in turn.file_backups:
-            content = fb.load_content(session.session_id, claude_dir=claude_dir)
-            if content:
-                file_snapshots.append(content)
-
-        # Build turn output (matches daemon format)
-        turn_output: dict[str, Any] = {
-            "response": truncate(assistant_text),
-            "tool_call_count": len(turn.all_tool_calls()),
-        }
-
-        # Add file snapshots to output if any were loaded
-        if file_snapshots:
-            turn_output["file_snapshots"] = file_snapshots
-
-        # Build turn summary (metadata, matches daemon format)
-        turn_summary: dict[str, Any] = {
-            "model": turn_model,
-            "tool_call_count": len(turn.all_tool_calls()),
-            "duration_ms": turn.duration_ms(),
-            "response_preview": truncate(assistant_text, 200),
-        }
-
-        # Usage in summary must be model-keyed for Weave schema
-        if turn_model and turn_usage:
-            turn_summary["usage"] = {turn_model: turn_usage.to_weave_usage()}
-
-        # Generate HTML diff view for this turn
-        # First try file-history-based diff generation
-        diff_html = generate_turn_diff_html(
-            turn=turn,
-            turn_index=i - 1,  # Convert to 0-based
-            all_turns=session.turns,
-            session_id=session.session_id,
-            turn_number=i,
-            tool_count=len(turn.all_tool_calls()),
-            model=turn_model,
-            historic_mode=True,
-            cwd=session.cwd,
-            user_prompt=user_content,
-        )
-
-        # If file-history-based diff failed, try using Edit tool data as fallback
-        # This handles cases where file-history-snapshot entries are empty/absent
-        if not diff_html and turn.raw_messages:
-            edit_data_list = extract_edit_data_from_raw_messages(turn.raw_messages)
-            if edit_data_list:
-                # Generate simple diff view from first Edit's structured patch
-                # For multiple edits, we show them all
-                html_parts = []
-                for edit_data in edit_data_list:
-                    file_path = edit_data.get("file_path", "unknown")
-                    original_file = edit_data.get("original_file", "")
-                    structured_patch = edit_data.get("structured_patch", [])
-                    if structured_patch:
-                        edit_html = generate_html_from_structured_patch(
-                            file_path=file_path,
-                            original_content=original_file,
-                            structured_patch=structured_patch,
-                        )
-                        if edit_html:
-                            html_parts.append(edit_html)
-                if html_parts:
-                    diff_html = "\n".join(html_parts)
-
-        # Build turn inputs (matches daemon format)
-        turn_inputs: dict[str, Any] = {
-            "user_message": truncate(user_content),
-        }
-
-        # Add Q&A context if previous turn ended with a question
-        if pending_question:
-            turn_inputs["in_response_to"] = pending_question
-
+    for i, turn in enumerate(session.turns):
         # Create turn call
-        turn_call = client.create_call(
-            op="claude_code.turn",
-            inputs=turn_inputs,
+        turn_call = processor.create_turn_call(
             parent=session_call,
-            attributes={
-                "turn_number": i,
-                "model": turn_model,
-                "tool_count": len(turn.all_tool_calls()),
-                "file_backup_count": len(file_snapshots),
-            },
-            display_name=turn_display_name,
-            use_stack=False,
+            turn_number=i + 1,
+            user_message=turn.user_message.content if turn.user_message else "",
+            pending_question=pending_question,
         )
-
-        # Set summary on call object before finishing
-        turn_call.summary = turn_summary
-
-        # Set view if we have diffs
-        if diff_html:
-            set_call_view(
-                call=turn_call,
-                client=client,
-                name="file_changes",
-                content=diff_html,
-                extension="html",
-                mimetype="text/html",
-            )
-
-        # Finish the call with output
-        client.finish_call(turn_call, output=turn_output)
         calls_created += 1
 
         # Import tool calls as children of the turn
-        # Use shared log_tool_call for consistent formatting and TodoWrite HTML views
         for tc in turn.all_tool_calls():
-            # For Skill calls, use the skill expansion as output if available
+            # Skip Task tools with subagent_type - handled separately after creating the tool call
             tool_output = tc.result
             if tc.name == "Skill" and turn.skill_expansion:
                 tool_output = turn.skill_expansion
@@ -584,9 +267,20 @@ def _import_session_to_weave(
                     calls_created += subagent_calls
                     total_tool_calls += subagent_calls
 
-        # Extract question from this turn's response for Q&A context tracking
-        # This will be added to the next turn's inputs as 'in_response_to'
-        pending_question = extract_question_from_text(assistant_text)
+        # Finish turn call (returns extracted question)
+        pending_question = processor.finish_turn_call(
+            turn_call=turn_call,
+            turn=turn,
+            session=session,
+            turn_index=i,
+        )
+
+    # Finish session call
+    processor.finish_session_call(
+        session_call=session_call,
+        session=session,
+        sessions_dir=sessions_dir,
+    )
 
     return len(session.turns), total_tool_calls, calls_created
 

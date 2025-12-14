@@ -262,15 +262,11 @@ class SessionProcessor:
             if text:
                 assistant_text += text + "\n"
 
-        # Build output
+        # Build output (Content objects and minimal data, no metadata)
         output: dict[str, Any] = {
             "response": truncate(assistant_text.strip()),
             "tool_call_count": len(turn.all_tool_calls()),
-            "duration_ms": turn.duration_ms(),
-            "model": model,
         }
-        if usage:
-            output["usage"] = usage.to_weave_usage()
         if interrupted:
             output["interrupted"] = True
             output["status"] = "[interrupted]"
