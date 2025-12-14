@@ -86,15 +86,15 @@ code{font-family:inherit;display:block}
 .prompt-label{font-size:11px;font-weight:600;color:#656d76;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;display:flex;align-items:center;gap:6px}
 .prompt-label svg{width:14px;height:14px;fill:#656d76}
 .prompt-bubble{background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:#fff;padding:12px 16px;border-radius:18px 18px 18px 4px;font-size:14px;line-height:1.5;max-width:85%;word-wrap:break-word;white-space:pre-wrap;box-shadow:0 2px 8px rgba(102,126,234,0.25)}
-.resume-section{padding:16px 20px;background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);border-bottom:1px solid #0f3460}
-.resume-label{font-size:12px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;display:flex;align-items:center;gap:8px}
-.resume-label svg{width:16px;height:16px;fill:#94a3b8}
-.resume-code-wrap{position:relative;background:#0d1117;border:1px solid #30363d;border-radius:8px;overflow:hidden}
-.resume-code{font-family:ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,monospace;font-size:13px;color:#58a6ff;padding:14px 50px 14px 16px;margin:0;white-space:nowrap;overflow-x:auto}
-.resume-copy-btn{position:absolute;top:50%;right:8px;transform:translateY(-50%);background:#21262d;border:1px solid #30363d;border-radius:6px;padding:8px;cursor:pointer;color:#8b949e;transition:all 0.15s ease}
-.resume-copy-btn:hover{background:#30363d;color:#c9d1d9;border-color:#8b949e}
+.resume-section{padding:12px 20px;background:#f6f8fa;border-bottom:1px solid #d1d9e0}
+.resume-label{font-size:11px;font-weight:600;color:#656d76;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.resume-label svg{width:14px;height:14px;fill:#656d76}
+.resume-code-wrap{position:relative;background:#fff;border:1px solid #d1d9e0;border-radius:6px;overflow:hidden}
+.resume-code{font-family:ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,monospace;font-size:12px;color:#0969da;padding:10px 44px 10px 12px;margin:0;white-space:nowrap;overflow-x:auto}
+.resume-copy-btn{position:absolute;top:50%;right:6px;transform:translateY(-50%);background:#f6f8fa;border:1px solid #d1d9e0;border-radius:6px;padding:6px;cursor:pointer;color:#656d76;transition:all 0.15s ease}
+.resume-copy-btn:hover{background:#eaeef2;color:#1f2328;border-color:#8c959f}
 .resume-copy-btn svg{width:16px;height:16px;display:block}
-.resume-copy-btn.copied{background:#238636;border-color:#238636;color:#fff}
+.resume-copy-btn.copied{background:#dafbe1;border-color:#aceebb;color:#1a7f37}
 .resume-copy-btn.copied svg.copy-icon{display:none}
 .resume-copy-btn svg.check-icon{display:none}
 .resume-copy-btn.copied svg.check-icon{display:block}
@@ -725,6 +725,16 @@ def generate_session_diff_html(
 
     html_parts.append('<div class="diff-view">')
 
+    # Session-level header
+    html_parts.append('<div class="diff-header">')
+    html_parts.append('<div class="diff-title">Session File Changes</div>')
+    html_parts.append('<div class="diff-stats">')
+    html_parts.append(f"{len(file_diffs)} file{'s' if len(file_diffs) != 1 else ''} changed")
+    html_parts.append(f' <span class="add">+{total_added}</span>')
+    html_parts.append(f' <span class="del">−{total_removed}</span>')
+    html_parts.append(f" · {len(session.turns)} turn{'s' if len(session.turns) != 1 else ''}")
+    html_parts.append("</div></div>")
+
     # Resume session section (only if project is provided)
     if project and session.session_id:
         teleport_cmd = f"weave teleport {session.session_id} {project}"
@@ -744,16 +754,6 @@ def generate_session_diff_html(
         html_parts.append('<svg class="check-icon" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"></path></svg>')
         html_parts.append("</button>")
         html_parts.append("</div></div>")
-
-    # Session-level header
-    html_parts.append('<div class="diff-header">')
-    html_parts.append('<div class="diff-title">Session File Changes</div>')
-    html_parts.append('<div class="diff-stats">')
-    html_parts.append(f"{len(file_diffs)} file{'s' if len(file_diffs) != 1 else ''} changed")
-    html_parts.append(f' <span class="add">+{total_added}</span>')
-    html_parts.append(f' <span class="del">−{total_removed}</span>')
-    html_parts.append(f" · {len(session.turns)} turn{'s' if len(session.turns) != 1 else ''}")
-    html_parts.append("</div></div>")
 
     # File diffs (reuse same structure as turn diff)
     for file_diff in file_diffs:
