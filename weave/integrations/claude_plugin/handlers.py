@@ -165,13 +165,13 @@ def _build_turn_output(
             output["images"] = turn.user_message.images
             logger.debug(f"_build_turn_output: captured {len(turn.user_message.images)} images")
 
-        # Load file backups as Content objects
+        # Load file backups as Content objects (list format)
         if turn.file_backups and session:
-            file_snapshots: dict[str, Content] = {}
+            file_snapshots: list[Any] = []
             for fb in turn.file_backups:
                 content = fb.load_content(session.session_id)
                 if content:
-                    file_snapshots[fb.file_path] = content
+                    file_snapshots.append(content)
             if file_snapshots:
                 output["file_snapshots"] = file_snapshots
 

@@ -229,8 +229,8 @@ class WeaveDaemon:
         self._pending_skill_calls: dict[str, tuple[str, datetime]] = {}
 
         # Subagent file snapshots to aggregate into parent turn
-        # Maps turn_call_id -> {file_path -> Content}
-        self._subagent_file_snapshots: dict[str, dict[str, Any]] = {}
+        # Maps turn_call_id -> list of Content objects
+        self._subagent_file_snapshots: dict[str, list[Any]] = {}
 
         # Compaction tracking - count how many times context was compacted
         self.compaction_count: int = 0
@@ -722,8 +722,8 @@ class WeaveDaemon:
             total_usage = None
             tool_counts: dict[str, int] = {}
 
-            # Collect file snapshots from all subagent turns
-            file_snapshots: dict[str, Any] = {}
+            # Collect file snapshots from all subagent turns (list format)
+            file_snapshots: list[Any] = []
 
             if session:
                 # Get final response
@@ -739,12 +739,11 @@ class WeaveDaemon:
                         tool_counts[tc.name] = tool_counts.get(tc.name, 0) + 1
 
                 # Load file backups from all turns
-                from weave.type_wrappers.Content.content import Content
                 for turn in session.turns:
                     for fb in turn.file_backups:
                         content = fb.load_content(session.session_id)
                         if content:
-                            file_snapshots[fb.file_path] = content
+                            file_snapshots.append(content)
 
             # Build output
             output: dict[str, Any] = {
@@ -762,8 +761,8 @@ class WeaveDaemon:
                 # Store file snapshots for parent turn aggregation
                 turn_call_id = tracker.turn_call_id
                 if turn_call_id not in self._subagent_file_snapshots:
-                    self._subagent_file_snapshots[turn_call_id] = {}
-                self._subagent_file_snapshots[turn_call_id].update(file_snapshots)
+                    self._subagent_file_snapshots[turn_call_id] = []
+                self._subagent_file_snapshots[turn_call_id].extend(file_snapshots)
                 logger.debug(f"Stored {len(file_snapshots)} file snapshots for parent turn {turn_call_id}")
 
             self.weave_client.finish_call(
@@ -930,14 +929,13 @@ class WeaveDaemon:
         # Aggregate token usage across all turns
         total_usage = agent_session.total_usage()
 
-        # Collect file snapshots from all subagent turns
-        from weave.type_wrappers.Content.content import Content
-        file_snapshots: dict[str, Content] = {}
+        # Collect file snapshots from all subagent turns (list format)
+        file_snapshots: list[Any] = []
         for turn in agent_session.turns:
             for fb in turn.file_backups:
                 content = fb.load_content(agent_session.session_id)
                 if content:
-                    file_snapshots[fb.file_path] = content
+                    file_snapshots.append(content)
 
         # Build output
         subagent_output: dict[str, Any] = {
@@ -1529,22 +1527,21 @@ class WeaveDaemon:
                 output["ends_with_question"] = truncate(pending_q, 500)
                 logger.debug(f"Detected trailing question: {pending_q[:50]}...")
 
-            # Load file backups as Content objects
+            # Load file backups as Content objects (list format)
             # Backups are already linked to turns via messageId in session_parser,
             # so we trust that association rather than timestamp filtering
-            from weave.type_wrappers.Content.content import Content
-            file_snapshots: dict[str, Content] = {}
+            file_snapshots: list[Any] = []
 
             if turn.file_backups and session:
                 for fb in turn.file_backups:
                     content = fb.load_content(session.session_id)
                     if content:
-                        file_snapshots[fb.file_path] = content
+                        file_snapshots.append(content)
 
             # Merge file snapshots from subagents that ran during this turn
             if self.current_turn_call_id in self._subagent_file_snapshots:
                 subagent_snapshots = self._subagent_file_snapshots.pop(self.current_turn_call_id)
-                file_snapshots.update(subagent_snapshots)
+                file_snapshots.extend(subagent_snapshots)
                 logger.debug(f"Merged {len(subagent_snapshots)} file snapshots from subagents")
 
             if file_snapshots:
