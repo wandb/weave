@@ -1094,7 +1094,9 @@ class WeaveDaemon:
                     session_output["file_snapshots"] = file_snapshots_list
                     logger.debug(f"Attached {len(file_snapshots_list)} file snapshots to output")
 
-            self.weave_client.finish_call(session_call, output=session_output, summary=session_summary)
+            # Set summary on call object before finishing (finish_call deep-merges call.summary)
+            session_call.summary = session_summary
+            self.weave_client.finish_call(session_call, output=session_output)
             self.weave_client.flush()
 
             logger.info(f"Finished session call: {self.session_call_id}")
