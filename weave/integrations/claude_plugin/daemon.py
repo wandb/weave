@@ -199,6 +199,7 @@ class WeaveDaemon:
 
         # Weave state
         self.weave_client: Any = None
+        self.processor: Any | None = None  # SessionProcessor, initialized when weave starts
         self.session_call_id: str | None = None
         self.trace_id: str | None = None
         self.trace_url: str | None = None
@@ -262,6 +263,14 @@ class WeaveDaemon:
         if self.project:
             weave.init(self.project)
             self.weave_client = require_weave_client()
+
+            # Initialize SessionProcessor
+            from weave.integrations.claude_plugin.session_processor import SessionProcessor
+            self.processor = SessionProcessor(
+                client=self.weave_client,
+                project=self.project,
+                source="plugin",
+            )
 
         # Setup signal handlers
         loop = asyncio.get_event_loop()
@@ -629,8 +638,8 @@ class WeaveDaemon:
         return {"status": "ok", "trace_url": self.trace_url, "session_id": self.session_id}
 
     async def _create_session_call(self, payload: dict[str, Any]) -> dict[str, Any]:
-        """Create the session-level Weave call."""
-        if not self.weave_client:
+        """Create the session-level Weave call using SessionProcessor."""
+        if not self.weave_client or not self.processor:
             return {"status": "error", "message": "Weave not initialized"}
 
         user_prompt = payload.get("prompt", "")
@@ -647,23 +656,11 @@ class WeaveDaemon:
                         user_prompt = real_prompt
                         logger.debug(f"Using real first prompt from transcript: {user_prompt[:50]!r}")
 
-        # Generate session name
-        display_name, suggested_branch = generate_session_name(user_prompt)
-
-        # Create session call
-        session_call = self.weave_client.create_call(
-            op="claude_code.session",
-            inputs={
-                "session_id": self.session_id,
-                "cwd": cwd,
-                "first_prompt": truncate(user_prompt, 1000),
-            },
-            attributes={
-                "session_id": self.session_id,
-                "source": "claude-code-plugin",
-            },
-            display_name=display_name,
-            use_stack=False,
+        # Use SessionProcessor to create session call
+        session_call = self.processor.create_session_call(
+            session_id=self.session_id,
+            first_prompt=user_prompt,
+            cwd=cwd,
         )
 
         self.session_call_id = session_call.id
