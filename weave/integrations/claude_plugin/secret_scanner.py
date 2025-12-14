@@ -203,6 +203,77 @@ class SecretScanner:
 
         return result, len(filtered)
 
+    def scan_content(self, content: Any) -> tuple[Any, int]:
+        """Scan a Content object for secrets and return redacted version.
+
+        Args:
+            content: Content object (from weave.type_wrappers.Content)
+
+        Returns:
+            Tuple of (redacted_content, secret_count)
+        """
+        from weave.type_wrappers.Content.content import Content
+
+        try:
+            data = content.data
+            metadata = content.metadata or {}
+            filename = metadata.get("relative_path", "content")
+
+            # Check if content is text
+            if isinstance(data, bytes):
+                if not self._is_text_content(data):
+                    logger.debug(f"Skipping binary content: {filename}")
+                    return content, 0
+                try:
+                    text = data.decode("utf-8")
+                except UnicodeDecodeError:
+                    logger.debug(f"Skipping non-UTF8 content: {filename}")
+                    return content, 0
+            else:
+                text = str(data)
+
+            # Scan and redact
+            redacted_text, count = self.redact_text(text, filename)
+
+            if count == 0:
+                return content, 0
+
+            logger.warning(f"Redacted {count} secrets from {filename}")
+
+            # Create new Content with redacted data
+            if isinstance(data, bytes):
+                redacted_data = redacted_text.encode("utf-8")
+                return Content.from_bytes(redacted_data, metadata=metadata), count
+            else:
+                return Content.from_text(redacted_text, metadata=metadata), count
+
+        except Exception as e:
+            logger.warning(f"Secret scanning failed for {content}: {e}")
+            return content, 0
+
+    def _is_text_content(self, data: bytes, sample_size: int = 8192) -> bool:
+        """Check if content appears to be text (not binary).
+
+        Args:
+            data: Bytes to check
+            sample_size: How many bytes to sample
+
+        Returns:
+            True if content appears to be text
+        """
+        sample = data[:sample_size]
+
+        # Check for null bytes (common in binary files)
+        if b"\x00" in sample:
+            return False
+
+        # Try to decode as UTF-8
+        try:
+            sample.decode("utf-8")
+            return True
+        except UnicodeDecodeError:
+            return False
+
 
 # Module-level scanner instance (lazy initialized)
 _scanner: SecretScanner | None = None

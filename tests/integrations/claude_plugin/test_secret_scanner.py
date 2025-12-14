@@ -144,3 +144,59 @@ class TestSecretRedaction:
         redacted, count = scanner.redact_text(content)
         assert count == 0
         assert redacted == content
+
+
+class TestContentScanning:
+    """Tests for scanning Content objects."""
+
+    @pytest.fixture
+    def scanner(self):
+        from weave.integrations.claude_plugin.secret_scanner import SecretScanner
+        return SecretScanner()
+
+    def test_scans_text_content(self, scanner):
+        """Should scan and redact text Content."""
+        from weave.type_wrappers.Content.content import Content
+
+        content = Content.from_text(
+            "API_KEY=sk-ant-abc123xyz789def456ghi",
+            metadata={"relative_path": "config.txt"},
+        )
+        redacted, count = scanner.scan_content(content)
+        assert count >= 1
+        assert b"sk-ant" not in redacted.data
+
+    def test_scans_bytes_content(self, scanner):
+        """Should scan and redact bytes Content."""
+        from weave.type_wrappers.Content.content import Content
+
+        content = Content.from_bytes(
+            b"SECRET=sk-proj-abc123xyz789def456ghi012jkl345",
+            metadata={"relative_path": "env.txt"},
+        )
+        redacted, count = scanner.scan_content(content)
+        assert count >= 1
+        assert b"sk-proj" not in redacted.data
+
+    def test_skips_binary_content(self, scanner):
+        """Should skip binary (non-text) content."""
+        from weave.type_wrappers.Content.content import Content
+
+        # Binary content with null bytes
+        binary_data = b"\x00\x01\x02\x03\x04\x05"
+        content = Content.from_bytes(binary_data, metadata={"relative_path": "binary.bin"})
+        result, count = scanner.scan_content(content)
+        assert count == 0
+        assert result.data == binary_data
+
+    def test_preserves_metadata(self, scanner):
+        """Should preserve Content metadata after redaction."""
+        from weave.type_wrappers.Content.content import Content
+
+        metadata = {"relative_path": "test.env", "custom": "value"}
+        content = Content.from_text(
+            "KEY=sk-ant-abc123xyz789def456ghi",
+            metadata=metadata,
+        )
+        redacted, count = scanner.scan_content(content)
+        assert redacted.metadata == metadata
