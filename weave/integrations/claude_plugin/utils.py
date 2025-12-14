@@ -328,12 +328,12 @@ def log_tool_call(
                         )
 
             elif tool_name == "Edit" and structured_patch:
-                from weave.integrations.claude_plugin.diff_utils import (
-                    generate_html_from_structured_patch,
+                from weave.integrations.claude_plugin.diff_view import (
+                    generate_edit_diff_html,
                 )
 
                 file_path = tool_input.get("file_path", "unknown")
-                html = generate_html_from_structured_patch(
+                html = generate_edit_diff_html(
                     file_path=file_path,
                     original_content=original_file or "",
                     structured_patch=structured_patch,

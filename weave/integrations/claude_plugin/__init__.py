@@ -63,6 +63,7 @@ from weave.integrations.claude_plugin.utils import (
     truncate,
 )
 from weave.integrations.claude_plugin.diff_view import (
+    generate_edit_diff_html,
     generate_turn_diff_html,
 )
 from weave.integrations.claude_plugin.session_importer import (
@@ -105,6 +106,7 @@ __all__ = [
     # Utils
     "truncate",
     "get_tool_display_name",
+    "generate_edit_diff_html",
     "generate_session_name",
     # Diff view
     "generate_turn_diff_html",

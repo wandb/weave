@@ -1086,6 +1086,76 @@ def generate_diff_html_from_edit_data_for_turn(
     return "".join(html_parts)
 
 
+def generate_edit_diff_html(
+    file_path: str,
+    original_content: str,
+    structured_patch: list[dict[str, Any]],
+) -> str:
+    """Generate GitHub-style HTML diff for a single Edit tool call.
+
+    Uses the same beautiful styling as turn-level diffs, replacing the
+    old inline-styled HTML from generate_html_from_structured_patch().
+
+    Args:
+        file_path: Path to the file being edited
+        original_content: The original file content before edit
+        structured_patch: Array of patch hunks from toolUseResult
+
+    Returns:
+        HTML string with GitHub-style diff view
+    """
+    # Create edit_data in the format expected by _build_file_diffs_from_edit_data
+    edit_data = [
+        {
+            "file_path": file_path,
+            "original_file": original_content,
+            "structured_patch": structured_patch,
+        }
+    ]
+
+    file_diffs = _build_file_diffs_from_edit_data(edit_data)
+    if not file_diffs:
+        return ""
+
+    # Build HTML using same structure as generate_turn_diff_html
+    html_parts: list[str] = []
+
+    # Document start with styles
+    html_parts.append("<!DOCTYPE html>")
+    html_parts.append('<html lang="en"><head>')
+    html_parts.append('<meta charset="utf-8">')
+    html_parts.append(
+        '<meta name="viewport" content="width=device-width,initial-scale=1">'
+    )
+    html_parts.append(DIFF_HTML_STYLES)
+    html_parts.append(
+        '<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github.min.css">'
+    )
+    html_parts.append(
+        '<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>'
+    )
+    html_parts.append("</head><body>")
+
+    # Content container
+    html_parts.append('<div class="diff-view">')
+
+    # Render the file diff
+    _render_file_diff_html(html_parts, file_diffs[0])
+
+    html_parts.append("</div>")  # Close diff-view
+
+    # Initialize highlight.js
+    html_parts.append("<script>")
+    html_parts.append("document.addEventListener('DOMContentLoaded',()=>{")
+    html_parts.append("document.querySelectorAll('code[class*=language-]').forEach(el=>{")
+    html_parts.append("try{hljs.highlightElement(el)}catch(e){}});});")
+    html_parts.append("</script>")
+
+    html_parts.append("</body></html>")
+
+    return "".join(html_parts)
+
+
 def _render_file_diff_html(html_parts: list[str], file_diff: dict[str, Any]) -> None:
     """Render a single file diff to HTML parts.
 

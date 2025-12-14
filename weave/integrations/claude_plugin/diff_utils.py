@@ -12,44 +12,10 @@ file-history-snapshot entries even when they make Edit calls.
 
 from __future__ import annotations
 
-import html
 import logging
 from typing import Any
 
 logger = logging.getLogger(__name__)
-
-
-def structured_patch_to_unified_diff(
-    file_path: str,
-    structured_patch: list[dict[str, Any]],
-) -> str:
-    """Convert a structuredPatch to unified diff format.
-
-    Args:
-        file_path: Path to the file being edited
-        structured_patch: Array of patch hunks from Claude Code's toolUseResult
-
-    Returns:
-        Unified diff string
-    """
-    lines = []
-    lines.append(f"--- {file_path}")
-    lines.append(f"+++ {file_path}")
-
-    for hunk in structured_patch:
-        old_start = hunk.get("oldStart", 1)
-        old_lines = hunk.get("oldLines", 0)
-        new_start = hunk.get("newStart", 1)
-        new_lines = hunk.get("newLines", 0)
-
-        # Unified diff hunk header
-        lines.append(f"@@ -{old_start},{old_lines} +{new_start},{new_lines} @@")
-
-        # Add the diff lines (they already have the +/- prefix)
-        for line in hunk.get("lines", []):
-            lines.append(line)
-
-    return "\n".join(lines)
 
 
 def apply_structured_patch(
@@ -98,97 +64,6 @@ def apply_structured_patch(
         result += "\n"
 
     return result
-
-
-def generate_html_from_structured_patch(
-    file_path: str,
-    original_content: str,
-    structured_patch: list[dict[str, Any]],
-) -> str:
-    """Generate HTML diff view from structuredPatch data.
-
-    Args:
-        file_path: Path to the file being edited
-        original_content: The original file content
-        structured_patch: Array of patch hunks from Claude Code's toolUseResult
-
-    Returns:
-        HTML string containing a diff view
-    """
-    # Get the new content by applying the patch
-    new_content = apply_structured_patch(original_content, structured_patch)
-
-    # Generate a simple side-by-side diff view
-    html_parts = []
-    html_parts.append('<div class="diff-view" style="font-family: monospace;">')
-    html_parts.append(f'<h3>{html.escape(file_path)}</h3>')
-
-    for hunk in structured_patch:
-        old_start = hunk.get("oldStart", 1)
-        html_parts.append(
-            f'<div class="diff-hunk" style="margin: 10px 0; '
-            f'background: #f5f5f5; padding: 5px;">'
-        )
-        html_parts.append(
-            f'<div class="hunk-header" style="color: #666;">@@ Line {old_start} @@</div>'
-        )
-
-        for line in hunk.get("lines", []):
-            escaped_line = html.escape(line[1:] if len(line) > 0 else "")
-
-            if line.startswith("-"):
-                html_parts.append(
-                    f'<div class="diff-removed" style="background: #ffdddd; '
-                    f'color: #cc0000;">- {escaped_line}</div>'
-                )
-            elif line.startswith("+"):
-                html_parts.append(
-                    f'<div class="diff-added" style="background: #ddffdd; '
-                    f'color: #008800;">+ {escaped_line}</div>'
-                )
-            else:
-                html_parts.append(
-                    f'<div class="diff-context" style="color: #666;">  {escaped_line}</div>'
-                )
-
-        html_parts.append("</div>")
-
-    html_parts.append("</div>")
-    return "\n".join(html_parts)
-
-
-def aggregate_file_patches(
-    edits: list[dict[str, Any]],
-) -> dict[str, dict[str, Any]]:
-    """Aggregate multiple edits to the same file.
-
-    When multiple Edit calls modify the same file, we want to show:
-    - The original content (from the first edit)
-    - The final content (after applying all edits)
-
-    Args:
-        edits: List of edit data dicts with file_path, original_file, structured_patch
-
-    Returns:
-        Dict mapping file_path to aggregated edit data
-    """
-    aggregated: dict[str, dict[str, Any]] = {}
-
-    for edit in edits:
-        file_path = edit.get("file_path")
-        if not file_path:
-            continue
-
-        if file_path not in aggregated:
-            # First edit to this file - use its original as the baseline
-            aggregated[file_path] = {
-                "original_content": edit.get("original_file", ""),
-                "patches": [],
-            }
-
-        aggregated[file_path]["patches"].append(edit.get("structured_patch", []))
-
-    return aggregated
 
 
 def extract_edit_data_from_raw_messages(
