@@ -90,6 +90,23 @@ def main() -> None:
 
     logger.debug(f"Event: {event_name} | Session: {session_id}")
 
+    # Check if tracing is enabled (config file or local override)
+    from weave.integrations.claude_plugin.config import is_enabled
+
+    cwd = payload.get("cwd", os.getcwd())
+    if not is_enabled(cwd):
+        logger.debug("Weave tracing disabled via config")
+        # Return disabled message for UserPromptSubmit
+        if event_name == "UserPromptSubmit":
+            result = {
+                "hookSpecificOutput": {
+                    "hookEventName": "UserPromptSubmit",
+                    "additionalContext": "Weave tracing is disabled. Run /weave:enable to enable tracing.",
+                }
+            }
+            print(json.dumps(result))
+        sys.exit(0)
+
     # Import here to avoid startup overhead
     from weave.integrations.claude_plugin.socket_client import (
         DaemonClient,

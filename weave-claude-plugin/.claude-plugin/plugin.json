@@ -1,6 +1,6 @@
 {
   "name": "weave",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "description": "Real-time Weave tracing for Claude Code sessions and a weave sdk skill",
   "author": {
     "name": "Weights & Biases"
