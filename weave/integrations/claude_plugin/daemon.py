@@ -757,13 +757,9 @@ class WeaveDaemon:
                         if content:
                             file_snapshots.append(content)
 
-            # Build output
+            # Build output (actual results only)
             output: dict[str, Any] = {
                 "response": truncate(final_output, 10000) if final_output else None,
-                "turn_count": len(session.turns) if session else 0,
-                "tool_call_count": sum(tool_counts.values()),
-                "tool_counts": tool_counts,
-                "usage": total_usage.to_weave_usage() if total_usage else None,
             }
 
             if file_snapshots:
@@ -776,6 +772,17 @@ class WeaveDaemon:
                     self._subagent_file_snapshots[turn_call_id] = []
                 self._subagent_file_snapshots[turn_call_id].extend(file_snapshots)
                 logger.debug(f"Stored {len(file_snapshots)} file snapshots for parent turn {turn_call_id}")
+
+            # Build summary (metadata)
+            model = session.primary_model() if session else None
+            subagent_call.summary = {
+                "turn_count": len(session.turns) if session else 0,
+                "tool_call_count": sum(tool_counts.values()),
+                "tool_counts": tool_counts,
+                "model": model,
+            }
+            if model and total_usage:
+                subagent_call.summary["usage"] = {model: total_usage.to_weave_usage()}
 
             self.weave_client.finish_call(
                 subagent_call,
@@ -916,18 +923,26 @@ class WeaveDaemon:
                     )
                     tool_counts[tool_name] = tool_counts.get(tool_name, 0) + 1
 
-                # Finish turn call with response and usage
+                # Finish turn call with response
                 turn_response = None
                 if turn.assistant_messages:
                     turn_response = turn.assistant_messages[-1].get_text()
 
                 turn_usage = turn.total_usage()
+                turn_model = turn.primary_model()
+
+                # Set summary (metadata)
+                turn_call.summary = {
+                    "model": turn_model,
+                    "tool_call_count": len(turn.all_tool_calls()),
+                }
+                if turn_model and turn_usage:
+                    turn_call.summary["usage"] = {turn_model: turn_usage.to_weave_usage()}
+
                 self.weave_client.finish_call(
                     turn_call,
                     output={
                         "response": truncate(turn_response, 5000) if turn_response else None,
-                        "usage": turn_usage.to_weave_usage() if turn_usage else None,
-                        "tool_call_count": len(turn.all_tool_calls()),
                     },
                 )
 
@@ -949,18 +964,25 @@ class WeaveDaemon:
                 if content:
                     file_snapshots.append(content)
 
-        # Build output
+        # Build output (actual results only)
         subagent_output: dict[str, Any] = {
             "response": truncate(final_output, 10000) if final_output else None,
-            "turn_count": len(agent_session.turns),
-            "tool_call_count": sum(tool_counts.values()),
-            "tool_counts": tool_counts,
-            "usage": total_usage.to_weave_usage() if total_usage else None,
         }
 
         if file_snapshots:
             subagent_output["file_snapshots"] = file_snapshots
             logger.debug(f"Subagent captured {len(file_snapshots)} file snapshots")
+
+        # Build summary (metadata)
+        model = agent_session.primary_model()
+        subagent_call.summary = {
+            "turn_count": len(agent_session.turns),
+            "tool_call_count": sum(tool_counts.values()),
+            "tool_counts": tool_counts,
+            "model": model,
+        }
+        if model and total_usage:
+            subagent_call.summary["usage"] = {model: total_usage.to_weave_usage()}
 
         # Finish subagent call with aggregated output
         self.weave_client.finish_call(
@@ -1507,20 +1529,26 @@ class WeaveDaemon:
                 )
                 logger.debug(f"Created thinking trace with {len(thinking_content_parts)} blocks")
 
-            output.update({
-                "model": turn.primary_model(),
-                "usage": usage.to_weave_usage(),
-                "response": truncate(assistant_text.strip()),
+            # Output contains actual results only
+            output["response"] = truncate(assistant_text.strip())
+
+            # Summary contains metadata (model, usage keyed by model, counts, duration)
+            model = turn.primary_model()
+            turn_call.summary = {
+                "model": model,
                 "tool_call_count": len(turn.all_tool_calls()),
                 "duration_ms": turn.duration_ms(),
-            })
+                "response_preview": truncate(assistant_text, 200),
+            }
+            if model and usage:
+                turn_call.summary["usage"] = {model: usage.to_weave_usage()}
 
             # Detect if turn ends with a question (for Q&A context tracking)
             # Store it so the next turn can include it as context
             pending_q = extract_question_from_text(assistant_text)
             if pending_q and not interrupted:
                 self._pending_question = pending_q
-                output["ends_with_question"] = truncate(pending_q, 500)
+                turn_call.summary["ends_with_question"] = truncate(pending_q, 500)
                 logger.debug(f"Detected trailing question: {pending_q[:50]}...")
 
             # Load file backups as Content objects (list format)

@@ -304,9 +304,15 @@ class TestFinishTurnCall:
         call_args = mock_client.finish_call.call_args
         output = call_args.kwargs.get("output") or call_args[1].get("output", {})
 
+        # Output contains actual results only
         assert "response" in output
-        assert "tool_call_count" in output
-        assert output["tool_call_count"] == 0
+
+        # Summary contains metadata (tool_call_count, model, duration_ms, etc.)
+        summary = mock_turn_call.summary
+        assert "tool_call_count" in summary
+        assert summary["tool_call_count"] == 0
+        assert summary["model"] == "claude-3"
+        assert summary["duration_ms"] == 1000
 
     def test_finish_turn_call_returns_extracted_question(self):
         """Verify pending question is extracted and returned."""

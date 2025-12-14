@@ -345,10 +345,9 @@ class SessionProcessor:
             if text:
                 assistant_text += text + "\n"
 
-        # Build output (Content objects and minimal data, no metadata)
+        # Build output (Content objects and actual results only - metadata goes in summary)
         output: dict[str, Any] = {
             "response": truncate(assistant_text.strip()),
-            "tool_call_count": len(turn.all_tool_calls()),
         }
         if interrupted:
             output["interrupted"] = True

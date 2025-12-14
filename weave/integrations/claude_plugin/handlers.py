@@ -116,13 +116,13 @@ def _log_tool_calls(
         session_data["total_tool_calls"] = session_data.get("total_tool_calls", 0) + 1
 
 
-def _build_turn_output(
+def _build_turn_output_and_summary(
     turn: Turn | None,
     session: Session | None = None,
     interrupted: bool = False,
     command_output: str | None = None,
-) -> dict[str, Any]:
-    """Build the output dict for a turn call.
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Build the output and summary dicts for a turn call.
 
     Args:
         turn: The turn data (may be None if not found in transcript)
@@ -131,9 +131,10 @@ def _build_turn_output(
         command_output: Output from a slash command to include in response
 
     Returns:
-        Output dict for the turn call
+        Tuple of (output dict, summary dict) for the turn call
     """
     output: dict[str, Any] = {}
+    summary: dict[str, Any] = {}
 
     if interrupted:
         output["interrupted"] = True
@@ -149,22 +150,27 @@ def _build_turn_output(
             if text:
                 assistant_text += text + "\n"
 
-        output.update(
-            {
-                "model": turn.primary_model(),
-                "usage": turn_usage.to_weave_usage(),
-                "response": truncate(assistant_text.strip()),
-                "tool_call_count": len(turn.all_tool_calls()),
-                "duration_ms": turn.duration_ms(),
-            }
-        )
+        model = turn.primary_model()
 
-        # Include images from user message
+        # Output contains actual results only
+        output["response"] = truncate(assistant_text.strip())
+
+        # Summary contains metadata (model, usage keyed by model, counts, duration)
+        summary = {
+            "model": model,
+            "tool_call_count": len(turn.all_tool_calls()),
+            "duration_ms": turn.duration_ms(),
+            "response_preview": truncate(assistant_text, 200),
+        }
+        if model and turn_usage:
+            summary["usage"] = {model: turn_usage.to_weave_usage()}
+
+        # Include images from user message (in output - actual data)
         # Images are captured here at Stop time because they're not reliably
         # in the transcript when UserPromptSubmit fires
         if turn.user_message.images:
             output["images"] = turn.user_message.images
-            logger.debug(f"_build_turn_output: captured {len(turn.user_message.images)} images")
+            logger.debug(f"_build_turn_output_and_summary: captured {len(turn.user_message.images)} images")
 
         # Load file backups as Content objects (list format)
         if turn.file_backups and session:
@@ -176,7 +182,7 @@ def _build_turn_output(
             if file_snapshots:
                 output["file_snapshots"] = file_snapshots
 
-    return output
+    return output, summary
 
 
 def _finish_interrupted_turn(
@@ -224,13 +230,15 @@ def _finish_interrupted_turn(
         _log_tool_calls(turn, turn_call, session_data)
 
     # Finish the turn with interrupted flag
-    output = _build_turn_output(turn, session=session, interrupted=True)
+    output, summary = _build_turn_output_and_summary(turn, session=session, interrupted=True)
+    if summary:
+        turn_call.summary = summary
     client.finish_call(turn_call, output=output)
 
     # Clear turn state
     session_data["turn_call_id"] = None
 
-    logger.debug(f"Finished interrupted turn {turn_number} with {output.get('tool_call_count', 0)} tool calls")
+    logger.debug(f"Finished interrupted turn {turn_number} with {summary.get('tool_call_count', 0)} tool calls")
 
 
 def handle_session_start(payload: dict[str, Any], project: str) -> dict[str, Any] | None:
@@ -536,14 +544,18 @@ def handle_stop(payload: dict[str, Any], project: str) -> dict[str, Any] | None:
         # Get any pending command output to include in turn output
         pending_command_output = session_data.get("pending_command_output")
 
-        # Build turn output with file snapshots
-        output = _build_turn_output(
+        # Build turn output and summary
+        output, summary = _build_turn_output_and_summary(
             turn, session=session, command_output=pending_command_output
         )
 
         # Clear pending command output after using it
         if pending_command_output:
             session_data["pending_command_output"] = None
+
+        # Set summary (metadata) on turn call
+        if summary:
+            turn_call.summary = summary
 
         # Generate diff HTML for summary view
         if turn and session:
@@ -681,15 +693,19 @@ def handle_subagent_stop(payload: dict[str, Any], project: str) -> dict[str, Any
 
         # Calculate totals
         total_usage = agent_session.total_usage()
+        model = agent_session.primary_model()
 
-        # Finish the subagent call
-        output = {
+        # Set summary (metadata)
+        subagent_call.summary = {
             "turn_count": len(agent_session.turns),
             "tool_call_count": total_tool_calls,
-            "input_tokens": total_usage.input_tokens,
-            "output_tokens": total_usage.output_tokens,
+            "model": model,
         }
-        client.finish_call(subagent_call, output=output)
+        if model and total_usage:
+            subagent_call.summary["usage"] = {model: total_usage.to_weave_usage()}
+
+        # Finish the subagent call with empty output (no actual results to return)
+        client.finish_call(subagent_call, output={})
 
         client.flush()
 
