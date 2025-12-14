@@ -222,9 +222,8 @@ def download_session_file(
         Path where session file was written
     """
     # Encode cwd path for directory name (replace / with -)
+    # Claude keeps the leading dash, e.g. /home/user/foo -> -home-user-foo
     encoded_cwd = cwd.replace("/", "-")
-    if encoded_cwd.startswith("-"):
-        encoded_cwd = encoded_cwd[1:]
 
     # Create projects directory
     projects_dir = CLAUDE_DIR / "projects" / encoded_cwd
