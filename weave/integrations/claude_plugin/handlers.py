@@ -27,6 +27,7 @@ from weave.integrations.claude_plugin.diff_view import (
     generate_session_diff_html,
     generate_turn_diff_html,
 )
+from weave.integrations.claude_plugin.secret_scanner import get_secret_scanner
 from weave.integrations.claude_plugin.session_parser import (
     Session,
     ToolCall,
@@ -789,27 +790,20 @@ def handle_session_end(payload: dict[str, Any], project: str) -> dict[str, Any] 
             session_summary["duration_ms"] = session.duration_ms()
 
         # Parse session for diff view and attach session file
+        diff_html: str | None = None  # Will be set if session has file changes
         transcript_file_path = Path(transcript_path) if transcript_path else None
         if transcript_file_path and transcript_file_path.exists():
             if session:
                 # Generate session-level diff view showing all file changes
+                # NOTE: Defer set_call_view until after session_call.summary is assigned
                 diff_html = generate_session_diff_html(
                     session,
                     cwd=session.cwd,
                     sessions_dir=transcript_file_path.parent,
                     project=project,
                 )
-
                 if diff_html:
-                    set_call_view(
-                        call=session_call,
-                        client=client,
-                        name="file_changes",
-                        content=diff_html,
-                        extension="html",
-                        mimetype="text/html",
-                    )
-                    logger.debug("Attached session diff HTML view")
+                    logger.debug("Generated session diff HTML view (will attach after summary assignment)")
 
             # Capture git info for teleport feature
             if session and session.cwd:
@@ -832,6 +826,12 @@ def handle_session_end(payload: dict[str, Any], project: str) -> dict[str, Any] 
                         "relative_path": "session.jsonl",
                     },
                 )
+                # Scan session content for secrets
+                scanner = get_secret_scanner()
+                redacted_count = 0
+                if scanner:
+                    session_content, count = scanner.scan_content(session_content)
+                    redacted_count += count
                 file_snapshots_list.append(session_content)
                 logger.debug(f"Attached session file: {transcript_file_path.name}")
             except Exception as e:
@@ -863,6 +863,10 @@ def handle_session_end(payload: dict[str, Any], project: str) -> dict[str, Any] 
                                         "relative_path": str(rel_path),
                                     },
                                 )
+                                # Scan file content for secrets
+                                if scanner:
+                                    file_content, count = scanner.scan_content(file_content)
+                                    redacted_count += count
                                 file_snapshots_list.append(file_content)
                                 logger.debug(f"Attached file snapshot: {rel_path}")
                         except Exception as e:
@@ -873,8 +877,27 @@ def handle_session_end(payload: dict[str, Any], project: str) -> dict[str, Any] 
                 session_output["file_snapshots"] = file_snapshots_list
                 logger.debug(f"Attached {len(file_snapshots_list)} file snapshots to output")
 
+            # Add redacted_secrets count to session summary if any secrets were redacted
+            if redacted_count > 0:
+                session_summary["redacted_secrets"] = redacted_count
+
+        # Set summary on call object before finishing (finish_call deep-merges call.summary)
+        session_call.summary = session_summary
+
+        # Attach HTML view AFTER summary assignment to avoid being overwritten
+        if diff_html:
+            set_call_view(
+                call=session_call,
+                client=client,
+                name="file_changes",
+                content=diff_html,
+                extension="html",
+                mimetype="text/html",
+            )
+            logger.debug("Attached session diff HTML view to summary.weave.views")
+
         # Finish the session call
-        client.finish_call(session_call, output=session_output, summary=session_summary)
+        client.finish_call(session_call, output=session_output)
 
         # Clean up state
         state.delete_session(session_id)
