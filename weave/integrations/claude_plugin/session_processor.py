@@ -6,7 +6,13 @@ for both live daemon tracing and historic session import.
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
+
+from weave.integrations.claude_plugin.utils import (
+    generate_session_name,
+    truncate,
+)
 
 if TYPE_CHECKING:
     from weave.trace.weave_client import WeaveClient
@@ -39,3 +45,47 @@ class SessionProcessor:
         self.client = client
         self.project = project
         self.source = source
+
+    def create_session_call(
+        self,
+        session_id: str,
+        first_prompt: str,
+        cwd: str | None = None,
+        git_branch: str | None = None,
+        claude_code_version: str | None = None,
+    ) -> Any:
+        """Create the root session call.
+
+        Generates display name using Ollama summarizer.
+
+        Args:
+            session_id: Unique session identifier
+            first_prompt: First user prompt (for display name generation)
+            cwd: Working directory of the session
+            git_branch: Git branch name if available
+            claude_code_version: Claude Code version string
+
+        Returns:
+            Created Call object (caller stores call.id, call.trace_id, call.ui_url)
+        """
+        display_name, suggested_branch = generate_session_name(first_prompt)
+
+        return self.client.create_call(
+            op="claude_code.session",
+            inputs={
+                "session_id": session_id,
+                "cwd": cwd,
+                "git_branch": git_branch,
+                "claude_code_version": claude_code_version,
+                "suggested_branch_name": suggested_branch or None,
+                "first_prompt": truncate(first_prompt, 1000),
+            },
+            attributes={
+                "session_id": session_id,
+                "filename": f"{session_id}.jsonl",
+                "git_branch": git_branch,
+                "source": f"claude-code-{self.source}",
+            },
+            display_name=display_name,
+            use_stack=False,
+        )
