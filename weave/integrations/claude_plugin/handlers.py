@@ -160,7 +160,6 @@ def _build_turn_output_and_summary(
             "model": model,
             "tool_call_count": len(turn.all_tool_calls()),
             "duration_ms": turn.duration_ms(),
-            "response_preview": truncate(assistant_text, 200),
         }
         if model and turn_usage:
             summary["usage"] = {model: turn_usage.to_weave_usage()}
@@ -691,6 +690,14 @@ def handle_subagent_stop(payload: dict[str, Any], project: str) -> dict[str, Any
                 total_tool_calls += 1
                 _log_single_tool_call(tool_call, subagent_call)
 
+        # Collect file snapshots from all subagent turns
+        file_snapshots: list[Any] = []
+        for turn in agent_session.turns:
+            for fb in turn.file_backups:
+                content = fb.load_content(agent_session.session_id)
+                if content:
+                    file_snapshots.append(content)
+
         # Calculate totals
         total_usage = agent_session.total_usage()
         model = agent_session.primary_model()
@@ -711,10 +718,13 @@ def handle_subagent_stop(payload: dict[str, Any], project: str) -> dict[str, Any
         if model and total_usage:
             subagent_call.summary["usage"] = {model: total_usage.to_weave_usage()}
 
-        # Finish the subagent call with last assistant response as output
-        output = {}
+        # Finish the subagent call with response and file snapshots
+        output: dict[str, Any] = {}
         if final_response:
             output["response"] = truncate(final_response, 10000)
+        if file_snapshots:
+            output["file_snapshots"] = file_snapshots
+            logger.debug(f"SubagentStop: attached {len(file_snapshots)} file snapshots")
         client.finish_call(subagent_call, output=output)
 
         client.flush()

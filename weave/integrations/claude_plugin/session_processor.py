@@ -365,7 +365,6 @@ class SessionProcessor:
             "model": model,
             "tool_call_count": len(turn.all_tool_calls()),
             "duration_ms": turn.duration_ms(),
-            "response_preview": truncate(assistant_text, 200),
         }
         if model and usage:
             turn_call.summary["usage"] = {model: usage.to_weave_usage()}
