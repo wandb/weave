@@ -1005,7 +1005,6 @@ class WeaveDaemon:
                 "tool_call_count": self.total_tool_calls,
                 "tool_call_breakdown": self.tool_counts,
                 "end_reason": payload.get("reason", "unknown"),
-                "redacted_secrets": self._redacted_count,
             }
 
             # Include compaction count if any compactions occurred
@@ -1116,6 +1115,10 @@ class WeaveDaemon:
                 if file_snapshots_list:
                     session_output["file_snapshots"] = file_snapshots_list
                     logger.debug(f"Attached {len(file_snapshots_list)} file snapshots to output")
+
+            # Include redacted_secrets count if any secrets were redacted
+            if self._redacted_count > 0:
+                session_summary["redacted_secrets"] = self._redacted_count
 
             # Set summary on call object before finishing (finish_call deep-merges call.summary)
             session_call.summary = session_summary
