@@ -430,13 +430,11 @@ class WeaveDaemon:
             parent_id=self.session_call_id if tracker.turn_call_id else None,
         )
 
-        # Create subagent call (eager creation)
+        # Create subagent call with ChatView-compatible inputs
+        from weave.integrations.claude_plugin.session_processor import SessionProcessor
         subagent_call = self.weave_client.create_call(
             op="claude_code.subagent",
-            inputs={
-                "agent_id": session.agent_id,
-                "prompt": truncate(first_prompt, 2000),
-            },
+            inputs=SessionProcessor.build_subagent_inputs(first_prompt, session.agent_id),
             parent=parent_call,
             display_name=display_name,
             attributes={"agent_id": session.agent_id, "is_sidechain": True},
@@ -730,7 +728,6 @@ class WeaveDaemon:
 
             # Parse file for final output
             session = parse_session_file(tracker.transcript_path)
-            final_output = None
             total_usage = None
             tool_counts: dict[str, int] = {}
 
@@ -738,12 +735,6 @@ class WeaveDaemon:
             file_snapshots: list[Any] = []
 
             if session:
-                # Get final response
-                if session.turns:
-                    last_turn = session.turns[-1]
-                    if last_turn.assistant_messages:
-                        final_output = last_turn.assistant_messages[-1].get_text()
-
                 # Aggregate usage and tool counts
                 total_usage = session.total_usage()
                 for turn in session.turns:
@@ -757,10 +748,9 @@ class WeaveDaemon:
                         if content:
                             file_snapshots.append(content)
 
-            # Build output (actual results only)
-            output: dict[str, Any] = {
-                "response": truncate(final_output, 10000) if final_output else None,
-            }
+            # Build output in Message format using shared helper
+            from weave.integrations.claude_plugin.session_processor import SessionProcessor
+            output = SessionProcessor.build_subagent_output(session)
 
             if file_snapshots:
                 output["file_snapshots"] = file_snapshots
@@ -857,13 +847,11 @@ class WeaveDaemon:
             parent_id=self.session_call_id if self.current_turn_call_id else None,
         )
 
-        # Create subagent call as child of turn (or session if no turn)
+        # Create subagent call with ChatView-compatible inputs
+        from weave.integrations.claude_plugin.session_processor import SessionProcessor
         subagent_call = self.weave_client.create_call(
             op="claude_code.subagent",
-            inputs={
-                "agent_id": agent_id,
-                "prompt": truncate(first_prompt, 2000),
-            },
+            inputs=SessionProcessor.build_subagent_inputs(first_prompt, agent_id),
             parent=parent_call,
             display_name=display_name,
             attributes={"agent_id": agent_id, "is_sidechain": True},
@@ -946,13 +934,6 @@ class WeaveDaemon:
                     },
                 )
 
-        # Get final assistant output for subagent summary
-        final_output = None
-        if agent_session.turns:
-            last_turn = agent_session.turns[-1]
-            if last_turn.assistant_messages:
-                final_output = last_turn.assistant_messages[-1].get_text()
-
         # Aggregate token usage across all turns
         total_usage = agent_session.total_usage()
 
@@ -964,10 +945,8 @@ class WeaveDaemon:
                 if content:
                     file_snapshots.append(content)
 
-        # Build output (actual results only)
-        subagent_output: dict[str, Any] = {
-            "response": truncate(final_output, 10000) if final_output else None,
-        }
+        # Build output in Message format using shared helper
+        subagent_output = SessionProcessor.build_subagent_output(agent_session)
 
         if file_snapshots:
             subagent_output["file_snapshots"] = file_snapshots
@@ -1504,14 +1483,10 @@ class WeaveDaemon:
         if turn:
             usage = turn.total_usage()
 
-            # Collect assistant text and thinking content
-            assistant_text = ""
+            # Collect thinking content for separate thinking trace
             thinking_content_parts = []
             thinking_usage = TokenUsage(requests=0)
             for msg in turn.assistant_messages:
-                text = msg.get_text()
-                if text:
-                    assistant_text += text + "\n"
                 if msg.thinking_content:
                     thinking_content_parts.append(msg.thinking_content)
                     thinking_usage = thinking_usage + msg.usage
@@ -1529,8 +1504,12 @@ class WeaveDaemon:
                 )
                 logger.debug(f"Created thinking trace with {len(thinking_content_parts)} blocks")
 
-            # Output contains actual results only
-            output["response"] = truncate(assistant_text.strip())
+            # Build output using shared helper from SessionProcessor
+            from weave.integrations.claude_plugin.session_processor import SessionProcessor
+            turn_output, assistant_text, _ = SessionProcessor.build_turn_output(
+                turn, interrupted=interrupted
+            )
+            output.update(turn_output)
 
             # Summary contains metadata (model, usage keyed by model, counts, duration)
             model = turn.primary_model()

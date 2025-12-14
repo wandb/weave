@@ -633,114 +633,136 @@ def generate_session_diff_html(
                 if not existing or fb.backup_time < existing.backup_time:
                     earliest_backups[fb.file_path] = fb
 
-    if not earliest_backups:
-        return None
-
     # Generate diffs comparing earliest backup -> current file on disk
     file_diffs: list[dict[str, Any]] = []
     total_added = 0
     total_removed = 0
 
-    for file_path in sorted(earliest_backups.keys()):
-        backup_fb = earliest_backups[file_path]
+    if earliest_backups:
+        # Primary path: use file-history backups
+        for file_path in sorted(earliest_backups.keys()):
+            backup_fb = earliest_backups[file_path]
 
-        # Load backup content (state BEFORE first edit)
-        backup_content = backup_fb.load_content(session.session_id)
-        if not backup_content:
-            continue
+            # Load backup content (state BEFORE first edit)
+            backup_content = backup_fb.load_content(session.session_id)
+            if not backup_content:
+                continue
 
-        try:
-            backup_text = backup_content.as_string()
-        except Exception:
-            continue  # Skip binary files
+            try:
+                backup_text = backup_content.as_string()
+            except Exception:
+                continue  # Skip binary files
 
-        backup_lines = backup_text.splitlines(keepends=True)
-        if backup_lines and not backup_lines[-1].endswith("\n"):
-            backup_lines[-1] += "\n"
+            backup_lines = backup_text.splitlines(keepends=True)
+            if backup_lines and not backup_lines[-1].endswith("\n"):
+                backup_lines[-1] += "\n"
 
-        # Detect language from file extension
-        ext = Path(file_path).suffix.lower()
-        lang = EXT_TO_HLJS_LANG.get(ext, "plaintext")
+            # Detect language from file extension
+            ext = Path(file_path).suffix.lower()
+            lang = EXT_TO_HLJS_LANG.get(ext, "plaintext")
 
-        # Compare backup to current file on disk
-        try:
-            disk_path = Path(file_path)
-            if not disk_path.is_absolute():
-                if cwd:
-                    disk_path = Path(cwd) / file_path
-                else:
+            # Compare backup to current file on disk
+            try:
+                disk_path = Path(file_path)
+                if not disk_path.is_absolute():
+                    if cwd:
+                        disk_path = Path(cwd) / file_path
+                    else:
+                        continue
+
+                if not disk_path.exists():
+                    # File was deleted - show as removal
+                    diff_lines = list(
+                        difflib.unified_diff(
+                            backup_lines,
+                            [],
+                            fromfile=f"a/{file_path}",
+                            tofile=f"b/{file_path}",
+                            n=3,
+                        )
+                    )
+                    if diff_lines:
+                        removed = len(backup_lines)
+                        total_removed += removed
+                        file_diffs.append(
+                            {
+                                "path": file_path,
+                                "lang": lang,
+                                "is_new": False,
+                                "is_deleted": True,
+                                "diff_lines": diff_lines[2:],
+                                "added": 0,
+                                "removed": removed,
+                            }
+                        )
                     continue
 
-            if not disk_path.exists():
-                # File was deleted - show as removal
+                current_text = disk_path.read_text()
+                current_lines = current_text.splitlines(keepends=True)
+                if current_lines and not current_lines[-1].endswith("\n"):
+                    current_lines[-1] += "\n"
+
+                # Generate diff: earliest backup -> current
                 diff_lines = list(
                     difflib.unified_diff(
                         backup_lines,
-                        [],
+                        current_lines,
                         fromfile=f"a/{file_path}",
                         tofile=f"b/{file_path}",
                         n=3,
                     )
                 )
+
                 if diff_lines:
-                    removed = len(backup_lines)
+                    added = sum(
+                        1
+                        for line in diff_lines
+                        if line.startswith("+") and not line.startswith("+++")
+                    )
+                    removed = sum(
+                        1
+                        for line in diff_lines
+                        if line.startswith("-") and not line.startswith("---")
+                    )
+                    total_added += added
                     total_removed += removed
+
                     file_diffs.append(
                         {
                             "path": file_path,
                             "lang": lang,
                             "is_new": False,
-                            "is_deleted": True,
+                            "is_deleted": False,
                             "diff_lines": diff_lines[2:],
-                            "added": 0,
+                            "added": added,
                             "removed": removed,
                         }
                     )
+            except Exception:
                 continue
 
-            current_text = disk_path.read_text()
-            current_lines = current_text.splitlines(keepends=True)
-            if current_lines and not current_lines[-1].endswith("\n"):
-                current_lines[-1] += "\n"
+    # Fallback: if no file-history backups, try extracting Edit tool data
+    # This handles sessions where edits happen in subagents (which don't have
+    # file-history-snapshot entries in their JSONL files)
+    if not file_diffs:
+        from weave.integrations.claude_plugin.diff_utils import (
+            extract_edit_data_from_raw_messages,
+        )
 
-            # Generate diff: earliest backup -> current
-            diff_lines = list(
-                difflib.unified_diff(
-                    backup_lines,
-                    current_lines,
-                    fromfile=f"a/{file_path}",
-                    tofile=f"b/{file_path}",
-                    n=3,
-                )
-            )
+        # Collect Edit data from all turns across all sessions
+        all_edit_data: list[dict[str, Any]] = []
+        for sess in all_sessions:
+            for turn in sess.turns:
+                if turn.raw_messages:
+                    edit_data = extract_edit_data_from_raw_messages(turn.raw_messages)
+                    all_edit_data.extend(edit_data)
 
-            if diff_lines:
-                added = sum(
-                    1
-                    for line in diff_lines
-                    if line.startswith("+") and not line.startswith("+++")
-                )
-                removed = sum(
-                    1
-                    for line in diff_lines
-                    if line.startswith("-") and not line.startswith("---")
-                )
-                total_added += added
-                total_removed += removed
-
-                file_diffs.append(
-                    {
-                        "path": file_path,
-                        "lang": lang,
-                        "is_new": False,
-                        "is_deleted": False,
-                        "diff_lines": diff_lines[2:],
-                        "added": added,
-                        "removed": removed,
-                    }
-                )
-        except Exception:
-            continue
+        if all_edit_data:
+            file_diffs = _build_file_diffs_from_edit_data(all_edit_data)
+            # Compute totals
+            for fd in file_diffs:
+                total_added += fd.get("added", 0)
+                total_removed += fd.get("removed", 0)
 
     if not file_diffs:
         return None

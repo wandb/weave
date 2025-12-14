@@ -128,7 +128,12 @@ class TestCreateTurnCall:
         call_kwargs = mock_client.create_call.call_args.kwargs
         assert call_kwargs["op"] == "claude_code.turn"
         assert call_kwargs["parent"] is mock_parent
-        assert call_kwargs["inputs"]["user_message"] == "Help me fix this bug"
+        # Input uses Anthropic message format for chat view detection
+        assert "messages" in call_kwargs["inputs"]
+        messages = call_kwargs["inputs"]["messages"]
+        assert len(messages) == 1
+        assert messages[0]["role"] == "user"
+        assert messages[0]["content"] == "Help me fix this bug"
         assert call_kwargs["attributes"]["turn_number"] == 1
         assert "Turn 1:" in call_kwargs["display_name"]
 
@@ -304,8 +309,13 @@ class TestFinishTurnCall:
         call_args = mock_client.finish_call.call_args
         output = call_args.kwargs.get("output") or call_args[1].get("output", {})
 
-        # Output contains actual results only
-        assert "response" in output
+        # Output uses Message format for ChatView (not Anthropic's native format)
+        # This enables reasoning_content (collapsible thinking) and tool_calls with results
+        assert output["role"] == "assistant"
+        assert output["model"] == "claude-3"
+        assert "content" in output
+        assert isinstance(output["content"], str)  # Content is string, not list
+        # Note: "type" is intentionally omitted to avoid Anthropic format detection
 
         # Summary contains metadata (tool_call_count, model, duration_ms, etc.)
         summary = mock_turn_call.summary
@@ -387,6 +397,172 @@ class TestFinishTurnCall:
         )
 
         assert result is None
+
+    def test_finish_turn_call_includes_reasoning_content(self):
+        """Verify thinking content is included as reasoning_content."""
+        from weave.integrations.claude_plugin.session_processor import SessionProcessor
+
+        mock_client = MagicMock()
+        processor = SessionProcessor(client=mock_client, project="entity/project")
+
+        mock_turn_call = MagicMock()
+        mock_msg = MagicMock()
+        mock_msg.get_text.return_value = "Here's my response."
+        mock_msg.thinking_content = "Let me think about this step by step..."
+
+        mock_turn = MagicMock()
+        mock_turn.assistant_messages = [mock_msg]
+        mock_turn.all_tool_calls.return_value = []
+        mock_turn.total_usage.return_value = None
+        mock_turn.primary_model.return_value = "claude-3"
+        mock_turn.duration_ms.return_value = 1000
+        mock_turn.file_backups = []
+        mock_turn.raw_messages = None
+        mock_turn.user_message = MagicMock()
+        mock_turn.user_message.content = "test prompt"
+
+        mock_session = MagicMock()
+        mock_session.session_id = "session-123"
+        mock_session.turns = [mock_turn]
+        mock_session.cwd = None
+
+        processor.finish_turn_call(
+            turn_call=mock_turn_call,
+            turn=mock_turn,
+            session=mock_session,
+            turn_index=0,
+        )
+
+        call_args = mock_client.finish_call.call_args
+        output = call_args.kwargs.get("output") or call_args[1].get("output", {})
+
+        # reasoning_content should be included for ChatView's collapsible thinking UI
+        assert "reasoning_content" in output
+        assert "Let me think about this step by step" in output["reasoning_content"]
+
+    def test_finish_turn_call_includes_tool_calls_with_results(self):
+        """Verify tool calls are included in OpenAI format with results."""
+        from weave.integrations.claude_plugin.session_processor import SessionProcessor
+
+        mock_client = MagicMock()
+        processor = SessionProcessor(client=mock_client, project="entity/project")
+
+        mock_turn_call = MagicMock()
+        mock_msg = MagicMock()
+        mock_msg.get_text.return_value = "I'll read that file for you."
+        mock_msg.thinking_content = None
+
+        # Create mock tool call with result
+        mock_tool_call = MagicMock()
+        mock_tool_call.id = "toolu_abc123"
+        mock_tool_call.name = "Read"
+        mock_tool_call.input = {"file_path": "/path/to/file.py"}
+        mock_tool_call.result = "def hello():\n    print('Hello, World!')"
+
+        mock_turn = MagicMock()
+        mock_turn.assistant_messages = [mock_msg]
+        mock_turn.all_tool_calls.return_value = [mock_tool_call]
+        mock_turn.total_usage.return_value = None
+        mock_turn.primary_model.return_value = "claude-3"
+        mock_turn.duration_ms.return_value = 1000
+        mock_turn.file_backups = []
+        mock_turn.raw_messages = None
+        mock_turn.user_message = MagicMock()
+        mock_turn.user_message.content = "Read file.py"
+
+        mock_session = MagicMock()
+        mock_session.session_id = "session-123"
+        mock_session.turns = [mock_turn]
+        mock_session.cwd = None
+
+        processor.finish_turn_call(
+            turn_call=mock_turn_call,
+            turn=mock_turn,
+            session=mock_session,
+            turn_index=0,
+        )
+
+        call_args = mock_client.finish_call.call_args
+        output = call_args.kwargs.get("output") or call_args[1].get("output", {})
+
+        # tool_calls should be in OpenAI format with embedded results
+        assert "tool_calls" in output
+        assert len(output["tool_calls"]) == 1
+
+        tool_call = output["tool_calls"][0]
+        assert tool_call["id"] == "toolu_abc123"
+        assert tool_call["type"] == "function"
+        assert tool_call["function"]["name"] == "Read"
+        assert "/path/to/file.py" in tool_call["function"]["arguments"]
+
+        # Response should be embedded with tool result
+        assert "response" in tool_call
+        assert tool_call["response"]["role"] == "tool"
+        assert "def hello():" in tool_call["response"]["content"]
+        assert tool_call["response"]["tool_call_id"] == "toolu_abc123"
+
+
+class TestBuildTurnOutput:
+    """Test SessionProcessor.build_turn_output() static method."""
+
+    def test_build_turn_output_returns_message_format(self):
+        """Verify build_turn_output returns proper Message format for ChatView."""
+        from weave.integrations.claude_plugin.session_processor import SessionProcessor
+
+        mock_msg = MagicMock()
+        mock_msg.get_text.return_value = "Here's my response."
+        mock_msg.thinking_content = "Let me think..."
+
+        mock_tool_call = MagicMock()
+        mock_tool_call.id = "toolu_123"
+        mock_tool_call.name = "Read"
+        mock_tool_call.input = {"file_path": "/test.py"}
+        mock_tool_call.result = "file content"
+
+        mock_turn = MagicMock()
+        mock_turn.assistant_messages = [mock_msg]
+        mock_turn.all_tool_calls.return_value = [mock_tool_call]
+        mock_turn.primary_model.return_value = "claude-3"
+
+        output, assistant_text, thinking_text = SessionProcessor.build_turn_output(mock_turn)
+
+        # Verify Message format structure
+        assert output["role"] == "assistant"
+        assert "Here's my response" in output["content"]
+        assert output["model"] == "claude-3"
+        assert "Let me think" in output["reasoning_content"]
+
+        # Verify tool_calls in OpenAI format
+        assert "tool_calls" in output
+        assert len(output["tool_calls"]) == 1
+        tc = output["tool_calls"][0]
+        assert tc["id"] == "toolu_123"
+        assert tc["type"] == "function"
+        assert tc["function"]["name"] == "Read"
+        assert tc["response"]["role"] == "tool"
+        assert tc["response"]["content"] == "file content"
+
+        # Verify returned text
+        assert "Here's my response" in assistant_text
+        assert "Let me think" in thinking_text
+
+    def test_build_turn_output_handles_interrupted(self):
+        """Verify interrupted flag is set correctly."""
+        from weave.integrations.claude_plugin.session_processor import SessionProcessor
+
+        mock_msg = MagicMock()
+        mock_msg.get_text.return_value = "Response"
+        mock_msg.thinking_content = None
+
+        mock_turn = MagicMock()
+        mock_turn.assistant_messages = [mock_msg]
+        mock_turn.all_tool_calls.return_value = []
+        mock_turn.primary_model.return_value = "claude-3"
+
+        output, _, _ = SessionProcessor.build_turn_output(mock_turn, interrupted=True)
+
+        assert output["interrupted"] is True
+        assert output["stop_reason"] == "user_interrupt"
 
 
 class TestFinishSessionCall:

@@ -330,22 +330,28 @@ class TestTurnSummary:
 
         with patch(
             "weave.integrations.claude_plugin.session_importer.require_weave_client"
-        ) as mock_client:
+        ) as mock_client, patch(
+            "weave.integrations.claude_plugin.session_importer.reconstruct_call"
+        ) as mock_reconstruct:
             mock_call = MagicMock(id="turn-1")
             mock_call.summary = {}
             mock_client.return_value.create_call.return_value = mock_call
             mock_client.return_value.finish_call = MagicMock()
+            # Make reconstruct_call return a call with settable summary
+            reconstructed_call = MagicMock(id="turn-1")
+            reconstructed_call.summary = {}
+            mock_reconstruct.return_value = reconstructed_call
 
             _import_session_to_weave(session, Path("/tmp/test.jsonl"), use_ollama=False)
 
-            # Turn summary should have been set with model info
+            # Turn summary should have been set with model info on the reconstructed call
             # Check that summary was assigned before finish_call
-            assert mock_call.summary is not None, "Turn should have summary set"
-            assert "model" in mock_call.summary, "Summary should have model"
-            assert "usage" in mock_call.summary, "Summary should have usage"
+            assert reconstructed_call.summary is not None, "Turn should have summary set"
+            assert "model" in reconstructed_call.summary, "Summary should have model"
+            assert "usage" in reconstructed_call.summary, "Summary should have usage"
 
-    def test_turn_output_does_not_have_model_usage(self):
-        """Turn output should NOT contain model/usage (those go in summary)."""
+    def test_turn_output_uses_anthropic_format(self):
+        """Turn output uses Anthropic completion format for chat view detection."""
         now = datetime.now(timezone.utc)
         turn = Turn(user_message=UserMessage(uuid="u1", content="Hello", timestamp=now))
         turn.assistant_messages.append(
@@ -370,12 +376,16 @@ class TestTurnSummary:
 
             _import_session_to_weave(session, Path("/tmp/test.jsonl"), use_ollama=False)
 
-            # Check finish_call was called and output doesn't have model/usage
+            # Check finish_call was called and output has Anthropic format
             finish_calls = mock_client.return_value.finish_call.call_args_list
             # Find the turn finish call (not session)
             for call in finish_calls:
                 output = call.kwargs.get("output", {}) or {}
-                if output:
-                    # Turn output should not have model or usage keys
-                    assert "model" not in output, "Output should not have model"
-                    assert "usage" not in output, "Output should not have usage"
+                if output and "type" in output:
+                    # Turn output uses Anthropic completion format
+                    assert output["type"] == "message"
+                    assert output["role"] == "assistant"
+                    assert "model" in output  # Model in output for chat view
+                    assert "content" in output
+                    # Usage should still NOT be in output (only in summary)
+                    assert "usage" not in output, "Usage goes in summary, not output"

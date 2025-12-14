@@ -101,54 +101,82 @@ def discover_session_files(sessions_dir: Path, most_recent_only: bool = True) ->
     return files
 
 
-def _expand_subagent(
+def _create_subagent_call(
     agent_id: str,
     parent_call: Any,
     sessions_dir: Path,
     client: Any,
-) -> int:
-    """Expand a subagent's tool calls as children of the parent Task call.
+    session_id: str,
+    trace_id: str,
+) -> tuple[int, list[Any]]:
+    """Create a subagent call with tool calls as children.
 
     When a Task tool is invoked with subagent_type, it spawns a subagent that
     runs in a separate agent-{agentId}.jsonl file. This function parses that
-    file and creates child traces for each tool call the subagent made.
+    file and creates a claude_code.subagent call with ChatView-compatible
+    inputs/outputs, matching the daemon's pattern.
 
     For Edit tool calls, extracts structured patch data from raw messages to
     generate HTML diff views (since subagent files don't have file-history-snapshot).
 
+    Also collects file snapshots from all turns for attachment to the parent turn.
+
     Args:
         agent_id: The agent ID extracted from the Task tool result
-        parent_call: The Task tool call to attach children to
+        parent_call: The turn call to attach the subagent to
         sessions_dir: Directory containing the agent files
         client: Weave client for creating calls
+        session_id: Main session ID for loading file backups from file-history
+        trace_id: Trace ID for reconstructing calls
 
     Returns:
-        Number of calls created
+        Tuple of (calls_created, file_snapshots)
     """
     from weave.integrations.claude_plugin.diff_utils import (
         extract_edit_data_from_raw_messages,
     )
+    from weave.integrations.claude_plugin.session_processor import SessionProcessor
 
     # Find the agent file
     agent_file = sessions_dir / f"agent-{agent_id}.jsonl"
     if not agent_file.exists():
         logger.debug(f"Agent file not found: {agent_file}")
-        return 0
+        return 0, []
 
     # Parse the subagent session
     try:
         subagent_session = parse_session_file(agent_file)
     except Exception as e:
         logger.warning(f"Failed to parse agent file {agent_file}: {e}")
-        return 0
+        return 0, []
 
     if not subagent_session or not subagent_session.turns:
         logger.debug(f"Agent session has no turns: {agent_file}")
-        return 0
+        return 0, []
 
-    calls_created = 0
+    # Build display name
+    first_prompt = subagent_session.first_user_prompt() or ""
+    if first_prompt:
+        from weave.integrations.claude_plugin.utils import truncate
+        display_name = f"SubAgent: {truncate(first_prompt, 50)}"
+    else:
+        display_name = f"SubAgent: {agent_id}"
 
-    # Import each turn's tool calls as children of the Task call
+    # Create subagent call with ChatView-compatible inputs
+    subagent_call = client.create_call(
+        op="claude_code.subagent",
+        inputs=SessionProcessor.build_subagent_inputs(first_prompt, agent_id),
+        parent=parent_call,
+        display_name=display_name,
+        attributes={"agent_id": agent_id, "is_sidechain": True},
+        use_stack=False,
+    )
+
+    calls_created = 1  # Count the subagent call itself
+    file_snapshots: list[Any] = []
+    tool_counts: dict[str, int] = {}
+
+    # Import each turn's tool calls as children of the subagent call
     for turn in subagent_session.turns:
         # Extract Edit tool data from raw messages for this turn
         # This provides originalFile and structuredPatch for HTML diff generation
@@ -179,21 +207,51 @@ def _expand_subagent(
                 tool_output=tc.result,
                 tool_use_id=tc.id,
                 duration_ms=tc.duration_ms() or 0,
-                parent=parent_call,
+                parent=subagent_call,
                 original_file=original_file,
                 structured_patch=structured_patch,
             )
             calls_created += 1
+            tool_counts[tc.name] = tool_counts.get(tc.name, 0) + 1
 
-    logger.debug(f"Expanded subagent {agent_id}: {calls_created} tool calls")
-    return calls_created
+        # Collect file snapshots from this turn's file backups
+        # Note: Use main session_id (not agent_id) since file-history is stored
+        # under the main session UUID, not the short agent ID
+        for fb in turn.file_backups:
+            content = fb.load_content(session_id)
+            if content:
+                file_snapshots.append(content)
+
+    # Build output in Message format using shared helper
+    subagent_output = SessionProcessor.build_subagent_output(subagent_session)
+
+    if file_snapshots:
+        subagent_output["file_snapshots"] = file_snapshots
+
+    # Build summary (metadata)
+    total_usage = subagent_session.total_usage()
+    model = subagent_session.primary_model()
+    subagent_call.summary = {
+        "turn_count": len(subagent_session.turns),
+        "tool_call_count": sum(tool_counts.values()),
+        "tool_counts": tool_counts,
+        "model": model,
+    }
+    if model and total_usage:
+        subagent_call.summary["usage"] = {model: total_usage.to_weave_usage()}
+
+    # Finish the subagent call
+    client.finish_call(subagent_call, output=subagent_output)
+
+    logger.debug(f"Created subagent {agent_id}: {calls_created} calls, {len(file_snapshots)} file snapshots")
+    return calls_created, file_snapshots
 
 
 def _import_session_to_weave(
     session: Session,
     session_file_path: Path,
     use_ollama: bool = True,
-) -> tuple[int, int, int]:
+) -> tuple[int, int, int, str]:
     """Import a session using SessionProcessor.
 
     Args:
@@ -201,7 +259,7 @@ def _import_session_to_weave(
         session_file_path: Path to the original session JSONL file
         use_ollama: Whether to use Ollama for generating display names
 
-    Returns: (turns, tool_calls, calls_created)
+    Returns: (turns, tool_calls, calls_created, call_id)
     """
     from weave.integrations.claude_plugin.session_processor import SessionProcessor
 
@@ -254,16 +312,37 @@ def _import_session_to_weave(
             user_message=turn.user_message.content if turn.user_message else "",
             pending_question=pending_question,
         )
+        turn_call_id = turn_call.id
         calls_created += 1
+
+        # Collect subagent file snapshots for this turn
+        subagent_file_snapshots: list = []
 
         # Import tool calls as children of the turn
         for tc in turn.all_tool_calls():
-            # Skip Task tools with subagent_type - handled separately after creating the tool call
+            # Handle Task tools with subagent_type specially - create subagent call instead
+            # This matches the daemon's pattern and enables ChatView-compatible format
+            if tc.name == "Task" and tc.input.get("subagent_type"):
+                agent_id = extract_agent_id(tc.result)
+                if agent_id:
+                    subagent_calls, snapshots = _create_subagent_call(
+                        agent_id=agent_id,
+                        parent_call=turn_call,
+                        sessions_dir=sessions_dir,
+                        client=client,
+                        session_id=session.session_id,
+                        trace_id=trace_id,
+                    )
+                    calls_created += subagent_calls
+                    total_tool_calls += subagent_calls
+                    subagent_file_snapshots.extend(snapshots)
+                continue  # Skip normal tool call logging for subagent tasks
+
             tool_output = tc.result
             if tc.name == "Skill" and turn.skill_expansion:
                 tool_output = turn.skill_expansion
 
-            tool_call = log_tool_call(
+            log_tool_call(
                 tool_name=tc.name,
                 tool_input=tc.input,
                 tool_output=tool_output,
@@ -274,35 +353,41 @@ def _import_session_to_weave(
             calls_created += 1
             total_tool_calls += 1
 
-            # Expand subagent traces for Task calls with subagent_type
-            if tc.name == "Task" and tc.input.get("subagent_type"):
-                agent_id = extract_agent_id(tc.result)
-                if agent_id:
-                    subagent_calls = _expand_subagent(
-                        agent_id=agent_id,
-                        parent_call=tool_call,
-                        sessions_dir=sessions_dir,
-                        client=client,
-                    )
-                    calls_created += subagent_calls
-                    total_tool_calls += subagent_calls
+        # Reconstruct turn_call before finishing to avoid _children accumulation
+        # This prevents tool call views from being merged into turn summary as arrays
+        reconstructed_turn_call = reconstruct_call(
+            project_id=project_id,
+            call_id=turn_call_id,
+            trace_id=trace_id,
+            parent_id=session_call_id,
+        )
 
         # Finish turn call (returns extracted question)
         pending_question = processor.finish_turn_call(
-            turn_call=turn_call,
+            turn_call=reconstructed_turn_call,
             turn=turn,
             session=session,
             turn_index=i,
+            extra_file_snapshots=subagent_file_snapshots if subagent_file_snapshots else None,
         )
+
+    # Reconstruct session_call before finishing to avoid _children accumulation
+    # This prevents turn views from being merged into session summary as arrays
+    reconstructed_session_call = reconstruct_call(
+        project_id=project_id,
+        call_id=session_call_id,
+        trace_id=trace_id,
+        parent_id=None,
+    )
 
     # Finish session call
     processor.finish_session_call(
-        session_call=session_call,
+        session_call=reconstructed_session_call,
         session=session,
         sessions_dir=sessions_dir,
     )
 
-    return len(session.turns), total_tool_calls, calls_created
+    return len(session.turns), total_tool_calls, calls_created, session_call_id
 
 
 def init_weave_quiet(project: str) -> None:
@@ -318,6 +403,7 @@ def import_session_with_result(
     session_path: Path,
     dry_run: bool = False,
     use_ollama: bool = True,
+    include_details: bool = True,
 ) -> "ImportResult":
     """Import a single session file and return structured result.
 
@@ -325,11 +411,12 @@ def import_session_with_result(
         session_path: Path to the session JSONL file
         dry_run: If True, show what would be imported without importing
         use_ollama: Whether to use Ollama for generating display names
+        include_details: If True, include session details for visualization
 
     Returns:
         ImportResult with session details and success/error status
     """
-    from .cli_output import ImportResult
+    from .cli_output import ImportResult, extract_session_details
 
     try:
         session = parse_session_file(session_path)
@@ -385,6 +472,9 @@ def import_session_with_result(
         else:
             display_name = session.session_id
 
+        # Extract session details for visualization (single session imports)
+        session_details = extract_session_details(session) if include_details else None
+
         if dry_run:
             # Estimate calls: 1 session + turns + tool_calls
             calls = 1 + turns + tool_calls
@@ -397,10 +487,11 @@ def import_session_with_result(
                 tokens=usage.total(),
                 display_name=display_name,
                 success=True,
+                session_details=session_details,
             )
         else:
             # Actually import using weave.log_call()
-            turns, tool_calls, calls = _import_session_to_weave(
+            turns, tool_calls, calls, call_id = _import_session_to_weave(
                 session,
                 session_file_path=session_path,
                 use_ollama=use_ollama,
@@ -414,6 +505,8 @@ def import_session_with_result(
                 tokens=usage.total(),
                 display_name=display_name,
                 success=True,
+                session_details=session_details,
+                call_id=call_id,
             )
 
     except Exception as e:

@@ -6,6 +6,8 @@ for both live daemon tracing and historic session import.
 
 from __future__ import annotations
 
+import json
+import socket
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -18,6 +20,14 @@ from weave.integrations.claude_plugin.utils import (
 )
 from weave.trace.view_utils import set_call_view
 from weave.type_wrappers.Content.content import Content
+
+
+def get_hostname() -> str:
+    """Get the hostname of the current machine."""
+    try:
+        return socket.gethostname()
+    except Exception:
+        return "unknown"
 
 if TYPE_CHECKING:
     from weave.trace.weave_client import WeaveClient
@@ -73,7 +83,7 @@ class SessionProcessor:
         Returns:
             Created Call object (caller stores call.id, call.trace_id, call.ui_url)
         """
-        display_name, suggested_branch = generate_session_name(first_prompt)
+        display_name, _ = generate_session_name(first_prompt)
 
         return self.client.create_call(
             op="claude_code.session",
@@ -82,7 +92,6 @@ class SessionProcessor:
                 "cwd": cwd,
                 "git_branch": git_branch,
                 "claude_code_version": claude_code_version,
-                "suggested_branch_name": suggested_branch or None,
                 "first_prompt": truncate(first_prompt, 1000),
             },
             attributes={
@@ -90,6 +99,7 @@ class SessionProcessor:
                 "filename": f"{session_id}.jsonl",
                 "git_branch": git_branch,
                 "source": f"claude-code-{self.source}",
+                "hostname": get_hostname(),
             },
             display_name=display_name,
             use_stack=False,
@@ -118,11 +128,25 @@ class SessionProcessor:
         Returns:
             Created Call object
         """
-        inputs: dict[str, Any] = {
-            "user_message": truncate(user_message, 5000),
-        }
+        # Build Anthropic-format message content for chat view detection
+        user_content: str | list[dict[str, Any]] = truncate(user_message, 5000)
         if images:
-            inputs["images"] = images
+            # Include images in Anthropic format alongside text
+            content_parts: list[dict[str, Any]] = [
+                {"type": "text", "text": truncate(user_message, 5000)}
+            ]
+            for img in images:
+                # Content objects have to_anthropic_format() or we use dict format
+                if hasattr(img, "to_dict"):
+                    content_parts.append({"type": "image", "source": img.to_dict()})
+                else:
+                    content_parts.append({"type": "image", "source": img})
+            user_content = content_parts
+
+        inputs: dict[str, Any] = {
+            # Anthropic-format messages for chat view detection
+            "messages": [{"role": "user", "content": user_content}],
+        }
         if pending_question:
             inputs["in_response_to"] = pending_question
 
@@ -312,6 +336,171 @@ class SessionProcessor:
 
         return snapshots, redacted_count
 
+    @staticmethod
+    def build_turn_output(
+        turn: Any,
+        *,
+        interrupted: bool = False,
+    ) -> tuple[dict[str, Any], str, str]:
+        """Build turn output in Message format for ChatView.
+
+        Creates output compatible with Weave's ChatView Message format:
+        - role: "assistant"
+        - content: Main text response (string)
+        - model: Model name
+        - reasoning_content: Thinking content (for collapsible UI)
+        - tool_calls: Tool calls in OpenAI format with embedded results
+
+        Args:
+            turn: Parsed turn data with assistant_messages and tool calls
+            interrupted: True if user interrupted this turn
+
+        Returns:
+            Tuple of (output_dict, assistant_text, thinking_text)
+        """
+        model = turn.primary_model()
+
+        # Collect assistant text and thinking content from all assistant messages
+        assistant_text = ""
+        thinking_text = ""
+        for msg in turn.assistant_messages:
+            text = msg.get_text()
+            if text:
+                assistant_text += text + "\n"
+            if msg.thinking_content:
+                thinking_text += msg.thinking_content + "\n"
+
+        # Build output in Message format for ChatView
+        # Note: We use Message format (not Anthropic's native format with type: "message")
+        # because the ChatView Anthropic normalizer requires all content blocks to be text-only.
+        # By omitting "type", the output passes through as a raw Message object which gives us:
+        # - reasoning_content: Collapsible "Thinking" UI
+        # - tool_calls: Expandable tool calls with embedded results
+        output: dict[str, Any] = {
+            "role": "assistant",
+            "content": truncate(assistant_text.strip()),
+            "model": model or "claude-sonnet-4-20250514",
+        }
+
+        # Add thinking/reasoning content for collapsible UI
+        if thinking_text.strip():
+            output["reasoning_content"] = truncate(thinking_text.strip())
+
+        # Add tool calls with results in OpenAI format for expandable tool UI
+        tool_calls = turn.all_tool_calls()
+        if tool_calls:
+            output["tool_calls"] = []
+            for tc in tool_calls:
+                tool_call_entry: dict[str, Any] = {
+                    "id": tc.id,
+                    "type": "function",
+                    "function": {
+                        "name": tc.name,
+                        "arguments": json.dumps(tc.input) if tc.input else "{}",
+                    },
+                }
+                # Include tool result as response if available
+                if tc.result is not None:
+                    tool_call_entry["response"] = {
+                        "role": "tool",
+                        "content": truncate(tc.result),
+                        "tool_call_id": tc.id,
+                    }
+                output["tool_calls"].append(tool_call_entry)
+
+        if interrupted:
+            output["interrupted"] = True
+            output["stop_reason"] = "user_interrupt"
+
+        return output, assistant_text.strip(), thinking_text.strip()
+
+    @staticmethod
+    def build_subagent_inputs(
+        prompt: str,
+        agent_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Build subagent inputs in ChatView-compatible format.
+
+        Creates inputs with `messages` array for ChatView detection,
+        similar to turn inputs.
+
+        Args:
+            prompt: The subagent's prompt/task description
+            agent_id: Optional agent ID for metadata
+
+        Returns:
+            Input dict with messages array for ChatView compatibility
+        """
+        inputs: dict[str, Any] = {
+            # Anthropic-format messages for chat view detection
+            "messages": [{"role": "user", "content": truncate(prompt, 5000)}],
+        }
+        if agent_id:
+            inputs["agent_id"] = agent_id
+        return inputs
+
+    @staticmethod
+    def build_subagent_output(
+        session: Any,
+    ) -> dict[str, Any]:
+        """Build subagent output in Message format for ChatView.
+
+        Aggregates assistant text and tool calls across all turns in the
+        subagent session to create a unified output.
+
+        Args:
+            session: Parsed subagent session with turns
+
+        Returns:
+            Output dict in Message format with role, content, tool_calls
+        """
+        if not session or not session.turns:
+            return {
+                "role": "assistant",
+                "content": "",
+                "model": "unknown",
+            }
+
+        # Get final assistant response (from last turn's last message)
+        final_output = ""
+        if session.turns:
+            last_turn = session.turns[-1]
+            if last_turn.assistant_messages:
+                final_output = last_turn.assistant_messages[-1].get_text() or ""
+
+        # Collect all tool calls across all turns
+        all_tool_calls = []
+        for turn in session.turns:
+            for tc in turn.all_tool_calls():
+                tool_call_entry: dict[str, Any] = {
+                    "id": tc.id,
+                    "type": "function",
+                    "function": {
+                        "name": tc.name,
+                        "arguments": json.dumps(tc.input) if tc.input else "{}",
+                    },
+                }
+                if tc.result is not None:
+                    tool_call_entry["response"] = {
+                        "role": "tool",
+                        "content": truncate(tc.result),
+                        "tool_call_id": tc.id,
+                    }
+                all_tool_calls.append(tool_call_entry)
+
+        # Build Message format output
+        model = session.primary_model()
+        output: dict[str, Any] = {
+            "role": "assistant",
+            "content": truncate(final_output),
+            "model": model or "unknown",
+        }
+
+        if all_tool_calls:
+            output["tool_calls"] = all_tool_calls
+
+        return output
+
     def finish_turn_call(
         self,
         turn_call: Any,
@@ -338,20 +527,8 @@ class SessionProcessor:
         usage = turn.total_usage()
         model = turn.primary_model()
 
-        # Collect assistant text
-        assistant_text = ""
-        for msg in turn.assistant_messages:
-            text = msg.get_text()
-            if text:
-                assistant_text += text + "\n"
-
-        # Build output (Content objects and actual results only - metadata goes in summary)
-        output: dict[str, Any] = {
-            "response": truncate(assistant_text.strip()),
-        }
-        if interrupted:
-            output["interrupted"] = True
-            output["status"] = "[interrupted]"
+        # Build output using shared helper
+        output, assistant_text, _ = self.build_turn_output(turn, interrupted=interrupted)
 
         # Collect file snapshots
         file_snapshots = self._collect_turn_file_snapshots(turn, session.session_id)

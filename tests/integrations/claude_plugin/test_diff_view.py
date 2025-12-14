@@ -138,3 +138,183 @@ class TestGenerateDiffHtmlFromEditDataForTurn:
         assert "diff-view" in result
         assert 'style="background: #ffdddd"' not in result  # Ugly inline style
         assert "<!DOCTYPE html>" in result  # Full document
+
+
+class TestGenerateSessionDiffHtmlWithEditDataFallback:
+    """Test generate_session_diff_html Edit data fallback.
+
+    When file-history backups are unavailable (e.g., edits made by subagents),
+    the function should fall back to extracting Edit tool data from raw_messages.
+    """
+
+    def test_returns_html_when_subagent_has_edit_data_but_no_backups(self):
+        """Verify session diff is generated from subagent Edit data when no backups exist."""
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+        from unittest.mock import MagicMock
+        import json
+
+        from weave.integrations.claude_plugin.diff_view import generate_session_diff_html
+
+        with TemporaryDirectory() as tmpdir:
+            sessions_dir = Path(tmpdir)
+
+            # Create main session with no file_backups
+            main_session = MagicMock()
+            main_session.session_id = "test-session-123"
+            main_session.turns = [MagicMock()]
+            main_session.turns[0].file_backups = []  # No file-history backups
+            main_session.turns[0].raw_messages = []  # No Edit calls in main session
+
+            # Create subagent session file with Edit tool data
+            agent_data = [
+                {
+                    "type": "user",
+                    "uuid": "u1",
+                    "timestamp": "2025-01-01T10:00:00Z",
+                    "sessionId": "agent-abc123",
+                    "message": {"role": "user", "content": "Fix the bug"},
+                },
+                {
+                    "type": "assistant",
+                    "uuid": "a1",
+                    "timestamp": "2025-01-01T10:00:01Z",
+                    "toolUseResult": {
+                        "filePath": "/path/to/file.py",
+                        "originalFile": "def foo():\n    return 1\n",
+                        "structuredPatch": [
+                            {
+                                "oldStart": 2,
+                                "oldLines": 1,
+                                "newStart": 2,
+                                "newLines": 1,
+                                "lines": ["-    return 1", "+    return 42"],
+                            }
+                        ],
+                    },
+                    "message": {
+                        "role": "assistant",
+                        "model": "claude-sonnet-4",
+                        "content": [{"type": "text", "text": "Fixed"}],
+                        "usage": {"input_tokens": 100, "output_tokens": 10},
+                    },
+                },
+            ]
+
+            agent_file = sessions_dir / "agent-abc123.jsonl"
+            with open(agent_file, "w") as f:
+                for msg in agent_data:
+                    f.write(json.dumps(msg) + "\n")
+
+            # Generate session diff
+            result = generate_session_diff_html(
+                main_session,
+                cwd="/path/to",
+                sessions_dir=sessions_dir,
+                project="test/project",
+            )
+
+            # Should have generated HTML from subagent Edit data
+            assert result is not None
+            assert "Session File Changes" in result
+            assert "/path/to/file.py" in result
+            assert "diff-view" in result
+
+    def test_returns_none_when_no_backups_and_no_edit_data(self):
+        """Verify None is returned when neither backups nor Edit data exist."""
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+        from unittest.mock import MagicMock
+
+        from weave.integrations.claude_plugin.diff_view import generate_session_diff_html
+
+        with TemporaryDirectory() as tmpdir:
+            sessions_dir = Path(tmpdir)
+
+            # Create main session with no file_backups and no Edit calls
+            main_session = MagicMock()
+            main_session.session_id = "test-session-456"
+            main_session.turns = [MagicMock()]
+            main_session.turns[0].file_backups = []
+            main_session.turns[0].raw_messages = []
+
+            # No subagent files
+
+            result = generate_session_diff_html(
+                main_session,
+                cwd="/path/to",
+                sessions_dir=sessions_dir,
+                project="test/project",
+            )
+
+            assert result is None
+
+    def test_aggregates_edit_data_from_multiple_subagents(self):
+        """Verify Edit data is collected from all subagent sessions."""
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+        from unittest.mock import MagicMock
+        import json
+
+        from weave.integrations.claude_plugin.diff_view import generate_session_diff_html
+
+        with TemporaryDirectory() as tmpdir:
+            sessions_dir = Path(tmpdir)
+
+            main_session = MagicMock()
+            main_session.session_id = "test-session-789"
+            main_session.turns = [MagicMock()]
+            main_session.turns[0].file_backups = []
+            main_session.turns[0].raw_messages = []
+
+            # Create two subagent files with different edits
+            for agent_id, file_path in [("abc", "file_a.py"), ("def", "file_b.py")]:
+                agent_data = [
+                    {
+                        "type": "user",
+                        "uuid": "u1",
+                        "timestamp": "2025-01-01T10:00:00Z",
+                        "sessionId": f"agent-{agent_id}",
+                        "message": {"role": "user", "content": "Edit"},
+                    },
+                    {
+                        "type": "assistant",
+                        "uuid": "a1",
+                        "timestamp": "2025-01-01T10:00:01Z",
+                        "toolUseResult": {
+                            "filePath": f"/path/to/{file_path}",
+                            "originalFile": "x = 1\n",
+                            "structuredPatch": [
+                                {
+                                    "oldStart": 1,
+                                    "oldLines": 1,
+                                    "newStart": 1,
+                                    "newLines": 1,
+                                    "lines": ["-x = 1", "+x = 99"],
+                                }
+                            ],
+                        },
+                        "message": {
+                            "role": "assistant",
+                            "model": "claude-sonnet-4",
+                            "content": [{"type": "text", "text": "Done"}],
+                            "usage": {"input_tokens": 50, "output_tokens": 5},
+                        },
+                    },
+                ]
+                agent_file = sessions_dir / f"agent-{agent_id}.jsonl"
+                with open(agent_file, "w") as f:
+                    for msg in agent_data:
+                        f.write(json.dumps(msg) + "\n")
+
+            result = generate_session_diff_html(
+                main_session,
+                cwd="/path/to",
+                sessions_dir=sessions_dir,
+                project="test/project",
+            )
+
+            assert result is not None
+            # Should contain diffs from both subagents
+            assert "file_a.py" in result
+            assert "file_b.py" in result
