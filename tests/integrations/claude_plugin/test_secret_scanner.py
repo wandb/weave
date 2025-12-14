@@ -96,3 +96,51 @@ class TestSecretDetection:
         """
         secrets = scanner.scan_text(content)
         assert len(secrets) >= 2
+
+
+class TestSecretRedaction:
+    """Tests for secret redaction."""
+
+    @pytest.fixture
+    def scanner(self):
+        from weave.integrations.claude_plugin.secret_scanner import SecretScanner
+        return SecretScanner()
+
+    def test_redacts_secret(self, scanner):
+        """Should replace secret with redaction marker."""
+        content = "key: sk-ant-abc123xyz789def456ghi"
+        redacted, count = scanner.redact_text(content)
+        assert count >= 1
+        assert "sk-ant" not in redacted
+        assert "[REDACTED:" in redacted
+
+    def test_redaction_preserves_context(self, scanner):
+        """Should preserve surrounding text."""
+        content = "Before sk-ant-abc123xyz789def456ghi After"
+        redacted, count = scanner.redact_text(content)
+        assert "Before" in redacted
+        assert "After" in redacted
+
+    def test_redaction_includes_type(self, scanner):
+        """Redaction marker should include secret type."""
+        content = "OPENAI_API_KEY=sk-proj-abc123xyz789def456ghi012jkl345"
+        redacted, count = scanner.redact_text(content)
+        assert "[REDACTED:openai_api_key]" in redacted or "[REDACTED:" in redacted
+
+    def test_redacts_multiple_secrets(self, scanner):
+        """Should redact all secrets in content."""
+        content = """
+        OPENAI_API_KEY=sk-proj-abc123xyz789def456ghi012jkl345
+        ANTHROPIC_API_KEY=sk-ant-def456xyz789abc123ghi
+        """
+        redacted, count = scanner.redact_text(content)
+        assert count >= 2
+        assert "sk-proj" not in redacted
+        assert "sk-ant" not in redacted
+
+    def test_no_redaction_for_clean_content(self, scanner):
+        """Should return content unchanged if no secrets."""
+        content = "Hello world, no secrets here."
+        redacted, count = scanner.redact_text(content)
+        assert count == 0
+        assert redacted == content

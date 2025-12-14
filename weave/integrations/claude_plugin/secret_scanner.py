@@ -143,6 +143,66 @@ class SecretScanner:
 
         return secrets
 
+    def redact_text(self, content: str, filename: str = "content") -> tuple[str, int]:
+        """Scan and redact secrets from text.
+
+        Args:
+            content: Text content to scan and redact
+            filename: Filename for context
+
+        Returns:
+            Tuple of (redacted_content, secret_count)
+        """
+        secrets = self.scan_text(content, filename)
+
+        if not secrets:
+            return content, 0
+
+        # Build list of (start, end, replacement) for all secrets
+        # We need to handle overlapping detections and work with line/column
+        replacements: list[tuple[int, int, str]] = []
+
+        lines = content.split("\n")
+        line_starts = [0]
+        for line in lines[:-1]:
+            line_starts.append(line_starts[-1] + len(line) + 1)  # +1 for newline
+
+        for secret in secrets:
+            # Calculate absolute position from line number and column
+            if secret.line_number > len(lines):
+                continue
+
+            line_start = line_starts[secret.line_number - 1]
+            line = lines[secret.line_number - 1]
+
+            # Find the secret in this line
+            if secret.secret_value:
+                idx = line.find(secret.secret_value)
+                if idx >= 0:
+                    abs_start = line_start + idx
+                    abs_end = abs_start + len(secret.secret_value)
+                    replacement = f"[REDACTED:{secret.secret_type}]"
+                    replacements.append((abs_start, abs_end, replacement))
+
+        if not replacements:
+            return content, 0
+
+        # Sort by start position descending so we can replace from end to start
+        replacements.sort(key=lambda x: x[0], reverse=True)
+
+        # Remove overlapping replacements (keep the first/longest one)
+        filtered: list[tuple[int, int, str]] = []
+        for repl in replacements:
+            if not filtered or repl[1] <= filtered[-1][0]:
+                filtered.append(repl)
+
+        # Apply replacements from end to start
+        result = content
+        for start, end, replacement in filtered:
+            result = result[:start] + replacement + result[end:]
+
+        return result, len(filtered)
+
 
 # Module-level scanner instance (lazy initialized)
 _scanner: SecretScanner | None = None
