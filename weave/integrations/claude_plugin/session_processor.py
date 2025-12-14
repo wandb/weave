@@ -10,10 +10,12 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from weave.integrations.claude_plugin.utils import (
+    extract_question_from_text,
     generate_session_name,
     get_turn_display_name,
     truncate,
 )
+from weave.trace.view_utils import set_call_view
 from weave.type_wrappers.Content.content import Content
 
 if TYPE_CHECKING:
@@ -226,3 +228,129 @@ class SessionProcessor:
                     pass
 
         return snapshots
+
+    def finish_turn_call(
+        self,
+        turn_call: Any,
+        turn: Any,
+        session: Any,
+        turn_index: int,
+        *,
+        interrupted: bool = False,
+        extra_file_snapshots: list[Any] | None = None,
+    ) -> str | None:
+        """Finish turn call with output, summary, and diff view.
+
+        Args:
+            turn_call: The call to finish
+            turn: Parsed turn data
+            session: Full session (for diff context)
+            turn_index: 0-based index into session.turns
+            interrupted: True if user interrupted this turn
+            extra_file_snapshots: Additional snapshots (e.g., from subagents)
+
+        Returns:
+            Extracted question from response (for Q&A tracking), or None
+        """
+        usage = turn.total_usage()
+        model = turn.primary_model()
+
+        # Collect assistant text
+        assistant_text = ""
+        for msg in turn.assistant_messages:
+            text = msg.get_text()
+            if text:
+                assistant_text += text + "\n"
+
+        # Build output
+        output: dict[str, Any] = {
+            "response": truncate(assistant_text.strip()),
+            "tool_call_count": len(turn.all_tool_calls()),
+            "duration_ms": turn.duration_ms(),
+            "model": model,
+        }
+        if usage:
+            output["usage"] = usage.to_weave_usage()
+        if interrupted:
+            output["interrupted"] = True
+            output["status"] = "[interrupted]"
+
+        # Collect file snapshots
+        file_snapshots = self._collect_turn_file_snapshots(turn, session.session_id)
+        if extra_file_snapshots:
+            file_snapshots.extend(extra_file_snapshots)
+        if file_snapshots:
+            output["file_snapshots"] = file_snapshots
+
+        # Build summary
+        turn_call.summary = {
+            "model": model,
+            "tool_call_count": len(turn.all_tool_calls()),
+            "duration_ms": turn.duration_ms(),
+            "response_preview": truncate(assistant_text, 200),
+        }
+        if model and usage:
+            turn_call.summary["usage"] = {model: usage.to_weave_usage()}
+
+        # Attach diff view
+        self._attach_turn_diff_view(
+            turn_call,
+            turn,
+            session,
+            turn_index,
+            user_prompt=turn.user_message.content if turn.user_message else None,
+        )
+
+        # Finish
+        self.client.finish_call(turn_call, output=output)
+
+        # Extract and return pending question for next turn
+        if not interrupted:
+            return extract_question_from_text(assistant_text)
+        return None
+
+    def _attach_turn_diff_view(
+        self,
+        turn_call: Any,
+        turn: Any,
+        session: Any,
+        turn_index: int,
+        user_prompt: str | None = None,
+    ) -> None:
+        """Generate and attach turn-level diff HTML view."""
+        from weave.integrations.claude_plugin.diff_view import (
+            generate_turn_diff_html,
+            generate_diff_html_from_edit_data_for_turn,
+        )
+
+        # Try file-history-based diff first
+        diff_html = generate_turn_diff_html(
+            turn=turn,
+            turn_index=turn_index,
+            all_turns=session.turns,
+            session_id=session.session_id,
+            turn_number=turn_index + 1,
+            tool_count=len(turn.all_tool_calls()),
+            model=turn.primary_model(),
+            historic_mode=(self.source == "import"),
+            cwd=session.cwd,
+            user_prompt=user_prompt,
+        )
+
+        # Fallback to Edit tool data
+        if not diff_html and turn.raw_messages:
+            diff_html = generate_diff_html_from_edit_data_for_turn(
+                turn=turn,
+                turn_number=turn_index + 1,
+                user_prompt=user_prompt,
+            )
+
+        if diff_html:
+            set_call_view(
+                call=turn_call,
+                client=self.client,
+                name="file_changes",
+                content=diff_html,
+                extension="html",
+                mimetype="text/html",
+            )

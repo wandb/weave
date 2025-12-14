@@ -264,3 +264,120 @@ class TestFileSnapshotCollection:
 
             # Should include the changed file
             assert len(result) >= 1
+
+
+class TestFinishTurnCall:
+    """Test SessionProcessor.finish_turn_call()."""
+
+    def test_finish_turn_call_builds_output(self):
+        """Verify finish_turn_call builds correct output structure."""
+        from weave.integrations.claude_plugin.session_processor import SessionProcessor
+
+        mock_client = MagicMock()
+        processor = SessionProcessor(client=mock_client, project="entity/project")
+
+        mock_turn_call = MagicMock()
+        mock_turn = MagicMock()
+        mock_turn.assistant_messages = []
+        mock_turn.all_tool_calls.return_value = []
+        mock_turn.total_usage.return_value = None
+        mock_turn.primary_model.return_value = "claude-3"
+        mock_turn.duration_ms.return_value = 1000
+        mock_turn.file_backups = []
+        mock_turn.raw_messages = None
+        mock_turn.user_message = MagicMock()
+        mock_turn.user_message.content = "test prompt"
+
+        mock_session = MagicMock()
+        mock_session.session_id = "session-123"
+        mock_session.turns = [mock_turn]
+        mock_session.cwd = None
+
+        processor.finish_turn_call(
+            turn_call=mock_turn_call,
+            turn=mock_turn,
+            session=mock_session,
+            turn_index=0,
+        )
+
+        mock_client.finish_call.assert_called_once()
+        call_args = mock_client.finish_call.call_args
+        output = call_args.kwargs.get("output") or call_args[1].get("output", {})
+
+        assert "response" in output
+        assert "tool_call_count" in output
+        assert output["tool_call_count"] == 0
+
+    def test_finish_turn_call_returns_extracted_question(self):
+        """Verify pending question is extracted and returned."""
+        from weave.integrations.claude_plugin.session_processor import SessionProcessor
+
+        mock_client = MagicMock()
+        processor = SessionProcessor(client=mock_client, project="entity/project")
+
+        mock_turn_call = MagicMock()
+        mock_msg = MagicMock()
+        mock_msg.get_text.return_value = "Here's my answer. What would you like to do next?"
+
+        mock_turn = MagicMock()
+        mock_turn.assistant_messages = [mock_msg]
+        mock_turn.all_tool_calls.return_value = []
+        mock_turn.total_usage.return_value = None
+        mock_turn.primary_model.return_value = "claude-3"
+        mock_turn.duration_ms.return_value = 1000
+        mock_turn.file_backups = []
+        mock_turn.raw_messages = None
+        mock_turn.user_message = MagicMock()
+        mock_turn.user_message.content = "test"
+
+        mock_session = MagicMock()
+        mock_session.session_id = "session-123"
+        mock_session.turns = [mock_turn]
+        mock_session.cwd = None
+
+        result = processor.finish_turn_call(
+            turn_call=mock_turn_call,
+            turn=mock_turn,
+            session=mock_session,
+            turn_index=0,
+        )
+
+        assert result is not None
+        assert "?" in result
+
+    def test_finish_turn_call_interrupted_returns_none(self):
+        """Verify interrupted turns don't extract questions."""
+        from weave.integrations.claude_plugin.session_processor import SessionProcessor
+
+        mock_client = MagicMock()
+        processor = SessionProcessor(client=mock_client, project="entity/project")
+
+        mock_turn_call = MagicMock()
+        mock_msg = MagicMock()
+        mock_msg.get_text.return_value = "What would you like?"
+
+        mock_turn = MagicMock()
+        mock_turn.assistant_messages = [mock_msg]
+        mock_turn.all_tool_calls.return_value = []
+        mock_turn.total_usage.return_value = None
+        mock_turn.primary_model.return_value = "claude-3"
+        mock_turn.duration_ms.return_value = 1000
+        mock_turn.file_backups = []
+        mock_turn.raw_messages = None
+        mock_turn.user_message = MagicMock()
+        mock_turn.user_message.content = "test"
+
+        mock_session = MagicMock()
+        mock_session.session_id = "session-123"
+        mock_session.turns = [mock_turn]
+        mock_session.cwd = None
+
+        result = processor.finish_turn_call(
+            turn_call=mock_turn_call,
+            turn=mock_turn,
+            session=mock_session,
+            turn_index=0,
+            interrupted=True,
+        )
+
+        assert result is None
