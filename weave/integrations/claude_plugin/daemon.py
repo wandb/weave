@@ -99,6 +99,7 @@ from weave.integrations.claude_plugin.session_parser import (
 from weave.integrations.claude_plugin.socket_client import get_socket_path
 from weave.integrations.claude_plugin.state import StateManager
 from weave.integrations.claude_plugin.utils import (
+    extract_question_from_text,
     generate_session_name,
     get_git_info,
     get_tool_display_name,
@@ -1337,7 +1338,22 @@ class WeaveDaemon:
         # Increment turn number
         self.turn_number += 1
 
-        # Create turn call
+        # Check for compaction (context continuation)
+        is_compacted = is_compaction_message(user_text)
+        if is_compacted:
+            self.compaction_count += 1
+            logger.debug(f"Detected compaction event #{self.compaction_count}")
+
+        # Log images if present (for debugging)
+        if user_images:
+            logger.debug(f"Turn {self.turn_number} has {len(user_images)} images")
+
+        # Get pending question from previous turn for Q&A context
+        pending_question = self._pending_question
+        if pending_question:
+            logger.debug(f"Added question context: {pending_question[:50]}...")
+            self._pending_question = None  # Clear after using
+
         # Reconstruct session call as parent
         session_call = reconstruct_call(
             project_id=self.weave_client._project_id(),
@@ -1346,46 +1362,14 @@ class WeaveDaemon:
             parent_id=None,
         )
 
-        # Check for compaction (context continuation)
-        is_compacted = is_compaction_message(user_text)
-        if is_compacted:
-            self.compaction_count += 1
-            logger.debug(f"Detected compaction event #{self.compaction_count}")
-
-        # Build inputs with images and pending question context
-        turn_inputs: dict[str, Any] = {
-            "user_message": truncate(user_text, 5000),
-        }
-        if user_images:
-            turn_inputs["images"] = user_images
-            logger.debug(f"Turn {self.turn_number} has {len(user_images)} images")
-
-        # Include pending question from previous turn for Q&A context
-        if self._pending_question:
-            turn_inputs["in_response_to"] = self._pending_question
-            logger.debug(f"Added question context: {self._pending_question[:50]}...")
-            self._pending_question = None  # Clear after using
-
-        # Build attributes
-        turn_attributes: dict[str, Any] = {
-            "turn_number": self.turn_number,
-        }
-        if is_compacted:
-            turn_attributes["compacted"] = True
-
-        # Use special display name for compaction turns
-        if is_compacted:
-            display_name = f"Turn {self.turn_number}: Compacted, resuming..."
-        else:
-            display_name = get_turn_display_name(self.turn_number, user_text)
-
-        turn_call = self.weave_client.create_call(
-            op="claude_code.turn",
-            inputs=turn_inputs,
+        # Use SessionProcessor to create turn call
+        turn_call = self.processor.create_turn_call(
             parent=session_call,
-            attributes=turn_attributes,
-            display_name=display_name,
-            use_stack=False,
+            turn_number=self.turn_number,
+            user_message=user_text,
+            pending_question=pending_question,
+            images=user_images if user_images else None,
+            is_compacted=is_compacted,
         )
 
         self.current_turn_call_id = turn_call.id
@@ -1517,7 +1501,14 @@ class WeaveDaemon:
                 logger.debug(f"Tracked pending tool call: {tool_name} ({tool_id})")
 
     async def _finish_current_turn(self, interrupted: bool = False) -> None:
-        """Finish the current turn call with file snapshots and diff view."""
+        """Finish the current turn call with file snapshots and diff view.
+
+        Note: This method has streaming-specific logic (real-time tool call logging,
+        thinking traces, inline parent handling) that differs from the batch-oriented
+        processor.finish_turn_call(). Full migration would require design work to
+        handle both real-time and batch processing patterns. For now, we use the
+        processor's helper functions where applicable (e.g., extract_question_from_text).
+        """
         if not self.weave_client or not self.current_turn_call_id:
             return
 
@@ -1578,7 +1569,7 @@ class WeaveDaemon:
 
             # Detect if turn ends with a question (for Q&A context tracking)
             # Store it so the next turn can include it as context
-            pending_q = self._extract_question_from_text(assistant_text)
+            pending_q = extract_question_from_text(assistant_text)
             if pending_q and not interrupted:
                 self._pending_question = pending_q
                 output["ends_with_question"] = truncate(pending_q, 500)
@@ -1821,43 +1812,6 @@ class WeaveDaemon:
 
         logger.debug(f"Finished inline parent: {tracker.display_name}")
         self._pending_inline_parent = None
-
-    def _extract_question_from_text(self, text: str) -> str | None:
-        """Extract the trailing question from assistant text output.
-
-        Looks for a question mark in the last paragraph and extracts
-        everything up to and including the first "?" as the question.
-        Handles cases where additional text follows the question.
-
-        Returns:
-            The extracted question text, or None if no question found.
-        """
-        if not text or not text.strip():
-            return None
-
-        text = text.strip()
-
-        # Split into paragraphs (double newline separated)
-        paragraphs = text.split("\n\n")
-        last_para = paragraphs[-1].strip()
-
-        # Look for question mark anywhere in the last paragraph
-        if "?" not in last_para:
-            return None
-
-        # Extract everything up to and including the first "?"
-        question_end = last_para.index("?") + 1
-        question = last_para[:question_end].strip()
-
-        # Clean up markdown formatting but keep the text
-        # Remove leading ** if present (bold markdown)
-        if question.startswith("**"):
-            question = question[2:]
-        # Remove all ** markers
-        if "**" in question:
-            question = question.replace("**", "")
-
-        return question.strip() if question.strip() else None
 
     async def _finish_question_call(
         self, tool_use_id: str, tool_result: dict[str, Any]
