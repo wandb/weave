@@ -1,5 +1,7 @@
 """Teleport functionality for Claude Code sessions.
 
+TODO: Add support for partial file restoration (allow user to select which files to restore)
+
 Enables resuming a Claude session from a different machine by:
 1. Fetching session data from Weave
 2. Verifying git state matches
@@ -314,13 +316,14 @@ def teleport(
         return False, f"Session {session_id} not found in Weave"
 
     output = session_data.get("output", {})
+    summary = session_data.get("summary", {})
 
-    # Check if session has ended
-    if not output.get("end_reason"):
+    # Check if session has ended (end_reason is in summary, not output)
+    if not summary.get("end_reason"):
         return False, f"Session {session_id} is still active. Wait for it to end."
 
-    # Verify git state
-    git_info = output.get("git", {})
+    # Verify git state (git info is in summary)
+    git_info = summary.get("git", {})
     if not skip_git_check and git_info:
         errors, warnings = verify_git_state(git_info, cwd)
 
