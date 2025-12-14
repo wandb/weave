@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Any
 from weave.integrations.claude_plugin.utils import (
     extract_question_from_text,
     generate_session_name,
+    get_git_info,
     get_turn_display_name,
     truncate,
 )
@@ -170,11 +171,14 @@ class SessionProcessor:
         session: Any,
         sessions_dir: Path,
     ) -> list[Any]:
-        """Collect file snapshots for session output.
+        """Collect file snapshots for session output (internal helper).
 
         Includes:
         - Session JSONL file itself
         - Final state of all changed files (from disk)
+
+        NOTE: This is the internal version without secret scanning.
+        For daemon use with secret scanning, use collect_session_file_snapshots_with_scanner.
 
         Args:
             session: Session object with session_id, cwd, get_all_changed_files()
@@ -228,6 +232,85 @@ class SessionProcessor:
                     pass
 
         return snapshots
+
+    def collect_session_file_snapshots_with_scanner(
+        self,
+        session: Any,
+        sessions_dir: Path,
+        secret_scanner: Any | None = None,
+    ) -> tuple[list[Any], int]:
+        """Collect file snapshots with optional secret scanning (for daemon).
+
+        Includes:
+        - Session JSONL file itself
+        - Final state of all changed files (from disk)
+
+        Args:
+            session: Session object with session_id, cwd, get_all_changed_files()
+            sessions_dir: Directory containing session files
+            secret_scanner: Optional SecretScanner instance (from get_secret_scanner())
+
+        Returns:
+            Tuple of (snapshots list, redacted_count)
+        """
+        from weave.integrations.claude_plugin.utils import logger
+
+        snapshots: list[Any] = []
+        redacted_count = 0
+
+        # Add session JSONL file
+        session_file = sessions_dir / f"{session.session_id}.jsonl"
+        if session_file.exists():
+            try:
+                content = Content.from_path(
+                    session_file,
+                    metadata={
+                        "session_id": session.session_id,
+                        "filename": session_file.name,
+                        "relative_path": "session.jsonl",
+                    },
+                )
+                # Scan for secrets if scanner provided
+                if secret_scanner:
+                    content, count = secret_scanner.scan_content(content)
+                    redacted_count += count
+                snapshots.append(content)
+                logger.debug(f"Attached session file: {session_file.name}")
+            except Exception as e:
+                logger.debug(f"Failed to attach session file: {e}")
+
+        # Add final state of changed files
+        if session.cwd:
+            cwd_path = Path(session.cwd)
+            for file_path in session.get_all_changed_files():
+                try:
+                    abs_path = Path(file_path)
+                    if not abs_path.is_absolute():
+                        abs_path = cwd_path / file_path
+
+                    if abs_path.exists():
+                        try:
+                            rel_path = abs_path.relative_to(cwd_path)
+                        except ValueError:
+                            rel_path = Path(abs_path.name)
+
+                        content = Content.from_path(
+                            abs_path,
+                            metadata={
+                                "original_path": str(file_path),
+                                "relative_path": str(rel_path),
+                            },
+                        )
+                        # Scan for secrets if scanner provided
+                        if secret_scanner:
+                            content, count = secret_scanner.scan_content(content)
+                            redacted_count += count
+                        snapshots.append(content)
+                        logger.debug(f"Attached file snapshot: {rel_path}")
+                except Exception as e:
+                    logger.debug(f"Failed to attach file {file_path}: {e}")
+
+        return snapshots, redacted_count
 
     def finish_turn_call(
         self,
@@ -384,6 +467,13 @@ class SessionProcessor:
             summary["usage"] = {model: usage.to_weave_usage()}
         if end_reason:
             summary["end_reason"] = end_reason
+
+        # Add git info if available (for teleport feature)
+        if session.cwd:
+            git_info = get_git_info(session.cwd)
+            if git_info:
+                summary["git"] = git_info
+
         if extra_summary:
             summary.update(extra_summary)
 

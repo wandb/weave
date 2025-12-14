@@ -1048,71 +1048,19 @@ class WeaveDaemon:
                         session_summary["git"] = git_info
                         logger.debug(f"Attached git info: branch={git_info.get('branch')}")
 
-                # Collect file snapshots as a list for output
+                # Collect file snapshots with secret scanning (using SessionProcessor helper)
                 # Includes: session.jsonl + all modified/created files
-                file_snapshots_list: list[Any] = []
-
-                # Add session JSONL file
-                try:
-                    from weave.type_wrappers.Content.content import Content
-                    session_content = Content.from_path(
-                        self.transcript_path,
-                        metadata={
-                            "session_id": self.session_id,
-                            "filename": self.transcript_path.name,
-                            "relative_path": "session.jsonl",
-                        },
-                    )
-                    # Scan session content for secrets
+                if session and self.processor:
                     scanner = get_secret_scanner()
-                    if scanner:
-                        session_content, count = scanner.scan_content(session_content)
-                        self._redacted_count += count
-                    file_snapshots_list.append(session_content)
-                    logger.debug(f"Attached session file: {self.transcript_path.name}")
-                except Exception as e:
-                    logger.debug(f"Failed to attach session file: {e}")
-
-                # Add final state of all changed files
-                if session and session.cwd:
-                    all_changed = session.get_all_changed_files()
-                    if all_changed:
-                        cwd_path = Path(session.cwd)
-                        for file_path in all_changed:
-                            try:
-                                # Handle both absolute and relative paths
-                                if Path(file_path).is_absolute():
-                                    abs_path = Path(file_path)
-                                    try:
-                                        rel_path = abs_path.relative_to(cwd_path)
-                                    except ValueError:
-                                        rel_path = Path(abs_path.name)
-                                else:
-                                    rel_path = Path(file_path)
-                                    abs_path = cwd_path / file_path
-
-                                if abs_path.exists():
-                                    file_content = Content.from_path(
-                                        abs_path,
-                                        metadata={
-                                            "original_path": str(file_path),
-                                            "relative_path": str(rel_path),
-                                        },
-                                    )
-                                    # Scan file content for secrets
-                                    scanner = get_secret_scanner()
-                                    if scanner:
-                                        file_content, count = scanner.scan_content(file_content)
-                                        self._redacted_count += count
-                                    file_snapshots_list.append(file_content)
-                                    logger.debug(f"Attached file snapshot: {rel_path}")
-                            except Exception as e:
-                                logger.debug(f"Failed to attach file {file_path}: {e}")
-
-                # Store file snapshots in output (Content objects are properly serialized there)
-                if file_snapshots_list:
-                    session_output["file_snapshots"] = file_snapshots_list
-                    logger.debug(f"Attached {len(file_snapshots_list)} file snapshots to output")
+                    file_snapshots_list, redaction_count = self.processor.collect_session_file_snapshots_with_scanner(
+                        session=session,
+                        sessions_dir=sessions_dir,
+                        secret_scanner=scanner,
+                    )
+                    self._redacted_count += redaction_count
+                    if file_snapshots_list:
+                        session_output["file_snapshots"] = file_snapshots_list
+                        logger.debug(f"Attached {len(file_snapshots_list)} file snapshots to output")
 
             # Include redacted_secrets count if any secrets were redacted
             if self._redacted_count > 0:
