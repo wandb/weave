@@ -1792,6 +1792,13 @@ def test_get_calls_storage_size_with_other_params(client):
     assert len(calls_filtered) == 2
 
 
+@pytest.fixture
+def clickhouse_client(client):
+    if client_is_sqlite(client):
+        return None
+    return client.server._next_trace_server.ch_client
+
+
 def test_get_calls_storage_size_values(client, clickhouse_client):
     """Test that storage size values are correctly included when parameters are set."""
     if client_is_sqlite(client):
