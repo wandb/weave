@@ -79,6 +79,13 @@ class Call:
     _children: list[Call] = dataclasses.field(default_factory=list)
     _feedback: RefFeedbackQuery | None = None
 
+    # Size of metadata storage for this call
+    storage_size_bytes: int | None = None
+
+    # Total size of metadata storage for the entire trace
+    total_storage_size_bytes: int | None = None
+
+
     @property
     def display_name(self) -> str | Callable[[Call], str] | None:
         return self._display_name
@@ -426,6 +433,8 @@ def make_client_call(
         wb_run_id=server_call.wb_run_id,
         wb_run_step=server_call.wb_run_step,
         wb_run_step_end=server_call.wb_run_step_end,
+        storage_size_bytes=server_call.storage_size_bytes,
+        total_storage_size_bytes=server_call.total_storage_size_bytes,
     )
     if isinstance(call.attributes, AttributesDict):
         call.attributes.freeze()
