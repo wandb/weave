@@ -61,11 +61,18 @@ DIFF_HTML_STYLES = """
 .diff-stats .add{color:#1a7f37;font-weight:600}
 .diff-stats .del{color:#d1242f;font-weight:600}
 .diff-file{margin:16px;border:1px solid #d1d9e0;border-radius:6px;overflow:hidden;background:#fff}
-.file-header{display:flex;align-items:center;padding:8px 12px;background:#f6f8fa;border-bottom:1px solid #d1d9e0;font-family:ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,monospace;font-size:12px}
+.file-header{display:flex;align-items:center;padding:8px 12px;background:#f6f8fa;border-bottom:1px solid #d1d9e0;font-family:ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,monospace;font-size:12px;cursor:pointer;user-select:none}
+.file-header:hover{background:#eaeef2}
 .file-icon{width:16px;height:16px;margin-right:8px;fill:#656d76}
 .file-name{font-weight:600;color:#1f2328}
 .file-badge{margin-left:8px;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:500}
 .file-badge.new{background:#dafbe1;color:#1a7f37}
+.file-stats{margin-left:auto;padding-left:12px;color:#656d76;font-size:11px}
+.file-stats .add{color:#1a7f37}
+.file-stats .del{color:#d1242f}
+.expand-icon{width:16px;height:16px;margin-left:8px;fill:#656d76;transition:transform 0.15s ease}
+.diff-file.collapsed .expand-icon{transform:rotate(-90deg)}
+.diff-file.collapsed .diff-table-wrap{display:none}
 .diff-table-wrap{overflow-x:auto;overflow-y:visible}
 .diff-table{border-collapse:collapse;font-family:ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,monospace;font-size:12px;line-height:20px;min-width:100%}
 .diff-table td{vertical-align:top}
@@ -104,6 +111,9 @@ code{font-family:inherit;display:block}
 </style>
 """
 
+# Threshold for collapsing large diffs (lines added + removed)
+LARGE_DIFF_THRESHOLD = 100
+
 
 def _html_escape(text: str) -> str:
     """Escape HTML special characters."""
@@ -113,6 +123,36 @@ def _html_escape(text: str) -> str:
         .replace(">", "&gt;")
         .replace('"', "&quot;")
     )
+
+
+def _to_relative_path(file_path: str, cwd: str | None) -> str:
+    """Convert an absolute file path to a relative path for display.
+
+    If cwd is provided and the file_path starts with cwd, returns the relative path.
+    Otherwise returns the original file_path.
+
+    Args:
+        file_path: The file path (may be absolute or relative)
+        cwd: The working directory to make paths relative to
+
+    Returns:
+        Relative path if possible, otherwise the original path
+    """
+    if not cwd or not file_path:
+        return file_path
+
+    try:
+        abs_path = Path(file_path)
+        cwd_path = Path(cwd)
+        if abs_path.is_absolute():
+            try:
+                return str(abs_path.relative_to(cwd_path))
+            except ValueError:
+                # Path is not relative to cwd, return as-is
+                return file_path
+    except Exception:
+        pass
+    return file_path
 
 
 def generate_turn_diff_html(
@@ -460,6 +500,7 @@ def generate_turn_diff_html(
     # File diffs
     for file_diff in file_diffs:
         file_path = file_diff["path"]
+        display_path = _to_relative_path(file_path, cwd)
         lang = file_diff["lang"]
         is_new = file_diff["is_new"]
 
@@ -471,7 +512,7 @@ def generate_turn_diff_html(
         html_parts.append(
             '<svg class="file-icon" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M3.75 1.5a.25.25 0 00-.25.25v12.5c0 .138.112.25.25.25h9.5a.25.25 0 00.25-.25V4.664a.25.25 0 00-.073-.177l-2.914-2.914a.25.25 0 00-.177-.073H3.75zM2 1.75C2 .784 2.784 0 3.75 0h6.586c.464 0 .909.184 1.237.513l2.914 2.914c.329.328.513.773.513 1.237v9.586A1.75 1.75 0 0113.25 16h-9.5A1.75 1.75 0 012 14.25V1.75z"></path></svg>'
         )
-        html_parts.append(f'<span class="file-name">{_html_escape(file_path)}</span>')
+        html_parts.append(f'<span class="file-name">{_html_escape(display_path)}</span>')
         if is_new:
             html_parts.append('<span class="file-badge new">NEW</span>')
         html_parts.append("</div>")
@@ -612,11 +653,12 @@ def generate_session_diff_html(
     # Collect all sessions to process (main session + subagents)
     all_sessions = [session]
 
-    # Find and parse subagent session files
+    # Find and parse subagent session files that belong to THIS session
+    # (filter by session_id to exclude subagents from other sessions)
     if sessions_dir and sessions_dir.exists():
         for agent_file in sessions_dir.glob("agent-*.jsonl"):
             agent_session = parse_session_file(agent_file)
-            if agent_session:
+            if agent_session and agent_session.session_id == session.session_id:
                 all_sessions.append(agent_session)
 
     # Collect earliest backup for each file across all sessions and turns
@@ -741,28 +783,28 @@ def generate_session_diff_html(
             except Exception:
                 continue
 
-    # Fallback: if no file-history backups, try extracting Edit tool data
-    # This handles sessions where edits happen in subagents (which don't have
-    # file-history-snapshot entries in their JSONL files)
-    if not file_diffs:
+    # Also collect file changes from raw messages (Edit/Write tool data)
+    # This captures changes in subagents (which don't have file-history-snapshot)
+    # and new files created with Write tool. Merge with file-history results.
+    if sessions_dir:
         from weave.integrations.claude_plugin.diff_utils import (
-            extract_edit_data_from_raw_messages,
+            build_file_diffs_from_file_changes,
+            collect_all_file_changes_from_session,
         )
 
-        # Collect Edit data from all turns across all sessions
-        all_edit_data: list[dict[str, Any]] = []
-        for sess in all_sessions:
-            for turn in sess.turns:
-                if turn.raw_messages:
-                    edit_data = extract_edit_data_from_raw_messages(turn.raw_messages)
-                    all_edit_data.extend(edit_data)
+        # Collect all file changes from session + subagents
+        file_changes = collect_all_file_changes_from_session(session, sessions_dir)
 
-        if all_edit_data:
-            file_diffs = _build_file_diffs_from_edit_data(all_edit_data)
-            # Compute totals
-            for fd in file_diffs:
-                total_added += fd.get("added", 0)
-                total_removed += fd.get("removed", 0)
+        if file_changes:
+            raw_diffs = build_file_diffs_from_file_changes(file_changes)
+
+            # Merge: add raw diffs for files not already in file_diffs
+            existing_paths = {fd["path"] for fd in file_diffs}
+            for rd in raw_diffs:
+                if rd["path"] not in existing_paths:
+                    file_diffs.append(rd)
+                    total_added += rd.get("added", 0)
+                    total_removed += rd.get("removed", 0)
 
     if not file_diffs:
         return None
@@ -820,17 +862,31 @@ def generate_session_diff_html(
     # File diffs (reuse same structure as turn diff)
     for file_diff in file_diffs:
         file_path = file_diff["path"]
+        display_path = _to_relative_path(file_path, cwd)
         lang = file_diff["lang"]
         is_deleted = file_diff.get("is_deleted", False)
+        is_new = file_diff.get("is_new", False)
+        added = file_diff.get("added", 0)
+        removed = file_diff.get("removed", 0)
 
-        html_parts.append('<div class="diff-file">')
-        html_parts.append('<div class="file-header">')
+        # Collapse large diffs by default
+        is_large = (added + removed) > LARGE_DIFF_THRESHOLD
+        collapse_class = " collapsed" if is_large else ""
+
+        html_parts.append(f'<div class="diff-file{collapse_class}">')
+        html_parts.append('<div class="file-header" onclick="this.parentElement.classList.toggle(\'collapsed\')">')
         html_parts.append(
             '<svg class="file-icon" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M3.75 1.5a.25.25 0 00-.25.25v12.5c0 .138.112.25.25.25h9.5a.25.25 0 00.25-.25V4.664a.25.25 0 00-.073-.177l-2.914-2.914a.25.25 0 00-.177-.073H3.75zM2 1.75C2 .784 2.784 0 3.75 0h6.586c.464 0 .909.184 1.237.513l2.914 2.914c.329.328.513.773.513 1.237v9.586A1.75 1.75 0 0113.25 16h-9.5A1.75 1.75 0 012 14.25V1.75z"></path></svg>'
         )
-        html_parts.append(f'<span class="file-name">{_html_escape(file_path)}</span>')
+        html_parts.append(f'<span class="file-name">{_html_escape(display_path)}</span>')
+        if is_new:
+            html_parts.append('<span class="file-badge new">NEW</span>')
         if is_deleted:
             html_parts.append('<span class="file-badge" style="background:#ffebe9;color:#d1242f">DELETED</span>')
+        # Add file-level stats
+        html_parts.append(f'<span class="file-stats"><span class="add">+{added}</span> <span class="del">−{removed}</span></span>')
+        # Expand/collapse chevron icon
+        html_parts.append('<svg class="expand-icon" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M12.78 5.22a.75.75 0 010 1.06l-4.25 4.25a.75.75 0 01-1.06 0L3.22 6.28a.75.75 0 011.06-1.06L8 8.94l3.72-3.72a.75.75 0 011.06 0z"></path></svg>')
         html_parts.append("</div>")
 
         html_parts.append('<div class="diff-table-wrap">')
@@ -1007,6 +1063,7 @@ def generate_diff_html_from_edit_data_for_turn(
     turn: "Turn",
     turn_number: int,
     user_prompt: str | None = None,
+    cwd: str | None = None,
 ) -> str | None:
     """Generate turn-level diff HTML from Edit tool data.
 
@@ -1017,6 +1074,7 @@ def generate_diff_html_from_edit_data_for_turn(
         turn: Turn object with raw_messages containing Edit tool results
         turn_number: 1-based turn number
         user_prompt: User's prompt for display
+        cwd: Working directory for converting absolute paths to relative
 
     Returns:
         HTML string with diff view, or None if no Edit data found
@@ -1092,7 +1150,7 @@ def generate_diff_html_from_edit_data_for_turn(
 
     # Render file diffs using same structure as generate_turn_diff_html
     for file_diff in file_diffs:
-        _render_file_diff_html(html_parts, file_diff)
+        _render_file_diff_html(html_parts, file_diff, cwd)
 
     html_parts.append("</div>")  # Close diff-view
 
@@ -1112,6 +1170,7 @@ def generate_edit_diff_html(
     file_path: str,
     original_content: str,
     structured_patch: list[dict[str, Any]],
+    cwd: str | None = None,
 ) -> str:
     """Generate GitHub-style HTML diff for a single Edit tool call.
 
@@ -1122,6 +1181,7 @@ def generate_edit_diff_html(
         file_path: Path to the file being edited
         original_content: The original file content before edit
         structured_patch: Array of patch hunks from toolUseResult
+        cwd: Working directory for converting absolute paths to relative
 
     Returns:
         HTML string with GitHub-style diff view
@@ -1162,7 +1222,7 @@ def generate_edit_diff_html(
     html_parts.append('<div class="diff-view">')
 
     # Render the file diff
-    _render_file_diff_html(html_parts, file_diffs[0])
+    _render_file_diff_html(html_parts, file_diffs[0], cwd)
 
     html_parts.append("</div>")  # Close diff-view
 
@@ -1178,12 +1238,22 @@ def generate_edit_diff_html(
     return "".join(html_parts)
 
 
-def _render_file_diff_html(html_parts: list[str], file_diff: dict[str, Any]) -> None:
+def _render_file_diff_html(
+    html_parts: list[str],
+    file_diff: dict[str, Any],
+    cwd: str | None = None,
+) -> None:
     """Render a single file diff to HTML parts.
 
     Shared helper for both turn and session diff rendering.
+
+    Args:
+        html_parts: List to append HTML parts to
+        file_diff: Dictionary with path, lang, is_new, diff_lines
+        cwd: Working directory for converting absolute paths to relative
     """
     file_path = file_diff["path"]
+    display_path = _to_relative_path(file_path, cwd)
     lang = file_diff["lang"]
     is_new = file_diff.get("is_new", False)
 
@@ -1194,7 +1264,7 @@ def _render_file_diff_html(html_parts: list[str], file_diff: dict[str, Any]) -> 
     html_parts.append(
         '<svg class="file-icon" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M3.75 1.5a.25.25 0 00-.25.25v12.5c0 .138.112.25.25.25h9.5a.25.25 0 00.25-.25V4.664a.25.25 0 00-.073-.177l-2.914-2.914a.25.25 0 00-.177-.073H3.75zM2 1.75C2 .784 2.784 0 3.75 0h6.586c.464 0 .909.184 1.237.513l2.914 2.914c.329.328.513.773.513 1.237v9.586A1.75 1.75 0 0113.25 16h-9.5A1.75 1.75 0 012 14.25V1.75z"></path></svg>'
     )
-    html_parts.append(f'<span class="file-name">{_html_escape(file_path)}</span>')
+    html_parts.append(f'<span class="file-name">{_html_escape(display_path)}</span>')
     if is_new:
         html_parts.append('<span class="file-badge new">NEW</span>')
     html_parts.append("</div>")

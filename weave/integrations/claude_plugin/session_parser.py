@@ -34,7 +34,7 @@ EXT_TO_MIMETYPE: dict[str, str] = {
     ".jsonl": "application/x-ndjson",
     ".yaml": "text/yaml",
     ".yml": "text/yaml",
-    ".md": "text/markdown",
+    ".md": "text/plain",
     ".txt": "text/plain",
     ".sh": "text/x-shellscript",
     ".bash": "text/x-shellscript",

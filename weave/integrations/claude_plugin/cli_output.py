@@ -131,6 +131,7 @@ class SessionDetails:
     latest_response: str = ""
     todos: list[TodoItem] = field(default_factory=list)
     max_duration_ms: int = 0  # For scaling timeline bars
+    total_duration_ms: int = 0  # Sum of all turn durations
     file_changes: FileChangeStats = field(default_factory=FileChangeStats)
 
 
@@ -178,6 +179,7 @@ class ImportSummary:
     total_tool_calls: int
     total_weave_calls: int
     total_tokens: int
+    total_duration_ms: int
     traces_url: str | None
     dry_run: bool
     results: list[ImportResult]
@@ -236,9 +238,11 @@ def extract_session_details(session: "Session") -> SessionDetails:
 
     # Extract turn statistics
     max_duration_ms = 0
+    total_duration_ms = 0
     for i, turn in enumerate(session.turns, 1):
         turn_duration_ms = turn.duration_ms()
         max_duration_ms = max(max_duration_ms, turn_duration_ms)
+        total_duration_ms += turn_duration_ms
 
         # Count tools by name
         tool_counts: dict[str, int] = defaultdict(int)
@@ -254,6 +258,7 @@ def extract_session_details(session: "Session") -> SessionDetails:
         )
 
     details.max_duration_ms = max_duration_ms
+    details.total_duration_ms = total_duration_ms
 
     # Extract latest user prompt
     if session.turns:
@@ -382,6 +387,30 @@ class RichOutput:
                 progress.update(task, completed=current_line, description=desc)
 
             yield update_progress
+
+    @contextmanager
+    def spinner_context(self, session_name: str) -> Iterator[Callable[[str], None]]:
+        """Create a simple spinner context for single session import.
+
+        Args:
+            session_name: Name of the session file
+
+        Yields:
+            A callback function to update status text
+        """
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            TimeElapsedColumn(),
+            console=self.console,
+            transient=True,
+        ) as progress:
+            task = progress.add_task(f"Importing {session_name[:30]}...", total=None)
+
+            def update_status(status: str) -> None:
+                progress.update(task, description=status)
+
+            yield update_status
 
     def _render_colored_bar(self, width: int, color_distribution: list[tuple[str, float]]) -> Text:
         """Render a bar with colored segments based on tool distribution."""
@@ -549,6 +578,9 @@ class RichOutput:
 
         table.add_row("Tokens", format_tokens(summary.total_tokens))
 
+        if summary.total_duration_ms > 0:
+            table.add_row("Duration", format_duration(summary.total_duration_ms))
+
         # Print table in a panel
         title = "Dry Run Summary" if summary.dry_run else "Import Summary"
         self.console.print()
@@ -625,6 +657,9 @@ class BasicOutput:
             print(f"Weave Calls: {summary.total_weave_calls}")
 
         print(f"Tokens: {summary.total_tokens:,}")
+
+        if summary.total_duration_ms > 0:
+            print(f"Duration: {format_duration(summary.total_duration_ms)}")
 
         if summary.traces_url and not summary.dry_run:
             print()

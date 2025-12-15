@@ -1222,3 +1222,165 @@ class TestTurnCreationWithProcessor:
         # Verify compaction was detected
         assert call_args.kwargs["is_compacted"] is True
         assert daemon.compaction_count == 1
+
+
+class TestSessionContinuationDetection:
+    """Test session continuation detection in WeaveDaemon."""
+
+    @pytest.mark.anyio
+    async def test_check_session_continuation_returns_true_when_session_ended(self):
+        """Test that _check_session_continuation returns True when session_ended flag is set."""
+        from weave.integrations.claude_plugin.daemon import WeaveDaemon
+        from weave.integrations.claude_plugin.state import StateManager
+
+        with patch.object(WeaveDaemon, "_load_state", return_value=True):
+            daemon = WeaveDaemon("test-session-123")
+            daemon.session_call_id = "old-session-call-id"
+            daemon.weave_client = MagicMock()
+
+            # Set up state with session_ended=True
+            with StateManager() as state:
+                state.save_session("test-session-123", {
+                    "session_call_id": "old-session-call-id",
+                    "trace_id": "trace-123",
+                    "session_ended": True,
+                })
+
+            # Check continuation detection
+            result = await daemon._check_session_continuation()
+            assert result is True
+
+            # Cleanup
+            with StateManager() as state:
+                state.delete_session("test-session-123")
+
+    @pytest.mark.anyio
+    async def test_check_session_continuation_returns_false_when_session_not_ended(self):
+        """Test that _check_session_continuation returns False when session is not ended."""
+        from weave.integrations.claude_plugin.daemon import WeaveDaemon
+        from weave.integrations.claude_plugin.state import StateManager
+
+        with patch.object(WeaveDaemon, "_load_state", return_value=True):
+            daemon = WeaveDaemon("test-session-456")
+            daemon.session_call_id = "session-call-id"
+            daemon.weave_client = MagicMock()
+            # API returns call without ended_at
+            mock_call = MagicMock()
+            mock_call.ended_at = None
+            daemon.weave_client.get_call.return_value = mock_call
+
+            # Set up state with session_ended=False
+            with StateManager() as state:
+                state.save_session("test-session-456", {
+                    "session_call_id": "session-call-id",
+                    "trace_id": "trace-456",
+                    "session_ended": False,
+                })
+
+            # Check continuation detection
+            result = await daemon._check_session_continuation()
+            assert result is False
+
+            # Cleanup
+            with StateManager() as state:
+                state.delete_session("test-session-456")
+
+    @pytest.mark.anyio
+    async def test_check_session_continuation_uses_api_fallback(self):
+        """Test that _check_session_continuation falls back to API when state flag is False."""
+        from weave.integrations.claude_plugin.daemon import WeaveDaemon
+        from weave.integrations.claude_plugin.state import StateManager
+
+        with patch.object(WeaveDaemon, "_load_state", return_value=True):
+            daemon = WeaveDaemon("test-session-789")
+            daemon.session_call_id = "session-call-id"
+            daemon.weave_client = MagicMock()
+
+            # API returns call WITH ended_at set
+            mock_call = MagicMock()
+            mock_call.ended_at = "2024-01-01T00:00:00Z"
+            daemon.weave_client.get_call.return_value = mock_call
+
+            # Set up state with session_ended=False (not set)
+            with StateManager() as state:
+                state.save_session("test-session-789", {
+                    "session_call_id": "session-call-id",
+                    "trace_id": "trace-789",
+                    "session_ended": False,
+                })
+
+            # Check continuation detection - should use API fallback
+            result = await daemon._check_session_continuation()
+            assert result is True
+
+            # Verify API was called
+            daemon.weave_client.get_call.assert_called_once_with(
+                "session-call-id", columns=["ended_at"]
+            )
+
+            # Cleanup
+            with StateManager() as state:
+                state.delete_session("test-session-789")
+
+
+class TestCreateContinuationSession:
+    """Test continuation session creation in WeaveDaemon."""
+
+    @pytest.mark.anyio
+    async def test_continuation_display_name_has_prefix(self):
+        """Test that continuation session has 'Continued: ' prefix in display name.
+
+        The display name is generated from the new prompt, not the original session.
+        """
+        from weave.integrations.claude_plugin.daemon import WeaveDaemon
+        from weave.integrations.claude_plugin.state import StateManager
+
+        with patch.object(WeaveDaemon, "_load_state", return_value=True):
+            daemon = WeaveDaemon("test-continuation-session")
+            daemon.session_call_id = "old-call-id"
+            daemon.weave_client = MagicMock()
+            daemon.processor = MagicMock()
+
+            # Mock the processor to return a new call
+            mock_new_call = MagicMock()
+            mock_new_call.id = "new-call-id"
+            mock_new_call.trace_id = "new-trace-id"
+            mock_new_call.ui_url = "https://example.com/new"
+            daemon.processor.create_session_call.return_value = (mock_new_call, "Continued: New Task Name")
+
+            # Set up state (no display_name needed)
+            with StateManager() as state:
+                state.save_session("test-continuation-session", {
+                    "session_call_id": "old-call-id",
+                    "trace_id": "old-trace-id",
+                    "session_ended": True,
+                    "continuation_count": 0,
+                })
+
+            # Create continuation session
+            result = await daemon._create_continuation_session_call({
+                "prompt": "Now let's work on a new task",
+                "cwd": "/test/path",
+            })
+
+            # Verify result
+            assert result["status"] == "ok"
+            assert daemon.session_call_id == "new-call-id"
+            assert daemon.trace_id == "new-trace-id"
+
+            # Verify create_session_call was called with continuation parameters
+            daemon.processor.create_session_call.assert_called_once()
+            call_kwargs = daemon.processor.create_session_call.call_args.kwargs
+            # Display name should start with "Continued: " and be generated from the new prompt
+            assert call_kwargs["display_name"].startswith("Continued: ")
+            assert call_kwargs["continuation_of"] == "old-call-id"
+
+            # Verify state was updated
+            with StateManager() as state:
+                session_data = state.get_session("test-continuation-session")
+                assert session_data["session_call_id"] == "new-call-id"
+                assert session_data["session_ended"] is False
+                assert session_data["continuation_count"] == 1
+                # display_name should not be stored in state anymore
+                assert "display_name" not in session_data or session_data.get("display_name") is None
+                state.delete_session("test-continuation-session")

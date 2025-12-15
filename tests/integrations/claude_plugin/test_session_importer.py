@@ -1,6 +1,9 @@
-"""Tests for session importer."""
+"""Tests for session importer.
 
-import pytest
+Tool calls are embedded in turn/subagent output using build_turn_output(),
+not as separate child traces. This enables ChatView rendering.
+"""
+
 from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -64,12 +67,12 @@ def make_turn_with_tool_call(
     return turn
 
 
-class TestToolCallLogging:
-    """Test that tool calls use log_tool_call for consistency."""
+class TestToolCallsInOutput:
+    """Test that tool calls are embedded in turn output, not as child traces."""
 
-    def test_todowrite_uses_log_tool_call(self):
-        """TodoWrite tool calls should go through log_tool_call for HTML views."""
-        # Create minimal session with TodoWrite call
+    def test_tool_calls_counted_in_return_value(self):
+        """Tool calls should be counted in the return value."""
+        # Create minimal session with tool calls
         turn = make_turn_with_tool_call(
             user_content="Add todos",
             tool_name="TodoWrite",
@@ -80,67 +83,68 @@ class TestToolCallLogging:
         session = make_minimal_session(turns=[turn])
 
         with patch(
-            "weave.integrations.claude_plugin.session_importer.log_tool_call"
-        ) as mock_log:
-            with patch(
-                "weave.integrations.claude_plugin.session_importer.require_weave_client"
-            ) as mock_client:
-                mock_client.return_value = MagicMock()
-                mock_client.return_value.create_call.return_value = MagicMock(
-                    id="call-1", summary={}
-                )
+            "weave.integrations.claude_plugin.session_importer.require_weave_client"
+        ) as mock_client:
+            mock_call = MagicMock(id="call-1")
+            mock_call.summary = {}
+            mock_client.return_value.create_call.return_value = mock_call
+            mock_client.return_value.finish_call = MagicMock()
 
-                # This should use log_tool_call for TodoWrite
-                _import_session_to_weave(session, Path("/tmp/test.jsonl"), use_ollama=False)
+            turns, tool_calls, calls_created, _ = _import_session_to_weave(
+                session, Path("/tmp/test.jsonl"), use_ollama=False
+            )
 
-                # Verify log_tool_call was called for TodoWrite
-                calls = [
-                    c
-                    for c in mock_log.call_args_list
-                    if c.kwargs.get("tool_name") == "TodoWrite"
-                ]
-                assert len(calls) == 1, "TodoWrite should use log_tool_call"
+            # Tool calls should be counted
+            assert tool_calls == 1, "Should count 1 tool call"
+            # Only session + turn calls created (no child tool traces)
+            assert calls_created == 2, "Should only create session + turn calls"
 
-    def test_read_uses_log_tool_call(self):
-        """Read tool calls should also go through log_tool_call."""
-        turn = make_turn_with_tool_call(
-            user_content="Read a file",
-            tool_name="Read",
-            tool_input={"file_path": "/tmp/test.txt"},
-            tool_result="file content",
+    def test_multiple_tool_calls_counted(self):
+        """Multiple tool calls should all be counted."""
+        now = datetime.now(timezone.utc)
+        turn = Turn(user_message=UserMessage(uuid="u1", content="Do stuff", timestamp=now))
+        turn.assistant_messages.append(
+            AssistantMessage(
+                uuid="a1",
+                model="claude-sonnet-4-20250514",
+                text_content=["Done"],
+                tool_calls=[
+                    ToolCall(id="t1", name="Read", input={"file_path": "/a.txt"}, timestamp=now, result="a"),
+                    ToolCall(id="t2", name="Grep", input={"pattern": "foo"}, timestamp=now, result="b"),
+                    ToolCall(id="t3", name="Edit", input={"file_path": "/a.txt"}, timestamp=now, result="c"),
+                ],
+                usage=TokenUsage(),
+                timestamp=now,
+            )
         )
         session = make_minimal_session(turns=[turn])
 
         with patch(
-            "weave.integrations.claude_plugin.session_importer.log_tool_call"
-        ) as mock_log:
-            with patch(
-                "weave.integrations.claude_plugin.session_importer.require_weave_client"
-            ) as mock_client:
-                mock_client.return_value = MagicMock()
-                mock_client.return_value.create_call.return_value = MagicMock(
-                    id="call-1", summary={}
-                )
+            "weave.integrations.claude_plugin.session_importer.require_weave_client"
+        ) as mock_client:
+            mock_call = MagicMock(id="call-1")
+            mock_call.summary = {}
+            mock_client.return_value.create_call.return_value = mock_call
+            mock_client.return_value.finish_call = MagicMock()
 
-                _import_session_to_weave(session, Path("/tmp/test.jsonl"), use_ollama=False)
+            turns, tool_calls, calls_created, _ = _import_session_to_weave(
+                session, Path("/tmp/test.jsonl"), use_ollama=False
+            )
 
-                # Verify log_tool_call was called for Read
-                calls = [
-                    c
-                    for c in mock_log.call_args_list
-                    if c.kwargs.get("tool_name") == "Read"
-                ]
-                assert len(calls) == 1, "Read should use log_tool_call"
+            # All tool calls should be counted
+            assert tool_calls == 3, "Should count 3 tool calls"
+            # Only session + turn calls created (no child tool traces)
+            assert calls_created == 2, "Should only create session + turn calls"
 
 
-class TestSkillExpansionAttachment:
-    """Test that skill expansions are attached to Skill tool calls."""
+class TestSkillToolCalls:
+    """Test that skill tool calls are properly handled."""
 
-    def test_skill_tool_gets_expansion_content(self):
-        """Skill tool calls should have the expansion as their output."""
+    def test_skill_tool_counted(self):
+        """Skill tool calls should be counted like other tool calls."""
         now = datetime.now(timezone.utc)
 
-        # Create session with skill call and expansion
+        # Create session with skill call
         turn = Turn(user_message=UserMessage(uuid="u1", content="Use skill", timestamp=now))
         turn.assistant_messages.append(
             AssistantMessage(
@@ -161,31 +165,27 @@ class TestSkillExpansionAttachment:
                 timestamp=now,
             )
         )
-        # Attach skill expansion to the turn
-        turn.skill_expansion = "Base directory for this skill: /path\n\n# Skill Content\n\nDetails here..."
+        # Note: skill_expansion is stored on the turn but not used for child traces
+        # The expansion becomes part of conversation context, not tool output
+        turn.skill_expansion = "Base directory for this skill: /path\n\n# Skill Content"
         session = make_minimal_session(turns=[turn])
 
         with patch(
-            "weave.integrations.claude_plugin.session_importer.log_tool_call"
-        ) as mock_log:
-            with patch(
-                "weave.integrations.claude_plugin.session_importer.require_weave_client"
-            ) as mock_client:
-                mock_client.return_value = MagicMock()
-                mock_client.return_value.create_call.return_value = MagicMock(
-                    id="call-1", summary={}
-                )
+            "weave.integrations.claude_plugin.session_importer.require_weave_client"
+        ) as mock_client:
+            mock_call = MagicMock(id="call-1")
+            mock_call.summary = {}
+            mock_client.return_value.create_call.return_value = mock_call
+            mock_client.return_value.finish_call = MagicMock()
 
-                _import_session_to_weave(session, Path("/tmp/test.jsonl"), use_ollama=False)
+            turns, tool_calls, calls_created, _ = _import_session_to_weave(
+                session, Path("/tmp/test.jsonl"), use_ollama=False
+            )
 
-                # Check Skill tool call got the expansion as output
-                skill_calls = [
-                    c
-                    for c in mock_log.call_args_list
-                    if c.kwargs.get("tool_name") == "Skill"
-                ]
-                assert len(skill_calls) == 1
-                assert "Skill Content" in skill_calls[0].kwargs.get("tool_output", "")
+            # Skill tool should be counted
+            assert tool_calls == 1, "Should count 1 tool call (Skill)"
+            # Only session + turn calls created (Skill embedded in turn output)
+            assert calls_created == 2, "Should only create session + turn calls"
 
 
 class TestQAContextTracking:
@@ -350,8 +350,8 @@ class TestTurnSummary:
             assert "model" in reconstructed_call.summary, "Summary should have model"
             assert "usage" in reconstructed_call.summary, "Summary should have usage"
 
-    def test_turn_output_uses_anthropic_format(self):
-        """Turn output uses Anthropic completion format for chat view detection."""
+    def test_turn_output_uses_message_format(self):
+        """Turn output uses Message format for chat view detection."""
         now = datetime.now(timezone.utc)
         turn = Turn(user_message=UserMessage(uuid="u1", content="Hello", timestamp=now))
         turn.assistant_messages.append(
@@ -376,14 +376,14 @@ class TestTurnSummary:
 
             _import_session_to_weave(session, Path("/tmp/test.jsonl"), use_ollama=False)
 
-            # Check finish_call was called and output has Anthropic format
+            # Check finish_call was called and output has Message format
             finish_calls = mock_client.return_value.finish_call.call_args_list
             # Find the turn finish call (not session)
             for call in finish_calls:
                 output = call.kwargs.get("output", {}) or {}
-                if output and "type" in output:
-                    # Turn output uses Anthropic completion format
-                    assert output["type"] == "message"
+                if output and "role" in output:
+                    # Turn output uses Message format (no "type" field)
+                    # This is OpenAI-compatible, not Anthropic's native format
                     assert output["role"] == "assistant"
                     assert "model" in output  # Model in output for chat view
                     assert "content" in output

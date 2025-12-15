@@ -117,9 +117,15 @@ def status() -> None:
 @click.argument("path", type=click.Path(exists=True))
 @click.argument("project")
 @click.option(
-    "--full",
+    "--all",
+    "import_all",
     is_flag=True,
     help="Import ALL sessions (default: most recent only)",
+)
+@click.option(
+    "--expand-tools",
+    is_flag=True,
+    help="Create child traces for each tool call",
 )
 @click.option(
     "--dry-run",
@@ -145,7 +151,8 @@ def status() -> None:
 def import_sessions_cmd(
     path: str,
     project: str,
-    full: bool,
+    import_all: bool,
+    expand_tools: bool,
     dry_run: bool,
     no_ollama: bool,
     verbose: bool,
@@ -159,7 +166,7 @@ def import_sessions_cmd(
 
     PROJECT should be in "entity/project" format (e.g., "myteam/claude-sessions").
 
-    By default, only the most recent session is imported. Use --full to import
+    By default, only the most recent session is imported. Use --all to import
     all sessions in the directory.
 
     Examples:
@@ -171,7 +178,10 @@ def import_sessions_cmd(
         weave claude import /path/to/session.jsonl vanpelt/sessions
 
         # Import all sessions
-        weave claude import ~/.claude/projects/myproject vanpelt/sessions --full
+        weave claude import ~/.claude/projects/myproject vanpelt/sessions --all
+
+        # Import with tool call traces expanded
+        weave claude import ~/.claude/projects/myproject vanpelt/sessions --expand-tools
 
         # Dry run to see what would be imported
         weave claude import ~/.claude/projects/myproject vanpelt/sessions --dry-run
@@ -198,7 +208,7 @@ def import_sessions_cmd(
         if session_path.is_file():
             session_files = [session_path]
         elif session_path.is_dir():
-            session_files = discover_session_files(session_path, most_recent_only=not full)
+            session_files = discover_session_files(session_path, most_recent_only=not import_all)
         else:
             raise ValueError(f"Path does not exist: {path}")
 
@@ -217,30 +227,20 @@ def import_sessions_cmd(
                 init_weave_quiet(project)
 
             if is_single_session:
-                # Single session: use line-based progress and include details for visualization
+                # Single session: use spinner and include details for visualization
                 session_file = session_files[0]
 
-                # Count lines for progress bar
-                try:
-                    with open(session_file) as f:
-                        total_lines = sum(1 for _ in f)
-                except Exception:
-                    total_lines = 100  # Fallback estimate
-
-                # For single session, use simpler progress (line tracking would require parser changes)
-                # Just show a spinner while importing
-                if hasattr(output, "line_progress_context"):
-                    with output.line_progress_context(total_lines, session_file.name) as update_progress:
-                        # Update progress at start
-                        update_progress(0, 1, "Starting...")
+                # Use a spinner since import happens quickly
+                if hasattr(output, "spinner_context"):
+                    with output.spinner_context(session_file.name) as update_status:
+                        update_status(f"Importing {session_file.name[:30]}...")
                         result = import_session_with_result(
                             session_path=session_file,
                             dry_run=dry_run,
                             use_ollama=not no_ollama,
                             include_details=True,
+                            include_tool_traces=expand_tools,
                         )
-                        # Update progress at end
-                        update_progress(total_lines, result.turns, "Complete")
                         results.append(result)
                 else:
                     result = import_session_with_result(
@@ -248,42 +248,50 @@ def import_sessions_cmd(
                         dry_run=dry_run,
                         use_ollama=not no_ollama,
                         include_details=True,
+                        include_tool_traces=expand_tools,
                     )
                     results.append(result)
             else:
                 # Multiple sessions: use session-based progress, skip details to save memory
+                total_sessions = len(session_files)
                 if hasattr(output, "progress_context"):
-                    with output.progress_context(len(session_files)) as progress:
+                    with output.progress_context(total_sessions) as progress:
                         if progress is not None:
-                            task = progress.add_task("Importing sessions...", total=len(session_files))
-                            for session_file in session_files:
+                            task = progress.add_task(f"Importing 0 of {total_sessions}...", total=total_sessions)
+                            for i, session_file in enumerate(session_files, 1):
+                                progress.update(task, description=f"Importing {i} of {total_sessions}...")
                                 result = import_session_with_result(
                                     session_path=session_file,
                                     dry_run=dry_run,
                                     use_ollama=not no_ollama,
-                                    include_details=False,
+                                    include_details=True,  # Include details for duration tracking
+                                    include_tool_traces=expand_tools,
                                 )
                                 results.append(result)
                                 output.print_session_result(result, dry_run=dry_run)
-                                progress.update(task, advance=1, description=f"Importing {session_file.name[:20]}...")
+                                progress.update(task, advance=1)
                         else:
                             # BasicOutput fallback
-                            for session_file in session_files:
+                            for i, session_file in enumerate(session_files, 1):
+                                print(f"Importing {i} of {total_sessions}...")
                                 result = import_session_with_result(
                                     session_path=session_file,
                                     dry_run=dry_run,
                                     use_ollama=not no_ollama,
-                                    include_details=False,
+                                    include_details=True,
+                                    include_tool_traces=expand_tools,
                                 )
                                 results.append(result)
                                 output.print_session_result(result, dry_run=dry_run)
                 else:
-                    for session_file in session_files:
+                    for i, session_file in enumerate(session_files, 1):
+                        print(f"Importing {i} of {total_sessions}...")
                         result = import_session_with_result(
                             session_path=session_file,
                             dry_run=dry_run,
                             use_ollama=not no_ollama,
-                            include_details=False,
+                            include_details=True,
+                            include_tool_traces=expand_tools,
                         )
                         results.append(result)
                         output.print_session_result(result, dry_run=dry_run)
@@ -304,6 +312,13 @@ def import_sessions_cmd(
                     entity, proj = project.split("/", 1)
                     traces_url = f"https://wandb.ai/{entity}/{proj}/weave/traces"
 
+        # Calculate total duration from session details
+        total_duration_ms = sum(
+            r.session_details.total_duration_ms
+            for r in successful
+            if r.session_details
+        )
+
         summary = ImportSummary(
             sessions_imported=len(successful),
             sessions_failed=len(failed),
@@ -311,6 +326,7 @@ def import_sessions_cmd(
             total_tool_calls=sum(r.tool_calls for r in successful),
             total_weave_calls=sum(r.weave_calls for r in successful),
             total_tokens=sum(r.tokens for r in successful),
+            total_duration_ms=total_duration_ms,
             traces_url=traces_url,
             dry_run=dry_run,
             results=results,

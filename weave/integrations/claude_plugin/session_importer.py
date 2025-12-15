@@ -5,20 +5,20 @@ enabling rich analytics on historic coding sessions.
 
 Trace Structure:
     Session (trace root) - display_name from summarizer
-    ├── Turn 1: User prompt → Assistant response
-    │   ├── Tool Call: Read
-    │   ├── Tool Call: Grep
-    │   └── Tool Call: Edit
-    ├── Turn 2: User prompt → Assistant response
-    │   └── ...
+    ├── Turn 1: User prompt → Assistant response (tool_calls in output)
+    ├── Turn 2: User prompt → Assistant response (tool_calls in output)
+    │   └── SubAgent (if Task tool spawned one)
     └── ...
 
 Each turn captures:
-    - User message content
-    - Assistant response (text + tool calls)
-    - Token usage (input, output, cache) - native Weave tracking
+    - User message content (in inputs.messages)
+    - Assistant response with embedded tool_calls (in output)
+    - Token usage (input, output, cache) - in summary
     - Model used
-    - Tool call details with inputs/outputs
+    - File snapshots and diff views
+
+Tool calls are embedded in the turn/subagent output using OpenAI format,
+enabling ChatView rendering without requiring separate child traces.
 """
 
 from __future__ import annotations
@@ -32,10 +32,9 @@ from typing import TYPE_CHECKING, Any
 import weave
 from weave.trace.context.weave_client_context import require_weave_client
 
-from .diff_utils import extract_edit_data_from_raw_messages
 from .session_parser import Session, parse_session_file
 from .state import load_session as get_session_state
-from .utils import generate_session_name, log_tool_call, reconstruct_call
+from .utils import generate_session_name, reconstruct_call
 
 if TYPE_CHECKING:
     from .cli_output import ImportResult
@@ -108,16 +107,19 @@ def _create_subagent_call(
     client: Any,
     session_id: str,
     trace_id: str,
+    subagent_type: str | None = None,
+    include_tool_traces: bool = False,
 ) -> tuple[int, list[Any]]:
-    """Create a subagent call with tool calls as children.
+    """Create a subagent call with tool calls embedded in output.
 
     When a Task tool is invoked with subagent_type, it spawns a subagent that
     runs in a separate agent-{agentId}.jsonl file. This function parses that
     file and creates a claude_code.subagent call with ChatView-compatible
     inputs/outputs, matching the daemon's pattern.
 
-    For Edit tool calls, extracts structured patch data from raw messages to
-    generate HTML diff views (since subagent files don't have file-history-snapshot).
+    Tool calls are embedded in the subagent output using build_subagent_output(),
+    which creates OpenAI-format tool_calls with results. When include_tool_traces
+    is True, also creates child traces for each tool call.
 
     Also collects file snapshots from all turns for attachment to the parent turn.
 
@@ -128,13 +130,12 @@ def _create_subagent_call(
         client: Weave client for creating calls
         session_id: Main session ID for loading file backups from file-history
         trace_id: Trace ID for reconstructing calls
+        subagent_type: Optional subagent type from Task tool input
+        include_tool_traces: If True, create child traces for each tool call
 
     Returns:
         Tuple of (calls_created, file_snapshots)
     """
-    from weave.integrations.claude_plugin.diff_utils import (
-        extract_edit_data_from_raw_messages,
-    )
     from weave.integrations.claude_plugin.session_processor import SessionProcessor
 
     # Find the agent file
@@ -154,75 +155,107 @@ def _create_subagent_call(
         logger.debug(f"Agent session has no turns: {agent_file}")
         return 0, []
 
-    # Build display name
+    # Build display name using helper that strips common prefixes
     first_prompt = subagent_session.first_user_prompt() or ""
-    if first_prompt:
-        from weave.integrations.claude_plugin.utils import truncate
-        display_name = f"SubAgent: {truncate(first_prompt, 50)}"
-    else:
-        display_name = f"SubAgent: {agent_id}"
+    from weave.integrations.claude_plugin.utils import get_subagent_display_name
+    display_name = get_subagent_display_name(first_prompt, agent_id)
 
     # Create subagent call with ChatView-compatible inputs
     subagent_call = client.create_call(
         op="claude_code.subagent",
-        inputs=SessionProcessor.build_subagent_inputs(first_prompt, agent_id),
+        inputs=SessionProcessor.build_subagent_inputs(first_prompt, agent_id, subagent_type),
         parent=parent_call,
         display_name=display_name,
         attributes={"agent_id": agent_id, "is_sidechain": True},
         use_stack=False,
     )
 
-    calls_created = 1  # Count the subagent call itself
+    # Collect file snapshots and count tools from all turns
     file_snapshots: list[Any] = []
+    file_paths_seen: set[str] = set()  # Avoid duplicates
     tool_counts: dict[str, int] = {}
+    calls_created = 1  # Count the subagent call itself
 
-    # Import each turn's tool calls as children of the subagent call
     for turn in subagent_session.turns:
-        # Extract Edit tool data from raw messages for this turn
-        # This provides originalFile and structuredPatch for HTML diff generation
-        edit_data_list = extract_edit_data_from_raw_messages(turn.raw_messages)
-
-        # Build a mapping from file_path to Edit data (use the last edit for each file)
-        edit_data_by_file: dict[str, dict[str, Any]] = {}
-        for edit_data in edit_data_list:
-            file_path = edit_data.get("file_path")
-            if file_path:
-                edit_data_by_file[file_path] = edit_data
-
-        for tc in turn.all_tool_calls():
-            # For Edit calls, try to get structured patch data for HTML diff view
-            original_file = None
-            structured_patch = None
-
-            if tc.name == "Edit":
-                file_path = tc.input.get("file_path")
-                if file_path and file_path in edit_data_by_file:
-                    edit_data = edit_data_by_file[file_path]
-                    original_file = edit_data.get("original_file")
-                    structured_patch = edit_data.get("structured_patch")
-
-            log_tool_call(
-                tool_name=tc.name,
-                tool_input=tc.input,
-                tool_output=tc.result,
-                tool_use_id=tc.id,
-                duration_ms=tc.duration_ms() or 0,
-                parent=subagent_call,
-                original_file=original_file,
-                structured_patch=structured_patch,
+        # Pre-extract Edit tool data for this turn if we need tool traces
+        edit_data_by_path: dict[str, dict] = {}
+        if include_tool_traces and turn.raw_messages:
+            from weave.integrations.claude_plugin.diff_utils import (
+                extract_edit_data_from_raw_messages,
             )
-            calls_created += 1
+            for edit_data in extract_edit_data_from_raw_messages(turn.raw_messages):
+                file_path = edit_data.get("file_path")
+                if file_path:
+                    edit_data_by_path[file_path] = edit_data
+
+        # Count tool calls and optionally create traces
+        for tc in turn.all_tool_calls():
             tool_counts[tc.name] = tool_counts.get(tc.name, 0) + 1
+
+            if include_tool_traces:
+                from weave.integrations.claude_plugin.utils import log_tool_call
+
+                # Get Edit tool data if available
+                original_file = None
+                structured_patch = None
+                if tc.name == "Edit":
+                    file_path = tc.input.get("file_path")
+                    if file_path and file_path in edit_data_by_path:
+                        edit_data = edit_data_by_path[file_path]
+                        original_file = edit_data.get("original_file")
+                        structured_patch = edit_data.get("structured_patch")
+
+                log_tool_call(
+                    tool_name=tc.name,
+                    tool_input=tc.input or {},
+                    tool_output=tc.result,
+                    tool_use_id=tc.id,
+                    duration_ms=tc.duration_ms(),
+                    parent=subagent_call,
+                    original_file=original_file,
+                    structured_patch=structured_patch,
+                )
+                calls_created += 1
 
         # Collect file snapshots from this turn's file backups
         # Note: Use main session_id (not agent_id) since file-history is stored
         # under the main session UUID, not the short agent ID
         for fb in turn.file_backups:
-            content = fb.load_content(session_id)
-            if content:
-                file_snapshots.append(content)
+            if fb.file_path not in file_paths_seen:
+                content = fb.load_content(session_id)
+                if content:
+                    file_snapshots.append(content)
+                    file_paths_seen.add(fb.file_path)
+
+        # Also collect file content from Write tool calls in raw messages
+        # This captures new files created in subagents (which don't have file-history)
+        if turn.raw_messages:
+            from weave.integrations.claude_plugin.diff_utils import (
+                extract_write_data_from_raw_messages,
+            )
+
+            write_data_list = extract_write_data_from_raw_messages(turn.raw_messages)
+            for write_data in write_data_list:
+                file_path = write_data["file_path"]
+                if file_path not in file_paths_seen:
+                    file_content = write_data["content"]
+                    # Create a Content object for the new file
+                    try:
+                        content = Content(
+                            content=file_content.encode("utf-8"),
+                            metadata={
+                                "original_path": file_path,
+                                "relative_path": Path(file_path).name,
+                                "source": "write_tool",
+                            },
+                        )
+                        file_snapshots.append(content)
+                        file_paths_seen.add(file_path)
+                    except Exception:
+                        pass
 
     # Build output in Message format using shared helper
+    # This embeds all tool calls with their results in OpenAI format
     subagent_output = SessionProcessor.build_subagent_output(subagent_session)
 
     if file_snapshots:
@@ -240,10 +273,57 @@ def _create_subagent_call(
     if model and total_usage:
         subagent_call.summary["usage"] = {model: total_usage.to_weave_usage()}
 
+    # Generate and attach HTML diff view for subagent's file changes
+    # Collect all edit data from all turns
+    all_edit_data: list[dict] = []
+    for turn in subagent_session.turns:
+        if turn.raw_messages:
+            from weave.integrations.claude_plugin.diff_utils import (
+                extract_edit_data_from_raw_messages,
+            )
+            all_edit_data.extend(extract_edit_data_from_raw_messages(turn.raw_messages))
+
+    if all_edit_data:
+        from weave.integrations.claude_plugin.diff_view import (
+            _build_file_diffs_from_edit_data,
+            _render_file_diff_html,
+            DIFF_HTML_STYLES,
+        )
+        from weave.integrations.claude_plugin.utils import set_call_view
+
+        # Get cwd from the subagent session for relative paths
+        cwd = subagent_session.cwd
+
+        file_diffs = _build_file_diffs_from_edit_data(all_edit_data)
+        if file_diffs:
+            # Generate HTML with same styling as turn diffs
+            html_parts = [
+                "<!DOCTYPE html>",
+                "<html><head>",
+                f"<style>{DIFF_HTML_STYLES}</style>",
+                "</head><body>",
+                '<div class="diff-view">',
+                '<div class="diff-header"><span class="diff-title">SubAgent File Changes</span></div>',
+            ]
+            # Render each file diff
+            for file_diff in file_diffs:
+                _render_file_diff_html(html_parts, file_diff, cwd=cwd)
+            html_parts.append("</div></body></html>")
+            diff_html = "\n".join(html_parts)
+
+            set_call_view(
+                call=subagent_call,
+                client=client,
+                name="file_changes",
+                content=diff_html,
+                extension="html",
+                mimetype="text/html",
+            )
+
     # Finish the subagent call
     client.finish_call(subagent_call, output=subagent_output)
 
-    logger.debug(f"Created subagent {agent_id}: {calls_created} calls, {len(file_snapshots)} file snapshots")
+    logger.debug(f"Created subagent {agent_id}: {calls_created} calls, {sum(tool_counts.values())} tool calls, {len(file_snapshots)} file snapshots")
     return calls_created, file_snapshots
 
 
@@ -251,6 +331,7 @@ def _import_session_to_weave(
     session: Session,
     session_file_path: Path,
     use_ollama: bool = True,
+    include_tool_traces: bool = False,
 ) -> tuple[int, int, int, str]:
     """Import a session using SessionProcessor.
 
@@ -258,6 +339,7 @@ def _import_session_to_weave(
         session: Parsed session data
         session_file_path: Path to the original session JSONL file
         use_ollama: Whether to use Ollama for generating display names
+        include_tool_traces: If True, create child traces for each tool call
 
     Returns: (turns, tool_calls, calls_created, call_id)
     """
@@ -274,7 +356,7 @@ def _import_session_to_weave(
     first_prompt = session.first_user_prompt() or ""
 
     # Create session call
-    session_call = processor.create_session_call(
+    session_call, _ = processor.create_session_call(
         session_id=session.session_id,
         first_prompt=first_prompt,
         cwd=session.cwd,
@@ -318,9 +400,24 @@ def _import_session_to_weave(
         # Collect subagent file snapshots for this turn
         subagent_file_snapshots: list = []
 
-        # Import tool calls as children of the turn
+        # Count tool calls and handle subagents
+        # Tool calls are embedded in turn output via build_turn_output(), not as child traces
+        # Unless include_tool_traces is True, then create child traces for each tool call
+
+        # Pre-extract Edit tool data from raw_messages for structured_patch
+        edit_data_by_path: dict[str, dict] = {}
+        if include_tool_traces and turn.raw_messages:
+            from weave.integrations.claude_plugin.diff_utils import (
+                extract_edit_data_from_raw_messages,
+            )
+            # Build a map of file_path -> edit data for matching
+            for edit_data in extract_edit_data_from_raw_messages(turn.raw_messages):
+                file_path = edit_data.get("file_path")
+                if file_path:
+                    edit_data_by_path[file_path] = edit_data
+
         for tc in turn.all_tool_calls():
-            # Handle Task tools with subagent_type specially - create subagent call instead
+            # Handle Task tools with subagent_type specially - create subagent call
             # This matches the daemon's pattern and enables ChatView-compatible format
             if tc.name == "Task" and tc.input.get("subagent_type"):
                 agent_id = extract_agent_id(tc.result)
@@ -332,25 +429,37 @@ def _import_session_to_weave(
                         client=client,
                         session_id=session.session_id,
                         trace_id=trace_id,
+                        subagent_type=tc.input.get("subagent_type"),
+                        include_tool_traces=include_tool_traces,
                     )
                     calls_created += subagent_calls
-                    total_tool_calls += subagent_calls
                     subagent_file_snapshots.extend(snapshots)
-                continue  # Skip normal tool call logging for subagent tasks
+            elif include_tool_traces:
+                # Use the shared utility for proper TodoWrite/Edit view handling
+                from weave.integrations.claude_plugin.utils import log_tool_call
 
-            tool_output = tc.result
-            if tc.name == "Skill" and turn.skill_expansion:
-                tool_output = turn.skill_expansion
+                # Get Edit tool data if available
+                original_file = None
+                structured_patch = None
+                if tc.name == "Edit":
+                    file_path = tc.input.get("file_path")
+                    if file_path and file_path in edit_data_by_path:
+                        edit_data = edit_data_by_path[file_path]
+                        original_file = edit_data.get("original_file")
+                        structured_patch = edit_data.get("structured_patch")
 
-            log_tool_call(
-                tool_name=tc.name,
-                tool_input=tc.input,
-                tool_output=tool_output,
-                tool_use_id=tc.id,
-                duration_ms=tc.duration_ms() or 0,
-                parent=turn_call,
-            )
-            calls_created += 1
+                log_tool_call(
+                    tool_name=tc.name,
+                    tool_input=tc.input or {},
+                    tool_output=tc.result,
+                    tool_use_id=tc.id,
+                    duration_ms=tc.duration_ms(),
+                    parent=turn_call,
+                    original_file=original_file,
+                    structured_patch=structured_patch,
+                )
+                calls_created += 1
+            # All tool calls (including regular ones) are counted for summary
             total_tool_calls += 1
 
         # Reconstruct turn_call before finishing to avoid _children accumulation
@@ -363,6 +472,7 @@ def _import_session_to_weave(
         )
 
         # Finish turn call (returns extracted question)
+        # build_turn_output() embeds all tool calls in the output
         pending_question = processor.finish_turn_call(
             turn_call=reconstructed_turn_call,
             turn=turn,
@@ -404,6 +514,7 @@ def import_session_with_result(
     dry_run: bool = False,
     use_ollama: bool = True,
     include_details: bool = True,
+    include_tool_traces: bool = False,
 ) -> "ImportResult":
     """Import a single session file and return structured result.
 
@@ -412,6 +523,7 @@ def import_session_with_result(
         dry_run: If True, show what would be imported without importing
         use_ollama: Whether to use Ollama for generating display names
         include_details: If True, include session details for visualization
+        include_tool_traces: If True, create child traces for each tool call
 
     Returns:
         ImportResult with session details and success/error status
@@ -495,6 +607,7 @@ def import_session_with_result(
                 session,
                 session_file_path=session_path,
                 use_ollama=use_ollama,
+                include_tool_traces=include_tool_traces,
             )
             return ImportResult(
                 session_name=session_path.name,

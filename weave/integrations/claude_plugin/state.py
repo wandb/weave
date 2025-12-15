@@ -277,6 +277,7 @@ def create_session_data(
     daemon_pid: int | None = None,
     last_processed_line: int = 0,
     transcript_path: str | None = None,
+    continuation_count: int = 0,
 ) -> dict[str, Any]:
     """Create a new session data dict with all fields.
 
@@ -293,6 +294,7 @@ def create_session_data(
         daemon_pid: PID of the daemon process for this session
         last_processed_line: Line number in session file processed up to
         transcript_path: Path to the session JSONL file
+        continuation_count: Number of times this session has been continued
 
     Returns:
         Session data dict
@@ -310,5 +312,6 @@ def create_session_data(
         "daemon_pid": daemon_pid,
         "last_processed_line": last_processed_line,
         "transcript_path": transcript_path,
+        "continuation_count": continuation_count,
         "last_updated": _now_iso(),
     }

@@ -43,6 +43,7 @@ from weave.integrations.claude_plugin.utils import (
     extract_slash_command,
     generate_session_name,
     get_git_info,
+    get_subagent_display_name,
     get_tool_display_name,
     get_turn_display_name,
     is_command_output,
@@ -277,6 +278,91 @@ def handle_session_start(payload: dict[str, Any], project: str) -> dict[str, Any
     return None
 
 
+def _check_session_continuation(
+    session_data: dict[str, Any],
+    session_call_id: str,
+    client: Any,
+) -> bool:
+    """Check if this session is being continued after previously ending.
+
+    Args:
+        session_data: Current session state
+        session_call_id: ID of the session call
+        client: Weave client for API queries
+
+    Returns:
+        True if session was previously ended and is being continued
+    """
+    # Primary detection: check session_ended flag in state
+    if session_data.get("session_ended"):
+        logger.debug("Continuation detected via session_ended flag")
+        return True
+
+    # Fallback: Query Weave API to check if session call is finished
+    if session_call_id:
+        try:
+            call = client.get_call(session_call_id, columns=["ended_at"])
+            if call.ended_at is not None:
+                logger.debug("Continuation detected via API (ended_at set)")
+                return True
+        except Exception as e:
+            logger.debug(f"Could not query session call status: {e}")
+
+    return False
+
+
+def _create_continuation_session(
+    session_id: str,
+    session_data: dict[str, Any],
+    user_prompt: str,
+    cwd: str | None,
+    client: Any,
+) -> Any:
+    """Create a new session call for a continued session.
+
+    The display name is generated from the continuation's first prompt,
+    not the original session name.
+
+    Args:
+        session_id: Claude Code session ID
+        session_data: Current session state
+        user_prompt: User's prompt
+        cwd: Working directory
+        client: Weave client
+
+    Returns:
+        Created session call
+    """
+    previous_call_id = session_data.get("session_call_id")
+
+    # Generate display name from the continuation's first prompt
+    base_name, _ = generate_session_name(user_prompt)
+    continuation_display_name = f"Continued: {base_name}"
+
+    # Build attributes
+    attributes = {
+        "session_id": session_id,
+        "source": "claude-code-plugin",
+    }
+    if previous_call_id:
+        attributes["continuation_of"] = previous_call_id
+
+    # Create new session call
+    session_call = client.create_call(
+        op="claude_code.session",
+        inputs={
+            "session_id": session_id,
+            "cwd": cwd,
+            "first_prompt": truncate(user_prompt, 1000),
+        },
+        attributes=attributes,
+        display_name=continuation_display_name,
+        use_stack=False,
+    )
+
+    return session_call
+
+
 def handle_user_prompt_submit(
     payload: dict[str, Any], project: str
 ) -> dict[str, Any] | None:
@@ -284,6 +370,10 @@ def handle_user_prompt_submit(
 
     On the first call, creates the session trace and first turn.
     On subsequent calls, creates a new turn as a child of the session.
+
+    Detects session continuation (when session_ended is True) and creates
+    a new trace with "Continued: " prefix instead of appending to the
+    finished session.
 
     If a previous turn was interrupted (turn_call_id still set), finishes
     that turn first before starting the new one.
@@ -319,6 +409,45 @@ def handle_user_prompt_submit(
             # SessionStart didn't fire or state was lost - create it now
             session_data = create_session_data(project=project, entity=entity)
 
+        session_call_id = session_data.get("session_call_id")
+        trace_id = session_data.get("trace_id")
+
+        # Check if this is a continuation of a previously ended session
+        if session_call_id and trace_id:
+            is_continuation = _check_session_continuation(
+                session_data, session_call_id, client
+            )
+            if is_continuation:
+                logger.info(f"Detected session continuation for {session_id}")
+
+                # Create new session call with continuation naming
+                session_call = _create_continuation_session(
+                    session_id, session_data, user_prompt, cwd, client
+                )
+
+                # Update continuation count
+                continuation_count = session_data.get("continuation_count", 0) + 1
+
+                # Reset session data for the continuation
+                session_data.update({
+                    "session_call_id": session_call.id,
+                    "trace_id": session_call.trace_id,
+                    "turn_call_id": None,
+                    "turn_number": 0,
+                    "total_tool_calls": 0,
+                    "tool_counts": {},
+                    "session_ended": False,
+                    "continuation_count": continuation_count,
+                })
+
+                # Update for the turn we're about to create
+                session_call_id = session_call.id
+                trace_id = session_call.trace_id
+
+                logger.info(
+                    f"Created continuation session: {session_call_id} (#{continuation_count})"
+                )
+
         # Check for interrupted previous turn
         if session_data.get("turn_call_id"):
             _finish_interrupted_turn(session_data, transcript_path, client)
@@ -326,10 +455,6 @@ def handle_user_prompt_submit(
         # Increment turn number
         turn_number = session_data.get("turn_number", 0) + 1
         session_data["turn_number"] = turn_number
-
-        # First turn - create session call
-        session_call_id = session_data.get("session_call_id")
-        trace_id = session_data.get("trace_id")
 
         if not session_call_id or not trace_id:
             # Generate session name from the prompt
@@ -661,12 +786,8 @@ def handle_subagent_stop(payload: dict[str, Any], project: str) -> dict[str, Any
         )
 
         # Create the subagent call as a child of the session
-        agent_display_name = f"Subagent: {agent_id}"
-        if agent_session.turns:
-            # Use first turn's user message as display hint
-            first_prompt = agent_session.first_user_prompt()
-            if first_prompt:
-                agent_display_name = f"Subagent: {truncate(first_prompt, 40)}"
+        first_prompt = agent_session.first_user_prompt() if agent_session.turns else None
+        agent_display_name = get_subagent_display_name(first_prompt, agent_id, max_len=40)
 
         subagent_call = client.create_call(
             op="claude_code.subagent",

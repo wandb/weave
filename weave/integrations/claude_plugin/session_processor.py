@@ -61,6 +61,27 @@ class SessionProcessor:
         self.project = project
         self.source = source
 
+    @staticmethod
+    def _get_mimetype_for_extension(ext: str) -> str:
+        """Get MIME type for a file extension."""
+        EXT_TO_MIMETYPE = {
+            ".py": "text/x-python",
+            ".js": "text/javascript",
+            ".ts": "text/typescript",
+            ".tsx": "text/typescript",
+            ".jsx": "text/javascript",
+            ".json": "application/json",
+            ".yaml": "text/yaml",
+            ".yml": "text/yaml",
+            ".md": "text/plain",
+            ".html": "text/html",
+            ".css": "text/css",
+            ".sh": "text/x-shellscript",
+            ".toml": "text/toml",
+            ".txt": "text/plain",
+        }
+        return EXT_TO_MIMETYPE.get(ext, "text/plain")
+
     def create_session_call(
         self,
         session_id: str,
@@ -68,10 +89,12 @@ class SessionProcessor:
         cwd: str | None = None,
         git_branch: str | None = None,
         claude_code_version: str | None = None,
-    ) -> Any:
+        display_name: str | None = None,
+        continuation_of: str | None = None,
+    ) -> tuple[Any, str]:
         """Create the root session call.
 
-        Generates display name using Ollama summarizer.
+        Generates display name using Ollama summarizer unless provided.
 
         Args:
             session_id: Unique session identifier
@@ -79,13 +102,29 @@ class SessionProcessor:
             cwd: Working directory of the session
             git_branch: Git branch name if available
             claude_code_version: Claude Code version string
+            display_name: Optional display name (overrides generated name)
+            continuation_of: If this is a continuation, the previous call_id
 
         Returns:
-            Created Call object (caller stores call.id, call.trace_id, call.ui_url)
+            Tuple of (Created Call object, display_name used)
         """
-        display_name, _ = generate_session_name(first_prompt)
+        if display_name is None:
+            display_name, _ = generate_session_name(first_prompt)
 
-        return self.client.create_call(
+        # Build attributes
+        attributes: dict[str, Any] = {
+            "session_id": session_id,
+            "filename": f"{session_id}.jsonl",
+            "git_branch": git_branch,
+            "source": f"claude-code-{self.source}",
+            "hostname": get_hostname(),
+        }
+
+        # Add continuation metadata if this is a continuation
+        if continuation_of:
+            attributes["continuation_of"] = continuation_of
+
+        call = self.client.create_call(
             op="claude_code.session",
             inputs={
                 "session_id": session_id,
@@ -94,16 +133,12 @@ class SessionProcessor:
                 "claude_code_version": claude_code_version,
                 "first_prompt": truncate(first_prompt, 1000),
             },
-            attributes={
-                "session_id": session_id,
-                "filename": f"{session_id}.jsonl",
-                "git_branch": git_branch,
-                "source": f"claude-code-{self.source}",
-                "hostname": get_hostname(),
-            },
+            attributes=attributes,
             display_name=display_name,
             use_stack=False,
         )
+
+        return call, display_name
 
     def create_turn_call(
         self,
@@ -143,9 +178,16 @@ class SessionProcessor:
                     content_parts.append({"type": "image", "source": img})
             user_content = content_parts
 
+        # Build messages array for ChatView
+        # For Q&A flow, prepend the question as an assistant message
+        messages: list[dict[str, Any]] = []
+        if pending_question:
+            messages.append({"role": "assistant", "content": pending_question})
+        messages.append({"role": "user", "content": user_content})
+
         inputs: dict[str, Any] = {
             # Anthropic-format messages for chat view detection
-            "messages": [{"role": "user", "content": user_content}],
+            "messages": messages,
         }
         if pending_question:
             inputs["in_response_to"] = pending_question
@@ -153,7 +195,7 @@ class SessionProcessor:
         display_name = (
             f"Turn {turn_number}: Compacted, resuming..."
             if is_compacted
-            else get_turn_display_name(turn_number, user_message)
+            else get_turn_display_name(turn_number, user_message, pending_question)
         )
 
         attributes: dict[str, Any] = {"turn_number": turn_number}
@@ -197,7 +239,11 @@ class SessionProcessor:
     ) -> list[Any]:
         """Collect file snapshots for session output (internal helper).
 
-        Includes:
+        For imports (historic sessions):
+        - Session JSONL file itself
+        - File backups with actual Claude backup data (backup_filename set)
+
+        For daemon (live sessions):
         - Session JSONL file itself
         - Final state of all changed files (from disk)
 
@@ -229,31 +275,77 @@ class SessionProcessor:
             except Exception:
                 pass
 
-        # Add final state of changed files
-        if session.cwd:
-            cwd_path = Path(session.cwd)
-            for file_path in session.get_all_changed_files():
-                try:
-                    abs_path = Path(file_path)
-                    if not abs_path.is_absolute():
-                        abs_path = cwd_path / file_path
+        # For imports, reconstruct file snapshots from Edit data
+        # This captures changes from main session AND all subagents
+        # Don't load from disk since files may have changed since the session
+        if self.source == "import":
+            from weave.integrations.claude_plugin.diff_utils import (
+                collect_all_file_changes_from_session,
+            )
 
-                    if abs_path.exists():
+            file_changes = collect_all_file_changes_from_session(session, sessions_dir)
+            cwd_path = Path(session.cwd) if session.cwd else None
+
+            for file_path, change_info in file_changes.items():
+                # Use the "after" state (final file content after all edits)
+                after_content = change_info.get("after")
+                if not after_content:
+                    continue
+
+                try:
+                    # Determine relative path for metadata
+                    abs_path = Path(file_path)
+                    if cwd_path and abs_path.is_absolute():
                         try:
                             rel_path = abs_path.relative_to(cwd_path)
                         except ValueError:
                             rel_path = Path(abs_path.name)
+                    else:
+                        rel_path = abs_path
 
-                        content = Content.from_path(
-                            abs_path,
-                            metadata={
-                                "original_path": str(file_path),
-                                "relative_path": str(rel_path),
-                            },
-                        )
-                        snapshots.append(content)
+                    # Determine extension and mimetype
+                    ext = abs_path.suffix.lower()
+                    mimetype = self._get_mimetype_for_extension(ext)
+
+                    content = Content.from_bytes(
+                        after_content.encode("utf-8"),
+                        mimetype=mimetype,
+                        extension=ext or ".txt",
+                        metadata={
+                            "original_path": str(file_path),
+                            "relative_path": str(rel_path),
+                            "source": "edit_data",
+                        },
+                    )
+                    snapshots.append(content)
                 except Exception:
                     pass
+        else:
+            # For daemon (live mode), load final state from disk
+            if session.cwd:
+                cwd_path = Path(session.cwd)
+                for file_path in session.get_all_changed_files():
+                    try:
+                        abs_path = Path(file_path)
+                        if not abs_path.is_absolute():
+                            abs_path = cwd_path / file_path
+
+                        if abs_path.exists():
+                            try:
+                                rel_path = abs_path.relative_to(cwd_path)
+                            except ValueError:
+                                rel_path = Path(abs_path.name)
+
+                            content = Content.from_path(
+                                abs_path,
+                                metadata={
+                                    "original_path": str(file_path),
+                                    "relative_path": str(rel_path),
+                                },
+                            )
+                            snapshots.append(content)
+                    except Exception:
+                        pass
 
         return snapshots
 
@@ -376,15 +468,18 @@ class SessionProcessor:
         # By omitting "type", the output passes through as a raw Message object which gives us:
         # - reasoning_content: Collapsible "Thinking" UI
         # - tool_calls: Expandable tool calls with embedded results
+        # Note: Don't truncate turn content - it's the primary output and truncation
+        # breaks Q&A detection when questions appear at the end of long responses
         output: dict[str, Any] = {
             "role": "assistant",
-            "content": truncate(assistant_text.strip()),
+            "content": assistant_text.strip(),
             "model": model or "claude-sonnet-4-20250514",
         }
 
         # Add thinking/reasoning content for collapsible UI
+        # Note: Don't truncate reasoning either - it's important context
         if thinking_text.strip():
-            output["reasoning_content"] = truncate(thinking_text.strip())
+            output["reasoning_content"] = thinking_text.strip()
 
         # Add tool calls with results in OpenAI format for expandable tool UI
         tool_calls = turn.all_tool_calls()
@@ -418,6 +513,7 @@ class SessionProcessor:
     def build_subagent_inputs(
         prompt: str,
         agent_id: str | None = None,
+        subagent_type: str | None = None,
     ) -> dict[str, Any]:
         """Build subagent inputs in ChatView-compatible format.
 
@@ -427,6 +523,7 @@ class SessionProcessor:
         Args:
             prompt: The subagent's prompt/task description
             agent_id: Optional agent ID for metadata
+            subagent_type: Optional subagent type from Task tool input
 
         Returns:
             Input dict with messages array for ChatView compatibility
@@ -437,6 +534,8 @@ class SessionProcessor:
         }
         if agent_id:
             inputs["agent_id"] = agent_id
+        if subagent_type:
+            inputs["subagent_type"] = subagent_type
         return inputs
 
     @staticmethod
@@ -558,9 +657,14 @@ class SessionProcessor:
         # Finish
         self.client.finish_call(turn_call, output=output)
 
-        # Extract and return pending question for next turn
+        # Extract and return pending question context for next turn
+        # If a question is detected, return the full assistant text for context
+        # (not just the question line) - this gives the next turn full context
         if not interrupted:
-            return extract_question_from_text(assistant_text)
+            question = extract_question_from_text(assistant_text)
+            if question:
+                # Return full assistant text as Q&A context
+                return assistant_text
         return None
 
     def _attach_turn_diff_view(
@@ -597,6 +701,7 @@ class SessionProcessor:
                 turn=turn,
                 turn_number=turn_index + 1,
                 user_prompt=user_prompt,
+                cwd=session.cwd,
             )
 
         if diff_html:

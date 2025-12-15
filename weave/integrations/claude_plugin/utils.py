@@ -29,6 +29,24 @@ DAEMON_STARTUP_TIMEOUT = 3.0
 INACTIVITY_TIMEOUT = 600
 SUBAGENT_DETECTION_TIMEOUT = 10
 
+# Boilerplate phrases to remove from subagent prompts for cleaner display names
+# These are replaced (not just prefix-stripped) to preserve meaningful parts
+# e.g., "Review the implementation of X" → "Review X"
+SUBAGENT_BOILERPLATE_REPLACEMENTS = [
+    # Remove "the implementation of/the implementation" but keep surrounding words
+    # Order matters - check longer patterns first
+    (" the implementation of ", " "),
+    (" the implementation", ""),  # Handles end-of-string case
+    # Remove "You are implementing" entirely (no useful context)
+    ("You are implementing ", ""),
+    ("You are ", ""),
+    # Remove filler phrases
+    ("Please implement ", "Implement "),
+    ("Please review ", "Review "),
+    ("Your task is to ", ""),
+    ("Your task: ", ""),
+]
+
 
 # Regex patterns for extracting command info from XML-tagged messages
 _COMMAND_NAME_PATTERN = re.compile(r"<command-name>([^<]+)</command-name>")
@@ -104,19 +122,79 @@ def extract_xml_tag_content(text: str) -> str | None:
     return None
 
 
-def get_turn_display_name(turn_number: int, user_prompt: str) -> str:
+def get_subagent_display_name(
+    prompt: str,
+    agent_id: str | None = None,
+    max_len: int = 50,
+) -> str:
+    """Generate a clean display name for a subagent.
+
+    Removes common boilerplate phrases from the prompt to show more
+    meaningful content in the limited display space.
+
+    Examples:
+        "Review the implementation of auth flow" → "SubAgent: Review auth flow"
+        "You are implementing a new feature" → "SubAgent: a new feature"
+
+    Args:
+        prompt: The subagent's full prompt/task description
+        agent_id: Optional agent ID to use as fallback
+        max_len: Maximum length for the display name preview
+
+    Returns:
+        Display name like "SubAgent: Review auth flow" or "SubAgent: abc123"
+    """
+    if prompt:
+        cleaned = prompt.strip()
+        # Apply boilerplate replacements (case-insensitive)
+        for pattern, replacement in SUBAGENT_BOILERPLATE_REPLACEMENTS:
+            # Case-insensitive replacement
+            lower_cleaned = cleaned.lower()
+            lower_pattern = pattern.lower()
+            if lower_pattern in lower_cleaned:
+                idx = lower_cleaned.index(lower_pattern)
+                cleaned = cleaned[:idx] + replacement + cleaned[idx + len(pattern) :]
+
+        # Clean up any double spaces and strip
+        cleaned = " ".join(cleaned.split()).strip()
+
+        # Truncate the cleaned prompt
+        preview = truncate(cleaned, max_len) or cleaned[:max_len]
+        if preview:
+            return f"SubAgent: {preview}"
+
+    # Fall back to agent ID if no meaningful prompt
+    if agent_id:
+        return f"SubAgent: {agent_id}"
+
+    return "SubAgent"
+
+
+def get_turn_display_name(
+    turn_number: int,
+    user_prompt: str,
+    in_response_to: str | None = None,
+) -> str:
     """Generate a clean display name for a turn.
 
-    Handles special cases like slash commands and XML tags to avoid showing
-    raw XML in display names.
+    Handles special cases like slash commands, XML tags, and Q&A flows
+    to provide meaningful display names.
 
     Args:
         turn_number: The turn number (1-indexed)
         user_prompt: The raw user prompt text
+        in_response_to: Full assistant context for Q&A flows (may contain full message)
 
     Returns:
-        Display name like "Turn 1: /plugin" or "Turn 2: Fix the bug..."
+        Display name like "Turn 1: /plugin", "Q&A 2: Which file?", etc.
     """
+    # Q&A flow - extract question from context for display name
+    if in_response_to:
+        # Extract just the question for the display name
+        question = extract_question_from_text(in_response_to)
+        question_preview = truncate(question or in_response_to, 50)
+        return f"Q&A {turn_number}: {question_preview}"
+
     # Check if this is a slash command message
     slash_command = extract_slash_command(user_prompt)
     if slash_command:
@@ -581,8 +659,8 @@ def extract_question_from_text(text: str) -> str | None:
     question, we want to capture it so it can be added as context to the
     next turn's input (via 'in_response_to' field).
 
-    Handles two patterns:
-    1. "**Next question:**" marker - extracts the first line with "?" after this marker
+    Handles multiple patterns:
+    1. "**Next question:**" or "**Last question:**" marker - extracts the question after this marker
     2. Last paragraph ending with "?" - extracts up to and including the first "?"
 
     Args:
@@ -595,25 +673,26 @@ def extract_question_from_text(text: str) -> str | None:
         return None
 
     text = text.strip()
-
-    # Pattern 1: Check for "**Next question:**" marker (case-insensitive)
-    next_question_marker = "**next question:**"
     lower_text = text.lower()
-    if next_question_marker in lower_text:
-        # Find the marker position in original text
-        marker_pos = lower_text.index(next_question_marker)
-        after_marker = text[marker_pos + len(next_question_marker) :]
 
-        # Find the first line with a question mark after the marker
-        for line in after_marker.split("\n"):
-            line = line.strip()
-            if "?" in line:
-                question_end = line.index("?") + 1
-                question = line[:question_end].strip()
-                # Clean up markdown formatting
-                question = _clean_markdown_formatting(question)
-                if question:
-                    return question
+    # Pattern 1: Check for question markers (case-insensitive)
+    question_markers = ["**next question:**", "**last question:**"]
+    for marker in question_markers:
+        if marker in lower_text:
+            # Find the marker position in original text
+            marker_pos = lower_text.index(marker)
+            after_marker = text[marker_pos + len(marker) :]
+
+            # Find the first line with a question mark after the marker
+            for line in after_marker.split("\n"):
+                line = line.strip()
+                if "?" in line:
+                    question_end = line.index("?") + 1
+                    question = line[:question_end].strip()
+                    # Clean up markdown formatting
+                    question = _clean_markdown_formatting(question)
+                    if question:
+                        return question
 
     # Pattern 2: Fall back to last paragraph
     paragraphs = text.split("\n\n")

@@ -51,13 +51,14 @@ class TestCreateSessionCall:
 
         processor = SessionProcessor(client=mock_client, project="entity/project")
 
-        result = processor.create_session_call(
+        result_call, result_name = processor.create_session_call(
             session_id="session-abc",
             first_prompt="Help me refactor this code",
             cwd="/path/to/project",
         )
 
-        assert result is mock_call
+        assert result_call is mock_call
+        assert isinstance(result_name, str)  # Display name is returned
         mock_client.create_call.assert_called_once()
 
         # Verify call arguments

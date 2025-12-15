@@ -167,12 +167,13 @@ class TestGenerateSessionDiffHtmlWithEditDataFallback:
             main_session.turns[0].raw_messages = []  # No Edit calls in main session
 
             # Create subagent session file with Edit tool data
+            # Note: subagent sessionId must match parent session for filtering
             agent_data = [
                 {
                     "type": "user",
                     "uuid": "u1",
                     "timestamp": "2025-01-01T10:00:00Z",
-                    "sessionId": "agent-abc123",
+                    "sessionId": "test-session-123",  # Same as parent session
                     "message": {"role": "user", "content": "Fix the bug"},
                 },
                 {
@@ -217,7 +218,8 @@ class TestGenerateSessionDiffHtmlWithEditDataFallback:
             # Should have generated HTML from subagent Edit data
             assert result is not None
             assert "Session File Changes" in result
-            assert "/path/to/file.py" in result
+            # Path should be relative to cwd (/path/to -> file.py)
+            assert "file.py" in result
             assert "diff-view" in result
 
     def test_returns_none_when_no_backups_and_no_edit_data(self):
@@ -268,13 +270,14 @@ class TestGenerateSessionDiffHtmlWithEditDataFallback:
             main_session.turns[0].raw_messages = []
 
             # Create two subagent files with different edits
+            # Note: subagent sessionId must match parent session for filtering
             for agent_id, file_path in [("abc", "file_a.py"), ("def", "file_b.py")]:
                 agent_data = [
                     {
                         "type": "user",
                         "uuid": "u1",
                         "timestamp": "2025-01-01T10:00:00Z",
-                        "sessionId": f"agent-{agent_id}",
+                        "sessionId": "test-session-789",  # Same as parent session
                         "message": {"role": "user", "content": "Edit"},
                     },
                     {

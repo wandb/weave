@@ -102,6 +102,7 @@ from weave.integrations.claude_plugin.utils import (
     extract_question_from_text,
     generate_session_name,
     get_git_info,
+    get_subagent_display_name,
     get_tool_display_name,
     get_turn_display_name,
     truncate,
@@ -141,6 +142,7 @@ class SubagentTracker:
     turn_call_id: str
     detected_at: datetime
     parent_session_id: str
+    subagent_type: str | None = None  # The subagent type from Task tool input
 
     # Set once file is found and matched
     agent_id: str | None = None
@@ -414,12 +416,9 @@ class WeaveDaemon:
         tracker.transcript_path = agent_file
         self._subagent_by_agent_id[session.agent_id] = tracker
 
-        # Build display name
+        # Build display name using helper that strips common prefixes
         first_prompt = session.first_user_prompt() or ""
-        if first_prompt:
-            display_name = f"SubAgent: {truncate(first_prompt, 50)}"
-        else:
-            display_name = f"SubAgent: {session.agent_id}"
+        display_name = get_subagent_display_name(first_prompt, session.agent_id)
 
         # Determine parent: prefer current turn, fall back to session
         parent_id = tracker.turn_call_id or self.session_call_id
@@ -434,7 +433,9 @@ class WeaveDaemon:
         from weave.integrations.claude_plugin.session_processor import SessionProcessor
         subagent_call = self.weave_client.create_call(
             op="claude_code.subagent",
-            inputs=SessionProcessor.build_subagent_inputs(first_prompt, session.agent_id),
+            inputs=SessionProcessor.build_subagent_inputs(
+                first_prompt, session.agent_id, tracker.subagent_type
+            ),
             parent=parent_call,
             display_name=display_name,
             attributes={"agent_id": session.agent_id, "is_sidechain": True},
@@ -443,7 +444,7 @@ class WeaveDaemon:
 
         tracker.subagent_call_id = subagent_call.id
 
-        logger.info(f"Started tailing subagent {session.agent_id}: {subagent_call.id}")
+        logger.info(f"Started tailing subagent {session.agent_id} (type={tracker.subagent_type}): {subagent_call.id}")
 
         # Process any existing content
         await self._process_subagent_updates(tracker)
@@ -629,11 +630,146 @@ class WeaveDaemon:
         return {"status": "ok", "trace_url": self.trace_url, "session_id": self.session_id}
 
     async def _handle_user_prompt_submit(self, payload: dict[str, Any]) -> dict[str, Any]:
-        """Handle UserPromptSubmit - ensure session exists, return trace URL."""
-        # Create session call if not exists (handles first turn)
-        if not self.session_call_id:
-            return await self._create_session_call(payload)
+        """Handle UserPromptSubmit - ensure session exists, return trace URL.
 
+        Detects session continuation (when session_ended is True) and creates
+        a new trace with "Continued: " prefix instead of appending to the
+        finished session.
+        """
+        # Check if this is a continuation of a previously ended session
+        if self.session_call_id:
+            is_continuation = await self._check_session_continuation()
+            if is_continuation:
+                logger.info(f"Detected session continuation for {self.session_id}")
+                return await self._create_continuation_session_call(payload)
+            # Session exists and isn't a continuation - continue normally
+            return {"status": "ok", "trace_url": self.trace_url, "session_id": self.session_id}
+
+        # No session call yet - create a fresh one
+        return await self._create_session_call(payload)
+
+    async def _check_session_continuation(self) -> bool:
+        """Check if this session is being continued after previously ending.
+
+        Detection approaches (in order):
+        1. State-based: Check if session_ended flag is True
+        2. API-based fallback: Query Weave API to check if call has ended_at set
+
+        Returns:
+            True if session was previously ended and is being continued
+        """
+        # Primary detection: check session_ended flag in state
+        with StateManager() as state:
+            session_data = state.get_session(self.session_id)
+            if session_data and session_data.get("session_ended"):
+                logger.debug("Continuation detected via session_ended flag")
+                return True
+
+        # Fallback: Query Weave API to check if session call is finished
+        # This handles edge cases where state might be out of sync
+        if self.session_call_id and self.weave_client:
+            try:
+                call = self.weave_client.get_call(
+                    self.session_call_id,
+                    columns=["ended_at"],
+                )
+                if call.ended_at is not None:
+                    logger.debug("Continuation detected via API (ended_at set)")
+                    return True
+            except Exception as e:
+                logger.debug(f"Could not query session call status: {e}")
+
+        return False
+
+    async def _create_continuation_session_call(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """Create a new session call for a continued session.
+
+        Creates a new trace with "Continued: " prefix and links to the
+        original session via continuation_of attribute. The display name
+        is generated from the new user prompt, not the original session.
+        """
+        if not self.weave_client or not self.processor:
+            return {"status": "error", "message": "Weave not initialized"}
+
+        user_prompt = payload.get("prompt", "")
+        cwd = payload.get("cwd")
+        previous_call_id = self.session_call_id
+        git_branch: str | None = None
+        claude_code_version: str | None = None
+
+        # Get continuation count from state
+        with StateManager() as state:
+            session_data = state.get_session(self.session_id) or {}
+            continuation_count = session_data.get("continuation_count", 0)
+
+        # Parse session file to get metadata and real prompt if needed
+        if self.transcript_path and self.transcript_path.exists():
+            session = parse_session_file(self.transcript_path)
+            if session:
+                # Extract metadata from session
+                git_branch = session.git_branch
+                claude_code_version = session.version
+
+                # If prompt is empty or system-like, use real first prompt
+                if not user_prompt or is_system_message(user_prompt):
+                    real_prompt = session.first_user_prompt()
+                    if real_prompt:
+                        user_prompt = real_prompt
+
+        # Generate display name from the continuation's first prompt
+        from weave.integrations.claude_plugin.utils import generate_session_name
+        base_name, _ = generate_session_name(user_prompt)
+        continuation_display_name = f"Continued: {base_name}"
+
+        # Increment continuation count
+        continuation_count += 1
+
+        # Create new session call with continuation naming
+        session_call, display_name = self.processor.create_session_call(
+            session_id=self.session_id,
+            first_prompt=user_prompt,
+            cwd=cwd,
+            display_name=continuation_display_name,
+            continuation_of=previous_call_id,
+            git_branch=git_branch,
+            claude_code_version=claude_code_version,
+        )
+
+        # Reset daemon state for the new session
+        self.session_call_id = session_call.id
+        self.trace_id = session_call.trace_id
+        self.trace_url = session_call.ui_url
+        self.current_turn_call_id = None
+        self.turn_number = 0
+        self.total_tool_calls = 0
+        self.tool_counts = {}
+        self._current_turn_tool_calls = []
+        self._pending_question = None
+        self.compaction_count = 0
+        self._redacted_count = 0
+
+        # Update state with new session info and clear session_ended
+        with StateManager() as state:
+            session_data = state.get_session(self.session_id) or {}
+            session_data.update({
+                "session_call_id": self.session_call_id,
+                "trace_id": self.trace_id,
+                "trace_url": self.trace_url,
+                "turn_call_id": None,
+                "turn_number": 0,
+                "total_tool_calls": 0,
+                "tool_counts": {},
+                "session_ended": False,  # Clear the ended flag
+                "continuation_count": continuation_count,
+                "pending_question": None,
+                "compaction_count": 0,
+            })
+            state.save_session(self.session_id, session_data)
+
+        # Flush to ensure call is sent
+        self.weave_client.flush()
+
+        logger.info(f"Created continuation session call: {self.session_call_id} (continuation #{continuation_count})")
         return {"status": "ok", "trace_url": self.trace_url, "session_id": self.session_id}
 
     async def _create_session_call(self, payload: dict[str, Any]) -> dict[str, Any]:
@@ -643,23 +779,31 @@ class WeaveDaemon:
 
         user_prompt = payload.get("prompt", "")
         cwd = payload.get("cwd")
+        git_branch: str | None = None
+        claude_code_version: str | None = None
 
-        # If prompt is empty or system-like (warmup subagent), find real first user prompt
-        # This handles the case where Claude fires warmup subagents before the actual user prompt
-        if not user_prompt or is_system_message(user_prompt):
-            if self.transcript_path and self.transcript_path.exists():
-                session = parse_session_file(self.transcript_path)
-                if session:
+        # Parse session file to get metadata and real prompt if needed
+        if self.transcript_path and self.transcript_path.exists():
+            session = parse_session_file(self.transcript_path)
+            if session:
+                # Extract metadata from session
+                git_branch = session.git_branch
+                claude_code_version = session.version
+
+                # If prompt is empty or system-like (warmup subagent), use real first prompt
+                if not user_prompt or is_system_message(user_prompt):
                     real_prompt = session.first_user_prompt()
                     if real_prompt:
                         user_prompt = real_prompt
                         logger.debug(f"Using real first prompt from transcript: {user_prompt[:50]!r}")
 
         # Use SessionProcessor to create session call
-        session_call = self.processor.create_session_call(
+        session_call, _ = self.processor.create_session_call(
             session_id=self.session_id,
             first_prompt=user_prompt,
             cwd=cwd,
+            git_branch=git_branch,
+            claude_code_version=claude_code_version,
         )
 
         self.session_call_id = session_call.id
@@ -828,14 +972,11 @@ class WeaveDaemon:
         if not self.weave_client or not self.session_call_id:
             return {"status": "error", "message": "No active session"}
 
-        # Build display name: "SubAgent: {prompt}"
+        # Build display name using helper that strips common prefixes
         # Use agent_id from payload as fallback (more reliable than parsed)
         agent_id = agent_session.agent_id or agent_id_from_payload or "unknown"
         first_prompt = agent_session.first_user_prompt() or ""
-        if first_prompt:
-            display_name = f"SubAgent: {truncate(first_prompt, 50)}"
-        else:
-            display_name = f"SubAgent: {agent_id}"
+        display_name = get_subagent_display_name(first_prompt, agent_id)
 
         # Determine parent: prefer current turn, fall back to session
         # This attaches the subagent to the turn that spawned it, not the session
@@ -848,10 +989,12 @@ class WeaveDaemon:
         )
 
         # Create subagent call with ChatView-compatible inputs
+        # Use tracker's subagent_type if available (from when Task tool was detected)
         from weave.integrations.claude_plugin.session_processor import SessionProcessor
+        subagent_type = tracker.subagent_type if tracker else None
         subagent_call = self.weave_client.create_call(
             op="claude_code.subagent",
-            inputs=SessionProcessor.build_subagent_inputs(first_prompt, agent_id),
+            inputs=SessionProcessor.build_subagent_inputs(first_prompt, agent_id, subagent_type),
             parent=parent_call,
             display_name=display_name,
             attributes={"agent_id": agent_id, "is_sidechain": True},
@@ -1363,10 +1506,11 @@ class WeaveDaemon:
                         turn_call_id=self.current_turn_call_id,
                         detected_at=datetime.now(timezone.utc),
                         parent_session_id=self.session_id,
+                        subagent_type=tool_input.get("subagent_type"),
                     )
                     self._subagent_trackers[tool_id] = tracker
 
-                    logger.debug(f"Subagent detected: tool_id={tool_id}, will scan for file")
+                    logger.debug(f"Subagent detected: tool_id={tool_id}, type={tracker.subagent_type}, will scan for file")
                     continue
 
                 # Handle EnterPlanMode tool - creates inline parent container
@@ -1522,10 +1666,11 @@ class WeaveDaemon:
                 turn_call.summary["usage"] = {model: usage.to_weave_usage()}
 
             # Detect if turn ends with a question (for Q&A context tracking)
-            # Store it so the next turn can include it as context
+            # Store full assistant text so the next turn can include it as context
             pending_q = extract_question_from_text(assistant_text)
             if pending_q and not interrupted:
-                self._pending_question = pending_q
+                # Store full assistant text for Q&A context, not just the question
+                self._pending_question = assistant_text
                 turn_call.summary["ends_with_question"] = truncate(pending_q, 500)
                 logger.debug(f"Detected trailing question: {pending_q[:50]}...")
 
