@@ -529,6 +529,8 @@ class WeaveClient:
         query: QueryLike | None = None,
         include_costs: bool = False,
         include_feedback: bool = False,
+        include_storage_size: bool = False,
+        include_total_storage_size: bool = False,
         columns: list[str] | None = None,
         expand_columns: list[str] | None = None,
         return_expanded_column_values: bool = True,
@@ -551,6 +553,8 @@ class WeaveClient:
             `query`: A mongo-like expression for advanced filtering. Not all Mongo operators are supported.
             `include_costs`: If True, includes token/cost info in `summary.weave`.
             `include_feedback`: If True, includes feedback in `summary.weave.feedback`.
+            `include_storage_size`: If True, includes storage_size_bytes for each call.
+            `include_total_storage_size`: If True, includes total_storage_size_bytes (trace total) for each call.
             `columns`: List of fields to return per call. Reducing this can significantly improve performance.
                     (Some fields like `id`, `trace_id`, `op_name`, and `started_at` are always included.)
             `scored_by`: Filter by one or more scorers (name or ref URI). Multiple scorers are AND-ed.
@@ -585,6 +589,8 @@ class WeaveClient:
             query=query,
             include_costs=include_costs,
             include_feedback=include_feedback,
+            include_storage_size=include_storage_size,
+            include_total_storage_size=include_total_storage_size,
             columns=columns,
             expand_columns=expand_columns,
             return_expanded_column_values=return_expanded_column_values,
@@ -597,6 +603,8 @@ class WeaveClient:
         call_id: str,
         include_costs: bool = False,
         include_feedback: bool = False,
+        include_storage_size: bool = False,
+        include_total_storage_size: bool = False,
         columns: list[str] | None = None,
     ) -> WeaveObject:
         """Get a single call by its ID.
@@ -605,6 +613,8 @@ class WeaveClient:
             call_id: The ID of the call to get.
             include_costs: If true, cost info is included at summary.weave
             include_feedback: If true, feedback info is included at summary.weave.feedback
+            include_storage_size: If true, storage_size_bytes is included for the call.
+            include_total_storage_size: If true, total_storage_size_bytes (trace total) is included.
             columns: A list of columns to include in the response. If None,
                all columns are included. Specifying fewer columns may be more performant.
                Some columns are always included: id, project_id, trace_id, op_name, started_at
@@ -619,6 +629,8 @@ class WeaveClient:
                     filter=CallsFilter(call_ids=[call_id]),
                     include_costs=include_costs,
                     include_feedback=include_feedback,
+                    include_storage_size=include_storage_size,
+                    include_total_storage_size=include_total_storage_size,
                     columns=columns,
                 )
             )
