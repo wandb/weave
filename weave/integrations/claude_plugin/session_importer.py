@@ -160,7 +160,7 @@ def _create_subagent_call(
     from weave.integrations.claude_plugin.utils import get_subagent_display_name
     display_name = get_subagent_display_name(first_prompt, agent_id)
 
-    # Create subagent call with ChatView-compatible inputs
+    # Create subagent call with ChatView-compatible inputs and timestamp from parsed session
     subagent_call = client.create_call(
         op="claude_code.subagent",
         inputs=SessionProcessor.build_subagent_inputs(first_prompt, agent_id, subagent_type),
@@ -168,6 +168,7 @@ def _create_subagent_call(
         display_name=display_name,
         attributes={"agent_id": agent_id, "is_sidechain": True},
         use_stack=False,
+        started_at=subagent_session.started_at(),
     )
 
     # Collect file snapshots and count tools from all turns
@@ -214,6 +215,8 @@ def _create_subagent_call(
                     parent=subagent_call,
                     original_file=original_file,
                     structured_patch=structured_patch,
+                    started_at=tc.timestamp,
+                    ended_at=tc.result_timestamp,
                 )
                 calls_created += 1
 
@@ -321,7 +324,7 @@ def _create_subagent_call(
             )
 
     # Finish the subagent call
-    client.finish_call(subagent_call, output=subagent_output)
+    client.finish_call(subagent_call, output=subagent_output, ended_at=subagent_session.ended_at())
 
     logger.debug(f"Created subagent {agent_id}: {calls_created} calls, {sum(tool_counts.values())} tool calls, {len(file_snapshots)} file snapshots")
     return calls_created, file_snapshots
@@ -355,13 +358,14 @@ def _import_session_to_weave(
     # Get first real user prompt for naming
     first_prompt = session.first_user_prompt() or ""
 
-    # Create session call
+    # Create session call with timestamp from parsed session
     session_call, _ = processor.create_session_call(
         session_id=session.session_id,
         first_prompt=first_prompt,
         cwd=session.cwd,
         git_branch=session.git_branch,
         claude_code_version=session.version,
+        started_at=session.started_at(),
     )
 
     # Store IDs for reconstructing parent references
@@ -387,12 +391,13 @@ def _import_session_to_weave(
             parent_id=None,
         )
 
-        # Create turn call
+        # Create turn call with timestamp from parsed turn
         turn_call = processor.create_turn_call(
             parent=parent_call,
             turn_number=i + 1,
             user_message=turn.user_message.content if turn.user_message else "",
             pending_question=pending_question,
+            started_at=turn.started_at(),
         )
         turn_call_id = turn_call.id
         calls_created += 1
@@ -457,6 +462,8 @@ def _import_session_to_weave(
                     parent=turn_call,
                     original_file=original_file,
                     structured_patch=structured_patch,
+                    started_at=tc.timestamp,
+                    ended_at=tc.result_timestamp,
                 )
                 calls_created += 1
             # All tool calls (including regular ones) are counted for summary
@@ -479,6 +486,7 @@ def _import_session_to_weave(
             session=session,
             turn_index=i,
             extra_file_snapshots=subagent_file_snapshots if subagent_file_snapshots else None,
+            ended_at=turn.ended_at(),
         )
 
     # Reconstruct session_call before finishing to avoid _children accumulation
@@ -495,6 +503,7 @@ def _import_session_to_weave(
         session_call=reconstructed_session_call,
         session=session,
         sessions_dir=sessions_dir,
+        ended_at=session.ended_at(),
     )
 
     return len(session.turns), total_tool_calls, calls_created, session_call_id

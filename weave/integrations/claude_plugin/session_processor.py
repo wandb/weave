@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import socket
+from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -91,6 +92,7 @@ class SessionProcessor:
         claude_code_version: str | None = None,
         display_name: str | None = None,
         continuation_of: str | None = None,
+        started_at: datetime | None = None,
     ) -> tuple[Any, str]:
         """Create the root session call.
 
@@ -104,6 +106,7 @@ class SessionProcessor:
             claude_code_version: Claude Code version string
             display_name: Optional display name (overrides generated name)
             continuation_of: If this is a continuation, the previous call_id
+            started_at: Optional timestamp override for retroactive logging
 
         Returns:
             Tuple of (Created Call object, display_name used)
@@ -136,6 +139,7 @@ class SessionProcessor:
             attributes=attributes,
             display_name=display_name,
             use_stack=False,
+            started_at=started_at,
         )
 
         return call, display_name
@@ -149,6 +153,7 @@ class SessionProcessor:
         pending_question: str | None = None,
         images: list[Any] | None = None,
         is_compacted: bool = False,
+        started_at: datetime | None = None,
     ) -> Any:
         """Create a turn call as child of session.
 
@@ -159,6 +164,7 @@ class SessionProcessor:
             pending_question: Question from previous turn (for Q&A context)
             images: Image Content objects from user message
             is_compacted: True if this is a context compaction turn
+            started_at: Optional timestamp override for retroactive logging
 
         Returns:
             Created Call object
@@ -209,6 +215,7 @@ class SessionProcessor:
             attributes=attributes,
             display_name=display_name,
             use_stack=False,
+            started_at=started_at,
         )
 
     def _collect_turn_file_snapshots(
@@ -609,6 +616,7 @@ class SessionProcessor:
         *,
         interrupted: bool = False,
         extra_file_snapshots: list[Any] | None = None,
+        ended_at: datetime | None = None,
     ) -> str | None:
         """Finish turn call with output, summary, and diff view.
 
@@ -619,6 +627,7 @@ class SessionProcessor:
             turn_index: 0-based index into session.turns
             interrupted: True if user interrupted this turn
             extra_file_snapshots: Additional snapshots (e.g., from subagents)
+            ended_at: Optional timestamp override for retroactive logging
 
         Returns:
             Extracted question from response (for Q&A tracking), or None
@@ -655,7 +664,7 @@ class SessionProcessor:
         )
 
         # Finish
-        self.client.finish_call(turn_call, output=output)
+        self.client.finish_call(turn_call, output=output, ended_at=ended_at)
 
         # Extract and return pending question context for next turn
         # If a question is detected, return the full assistant text for context
@@ -722,6 +731,7 @@ class SessionProcessor:
         *,
         end_reason: str | None = None,
         extra_summary: dict[str, Any] | None = None,
+        ended_at: datetime | None = None,
     ) -> None:
         """Finish session call with summary, file snapshots, and diff view.
 
@@ -731,6 +741,7 @@ class SessionProcessor:
             sessions_dir: Directory containing session files (for subagent lookup)
             end_reason: Optional reason (e.g., "user_exit", "timeout")
             extra_summary: Additional summary fields (compaction_count, redacted_secrets)
+            ended_at: Optional timestamp override for retroactive logging
         """
         # Build summary
         usage = session.total_usage()
@@ -770,7 +781,7 @@ class SessionProcessor:
         self._attach_session_diff_view(session_call, session, sessions_dir)
 
         # Finish
-        self.client.finish_call(session_call, output=output)
+        self.client.finish_call(session_call, output=output, ended_at=ended_at)
 
     def _attach_session_diff_view(
         self,

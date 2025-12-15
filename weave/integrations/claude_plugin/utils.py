@@ -330,6 +330,9 @@ def log_tool_call(
     # Edit tool specific data for generating HTML diff views
     original_file: str | None = None,
     structured_patch: list[dict[str, Any]] | None = None,
+    # Timestamp overrides for retroactive logging (e.g., session import)
+    started_at: datetime | None = None,
+    ended_at: datetime | None = None,
 ) -> Any:
     """Log a tool call to Weave with standardized formatting.
 
@@ -350,6 +353,8 @@ def log_tool_call(
         max_output_length: Max length for output string
         original_file: For Edit calls, the original file content before edit
         structured_patch: For Edit calls, the structured patch data from toolUseResult
+        started_at: Optional timestamp for when the tool call started (for retroactive logging)
+        ended_at: Optional timestamp for when the tool call ended (for retroactive logging)
 
     Returns:
         The created Call object
@@ -386,6 +391,7 @@ def log_tool_call(
                 display_name=tool_display,
                 parent=parent,
                 use_stack=False,
+                started_at=started_at,
             )
 
             # Attach HTML view BEFORE finishing
@@ -427,7 +433,7 @@ def log_tool_call(
                     )
 
             # Now finish the call
-            client.finish_call(call, output=output)
+            client.finish_call(call, output=output, ended_at=ended_at)
             return call
         except Exception as e:
             logger.debug(f"Failed to log {tool_name} with view: {e}")
@@ -444,6 +450,8 @@ def log_tool_call(
                 display_name=tool_display,
                 parent=parent,
                 use_stack=False,
+                started_at=started_at,
+                ended_at=ended_at,
             )
     else:
         return weave.log_call(
@@ -458,6 +466,8 @@ def log_tool_call(
             display_name=tool_display,
             parent=parent,
             use_stack=False,
+            started_at=started_at,
+            ended_at=ended_at,
         )
 
 
