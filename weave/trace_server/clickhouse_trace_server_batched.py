@@ -775,6 +775,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         Accepts only end call types and updates existing records in the
         calls_complete table without needing to split the batch.
         """
+        batch_length = len(req.batch)
+        if batch_length > ch_settings.MAX_BATCH_UPDATE_CALLS:
+            raise RequestTooLarge(
+                f"Cannot update more than {ch_settings.MAX_BATCH_UPDATE_CALLS} calls at once, got: {batch_length}"
+            )
+
         # Extract ends from batch
         end_calls = [item.req.end for item in req.batch]
 
