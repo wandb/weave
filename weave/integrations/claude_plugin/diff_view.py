@@ -125,6 +125,30 @@ def _html_escape(text: str) -> str:
     )
 
 
+def _normalize_path(file_path: str) -> str:
+    """Normalize a file path for consistent comparison.
+
+    Handles:
+    - Trailing slashes
+    - Redundant separators (// -> /)
+    - Mixed separators (on Windows)
+    - Relative path components like './'
+
+    Args:
+        file_path: The file path to normalize
+
+    Returns:
+        Normalized path string
+    """
+    import os.path
+
+    if not file_path:
+        return file_path
+    # Use os.path.normpath for robust normalization across platforms
+    # This handles /./, /../, //, and trailing slashes
+    return os.path.normpath(file_path)
+
+
 def _to_relative_path(file_path: str, cwd: str | None) -> str:
     """Convert an absolute file path to a relative path for display.
 
@@ -625,6 +649,7 @@ def generate_session_diff_html(
     cwd: str | None = None,
     sessions_dir: Path | None = None,
     project: str | None = None,
+    first_prompt: str | None = None,
 ) -> str | None:
     """Generate HTML showing all file changes for an entire session.
 
@@ -638,6 +663,7 @@ def generate_session_diff_html(
         cwd: Current working directory for resolving relative paths
         sessions_dir: Directory containing session files (for finding subagent files)
         project: Weave project name (e.g., "entity/project") for the resume command
+        first_prompt: The user's first prompt for display at the top of the diff view
 
     Returns:
         HTML string with session diff view, or None if no file changes
@@ -799,9 +825,10 @@ def generate_session_diff_html(
             raw_diffs = build_file_diffs_from_file_changes(file_changes)
 
             # Merge: add raw diffs for files not already in file_diffs
-            existing_paths = {fd["path"] for fd in file_diffs}
+            # Use normalized paths for comparison to handle path format differences
+            existing_paths = {_normalize_path(fd["path"]) for fd in file_diffs}
             for rd in raw_diffs:
-                if rd["path"] not in existing_paths:
+                if _normalize_path(rd["path"]) not in existing_paths:
                     file_diffs.append(rd)
                     total_added += rd.get("added", 0)
                     total_removed += rd.get("removed", 0)
@@ -828,6 +855,20 @@ def generate_session_diff_html(
     html_parts.append("</head><body>")
 
     html_parts.append('<div class="diff-view">')
+
+    # User prompt chat bubble at the very top (if provided)
+    if first_prompt:
+        # Truncate very long prompts for display
+        display_prompt = first_prompt[:2000] + "..." if len(first_prompt) > 2000 else first_prompt
+        html_parts.append('<div class="prompt-section">')
+        html_parts.append('<div class="prompt-label">')
+        # User icon SVG
+        html_parts.append(
+            '<svg viewBox="0 0 16 16"><path fill-rule="evenodd" d="M10.5 5a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0zm.061 3.073a4 4 0 10-5.123 0 6.004 6.004 0 00-3.431 5.142.75.75 0 001.498.07 4.5 4.5 0 018.99 0 .75.75 0 101.498-.07 6.005 6.005 0 00-3.432-5.142z"></path></svg>'
+        )
+        html_parts.append("User Prompt</div>")
+        html_parts.append(f'<div class="prompt-bubble">{_html_escape(display_prompt)}</div>')
+        html_parts.append("</div>")
 
     # Session-level header
     html_parts.append('<div class="diff-header">')

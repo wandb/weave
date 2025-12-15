@@ -958,6 +958,7 @@ def handle_session_end(payload: dict[str, Any], project: str) -> dict[str, Any] 
                     cwd=session.cwd,
                     sessions_dir=transcript_file_path.parent,
                     project=project,
+                    first_prompt=session.first_user_prompt(),
                 )
                 if diff_html:
                     logger.debug("Generated session diff HTML view (will attach after summary assignment)")

@@ -189,36 +189,19 @@ def _create_subagent_call(
                 if file_path:
                     edit_data_by_path[file_path] = edit_data
 
-        # Count tool calls and optionally create traces
+        # Count tool calls for summary
         for tc in turn.all_tool_calls():
             tool_counts[tc.name] = tool_counts.get(tc.name, 0) + 1
 
-            if include_tool_traces:
-                from weave.integrations.claude_plugin.utils import log_tool_call
+        # Log tool calls with parallel grouping (subagents often use parallel calls)
+        if include_tool_traces:
+            from weave.integrations.claude_plugin.utils import log_tool_calls_grouped
 
-                # Get Edit tool data if available
-                original_file = None
-                structured_patch = None
-                if tc.name == "Edit":
-                    file_path = tc.input.get("file_path")
-                    if file_path and file_path in edit_data_by_path:
-                        edit_data = edit_data_by_path[file_path]
-                        original_file = edit_data.get("original_file")
-                        structured_patch = edit_data.get("structured_patch")
-
-                log_tool_call(
-                    tool_name=tc.name,
-                    tool_input=tc.input or {},
-                    tool_output=tc.result,
-                    tool_use_id=tc.id,
-                    duration_ms=tc.duration_ms(),
-                    parent=subagent_call,
-                    original_file=original_file,
-                    structured_patch=structured_patch,
-                    started_at=tc.timestamp,
-                    ended_at=tc.result_timestamp,
-                )
-                calls_created += 1
+            calls_created += log_tool_calls_grouped(
+                tool_call_groups=turn.grouped_tool_calls(),
+                parent=subagent_call,
+                edit_data_by_path=edit_data_by_path,
+            )
 
         # Collect file snapshots from this turn's file backups
         # Note: Use main session_id (not agent_id) since file-history is stored
@@ -421,9 +404,8 @@ def _import_session_to_weave(
                 if file_path:
                     edit_data_by_path[file_path] = edit_data
 
+        # First pass: handle Task tools with subagent_type (these spawn subagent calls)
         for tc in turn.all_tool_calls():
-            # Handle Task tools with subagent_type specially - create subagent call
-            # This matches the daemon's pattern and enables ChatView-compatible format
             if tc.name == "Task" and tc.input.get("subagent_type"):
                 agent_id = extract_agent_id(tc.result)
                 if agent_id:
@@ -439,35 +421,21 @@ def _import_session_to_weave(
                     )
                     calls_created += subagent_calls
                     subagent_file_snapshots.extend(snapshots)
-            elif include_tool_traces:
-                # Use the shared utility for proper TodoWrite/Edit view handling
-                from weave.integrations.claude_plugin.utils import log_tool_call
 
-                # Get Edit tool data if available
-                original_file = None
-                structured_patch = None
-                if tc.name == "Edit":
-                    file_path = tc.input.get("file_path")
-                    if file_path and file_path in edit_data_by_path:
-                        edit_data = edit_data_by_path[file_path]
-                        original_file = edit_data.get("original_file")
-                        structured_patch = edit_data.get("structured_patch")
+        # Second pass: log remaining tool calls with parallel grouping
+        if include_tool_traces:
+            from weave.integrations.claude_plugin.utils import log_tool_calls_grouped
 
-                log_tool_call(
-                    tool_name=tc.name,
-                    tool_input=tc.input or {},
-                    tool_output=tc.result,
-                    tool_use_id=tc.id,
-                    duration_ms=tc.duration_ms(),
-                    parent=turn_call,
-                    original_file=original_file,
-                    structured_patch=structured_patch,
-                    started_at=tc.timestamp,
-                    ended_at=tc.result_timestamp,
-                )
-                calls_created += 1
-            # All tool calls (including regular ones) are counted for summary
-            total_tool_calls += 1
+            # Note: skip_subagent_tasks=True by default, which skips Task tools
+            # with subagent_type (handled above)
+            calls_created += log_tool_calls_grouped(
+                tool_call_groups=turn.grouped_tool_calls(),
+                parent=turn_call,
+                edit_data_by_path=edit_data_by_path,
+            )
+
+        # Count all tool calls for summary
+        total_tool_calls += len(turn.all_tool_calls())
 
         # Reconstruct turn_call before finishing to avoid _children accumulation
         # This prevents tool call views from being merged into turn summary as arrays

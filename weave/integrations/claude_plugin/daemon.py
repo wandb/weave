@@ -92,6 +92,7 @@ from weave.trace.view_utils import set_call_view
 from weave.integrations.claude_plugin.session_parser import (
     Session,
     TokenUsage,
+    ToolCall,
     Turn,
     is_system_message,
     parse_session_file,
@@ -235,6 +236,11 @@ class WeaveDaemon:
         # Pending tool calls waiting for results: tool_use_id -> (name, inputs, timestamp)
         # Used for real-time tool call logging when tool_result arrives
         self._pending_tool_calls: dict[str, tuple[str, dict[str, Any], datetime]] = {}
+
+        # Buffered tool results waiting to be logged with parallel grouping
+        # tool_use_id -> (name, input, tool_use_timestamp, result_content, is_error)
+        # Tools are buffered until aged (> 2 seconds) to allow parallel grouping
+        self._buffered_tool_results: dict[str, tuple[str, dict[str, Any], datetime, str, bool]] = {}
 
         # Tool calls already logged in real-time (to avoid duplicate logging at turn finish)
         self._logged_tool_call_ids: set[str] = set()
@@ -827,6 +833,10 @@ class WeaveDaemon:
         # Process remaining lines from session file to capture turn data
         await self._process_session_file()
 
+        # Flush all remaining buffered tool results before finishing turn
+        # force=True ensures we don't wait for aging - log everything now
+        self._flush_buffered_tool_results(force=True)
+
         # Note: PlanMode inline parents are finished by ExitPlanMode, not Stop
 
         # Finish current turn if open
@@ -1178,7 +1188,11 @@ class WeaveDaemon:
                     # NOTE: Defer set_call_view until after session_call.summary is assigned
                     # to avoid the summary assignment overwriting the views
                     diff_html = generate_session_diff_html(
-                        session, cwd=cwd, sessions_dir=sessions_dir, project=self.project
+                        session,
+                        cwd=cwd,
+                        sessions_dir=sessions_dir,
+                        project=self.project,
+                        first_prompt=session.first_user_prompt(),
                     )
                     if diff_html:
                         logger.debug("Generated session diff HTML view (will attach after summary assignment)")
@@ -1308,6 +1322,10 @@ class WeaveDaemon:
                 # Clean up stale trackers (file never appeared)
                 self._cleanup_stale_subagent_trackers()
 
+                # Flush aged buffered tool results with parallel grouping
+                # This provides real-time feedback while allowing parallel detection
+                self._flush_buffered_tool_results()
+
             except Exception as e:
                 logger.error(f"Error processing session file: {e}")
 
@@ -1372,6 +1390,8 @@ class WeaveDaemon:
             user_text = content
         elif isinstance(content, list):
             text_parts = []
+            # Collect tool results for batched logging with parallel grouping
+            pending_tool_results: list[tuple[str, dict[str, Any]]] = []
             for c in content:
                 if c.get("type") == "text":
                     text_parts.append(c.get("text", ""))
@@ -1392,9 +1412,31 @@ class WeaveDaemon:
                     # Handle AskUserQuestion results
                     if tool_use_id in self._pending_question_calls:
                         await self._finish_question_call(tool_use_id, c)
-                    # Handle regular tool results - log in real-time
+                    # Buffer tool results for grouped logging
+                    # We buffer instead of logging immediately to allow parallel grouping:
+                    # - Claude sends each tool_result in separate user messages
+                    # - By buffering, we can group tools with close timestamps
+                    # - Aged results (> 1s) are flushed with parallel grouping
                     elif tool_use_id in self._pending_tool_calls:
-                        await self._log_pending_tool_call(tool_use_id, c)
+                        tool_name, tool_input, tool_timestamp = self._pending_tool_calls[tool_use_id]
+
+                        # Extract result content
+                        result_content = c.get("content", "")
+                        if isinstance(result_content, list):
+                            text_parts = []
+                            for item in result_content:
+                                if isinstance(item, dict) and item.get("type") == "text":
+                                    text_parts.append(item.get("text", ""))
+                            result_content = "\n".join(text_parts)
+
+                        # Check if this is an error result
+                        is_error = c.get("is_error", False)
+
+                        # Buffer for grouped logging
+                        self._buffered_tool_results[tool_use_id] = (
+                            tool_name, tool_input, tool_timestamp, result_content, is_error
+                        )
+                        del self._pending_tool_calls[tool_use_id]
             user_text = "\n".join(text_parts)
 
         # Skip if no real content (tool results only) - don't trigger interruption check
@@ -1479,6 +1521,17 @@ class WeaveDaemon:
 
         if not isinstance(content, list):
             return
+
+        # Get the actual message timestamp from JSONL (not poll time)
+        # This is critical for parallel tool detection - poll timing can exceed
+        # the 1000ms threshold even for truly parallel calls
+        from weave.integrations.claude_plugin.session_parser import parse_timestamp
+        msg_timestamp_str = obj.get("timestamp")
+        msg_timestamp = (
+            parse_timestamp(msg_timestamp_str)
+            if msg_timestamp_str
+            else datetime.now(timezone.utc)
+        )
 
         # Reconstruct turn call as parent
         turn_call = reconstruct_call(
@@ -1584,10 +1637,11 @@ class WeaveDaemon:
 
                 # Track pending tool call with full info for real-time logging
                 # when the tool_result arrives in a subsequent user message
+                # Use actual message timestamp (not poll time) for parallel detection
                 self._pending_tool_calls[tool_id] = (
                     tool_name,
                     tool_input,
-                    datetime.now(timezone.utc),
+                    msg_timestamp,
                 )
                 self._current_turn_tool_calls.append(tool_id)
 
@@ -1720,7 +1774,12 @@ class WeaveDaemon:
                     )
                     logger.debug("Attached diff HTML view to turn")
 
-        self.weave_client.finish_call(turn_call, output=output)
+        # Mark interrupted turns with an exception so they show as failed in Weave
+        exception: BaseException | None = None
+        if interrupted:
+            exception = InterruptedError("Interrupted by user")
+
+        self.weave_client.finish_call(turn_call, output=output, exception=exception)
         self.weave_client.flush()
 
         logger.debug(f"Finished turn {self.turn_number}")
@@ -1733,6 +1792,9 @@ class WeaveDaemon:
         and tool_use/tool_result have been linked together, so we have the actual
         output for each tool call.
 
+        Tool calls are grouped by parallel execution - when multiple tools run
+        within 1 second of each other, they're wrapped in a Parallel container.
+
         Args:
             turn: The parsed Turn object containing tool calls with results
             turn_call: The parent turn call to attach tool calls to
@@ -1740,48 +1802,58 @@ class WeaveDaemon:
         if not self.weave_client:
             return
 
-        for tc in turn.all_tool_calls():
-            tool_name = tc.name
+        from weave.integrations.claude_plugin.utils import (
+            log_tool_calls_grouped,
+            _generate_parallel_display_name,
+        )
 
-            # Skip tool calls already logged in real-time
-            if tc.id in self._logged_tool_call_ids:
-                continue
+        # Tools to skip (handled elsewhere)
+        skip_tools = {
+            "Task",  # Task with subagent_type handled by SubagentStop
+            "EnterPlanMode",
+            "ExitPlanMode",
+            "AskUserQuestion",
+            "Skill",
+            "SlashCommand",
+        }
 
-            # Skip Task tools with subagent_type - handled by SubagentStop
-            if tool_name == "Task" and tc.input.get("subagent_type"):
-                continue
-
-            # Skip special tools handled elsewhere
-            if tool_name in ("EnterPlanMode", "ExitPlanMode", "AskUserQuestion", "Skill", "SlashCommand"):
-                continue
-
-            # Determine parent: inline parent if active, otherwise turn
-            if self._pending_inline_parent and self._pending_inline_parent.is_active:
-                tool_parent = reconstruct_call(
-                    project_id=self.weave_client._project_id(),
-                    call_id=self._pending_inline_parent.call_id,
-                    trace_id=self.trace_id,
-                    parent_id=self._pending_inline_parent.parent_turn_call_id,
-                )
-            else:
-                tool_parent = turn_call
-
-            # Log tool call with output (result is now available from parsed turn)
-            log_tool_call(
-                tool_name=tool_name,
-                tool_input=tc.input,
-                tool_output=tc.result,
-                tool_use_id=tc.id,
-                duration_ms=tc.duration_ms(),
-                parent=tool_parent,
-                max_output_length=10000,
+        # Determine parent: inline parent if active, otherwise turn
+        if self._pending_inline_parent and self._pending_inline_parent.is_active:
+            tool_parent = reconstruct_call(
+                project_id=self.weave_client._project_id(),
+                call_id=self._pending_inline_parent.call_id,
+                trace_id=self.trace_id,
+                parent_id=self._pending_inline_parent.parent_turn_call_id,
             )
+        else:
+            tool_parent = turn_call
 
-            # Update counts
-            self.tool_counts[tool_name] = self.tool_counts.get(tool_name, 0) + 1
-            self.total_tool_calls += 1
+        # Get grouped tool calls and filter out already-logged and special tools
+        groups = turn.grouped_tool_calls()
+        filtered_groups: list[list[ToolCall]] = []
 
-            logger.debug(f"Logged tool call: {tool_name} (result={'yes' if tc.result else 'no'})")
+        for group in groups:
+            filtered = [
+                tc for tc in group
+                if tc.id not in self._logged_tool_call_ids
+                and tc.name not in skip_tools
+                and not (tc.name == "Task" and tc.input.get("subagent_type"))
+            ]
+            if filtered:
+                filtered_groups.append(filtered)
+
+        # Log grouped tool calls
+        calls_created = log_tool_calls_grouped(
+            tool_call_groups=filtered_groups,
+            parent=tool_parent,
+        )
+
+        # Update counts
+        for group in filtered_groups:
+            for tc in group:
+                self.tool_counts[tc.name] = self.tool_counts.get(tc.name, 0) + 1
+                self.total_tool_calls += 1
+                logger.debug(f"Logged tool call: {tc.name} (result={'yes' if tc.result else 'no'})")
 
         # Clear tracked tool calls for this turn
         self._current_turn_tool_calls = []
@@ -1971,10 +2043,410 @@ class WeaveDaemon:
         logger.debug(f"Finished question call with {len(answers)} answers")
         del self._pending_question_calls[tool_use_id]
 
+    async def _log_pending_tool_calls_grouped(
+        self, tool_results: list[tuple[str, dict[str, Any]]]
+    ) -> None:
+        """Log multiple pending tool calls with parallel grouping.
+
+        Tool calls with started_at timestamps within 1000ms of each other are
+        considered parallel and wrapped in a claude_code.parallel container.
+
+        This is called when multiple tool_results arrive in the same user message,
+        which indicates they may have been executed in parallel.
+
+        Args:
+            tool_results: List of (tool_use_id, tool_result_content) tuples
+        """
+        if not tool_results:
+            return
+
+        if not self.weave_client or not self.current_turn_call_id:
+            # Clear pending state for all tools
+            for tool_use_id, _ in tool_results:
+                if tool_use_id in self._pending_tool_calls:
+                    del self._pending_tool_calls[tool_use_id]
+            return
+
+        # Build list of (tool_use_id, tool_result, name, input, started_at)
+        tool_data: list[tuple[str, dict, str, dict, datetime]] = []
+        for tool_use_id, tool_result in tool_results:
+            if tool_use_id in self._pending_tool_calls:
+                name, input_data, started_at = self._pending_tool_calls[tool_use_id]
+                tool_data.append((tool_use_id, tool_result, name, input_data, started_at))
+
+        if not tool_data:
+            return
+
+        # Sort by started_at timestamp
+        tool_data.sort(key=lambda x: x[4])
+
+        # Group by timestamp proximity (1000ms threshold, matching session_parser)
+        PARALLEL_THRESHOLD_MS = 1000
+        groups: list[list[tuple[str, dict, str, dict, datetime]]] = []
+        current_group: list[tuple[str, dict, str, dict, datetime]] = [tool_data[0]]
+
+        for td in tool_data[1:]:
+            prev_started = current_group[-1][4]
+            gap_ms = abs((td[4] - prev_started).total_seconds() * 1000)
+
+            if gap_ms <= PARALLEL_THRESHOLD_MS:
+                current_group.append(td)
+            else:
+                groups.append(current_group)
+                current_group = [td]
+        groups.append(current_group)
+
+        # Determine parent: inline parent if active, otherwise turn
+        if self._pending_inline_parent and self._pending_inline_parent.is_active:
+            tool_parent = reconstruct_call(
+                project_id=self.weave_client._project_id(),
+                call_id=self._pending_inline_parent.call_id,
+                trace_id=self.trace_id,
+                parent_id=self._pending_inline_parent.parent_turn_call_id,
+            )
+        else:
+            tool_parent = reconstruct_call(
+                project_id=self.weave_client._project_id(),
+                call_id=self.current_turn_call_id,
+                trace_id=self.trace_id,
+                parent_id=self.session_call_id,
+            )
+
+        # Log each group
+        for group in groups:
+            if len(group) == 1:
+                # Single tool - log directly
+                tool_use_id, tool_result, tool_name, tool_input, started_at = group[0]
+                self._log_single_tool_call(
+                    tool_use_id, tool_result, tool_name, tool_input, started_at, tool_parent
+                )
+            else:
+                # Multiple tools - create parallel wrapper
+                self._log_parallel_tool_calls(group, tool_parent)
+
+        # Flush to ensure calls are sent
+        self.weave_client.flush()
+
+    def _log_single_tool_call(
+        self,
+        tool_use_id: str,
+        tool_result: dict[str, Any],
+        tool_name: str,
+        tool_input: dict[str, Any],
+        started_at: datetime,
+        parent: Any,
+    ) -> None:
+        """Log a single tool call (helper for grouped logging)."""
+        # Extract result content
+        result_content = tool_result.get("content", "")
+        if isinstance(result_content, list):
+            text_parts = []
+            for item in result_content:
+                if isinstance(item, dict) and item.get("type") == "text":
+                    text_parts.append(item.get("text", ""))
+            result_content = "\n".join(text_parts)
+
+        # Calculate duration
+        ended_at = datetime.now(timezone.utc)
+        duration_ms = int((ended_at - started_at).total_seconds() * 1000)
+
+        log_tool_call(
+            tool_name=tool_name,
+            tool_input=tool_input,
+            tool_output=result_content,
+            tool_use_id=tool_use_id,
+            duration_ms=duration_ms,
+            parent=parent,
+            max_output_length=10000,
+        )
+
+        # Update counts and tracking
+        self.tool_counts[tool_name] = self.tool_counts.get(tool_name, 0) + 1
+        self.total_tool_calls += 1
+
+        if tool_use_id in self._pending_tool_calls:
+            del self._pending_tool_calls[tool_use_id]
+        self._logged_tool_call_ids.add(tool_use_id)
+        if tool_use_id in self._current_turn_tool_calls:
+            self._current_turn_tool_calls.remove(tool_use_id)
+
+        logger.debug(f"Logged tool call: {tool_name} ({tool_use_id})")
+
+    def _log_parallel_tool_calls(
+        self,
+        group: list[tuple[str, dict, str, dict, datetime]],
+        parent: Any,
+    ) -> None:
+        """Log a group of parallel tool calls with a wrapper.
+
+        Args:
+            group: List of (tool_use_id, tool_result, name, input, started_at) tuples
+            parent: Parent call for the parallel wrapper
+        """
+        from collections import Counter
+
+        # Generate display name from tool names
+        tool_names = [g[2] for g in group]  # g[2] is tool_name
+        counts = Counter(tool_names)
+        parts = []
+        for name, count in counts.most_common():
+            if count > 1:
+                parts.append(f"{name} x{count}")
+            else:
+                parts.append(name)
+        display_name = f"Parallel ({', '.join(parts)})"
+
+        # Calculate timing for the parallel group
+        started_at = min(g[4] for g in group)
+        ended_at = datetime.now(timezone.utc)
+
+        # Create parallel wrapper
+        parallel_call = self.weave_client.create_call(
+            op="claude_code.parallel",
+            inputs={
+                "tool_count": len(group),
+                "tools": tool_names,
+            },
+            parent=parent,
+            display_name=display_name,
+            attributes={"is_parallel_group": True},
+            use_stack=False,
+        )
+
+        # Log each tool under the parallel wrapper
+        for tool_use_id, tool_result, tool_name, tool_input, tool_started_at in group:
+            self._log_single_tool_call(
+                tool_use_id, tool_result, tool_name, tool_input, tool_started_at, parallel_call
+            )
+
+        # Finish parallel wrapper
+        self.weave_client.finish_call(
+            parallel_call,
+            output={"completed": len(group)},
+        )
+
+        logger.debug(f"Logged parallel group: {display_name}")
+
+    def _flush_buffered_tool_results(self, force: bool = False) -> None:
+        """Flush buffered tool results with parallel grouping.
+
+        Tools are buffered to allow parallel grouping - we wait until tools are
+        "aged" (> 1 second since their tool_use timestamp) before logging them.
+        This gives time for parallel tool results to arrive before we commit
+        to grouping decisions.
+
+        Args:
+            force: If True, flush all buffered results immediately (used at Stop)
+        """
+        if not self._buffered_tool_results:
+            return
+
+        if not self.weave_client or not self.current_turn_call_id:
+            self._buffered_tool_results.clear()
+            return
+
+        now = datetime.now(timezone.utc)
+        TOOL_AGE_THRESHOLD_MS = 2000  # Wait 2 seconds before logging (allows parallel tools to arrive)
+        PARALLEL_THRESHOLD_MS = 1000  # Tools within this gap are considered parallel
+
+        if force:
+            # At Stop, flush everything
+            ready_to_log = [
+                (tool_id, name, inp, ts, result, is_err)
+                for tool_id, (name, inp, ts, result, is_err) in self._buffered_tool_results.items()
+            ]
+        else:
+            # Smart aging: only flush a tool if it's aged AND all "nearby" tools are also aged
+            # This prevents splitting parallel groups due to timestamp differences
+            all_tools = [
+                (tool_id, name, inp, ts, result, is_err)
+                for tool_id, (name, inp, ts, result, is_err) in self._buffered_tool_results.items()
+            ]
+
+            if not all_tools:
+                return
+
+            # Sort by timestamp to find groups
+            all_tools.sort(key=lambda x: x[3])
+
+            # Find the oldest tool's age
+            oldest_ts = all_tools[0][3]
+            oldest_age_ms = (now - oldest_ts).total_seconds() * 1000
+
+            if oldest_age_ms <= TOOL_AGE_THRESHOLD_MS:
+                # Nothing aged yet
+                return
+
+            # Find all tools that would be in the same parallel group as the oldest
+            # (chained by timestamp proximity)
+            ready_to_log = [all_tools[0]]
+            for tool in all_tools[1:]:
+                prev_ts = ready_to_log[-1][3]
+                gap_ms = (tool[3] - prev_ts).total_seconds() * 1000
+                if gap_ms <= PARALLEL_THRESHOLD_MS:
+                    ready_to_log.append(tool)
+                else:
+                    break  # Gap too large, stop here
+
+            # Check if ALL tools in this potential group are aged
+            newest_in_group_ts = ready_to_log[-1][3]
+            newest_age_ms = (now - newest_in_group_ts).total_seconds() * 1000
+            if newest_age_ms <= TOOL_AGE_THRESHOLD_MS:
+                # Not all tools in the group are aged yet, wait
+                return
+
+        if not ready_to_log:
+            return
+
+        # Sort by timestamp
+        ready_to_log.sort(key=lambda x: x[3])
+
+        # Group by timestamp proximity (1000ms threshold)
+        PARALLEL_THRESHOLD_MS = 1000
+        groups: list[list[tuple[str, str, dict, datetime, str, bool]]] = []
+        current_group: list[tuple[str, str, dict, datetime, str, bool]] = [ready_to_log[0]]
+
+        for item in ready_to_log[1:]:
+            prev_ts = current_group[-1][3]
+            gap_ms = abs((item[3] - prev_ts).total_seconds() * 1000)
+
+            if gap_ms <= PARALLEL_THRESHOLD_MS:
+                current_group.append(item)
+            else:
+                groups.append(current_group)
+                current_group = [item]
+        groups.append(current_group)
+
+        # Determine parent: inline parent if active, otherwise turn
+        if self._pending_inline_parent and self._pending_inline_parent.is_active:
+            tool_parent = reconstruct_call(
+                project_id=self.weave_client._project_id(),
+                call_id=self._pending_inline_parent.call_id,
+                trace_id=self.trace_id,
+                parent_id=self._pending_inline_parent.parent_turn_call_id,
+            )
+        else:
+            tool_parent = reconstruct_call(
+                project_id=self.weave_client._project_id(),
+                call_id=self.current_turn_call_id,
+                trace_id=self.trace_id,
+                parent_id=self.session_call_id,
+            )
+
+        # Log each group
+        for group in groups:
+            if len(group) == 1:
+                # Single tool - log directly
+                tool_id, name, inp, ts, result, is_err = group[0]
+                self._log_single_tool_call_from_buffer(tool_id, name, inp, ts, result, tool_parent, is_err)
+            else:
+                # Multiple tools - create parallel wrapper
+                self._log_parallel_tool_calls_from_buffer(group, tool_parent)
+
+        # Remove logged tools from buffer
+        for tool_id, _, _, _, _, _ in ready_to_log:
+            if tool_id in self._buffered_tool_results:
+                del self._buffered_tool_results[tool_id]
+
+        # Flush to send calls
+        self.weave_client.flush()
+
+    def _log_single_tool_call_from_buffer(
+        self,
+        tool_use_id: str,
+        tool_name: str,
+        tool_input: dict[str, Any],
+        tool_timestamp: datetime,
+        result_content: str,
+        parent: Any,
+        is_error: bool = False,
+    ) -> None:
+        """Log a single buffered tool call."""
+        # Calculate duration from tool_use timestamp to now
+        ended_at = datetime.now(timezone.utc)
+        duration_ms = int((ended_at - tool_timestamp).total_seconds() * 1000)
+
+        log_tool_call(
+            tool_name=tool_name,
+            tool_input=tool_input,
+            tool_output=result_content,
+            tool_use_id=tool_use_id,
+            duration_ms=duration_ms,
+            parent=parent,
+            max_output_length=10000,
+            is_error=is_error,
+        )
+
+        # Update counts and tracking
+        self.tool_counts[tool_name] = self.tool_counts.get(tool_name, 0) + 1
+        self.total_tool_calls += 1
+        self._logged_tool_call_ids.add(tool_use_id)
+
+        if tool_use_id in self._current_turn_tool_calls:
+            self._current_turn_tool_calls.remove(tool_use_id)
+
+        logger.debug(f"Logged tool call: {tool_name} ({tool_use_id})")
+
+    def _log_parallel_tool_calls_from_buffer(
+        self,
+        group: list[tuple[str, str, dict, datetime, str, bool]],
+        parent: Any,
+    ) -> None:
+        """Log a group of parallel buffered tool calls with a wrapper.
+
+        Args:
+            group: List of (tool_use_id, name, input, timestamp, result, is_error) tuples
+            parent: Parent call for the parallel wrapper
+        """
+        from collections import Counter
+
+        # Generate display name from tool names
+        tool_names = [g[1] for g in group]  # g[1] is tool_name
+        counts = Counter(tool_names)
+        parts = []
+        for name, count in counts.most_common():
+            if count > 1:
+                parts.append(f"{name} x{count}")
+            else:
+                parts.append(name)
+        display_name = f"Parallel ({', '.join(parts)})"
+
+        # Calculate timing for the parallel group
+        started_at = min(g[3] for g in group)
+        ended_at = datetime.now(timezone.utc)
+
+        # Create parallel wrapper
+        parallel_call = self.weave_client.create_call(
+            op="claude_code.parallel",
+            inputs={
+                "tool_count": len(group),
+                "tools": tool_names,
+            },
+            parent=parent,
+            display_name=display_name,
+            attributes={"is_parallel_group": True},
+            use_stack=False,
+        )
+
+        # Log each tool under the parallel wrapper
+        for tool_id, name, inp, ts, result, is_err in group:
+            self._log_single_tool_call_from_buffer(tool_id, name, inp, ts, result, parallel_call, is_err)
+
+        # Finish parallel wrapper
+        self.weave_client.finish_call(
+            parallel_call,
+            output={"completed": len(group)},
+        )
+
+        logger.debug(f"Logged parallel group: {display_name}")
+
     async def _log_pending_tool_call(
         self, tool_use_id: str, tool_result: dict[str, Any]
     ) -> None:
         """Log a pending tool call now that its result has arrived.
+
+        NOTE: This is now only used as a fallback. The primary path is
+        _flush_buffered_tool_results which handles parallel grouping.
 
         This enables real-time streaming of tool calls - they appear in the trace
         as soon as their results are available, rather than waiting for turn finish.

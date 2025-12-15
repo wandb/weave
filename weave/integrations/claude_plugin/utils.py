@@ -9,13 +9,18 @@ from __future__ import annotations
 import logging
 import re
 import subprocess
+from collections import Counter
+from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
 
 import weave
 from weave.trace.context.weave_client_context import require_weave_client
 from weave.trace.view_utils import set_call_view
+
+if TYPE_CHECKING:
+    from weave.integrations.claude_plugin.session_parser import ToolCall
 
 logger = logging.getLogger(__name__)
 
@@ -317,6 +322,11 @@ def reconstruct_call(
     )
 
 
+class ToolCallError(Exception):
+    """Exception raised when a tool call fails."""
+    pass
+
+
 def log_tool_call(
     tool_name: str,
     tool_input: dict[str, Any],
@@ -333,6 +343,8 @@ def log_tool_call(
     # Timestamp overrides for retroactive logging (e.g., session import)
     started_at: datetime | None = None,
     ended_at: datetime | None = None,
+    # Error handling
+    is_error: bool = False,
 ) -> Any:
     """Log a tool call to Weave with standardized formatting.
 
@@ -355,6 +367,7 @@ def log_tool_call(
         structured_patch: For Edit calls, the structured patch data from toolUseResult
         started_at: Optional timestamp for when the tool call started (for retroactive logging)
         ended_at: Optional timestamp for when the tool call ended (for retroactive logging)
+        is_error: If True, mark the call as failed with an exception
 
     Returns:
         The created Call object
@@ -367,6 +380,15 @@ def log_tool_call(
 
     # Build output dict
     output = {"result": truncate(tool_output, max_output_length)} if tool_output else None
+
+    # Create exception if this is an error
+    exception: BaseException | None = None
+    if is_error:
+        # Extract error message from tool_output (strip <tool_use_error> tags if present)
+        error_msg = tool_output or "Tool call failed"
+        if error_msg.startswith("<tool_use_error>") and error_msg.endswith("</tool_use_error>"):
+            error_msg = error_msg[16:-17]  # Strip tags
+        exception = ToolCallError(error_msg)
 
     # For tools with HTML views (TodoWrite, Edit), we need to attach the view
     # BEFORE finishing the call, so we use create_call + set_call_view + finish_call
@@ -432,8 +454,8 @@ def log_tool_call(
                         mimetype="text/html",
                     )
 
-            # Now finish the call
-            client.finish_call(call, output=output, ended_at=ended_at)
+            # Now finish the call (with exception if error)
+            client.finish_call(call, output=output, exception=exception, ended_at=ended_at)
             return call
         except Exception as e:
             logger.debug(f"Failed to log {tool_name} with view: {e}")
@@ -450,6 +472,7 @@ def log_tool_call(
                 display_name=tool_display,
                 parent=parent,
                 use_stack=False,
+                exception=exception,
                 started_at=started_at,
                 ended_at=ended_at,
             )
@@ -466,6 +489,7 @@ def log_tool_call(
             display_name=tool_display,
             parent=parent,
             use_stack=False,
+            exception=exception,
             started_at=started_at,
             ended_at=ended_at,
         )
@@ -770,3 +794,159 @@ def generate_session_name(
         fallback_name += "..."
     logger.debug(f"Using fallback session title: {fallback_name}")
     return fallback_name or "Claude Session", ""
+
+
+def _generate_parallel_display_name(tool_calls: list["ToolCall"]) -> str:
+    """Generate a display name for a parallel execution group.
+
+    Examples:
+        - ["Read", "Read"] -> "Parallel (Read x2)"
+        - ["Read", "Grep", "Glob"] -> "Parallel (Read, Grep, Glob)"
+        - ["Read", "Read", "Grep"] -> "Parallel (Read x2, Grep)"
+
+    Args:
+        tool_calls: List of tool calls in the parallel group
+
+    Returns:
+        Human-readable display name
+    """
+    counts = Counter(tc.name for tc in tool_calls)
+
+    parts = []
+    for name, count in counts.most_common():
+        if count > 1:
+            parts.append(f"{name} x{count}")
+        else:
+            parts.append(name)
+
+    return f"Parallel ({', '.join(parts)})"
+
+
+def log_tool_calls_grouped(
+    tool_call_groups: list[list["ToolCall"]],
+    parent: Any,
+    *,
+    skip_tool_names: set[str] | None = None,
+    skip_subagent_tasks: bool = True,
+    edit_data_by_path: dict[str, dict] | None = None,
+) -> int:
+    """Log tool calls with parallel grouping.
+
+    Tool calls in groups of 2+ are wrapped in a `claude_code.parallel` parent call
+    to visually indicate parallel execution.
+
+    Args:
+        tool_call_groups: Groups of tool calls from Turn.grouped_tool_calls()
+        parent: Parent Call object (typically the turn call)
+        skip_tool_names: Tool names to skip entirely (e.g., {"EnterPlanMode"})
+        skip_subagent_tasks: If True, skip Task tools that have subagent_type
+            (these spawn subagent calls and are handled separately)
+        edit_data_by_path: Optional map of file_path -> edit data for Edit tool diffs
+
+    Returns:
+        Number of calls created (including parallel wrappers)
+    """
+    from weave.integrations.claude_plugin.session_parser import ToolCall
+
+    skip_names = skip_tool_names or set()
+    edit_data = edit_data_by_path or {}
+    calls_created = 0
+
+    def should_skip(tc: ToolCall) -> bool:
+        """Check if a tool call should be skipped."""
+        if tc.name in skip_names:
+            return True
+        # Skip Task tools that spawn subagents (handled separately)
+        if skip_subagent_tasks and tc.name == "Task" and tc.input.get("subagent_type"):
+            return True
+        return False
+
+    for group in tool_call_groups:
+        # Filter out skipped tools
+        filtered_group = [tc for tc in group if not should_skip(tc)]
+        if not filtered_group:
+            continue
+
+        if len(filtered_group) == 1:
+            # Single tool - log directly under parent
+            tc = filtered_group[0]
+            original_file = None
+            structured_patch = None
+            if tc.name == "Edit":
+                file_path = tc.input.get("file_path")
+                if file_path and file_path in edit_data:
+                    original_file = edit_data[file_path].get("original_file")
+                    structured_patch = edit_data[file_path].get("structured_patch")
+
+            log_tool_call(
+                tool_name=tc.name,
+                tool_input=tc.input or {},
+                tool_output=tc.result,
+                tool_use_id=tc.id,
+                duration_ms=tc.duration_ms(),
+                parent=parent,
+                original_file=original_file,
+                structured_patch=structured_patch,
+                started_at=tc.timestamp,
+                ended_at=tc.result_timestamp,
+                is_error=tc.is_error,
+            )
+            calls_created += 1
+        else:
+            # Multiple tools - create parallel wrapper
+            client = require_weave_client()
+
+            # Calculate timing for the parallel group
+            started_at = min(tc.timestamp for tc in filtered_group)
+            result_timestamps = [tc.result_timestamp for tc in filtered_group if tc.result_timestamp]
+            ended_at = max(result_timestamps) if result_timestamps else None
+
+            # Create parallel wrapper call
+            display_name = _generate_parallel_display_name(filtered_group)
+            parallel_call = client.create_call(
+                op="claude_code.parallel",
+                inputs={
+                    "tool_count": len(filtered_group),
+                    "tools": [tc.name for tc in filtered_group],
+                },
+                parent=parent,
+                display_name=display_name,
+                attributes={"is_parallel_group": True},
+                use_stack=False,
+                started_at=started_at,
+            )
+            calls_created += 1
+
+            # Log each tool as child of parallel wrapper
+            for tc in filtered_group:
+                original_file = None
+                structured_patch = None
+                if tc.name == "Edit":
+                    file_path = tc.input.get("file_path")
+                    if file_path and file_path in edit_data:
+                        original_file = edit_data[file_path].get("original_file")
+                        structured_patch = edit_data[file_path].get("structured_patch")
+
+                log_tool_call(
+                    tool_name=tc.name,
+                    tool_input=tc.input or {},
+                    tool_output=tc.result,
+                    tool_use_id=tc.id,
+                    duration_ms=tc.duration_ms(),
+                    parent=parallel_call,
+                    original_file=original_file,
+                    structured_patch=structured_patch,
+                    started_at=tc.timestamp,
+                    ended_at=tc.result_timestamp,
+                    is_error=tc.is_error,
+                )
+                calls_created += 1
+
+            # Finish parallel wrapper
+            client.finish_call(
+                parallel_call,
+                output={"completed": len(filtered_group)},
+                ended_at=ended_at,
+            )
+
+    return calls_created

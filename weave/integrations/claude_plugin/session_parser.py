@@ -144,6 +144,7 @@ class ToolCall:
     timestamp: datetime.datetime
     result: str | None = None
     result_timestamp: datetime.datetime | None = None
+    is_error: bool = False  # True if tool_result had is_error=True
 
     def duration_ms(self) -> int | None:
         if self.result_timestamp:
@@ -253,6 +254,43 @@ class Turn:
         for msg in self.assistant_messages:
             calls.extend(msg.tool_calls)
         return calls
+
+    def grouped_tool_calls(
+        self, parallel_threshold_ms: int = 1000
+    ) -> list[list[ToolCall]]:
+        """Group tool calls by parallel execution.
+
+        Tool calls with timestamps within the threshold are considered parallel.
+        Returns a list of groups, where each group is a list of ToolCall objects.
+        Groups preserve the order of tool calls within the turn.
+
+        Args:
+            parallel_threshold_ms: Max milliseconds between tool calls to consider
+                them parallel. Default 1000ms (1 second).
+
+        Returns:
+            List of tool call groups. Single-tool groups contain one ToolCall,
+            parallel groups contain 2+ ToolCalls that were executed concurrently.
+        """
+        all_calls = self.all_tool_calls()
+        if not all_calls:
+            return []
+
+        groups: list[list[ToolCall]] = []
+        current_group: list[ToolCall] = [all_calls[0]]
+
+        for tc in all_calls[1:]:
+            prev_tc = current_group[-1]
+            gap_ms = abs((tc.timestamp - prev_tc.timestamp).total_seconds() * 1000)
+
+            if gap_ms <= parallel_threshold_ms:
+                current_group.append(tc)
+            else:
+                groups.append(current_group)
+                current_group = [tc]
+
+        groups.append(current_group)
+        return groups
 
     def primary_model(self) -> str:
         """Get the primary model used in this turn."""
@@ -598,6 +636,8 @@ def parse_session_file(path: Path) -> Session | None:
                                         text_parts_result.append(block.get("text", ""))
                                 tc.result = "\n".join(text_parts_result)[:10000]
                             tc.result_timestamp = timestamp
+                            # Capture error status from tool_result
+                            tc.is_error = c.get("is_error", False)
                 user_content = "\n".join(text_parts)
 
             # Only create a new turn if there's actual user text content

@@ -800,6 +800,7 @@ class SessionProcessor:
             cwd=session.cwd,
             sessions_dir=sessions_dir,
             project=self.project,
+            first_prompt=session.first_user_prompt(),
         )
 
         # TODO: Add fallback to Edit data in future enhancement
