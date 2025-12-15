@@ -1722,7 +1722,7 @@ def test_summary_tokens_cost_sqlite(client):
 
 def _setup_calls_for_storage_size_test(client):
     """Helper function to set up calls for storage size tests.
-    
+
     Returns:
         List of created Call objects.
     """
@@ -1739,9 +1739,7 @@ def test_get_calls_with_storage_size_parameters(client):
 
     # Use (False, False) as the source of truth
     baseline_calls = list(
-        client.get_calls(
-            include_storage_size=False, include_total_storage_size=False
-        )
+        client.get_calls(include_storage_size=False, include_total_storage_size=False)
     )
     baseline_count = len(baseline_calls)
 
@@ -1757,7 +1755,6 @@ def test_get_calls_with_storage_size_parameters(client):
 
     # Verify all other permutations match the baseline in both content and length
     for include_storage_size, include_total_storage_size in storage_permutations:
-
         calls = list(
             client.get_calls(
                 include_storage_size=include_storage_size,
@@ -1769,7 +1766,7 @@ def test_get_calls_with_storage_size_parameters(client):
         assert len(calls) == baseline_count
 
         # Verify content matches baseline (storage size fields are on CallSchema, not Call object)
-        for call, baseline_call in zip(calls, baseline_calls):
+        for call, baseline_call in zip(calls, baseline_calls, strict=True):
             assert call.id == baseline_call.id
             assert call.op_name == baseline_call.op_name
             assert call.inputs == baseline_call.inputs
@@ -1815,9 +1812,7 @@ def test_get_calls_storage_size_values(client, clickhouse_client):
 
     # Get calls via get_calls with storage size parameters
     client_calls = list(
-        client.get_calls(
-            include_storage_size=True, include_total_storage_size=True
-        )
+        client.get_calls(include_storage_size=True, include_total_storage_size=True)
     )
 
     # Get calls directly from server with same parameters
@@ -1853,7 +1848,10 @@ def test_get_calls_storage_size_values(client, clickhouse_client):
         if server_call.id and server_call.id in client_calls_by_id:
             client_call = client_calls_by_id[server_call.id]
             assert server_call.storage_size_bytes == client_call.storage_size_bytes
-            assert server_call.total_storage_size_bytes == client_call.total_storage_size_bytes
+            assert (
+                server_call.total_storage_size_bytes
+                == client_call.total_storage_size_bytes
+            )
 
 
 def test_ref_in_dict(client):

@@ -85,7 +85,6 @@ class Call:
     # Total size of metadata storage for the entire trace
     total_storage_size_bytes: int | None = None
 
-
     @property
     def display_name(self) -> str | Callable[[Call], str] | None:
         return self._display_name
