@@ -193,6 +193,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install nox uv
       - name: Run nox (Sqlite Trace Server)
+        # Skip SQLite for trace_dual_write_read_complete - only run ClickHouse
+        if: matrix.nox-shard != 'trace_dual_write_read_complete'
         env:
           WEAVE_SENTRY_ENV: ci
           CI: 1
