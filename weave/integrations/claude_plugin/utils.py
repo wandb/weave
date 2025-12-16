@@ -10,6 +10,7 @@ import logging
 import re
 import subprocess
 from collections import Counter
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -325,6 +326,21 @@ def reconstruct_call(
 class ToolCallError(Exception):
     """Exception raised when a tool call fails."""
     pass
+
+
+@dataclass
+class BufferedToolResult:
+    """A tool result waiting to be logged with parallel grouping.
+
+    Replaces the fragile tuple-based buffering:
+    (name, input, tool_use_timestamp, result_content, is_error)
+    """
+    tool_use_id: str
+    name: str
+    input: dict[str, Any]
+    timestamp: datetime
+    result: str
+    is_error: bool = False
 
 
 def log_tool_call(
