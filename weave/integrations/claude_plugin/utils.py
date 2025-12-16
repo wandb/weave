@@ -20,20 +20,25 @@ import weave
 from weave.trace.context.weave_client_context import require_weave_client
 from weave.trace.view_utils import set_call_view
 
+from weave.integrations.claude_plugin.constants import (
+    DaemonConfig,
+    ParallelGrouping,
+    PromptLimits,
+    ToolCallLimits,
+)
+
 if TYPE_CHECKING:
     from weave.integrations.claude_plugin.session_parser import ToolCall
 
 logger = logging.getLogger(__name__)
 
-# Truncation limits for tool call logging
-MAX_TOOL_INPUT_LENGTH = 5000
-MAX_TOOL_OUTPUT_LENGTH = 10000
-MAX_PROMPT_LENGTH = 2000
-
-# Timeout values (seconds)
-DAEMON_STARTUP_TIMEOUT = 3.0
-INACTIVITY_TIMEOUT = 600
-SUBAGENT_DETECTION_TIMEOUT = 10
+# Re-export constants for backward compatibility
+MAX_TOOL_INPUT_LENGTH = ToolCallLimits.MAX_INPUT_LENGTH
+MAX_TOOL_OUTPUT_LENGTH = ToolCallLimits.MAX_OUTPUT_LENGTH
+MAX_PROMPT_LENGTH = PromptLimits.MAX_PROMPT_LENGTH
+DAEMON_STARTUP_TIMEOUT = DaemonConfig.STARTUP_TIMEOUT_SECONDS
+INACTIVITY_TIMEOUT = DaemonConfig.INACTIVITY_TIMEOUT_SECONDS
+SUBAGENT_DETECTION_TIMEOUT = DaemonConfig.SUBAGENT_DETECTION_TIMEOUT_SECONDS
 
 # Boilerplate phrases to remove from subagent prompts for cleaner display names
 # These are replaced (not just prefix-stripped) to preserve meaningful parts
@@ -251,7 +256,7 @@ def extract_command_output(text: str) -> str:
     return ""
 
 
-def truncate(s: str | None, max_len: int = MAX_TOOL_INPUT_LENGTH) -> str | None:
+def truncate(s: str | None, max_len: int = ToolCallLimits.MAX_INPUT_LENGTH) -> str | None:
     """Truncate a string to max_len characters.
 
     Args:
@@ -270,13 +275,13 @@ def truncate(s: str | None, max_len: int = MAX_TOOL_INPUT_LENGTH) -> str | None:
 
 def sanitize_tool_input(
     tool_input: dict[str, Any],
-    max_length: int = MAX_TOOL_INPUT_LENGTH,
+    max_length: int = ToolCallLimits.MAX_INPUT_LENGTH,
 ) -> dict[str, Any]:
     """Sanitize tool input by truncating long string values.
 
     Args:
         tool_input: Dictionary of tool input parameters
-        max_length: Maximum length for string values (default MAX_TOOL_INPUT_LENGTH)
+        max_length: Maximum length for string values (default ToolCallLimits.MAX_INPUT_LENGTH)
 
     Returns:
         New dictionary with long strings truncated
@@ -379,8 +384,8 @@ class ToolResultBuffer:
         ready = buffer.get_ready_to_flush(force=True)
     """
 
-    TOOL_AGE_THRESHOLD_MS = 2000  # Wait before logging
-    PARALLEL_THRESHOLD_MS = 1000  # Gap for parallel grouping
+    TOOL_AGE_THRESHOLD_MS = ParallelGrouping.TOOL_AGE_THRESHOLD_MS
+    PARALLEL_THRESHOLD_MS = ParallelGrouping.THRESHOLD_MS
 
     def __init__(self) -> None:
         self._buffer: dict[str, BufferedToolResult] = {}
@@ -491,8 +496,8 @@ def log_tool_call(
     tool_use_id: str,
     duration_ms: int,
     parent: Any,
-    max_input_length: int = MAX_TOOL_INPUT_LENGTH,
-    max_output_length: int = MAX_TOOL_OUTPUT_LENGTH,
+    max_input_length: int = ToolCallLimits.MAX_INPUT_LENGTH,
+    max_output_length: int = ToolCallLimits.MAX_OUTPUT_LENGTH,
     *,
     # Edit tool specific data for generating HTML diff views
     original_file: str | None = None,
