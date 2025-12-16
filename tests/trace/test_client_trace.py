@@ -4742,10 +4742,39 @@ def test_project_stats_clickhouse(client, clickhouse_client):
     table_size = 1234  # New test data for table storage size
 
     # directly insert into stats tables to avoid materialized views's consistency issue
-    # Insert into calls_merged_stats
+    # Insert into calls_merged_stats (for legacy table)
     clickhouse_client.command(
         f"INSERT INTO calls_merged_stats (project_id, attributes_size_bytes, inputs_size_bytes, output_size_bytes, summary_size_bytes) "
         f"VALUES ('{internal_project_id}', {attr_size}, {inputs_size}, {output_size}, {summary_size})"
+    )
+    # Insert into calls_complete_stats (for new table)
+    # Use SELECT to allow function calls for aggregate state columns
+    clickhouse_client.command(
+        f"""INSERT INTO calls_complete_stats
+        SELECT
+            '{internal_project_id}' AS project_id,
+            'test-call-id' AS id,
+            'test-trace-id' AS trace_id,
+            CAST(NULL AS Nullable(String)) AS parent_id,
+            'test-op' AS op_name,
+            now64(6) AS started_at,
+            now64(6) AS ended_at,
+            {attr_size} AS attributes_size_bytes,
+            {inputs_size} AS inputs_size_bytes,
+            {output_size} AS output_size_bytes,
+            {summary_size} AS summary_size_bytes,
+            CAST(NULL AS Nullable(UInt64)) AS otel_size_bytes,
+            CAST(NULL AS Nullable(UInt64)) AS exception_size_bytes,
+            CAST(NULL AS Nullable(String)) AS wb_user_id,
+            CAST(NULL AS Nullable(String)) AS wb_run_id,
+            CAST(NULL AS Nullable(UInt64)) AS wb_run_step,
+            CAST(NULL AS Nullable(UInt64)) AS wb_run_step_end,
+            CAST(NULL AS Nullable(String)) AS thread_id,
+            CAST(NULL AS Nullable(String)) AS turn_id,
+            now64(3) AS created_at,
+            CAST(NULL AS Nullable(DateTime64(3))) AS updated_at,
+            argMaxState(CAST(NULL AS Nullable(String)), now64(3)) AS display_name
+        """
     )
     # Insert into object_versions_stats
     clickhouse_client.command(
