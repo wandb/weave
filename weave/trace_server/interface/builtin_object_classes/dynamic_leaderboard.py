@@ -41,15 +41,7 @@ class AggregationMethod(str, Enum):
     LATEST = "latest"
     AVERAGE = "average"
 
-
-class DynamicLeaderboardColumnConfig(BaseModel):
-    evaluation_object_ref: base_object_def.RefStr
-    scorer_name: str
-    summary_metric_path: str
-    should_minimize: bool = False
-    deselected: bool = False  # If True, this metric is excluded from the leaderboard
-
-class VersionGroup:
+class VersionGroup(BaseModel):
     label: str # label for the combination of the groups
     versions: list[str]
     method: AggregationMethod
