@@ -108,11 +108,11 @@ def main() -> None:
         sys.exit(0)
 
     # Import here to avoid startup overhead
-    from weave.integrations.claude_plugin.socket_client import (
+    from weave.integrations.claude_plugin.core.socket_client import (
         DaemonClient,
         ensure_daemon_running,
     )
-    from weave.integrations.claude_plugin.state import (
+    from weave.integrations.claude_plugin.core.state import (
         StateManager,
         create_session_data,
     )

@@ -32,12 +32,12 @@ from typing import TYPE_CHECKING, Any
 import weave
 from weave.trace.context.weave_client_context import require_weave_client
 
-from .session_parser import Session, parse_session_file
-from .state import load_session as get_session_state
-from .utils import generate_session_name, reconstruct_call
+from weave.integrations.claude_plugin.session.session_parser import Session, parse_session_file
+from weave.integrations.claude_plugin.core.state import load_session as get_session_state
+from weave.integrations.claude_plugin.utils import generate_session_name, reconstruct_call
 
 if TYPE_CHECKING:
-    from .cli_output import ImportResult
+    from weave.integrations.claude_plugin.views.cli_output import ImportResult
 
 logger = logging.getLogger(__name__)
 
@@ -136,7 +136,7 @@ def _create_subagent_call(
     Returns:
         Tuple of (calls_created, file_snapshots)
     """
-    from weave.integrations.claude_plugin.session_processor import SessionProcessor
+    from weave.integrations.claude_plugin.session.session_processor import SessionProcessor
 
     # Find the agent file
     agent_file = sessions_dir / f"agent-{agent_id}.jsonl"
@@ -181,7 +181,7 @@ def _create_subagent_call(
         # Pre-extract Edit tool data for this turn if we need tool traces
         edit_data_by_path: dict[str, dict] = {}
         if include_tool_traces and turn.raw_messages:
-            from weave.integrations.claude_plugin.diff_utils import (
+            from weave.integrations.claude_plugin.views.diff_utils import (
                 extract_edit_data_from_raw_messages,
             )
             for edit_data in extract_edit_data_from_raw_messages(turn.raw_messages):
@@ -216,7 +216,7 @@ def _create_subagent_call(
         # Also collect file content from Write tool calls in raw messages
         # This captures new files created in subagents (which don't have file-history)
         if turn.raw_messages:
-            from weave.integrations.claude_plugin.diff_utils import (
+            from weave.integrations.claude_plugin.views.diff_utils import (
                 extract_write_data_from_raw_messages,
             )
 
@@ -264,13 +264,13 @@ def _create_subagent_call(
     all_edit_data: list[dict] = []
     for turn in subagent_session.turns:
         if turn.raw_messages:
-            from weave.integrations.claude_plugin.diff_utils import (
+            from weave.integrations.claude_plugin.views.diff_utils import (
                 extract_edit_data_from_raw_messages,
             )
             all_edit_data.extend(extract_edit_data_from_raw_messages(turn.raw_messages))
 
     if all_edit_data:
-        from weave.integrations.claude_plugin.diff_view import (
+        from weave.integrations.claude_plugin.views.diff_view import (
             _build_file_diffs_from_edit_data,
             _render_file_diff_html,
             DIFF_HTML_STYLES,
@@ -329,7 +329,7 @@ def _import_session_to_weave(
 
     Returns: (turns, tool_calls, calls_created, call_id)
     """
-    from weave.integrations.claude_plugin.session_processor import SessionProcessor
+    from weave.integrations.claude_plugin.session.session_processor import SessionProcessor
 
     client = require_weave_client()
     processor = SessionProcessor(
@@ -395,7 +395,7 @@ def _import_session_to_weave(
         # Pre-extract Edit tool data from raw_messages for structured_patch
         edit_data_by_path: dict[str, dict] = {}
         if include_tool_traces and turn.raw_messages:
-            from weave.integrations.claude_plugin.diff_utils import (
+            from weave.integrations.claude_plugin.views.diff_utils import (
                 extract_edit_data_from_raw_messages,
             )
             # Build a map of file_path -> edit data for matching
@@ -505,7 +505,7 @@ def import_session_with_result(
     Returns:
         ImportResult with session details and success/error status
     """
-    from .cli_output import ImportResult, extract_session_details
+    from weave.integrations.claude_plugin.views.cli_output import ImportResult, extract_session_details
 
     try:
         session = parse_session_file(session_path)

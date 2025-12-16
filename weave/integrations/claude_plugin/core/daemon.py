@@ -89,7 +89,7 @@ import weave
 from weave.trace.context.weave_client_context import require_weave_client
 from weave.trace.view_utils import set_call_view
 
-from weave.integrations.claude_plugin.session_parser import (
+from weave.integrations.claude_plugin.session.session_parser import (
     Session,
     TokenUsage,
     ToolCall,
@@ -97,8 +97,8 @@ from weave.integrations.claude_plugin.session_parser import (
     is_system_message,
     parse_session_file,
 )
-from weave.integrations.claude_plugin.socket_client import get_socket_path
-from weave.integrations.claude_plugin.state import StateManager
+from weave.integrations.claude_plugin.core.socket_client import get_socket_path
+from weave.integrations.claude_plugin.core.state import StateManager
 from weave.integrations.claude_plugin.utils import (
     BufferedToolResult,
     ToolResultBuffer,
@@ -117,7 +117,7 @@ from weave.integrations.claude_plugin.utils import (
     INACTIVITY_TIMEOUT,
     SUBAGENT_DETECTION_TIMEOUT,
 )
-from weave.integrations.claude_plugin.diff_view import (
+from weave.integrations.claude_plugin.views.diff_view import (
     generate_session_diff_html,
     generate_turn_diff_html,
 )
@@ -274,7 +274,7 @@ class WeaveDaemon:
             self.weave_client = require_weave_client()
 
             # Initialize SessionProcessor
-            from weave.integrations.claude_plugin.session_processor import SessionProcessor
+            from weave.integrations.claude_plugin.session.session_processor import SessionProcessor
             self.processor = SessionProcessor(
                 client=self.weave_client,
                 project=self.project,
@@ -436,7 +436,7 @@ class WeaveDaemon:
         )
 
         # Create subagent call with ChatView-compatible inputs
-        from weave.integrations.claude_plugin.session_processor import SessionProcessor
+        from weave.integrations.claude_plugin.session.session_processor import SessionProcessor
         subagent_call = self.weave_client.create_call(
             op="claude_code.subagent",
             inputs=SessionProcessor.build_subagent_inputs(
@@ -903,7 +903,7 @@ class WeaveDaemon:
                             file_snapshots.append(content)
 
             # Build output in Message format using shared helper
-            from weave.integrations.claude_plugin.session_processor import SessionProcessor
+            from weave.integrations.claude_plugin.session.session_processor import SessionProcessor
             output = SessionProcessor.build_subagent_output(session)
 
             if file_snapshots:
@@ -1000,7 +1000,7 @@ class WeaveDaemon:
 
         # Create subagent call with ChatView-compatible inputs
         # Use tracker's subagent_type if available (from when Task tool was detected)
-        from weave.integrations.claude_plugin.session_processor import SessionProcessor
+        from weave.integrations.claude_plugin.session.session_processor import SessionProcessor
         subagent_type = tracker.subagent_type if tracker else None
         subagent_call = self.weave_client.create_call(
             op="claude_code.subagent",
@@ -1530,7 +1530,7 @@ class WeaveDaemon:
         # Get the actual message timestamp from JSONL (not poll time)
         # This is critical for parallel tool detection - poll timing can exceed
         # the 1000ms threshold even for truly parallel calls
-        from weave.integrations.claude_plugin.session_parser import parse_timestamp
+        from weave.integrations.claude_plugin.session.session_parser import parse_timestamp
         msg_timestamp_str = obj.get("timestamp")
         msg_timestamp = (
             parse_timestamp(msg_timestamp_str)
@@ -1708,7 +1708,7 @@ class WeaveDaemon:
                 logger.debug(f"Created thinking trace with {len(thinking_content_parts)} blocks")
 
             # Build output using shared helper from SessionProcessor
-            from weave.integrations.claude_plugin.session_processor import SessionProcessor
+            from weave.integrations.claude_plugin.session.session_processor import SessionProcessor
             turn_output, assistant_text, _ = SessionProcessor.build_turn_output(
                 turn, interrupted=interrupted
             )

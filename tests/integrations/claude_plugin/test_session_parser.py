@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from weave.integrations.claude_plugin.session_parser import (
+from weave.integrations.claude_plugin.session.session_parser import (
     UserMessage,
     parse_session_file,
 )

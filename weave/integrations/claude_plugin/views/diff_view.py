@@ -20,7 +20,7 @@ from typing import TYPE_CHECKING, Any
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from weave.integrations.claude_plugin.session_parser import FileBackup, Session, Turn
+    from weave.integrations.claude_plugin.session.session_parser import FileBackup, Session, Turn
 
 # File extension to highlight.js language mapping
 EXT_TO_HLJS_LANG: dict[str, str] = {
@@ -228,7 +228,7 @@ def generate_turn_diff_html(
         HTML string with diff view, or None if no file changes
     """
     # Import here to avoid circular imports
-    from weave.integrations.claude_plugin.session_parser import FileBackup
+    from weave.integrations.claude_plugin.session.session_parser import FileBackup
 
     if not turn.file_backups:
         logger.debug("generate_turn_diff_html: no file_backups in turn")
@@ -672,7 +672,7 @@ def generate_session_diff_html(
     Returns:
         HTML string with session diff view, or None if no file changes
     """
-    from weave.integrations.claude_plugin.session_parser import (
+    from weave.integrations.claude_plugin.session.session_parser import (
         FileBackup,
         parse_session_file,
     )
@@ -817,7 +817,7 @@ def generate_session_diff_html(
     # This captures changes in subagents (which don't have file-history-snapshot)
     # and new files created with Write tool. Merge with file-history results.
     if sessions_dir:
-        from weave.integrations.claude_plugin.diff_utils import (
+        from weave.integrations.claude_plugin.views.diff_utils import (
             build_file_diffs_from_file_changes,
             collect_all_file_changes_from_session,
         )
@@ -1032,7 +1032,7 @@ def _build_file_diffs_from_edit_data(
     Returns:
         List of file_diff dicts in same format as generate_*_diff_html
     """
-    from weave.integrations.claude_plugin.diff_utils import apply_structured_patch
+    from weave.integrations.claude_plugin.views.diff_utils import apply_structured_patch
 
     # Aggregate by file path
     by_file: dict[str, dict[str, Any]] = {}
@@ -1124,7 +1124,7 @@ def generate_diff_html_from_edit_data_for_turn(
     Returns:
         HTML string with diff view, or None if no Edit data found
     """
-    from weave.integrations.claude_plugin.diff_utils import (
+    from weave.integrations.claude_plugin.views.diff_utils import (
         extract_edit_data_from_raw_messages,
     )
 

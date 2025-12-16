@@ -33,18 +33,38 @@ Claude Code ──────────────────────�
 
 ## File Overview
 
+### Core (`core/`)
 | File | Purpose |
 |------|---------|
 | `hook.py` | Entry point for Claude Code hook invocations |
 | `daemon.py` | Background process that creates Weave traces |
 | `socket_client.py` | Unix socket IPC between hook and daemon |
-| `session_parser.py` | Parses Claude's JSONL transcript files |
 | `state.py` | Persists state across process invocations |
-| `credentials.py` | Retrieves Claude Code OAuth credentials |
+
+### Session (`session/`)
+| File | Purpose |
+|------|---------|
+| `session_parser.py` | Parses Claude's JSONL transcript files |
+| `session_processor.py` | Factory for creating Weave traces from sessions |
+| `session_importer.py` | Batch import of session files |
 | `session_title.py` | Generates session names via Claude API |
+
+### Views (`views/`)
+| File | Purpose |
+|------|---------|
 | `diff_view.py` | Generates GitHub-style HTML diffs |
+| `diff_utils.py` | Diff calculation utilities |
+| `cli_output.py` | Rich CLI output formatting |
+| `feedback.py` | CLI for sending session feedback |
+
+### Top-level
+| File | Purpose |
+|------|---------|
+| `config.py` | Global and local configuration management |
+| `credentials.py` | Retrieves Claude Code OAuth credentials |
 | `utils.py` | Shared utilities (truncation, tool names) |
-| `handlers.py` | Legacy handlers (deprecated in favor of daemon) |
+| `secret_scanner.py` | Scans and redacts secrets |
+| `teleport.py` | Resume sessions across machines |
 
 ## Configuration
 

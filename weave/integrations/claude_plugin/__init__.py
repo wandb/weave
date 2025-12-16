@@ -7,7 +7,7 @@ the batch import script (scripts/import_claude_sessions.py).
 Components:
 - session_parser: Parse Claude Code session JSONL files
 - state: Persist hook state across process invocations
-- handlers: Hook event handlers for real-time tracing
+- daemon: Long-running daemon for real-time tracing
 - credentials: Claude Code OAuth credential management
 - session_title: Session title generation using Claude API
 - utils: Shared utilities
@@ -34,7 +34,7 @@ from weave.integrations.claude_plugin.credentials import (
     get_api_headers,
     get_oauth_credentials,
 )
-from weave.integrations.claude_plugin.session_parser import (
+from weave.integrations.claude_plugin.session.session_parser import (
     AssistantMessage,
     FileBackup,
     Session,
@@ -46,11 +46,11 @@ from weave.integrations.claude_plugin.session_parser import (
     parse_session_file,
     parse_timestamp,
 )
-from weave.integrations.claude_plugin.session_title import (
+from weave.integrations.claude_plugin.session.session_title import (
     analyze_session_title,
     generate_session_title,
 )
-from weave.integrations.claude_plugin.state import (
+from weave.integrations.claude_plugin.core.state import (
     StateManager,
     create_session_data,
     delete_session,
@@ -62,16 +62,16 @@ from weave.integrations.claude_plugin.utils import (
     get_tool_display_name,
     truncate,
 )
-from weave.integrations.claude_plugin.diff_view import (
+from weave.integrations.claude_plugin.views.diff_view import (
     generate_edit_diff_html,
     generate_turn_diff_html,
 )
-from weave.integrations.claude_plugin.session_importer import (
+from weave.integrations.claude_plugin.session.session_importer import (
     discover_session_files,
     import_session,
     import_sessions,
 )
-from weave.integrations.claude_plugin.socket_client import (
+from weave.integrations.claude_plugin.core.socket_client import (
     DaemonClient,
     ensure_daemon_running,
     get_socket_path,

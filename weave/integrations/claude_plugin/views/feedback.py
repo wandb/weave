@@ -13,8 +13,8 @@ from __future__ import annotations
 
 import sys
 
-from weave.integrations.claude_plugin.socket_client import DaemonClient
-from weave.integrations.claude_plugin.state import StateManager
+from weave.integrations.claude_plugin.core.socket_client import DaemonClient
+from weave.integrations.claude_plugin.core.state import StateManager
 
 
 def main() -> int:

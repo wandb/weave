@@ -143,11 +143,11 @@ class TestRestoreFiles:
         with tempfile.TemporaryDirectory() as tmpdir:
             # Create mock file snapshots as list with metadata
             mock_content1 = MagicMock()
-            mock_content1.to_bytes.return_value = b"file content"
+            mock_content1.data = b"file content"
             mock_content1.metadata = {"relative_path": "src/app.py"}
 
             mock_content2 = MagicMock()
-            mock_content2.to_bytes.return_value = b"file content"
+            mock_content2.data = b"file content"
             mock_content2.metadata = {"relative_path": "tests/test_app.py"}
 
             file_snapshots = [mock_content1, mock_content2]
@@ -165,11 +165,11 @@ class TestRestoreFiles:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             mock_content1 = MagicMock()
-            mock_content1.to_bytes.return_value = b"content"
+            mock_content1.data = b"content"
             mock_content1.metadata = {"relative_path": "session.jsonl"}
 
             mock_content2 = MagicMock()
-            mock_content2.to_bytes.return_value = b"content"
+            mock_content2.data = b"content"
             mock_content2.metadata = {"relative_path": "src/app.py"}
 
             file_snapshots = [mock_content1, mock_content2]
@@ -186,7 +186,7 @@ class TestRestoreFiles:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             mock_content = MagicMock()
-            mock_content.to_bytes.return_value = b"content"
+            mock_content.data = b"content"
             mock_content.metadata = {"relative_path": "deeply/nested/path/file.py"}
 
             file_snapshots = [mock_content]
@@ -206,7 +206,7 @@ class TestDownloadSessionFile:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             mock_content = MagicMock()
-            mock_content.to_bytes.return_value = b'{"type": "user"}'
+            mock_content.data = b'{"type": "user"}'
 
             # Use a mock claude dir in temp
             claude_dir = Path(tmpdir) / ".claude"
@@ -274,11 +274,11 @@ class TestContentDictHandling:
         assert data == original
 
     def test_get_content_bytes_from_object(self):
-        """Should call to_bytes() on Content object."""
+        """Should access .data attribute on Content object."""
         from weave.integrations.claude_plugin.teleport import _get_content_bytes
 
         mock_content = MagicMock()
-        mock_content.to_bytes.return_value = b"file content"
+        mock_content.data = b"file content"
 
         data = _get_content_bytes(mock_content)
         assert data == b"file content"

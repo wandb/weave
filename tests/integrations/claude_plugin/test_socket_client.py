@@ -11,7 +11,7 @@ from unittest import mock
 
 import pytest
 
-from weave.integrations.claude_plugin.socket_client import (
+from weave.integrations.claude_plugin.core.socket_client import (
     SOCKET_DIR,
     DaemonClient,
     ensure_daemon_running,
@@ -165,7 +165,7 @@ class TestDaemonClientCleanupStaleSocket:
 
         client = DaemonClient("test-session-id")
 
-        with caplog.at_level(logging.WARNING, logger="weave.integrations.claude_plugin.socket_client"):
+        with caplog.at_level(logging.WARNING, logger="weave.integrations.claude_plugin.core.socket_client"):
             with mock.patch("pathlib.Path.exists", return_value=True):
                 with mock.patch("pathlib.Path.unlink", side_effect=OSError("Permission denied")):
                     client.cleanup_stale_socket()
@@ -184,7 +184,7 @@ class TestDaemonClientStartDaemon:
             socket_dir = Path(tmpdir) / "test-dir"
             client.socket_path = socket_dir / "daemon.sock"
 
-            with mock.patch("weave.integrations.claude_plugin.socket_client.SOCKET_DIR", socket_dir):
+            with mock.patch("weave.integrations.claude_plugin.core.socket_client.SOCKET_DIR", socket_dir):
                 with mock.patch("subprocess.Popen"):
                     with mock.patch.object(client, "is_daemon_running", return_value=True):
                         client.start_daemon()
@@ -209,7 +209,7 @@ class TestDaemonClientStartDaemon:
 
         with mock.patch("subprocess.Popen") as mock_popen:
             with mock.patch.object(client, "is_daemon_running", return_value=True):
-                with mock.patch("weave.integrations.claude_plugin.socket_client.SOCKET_DIR") as mock_dir:
+                with mock.patch("weave.integrations.claude_plugin.core.socket_client.SOCKET_DIR") as mock_dir:
                     mock_dir.mkdir = mock.MagicMock()
                     client.start_daemon()
 
@@ -217,7 +217,7 @@ class TestDaemonClientStartDaemon:
                     mock_popen.assert_called_once()
                     args = mock_popen.call_args
                     assert args[0][0][0] == mock.ANY  # sys.executable
-                    assert args[0][0][1:] == ["-m", "weave.integrations.claude_plugin.daemon", session_id]
+                    assert args[0][0][1:] == ["-m", "weave.integrations.claude_plugin.core.daemon", session_id]
                     assert args[1]["start_new_session"] is True
                     assert args[1]["stdout"] == subprocess.DEVNULL
                     assert args[1]["stderr"] == subprocess.DEVNULL
@@ -229,7 +229,7 @@ class TestDaemonClientStartDaemon:
 
         with mock.patch("subprocess.Popen"):
             with mock.patch.object(client, "is_daemon_running", return_value=True):
-                with mock.patch("weave.integrations.claude_plugin.socket_client.SOCKET_DIR") as mock_dir:
+                with mock.patch("weave.integrations.claude_plugin.core.socket_client.SOCKET_DIR") as mock_dir:
                     mock_dir.mkdir = mock.MagicMock()
                     result = client.start_daemon()
 
@@ -242,7 +242,7 @@ class TestDaemonClientStartDaemon:
         with mock.patch("subprocess.Popen"):
             with mock.patch.object(client, "is_daemon_running", return_value=False):
                 with mock.patch("time.sleep"):  # Speed up test
-                    with mock.patch("weave.integrations.claude_plugin.socket_client.SOCKET_DIR") as mock_dir:
+                    with mock.patch("weave.integrations.claude_plugin.core.socket_client.SOCKET_DIR") as mock_dir:
                         mock_dir.mkdir = mock.MagicMock()
                         result = client.start_daemon()
 
@@ -257,7 +257,7 @@ class TestDaemonClientStartDaemon:
         # Suppress error logs during this test
         with caplog.at_level(logging.CRITICAL):
             with mock.patch("subprocess.Popen", side_effect=Exception("Test error")):
-                with mock.patch("weave.integrations.claude_plugin.socket_client.SOCKET_DIR") as mock_dir:
+                with mock.patch("weave.integrations.claude_plugin.core.socket_client.SOCKET_DIR") as mock_dir:
                     mock_dir.mkdir = mock.MagicMock()
                     result = client.start_daemon()
 

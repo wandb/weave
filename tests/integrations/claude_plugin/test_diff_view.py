@@ -8,7 +8,7 @@ class TestBuildFileDiffsFromEditData:
 
     def test_converts_edit_data_to_file_diffs_format(self):
         """Verify Edit tool data is converted to file_diffs format."""
-        from weave.integrations.claude_plugin.diff_view import (
+        from weave.integrations.claude_plugin.views.diff_view import (
             _build_file_diffs_from_edit_data,
         )
 
@@ -39,7 +39,7 @@ class TestBuildFileDiffsFromEditData:
 
     def test_aggregates_multiple_edits_to_same_file(self):
         """Verify multiple edits to same file are aggregated."""
-        from weave.integrations.claude_plugin.diff_view import (
+        from weave.integrations.claude_plugin.views.diff_view import (
             _build_file_diffs_from_edit_data,
         )
 
@@ -84,7 +84,7 @@ class TestGenerateDiffHtmlFromEditDataForTurn:
 
     def test_returns_none_when_no_raw_messages(self):
         """Verify None is returned when turn has no raw_messages."""
-        from weave.integrations.claude_plugin.diff_view import (
+        from weave.integrations.claude_plugin.views.diff_view import (
             generate_diff_html_from_edit_data_for_turn,
         )
         from unittest.mock import MagicMock
@@ -101,7 +101,7 @@ class TestGenerateDiffHtmlFromEditDataForTurn:
 
     def test_uses_diff_html_styles(self):
         """Verify output uses DIFF_HTML_STYLES (not ugly inline styles)."""
-        from weave.integrations.claude_plugin.diff_view import (
+        from weave.integrations.claude_plugin.views.diff_view import (
             generate_diff_html_from_edit_data_for_turn,
             DIFF_HTML_STYLES,
         )
@@ -154,7 +154,7 @@ class TestGenerateSessionDiffHtmlWithEditDataFallback:
         from unittest.mock import MagicMock
         import json
 
-        from weave.integrations.claude_plugin.diff_view import generate_session_diff_html
+        from weave.integrations.claude_plugin.views.diff_view import generate_session_diff_html
 
         with TemporaryDirectory() as tmpdir:
             sessions_dir = Path(tmpdir)
@@ -228,7 +228,7 @@ class TestGenerateSessionDiffHtmlWithEditDataFallback:
         from tempfile import TemporaryDirectory
         from unittest.mock import MagicMock
 
-        from weave.integrations.claude_plugin.diff_view import generate_session_diff_html
+        from weave.integrations.claude_plugin.views.diff_view import generate_session_diff_html
 
         with TemporaryDirectory() as tmpdir:
             sessions_dir = Path(tmpdir)
@@ -258,7 +258,7 @@ class TestGenerateSessionDiffHtmlWithEditDataFallback:
         from unittest.mock import MagicMock
         import json
 
-        from weave.integrations.claude_plugin.diff_view import generate_session_diff_html
+        from weave.integrations.claude_plugin.views.diff_view import generate_session_diff_html
 
         with TemporaryDirectory() as tmpdir:
             sessions_dir = Path(tmpdir)

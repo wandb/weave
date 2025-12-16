@@ -18,8 +18,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from weave.integrations.claude_plugin.session_importer import _import_session_to_weave
-from weave.integrations.claude_plugin.session_parser import parse_session_file
+from weave.integrations.claude_plugin.session.session_importer import _import_session_to_weave
+from weave.integrations.claude_plugin.session.session_parser import parse_session_file
 
 
 def create_session_jsonl(messages: list[dict]) -> Path:
@@ -119,7 +119,7 @@ class TestSessionImporterIntegration:
 
             # Mock the Weave client and import
             with patch(
-                "weave.integrations.claude_plugin.session_importer.require_weave_client"
+                "weave.integrations.claude_plugin.session.session_importer.require_weave_client"
             ) as mock_client:
                 mock_call = MagicMock(id="call-1")
                 mock_call.summary = {}
@@ -182,7 +182,7 @@ class TestSessionImporterIntegration:
             assert session is not None
 
             with patch(
-                "weave.integrations.claude_plugin.session_importer.require_weave_client"
+                "weave.integrations.claude_plugin.session.session_importer.require_weave_client"
             ) as mock_client:
                 mock_call = MagicMock(id="call-1")
                 mock_call.summary = {}
@@ -229,9 +229,9 @@ class TestSessionImporterIntegration:
             session = parse_session_file(session_jsonl)
 
             with patch(
-                "weave.integrations.claude_plugin.session_importer.require_weave_client"
+                "weave.integrations.claude_plugin.session.session_importer.require_weave_client"
             ) as mock_client, patch(
-                "weave.integrations.claude_plugin.session_importer.reconstruct_call"
+                "weave.integrations.claude_plugin.session.session_importer.reconstruct_call"
             ) as mock_reconstruct:
                 mock_turn_call = MagicMock(id="turn-1")
                 mock_turn_call.summary = {}
@@ -312,7 +312,7 @@ class TestSessionImporterIntegration:
             session = parse_session_file(session_jsonl)
 
             with patch(
-                "weave.integrations.claude_plugin.session_importer.require_weave_client"
+                "weave.integrations.claude_plugin.session.session_importer.require_weave_client"
             ) as mock_client:
                 mock_call = MagicMock(id="call-1")
                 mock_call.summary = {}
@@ -585,7 +585,7 @@ agentId: a06151e (for resuming to continue this agent's work if needed)"""
         create_call_ops = []
 
         with patch(
-            "weave.integrations.claude_plugin.session_importer.require_weave_client"
+            "weave.integrations.claude_plugin.session.session_importer.require_weave_client"
         ) as mock_client:
             def track_create_call(**kwargs):
                 create_call_ops.append(kwargs.get("op"))
@@ -654,9 +654,9 @@ class TestHTMLDiffViews:
             session = parse_session_file(session_jsonl)
 
             with patch(
-                "weave.integrations.claude_plugin.session_importer.require_weave_client"
+                "weave.integrations.claude_plugin.session.session_importer.require_weave_client"
             ) as mock_client, patch(
-                "weave.integrations.claude_plugin.session_importer.reconstruct_call"
+                "weave.integrations.claude_plugin.session.session_importer.reconstruct_call"
             ) as mock_reconstruct:
                 mock_session_call = MagicMock(id="session-1")
                 mock_session_call.summary = {}
@@ -678,10 +678,10 @@ class TestHTMLDiffViews:
                 ]
 
                 with patch(
-                    "weave.integrations.claude_plugin.session_processor.set_call_view"
+                    "weave.integrations.claude_plugin.session.session_processor.set_call_view"
                 ) as mock_set_view:
                     with patch(
-                        "weave.integrations.claude_plugin.diff_view.generate_session_diff_html"
+                        "weave.integrations.claude_plugin.views.diff_view.generate_session_diff_html"
                     ) as mock_gen_diff:
                         mock_gen_diff.return_value = "<html>session diff</html>"
 
@@ -740,9 +740,9 @@ class TestHTMLDiffViews:
             session = parse_session_file(session_jsonl)
 
             with patch(
-                "weave.integrations.claude_plugin.session_importer.require_weave_client"
+                "weave.integrations.claude_plugin.session.session_importer.require_weave_client"
             ) as mock_client, patch(
-                "weave.integrations.claude_plugin.session_importer.reconstruct_call"
+                "weave.integrations.claude_plugin.session.session_importer.reconstruct_call"
             ) as mock_reconstruct:
                 mock_session_call = MagicMock(id="session-1")
                 mock_session_call.summary = {}
@@ -764,10 +764,10 @@ class TestHTMLDiffViews:
                 ]
 
                 with patch(
-                    "weave.integrations.claude_plugin.session_processor.set_call_view"
+                    "weave.integrations.claude_plugin.session.session_processor.set_call_view"
                 ) as mock_set_view:
                     with patch(
-                        "weave.integrations.claude_plugin.diff_view.generate_turn_diff_html"
+                        "weave.integrations.claude_plugin.views.diff_view.generate_turn_diff_html"
                     ) as mock_gen_diff:
                         mock_gen_diff.return_value = "<html>turn diff</html>"
 
@@ -831,7 +831,7 @@ class TestImporterDaemonParity:
             session = parse_session_file(session_jsonl)
 
             with patch(
-                "weave.integrations.claude_plugin.session_importer.require_weave_client"
+                "weave.integrations.claude_plugin.session.session_importer.require_weave_client"
             ) as mock_client:
                 mock_client.return_value.create_call.return_value = MagicMock(
                     id="call-1", summary={}
@@ -873,7 +873,7 @@ class TestImporterDaemonParity:
             session = parse_session_file(session_jsonl)
 
             with patch(
-                "weave.integrations.claude_plugin.session_importer.require_weave_client"
+                "weave.integrations.claude_plugin.session.session_importer.require_weave_client"
             ) as mock_client:
                 mock_session_call = MagicMock(id="session-1", summary={})
                 mock_turn_call = MagicMock(id="turn-1", summary={})
@@ -918,9 +918,9 @@ class TestImporterDaemonParity:
             session = parse_session_file(session_jsonl)
 
             with patch(
-                "weave.integrations.claude_plugin.session_importer.require_weave_client"
+                "weave.integrations.claude_plugin.session.session_importer.require_weave_client"
             ) as mock_client, patch(
-                "weave.integrations.claude_plugin.session_importer.reconstruct_call"
+                "weave.integrations.claude_plugin.session.session_importer.reconstruct_call"
             ) as mock_reconstruct:
                 # Create distinct mock objects for session and turn
                 mock_session_call = MagicMock(id="session-1")
@@ -968,7 +968,7 @@ class TestFileChangeDetectionFiltering:
 
     def test_collect_file_changes_filters_by_session_id(self, tmp_path):
         """collect_all_file_changes_from_session only includes this session's subagents."""
-        from weave.integrations.claude_plugin.diff_utils import (
+        from weave.integrations.claude_plugin.views.diff_utils import (
             collect_all_file_changes_from_session,
         )
 
@@ -1096,7 +1096,7 @@ class TestFileChangeDetectionFiltering:
         Regression test for the bug where ALL agent files were scanned
         instead of only those belonging to the current session.
         """
-        from weave.integrations.claude_plugin.diff_utils import (
+        from weave.integrations.claude_plugin.views.diff_utils import (
             collect_all_file_changes_from_session,
         )
 

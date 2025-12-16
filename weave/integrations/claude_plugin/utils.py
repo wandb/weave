@@ -28,7 +28,7 @@ from weave.integrations.claude_plugin.constants import (
 )
 
 if TYPE_CHECKING:
-    from weave.integrations.claude_plugin.session_parser import ToolCall
+    from weave.integrations.claude_plugin.session.session_parser import ToolCall
 
 logger = logging.getLogger(__name__)
 
@@ -580,7 +580,7 @@ def log_tool_call(
 
             # Attach HTML view BEFORE finishing
             if tool_name == "TodoWrite":
-                from weave.integrations.claude_plugin.diff_view import generate_todo_html
+                from weave.integrations.claude_plugin.views.diff_view import generate_todo_html
 
                 todos = tool_input.get("todos", [])
                 if todos:
@@ -596,7 +596,7 @@ def log_tool_call(
                         )
 
             elif tool_name == "Edit" and structured_patch:
-                from weave.integrations.claude_plugin.diff_view import (
+                from weave.integrations.claude_plugin.views.diff_view import (
                     generate_edit_diff_html,
                 )
 
@@ -670,7 +670,7 @@ def _generate_session_name_claude(user_prompt: str) -> str | None:
         Session title string, or None if generation failed
     """
     try:
-        from weave.integrations.claude_plugin.session_title import (
+        from weave.integrations.claude_plugin.session.session_title import (
             generate_session_title,
         )
 
@@ -1008,7 +1008,7 @@ def log_tool_calls_grouped(
     Returns:
         Number of calls created (including parallel wrappers)
     """
-    from weave.integrations.claude_plugin.session_parser import ToolCall
+    from weave.integrations.claude_plugin.session.session_parser import ToolCall
 
     skip_names = skip_tool_names or set()
     edit_data = edit_data_by_path or {}

@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from rich.console import Console
     from rich.progress import Progress
 
-    from weave.integrations.claude_plugin.session_parser import Session
+    from weave.integrations.claude_plugin.session.session_parser import Session
 
 # Try to import rich, gracefully degrade if not available
 try:
@@ -759,7 +759,7 @@ def suppress_verbose_logging(debug: bool = False) -> Iterator[None]:
         "weave",
         "weave.trace",
         "weave.integrations",
-        "weave.integrations.claude_plugin.session_parser",
+        "weave.integrations.claude_plugin.session.session_parser",
         "polyfile",  # suppress polyfile warnings too
     ]
 

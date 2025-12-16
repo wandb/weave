@@ -175,7 +175,7 @@ def collect_all_file_changes_from_session(
     """
     from pathlib import Path
 
-    from .session_parser import parse_session_file
+    from weave.integrations.claude_plugin.session.session_parser import parse_session_file
 
     # Regex to extract agentId from Task tool results
     import re

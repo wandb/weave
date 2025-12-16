@@ -492,4 +492,4 @@ conflicts = [
 
 [tool.coverage.report]
 exclude_also = ["if TYPE_CHECKING:", "@abstractmethod"]
-omit = ["weave/agent/**"]
+omit = ["weave/agent/**", "weave/integrations/claude_plugin/views/cli_output.py"]

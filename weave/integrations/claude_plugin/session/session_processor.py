@@ -286,7 +286,7 @@ class SessionProcessor:
         # This captures changes from main session AND all subagents
         # Don't load from disk since files may have changed since the session
         if self.source == "import":
-            from weave.integrations.claude_plugin.diff_utils import (
+            from weave.integrations.claude_plugin.views.diff_utils import (
                 collect_all_file_changes_from_session,
             )
 
@@ -685,7 +685,7 @@ class SessionProcessor:
         user_prompt: str | None = None,
     ) -> None:
         """Generate and attach turn-level diff HTML view."""
-        from weave.integrations.claude_plugin.diff_view import (
+        from weave.integrations.claude_plugin.views.diff_view import (
             generate_turn_diff_html,
             generate_diff_html_from_edit_data_for_turn,
         )
@@ -790,7 +790,7 @@ class SessionProcessor:
         sessions_dir: Path,
     ) -> None:
         """Generate and attach session-level diff HTML view."""
-        from weave.integrations.claude_plugin.diff_view import (
+        from weave.integrations.claude_plugin.views.diff_view import (
             generate_session_diff_html,
         )
 

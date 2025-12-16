@@ -16,7 +16,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from weave.integrations.claude_plugin.session_parser import (
+from weave.integrations.claude_plugin.session.session_parser import (
     ToolCall,
     parse_session_file,
 )
@@ -394,7 +394,7 @@ class TestStructuredPatchParsing:
         """Convert structuredPatch to unified diff format."""
         # This functionality is now handled internally by diff_view.py
         # when building file diffs. We can test it via apply_structured_patch.
-        from weave.integrations.claude_plugin.diff_utils import (
+        from weave.integrations.claude_plugin.views.diff_utils import (
             apply_structured_patch,
         )
         import difflib
@@ -423,7 +423,7 @@ class TestStructuredPatchParsing:
 
     def test_apply_structured_patch_to_original(self):
         """Apply structuredPatch to originalFile to get new content."""
-        from weave.integrations.claude_plugin.diff_utils import (
+        from weave.integrations.claude_plugin.views.diff_utils import (
             apply_structured_patch,
         )
 
@@ -441,7 +441,7 @@ class TestStructuredPatchParsing:
 
     def test_generate_html_diff_from_structured_patch(self):
         """Generate HTML diff view from structuredPatch data."""
-        from weave.integrations.claude_plugin.diff_view import (
+        from weave.integrations.claude_plugin.views.diff_view import (
             generate_edit_diff_html,
         )
 
@@ -464,7 +464,7 @@ class TestMultipleEditsToSameFile:
         """Multiple edits to same file should be aggregated."""
         # This functionality is now handled internally by diff_view._build_file_diffs_from_edit_data
         # We can test the aggregation behavior through that function
-        from weave.integrations.claude_plugin.diff_view import _build_file_diffs_from_edit_data
+        from weave.integrations.claude_plugin.views.diff_view import _build_file_diffs_from_edit_data
 
         edits = [
             {
@@ -507,10 +507,10 @@ class TestEndToEndSubagentDiffGeneration:
 
     def test_generate_html_diff_from_subagent_edits(self, tmp_path):
         """Generate HTML diff views from subagent Edit tool results."""
-        from weave.integrations.claude_plugin.diff_utils import (
+        from weave.integrations.claude_plugin.views.diff_utils import (
             extract_edit_data_from_raw_messages,
         )
-        from weave.integrations.claude_plugin.diff_view import (
+        from weave.integrations.claude_plugin.views.diff_view import (
             generate_edit_diff_html,
         )
 
@@ -624,10 +624,10 @@ class TestEndToEndSubagentDiffGeneration:
 
     def test_collect_all_subagent_edits_for_session(self, tmp_path):
         """Collect Edit data from multiple subagents in a session."""
-        from weave.integrations.claude_plugin.diff_utils import (
+        from weave.integrations.claude_plugin.views.diff_utils import (
             extract_edit_data_from_raw_messages,
         )
-        from weave.integrations.claude_plugin.diff_view import _build_file_diffs_from_edit_data
+        from weave.integrations.claude_plugin.views.diff_view import _build_file_diffs_from_edit_data
 
         # Helper to create agent file with edits
         def create_agent_file(agent_id: str, file_path: str, original: str, patch: list):

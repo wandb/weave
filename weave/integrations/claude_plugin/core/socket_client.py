@@ -103,7 +103,7 @@ class DaemonClient:
                 [
                     sys.executable,
                     "-m",
-                    "weave.integrations.claude_plugin.daemon",
+                    "weave.integrations.claude_plugin.core.daemon",
                     self.session_id,
                 ],
                 start_new_session=True,

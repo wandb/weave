@@ -38,7 +38,7 @@ def hook() -> None:
     Required environment variables:
         WEAVE_PROJECT: Weave project in "entity/project" format
     """
-    from weave.integrations.claude_plugin.hook import main
+    from weave.integrations.claude_plugin.core.hook import main
 
     main()
 
@@ -188,13 +188,13 @@ def import_sessions_cmd(
     """
     from pathlib import Path
 
-    from weave.integrations.claude_plugin.cli_output import (
+    from weave.integrations.claude_plugin.views.cli_output import (
         ImportResult,
         ImportSummary,
         get_output,
         suppress_verbose_logging,
     )
-    from weave.integrations.claude_plugin.session_importer import (
+    from weave.integrations.claude_plugin.session.session_importer import (
         discover_session_files,
         import_session_with_result,
         init_weave_quiet,
