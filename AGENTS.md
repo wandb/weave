@@ -137,7 +137,8 @@ nox --no-install -e "tests-3.13(shard='trace_dual_write_read_complete')"
 
 - The `--trace-server` flag is for **backend selection** (SQLite vs ClickHouse)
 - The `--remote-http-trace-server` flag is for **trace server binding implementation** (RemoteHTTPTraceServer vs StainlessRemoteHTTPTraceServer)
-- The `--calls-storage-mode` flag is for **calls table selection** (calls_merged vs calls_complete)
+- The `--calls-storage-mode` flag is for **calls storage mode** (auto, force_legacy, dual_write_read_merged, dual_write_read_complete, off)
+- **Default**: `force_legacy` for all shards except `trace_dual_write_read_complete`
 - The `trace_dual_write_read_complete` shard runs the full trace test suite with dual write + read from calls_complete (ClickHouse only)
 
 #### Environment Issues
