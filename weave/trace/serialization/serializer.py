@@ -38,9 +38,11 @@ from __future__ import annotations
 import inspect
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 from typing_extensions import TypeIs
+
+T = TypeVar("T")
 
 # This is avoiding a circular import.
 if TYPE_CHECKING:
@@ -71,10 +73,23 @@ def is_probably_legacy_file_load(fn: Callable) -> TypeIs[LegacyFileLoad]:
 
 
 @dataclass
-class Serializer:
-    target_class: type
-    save: SerializeSaveCallable
-    load: SerializeLoadCallable
+class Serializer(Generic[T]):
+    """A serializer for a specific type T.
+
+    Type Parameters:
+        T: The type of object this serializer handles.
+
+    Attributes:
+        target_class: The class that this serializer handles.
+        save: Function to serialize an instance of T to an artifact.
+        load: Function to deserialize an instance of T from an artifact.
+        instance_check: Optional custom isinstance check (useful for protocols).
+        publish_load_op: Whether to publish the load function as an op.
+    """
+
+    target_class: type[T]
+    save: Callable[[T, MemTraceFilesArtifact, str], Any]
+    load: Callable[[MemTraceFilesArtifact, str, Any], T]
 
     # Added to provide a function to check if an object is an instance of the
     # target class because protocol isinstance checks can fail in python3.12+
@@ -91,29 +106,54 @@ class Serializer:
         return serializer_id
 
 
-SERIALIZERS = []
+SERIALIZERS: list[Serializer[Any]] = []
 
 
 def register_serializer(
-    target_class: type,
-    save: SerializeSaveCallable,
-    load: SerializeLoadCallable,
+    target_class: type[T],
+    save: Callable[[T, MemTraceFilesArtifact, str], Any],
+    load: Callable[[MemTraceFilesArtifact, str, Any], T],
     instance_check: Callable[[Any], bool] | None = None,
     publish_load_op: bool = True,
 ) -> None:
+    """Register a serializer for a specific type.
+
+    Args:
+        target_class: The class to serialize.
+        save: Function that serializes an instance to an artifact.
+        load: Function that deserializes an instance from an artifact.
+        instance_check: Optional custom isinstance check (useful for protocols).
+        publish_load_op: Whether to publish the load function as an op.
+    """
     SERIALIZERS.append(
         Serializer(target_class, save, load, instance_check, publish_load_op)
     )
 
 
-def get_serializer_by_id(id: str) -> Serializer | None:
+def get_serializer_by_id(id: str) -> Serializer[Any] | None:
+    """Get a serializer by its ID string.
+
+    Args:
+        id: The serializer ID (typically module.ClassName).
+
+    Returns:
+        The matching serializer, or None if not found.
+    """
     for serializer in SERIALIZERS:
         if serializer.id() == id:
             return serializer
     return None
 
 
-def get_serializer_for_obj(obj: Any) -> Serializer | None:
+def get_serializer_for_obj(obj: Any) -> Serializer[Any] | None:
+    """Get a serializer for a given object instance.
+
+    Args:
+        obj: The object to find a serializer for.
+
+    Returns:
+        A serializer that can handle the object, or None if not found.
+    """
     for serializer in SERIALIZERS:
         if serializer.instance_check and serializer.instance_check(obj):
             return serializer
