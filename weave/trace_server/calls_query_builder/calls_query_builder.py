@@ -514,7 +514,7 @@ class CallsQuery(BaseModel):
             hardcoded_filter=self.hardcoded_filter,
             limit=self.limit,
             offset=self.offset,
-            project_version=self.project_version,
+            read_table=self.read_table,
         )
 
     def set_include_costs(self, include_costs: bool) -> "CallsQuery":
@@ -1811,7 +1811,6 @@ def build_calls_stats_query(
     inner_query = cq.as_sql(param_builder)
     calls_query_sql = f"SELECT {', '.join(aggregated_columns[k] for k in aggregated_columns)} FROM ({inner_query})"
 
-
     return (calls_query_sql, aggregated_columns.keys())
 
 
@@ -2058,6 +2057,7 @@ def build_calls_complete_batch_update_query(
     if not end_calls:
         return ""
 
+    # All calls should be from the same project
     project_id = end_calls[0].project_id
     call_ids = []
 
