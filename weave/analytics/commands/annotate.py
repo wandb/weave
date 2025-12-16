@@ -412,19 +412,10 @@ def annotate(
         spinner.stop("No references to resolve", success=True)
 
     # Fetch feedback for annotations
+    # Note: Feedback is included in traces via include_feedback=True in the query
+    traces_with_feedback = sum(1 for t in traces if t.get("feedback"))
     if pretty or dry_run:
-        console.print("\n[bold cyan]Step 3: Fetching Feedback[/bold cyan]")
-        spinner = AnalyticsSpinner("Fetching feedback")
-        spinner.start()
-
-    try:
-        traces = analytics_client.fetch_feedback_for_traces(traces)
-        traces_with_feedback = sum(1 for t in traces if t.get("feedback"))
-        if pretty or dry_run:
-            spinner.stop(f"Found feedback for {traces_with_feedback} traces", success=True)
-    except Exception as e:
-        if pretty or dry_run:
-            spinner.stop(f"Warning: {e}", success=False)
+        console.print(f"\n[dim]Found feedback for {traces_with_feedback} traces[/dim]")
 
     # Extract human annotations
     annotation_examples = []
@@ -506,22 +497,22 @@ def annotate(
             bar_length = int((count / max_count) * 30)
             bar = "█" * bar_length
 
-        if pct >= 30:
-            pct_style = "bright_magenta"
-        elif pct >= 10:
-            pct_style = "yellow"
-        else:
-            pct_style = "white"
+            if pct >= 30:
+                pct_style = "bright_magenta"
+            elif pct >= 10:
+                pct_style = "yellow"
+            else:
+                pct_style = "white"
 
             histogram_table.add_row(
                 category,
                 str(count),
-            f"[{pct_style}]{pct:.1f}%[/{pct_style}]",
+                f"[{pct_style}]{pct:.1f}%[/{pct_style}]",
                 bar,
-        )
+            )
 
         console.print(histogram_table)
-    console.print()
+        console.print()
 
     # Dry run - show sample annotations
     if dry_run:
@@ -555,9 +546,10 @@ def annotate(
         sys.exit(1)
 
     # Create AnnotationSpec for the failure analysis field
+    spinner = None
     if pretty:
         spinner = AnalyticsSpinner("Creating annotation spec")
-    spinner.start()
+        spinner.start()
 
     try:
         from weave import AnnotationSpec
@@ -593,10 +585,10 @@ def annotate(
         # Publish the annotation spec
         failure_ref = weave.publish(failure_spec, name=annotation_name)
 
-        if pretty:
+        if spinner:
             spinner.stop(f"Created annotation spec: {annotation_name}", success=True)
     except Exception as e:
-        if pretty:
+        if spinner:
             spinner.stop(f"Failed: {e}", success=False)
         console.print(f"[red]Error creating annotation spec:[/red] {e}")
         sys.exit(1)
@@ -604,7 +596,7 @@ def annotate(
     # Apply annotations to each trace
     if pretty:
         spinner = AnalyticsSpinner(f"Annotating {len(traces)} traces")
-    spinner.start()
+        spinner.start()
 
     from weave.trace_server.interface.feedback_types import ANNOTATION_FEEDBACK_TYPE_PREFIX
     from weave.trace_server.trace_server_interface import FeedbackCreateReq
@@ -643,7 +635,7 @@ def annotate(
             if error_count <= 3:
                 console.print(f"[yellow]Warning: Failed to annotate {trace_id}: {e}[/yellow]")
 
-    if pretty:
+    if pretty and spinner:
         spinner.stop(
             f"Annotated {success_count} traces ({error_count} errors)",
             success=error_count == 0,
