@@ -1,13 +1,11 @@
+import json
 from typing import Any
 
 from pydantic import BaseModel
 
-from weave.trace.refs import OpRef
-from weave.trace.weave_client import WeaveClient, get_ref
+from weave.trace.weave_client import WeaveClient
 from weave.trace_server.interface.builtin_object_classes import dynamic_leaderboard
-from weave.trace_server.trace_server_interface import CallsFilter
 from weave.utils.project_id import from_project_id
-import json
 
 
 class LeaderboardModelEvaluationResult(BaseModel):
@@ -29,9 +27,7 @@ def get_leaderboard_results(
 ) -> list[LeaderboardModelResult]:
     entity, project = from_project_id(client._project_id())
     query = json.loads(spec.calls_query)
-    calls = client.get_calls(
-        query=query
-    )
+    calls = client.get_calls(query=query)
     # implement here
     pass
 
