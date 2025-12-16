@@ -141,11 +141,17 @@ def fast_retrying_server():
         stop=tenacity.stop_after_attempt(2),
         reraise=True,
     )
-    unwrapped_send_batch_to_server = MethodType(
-        server._send_batch_to_server.__wrapped__,  # type: ignore[attr-defined]
+    # Update both start and end batch send methods
+    unwrapped_start = MethodType(
+        server._send_calls_start_batch_to_server.__wrapped__,  # type: ignore[attr-defined]
         server,
     )
-    server._send_batch_to_server = fast_retry(unwrapped_send_batch_to_server)
+    unwrapped_end = MethodType(
+        server._send_calls_end_batch_to_server.__wrapped__,  # type: ignore[attr-defined]
+        server,
+    )
+    server._send_calls_start_batch_to_server = fast_retry(unwrapped_start)
+    server._send_calls_end_batch_to_server = fast_retry(unwrapped_end)
     yield server
     if server.call_processor:
         server.call_processor.stop_accepting_new_work_and_flush_queue()
@@ -184,16 +190,9 @@ def test_post_timeout(mock_post, success_response, fast_retrying_server, log_col
 
     # Create a new server since the old one has shutdown its batch processor
     new_server = RemoteHTTPTraceServer("http://example.com", should_batch=False)
-    fast_retry = tenacity.retry(
-        wait=tenacity.wait_fixed(0.1),
-        stop=tenacity.stop_after_attempt(2),
-        reraise=True,
-    )
-    unwrapped_send_batch_to_server = MethodType(
-        new_server._send_batch_to_server.__wrapped__,  # type: ignore[attr-defined]
-        new_server,
-    )
-    new_server._send_batch_to_server = fast_retry(unwrapped_send_batch_to_server)
+    # Note: When should_batch=False, the new server doesn't use batch processing,
+    # so it will directly call the endpoints. The mock_post will be used by the
+    # underlying http_requests.post() calls.
 
     # Should succeed with retry
     start_req = tsi.CallStartReq(start=generate_start())

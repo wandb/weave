@@ -163,6 +163,13 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
             if call_id in ends:
                 # Found a pair - create a complete item
                 end_item = ends[call_id]
+                # Ensure id and trace_id are not None
+                if (
+                    start_item.req.start.id is None
+                    or start_item.req.start.trace_id is None
+                ):
+                    # Skip pairing if essential fields are missing
+                    continue
                 complete_call = tsi.CompletedCallSchemaForInsert(
                     project_id=start_item.req.start.project_id,
                     id=start_item.req.start.id,
@@ -203,6 +210,28 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         consolidated.extend(completes)
 
         return consolidated
+
+    @with_retry
+    def _send_calls_start_batch_to_server(
+        self, entity: str, project: str, encoded_data: bytes
+    ) -> None:
+        """Send a batch of call starts/completes to the server with retry logic."""
+        if not entity or not project:
+            raise ValueError("Entity and project required for batch call")
+        url = f"/v2/{entity}/{project}/calls/start/batch"
+        r = self.post(url, data=encoded_data)
+        handle_response_error(r, url)
+
+    @with_retry
+    def _send_calls_end_batch_to_server(
+        self, entity: str, project: str, encoded_data: bytes
+    ) -> None:
+        """Send a batch of call ends to the server with retry logic."""
+        if not entity or not project:
+            raise ValueError("Entity and project required for batch call")
+        url = f"/v2/{entity}/{project}/calls/end/batch"
+        r = self.post(url, data=encoded_data)
+        handle_response_error(r, url)
 
     def _flush_calls(
         self,
@@ -272,21 +301,17 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
                 batch: list[StartBatchItem | CompleteBatchItem],
             ) -> bytes:
                 # Convert internal batch items to API types
-                api_batch = []
+                api_batch: list[tsi.CallBatchStartMode | tsi.CallBatchCompleteMode] = []
                 for item in batch:
                     if isinstance(item, StartBatchItem):
                         api_batch.append(tsi.CallBatchStartMode(req=item.req))
                     elif isinstance(item, CompleteBatchItem):
                         api_batch.append(tsi.CallBatchCompleteMode(req=item.req))
-                req = tsi.CallsStartBatchReq(project_id=project_id, batch=api_batch)
+                req = tsi.CallsStartBatchReq(project_id=project_id, batch=api_batch)  # type: ignore
                 return req.model_dump_json().encode("utf-8")
 
             def send_start_batch_fn(encoded_data: bytes) -> None:
-                if not entity or not project:
-                    raise ValueError("Entity and project required for batch call")
-                url = f"/v2/{entity}/{project}/calls/start/batch"
-                r = self.post(url, data=encoded_data)
-                handle_response_error(r, url)
+                self._send_calls_start_batch_to_server(entity, project, encoded_data)
 
             process_batch_with_retry(
                 batch_name="call_starts",
@@ -310,11 +335,7 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
                 return req.model_dump_json().encode("utf-8")
 
             def send_end_batch_fn(encoded_data: bytes) -> None:
-                if not entity or not project:
-                    raise ValueError("Entity and project required for batch call")
-                url = f"/v2/{entity}/{project}/calls/end/batch"
-                r = self.post(url, data=encoded_data)
-                handle_response_error(r, url)
+                self._send_calls_end_batch_to_server(entity, project, encoded_data)
 
             process_batch_with_retry(
                 batch_name="call_ends",
