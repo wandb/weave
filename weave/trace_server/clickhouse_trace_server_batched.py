@@ -424,10 +424,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # Convert calls to CH insertable format and then to rows for batch insertion
         batch_rows = []
         for start_call, end_call in calls:
-            ch_start = _start_call_for_insert_to_ch_insertable_start_call(
-                start_call, self
-            )
-            ch_end = _end_call_for_insert_to_ch_insertable_end_call(end_call, self)
+            ch_start = _start_call_for_insert_to_ch_insertable_start_call(start_call)
+            ch_end = _end_call_for_insert_to_ch_insertable_end_call(end_call)
             batch_rows.append(_ch_call_to_row(ch_start))
             batch_rows.append(_ch_call_to_row(ch_end))
 
@@ -485,7 +483,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # as enforcing business rules and defaults
 
         req = process_call_req_to_content(req, self)
-        ch_call = _start_call_for_insert_to_ch_insertable_start_call(req.start, self)
+        ch_call = _start_call_for_insert_to_ch_insertable_start_call(req.start)
 
         # Inserts the call into the clickhouse database, verifying that
         # the call does not already exist
@@ -507,7 +505,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # This does validation and conversion of the input data as well
         # as enforcing business rules and defaults
         req = process_call_req_to_content(req, self)
-        ch_call = _end_call_for_insert_to_ch_insertable_end_call(req.end, self)
+        ch_call = _end_call_for_insert_to_ch_insertable_end_call(req.end)
 
         # Inserts the call into the clickhouse database, verifying that
         # the call does not already exist
@@ -4164,7 +4162,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             inputs={**req.inputs.model_dump(exclude_none=True)},
             attributes={},
         )
-        start_call = _start_call_for_insert_to_ch_insertable_start_call(start, self)
+        start_call = _start_call_for_insert_to_ch_insertable_start_call(start)
         end = tsi.EndedCallSchemaForInsert(
             project_id=req.project_id,
             id=start_call.id,
@@ -4177,7 +4175,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         if "error" in res.response:
             end.exception = res.response["error"]
-        end_call = _end_call_for_insert_to_ch_insertable_end_call(end, self)
+        end_call = _end_call_for_insert_to_ch_insertable_end_call(end)
         calls: list[CallStartCHInsertable | CallEndCHInsertable] = [
             start_call,
             end_call,
@@ -4270,7 +4268,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 inputs=tracked_inputs,
                 attributes={},
             )
-            start_call = _start_call_for_insert_to_ch_insertable_start_call(start, self)
+            start_call = _start_call_for_insert_to_ch_insertable_start_call(start)
             # Insert immediately so that callers can see the call in progress
             self._insert_call(start_call)
 
@@ -4995,7 +4993,6 @@ def _ch_call_to_row(ch_call: CallCHInsertable) -> list[Any]:
 
 def _start_call_for_insert_to_ch_insertable_start_call(
     start_call: tsi.StartedCallSchemaForInsert,
-    trace_server: tsi.TraceServerInterface | None = None,
 ) -> CallStartCHInsertable:
     # Note: it is technically possible for the user to mess up and provide the
     # wrong trace id (one that does not match the parent_id)!
@@ -5031,7 +5028,6 @@ def _start_call_for_insert_to_ch_insertable_start_call(
 
 def _end_call_for_insert_to_ch_insertable_end_call(
     end_call: tsi.EndedCallSchemaForInsert,
-    trace_server: tsi.TraceServerInterface | None = None,
 ) -> CallEndCHInsertable:
     # Note: it is technically possible for the user to mess up and provide the
     # wrong trace id (one that does not match the parent_id)!
@@ -5318,9 +5314,7 @@ def _create_tracked_stream_wrapper(
                 output=aggregated_output,
                 summary=summary,
             )
-            end_call = _end_call_for_insert_to_ch_insertable_end_call(
-                end, None
-            )  # No trace_server in stream wrapper
+            end_call = _end_call_for_insert_to_ch_insertable_end_call(end)
             insert_call(end_call)
 
     return _stream_wrapper()
