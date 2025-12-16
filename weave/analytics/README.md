@@ -276,6 +276,46 @@ This logs all LLM calls to your configured debug Weave project, allowing you to 
 
 ---
 
+## URL Filtering
+
+The CLI parses Weave trace URLs directly, including filters applied in the Weave UI. Simply copy the URL from your browser and pass it to the CLI commands.
+
+**Supported URL parameters:**
+
+| Parameter | Description | Example |
+|-----------|-------------|---------|
+| `filter` | Op version refs and basic filters | `{"opVersionRefs":["weave:///entity/project/op/MyOp:*"]}` |
+| `filters` | Advanced filter items | `{"items":[{"field":"started_at","operator":"(date): before","value":"2025-04-21T22:00:00.000Z"}]}` |
+
+**Supported filter operators:**
+
+| Operator | Field Types | Example |
+|----------|-------------|---------|
+| `(string): equals` | Any string field | `op_name`, `display_name` |
+| `(string): contains` | Any string field | Substring matching |
+| `(string): in` | Any string field | Comma-separated values |
+| `(bool): is` | Boolean fields | `true` / `false` |
+| `(number): >` / `(number): <` | Numeric fields | `summary.usage.tokens` |
+| `(date): before` / `(date): after` | Datetime fields | `started_at`, `ended_at` |
+
+**How filtering works:**
+
+1. **Op filtering** - `opVersionRefs` are passed directly to the Weave API's `filter.op_names` field, supporting wildcards like `:*`
+2. **Date filtering** - ISO timestamps are converted to Unix timestamps and use the `$not`/`$gt` pattern per the [Weave API spec](https://docs.wandb.ai/weave/reference/service-api/calls/calls-query-stream)
+3. **Root traces** - By default, only root traces (no parent) are fetched to avoid duplicate analysis
+
+**Example with complex filters:**
+
+```bash
+# Filter by op name AND date range
+weave analytics cluster "https://wandb.ai/team/project/weave/traces?\
+filter={\"opVersionRefs\":[\"weave:///team/project/op/MyAgent.run:*\"]}&\
+filters={\"items\":[{\"field\":\"started_at\",\"operator\":\"(date): before\",\"value\":\"2025-04-21T22:00:00.000Z\"}]}" \
+--pretty
+```
+
+---
+
 ## Architecture
 
 ```
