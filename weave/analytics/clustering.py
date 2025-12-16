@@ -407,8 +407,8 @@ def compact_execution_trace(
     target_tokens = int(max_tokens * 0.7)
 
     try:
+        llm_kwargs = get_llm_kwargs(model)
         response = litellm.completion(
-            model=model,
             messages=[
                 {"role": "system", "content": TRACE_COMPACTION_SYSTEM_PROMPT},
                 {
@@ -419,7 +419,7 @@ def compact_execution_trace(
                 },
             ],
             temperature=0.0,
-            api_key=api_key,
+            **llm_kwargs,
         )
 
         compacted = response.choices[0].message.content
@@ -489,8 +489,8 @@ def get_api_key_for_model(model: str) -> str:
         "claude": "ANTHROPIC_API_KEY",
         "gemini": "GOOGLE_API_KEY",
         "google": "GOOGLE_API_KEY",
-        "wandb": "WANDB_INFERENCE_API_KEY",
-        "wandb_ai": "WANDB_INFERENCE_API_KEY",
+        "wandb": "WANDB_API_KEY",
+        "wandb_ai": "WANDB_API_KEY",
     }
 
     env_var = provider_env_map.get(provider, "OPENAI_API_KEY")
@@ -500,6 +500,35 @@ def get_api_key_for_model(model: str) -> str:
         raise ValueError(f"{env_var} not set. Run 'weave analytics setup' first.")
 
     return api_key
+
+
+def get_llm_kwargs(model: str) -> dict[str, Any]:
+    """Get the kwargs for litellm completion based on the model provider.
+
+    For W&B inference models, this configures the custom API base URL.
+
+    Args:
+        model: The model name (e.g., "gemini/gemini-2.5-flash", "wandb/meta-llama/Llama-4-Scout-17B-16E-Instruct")
+
+    Returns:
+        Dictionary of kwargs for litellm.completion
+    """
+    provider = model.split("/")[0].lower() if "/" in model else "openai"
+    api_key = get_api_key_for_model(model)
+
+    kwargs: dict[str, Any] = {
+        "model": model,
+        "api_key": api_key,
+    }
+
+    # W&B inference uses OpenAI-compatible API
+    if provider in ("wandb", "wandb_ai"):
+        # Convert wandb/model-name to openai/model-name for litellm
+        model_name = "/".join(model.split("/")[1:])  # Remove wandb/ prefix
+        kwargs["model"] = f"openai/{model_name}"
+        kwargs["api_base"] = "https://api.inference.wandb.ai/v1"
+
+    return kwargs
 
 
 def extract_human_annotations(trace: dict[str, Any]) -> dict[str, Any]:
@@ -606,14 +635,14 @@ async def draft_categorization(
             execution_trace_section=execution_trace_section,
         )
 
+        llm_kwargs = get_llm_kwargs(model)
         response = await litellm.acompletion(
-            model=model,
             messages=[
                 {"role": "system", "content": FIRST_PASS_SYSTEM_PROMPT},
                 {"role": "user", "content": prompt},
             ],
             response_format=FirstPassCategorization,
-            api_key=get_api_key_for_model(model),
+            **llm_kwargs,
         )
 
         result = json.loads(response.choices[0].message.content)
@@ -700,14 +729,14 @@ async def aggregate_categorizations(
         console.print(f"[dim]Calling LLM for clustering aggregation...[/dim]")
 
     try:
+        llm_kwargs = get_llm_kwargs(model)
         response = await litellm.acompletion(
-            model=model,
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": prompt},
             ],
             response_format=ClusteringCategories,
-            api_key=get_api_key_for_model(model),
+            **llm_kwargs,
         )
 
         if debug and console:
@@ -760,14 +789,14 @@ async def final_classification(
             available_pattern_categories=categories_str,
         )
 
+        llm_kwargs = get_llm_kwargs(model)
         response = await litellm.acompletion(
-            model=model,
             messages=[
                 {"role": "system", "content": FINAL_CLASSIFICATION_SYSTEM_PROMPT},
                 {"role": "user", "content": prompt},
             ],
             response_format=FinalClassification,
-            api_key=get_api_key_for_model(model),
+            **llm_kwargs,
         )
 
         result = json.loads(response.choices[0].message.content)

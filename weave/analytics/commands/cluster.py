@@ -48,7 +48,7 @@ def load_existing_clusters(clusters_file: str) -> dict | None:
 @click.option(
     "--model",
     default=None,
-    help="LiteLLM model name (default: from config or gemini/gemini-2.5-pro)",
+    help="LiteLLM model name (default: from config or gemini/gemini-2.5-flash)",
 )
 @click.option(
     "--limit",
@@ -177,7 +177,7 @@ def cluster(
     # Get model from config or use default
     config = load_config()
     if model is None:
-        model = config.get("LLM_MODEL", "gemini/gemini-2.5-pro")
+        model = config.get("LLM_MODEL", "gemini/gemini-2.5-flash")
 
     # Debug mode: limited samples, Weave tracing
     if debug:

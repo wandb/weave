@@ -21,9 +21,19 @@ def load_env_from_config() -> None:
             os.environ[key] = value
 
 
-def get_api_key_for_model(model: str) -> str:
-    """Get the appropriate API key based on the model provider."""
+def get_llm_kwargs(model: str) -> dict:
+    """Get the kwargs for litellm completion based on the model provider.
+
+    For W&B inference models, this configures the custom API base URL.
+
+    Args:
+        model: The model name (e.g., "gemini/gemini-2.5-flash", "wandb/meta-llama/Llama-4-Scout-17B-16E-Instruct")
+
+    Returns:
+        Dictionary of kwargs for litellm.completion
+    """
     import os
+    from typing import Any
 
     provider = model.split("/")[0].lower() if "/" in model else "openai"
 
@@ -33,7 +43,8 @@ def get_api_key_for_model(model: str) -> str:
         "claude": "ANTHROPIC_API_KEY",
         "gemini": "GOOGLE_API_KEY",
         "google": "GOOGLE_API_KEY",
-        "wandb": "WANDB_INFERENCE_API_KEY",
+        "wandb": "WANDB_API_KEY",
+        "wandb_ai": "WANDB_API_KEY",
     }
 
     env_var = provider_env_map.get(provider, "OPENAI_API_KEY")
@@ -42,7 +53,19 @@ def get_api_key_for_model(model: str) -> str:
     if not api_key:
         raise ValueError(f"{env_var} not set. Run 'weave analytics setup' first.")
 
-    return api_key
+    kwargs: dict[str, Any] = {
+        "model": model,
+        "api_key": api_key,
+    }
+
+    # W&B inference uses OpenAI-compatible API
+    if provider in ("wandb", "wandb_ai"):
+        # Convert wandb/model-name to openai/model-name for litellm
+        model_name = "/".join(model.split("/")[1:])  # Remove wandb/ prefix
+        kwargs["model"] = f"openai/{model_name}"
+        kwargs["api_base"] = "https://api.inference.wandb.ai/v1"
+
+    return kwargs
 
 
 @click.command("summarize")
@@ -212,7 +235,7 @@ def summarize(
         spinner.start()
 
     try:
-        api_key = get_api_key_for_model(model)
+        llm_kwargs = get_llm_kwargs(model)
 
         prompt = TRACE_SUMMARY_USER_PROMPT.format(
             trace_id=trace_id,
@@ -226,12 +249,11 @@ def summarize(
         )
 
         response = litellm.completion(
-            model=model,
             messages=[
                 {"role": "system", "content": TRACE_SUMMARY_SYSTEM_PROMPT},
                 {"role": "user", "content": prompt},
             ],
-            api_key=api_key,
+            **llm_kwargs,
         )
 
         summary = response.choices[0].message.content

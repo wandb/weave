@@ -52,7 +52,7 @@ uv pip install weave[analytics]
 weave analytics setup
 ```
 
-This configures your W&B API key and LLM provider (Google, OpenAI, or Anthropic).
+This configures your W&B API key and LLM provider. The default model is Gemini Flash (`gemini/gemini-2.5-flash`).
 
 2. **Cluster traces from a Weave URL:**
 
@@ -93,9 +93,9 @@ Interactive configuration wizard for setting up API keys and preferences.
 | Option | Description |
 |--------|-------------|
 | `--wandb-api-key` | W&B API key |
-| `--llm-model` | LiteLLM model name (default: `gemini/gemini-2.5-pro`) |
+| `--llm-model` | LiteLLM model name (default: `gemini/gemini-2.5-flash`) |
 | `--llm-api-key` | API key for the LLM provider |
-| `--llm-provider` | Provider: `google`, `openai`, `anthropic`, or `auto` |
+| `--llm-provider` | Provider: `google`, `openai`, `anthropic`, `wandb`, or `auto` |
 | `--debug-entity` | W&B entity for debug tracing |
 | `--debug-project` | W&B project for debug tracing |
 
@@ -343,9 +343,26 @@ Via LiteLLM, the following providers are supported:
 
 | Provider | Model format | Environment variable |
 |----------|-------------|---------------------|
-| Google | `gemini/gemini-2.5-pro` | `GOOGLE_API_KEY` |
+| Google (default) | `gemini/gemini-2.5-flash` | `GOOGLE_API_KEY` |
 | OpenAI | `openai/gpt-4o` | `OPENAI_API_KEY` |
 | Anthropic | `anthropic/claude-3-5-sonnet` | `ANTHROPIC_API_KEY` |
+| **W&B Inference** | `wandb/meta-llama/Llama-3.1-8B-Instruct` | `WANDB_API_KEY` |
+
+### W&B Inference
+
+[W&B Inference](https://docs.wandb.ai/inference) gives you access to leading open-source foundation models through an OpenAI-compatible API. Since you already have a `WANDB_API_KEY` configured for fetching traces, no additional API key setup is needed.
+
+**Available models include:**
+- `wandb/meta-llama/Llama-3.1-8B-Instruct`
+- `wandb/meta-llama/Llama-3.1-70B-Instruct`
+- And more at [wandb.ai/inference](https://wandb.ai/inference)
+
+**Example:**
+
+```bash
+weave analytics cluster "https://wandb.ai/team/project/weave/traces?..." \
+  --model "wandb/meta-llama/Llama-3.1-8B-Instruct" --pretty
+```
 
 See [LiteLLM documentation](https://docs.litellm.ai/docs/providers) for additional providers.
 

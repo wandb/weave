@@ -44,7 +44,8 @@ def save_config(config: dict) -> None:
         f.write("\n# LLM Configuration\n")
         if "LLM_MODEL" in config:
             f.write(f"LLM_MODEL={config['LLM_MODEL']}\n")
-        for key in ["GOOGLE_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "WANDB_INFERENCE_API_KEY"]:
+        # Note: W&B inference uses WANDB_API_KEY, not a separate key
+        for key in ["GOOGLE_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY"]:
             if key in config:
                 f.write(f"{key}={config[key]}\n")
 
@@ -63,8 +64,8 @@ def save_config(config: dict) -> None:
 )
 @click.option(
     "--llm-model",
-    default="gemini/gemini-2.5-pro",
-    help="LiteLLM-compatible model name (e.g., gemini/gemini-2.5-pro, openai/gpt-4o)",
+    default="gemini/gemini-2.5-flash",
+    help="LiteLLM-compatible model name (e.g., gemini/gemini-2.5-flash, openai/gpt-4o, wandb/meta-llama/Llama-4-Scout-17B-16E-Instruct)",
 )
 @click.option(
     "--llm-api-key",
@@ -177,11 +178,12 @@ def setup(
             )
 
     # Get the appropriate API key environment variable
+    # Note: W&B inference uses the standard WANDB_API_KEY
     provider_env_map = {
         "google": "GOOGLE_API_KEY",
         "openai": "OPENAI_API_KEY",
         "anthropic": "ANTHROPIC_API_KEY",
-        "wandb": "WANDB_INFERENCE_API_KEY",
+        "wandb": "WANDB_API_KEY",  # W&B inference uses the same API key
     }
     env_var = provider_env_map.get(detected_provider, "OPENAI_API_KEY")
 
