@@ -18,7 +18,7 @@ from weave.trace_server_bindings.remote_http_trace_server import (
 
 def generate_start(
     id: str | None = None,
-    project_id: str = "test",
+    project_id: str = "test_entity/test",
 ) -> tsi.StartedCallSchemaForInsert:
     """Generate a test StartedCallSchemaForInsert."""
     return tsi.StartedCallSchemaForInsert(
@@ -35,7 +35,7 @@ def generate_start(
 
 def generate_end(
     id: str | None = None,
-    project_id: str = "test",
+    project_id: str = "test_entity/test",
 ) -> tsi.EndedCallSchemaForInsert:
     """Generate a test EndedCallSchemaForInsert."""
     return tsi.EndedCallSchemaForInsert(
@@ -51,7 +51,7 @@ def generate_end(
 
 def generate_call_start_end_pair(
     id: str | None = None,
-    project_id: str = "test",
+    project_id: str = "test_entity/test",
 ) -> tuple[tsi.CallStartReq, tsi.CallEndReq]:
     """Generate a matching pair of CallStartReq and CallEndReq for testing."""
     start = generate_start(id, project_id)
@@ -91,22 +91,37 @@ def server(request, server_class):
     """Common server fixture that uses server_class based on the CLI flag."""
     server_ = server_class("http://example.com", should_batch=True)
 
+    # Create a shared mock that tracks all batch sends (both starts and ends)
+    # This allows tests to check total number of batches sent
+    shared_mock = MagicMock()
+
     if request.param == "normal":
-        server_._send_batch_to_server = MagicMock()
+        server_._send_calls_start_batch_to_server = shared_mock
+        server_._send_calls_end_batch_to_server = shared_mock
+        # For backward compatibility with tests that check _send_batch_to_server
+        server_._send_batch_to_server = shared_mock
     elif request.param == "small_limit":
         server_.remote_request_bytes_limit = 1024  # 1kb
-        server_._send_batch_to_server = MagicMock()
+        server_._send_calls_start_batch_to_server = shared_mock
+        server_._send_calls_end_batch_to_server = shared_mock
+        server_._send_batch_to_server = shared_mock
     elif request.param == "fast_retrying":
         fast_retry = tenacity.retry(
             wait=tenacity.wait_fixed(0.1),
             stop=tenacity.stop_after_attempt(2),
             reraise=True,
         )
-        unwrapped_send_batch_to_server = MethodType(
-            server_._send_batch_to_server.__wrapped__,  # type: ignore[attr-defined]
+        # For fast retrying, we need to wrap the actual methods
+        unwrapped_start = MethodType(
+            server_._send_calls_start_batch_to_server.__wrapped__,  # type: ignore[attr-defined]
             server_,
         )
-        server_._send_batch_to_server = fast_retry(unwrapped_send_batch_to_server)
+        unwrapped_end = MethodType(
+            server_._send_calls_end_batch_to_server.__wrapped__,  # type: ignore[attr-defined]
+            server_,
+        )
+        server_._send_calls_start_batch_to_server = fast_retry(unwrapped_start)
+        server_._send_calls_end_batch_to_server = fast_retry(unwrapped_end)
 
     yield server_
 
