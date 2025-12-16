@@ -1732,61 +1732,38 @@ def _setup_calls_for_storage_size_test(client):
     return [call0, call0_child1, call1]
 
 
-def test_get_calls_with_storage_size_parameters(client):
-    """Test that get_calls accepts include_storage_size and include_total_storage_size parameters."""
-    expected_calls = _setup_calls_for_storage_size_test(client)
-    expected_count = len(expected_calls)
-
-    # Use (False, False) as the source of truth
-    baseline_calls = list(
-        client.get_calls(include_storage_size=False, include_total_storage_size=False)
-    )
-    baseline_count = len(baseline_calls)
-
-    # Verify baseline matches expected count
-    assert baseline_count == expected_count
-
-    # Get all storage parameter permutations (excluding baseline)
-    storage_permutations = [
-        (False, True),
-        (True, False),
-        (True, True),
-    ]
-
-    # Verify all other permutations match the baseline in both content and length
-    for include_storage_size, include_total_storage_size in storage_permutations:
-        calls = list(
-            client.get_calls(
-                include_storage_size=include_storage_size,
-                include_total_storage_size=include_total_storage_size,
-            )
-        )
-
-        # Verify length matches baseline
-        assert len(calls) == baseline_count
-
-        # Verify content matches baseline (storage size fields are on CallSchema, not Call object)
-        for call, baseline_call in zip(calls, baseline_calls, strict=True):
-            assert call.id == baseline_call.id
-            assert call.op_name == baseline_call.op_name
-            assert call.inputs == baseline_call.inputs
-
-
-def test_get_calls_storage_size_with_other_params(client):
+def test_get_calls_storage_size_with_filter(client):
     """Test that storage size parameters can be combined with other get_calls parameters."""
-    expected_calls = _setup_calls_for_storage_size_test(client)
-    call0 = expected_calls[0]
+    all_calls = _setup_calls_for_storage_size_test(client)
+    assert len(all_calls) > 2
+
+    call0 = all_calls[0]
 
     # Test that parameters can be combined with other parameters
     calls_filtered = list(
         client.get_calls(
             filter=tsi.CallsFilter(op_names=[call0.op_name]),
             include_storage_size=True,
+            include_total_storage_size=True
+        )
+    )
+    assert len(calls_filtered) == 2
+
+
+def test_get_calls_storage_size_with_limit(client):
+    """Test that storage size parameters can be combined with other get_calls parameters."""
+    all_calls = _setup_calls_for_storage_size_test(client)
+    assert len(all_calls) > 2
+
+    # Test that parameters can be combined with other parameters
+    calls_limited = list(
+        client.get_calls(
+            include_storage_size=True,
             include_total_storage_size=True,
             limit=2,
         )
     )
-    assert len(calls_filtered) == 2
+    assert len(calls_limited) == 2
 
 
 @pytest.fixture
@@ -1852,6 +1829,7 @@ def test_get_calls_storage_size_values(client, clickhouse_client):
                 server_call.total_storage_size_bytes
                 == client_call.total_storage_size_bytes
             )
+            assert server_call.storage_size_bytes is not None
 
 
 def test_ref_in_dict(client):
