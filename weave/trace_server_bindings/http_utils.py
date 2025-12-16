@@ -59,8 +59,9 @@ def log_dropped_call_batch(
         logger.error(f"dropped call complete ids: {dropped_complete_ids}")
     response = getattr(e, "response", None)
     if isinstance(e, (httpx.HTTPError, httpx.HTTPStatusError)) and response:
-        logger.error(f"reason: {e.response.reason}")
-        logger.error(f"text: {e.response.text}")
+        logger.error(f"status code: {response.status_code}")
+        logger.error(f"reason: {response.reason_phrase}")
+        logger.error(f"text: {response.text}")
     else:
         logger.error(f"error: {e}")
 

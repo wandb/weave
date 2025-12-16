@@ -372,17 +372,17 @@ class CallUpsertRes(BaseModel):
 
 
 class CallBatchStartMode(BaseModel):
-    mode: Literal["start"] = "start"
+    mode: str = "start"
     req: CallStartReq
 
 
 class CallBatchEndMode(BaseModel):
-    mode: Literal["end"] = "end"
+    mode: str = "end"
     req: CallEndReq
 
 
 class CallBatchCompleteMode(BaseModel):
-    mode: Literal["complete"] = "complete"
+    mode: str = "complete"
     req: CallCompleteReq
 
 
