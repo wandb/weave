@@ -11,7 +11,7 @@ import re
 import subprocess
 from collections import Counter
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
@@ -341,6 +341,132 @@ class BufferedToolResult:
     timestamp: datetime
     result: str
     is_error: bool = False
+
+
+class ToolResultBuffer:
+    """Buffer for tool results enabling parallel grouping detection.
+
+    Tools are buffered until "aged" to allow parallel tool results to arrive
+    before committing to grouping decisions. Tools within PARALLEL_THRESHOLD_MS
+    of each other are considered parallel and logged under a wrapper call.
+
+    Usage:
+        buffer = ToolResultBuffer()
+        buffer.add(tool_use_id, name, input, timestamp, result, is_error)
+
+        # Periodically flush aged results
+        ready = buffer.get_ready_to_flush()
+        for group in ready:
+            log_group(group)
+        buffer.remove(ready)
+
+        # At turn end, flush everything
+        ready = buffer.get_ready_to_flush(force=True)
+    """
+
+    TOOL_AGE_THRESHOLD_MS = 2000  # Wait before logging
+    PARALLEL_THRESHOLD_MS = 1000  # Gap for parallel grouping
+
+    def __init__(self) -> None:
+        self._buffer: dict[str, BufferedToolResult] = {}
+
+    def add(
+        self,
+        tool_use_id: str,
+        name: str,
+        input: dict[str, Any],
+        timestamp: datetime,
+        result: str,
+        is_error: bool = False,
+    ) -> None:
+        """Add a tool result to the buffer."""
+        self._buffer[tool_use_id] = BufferedToolResult(
+            tool_use_id=tool_use_id,
+            name=name,
+            input=input,
+            timestamp=timestamp,
+            result=result,
+            is_error=is_error,
+        )
+
+    def is_empty(self) -> bool:
+        """Check if buffer has any results."""
+        return len(self._buffer) == 0
+
+    def clear(self) -> None:
+        """Clear all buffered results."""
+        self._buffer.clear()
+
+    def get_ready_to_flush(
+        self, force: bool = False
+    ) -> list[list[BufferedToolResult]]:
+        """Get tool result groups ready to be logged.
+
+        Args:
+            force: If True, return all buffered results (used at turn end)
+
+        Returns:
+            List of groups. Each group is a list of BufferedToolResult objects
+            that should be logged together (parallel if len > 1).
+        """
+        if not self._buffer:
+            return []
+
+        now = datetime.now(timezone.utc)
+
+        if force:
+            # Return all buffered results
+            ready = list(self._buffer.values())
+        else:
+            # Smart aging: only flush tools that are aged AND in complete groups
+            all_tools = sorted(self._buffer.values(), key=lambda x: x.timestamp)
+
+            # Find oldest tool's age
+            oldest_age_ms = (now - all_tools[0].timestamp).total_seconds() * 1000
+            if oldest_age_ms <= self.TOOL_AGE_THRESHOLD_MS:
+                return []  # Nothing aged yet
+
+            # Find all tools in the same parallel group as oldest
+            ready = [all_tools[0]]
+            for tool in all_tools[1:]:
+                prev_ts = ready[-1].timestamp
+                gap_ms = (tool.timestamp - prev_ts).total_seconds() * 1000
+                if gap_ms <= self.PARALLEL_THRESHOLD_MS:
+                    ready.append(tool)
+                else:
+                    break
+
+            # Check if ALL tools in group are aged
+            newest_age_ms = (now - ready[-1].timestamp).total_seconds() * 1000
+            if newest_age_ms <= self.TOOL_AGE_THRESHOLD_MS:
+                return []  # Not all aged yet
+
+        if not ready:
+            return []
+
+        # Group by timestamp proximity
+        ready.sort(key=lambda x: x.timestamp)
+        groups: list[list[BufferedToolResult]] = []
+        current_group: list[BufferedToolResult] = [ready[0]]
+
+        for tool in ready[1:]:
+            prev_ts = current_group[-1].timestamp
+            gap_ms = abs((tool.timestamp - prev_ts).total_seconds() * 1000)
+
+            if gap_ms <= self.PARALLEL_THRESHOLD_MS:
+                current_group.append(tool)
+            else:
+                groups.append(current_group)
+                current_group = [tool]
+        groups.append(current_group)
+
+        return groups
+
+    def remove(self, groups: list[list[BufferedToolResult]]) -> None:
+        """Remove flushed results from buffer."""
+        for group in groups:
+            for tool in group:
+                self._buffer.pop(tool.tool_use_id, None)
 
 
 def log_tool_call(
