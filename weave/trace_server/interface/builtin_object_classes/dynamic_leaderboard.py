@@ -4,38 +4,6 @@ from pydantic import BaseModel
 
 from weave.trace_server.interface.builtin_object_classes import base_object_def
 
-"""
-Data Model:
-    inputs:
-        inputs.model
-            inputs.model.self
-                Model Ref
-            inputs.model.name: optional? (str)
-            inputs.model.predict: Predict ref
-        inputs.self: eval ref
-        inputs.self.name: eval name
-        inputs.self.dataset: dataset ref
-        inputs.self.dataset.name: name (str)
-        inputs.self.dataset.rows: rows (dataset ref)
-        inputs.self.scorers: array of scorer refs (EMPTY IN IMPERATIVE EVALS)
-        inputs.self.evaluate: Op ref - Evaluation.evaluate (EMPTY IN IMPERATIVE EVALS)
-        inputs.self.predict_and_score : Op ref - Evaluation.predict_and_score (EMPTY IN IMPERATIVE EVALS)
-        inputs.
-    output:
-        each key under output is either:
-            A scorer name (imperative eval)
-        each scorer 
-
-What is a leaderboard:
-
-each row is represented by a model
-each column is an eval object
-each eval object contains:
-    dataset
-    scorers (not for imperative evals)
-    scorers contain metrics 
-"""
-
 
 class AggregationMethod(str, Enum):
     LATEST = "latest"
