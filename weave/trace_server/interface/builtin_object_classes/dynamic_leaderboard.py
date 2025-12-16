@@ -26,8 +26,12 @@ class ObjectVersionGroup(BaseModel):
 class ObjectConfig(BaseModel):
     version_groups: list[ObjectVersionGroup]
     show_version_indicator: bool
-    display_name_map: dict[str, str]  # ref/name -> display name (keys can use "*" wildcards)
-    deselected: list[str]  # List of dataset refs or patterns to exclude (can use "*" for wildcard matching)
+    display_name_map: dict[
+        str, str
+    ]  # ref/name -> display name (keys can use "*" wildcards)
+    deselected: list[
+        str
+    ]  # List of dataset refs or patterns to exclude (can use "*" for wildcard matching)
 
 
 class DynamicLeaderboardColumnConfig(BaseModel):
@@ -43,5 +47,4 @@ class DynamicLeaderboard(base_object_def.BaseObject):
     model_configuration: ObjectConfig
     dataset_configuration: ObjectConfig
     scorer_configuration: ObjectConfig
-    columns_configuration: list[DynamicLeaderboardColumnConfig] # Empty by default
-
+    columns_configuration: list[DynamicLeaderboardColumnConfig]  # Empty by default
