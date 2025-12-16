@@ -1565,7 +1565,6 @@ def test_aggregated_data_size_field():
     sql = field.as_select_sql(pb, "calls_merged")
     assert "CASE" in sql
     assert "parent_id" in sql
-    # The actual table name used is "rolled_up_cms" (short form)
     assert "rolled_up_cms.total_storage_size_bytes" in sql
 
 

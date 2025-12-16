@@ -66,9 +66,15 @@ def pytest_addoption(parser):
         parser.addoption(
             "--calls-storage-mode",
             action="store",
-            default="calls_merged",
-            choices=["calls_merged", "calls_complete"],
-            help="Storage mode for calls: 'calls_merged' (legacy) or 'calls_complete' (new)",
+            default="force_legacy",
+            choices=[
+                "auto",
+                "force_legacy",
+                "dual_write_read_merged",
+                "dual_write_read_complete",
+                "off",
+            ],
+            help="Storage mode for calls: matches CallsStorageServerMode enum values",
         )
     except ValueError:
         pass
@@ -119,7 +125,8 @@ def get_calls_storage_mode(request):
     """Get the calls storage mode to use.
 
     Returns:
-        str: Either 'auto', 'force_legacy', 'dual_write_read_merged', 'dual_write_read_complete', or 'off'
+        str: One of the CallsStorageServerMode enum values:
+            'auto', 'force_legacy', 'dual_write_read_merged', 'dual_write_read_complete', 'off'
     """
     return request.config.getoption("--calls-storage-mode")
 

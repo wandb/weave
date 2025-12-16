@@ -13,16 +13,21 @@ from weave.trace_server.threads_query_builder import (
 )
 
 
-def assert_clickhouse_sql(expected_query: str, expected_params: dict, **kwargs) -> None:
+def assert_clickhouse_sql(
+    expected_query: str,
+    expected_params: dict,
+    read_table: ReadTable = ReadTable.CALLS_MERGED,
+    **kwargs,
+) -> None:
     """Helper to test ClickHouse query generation for threads.
 
     Args:
         expected_query: The expected SQL query string
         expected_params: The expected parameter dictionary
+        read_table: The table to read from (defaults to CALLS_MERGED)
         **kwargs: Arguments to pass to make_threads_query
     """
     pb = ParamBuilder("pb")
-    read_table = ReadTable.CALLS_MERGED
     query = make_threads_query(pb=pb, read_table=read_table, **kwargs)
     params = pb.get_params()
 
@@ -61,40 +66,72 @@ def assert_sqlite_sql(expected_query: str, expected_params: list, **kwargs) -> N
 # Basic Functionality Tests
 
 
-def test_clickhouse_basic_query():
+@pytest.mark.parametrize(
+    ("read_table", "table_name"),
+    [
+        (ReadTable.CALLS_MERGED, "calls_merged"),
+        (ReadTable.CALLS_COMPLETE, "calls_complete"),
+    ],
+)
+def test_clickhouse_basic_query(read_table: ReadTable, table_name: str):
     """Test basic ClickHouse query with turn-only filtering."""
-    assert_clickhouse_sql(
-        """
-        SELECT
-            aggregated_thread_id AS thread_id,
-            COUNT(*) AS turn_count,
-            min(call_start_time) AS start_time,
-            max(call_end_time) AS last_updated,
-            argMin(id, call_start_time) AS first_turn_id,
-            argMax(id, call_end_time) AS last_turn_id,
-            quantile(0.5)(call_duration) AS p50_turn_duration_ms,
-            quantile(0.99)(call_duration) AS p99_turn_duration_ms
-        FROM (
+    if read_table == ReadTable.CALLS_MERGED:
+        # CALLS_MERGED uses two-level aggregation to handle partial merges
+        expected_query = f"""
             SELECT
-                id,
-                any(thread_id) AS aggregated_thread_id,
-                min(started_at) AS call_start_time,
-                max(ended_at) AS call_end_time,
-                CASE
-                    WHEN call_end_time IS NOT NULL AND call_start_time IS NOT NULL
-                    THEN dateDiff('millisecond', call_start_time, call_end_time)
-                    ELSE NULL
-                END AS call_duration
-            FROM calls_merged
-            WHERE project_id = {pb_0: String}
+                aggregated_thread_id AS thread_id,
+                COUNT(*) AS turn_count,
+                min(call_start_time) AS start_time,
+                max(call_end_time) AS last_updated,
+                argMin(id, call_start_time) AS first_turn_id,
+                argMax(id, call_end_time) AS last_turn_id,
+                quantile(0.5)(call_duration) AS p50_turn_duration_ms,
+                quantile(0.99)(call_duration) AS p99_turn_duration_ms
+            FROM (
+                SELECT
+                    id,
+                    any(thread_id) AS aggregated_thread_id,
+                    min(started_at) AS call_start_time,
+                    max(ended_at) AS call_end_time,
+                    CASE
+                        WHEN call_end_time IS NOT NULL AND call_start_time IS NOT NULL
+                        THEN dateDiff('millisecond', call_start_time, call_end_time)
+                        ELSE NULL
+                    END AS call_duration
+                FROM {table_name}
+                WHERE project_id = {{pb_0: String}}
 
-            GROUP BY (project_id, id)
-            HAVING id = any(turn_id) AND aggregated_thread_id IS NOT NULL AND aggregated_thread_id != ''
-        ) AS properly_merged_calls
-        GROUP BY aggregated_thread_id
-        ORDER BY last_updated DESC
-        """,
+                GROUP BY (project_id, id)
+                HAVING id = any(turn_id) AND aggregated_thread_id IS NOT NULL AND aggregated_thread_id != ''
+            ) AS properly_merged_calls
+            GROUP BY aggregated_thread_id
+            ORDER BY last_updated DESC
+            """
+    else:
+        # CALLS_COMPLETE uses single-level aggregation (no partial merges)
+        expected_query = f"""
+            SELECT
+                thread_id AS thread_id,
+                COUNT(*) AS turn_count,
+                min(started_at) AS start_time,
+                max(ended_at) AS last_updated,
+                argMin(id, started_at) AS first_turn_id,
+                argMax(id, ended_at) AS last_turn_id,
+                quantile(0.5)(dateDiff('millisecond', started_at, ended_at)) AS p50_turn_duration_ms,
+                quantile(0.99)(dateDiff('millisecond', started_at, ended_at)) AS p99_turn_duration_ms
+            FROM
+                {table_name}
+            WHERE project_id = {{pb_0: String}}
+
+            GROUP BY thread_id
+            HAVING id = any(turn_id) AND thread_id IS NOT NULL AND thread_id != ''
+            ORDER BY last_updated DESC
+            """
+
+    assert_clickhouse_sql(
+        expected_query,
         {"pb_0": "test_project"},
+        read_table=read_table,
         project_id="test_project",
     )
 
@@ -138,45 +175,75 @@ def test_sqlite_basic_query():
 # Sorting Tests
 
 
-def test_clickhouse_custom_sorting():
+@pytest.mark.parametrize(
+    ("read_table", "table_name"),
+    [
+        (ReadTable.CALLS_MERGED, "calls_merged"),
+        (ReadTable.CALLS_COMPLETE, "calls_complete"),
+    ],
+)
+def test_clickhouse_custom_sorting(read_table: ReadTable, table_name: str):
     """Test ClickHouse query with custom sorting."""
     sort_by = [
         tsi.SortBy(field="turn_count", direction="asc"),
         tsi.SortBy(field="start_time", direction="desc"),
     ]
 
-    assert_clickhouse_sql(
-        """
-        SELECT
-            aggregated_thread_id AS thread_id,
-            COUNT(*) AS turn_count,
-            min(call_start_time) AS start_time,
-            max(call_end_time) AS last_updated,
-            argMin(id, call_start_time) AS first_turn_id,
-            argMax(id, call_end_time) AS last_turn_id,
-            quantile(0.5)(call_duration) AS p50_turn_duration_ms,
-            quantile(0.99)(call_duration) AS p99_turn_duration_ms
-        FROM (
+    if read_table == ReadTable.CALLS_MERGED:
+        expected_query = f"""
             SELECT
-                id,
-                any(thread_id) AS aggregated_thread_id,
-                min(started_at) AS call_start_time,
-                max(ended_at) AS call_end_time,
-                CASE
-                    WHEN call_end_time IS NOT NULL AND call_start_time IS NOT NULL
-                    THEN dateDiff('millisecond', call_start_time, call_end_time)
-                    ELSE NULL
-                END AS call_duration
-            FROM calls_merged
-            WHERE project_id = {pb_0: String}
+                aggregated_thread_id AS thread_id,
+                COUNT(*) AS turn_count,
+                min(call_start_time) AS start_time,
+                max(call_end_time) AS last_updated,
+                argMin(id, call_start_time) AS first_turn_id,
+                argMax(id, call_end_time) AS last_turn_id,
+                quantile(0.5)(call_duration) AS p50_turn_duration_ms,
+                quantile(0.99)(call_duration) AS p99_turn_duration_ms
+            FROM (
+                SELECT
+                    id,
+                    any(thread_id) AS aggregated_thread_id,
+                    min(started_at) AS call_start_time,
+                    max(ended_at) AS call_end_time,
+                    CASE
+                        WHEN call_end_time IS NOT NULL AND call_start_time IS NOT NULL
+                        THEN dateDiff('millisecond', call_start_time, call_end_time)
+                        ELSE NULL
+                    END AS call_duration
+                FROM {table_name}
+                WHERE project_id = {{pb_0: String}}
 
-            GROUP BY (project_id, id)
-            HAVING id = any(turn_id) AND aggregated_thread_id IS NOT NULL AND aggregated_thread_id != ''
-        ) AS properly_merged_calls
-        GROUP BY aggregated_thread_id
-        ORDER BY turn_count ASC, start_time DESC
-        """,
+                GROUP BY (project_id, id)
+                HAVING id = any(turn_id) AND aggregated_thread_id IS NOT NULL AND aggregated_thread_id != ''
+            ) AS properly_merged_calls
+            GROUP BY aggregated_thread_id
+            ORDER BY turn_count ASC, start_time DESC
+            """
+    else:
+        expected_query = f"""
+            SELECT
+                thread_id AS thread_id,
+                COUNT(*) AS turn_count,
+                min(started_at) AS start_time,
+                max(ended_at) AS last_updated,
+                argMin(id, started_at) AS first_turn_id,
+                argMax(id, ended_at) AS last_turn_id,
+                quantile(0.5)(dateDiff('millisecond', started_at, ended_at)) AS p50_turn_duration_ms,
+                quantile(0.99)(dateDiff('millisecond', started_at, ended_at)) AS p99_turn_duration_ms
+            FROM
+                {table_name}
+            WHERE project_id = {{pb_0: String}}
+
+            GROUP BY thread_id
+            HAVING id = any(turn_id) AND thread_id IS NOT NULL AND thread_id != ''
+            ORDER BY turn_count ASC, start_time DESC
+            """
+
+    assert_clickhouse_sql(
+        expected_query,
         {"pb_0": "test_project"},
+        read_table=read_table,
         project_id="test_project",
         sort_by=sort_by,
     )
@@ -227,82 +294,145 @@ def test_sqlite_custom_sorting():
 # Pagination Tests
 
 
-def test_clickhouse_with_limit():
+@pytest.mark.parametrize(
+    ("read_table", "table_name"),
+    [
+        (ReadTable.CALLS_MERGED, "calls_merged"),
+        (ReadTable.CALLS_COMPLETE, "calls_complete"),
+    ],
+)
+def test_clickhouse_with_limit(read_table: ReadTable, table_name: str):
     """Test ClickHouse query with limit."""
-    assert_clickhouse_sql(
-        """
-        SELECT
-            aggregated_thread_id AS thread_id,
-            COUNT(*) AS turn_count,
-            min(call_start_time) AS start_time,
-            max(call_end_time) AS last_updated,
-            argMin(id, call_start_time) AS first_turn_id,
-            argMax(id, call_end_time) AS last_turn_id,
-            quantile(0.5)(call_duration) AS p50_turn_duration_ms,
-            quantile(0.99)(call_duration) AS p99_turn_duration_ms
-        FROM (
+    if read_table == ReadTable.CALLS_MERGED:
+        expected_query = f"""
             SELECT
-                id,
-                any(thread_id) AS aggregated_thread_id,
-                min(started_at) AS call_start_time,
-                max(ended_at) AS call_end_time,
-                CASE
-                    WHEN call_end_time IS NOT NULL AND call_start_time IS NOT NULL
-                    THEN dateDiff('millisecond', call_start_time, call_end_time)
-                    ELSE NULL
-                END AS call_duration
-            FROM calls_merged
-            WHERE project_id = {pb_0: String}
+                aggregated_thread_id AS thread_id,
+                COUNT(*) AS turn_count,
+                min(call_start_time) AS start_time,
+                max(call_end_time) AS last_updated,
+                argMin(id, call_start_time) AS first_turn_id,
+                argMax(id, call_end_time) AS last_turn_id,
+                quantile(0.5)(call_duration) AS p50_turn_duration_ms,
+                quantile(0.99)(call_duration) AS p99_turn_duration_ms
+            FROM (
+                SELECT
+                    id,
+                    any(thread_id) AS aggregated_thread_id,
+                    min(started_at) AS call_start_time,
+                    max(ended_at) AS call_end_time,
+                    CASE
+                        WHEN call_end_time IS NOT NULL AND call_start_time IS NOT NULL
+                        THEN dateDiff('millisecond', call_start_time, call_end_time)
+                        ELSE NULL
+                    END AS call_duration
+                FROM {table_name}
+                WHERE project_id = {{pb_0: String}}
 
-            GROUP BY (project_id, id)
-            HAVING id = any(turn_id) AND aggregated_thread_id IS NOT NULL AND aggregated_thread_id != ''
-        ) AS properly_merged_calls
-        GROUP BY aggregated_thread_id
-        ORDER BY last_updated DESC
-        LIMIT {pb_1: Int64}
-        """,
+                GROUP BY (project_id, id)
+                HAVING id = any(turn_id) AND aggregated_thread_id IS NOT NULL AND aggregated_thread_id != ''
+            ) AS properly_merged_calls
+            GROUP BY aggregated_thread_id
+            ORDER BY last_updated DESC
+            LIMIT {{pb_1: Int64}}
+            """
+    else:
+        expected_query = f"""
+            SELECT
+                thread_id AS thread_id,
+                COUNT(*) AS turn_count,
+                min(started_at) AS start_time,
+                max(ended_at) AS last_updated,
+                argMin(id, started_at) AS first_turn_id,
+                argMax(id, ended_at) AS last_turn_id,
+                quantile(0.5)(dateDiff('millisecond', started_at, ended_at)) AS p50_turn_duration_ms,
+                quantile(0.99)(dateDiff('millisecond', started_at, ended_at)) AS p99_turn_duration_ms
+            FROM
+                {table_name}
+            WHERE project_id = {{pb_0: String}}
+
+            GROUP BY thread_id
+            HAVING id = any(turn_id) AND thread_id IS NOT NULL AND thread_id != ''
+            ORDER BY last_updated DESC
+            LIMIT {{pb_1: Int64}}
+            """
+
+    assert_clickhouse_sql(
+        expected_query,
         {"pb_0": "test_project", "pb_1": 50},
+        read_table=read_table,
         project_id="test_project",
         limit=50,
     )
 
 
-def test_clickhouse_with_limit_and_offset():
+@pytest.mark.parametrize(
+    ("read_table", "table_name"),
+    [
+        (ReadTable.CALLS_MERGED, "calls_merged"),
+        (ReadTable.CALLS_COMPLETE, "calls_complete"),
+    ],
+)
+def test_clickhouse_with_limit_and_offset(read_table: ReadTable, table_name: str):
     """Test ClickHouse query with limit and offset."""
-    assert_clickhouse_sql(
-        """
-        SELECT
-            aggregated_thread_id AS thread_id,
-            COUNT(*) AS turn_count,
-            min(call_start_time) AS start_time,
-            max(call_end_time) AS last_updated,
-            argMin(id, call_start_time) AS first_turn_id,
-            argMax(id, call_end_time) AS last_turn_id,
-            quantile(0.5)(call_duration) AS p50_turn_duration_ms,
-            quantile(0.99)(call_duration) AS p99_turn_duration_ms
-        FROM (
+    if read_table == ReadTable.CALLS_MERGED:
+        expected_query = f"""
             SELECT
-                id,
-                any(thread_id) AS aggregated_thread_id,
-                min(started_at) AS call_start_time,
-                max(ended_at) AS call_end_time,
-                CASE
-                    WHEN call_end_time IS NOT NULL AND call_start_time IS NOT NULL
-                    THEN dateDiff('millisecond', call_start_time, call_end_time)
-                    ELSE NULL
-                END AS call_duration
-            FROM calls_merged
-            WHERE project_id = {pb_0: String}
+                aggregated_thread_id AS thread_id,
+                COUNT(*) AS turn_count,
+                min(call_start_time) AS start_time,
+                max(call_end_time) AS last_updated,
+                argMin(id, call_start_time) AS first_turn_id,
+                argMax(id, call_end_time) AS last_turn_id,
+                quantile(0.5)(call_duration) AS p50_turn_duration_ms,
+                quantile(0.99)(call_duration) AS p99_turn_duration_ms
+            FROM (
+                SELECT
+                    id,
+                    any(thread_id) AS aggregated_thread_id,
+                    min(started_at) AS call_start_time,
+                    max(ended_at) AS call_end_time,
+                    CASE
+                        WHEN call_end_time IS NOT NULL AND call_start_time IS NOT NULL
+                        THEN dateDiff('millisecond', call_start_time, call_end_time)
+                        ELSE NULL
+                    END AS call_duration
+                FROM {table_name}
+                WHERE project_id = {{pb_0: String}}
 
-            GROUP BY (project_id, id)
-            HAVING id = any(turn_id) AND aggregated_thread_id IS NOT NULL AND aggregated_thread_id != ''
-        ) AS properly_merged_calls
-        GROUP BY aggregated_thread_id
-        ORDER BY last_updated DESC
-        LIMIT {pb_1: Int64}
-        OFFSET {pb_2: Int64}
-        """,
+                GROUP BY (project_id, id)
+                HAVING id = any(turn_id) AND aggregated_thread_id IS NOT NULL AND aggregated_thread_id != ''
+            ) AS properly_merged_calls
+            GROUP BY aggregated_thread_id
+            ORDER BY last_updated DESC
+            LIMIT {{pb_1: Int64}}
+            OFFSET {{pb_2: Int64}}
+            """
+    else:
+        expected_query = f"""
+            SELECT
+                thread_id AS thread_id,
+                COUNT(*) AS turn_count,
+                min(started_at) AS start_time,
+                max(ended_at) AS last_updated,
+                argMin(id, started_at) AS first_turn_id,
+                argMax(id, ended_at) AS last_turn_id,
+                quantile(0.5)(dateDiff('millisecond', started_at, ended_at)) AS p50_turn_duration_ms,
+                quantile(0.99)(dateDiff('millisecond', started_at, ended_at)) AS p99_turn_duration_ms
+            FROM
+                {table_name}
+            WHERE project_id = {{pb_0: String}}
+
+            GROUP BY thread_id
+            HAVING id = any(turn_id) AND thread_id IS NOT NULL AND thread_id != ''
+            ORDER BY last_updated DESC
+            LIMIT {{pb_1: Int64}}
+            OFFSET {{pb_2: Int64}}
+            """
+
+    assert_clickhouse_sql(
+        expected_query,
         {"pb_0": "test_project", "pb_1": 25, "pb_2": 100},
+        read_table=read_table,
         project_id="test_project",
         limit=25,
         offset=100,
@@ -352,47 +482,77 @@ def test_sqlite_with_limit_and_offset():
 # Date Filtering Tests
 
 
-def test_clickhouse_with_date_filters():
+@pytest.mark.parametrize(
+    ("read_table", "table_name"),
+    [
+        (ReadTable.CALLS_MERGED, "calls_merged"),
+        (ReadTable.CALLS_COMPLETE, "calls_complete"),
+    ],
+)
+def test_clickhouse_with_date_filters(read_table: ReadTable, table_name: str):
     """Test ClickHouse query with sortable_datetime filters."""
     after_date = datetime.datetime(2024, 1, 1, 12, 0, 0)
     before_date = datetime.datetime(2024, 12, 31, 23, 59, 59)
 
-    assert_clickhouse_sql(
-        """
-        SELECT
-            aggregated_thread_id AS thread_id,
-            COUNT(*) AS turn_count,
-            min(call_start_time) AS start_time,
-            max(call_end_time) AS last_updated,
-            argMin(id, call_start_time) AS first_turn_id,
-            argMax(id, call_end_time) AS last_turn_id,
-            quantile(0.5)(call_duration) AS p50_turn_duration_ms,
-            quantile(0.99)(call_duration) AS p99_turn_duration_ms
-        FROM (
+    if read_table == ReadTable.CALLS_MERGED:
+        expected_query = f"""
             SELECT
-                id,
-                any(thread_id) AS aggregated_thread_id,
-                min(started_at) AS call_start_time,
-                max(ended_at) AS call_end_time,
-                CASE
-                    WHEN call_end_time IS NOT NULL AND call_start_time IS NOT NULL
-                    THEN dateDiff('millisecond', call_start_time, call_end_time)
-                    ELSE NULL
-                END AS call_duration
-            FROM calls_merged
-            WHERE project_id = {pb_0: String}
-                AND sortable_datetime > {pb_1: String} AND sortable_datetime < {pb_2: String}
-            GROUP BY (project_id, id)
-            HAVING id = any(turn_id) AND aggregated_thread_id IS NOT NULL AND aggregated_thread_id != ''
-        ) AS properly_merged_calls
-        GROUP BY aggregated_thread_id
-        ORDER BY last_updated DESC
-        """,
+                aggregated_thread_id AS thread_id,
+                COUNT(*) AS turn_count,
+                min(call_start_time) AS start_time,
+                max(call_end_time) AS last_updated,
+                argMin(id, call_start_time) AS first_turn_id,
+                argMax(id, call_end_time) AS last_turn_id,
+                quantile(0.5)(call_duration) AS p50_turn_duration_ms,
+                quantile(0.99)(call_duration) AS p99_turn_duration_ms
+            FROM (
+                SELECT
+                    id,
+                    any(thread_id) AS aggregated_thread_id,
+                    min(started_at) AS call_start_time,
+                    max(ended_at) AS call_end_time,
+                    CASE
+                        WHEN call_end_time IS NOT NULL AND call_start_time IS NOT NULL
+                        THEN dateDiff('millisecond', call_start_time, call_end_time)
+                        ELSE NULL
+                    END AS call_duration
+                FROM {table_name}
+                WHERE project_id = {{pb_0: String}}
+                    AND sortable_datetime > {{pb_1: String}} AND sortable_datetime < {{pb_2: String}}
+                GROUP BY (project_id, id)
+                HAVING id = any(turn_id) AND aggregated_thread_id IS NOT NULL AND aggregated_thread_id != ''
+            ) AS properly_merged_calls
+            GROUP BY aggregated_thread_id
+            ORDER BY last_updated DESC
+            """
+    else:
+        expected_query = f"""
+            SELECT
+                thread_id AS thread_id,
+                COUNT(*) AS turn_count,
+                min(started_at) AS start_time,
+                max(ended_at) AS last_updated,
+                argMin(id, started_at) AS first_turn_id,
+                argMax(id, ended_at) AS last_turn_id,
+                quantile(0.5)(dateDiff('millisecond', started_at, ended_at)) AS p50_turn_duration_ms,
+                quantile(0.99)(dateDiff('millisecond', started_at, ended_at)) AS p99_turn_duration_ms
+            FROM
+                {table_name}
+            WHERE project_id = {{pb_0: String}}
+                AND sortable_datetime > {{pb_1: String}} AND sortable_datetime < {{pb_2: String}}
+            GROUP BY thread_id
+            HAVING id = any(turn_id) AND thread_id IS NOT NULL AND thread_id != ''
+            ORDER BY last_updated DESC
+            """
+
+    assert_clickhouse_sql(
+        expected_query,
         {
             "pb_0": "test_project",
             "pb_1": "2024-01-01 12:00:00.000000",
             "pb_2": "2024-12-31 23:59:59.000000",
         },
+        read_table=read_table,
         project_id="test_project",
         sortable_datetime_after=after_date,
         sortable_datetime_before=before_date,
@@ -444,45 +604,76 @@ def test_sqlite_with_date_filters():
 # Complex Scenarios
 
 
-def test_clickhouse_full_featured_query():
+@pytest.mark.parametrize(
+    ("read_table", "table_name"),
+    [
+        (ReadTable.CALLS_MERGED, "calls_merged"),
+        (ReadTable.CALLS_COMPLETE, "calls_complete"),
+    ],
+)
+def test_clickhouse_full_featured_query(read_table: ReadTable, table_name: str):
     """Test ClickHouse query with all features: custom sorting, pagination, and date filtering."""
     after_date = datetime.datetime(2024, 1, 1)
     before_date = datetime.datetime(2024, 12, 31)
     sort_by = [tsi.SortBy(field="turn_count", direction="desc")]
 
-    assert_clickhouse_sql(
-        """
-        SELECT
-            aggregated_thread_id AS thread_id,
-            COUNT(*) AS turn_count,
-            min(call_start_time) AS start_time,
-            max(call_end_time) AS last_updated,
-            argMin(id, call_start_time) AS first_turn_id,
-            argMax(id, call_end_time) AS last_turn_id,
-            quantile(0.5)(call_duration) AS p50_turn_duration_ms,
-            quantile(0.99)(call_duration) AS p99_turn_duration_ms
-        FROM (
+    if read_table == ReadTable.CALLS_MERGED:
+        expected_query = f"""
             SELECT
-                id,
-                any(thread_id) AS aggregated_thread_id,
-                min(started_at) AS call_start_time,
-                max(ended_at) AS call_end_time,
-                CASE
-                    WHEN call_end_time IS NOT NULL AND call_start_time IS NOT NULL
-                    THEN dateDiff('millisecond', call_start_time, call_end_time)
-                    ELSE NULL
-                END AS call_duration
-            FROM calls_merged
-            WHERE project_id = {pb_0: String}
-                AND sortable_datetime > {pb_1: String} AND sortable_datetime < {pb_2: String}
-            GROUP BY (project_id, id)
-            HAVING id = any(turn_id) AND aggregated_thread_id IS NOT NULL AND aggregated_thread_id != ''
-        ) AS properly_merged_calls
-        GROUP BY aggregated_thread_id
-        ORDER BY turn_count DESC
-        LIMIT {pb_3: Int64}
-        OFFSET {pb_4: Int64}
-        """,
+                aggregated_thread_id AS thread_id,
+                COUNT(*) AS turn_count,
+                min(call_start_time) AS start_time,
+                max(call_end_time) AS last_updated,
+                argMin(id, call_start_time) AS first_turn_id,
+                argMax(id, call_end_time) AS last_turn_id,
+                quantile(0.5)(call_duration) AS p50_turn_duration_ms,
+                quantile(0.99)(call_duration) AS p99_turn_duration_ms
+            FROM (
+                SELECT
+                    id,
+                    any(thread_id) AS aggregated_thread_id,
+                    min(started_at) AS call_start_time,
+                    max(ended_at) AS call_end_time,
+                    CASE
+                        WHEN call_end_time IS NOT NULL AND call_start_time IS NOT NULL
+                        THEN dateDiff('millisecond', call_start_time, call_end_time)
+                        ELSE NULL
+                    END AS call_duration
+                FROM {table_name}
+                WHERE project_id = {{pb_0: String}}
+                    AND sortable_datetime > {{pb_1: String}} AND sortable_datetime < {{pb_2: String}}
+                GROUP BY (project_id, id)
+                HAVING id = any(turn_id) AND aggregated_thread_id IS NOT NULL AND aggregated_thread_id != ''
+            ) AS properly_merged_calls
+            GROUP BY aggregated_thread_id
+            ORDER BY turn_count DESC
+            LIMIT {{pb_3: Int64}}
+            OFFSET {{pb_4: Int64}}
+            """
+    else:
+        expected_query = f"""
+            SELECT
+                thread_id AS thread_id,
+                COUNT(*) AS turn_count,
+                min(started_at) AS start_time,
+                max(ended_at) AS last_updated,
+                argMin(id, started_at) AS first_turn_id,
+                argMax(id, ended_at) AS last_turn_id,
+                quantile(0.5)(dateDiff('millisecond', started_at, ended_at)) AS p50_turn_duration_ms,
+                quantile(0.99)(dateDiff('millisecond', started_at, ended_at)) AS p99_turn_duration_ms
+            FROM
+                {table_name}
+            WHERE project_id = {{pb_0: String}}
+                AND sortable_datetime > {{pb_1: String}} AND sortable_datetime < {{pb_2: String}}
+            GROUP BY thread_id
+            HAVING id = any(turn_id) AND thread_id IS NOT NULL AND thread_id != ''
+            ORDER BY turn_count DESC
+            LIMIT {{pb_3: Int64}}
+            OFFSET {{pb_4: Int64}}
+            """
+
+    assert_clickhouse_sql(
+        expected_query,
         {
             "pb_0": "test_project",
             "pb_1": "2024-01-01 00:00:00.000000",
@@ -490,6 +681,7 @@ def test_clickhouse_full_featured_query():
             "pb_3": 15,
             "pb_4": 30,
         },
+        read_table=read_table,
         project_id="test_project",
         sortable_datetime_after=after_date,
         sortable_datetime_before=before_date,
@@ -549,42 +741,72 @@ def test_sqlite_full_featured_query():
 # Edge Cases
 
 
-def test_clickhouse_only_after_date():
+@pytest.mark.parametrize(
+    ("read_table", "table_name"),
+    [
+        (ReadTable.CALLS_MERGED, "calls_merged"),
+        (ReadTable.CALLS_COMPLETE, "calls_complete"),
+    ],
+)
+def test_clickhouse_only_after_date(read_table: ReadTable, table_name: str):
     """Test ClickHouse query with only after date filter."""
     after_date = datetime.datetime(2024, 1, 1, 0, 0, 0)
 
-    assert_clickhouse_sql(
-        """
-        SELECT
-            aggregated_thread_id AS thread_id,
-            COUNT(*) AS turn_count,
-            min(call_start_time) AS start_time,
-            max(call_end_time) AS last_updated,
-            argMin(id, call_start_time) AS first_turn_id,
-            argMax(id, call_end_time) AS last_turn_id,
-            quantile(0.5)(call_duration) AS p50_turn_duration_ms,
-            quantile(0.99)(call_duration) AS p99_turn_duration_ms
-        FROM (
+    if read_table == ReadTable.CALLS_MERGED:
+        expected_query = f"""
             SELECT
-                id,
-                any(thread_id) AS aggregated_thread_id,
-                min(started_at) AS call_start_time,
-                max(ended_at) AS call_end_time,
-                CASE
-                    WHEN call_end_time IS NOT NULL AND call_start_time IS NOT NULL
-                    THEN dateDiff('millisecond', call_start_time, call_end_time)
-                    ELSE NULL
-                END AS call_duration
-            FROM calls_merged
-            WHERE project_id = {pb_0: String}
-                AND sortable_datetime > {pb_1: String}
-            GROUP BY (project_id, id)
-            HAVING id = any(turn_id) AND aggregated_thread_id IS NOT NULL AND aggregated_thread_id != ''
-        ) AS properly_merged_calls
-        GROUP BY aggregated_thread_id
-        ORDER BY last_updated DESC
-        """,
+                aggregated_thread_id AS thread_id,
+                COUNT(*) AS turn_count,
+                min(call_start_time) AS start_time,
+                max(call_end_time) AS last_updated,
+                argMin(id, call_start_time) AS first_turn_id,
+                argMax(id, call_end_time) AS last_turn_id,
+                quantile(0.5)(call_duration) AS p50_turn_duration_ms,
+                quantile(0.99)(call_duration) AS p99_turn_duration_ms
+            FROM (
+                SELECT
+                    id,
+                    any(thread_id) AS aggregated_thread_id,
+                    min(started_at) AS call_start_time,
+                    max(ended_at) AS call_end_time,
+                    CASE
+                        WHEN call_end_time IS NOT NULL AND call_start_time IS NOT NULL
+                        THEN dateDiff('millisecond', call_start_time, call_end_time)
+                        ELSE NULL
+                    END AS call_duration
+                FROM {table_name}
+                WHERE project_id = {{pb_0: String}}
+                    AND sortable_datetime > {{pb_1: String}}
+                GROUP BY (project_id, id)
+                HAVING id = any(turn_id) AND aggregated_thread_id IS NOT NULL AND aggregated_thread_id != ''
+            ) AS properly_merged_calls
+            GROUP BY aggregated_thread_id
+            ORDER BY last_updated DESC
+            """
+    else:
+        expected_query = f"""
+            SELECT
+                thread_id AS thread_id,
+                COUNT(*) AS turn_count,
+                min(started_at) AS start_time,
+                max(ended_at) AS last_updated,
+                argMin(id, started_at) AS first_turn_id,
+                argMax(id, ended_at) AS last_turn_id,
+                quantile(0.5)(dateDiff('millisecond', started_at, ended_at)) AS p50_turn_duration_ms,
+                quantile(0.99)(dateDiff('millisecond', started_at, ended_at)) AS p99_turn_duration_ms
+            FROM
+                {table_name}
+            WHERE project_id = {{pb_0: String}}
+                AND sortable_datetime > {{pb_1: String}}
+            GROUP BY thread_id
+            HAVING id = any(turn_id) AND thread_id IS NOT NULL AND thread_id != ''
+            ORDER BY last_updated DESC
+            """
+
+    assert_clickhouse_sql(
+        expected_query,
         {"pb_0": "test_project", "pb_1": "2024-01-01 00:00:00.000000"},
+        read_table=read_table,
         project_id="test_project",
         sortable_datetime_after=after_date,
     )
@@ -692,9 +914,8 @@ def test_turn_filtering_explanation():
 
     # Verify this is present in both query builders
     pb = ParamBuilder("pb")
-    read_table = ReadTable.CALLS_MERGED
     clickhouse_query = make_threads_query(
-        project_id="test", pb=pb, read_table=read_table
+        project_id="test", pb=pb, read_table=ReadTable.CALLS_MERGED
     )
     sqlite_query, _ = make_threads_query_sqlite(project_id="test")
 
@@ -715,40 +936,70 @@ def test_turn_filtering_explanation():
 # Thread ID Filtering Tests
 
 
-def test_clickhouse_with_thread_id_filter():
+@pytest.mark.parametrize(
+    ("read_table", "table_name"),
+    [
+        (ReadTable.CALLS_MERGED, "calls_merged"),
+        (ReadTable.CALLS_COMPLETE, "calls_complete"),
+    ],
+)
+def test_clickhouse_with_thread_id_filter(read_table: ReadTable, table_name: str):
     """Test ClickHouse query with thread_id filter."""
-    assert_clickhouse_sql(
-        """
-        SELECT
-            aggregated_thread_id AS thread_id,
-            COUNT(*) AS turn_count,
-            min(call_start_time) AS start_time,
-            max(call_end_time) AS last_updated,
-            argMin(id, call_start_time) AS first_turn_id,
-            argMax(id, call_end_time) AS last_turn_id,
-            quantile(0.5)(call_duration) AS p50_turn_duration_ms,
-            quantile(0.99)(call_duration) AS p99_turn_duration_ms
-        FROM (
+    if read_table == ReadTable.CALLS_MERGED:
+        expected_query = f"""
             SELECT
-                id,
-                any(thread_id) AS aggregated_thread_id,
-                min(started_at) AS call_start_time,
-                max(ended_at) AS call_end_time,
-                CASE
-                    WHEN call_end_time IS NOT NULL AND call_start_time IS NOT NULL
-                    THEN dateDiff('millisecond', call_start_time, call_end_time)
-                    ELSE NULL
-                END AS call_duration
-            FROM calls_merged
-            WHERE project_id = {pb_0: String}
-                AND (thread_id IS NULL OR thread_id IN ({pb_1: String}))
-            GROUP BY (project_id, id)
-            HAVING id = any(turn_id) AND aggregated_thread_id IN ({pb_1: String})
-        ) AS properly_merged_calls
-        GROUP BY aggregated_thread_id
-         ORDER BY last_updated DESC
-        """,
+                aggregated_thread_id AS thread_id,
+                COUNT(*) AS turn_count,
+                min(call_start_time) AS start_time,
+                max(call_end_time) AS last_updated,
+                argMin(id, call_start_time) AS first_turn_id,
+                argMax(id, call_end_time) AS last_turn_id,
+                quantile(0.5)(call_duration) AS p50_turn_duration_ms,
+                quantile(0.99)(call_duration) AS p99_turn_duration_ms
+            FROM (
+                SELECT
+                    id,
+                    any(thread_id) AS aggregated_thread_id,
+                    min(started_at) AS call_start_time,
+                    max(ended_at) AS call_end_time,
+                    CASE
+                        WHEN call_end_time IS NOT NULL AND call_start_time IS NOT NULL
+                        THEN dateDiff('millisecond', call_start_time, call_end_time)
+                        ELSE NULL
+                    END AS call_duration
+                FROM {table_name}
+                WHERE project_id = {{pb_0: String}}
+                    AND (thread_id IS NULL OR thread_id IN ({{pb_1: String}}))
+                GROUP BY (project_id, id)
+                HAVING id = any(turn_id) AND aggregated_thread_id IN ({{pb_1: String}})
+            ) AS properly_merged_calls
+            GROUP BY aggregated_thread_id
+             ORDER BY last_updated DESC
+            """
+    else:
+        expected_query = f"""
+            SELECT
+                thread_id AS thread_id,
+                COUNT(*) AS turn_count,
+                min(started_at) AS start_time,
+                max(ended_at) AS last_updated,
+                argMin(id, started_at) AS first_turn_id,
+                argMax(id, ended_at) AS last_turn_id,
+                quantile(0.5)(dateDiff('millisecond', started_at, ended_at)) AS p50_turn_duration_ms,
+                quantile(0.99)(dateDiff('millisecond', started_at, ended_at)) AS p99_turn_duration_ms
+            FROM
+                {table_name}
+            WHERE project_id = {{pb_0: String}}
+                AND (thread_id IS NULL OR thread_id IN ({{pb_1: String}}))
+            GROUP BY thread_id
+            HAVING id = any(turn_id) AND thread_id IN ({{pb_1: String}})
+             ORDER BY last_updated DESC
+            """
+
+    assert_clickhouse_sql(
+        expected_query,
         {"pb_0": "test_project", "pb_1": "my_specific_thread"},
+        read_table=read_table,
         project_id="test_project",
         thread_ids=["my_specific_thread"],
     )
@@ -790,49 +1041,82 @@ def test_sqlite_with_thread_id_filter():
     )
 
 
-def test_clickhouse_with_thread_id_and_date_filters():
+@pytest.mark.parametrize(
+    ("read_table", "table_name"),
+    [
+        (ReadTable.CALLS_MERGED, "calls_merged"),
+        (ReadTable.CALLS_COMPLETE, "calls_complete"),
+    ],
+)
+def test_clickhouse_with_thread_id_and_date_filters(
+    read_table: ReadTable, table_name: str
+):
     """Test ClickHouse query with both thread_id and date filters."""
     after_date = datetime.datetime(2024, 1, 1, 12, 0, 0)
     before_date = datetime.datetime(2024, 12, 31, 23, 59, 59)
 
-    assert_clickhouse_sql(
-        """
-        SELECT
-            aggregated_thread_id AS thread_id,
-            COUNT(*) AS turn_count,
-            min(call_start_time) AS start_time,
-            max(call_end_time) AS last_updated,
-            argMin(id, call_start_time) AS first_turn_id,
-            argMax(id, call_end_time) AS last_turn_id,
-            quantile(0.5)(call_duration) AS p50_turn_duration_ms,
-            quantile(0.99)(call_duration) AS p99_turn_duration_ms
-        FROM (
+    if read_table == ReadTable.CALLS_MERGED:
+        expected_query = f"""
             SELECT
-                id,
-                any(thread_id) AS aggregated_thread_id,
-                min(started_at) AS call_start_time,
-                max(ended_at) AS call_end_time,
-                CASE
-                    WHEN call_end_time IS NOT NULL AND call_start_time IS NOT NULL
-                    THEN dateDiff('millisecond', call_start_time, call_end_time)
-                    ELSE NULL
-                END AS call_duration
-            FROM calls_merged
-            WHERE project_id = {pb_0: String}
-                AND sortable_datetime > {pb_1: String} AND sortable_datetime < {pb_2: String}
-                AND (thread_id IS NULL OR thread_id IN ({pb_3: String}))
-            GROUP BY (project_id, id)
-            HAVING id = any(turn_id) AND aggregated_thread_id IN ({pb_3: String})
-        ) AS properly_merged_calls
-        GROUP BY aggregated_thread_id
-         ORDER BY last_updated DESC
-        """,
+                aggregated_thread_id AS thread_id,
+                COUNT(*) AS turn_count,
+                min(call_start_time) AS start_time,
+                max(call_end_time) AS last_updated,
+                argMin(id, call_start_time) AS first_turn_id,
+                argMax(id, call_end_time) AS last_turn_id,
+                quantile(0.5)(call_duration) AS p50_turn_duration_ms,
+                quantile(0.99)(call_duration) AS p99_turn_duration_ms
+            FROM (
+                SELECT
+                    id,
+                    any(thread_id) AS aggregated_thread_id,
+                    min(started_at) AS call_start_time,
+                    max(ended_at) AS call_end_time,
+                    CASE
+                        WHEN call_end_time IS NOT NULL AND call_start_time IS NOT NULL
+                        THEN dateDiff('millisecond', call_start_time, call_end_time)
+                        ELSE NULL
+                    END AS call_duration
+                FROM {table_name}
+                WHERE project_id = {{pb_0: String}}
+                    AND sortable_datetime > {{pb_1: String}} AND sortable_datetime < {{pb_2: String}}
+                    AND (thread_id IS NULL OR thread_id IN ({{pb_3: String}}))
+                GROUP BY (project_id, id)
+                HAVING id = any(turn_id) AND aggregated_thread_id IN ({{pb_3: String}})
+            ) AS properly_merged_calls
+            GROUP BY aggregated_thread_id
+             ORDER BY last_updated DESC
+            """
+    else:
+        expected_query = f"""
+            SELECT
+                thread_id AS thread_id,
+                COUNT(*) AS turn_count,
+                min(started_at) AS start_time,
+                max(ended_at) AS last_updated,
+                argMin(id, started_at) AS first_turn_id,
+                argMax(id, ended_at) AS last_turn_id,
+                quantile(0.5)(dateDiff('millisecond', started_at, ended_at)) AS p50_turn_duration_ms,
+                quantile(0.99)(dateDiff('millisecond', started_at, ended_at)) AS p99_turn_duration_ms
+            FROM
+                {table_name}
+            WHERE project_id = {{pb_0: String}}
+                AND sortable_datetime > {{pb_1: String}} AND sortable_datetime < {{pb_2: String}}
+                AND (thread_id IS NULL OR thread_id IN ({{pb_3: String}}))
+            GROUP BY thread_id
+            HAVING id = any(turn_id) AND thread_id IN ({{pb_3: String}})
+             ORDER BY last_updated DESC
+            """
+
+    assert_clickhouse_sql(
+        expected_query,
         {
             "pb_0": "test_project",
             "pb_1": "2024-01-01 12:00:00.000000",
             "pb_2": "2024-12-31 23:59:59.000000",
             "pb_3": "thread_with_dates",
         },
+        read_table=read_table,
         project_id="test_project",
         sortable_datetime_after=after_date,
         sortable_datetime_before=before_date,
@@ -887,46 +1171,80 @@ def test_sqlite_with_thread_id_and_date_filters():
     )
 
 
-def test_clickhouse_with_thread_id_and_all_options():
+@pytest.mark.parametrize(
+    ("read_table", "table_name"),
+    [
+        (ReadTable.CALLS_MERGED, "calls_merged"),
+        (ReadTable.CALLS_COMPLETE, "calls_complete"),
+    ],
+)
+def test_clickhouse_with_thread_id_and_all_options(
+    read_table: ReadTable, table_name: str
+):
     """Test ClickHouse query with thread_id, dates, sorting, and pagination."""
     after_date = datetime.datetime(2024, 1, 1)
     before_date = datetime.datetime(2024, 12, 31)
     sort_by = [tsi.SortBy(field="turn_count", direction="desc")]
 
-    assert_clickhouse_sql(
-        """
-        SELECT
-            aggregated_thread_id AS thread_id,
-            COUNT(*) AS turn_count,
-            min(call_start_time) AS start_time,
-            max(call_end_time) AS last_updated,
-            argMin(id, call_start_time) AS first_turn_id,
-            argMax(id, call_end_time) AS last_turn_id,
-            quantile(0.5)(call_duration) AS p50_turn_duration_ms,
-            quantile(0.99)(call_duration) AS p99_turn_duration_ms
-        FROM (
+    if read_table == ReadTable.CALLS_MERGED:
+        expected_query = f"""
             SELECT
-                id,
-                any(thread_id) AS aggregated_thread_id,
-                min(started_at) AS call_start_time,
-                max(ended_at) AS call_end_time,
-                CASE
-                    WHEN call_end_time IS NOT NULL AND call_start_time IS NOT NULL
-                    THEN dateDiff('millisecond', call_start_time, call_end_time)
-                    ELSE NULL
-                END AS call_duration
-            FROM calls_merged
-            WHERE project_id = {pb_0: String}
-                AND sortable_datetime > {pb_1: String} AND sortable_datetime < {pb_2: String}
-                AND (thread_id IS NULL OR thread_id IN ({pb_3: String}))
-            GROUP BY (project_id, id)
-            HAVING id = any(turn_id) AND aggregated_thread_id IN ({pb_3: String})
-        ) AS properly_merged_calls
-        GROUP BY aggregated_thread_id
-         ORDER BY turn_count DESC
-         LIMIT {pb_4: Int64}
-         OFFSET {pb_5: Int64}
-        """,
+                aggregated_thread_id AS thread_id,
+                COUNT(*) AS turn_count,
+                min(call_start_time) AS start_time,
+                max(call_end_time) AS last_updated,
+                argMin(id, call_start_time) AS first_turn_id,
+                argMax(id, call_end_time) AS last_turn_id,
+                quantile(0.5)(call_duration) AS p50_turn_duration_ms,
+                quantile(0.99)(call_duration) AS p99_turn_duration_ms
+            FROM (
+                SELECT
+                    id,
+                    any(thread_id) AS aggregated_thread_id,
+                    min(started_at) AS call_start_time,
+                    max(ended_at) AS call_end_time,
+                    CASE
+                        WHEN call_end_time IS NOT NULL AND call_start_time IS NOT NULL
+                        THEN dateDiff('millisecond', call_start_time, call_end_time)
+                        ELSE NULL
+                    END AS call_duration
+                FROM {table_name}
+                WHERE project_id = {{pb_0: String}}
+                    AND sortable_datetime > {{pb_1: String}} AND sortable_datetime < {{pb_2: String}}
+                    AND (thread_id IS NULL OR thread_id IN ({{pb_3: String}}))
+                GROUP BY (project_id, id)
+                HAVING id = any(turn_id) AND aggregated_thread_id IN ({{pb_3: String}})
+            ) AS properly_merged_calls
+            GROUP BY aggregated_thread_id
+             ORDER BY turn_count DESC
+             LIMIT {{pb_4: Int64}}
+             OFFSET {{pb_5: Int64}}
+            """
+    else:
+        expected_query = f"""
+            SELECT
+                thread_id AS thread_id,
+                COUNT(*) AS turn_count,
+                min(started_at) AS start_time,
+                max(ended_at) AS last_updated,
+                argMin(id, started_at) AS first_turn_id,
+                argMax(id, ended_at) AS last_turn_id,
+                quantile(0.5)(dateDiff('millisecond', started_at, ended_at)) AS p50_turn_duration_ms,
+                quantile(0.99)(dateDiff('millisecond', started_at, ended_at)) AS p99_turn_duration_ms
+            FROM
+                {table_name}
+            WHERE project_id = {{pb_0: String}}
+                AND sortable_datetime > {{pb_1: String}} AND sortable_datetime < {{pb_2: String}}
+                AND (thread_id IS NULL OR thread_id IN ({{pb_3: String}}))
+            GROUP BY thread_id
+            HAVING id = any(turn_id) AND thread_id IN ({{pb_3: String}})
+             ORDER BY turn_count DESC
+             LIMIT {{pb_4: Int64}}
+             OFFSET {{pb_5: Int64}}
+            """
+
+    assert_clickhouse_sql(
+        expected_query,
         {
             "pb_0": "test_project",
             "pb_1": "2024-01-01 00:00:00.000000",
@@ -935,6 +1253,7 @@ def test_clickhouse_with_thread_id_and_all_options():
             "pb_4": 15,
             "pb_5": 30,
         },
+        read_table=read_table,
         project_id="test_project",
         sortable_datetime_after=after_date,
         sortable_datetime_before=before_date,
@@ -992,11 +1311,13 @@ def test_sqlite_with_thread_id_and_all_options():
     )
 
 
-def test_thread_id_filter_no_match():
+@pytest.mark.parametrize(
+    "read_table", [ReadTable.CALLS_MERGED, ReadTable.CALLS_COMPLETE]
+)
+def test_thread_id_filter_no_match(read_table: ReadTable):
     """Test that thread_id filter doesn't break query even if no threads match."""
     # This test verifies that the SQL generation doesn't break with thread_id filter
     pb = ParamBuilder("pb")
-    read_table = ReadTable.CALLS_MERGED
     query = make_threads_query(
         project_id="test_project",
         pb=pb,
@@ -1013,12 +1334,14 @@ def test_thread_id_filter_no_match():
     assert params["pb_1"] == "nonexistent_thread"
 
 
-def test_thread_id_filter_consistency():
+@pytest.mark.parametrize(
+    "read_table", [ReadTable.CALLS_MERGED, ReadTable.CALLS_COMPLETE]
+)
+def test_thread_id_filter_consistency(read_table: ReadTable):
     """Test that both ClickHouse and SQLite handle thread_id filtering consistently."""
     pb = ParamBuilder("pb")
 
     # Generate both queries with same parameters
-    read_table = ReadTable.CALLS_MERGED
     clickhouse_query = make_threads_query(
         project_id="test_project",
         pb=pb,
@@ -1039,29 +1362,38 @@ def test_thread_id_filter_consistency():
     assert "consistency_test" in sqlite_params
 
 
-def test_query_structure_documentation():
+@pytest.mark.parametrize(
+    "read_table", [ReadTable.CALLS_MERGED, ReadTable.CALLS_COMPLETE]
+)
+def test_query_structure_documentation(read_table: ReadTable):
     """Test that documents the structure and purpose of the threads query.
 
     This test serves AS living documentation of what the threads query does
     and why it's structured the way it is.
     """
     pb = ParamBuilder("pb")
-    read_table = ReadTable.CALLS_MERGED
     query = make_threads_query(project_id="test_project", pb=pb, read_table=read_table)
 
-    # Should be a two-level aggregation for ClickHouse
-    assert "SELECT" in query  # Outer query
-    assert "FROM (" in query  # Inner subquery
-    assert "GROUP BY aggregated_thread_id" in query  # Outer aggregation by thread
-    assert "GROUP BY (project_id, id)" in query  # Inner aggregation by call
+    # All queries should have a SELECT
+    assert "SELECT" in query
 
-    # Should include key aggregations
+    if read_table == ReadTable.CALLS_MERGED:
+        # CALLS_MERGED uses two-level aggregation for ClickHouse
+        assert "FROM (" in query  # Inner subquery
+        assert "GROUP BY aggregated_thread_id" in query  # Outer aggregation by thread
+        assert "GROUP BY (project_id, id)" in query  # Inner aggregation by call
+        # Should include key aggregations using subquery aliases
+        assert "min(call_start_time) AS start_time" in query
+        assert "max(call_end_time) AS last_updated" in query
+    else:
+        # CALLS_COMPLETE uses single-level aggregation (no subquery)
+        assert "FROM (" not in query  # No subquery
+        assert "GROUP BY thread_id" in query  # Direct aggregation by thread
+        # Should include key aggregations using actual column names
+        assert "min(started_at) AS start_time" in query
+        assert "max(ended_at) AS last_updated" in query
+
+    # Common assertions for both table types
     assert "COUNT(*) AS turn_count" in query
-    assert "min(call_start_time) AS start_time" in query
-    assert "max(call_end_time) AS last_updated" in query
-
-    # Should include turn filtering
-    assert "id = any(turn_id)" in query
-
-    # Should have default ordering
-    assert "ORDER BY last_updated DESC" in query
+    assert "id = any(turn_id)" in query  # Turn filtering
+    assert "ORDER BY last_updated DESC" in query  # Default ordering

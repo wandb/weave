@@ -7,10 +7,12 @@ from weave.trace_server.calls_query_builder.fields import (
     ROLLED_UP_CALL_MERGED_STATS_TABLE_NAME,
     STORAGE_SIZE_TABLE_NAME,
     AggregatedDataSizeField,
+    DynamicCallsField,
     DynamicField,
     FeedbackField,
     FieldWithTableOverride,
     SimpleCallsField,
+    SimpleField,
     SummaryField,
 )
 from weave.trace_server.calls_query_builder.table_strategy import TableStrategy
@@ -18,8 +20,10 @@ from weave.trace_server.errors import InvalidFieldError
 from weave.trace_server.orm import split_escaped_field_path
 
 QueryFieldType = (
-    SimpleCallsField
+    SimpleField
     | DynamicField
+    | SimpleCallsField
+    | DynamicCallsField
     | FieldWithTableOverride
     | SummaryField
     | FeedbackField
@@ -51,7 +55,7 @@ class FieldDefinition:
             )
 
         if self.is_dynamic:
-            return DynamicField(
+            return DynamicCallsField(
                 field=self.field_name,
                 strategy=strategy,
                 agg_fn=self.agg_fn,

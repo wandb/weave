@@ -157,14 +157,85 @@ class DynamicField(QueryField, BaseModel):
     """A field that supports JSON path navigation.
 
     Example: inputs.messages[0].content
+
+    Works for both aggregated and non-aggregated tables.
+    Use DynamicCallsField for strategy-aware aggregation.
     """
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     field: str
-    strategy: TableStrategy
     agg_fn: str | None = None
     extra_path: list[str] | None = None
+
+    def as_sql(
+        self,
+        pb: ParamBuilder,
+        table_alias: str,
+        cast: tsi_query.CastTo | None = None,
+        use_agg_fn: bool = True,
+    ) -> str:
+        base_sql = f"{table_alias}.{self.field}"
+        root_field_sanitized = base_sql
+
+        return json_dump_field_as_sql(
+            pb=pb,
+            table_alias=table_alias,
+            root_field_sanitized=root_field_sanitized,
+            extra_path=self.extra_path,
+            cast=cast,
+            use_agg_fn=use_agg_fn,
+        )
+
+    def as_select_sql(self, pb: ParamBuilder, table_alias: str) -> str:
+        if self.extra_path:
+            raise NotImplementedError(
+                "Dynamic fields cannot be selected directly, yet - implement me!"
+            )
+        # For select without extra_path, just return the field
+        base_sql = f"{table_alias}.{self.field}"
+        return f"{base_sql} AS {self.field}"
+
+    def is_heavy(self) -> bool:
+        return True
+
+    def with_path(self, path: list[str]) -> "DynamicField":
+        extra_path = [*(self.extra_path or [])]
+        extra_path.extend(path)
+        return DynamicField(
+            field=self.field,
+            agg_fn=self.agg_fn,
+            extra_path=extra_path,
+        )
+
+    def supports_aggregation(self) -> bool:
+        """Whether this field can be used with aggregate functions."""
+        return self.agg_fn is not None
+
+    def as_sql_without_aggregation(
+        self,
+        pb: ParamBuilder,
+        table_alias: str,
+    ) -> str:
+        """Generate SQL without aggregation function.
+
+        Useful for WHERE clause conditions that need raw column access.
+        """
+        root_field_sanitized = f"{table_alias}.{self.field}"
+        return json_dump_field_as_sql(
+            pb=pb,
+            table_alias=table_alias,
+            root_field_sanitized=root_field_sanitized,
+            extra_path=self.extra_path,
+            cast=None,
+            use_agg_fn=False,
+        )
+
+
+class DynamicCallsField(DynamicField):
+    """DynamicField with strategy-aware aggregation."""
+
+    strategy: TableStrategy
 
     def as_sql(
         self,
@@ -200,13 +271,10 @@ class DynamicField(QueryField, BaseModel):
             base_sql = f"{self.agg_fn}({base_sql})"
         return f"{base_sql} AS {self.field}"
 
-    def is_heavy(self) -> bool:
-        return True
-
-    def with_path(self, path: list[str]) -> "DynamicField":
+    def with_path(self, path: list[str]) -> "DynamicCallsField":
         extra_path = [*(self.extra_path or [])]
         extra_path.extend(path)
-        return DynamicField(
+        return DynamicCallsField(
             field=self.field,
             strategy=self.strategy,
             agg_fn=self.agg_fn,
@@ -216,25 +284,6 @@ class DynamicField(QueryField, BaseModel):
     def supports_aggregation(self) -> bool:
         """Whether this field can be used with aggregate functions."""
         return self.agg_fn is not None and self.strategy.requires_grouping()
-
-    def as_sql_without_aggregation(
-        self,
-        pb: ParamBuilder,
-        table_alias: str,
-    ) -> str:
-        """Generate SQL without aggregation function.
-
-        Useful for WHERE clause conditions that need raw column access.
-        """
-        root_field_sanitized = f"{table_alias}.{self.field}"
-        return json_dump_field_as_sql(
-            pb=pb,
-            table_alias=table_alias,
-            root_field_sanitized=root_field_sanitized,
-            extra_path=self.extra_path,
-            cast=None,
-            use_agg_fn=False,
-        )
 
 
 class FieldWithTableOverride(SimpleCallsField):
