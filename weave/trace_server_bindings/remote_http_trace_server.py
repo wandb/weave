@@ -593,7 +593,7 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
                 )
 
     @validate_call
-    def call_read(self, req: tsi.CallReadReq | dict[str, Any]) -> tsi.CallReadRes:
+    def call_read(self, req: tsi.CallReadReq) -> tsi.CallReadRes:
         return self._generic_request(
             "/call/read", req, tsi.CallReadReq, tsi.CallReadRes
         )
