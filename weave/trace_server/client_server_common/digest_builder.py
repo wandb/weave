@@ -125,12 +125,6 @@ def _canonicalize_json_like(obj: Any) -> Any:
     containers (dict/list/tuple/set) so that stable hashing is possible.
     """
     if isinstance(obj, dict):
-        for k in obj.keys():
-            if not isinstance(k, str):
-                raise TypeError(
-                    "safe_digest only supports JSON-like dicts with string keys; "
-                    f"got key type {type(k)}"
-                )
         return {k: _canonicalize_json_like(obj[k]) for k in sorted(obj.keys())}
     if isinstance(obj, list):
         return [_canonicalize_json_like(v) for v in obj]
