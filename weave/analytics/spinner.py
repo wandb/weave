@@ -129,8 +129,10 @@ def with_spinner(message: str = "Processing") -> Callable:
             time.sleep(3)
             return "done"
     """
+    from typing import Any
+
     def decorator(func: Callable) -> Callable:
-        def wrapper(*args, **kwargs):  # noqa: ANN202
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
             spinner = AnalyticsSpinner(message)
             spinner.start()
             try:
@@ -142,4 +144,3 @@ def with_spinner(message: str = "Processing") -> Callable:
                 raise
         return wrapper
     return decorator
-

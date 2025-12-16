@@ -3,6 +3,7 @@
 import asyncio
 import json
 import os
+import random
 import sys
 from asyncio import Semaphore
 from pathlib import Path
@@ -13,6 +14,7 @@ import yaml
 
 import weave
 from weave.analytics.clustering import (
+    ProgressTracker,
     extract_human_annotations,
     extract_metadata,
     final_classification,
@@ -132,6 +134,7 @@ async def run_classification_for_annotation(
     user_context: str,
     annotation_summary: dict[str, Any],
     max_concurrent: int = 10,
+    progress_tracker: ProgressTracker | None = None,
 ) -> list[dict[str, Any]]:
     """Run classification on all traces for annotation.
 
@@ -142,6 +145,7 @@ async def run_classification_for_annotation(
         user_context: User-provided context
         annotation_summary: Human annotation summary
         max_concurrent: Maximum concurrent LLM calls
+        progress_tracker: Optional progress tracker for feedback
 
     Returns:
         List of classification results
@@ -155,8 +159,9 @@ async def run_classification_for_annotation(
         categories_str += f"\n### Category {i + 1}: {cat['name']}\n"
         categories_str += f"**Definition:** {cat['definition']}\n"
 
-    tasks = [
-        classify_trace_into_category(
+    async def classify_with_progress(trace: dict[str, Any]) -> dict[str, Any]:
+        """Wrapper to track progress."""
+        result = await classify_trace_into_category(
             trace_id=trace.get("id", ""),
             trace_input=trace.get("inputs", {}),
             trace_output=trace.get("output", {}),
@@ -167,8 +172,11 @@ async def run_classification_for_annotation(
             model=model,
             semaphore=semaphore,
         )
-        for trace in traces
-    ]
+        if progress_tracker:
+            progress_tracker.update(result.get("trace_id"))
+        return result
+
+    tasks = [classify_with_progress(trace) for trace in traces]
 
     return await asyncio.gather(*tasks)
 
@@ -225,6 +233,17 @@ async def run_classification_for_annotation(
     default="",
     help="User context about the AI system being analyzed",
 )
+@click.option(
+    "--sample-size",
+    default=None,
+    type=int,
+    help="Maximum number of traces to randomly sample (default: from config or 500)",
+)
+@click.option(
+    "--no-sampling",
+    is_flag=True,
+    help="Disable random sampling (fetch all traces up to --limit)",
+)
 def annotate(
     url: str,
     categories: Path,
@@ -236,6 +255,8 @@ def annotate(
     pretty: bool,
     output: str | None,
     context: str,
+    sample_size: int | None,
+    no_sampling: bool,
 ) -> None:
     """Classify traces and add failure analysis annotations.
 
@@ -277,6 +298,14 @@ def annotate(
     \b
         # Limit to 20 traces
         weave analytics annotate "..." --limit 20 --pretty
+
+    \b
+        # Sample 200 random traces from a large dataset
+        weave analytics annotate "..." --sample-size 200
+
+    \b
+        # Disable sampling to annotate all traces
+        weave analytics annotate "..." --no-sampling --limit 1000
     """
     # Import rich here to avoid slow startup
     from rich.console import Console
@@ -305,6 +334,11 @@ def annotate(
     if model is None:
         model = config.get("LLM_MODEL", "gemini/gemini-2.5-pro")
 
+    # Get sample size from config or use default
+    effective_sample_size = sample_size
+    if effective_sample_size is None and not no_sampling:
+        effective_sample_size = int(config.get("MAX_SAMPLE_SIZE", "500"))
+
     # Parse URL
     try:
         parsed_url = parse_weave_url(url)
@@ -323,12 +357,14 @@ def annotate(
 
     # Show configuration
     if pretty or dry_run:
+        sampling_info = "disabled" if no_sampling else f"{effective_sample_size} traces"
         config_info = f"""[bold]Entity:[/bold] {parsed_url.entity}
 [bold]Project:[/bold] {parsed_url.project}
 [bold]Model:[/bold] {model}
 [bold]Categories:[/bold] {len(category_list)}
 [bold]Annotation Name:[/bold] {annotation_name}
-[bold]Limit:[/bold] {limit or 'all'}
+[bold]Sampling:[/bold] {sampling_info}
+[bold]Limit:[/bold] {limit or 'none'}
 [bold]Dry Run:[/bold] {dry_run}"""
         console.print(Panel(config_info, title="Configuration", border_style="cyan"))
         console.print()
@@ -361,32 +397,108 @@ def annotate(
         console.print("[dim]Run 'weave analytics setup' to configure your credentials.[/dim]")
         sys.exit(1)
 
-    # Step 1: Fetch traces
+    # Step 1: Fetch traces (with sampling for large datasets)
+    total_traces = 0
+    sampled = False
+
     if pretty or dry_run:
         console.print("[bold cyan]Step 1: Fetching Traces[/bold cyan]")
-        spinner = AnalyticsSpinner("Fetching traces from Weave")
+        spinner = AnalyticsSpinner("Counting traces")
         spinner.start()
 
     try:
         if parsed_url.url_type == "call" and parsed_url.trace_id:
+            # Single trace - no sampling needed
             traces = analytics_client.query_by_call_id(parsed_url.trace_id)
+            total_traces = len(traces)
+            if pretty or dry_run:
+                spinner.stop(f"Found {len(traces)} trace(s)", success=True)
         else:
-            traces = analytics_client.query_traces_with_filters(
-                filters=parsed_url.filters,
-                limit=limit,
-            )
+            # Check if sampling is needed
+            if not no_sampling and effective_sample_size is not None:
+                # Count total traces first
+                total_traces = analytics_client.count_traces_with_filters(
+                    filters=parsed_url.filters,
+                )
+                if pretty or dry_run:
+                    spinner.stop(f"Found {total_traces} total traces", success=True)
+
+                # Apply limit if specified
+                effective_total = min(total_traces, limit) if limit else total_traces
+
+                if effective_total > effective_sample_size:
+                    # Need to sample
+                    sampled = True
+                    if pretty or dry_run:
+                        pct = (effective_sample_size / effective_total) * 100
+                        console.print(f"[dim]  Sampling {effective_sample_size} of {effective_total} traces ({pct:.1f}%)[/dim]")
+                        spinner = AnalyticsSpinner("Fetching trace IDs for sampling")
+                        spinner.start()
+
+                    # Fetch all trace IDs (minimal data)
+                    all_trace_ids = analytics_client.query_trace_ids_with_filters(
+                        filters=parsed_url.filters,
+                    )
+
+                    # Apply limit if specified
+                    if limit and len(all_trace_ids) > limit:
+                        all_trace_ids = all_trace_ids[:limit]
+
+                    if pretty or dry_run:
+                        spinner.stop(f"Fetched {len(all_trace_ids)} trace IDs", success=True)
+
+                    # Random sample
+                    sampled_ids = random.sample(all_trace_ids, min(effective_sample_size, len(all_trace_ids)))
+
+                    if pretty or dry_run:
+                        spinner = AnalyticsSpinner(f"Fetching full data for {len(sampled_ids)} sampled traces")
+                        spinner.start()
+
+                    # Fetch full trace data for sampled IDs
+                    traces = analytics_client.query_traces_by_ids(sampled_ids)
+
+                    if pretty or dry_run:
+                        spinner.stop(f"Sampled {len(traces)} of {effective_total} traces", success=True)
+                else:
+                    # No sampling needed - fetch all
+                    if pretty or dry_run:
+                        spinner = AnalyticsSpinner("Fetching traces")
+                        spinner.start()
+                    traces = analytics_client.query_traces_with_filters(
+                        filters=parsed_url.filters,
+                        limit=limit,
+                    )
+                    total_traces = len(traces)
+                    if pretty or dry_run:
+                        spinner.stop(f"Fetched {len(traces)} traces", success=True)
+            else:
+                # No sampling - fetch directly
+                if pretty or dry_run:
+                    spinner.stop("Sampling disabled", success=True)
+                    spinner = AnalyticsSpinner("Fetching traces")
+                    spinner.start()
+                traces = analytics_client.query_traces_with_filters(
+                    filters=parsed_url.filters,
+                    limit=limit,
+                )
+                total_traces = len(traces)
+                if pretty or dry_run:
+                    spinner.stop(f"Fetched {len(traces)} traces", success=True)
     except Exception as e:
         if pretty or dry_run:
             spinner.stop("Failed to fetch traces", success=False)
         console.print(f"[red]Error fetching traces:[/red] {e}")
+        import traceback
+        console.print(f"[dim]{traceback.format_exc()}[/dim]")
         sys.exit(1)
-
-    if pretty or dry_run:
-        spinner.stop(f"Found {len(traces)} traces", success=True)
 
     if not traces:
         console.print("[yellow]No traces found matching the criteria.[/yellow]")
         sys.exit(1)
+
+    # Show sampling summary
+    if sampled and (pretty or dry_run):
+        console.print(f"\n[dim]  ℹ️  Annotating a random sample. Use --no-sampling to annotate all traces.[/dim]")
 
     # Step 2: Resolve references
     if pretty or dry_run:
@@ -437,10 +549,17 @@ def annotate(
         )
 
     # Step 4: Classify traces using LLM
+    classification_progress = None
     if pretty or dry_run:
         console.print("\n[bold cyan]Step 4: Classifying Traces[/bold cyan]")
-        spinner = AnalyticsSpinner(f"Classifying {len(traces)} traces")
-        spinner.start()
+        console.print(f"  [dim]Classifying into {len(category_list)} categories...[/dim]")
+        classification_progress = ProgressTracker(
+            total=len(traces),
+            description="Classifying",
+            console=console,
+            show_ids=True,
+        )
+        classification_progress.start()
 
     try:
         classifications = asyncio.run(
@@ -451,18 +570,19 @@ def annotate(
                 user_context=context,
                 annotation_summary=annotation_summary,
                 max_concurrent=max_concurrent,
+                progress_tracker=classification_progress,
             )
         )
     except Exception as e:
-        if pretty or dry_run:
-            spinner.stop("Classification failed", success=False)
+        if classification_progress:
+            classification_progress.finish("Classification failed")
         console.print(f"[red]Error during classification:[/red] {e}")
         import traceback
         console.print(f"[dim]{traceback.format_exc()}[/dim]")
         sys.exit(1)
 
-    if pretty or dry_run:
-        spinner.stop(f"Classified {len(classifications)} traces", success=True)
+    if classification_progress:
+        classification_progress.finish(f"Classified {len(classifications)} traces")
 
     # Build histogram of categories
     category_counts: dict[str, int] = {}

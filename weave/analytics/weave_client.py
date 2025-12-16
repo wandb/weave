@@ -176,6 +176,179 @@ class AnalyticsWeaveClient:
 
         return self._execute_query(query)
 
+    def _build_filter_and_query(
+        self,
+        filters: dict[str, Any] | None = None,
+        trace_roots_only: bool = True,
+    ) -> tuple[dict[str, Any], dict[str, Any] | None]:
+        """Build API filter and query expression from Weave UI filters.
+
+        Args:
+            filters: Filter object from Weave UI (from trace URL)
+            trace_roots_only: If True, only return root traces
+
+        Returns:
+            Tuple of (api_filter dict, query dict or None)
+        """
+        api_filter: dict[str, Any] = {
+            "trace_roots_only": trace_roots_only,
+        }
+
+        expr_conditions = []
+
+        if filters:
+            # Handle opVersionRefs filter
+            op_version_refs = filters.get("opVersionRefs", [])
+            if op_version_refs:
+                api_filter["op_names"] = op_version_refs
+
+            # Handle filter items (field/operator/value format)
+            filter_items = filters.get("items", [])
+            for item in filter_items:
+                field = item.get("field")
+                operator = item.get("operator", "")
+                value = item.get("value")
+
+                condition = self._convert_filter_item(field, operator, value)
+                if condition:
+                    expr_conditions.append(condition)
+
+        query_expr = None
+        if expr_conditions:
+            if len(expr_conditions) == 1:
+                query_expr = {"$expr": expr_conditions[0]}
+            else:
+                query_expr = {"$expr": {"$and": expr_conditions}}
+
+        return api_filter, query_expr
+
+    @retry_on_failure()
+    def count_traces_with_filters(
+        self,
+        filters: dict[str, Any] | None = None,
+        trace_roots_only: bool = True,
+    ) -> int:
+        """Count traces matching the given filters efficiently.
+
+        Uses the calls/query_stats endpoint which is optimized for counting
+        without fetching full trace data.
+
+        Args:
+            filters: Filter object from Weave UI (from trace URL)
+            trace_roots_only: If True, only count root traces
+
+        Returns:
+            Number of traces matching the filters
+        """
+        api_filter, query_expr = self._build_filter_and_query(filters, trace_roots_only)
+
+        request_body: dict[str, Any] = {
+            "project_id": f"{self.config.entity}/{self.config.project}",
+            "filter": api_filter,
+        }
+
+        if query_expr:
+            request_body["query"] = query_expr
+
+        endpoint = f"{self.config.base_url}/calls/query_stats"
+        headers = {
+            "Authorization": self.headers["Authorization"],
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        }
+
+        response = requests.post(
+            endpoint,
+            headers=headers,
+            json=request_body,
+            timeout=30,
+        )
+        response.raise_for_status()
+
+        result = response.json()
+        return result.get("count", 0)
+
+    def query_trace_ids_with_filters(
+        self,
+        filters: dict[str, Any] | None = None,
+        trace_roots_only: bool = True,
+    ) -> list[str]:
+        """Query only trace IDs matching the given filters.
+
+        This is more efficient than fetching full traces when you only need IDs
+        for sampling purposes.
+
+        Args:
+            filters: Filter object from Weave UI (from trace URL)
+            trace_roots_only: If True, only return root trace IDs
+
+        Returns:
+            List of trace IDs matching the filters
+        """
+        api_filter, query_expr = self._build_filter_and_query(filters, trace_roots_only)
+
+        query: dict[str, Any] = {
+            "project_id": f"{self.config.entity}/{self.config.project}",
+            "filter": api_filter,
+            "columns": ["id"],  # Only fetch ID column
+            "sort_by": [{"field": "started_at", "direction": "desc"}],
+            "include_feedback": False,
+            "include_costs": False,
+        }
+
+        if query_expr:
+            query["query"] = query_expr
+
+        results = self._execute_query(query)
+        return [r["id"] for r in results if r.get("id")]
+
+    def query_traces_by_ids(
+        self,
+        trace_ids: list[str],
+    ) -> list[dict[str, Any]]:
+        """Fetch full trace data for specific trace IDs.
+
+        Args:
+            trace_ids: List of trace IDs to fetch
+
+        Returns:
+            List of trace dictionaries with full data
+        """
+        if not trace_ids:
+            return []
+
+        columns = [
+            "id",
+            "trace_id",
+            "parent_id",
+            "started_at",
+            "ended_at",
+            "op_name",
+            "display_name",
+            "inputs",
+            "output",
+            "summary",
+            "exception",
+            "attributes",
+        ]
+
+        # Build OR condition for all trace IDs
+        id_conditions = [
+            {"$eq": [{"$getField": "id"}, {"$literal": tid}]}
+            for tid in trace_ids
+        ]
+
+        query: dict[str, Any] = {
+            "project_id": f"{self.config.entity}/{self.config.project}",
+            "query": {"$expr": {"$or": id_conditions}},
+            "columns": columns,
+            "sort_by": [{"field": "started_at", "direction": "desc"}],
+            "include_feedback": False,
+            "include_costs": False,
+        }
+
+        return self._execute_query(query)
+
     def _convert_filter_item(
         self,
         field: str,

@@ -49,6 +49,10 @@ def save_config(config: dict) -> None:
             if key in config:
                 f.write(f"{key}={config[key]}\n")
 
+        f.write("\n# Sampling Configuration\n")
+        if "MAX_SAMPLE_SIZE" in config:
+            f.write(f"MAX_SAMPLE_SIZE={config['MAX_SAMPLE_SIZE']}\n")
+
         f.write("\n# Debug Configuration (for tracing with Weave)\n")
         if "DEBUG_WEAVE_ENTITY" in config:
             f.write(f"DEBUG_WEAVE_ENTITY={config['DEBUG_WEAVE_ENTITY']}\n")
@@ -86,6 +90,12 @@ def save_config(config: dict) -> None:
     default="weave-analytics-debug",
     help="W&B project for debug tracing (used with --debug flag)",
 )
+@click.option(
+    "--max-sample-size",
+    default=500,
+    type=int,
+    help="Default maximum number of traces to sample for analysis (default: 500)",
+)
 def setup(
     wandb_api_key: str | None,
     llm_model: str,
@@ -93,6 +103,7 @@ def setup(
     llm_provider: str,
     debug_entity: str | None,
     debug_project: str,
+    max_sample_size: int,
 ) -> None:
     """Configure weave analytics with required API keys.
 
@@ -102,7 +113,8 @@ def setup(
     \b
     1. A W&B API key (for fetching traces from Weave)
     2. An LLM API key (for AI-powered clustering)
-    3. (Optional) Debug entity/project for tracing with --debug
+    3. (Optional) Max sample size for large trace sets
+    4. (Optional) Debug entity/project for tracing with --debug
 
     Configuration is stored in ~/.weave/analytics_config
 
@@ -203,6 +215,21 @@ def setup(
 
     console.print()
 
+    # Sampling configuration
+    console.print("[bold cyan]Sampling Configuration[/bold cyan]")
+    console.print("[dim]Used to limit traces when analyzing large datasets[/dim]\n")
+
+    current_sample_size = config.get("MAX_SAMPLE_SIZE", str(max_sample_size))
+    new_sample_size = click.prompt(
+        "  Max sample size (traces to analyze)",
+        default=current_sample_size,
+        type=int,
+    )
+    config["MAX_SAMPLE_SIZE"] = str(new_sample_size)
+    console.print(f"[green]✓[/green] MAX_SAMPLE_SIZE: {new_sample_size}")
+
+    console.print()
+
     # Debug configuration
     console.print("[bold cyan]Debug Configuration (Optional)[/bold cyan]")
     console.print("[dim]Used when running with --debug to trace LLM calls to Weave[/dim]\n")
@@ -240,7 +267,8 @@ def setup(
 
 [bold]Settings:[/bold]
   • LLM Model: [cyan]{config.get('LLM_MODEL', 'not set')}[/cyan]
-  • LLM Provider: [cyan]{detected_provider}[/cyan]"""
+  • LLM Provider: [cyan]{detected_provider}[/cyan]
+  • Max Sample Size: [cyan]{config.get('MAX_SAMPLE_SIZE', '500')}[/cyan]"""
 
     if config.get("DEBUG_WEAVE_ENTITY"):
         config_info += f"""

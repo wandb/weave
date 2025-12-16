@@ -3,13 +3,129 @@
 import asyncio
 import json
 import os
+import sys
+import threading
 from asyncio import Semaphore
 from datetime import datetime
-from typing import Any
+from typing import Any, Callable
 
 import litellm
 
 import weave
+
+
+# ============================================================================
+# Progress tracking for async operations
+# ============================================================================
+
+
+class ProgressTracker:
+    """Thread-safe progress tracker for async operations with console output."""
+
+    def __init__(
+        self,
+        total: int,
+        description: str = "Processing",
+        console: Any = None,
+        show_ids: bool = True,
+    ) -> None:
+        """Initialize the progress tracker.
+
+        Args:
+            total: Total number of items to process
+            description: Description of the operation
+            console: Rich console for output (optional)
+            show_ids: Whether to show trace IDs in progress
+        """
+        self.total = total
+        self.description = description
+        self.console = console
+        self.show_ids = show_ids
+        self.completed = 0
+        self.current_id: str | None = None
+        self._lock = threading.Lock()
+        self._started = False
+
+    def start(self) -> None:
+        """Start the progress display."""
+        if self.console:
+            self._started = True
+            self._print_progress()
+
+    def update(self, trace_id: str | None = None) -> None:
+        """Update progress after completing an item.
+
+        Args:
+            trace_id: Optional trace ID that was just completed
+        """
+        with self._lock:
+            self.completed += 1
+            self.current_id = trace_id
+
+        if self._started and self.console:
+            self._print_progress()
+
+    def _print_progress(self) -> None:
+        """Print the current progress to console."""
+        pct = (self.completed / self.total * 100) if self.total > 0 else 0
+
+        # Build progress bar
+        bar_width = 20
+        filled = int(bar_width * self.completed / self.total) if self.total > 0 else 0
+        bar = "█" * filled + "░" * (bar_width - filled)
+
+        # Build status line
+        if self.show_ids and self.current_id and self.completed < self.total:
+            id_preview = self.current_id[:8] if len(self.current_id) > 8 else self.current_id
+            status = f"  {self.description} [{bar}] {self.completed}/{self.total} ({pct:.0f}%) - {id_preview}..."
+        else:
+            status = f"  {self.description} [{bar}] {self.completed}/{self.total} ({pct:.0f}%)"
+
+        # Clear line and print
+        sys.stderr.write(f"\r{' ' * 80}\r{status}")
+        sys.stderr.flush()
+
+    def finish(self, message: str | None = None) -> None:
+        """Finish progress tracking and print final message.
+
+        Args:
+            message: Optional completion message
+        """
+        if self._started and self.console:
+            # Clear the progress line
+            sys.stderr.write(f"\r{' ' * 80}\r")
+            sys.stderr.flush()
+
+            if message:
+                sys.stderr.write(f"  \033[92m✓\033[0m {message}\n")
+                sys.stderr.flush()
+
+
+def with_progress(
+    tracker: ProgressTracker | None,
+) -> Callable:
+    """Decorator factory to track progress for async tasks.
+
+    Args:
+        tracker: ProgressTracker instance
+
+    Returns:
+        Decorator that wraps async functions to report progress
+    """
+    def decorator(func: Callable) -> Callable:
+        async def wrapper(*args: Any, **kwargs: Any) -> Any:
+            result = await func(*args, **kwargs)
+            if tracker:
+                # Try to extract trace_id from result or kwargs
+                trace_id = None
+                if isinstance(result, dict):
+                    trace_id = result.get("trace_id")
+                elif "trace_id" in kwargs:
+                    trace_id = kwargs["trace_id"]
+                tracker.update(trace_id)
+            return result
+        return wrapper
+    return decorator
 
 from weave.analytics.models import (
     Category,
@@ -664,6 +780,7 @@ async def run_draft_categorization(
     debug: bool = False,
     console: Any = None,
     existing_clusters: dict | None = None,
+    progress_tracker: ProgressTracker | None = None,
 ) -> list[dict[str, Any]]:
     """Run first-pass categorization on all traces."""
     semaphore = Semaphore(max_concurrent)
@@ -675,8 +792,9 @@ async def run_draft_categorization(
         if existing_clusters and "clusters" in existing_clusters:
             console.print(f"[dim]Using {len(existing_clusters['clusters'])} existing cluster definitions[/dim]")
 
-    tasks = [
-        draft_categorization(
+    async def categorize_with_progress(trace: dict[str, Any]) -> dict[str, Any]:
+        """Wrapper to track progress."""
+        result = await draft_categorization(
             trace_id=trace.get("id", ""),
             trace_input=trace.get("inputs", {}),
             trace_output=trace.get("output", {}),
@@ -690,8 +808,11 @@ async def run_draft_categorization(
             console=console,
             existing_clusters=existing_clusters,
         )
-        for trace in traces
-    ]
+        if progress_tracker:
+            progress_tracker.update(result.get("trace_id"))
+        return result
+
+    tasks = [categorize_with_progress(trace) for trace in traces]
 
     return await asyncio.gather(*tasks)
 
@@ -819,6 +940,7 @@ async def run_final_classification(
     max_concurrent: int = 10,
     debug: bool = False,
     console: Any = None,
+    progress_tracker: ProgressTracker | None = None,
 ) -> list[dict[str, Any]]:
     """Run final classification on all traces."""
     semaphore = Semaphore(max_concurrent)
@@ -835,8 +957,9 @@ async def run_final_classification(
     if debug and console:
         console.print(f"[dim]Starting final classification for {len(traces)} traces with {len(categories)} categories[/dim]")
 
-    tasks = [
-        final_classification(
+    async def classify_with_progress(trace: dict[str, Any]) -> dict[str, Any]:
+        """Wrapper to track progress."""
+        result = await final_classification(
             trace_id=trace.get("id", ""),
             trace_input=trace.get("inputs", {}),
             trace_output=trace.get("output", {}),
@@ -850,8 +973,11 @@ async def run_final_classification(
             debug=debug,
             console=console,
         )
-        for trace in traces
-    ]
+        if progress_tracker:
+            progress_tracker.update(result.get("trace_id"))
+        return result
+
+    tasks = [classify_with_progress(trace) for trace in traces]
 
     return await asyncio.gather(*tasks)
 
@@ -863,6 +989,7 @@ async def fetch_deep_traces(
     compaction_model: str,
     max_trace_tokens: int,
     console: Any = None,
+    progress_tracker: ProgressTracker | None = None,
 ) -> list[dict[str, Any]]:
     """Fetch and format deep execution traces for all traces.
 
@@ -873,6 +1000,7 @@ async def fetch_deep_traces(
         compaction_model: LLM model for trace compaction
         max_trace_tokens: Token threshold before triggering compaction
         console: Rich console for output
+        progress_tracker: Optional progress tracker
 
     Returns:
         List of traces with execution_trace field populated
@@ -881,8 +1009,6 @@ async def fetch_deep_traces(
 
     for i, trace in enumerate(traces):
         trace_id = trace.get("id", "")
-        if console:
-            console.print(f"[dim]  Fetching deep trace {i + 1}/{len(traces)}: {trace_id[:8]}...[/dim]")
 
         try:
             # Fetch descendants
@@ -932,6 +1058,9 @@ async def fetch_deep_traces(
             if console:
                 console.print(f"[yellow]    Warning: Could not fetch deep trace: {e}[/yellow]")
             trace["execution_trace"] = None
+
+        if progress_tracker:
+            progress_tracker.update(trace_id)
 
     return traces
 
@@ -1008,10 +1137,17 @@ async def run_clustering_pipeline(
 
     # Step 0: Deep trace analysis (if enabled)
     if deep_trace_analysis and client:
+        deep_progress = None
         if use_console:
             console.print("\n[bold cyan]Step 0: Deep Trace Analysis[/bold cyan]")
-            spinner = AnalyticsSpinner(f"Fetching execution trees for {len(traces)} traces")
-            spinner.start()
+            console.print("  [dim]Fetching execution trees...[/dim]")
+            deep_progress = ProgressTracker(
+                total=len(traces),
+                description="Fetching trees",
+                console=console,
+                show_ids=True,
+            )
+            deep_progress.start()
 
         traces = await fetch_deep_traces(
             traces=traces,
@@ -1020,16 +1156,24 @@ async def run_clustering_pipeline(
             compaction_model=compaction_model,
             max_trace_tokens=max_trace_tokens,
             console=console if debug else None,
+            progress_tracker=deep_progress,
         )
 
-        if use_console:
+        if deep_progress:
             traces_with_trees = sum(1 for t in traces if t.get("execution_trace"))
-            spinner.stop(f"Fetched {traces_with_trees} execution trees", success=True)
+            deep_progress.finish(f"Fetched {traces_with_trees} execution trees")
 
     # Step 1: Draft categorization
+    draft_progress = None
     if use_console:
-        spinner = AnalyticsSpinner(f"Categorizing {len(traces)} traces")
-        spinner.start()
+        console.print("  [dim]Draft categorization...[/dim]")
+        draft_progress = ProgressTracker(
+            total=len(traces),
+            description="Categorizing",
+            console=console,
+            show_ids=True,
+        )
+        draft_progress.start()
 
     draft_results = await run_draft_categorization(
         traces=traces,
@@ -1041,10 +1185,11 @@ async def run_clustering_pipeline(
         debug=debug,
         console=console if debug else None,
         existing_clusters=existing_clusters,
+        progress_tracker=draft_progress,
     )
 
-    if use_console:
-        spinner.stop(f"Completed {len(draft_results)} draft categorizations", success=True)
+    if draft_progress:
+        draft_progress.finish(f"Completed {len(draft_results)} draft categorizations")
 
     # Load existing cluster definitions if provided
     existing_categories = []
@@ -1095,11 +1240,17 @@ async def run_clustering_pipeline(
             console.print(f"     [dim]{cat.pattern_category_definition[:80]}...[/dim]")
 
     # Step 3: Final classification
+    classification_progress = None
     if use_console:
         console.print("\n[bold cyan]Step 5: Final Classification[/bold cyan]")
-        console.print("[bright_magenta]  Classifying traces into final categories...[/bright_magenta]")
-        spinner = AnalyticsSpinner(f"Classifying {len(traces)} traces")
-        spinner.start()
+        console.print(f"  [dim]Classifying into {len(all_categories)} categories...[/dim]")
+        classification_progress = ProgressTracker(
+            total=len(traces),
+            description="Classifying",
+            console=console,
+            show_ids=True,
+        )
+        classification_progress.start()
 
     classification_results = await run_final_classification(
         traces=traces,
@@ -1111,10 +1262,11 @@ async def run_clustering_pipeline(
         max_concurrent=max_concurrent,
         debug=debug,
         console=console if debug else None,
+        progress_tracker=classification_progress,
     )
 
-    if use_console:
-        spinner.stop("Classification complete", success=True)
+    if classification_progress:
+        classification_progress.finish("Classification complete")
 
     # Build output structure - traces can belong to multiple clusters
     clusters_by_category: dict[str, list[ClusterResult]] = {}

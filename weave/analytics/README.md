@@ -46,29 +46,54 @@ uv pip install weave[analytics]
 
 ## Quick Start
 
-1. **Setup credentials:**
+### 1. Setup credentials
 
 ```bash
 weave analytics setup
 ```
 
-This configures your W&B API key and LLM provider. The default model is Gemini Flash (`gemini/gemini-2.5-flash`).
+This interactive wizard configures:
+- **W&B API key** for fetching traces
+- **LLM model** (default: `gemini/gemini-2.5-flash`)
+- **LLM API key** for your chosen provider
+- **Max sample size** (default: 500 traces) for large trace sets
+- **Debug tracing** (optional) to inspect the analytics pipeline itself
 
-2. **Cluster traces from a Weave URL:**
+### 2. Cluster traces from a Weave URL
+
+Copy a trace URL from the Weave UI (including any filters) and run:
 
 ```bash
 weave analytics cluster "https://wandb.ai/your-team/your-project/weave/traces?filter=..." \
-  --pretty -o categories.yaml
+  --context "Email agent for customer support" \
+  --pretty \
+  -o categories.yaml
 ```
 
-3. **Annotate traces with discovered categories:**
+For large trace sets (thousands of traces), the CLI automatically samples to stay within limits:
+
+```bash
+# Explicitly set sample size (overrides config)
+weave analytics cluster "..." --sample-size 200 --pretty -o categories.yaml
+
+# Disable sampling to process all traces
+weave analytics cluster "..." --no-sampling --pretty -o categories.yaml
+```
+
+### 3. Annotate traces with discovered categories
+
+Apply the discovered categories as annotations in Weave:
 
 ```bash
 weave analytics annotate "https://wandb.ai/your-team/your-project/weave/traces?filter=..." \
-  --categories categories.yaml --pretty
+  --categories categories.yaml \
+  --sample-size 100 \
+  --pretty
 ```
 
-4. **Summarize a single trace:**
+Annotations appear in the Weave UI's **Feedback** sidebar and **Annotations** column.
+
+### 4. Summarize a single trace
 
 ```bash
 weave analytics summarize "https://wandb.ai/your-team/your-project/weave/calls/abc123" --pretty
@@ -84,6 +109,7 @@ Interactive configuration wizard for setting up API keys and preferences.
 
 - W&B API key (for fetching traces)
 - LLM model and API key (for AI analysis)
+- Max sample size (for scaling to large trace sets)
 - Debug entity/project (optional, for tracing the analytics pipeline itself)
 
 **Configuration storage:** `~/.weave/analytics_config`
@@ -96,6 +122,7 @@ Interactive configuration wizard for setting up API keys and preferences.
 | `--llm-model` | LiteLLM model name (default: `gemini/gemini-2.5-flash`) |
 | `--llm-api-key` | API key for the LLM provider |
 | `--llm-provider` | Provider: `google`, `openai`, `anthropic`, `wandb`, or `auto` |
+| `--max-sample-size` | Max traces to sample (default: 500) |
 | `--debug-entity` | W&B entity for debug tracing |
 | `--debug-project` | W&B project for debug tracing |
 
@@ -129,6 +156,8 @@ Analyze and cluster traces into pattern categories using AI.
 |--------|-------------|
 | `--model` | LiteLLM model name |
 | `--limit` | Maximum traces to analyze |
+| `--sample-size` | Override max sample size from config |
+| `--no-sampling` | Disable sampling and process all traces |
 | `--max-concurrent` | Concurrent LLM calls (default: 10) |
 | `--pretty` | Pretty print with Rich formatting |
 | `-o, --output` | Output file path |
@@ -189,6 +218,8 @@ Classify traces and add failure analysis annotations to Weave.
 | `-c, --categories` | Path to categories YAML file (default: `categories.yaml`) |
 | `--model` | LiteLLM model name |
 | `--limit` | Maximum traces to annotate |
+| `--sample-size` | Override max sample size from config |
+| `--no-sampling` | Disable sampling and process all traces |
 | `--max-concurrent` | Concurrent LLM calls (default: 10) |
 | `--annotation-name` | Name for the annotation field (default: `failure_analysis`) |
 | `--dry-run` | Preview classifications without making changes |
@@ -318,21 +349,164 @@ filters={\"items\":[{\"field\":\"started_at\",\"operator\":\"(date): before\",\"
 
 ## Architecture
 
+### File Structure
+
 ```
 weave/analytics/
-    main.py           - CLI entry point and command registration
-    commands/
-        setup.py      - Configuration wizard
-        cluster.py    - Clustering command
-        annotate.py   - Annotation command
-        summarize.py  - Summarization command
-    clustering.py     - Core clustering pipeline and trace utilities
-    models.py         - Pydantic models for structured outputs
-    prompts.py        - LLM prompts for categorization
-    url_parser.py     - Weave URL parsing utilities
-    weave_client.py   - Weave API client wrapper
-    header.py         - CLI branding
-    spinner.py        - Loading spinner utility
+├── main.py           - CLI entry point and command registration
+├── commands/
+│   ├── setup.py      - Configuration wizard
+│   ├── cluster.py    - Clustering command
+│   ├── annotate.py   - Annotation command
+│   └── summarize.py  - Summarization command
+├── clustering.py     - Core clustering pipeline and progress tracking
+├── models.py         - Pydantic models for structured outputs
+├── prompts.py        - LLM prompts for categorization
+├── url_parser.py     - Weave URL parsing utilities
+├── weave_client.py   - Weave API client wrapper
+├── header.py         - CLI branding
+└── spinner.py        - Loading spinner utility
+```
+
+### Clustering Workflow
+
+The clustering pipeline follows a multi-stage approach to discover and assign categories:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           CLUSTERING PIPELINE                                │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  1. FETCH & SAMPLE                                                           │
+│     ┌──────────────┐    ┌──────────────┐    ┌──────────────┐                │
+│     │ Parse URL &  │───▶│ Count Total  │───▶│ Random Sample│                │
+│     │ Filters      │    │ Traces       │    │ (if needed)  │                │
+│     └──────────────┘    └──────────────┘    └──────────────┘                │
+│                                                     │                        │
+│                                                     ▼                        │
+│  2. DEEP TRACE ANALYSIS (optional, --depth N)                                │
+│     ┌──────────────────────────────────────────────────────┐                │
+│     │ Fetch execution trees for each trace (nested calls)  │                │
+│     │ Progress: [████████████████████] 50/50 traces        │                │
+│     └──────────────────────────────────────────────────────┘                │
+│                                                     │                        │
+│                                                     ▼                        │
+│  3. DRAFT CATEGORIZATION (concurrent LLM calls)                              │
+│     ┌──────────────────────────────────────────────────────┐                │
+│     │ Each trace → LLM → 1-3 candidate categories          │                │
+│     │ Progress: [████████████████████] 50/50 traces        │                │
+│     │ Current: abc123-def456-789...                        │                │
+│     └──────────────────────────────────────────────────────┘                │
+│                                                     │                        │
+│                                                     ▼                        │
+│  4. CLUSTER AGGREGATION (single LLM call)                                    │
+│     ┌──────────────────────────────────────────────────────┐                │
+│     │ Merge similar categories into coherent clusters      │                │
+│     │ e.g., "timeout", "api_timeout" → "timeout_errors"    │                │
+│     └──────────────────────────────────────────────────────┘                │
+│                                                     │                        │
+│                                                     ▼                        │
+│  5. FINAL CLASSIFICATION (concurrent LLM calls)                              │
+│     ┌──────────────────────────────────────────────────────┐                │
+│     │ Each trace → LLM → Final category assignment         │                │
+│     │ Progress: [████████████████████] 50/50 traces        │                │
+│     │ Current: xyz789-abc012-345...                        │                │
+│     └──────────────────────────────────────────────────────┘                │
+│                                                     │                        │
+│                                                     ▼                        │
+│  OUTPUT: categories.yaml + JSON report                                       │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Annotation Workflow
+
+The annotation command applies pre-discovered categories to traces:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          ANNOTATION PIPELINE                                 │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  1. LOAD CATEGORIES                                                          │
+│     ┌──────────────┐                                                        │
+│     │ Parse YAML   │  categories.yaml from cluster command                  │
+│     │ File         │                                                        │
+│     └──────────────┘                                                        │
+│             │                                                                │
+│             ▼                                                                │
+│  2. FETCH & SAMPLE TRACES                                                    │
+│     ┌──────────────┐    ┌──────────────┐    ┌──────────────┐                │
+│     │ Parse URL    │───▶│ Count Total  │───▶│ Random Sample│                │
+│     │              │    │ (API stats)  │    │ (if needed)  │                │
+│     └──────────────┘    └──────────────┘    └──────────────┘                │
+│                                                     │                        │
+│                                                     ▼                        │
+│  3. CLASSIFY TRACES (concurrent LLM calls)                                   │
+│     ┌──────────────────────────────────────────────────────┐                │
+│     │ Each trace → LLM → Category from predefined set      │                │
+│     │ Progress: [████████████████████] 100/100 traces      │                │
+│     │ Current: trace-id-being-processed...                 │                │
+│     └──────────────────────────────────────────────────────┘                │
+│                                                     │                        │
+│                                                     ▼                        │
+│  4. CREATE ANNOTATION SPEC                                                   │
+│     ┌──────────────────────────────────────────────────────┐                │
+│     │ Create/update Human Annotation scorer in Weave       │                │
+│     │ with enum of all category names                      │                │
+│     └──────────────────────────────────────────────────────┘                │
+│                                                     │                        │
+│                                                     ▼                        │
+│  5. APPLY ANNOTATIONS                                                        │
+│     ┌──────────────────────────────────────────────────────┐                │
+│     │ Add feedback to each trace with assigned category    │                │
+│     │ Visible in Weave UI Feedback sidebar                 │                │
+│     └──────────────────────────────────────────────────────┘                │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Sampling for Scalability
+
+When working with large trace sets (thousands of traces), the CLI implements intelligent sampling:
+
+1. **Count Phase**: Uses the `/calls/query_stats` API endpoint to efficiently get total trace count
+2. **ID Fetch**: Fetches only trace IDs (lightweight) for the full filtered set
+3. **Random Sample**: Randomly selects up to `MAX_SAMPLE_SIZE` traces
+4. **Full Fetch**: Fetches complete trace data only for sampled traces
+
+This approach ensures:
+- **Efficiency**: Avoids fetching full data for thousands of traces
+- **Representativeness**: Random sampling gives statistically meaningful results
+- **Configurability**: Sample size can be set via `setup`, `--sample-size`, or disabled with `--no-sampling`
+
+```bash
+# Configure default sample size during setup
+weave analytics setup
+# → "Max sample size (default 500):"
+
+# Override per-command
+weave analytics cluster "..." --sample-size 200
+
+# Disable sampling for complete analysis
+weave analytics cluster "..." --no-sampling
+```
+
+### Progress Tracking
+
+Long-running operations display real-time progress with:
+
+- **Progress bar**: Visual indication of completion percentage
+- **Trace counter**: Current trace number out of total
+- **Current trace ID**: Shows which trace is being processed (truncated for readability)
+- **Phase indicators**: Clear labels for each pipeline stage
+
+Example output:
+```
+Sampling 100 of 1876 traces (5.3%)
+Fetching Traces        [████████████████████] 100/100 done
+Resolving References   [████████████████████] 100/100 done
+Classifying Traces     [████████████████░░░░]  82/100 abc123-def456-789...
 ```
 
 ---

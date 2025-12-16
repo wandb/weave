@@ -3,6 +3,7 @@
 import asyncio
 import json
 import os
+import random
 import sys
 from datetime import datetime
 
@@ -94,6 +95,17 @@ def load_existing_clusters(clusters_file: str) -> dict | None:
     type=click.Path(exists=True),
     help="Path to existing clusters YAML file to use as base definitions",
 )
+@click.option(
+    "--sample-size",
+    default=None,
+    type=int,
+    help="Maximum number of traces to randomly sample (default: from config or 500)",
+)
+@click.option(
+    "--no-sampling",
+    is_flag=True,
+    help="Disable random sampling (fetch all traces up to --limit)",
+)
 def cluster(
     url: str,
     model: str | None,
@@ -105,6 +117,8 @@ def cluster(
     depth: int,
     context: str,
     clusters_file: str | None,
+    sample_size: int | None,
+    no_sampling: bool,
 ) -> None:
     """Cluster traces from a Weave URL into pattern categories.
 
@@ -144,6 +158,14 @@ def cluster(
     \b
         # With user context for better categorization
         weave analytics cluster "..." --context "This is a customer service chatbot"
+
+    \b
+        # Sample 200 random traces from a large dataset
+        weave analytics cluster "..." --sample-size 200
+
+    \b
+        # Disable sampling to analyze all traces (up to --limit)
+        weave analytics cluster "..." --no-sampling --limit 1000
     """
     # Import rich here to avoid slow startup for simple --help
     from rich.console import Console
@@ -178,6 +200,11 @@ def cluster(
     config = load_config()
     if model is None:
         model = config.get("LLM_MODEL", "gemini/gemini-2.5-flash")
+
+    # Get sample size from config or use default
+    effective_sample_size = sample_size
+    if effective_sample_size is None and not no_sampling:
+        effective_sample_size = int(config.get("MAX_SAMPLE_SIZE", "500"))
 
     # Debug mode: limited samples, Weave tracing
     if debug:
@@ -235,10 +262,12 @@ def cluster(
 
     # Show configuration panel in pretty/debug mode
     if pretty or debug:
+        sampling_info = "disabled" if no_sampling else f"{effective_sample_size} traces"
         config_info = f"""[bold]Entity:[/bold] {parsed_url.entity}
 [bold]Project:[/bold] {parsed_url.project}
 [bold]Model:[/bold] {model}
-[bold]Limit:[/bold] {limit or 'all'}
+[bold]Sampling:[/bold] {sampling_info}
+[bold]Limit:[/bold] {limit or 'none'}
 [bold]Max Concurrent:[/bold] {max_concurrent}
 [bold]Deep Analysis:[/bold] {'enabled (depth=' + str(depth) + ')' if depth > 0 else 'disabled'}"""
         if context:
@@ -258,32 +287,109 @@ def cluster(
         console.print("[dim]Run 'weave analytics setup' to configure your credentials.[/dim]")
         sys.exit(1)
 
-    # Step 1: Fetch traces
+    # Step 1: Fetch traces (with sampling for large datasets)
+    total_traces = 0
+    sampled = False
+
     if pretty or debug:
         console.print("[bold cyan]Step 1: Fetching Traces[/bold cyan]")
-        spinner = AnalyticsSpinner("Fetching traces from Weave")
+        spinner = AnalyticsSpinner("Counting traces")
         spinner.start()
 
     try:
         if parsed_url.url_type == "call" and parsed_url.trace_id:
+            # Single trace - no sampling needed
             traces = client.query_by_call_id(parsed_url.trace_id)
+            total_traces = len(traces)
+            if pretty or debug:
+                spinner.stop(f"Found {len(traces)} trace(s)", success=True)
         else:
-            traces = client.query_traces_with_filters(
-                filters=parsed_url.filters,
-                limit=limit,
-            )
+            # Check if sampling is needed
+            if not no_sampling and effective_sample_size is not None:
+                # Count total traces first
+                total_traces = client.count_traces_with_filters(
+                    filters=parsed_url.filters,
+                )
+                if pretty or debug:
+                    spinner.stop(f"Found {total_traces} total traces", success=True)
+
+                # Apply limit if specified
+                effective_total = min(total_traces, limit) if limit else total_traces
+
+                if effective_total > effective_sample_size:
+                    # Need to sample
+                    sampled = True
+                    if pretty or debug:
+                        pct = (effective_sample_size / effective_total) * 100
+                        console.print(f"[dim]  Sampling {effective_sample_size} of {effective_total} traces ({pct:.1f}%)[/dim]")
+                        spinner = AnalyticsSpinner("Fetching trace IDs for sampling")
+                        spinner.start()
+
+                    # Fetch all trace IDs (minimal data)
+                    all_trace_ids = client.query_trace_ids_with_filters(
+                        filters=parsed_url.filters,
+                    )
+
+                    # Apply limit if specified
+                    if limit and len(all_trace_ids) > limit:
+                        all_trace_ids = all_trace_ids[:limit]
+
+                    if pretty or debug:
+                        spinner.stop(f"Fetched {len(all_trace_ids)} trace IDs", success=True)
+
+                    # Random sample
+                    sampled_ids = random.sample(all_trace_ids, min(effective_sample_size, len(all_trace_ids)))
+
+                    if pretty or debug:
+                        spinner = AnalyticsSpinner(f"Fetching full data for {len(sampled_ids)} sampled traces")
+                        spinner.start()
+
+                    # Fetch full trace data for sampled IDs
+                    traces = client.query_traces_by_ids(sampled_ids)
+
+                    if pretty or debug:
+                        spinner.stop(f"Sampled {len(traces)} of {effective_total} traces", success=True)
+                else:
+                    # No sampling needed - fetch all
+                    if pretty or debug:
+                        spinner = AnalyticsSpinner("Fetching traces")
+                        spinner.start()
+                    traces = client.query_traces_with_filters(
+                        filters=parsed_url.filters,
+                        limit=limit,
+                    )
+                    total_traces = len(traces)
+                    if pretty or debug:
+                        spinner.stop(f"Fetched {len(traces)} traces", success=True)
+            else:
+                # No sampling - fetch directly
+                if pretty or debug:
+                    spinner.stop("Sampling disabled", success=True)
+                    spinner = AnalyticsSpinner("Fetching traces")
+                    spinner.start()
+                traces = client.query_traces_with_filters(
+                    filters=parsed_url.filters,
+                    limit=limit,
+                )
+                total_traces = len(traces)
+                if pretty or debug:
+                    spinner.stop(f"Fetched {len(traces)} traces", success=True)
     except Exception as e:
         if pretty or debug:
             spinner.stop("Failed to fetch traces", success=False)
         console.print(f"[red]Error fetching traces:[/red] {e}")
+        if debug:
+            import traceback
+            console.print(f"[dim]{traceback.format_exc()}[/dim]")
         sys.exit(1)
-
-    if pretty or debug:
-        spinner.stop(f"Found {len(traces)} traces", success=True)
 
     if not traces:
         console.print("[yellow]No traces found matching the criteria.[/yellow]")
         sys.exit(1)
+
+    # Show sampling summary
+    if sampled and (pretty or debug):
+        console.print(f"\n[dim]  ℹ️  Analyzing a random sample. Use --no-sampling to analyze all traces.[/dim]")
 
     # Step 2: Resolve references
     if pretty or debug:
