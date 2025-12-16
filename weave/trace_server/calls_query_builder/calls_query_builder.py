@@ -28,16 +28,22 @@ Outstanding Optimizations/Work:
 import datetime
 import json
 import logging
-import re
 from collections import defaultdict
 from collections.abc import Callable, KeysView
-from typing import TYPE_CHECKING, Any, Literal, Union, cast
+from typing import Any, Literal, cast
 
 from pydantic import BaseModel, Field
-from typing_extensions import Self
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.calls_query_builder.cte import CTECollection
+from weave.trace_server.calls_query_builder.field_factory import (
+    QueryFieldType,
+    get_field_by_name_strategy,
+)
+from weave.trace_server.calls_query_builder.fields import (
+    DynamicField,
+    FeedbackField,
+)
 from weave.trace_server.calls_query_builder.object_ref_query_builder import (
     ObjectRefCondition,
     ObjectRefOrderCondition,
@@ -55,16 +61,7 @@ from weave.trace_server.calls_query_builder.table_strategy import (
     TableStrategy,
     get_table_strategy,
 )
-from weave.trace_server.calls_query_builder.fields import (
-    DynamicField,
-    FeedbackField,
-)
-from weave.trace_server.calls_query_builder.field_factory import (
-    QueryFieldType,
-    get_field_by_name_strategy,
-)
 from weave.trace_server.calls_query_builder.utils import (
-    json_dump_field_as_sql,
     param_slot,
     safely_format_sql,
 )
@@ -75,7 +72,6 @@ from weave.trace_server.orm import (
     clickhouse_cast,
     combine_conditions,
     python_value_to_ch_type,
-    split_escaped_field_path,
 )
 from weave.trace_server.project_version.types import ReadTable
 from weave.trace_server.token_costs import build_cost_ctes, get_cost_final_select
@@ -168,13 +164,8 @@ def get_field_sql_for_filter(
     Returns:
         SQL expression for the field
     """
-    field = strategy.get_field(field_name)
-
-    if (
-        use_raw_column
-        and hasattr(field, "supports_aggregation")
-        and field.supports_aggregation()
-    ) and hasattr(field, "as_sql_without_aggregation"):
+    field = get_field_by_name_strategy(field_name, strategy)
+    if use_raw_column and field.supports_aggregation():
         return field.as_sql_without_aggregation(pb, strategy.table_name)
 
     return field.as_sql(pb, strategy.table_name)
@@ -2233,10 +2224,3 @@ def build_calls_complete_batch_delete_query(
         updated_at=updated_at,
         pb=pb,
     )
-
-
-# Rebuild CallsQuery to resolve TableStrategy forward reference.
-# TableStrategy is imported under TYPE_CHECKING in both fields.py and field_factory.py
-# but used in field type annotations. Pydantic needs this single rebuild to resolve
-# the forward reference at runtime.
-CallsQuery.model_rebuild()
