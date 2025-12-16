@@ -2,32 +2,29 @@
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Union
 
 from weave.trace_server.calls_query_builder.fields import (
+    ROLLED_UP_CALL_MERGED_STATS_TABLE_NAME,
+    STORAGE_SIZE_TABLE_NAME,
     AggregatedDataSizeField,
     DynamicField,
     FeedbackField,
     FieldWithTableOverride,
-    SimpleField,
+    SimpleCallsField,
     SummaryField,
-    STORAGE_SIZE_TABLE_NAME,
-    ROLLED_UP_CALL_MERGED_STATS_TABLE_NAME,
 )
 from weave.trace_server.calls_query_builder.table_strategy import TableStrategy
 from weave.trace_server.errors import InvalidFieldError
 from weave.trace_server.orm import split_escaped_field_path
 
-
-# Union type of all concrete field implementations
-QueryFieldType = Union[
-    SimpleField,
-    DynamicField,
-    FieldWithTableOverride,
-    SummaryField,
-    FeedbackField,
-    AggregatedDataSizeField,
-]
+QueryFieldType = (
+    SimpleCallsField
+    | DynamicField
+    | FieldWithTableOverride
+    | SummaryField
+    | FeedbackField
+    | AggregatedDataSizeField
+)
 
 
 @dataclass
@@ -60,7 +57,7 @@ class FieldDefinition:
                 agg_fn=self.agg_fn,
             )
 
-        return SimpleField(
+        return SimpleCallsField(
             field=self.field_name,
             strategy=strategy,
             agg_fn=self.agg_fn,

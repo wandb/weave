@@ -2,9 +2,6 @@
 
 import re
 from abc import ABC, abstractmethod
-from collections.abc import Callable
-from dataclasses import dataclass
-from typing import Union
 
 from pydantic import BaseModel, ConfigDict
 
@@ -20,7 +17,6 @@ from weave.trace_server.orm import (
     clickhouse_cast,
     split_escaped_field_path,
 )
-
 
 STORAGE_SIZE_TABLE_NAME = "storage_size_tbl"
 ROLLED_UP_CALL_MERGED_STATS_TABLE_NAME = "rolled_up_cms"
@@ -91,11 +87,50 @@ class SimpleField(QueryField, BaseModel):
     Works for both aggregated and non-aggregated tables.
     The strategy determines whether to wrap with aggregation function.
     """
+
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     field: str
-    strategy: TableStrategy
     agg_fn: str | None = None
+
+    def as_sql(
+        self,
+        pb: ParamBuilder,
+        table_alias: str,
+        cast: tsi_query.CastTo | None = None,
+        use_agg_fn: bool = True,
+    ) -> str:
+        base_sql = f"{table_alias}.{self.field}"
+
+        if cast:
+            base_sql = clickhouse_cast(base_sql, cast)
+
+        return base_sql
+
+    def as_select_sql(self, pb: ParamBuilder, table_alias: str) -> str:
+        return f"{self.as_sql(pb, table_alias)} AS {self.field}"
+
+    def is_heavy(self) -> bool:
+        return False
+
+    def supports_aggregation(self) -> bool:
+        """Whether this field can be used with aggregate functions."""
+        return self.agg_fn is not None
+
+    def as_sql_without_aggregation(
+        self,
+        pb: ParamBuilder,
+        table_alias: str,
+    ) -> str:
+        """Generate SQL without aggregation function.
+
+        Useful for WHERE clause conditions that need raw column access.
+        """
+        return f"{table_alias}.{self.field}"
+
+
+class SimpleCallsField(SimpleField):
+    strategy: TableStrategy
 
     def as_sql(
         self,
@@ -114,26 +149,8 @@ class SimpleField(QueryField, BaseModel):
 
         return base_sql
 
-    def as_select_sql(self, pb: ParamBuilder, table_alias: str) -> str:
-        return f"{self.as_sql(pb, table_alias)} AS {self.field}"
-
-    def is_heavy(self) -> bool:
-        return False
-
     def supports_aggregation(self) -> bool:
-        """Whether this field can be used with aggregate functions."""
         return self.agg_fn is not None and self.strategy.requires_grouping()
-
-    def as_sql_without_aggregation(
-        self,
-        pb: ParamBuilder,
-        table_alias: str,
-    ) -> str:
-        """Generate SQL without aggregation function.
-
-        Useful for WHERE clause conditions that need raw column access.
-        """
-        return f"{table_alias}.{self.field}"
 
 
 class DynamicField(QueryField, BaseModel):
@@ -141,6 +158,7 @@ class DynamicField(QueryField, BaseModel):
 
     Example: inputs.messages[0].content
     """
+
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     field: str
@@ -219,7 +237,7 @@ class DynamicField(QueryField, BaseModel):
         )
 
 
-class FieldWithTableOverride(SimpleField):
+class FieldWithTableOverride(SimpleCallsField):
     """Field that comes from a specific table (e.g., for JOINs)."""
 
     table_name: str | None = None
@@ -237,6 +255,7 @@ class FieldWithTableOverride(SimpleField):
 
 class SummaryField(QueryField, BaseModel):
     """Field class for computed summary values."""
+
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     field: str
@@ -274,10 +293,10 @@ class SummaryField(QueryField, BaseModel):
 
     def is_heavy(self) -> bool:
         return False
-    
+
     def supports_aggregation(self) -> bool:
         return False
-    
+
     def as_sql_without_aggregation(
         self,
         pb: ParamBuilder,
@@ -288,6 +307,7 @@ class SummaryField(QueryField, BaseModel):
 
 class FeedbackField(QueryField, BaseModel):
     """Field class for feedback payload fields."""
+
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     field: str
@@ -359,10 +379,10 @@ class FeedbackField(QueryField, BaseModel):
 
     def is_heavy(self) -> bool:
         return True
-    
+
     def supports_aggregation(self) -> bool:
         return True
-    
+
     def as_sql_without_aggregation(
         self,
         pb: ParamBuilder,
@@ -382,6 +402,7 @@ class FeedbackField(QueryField, BaseModel):
 
 class AggregatedDataSizeField(QueryField, BaseModel):
     """Field class for total_storage_size_bytes."""
+
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     field: str
@@ -421,25 +442,13 @@ class AggregatedDataSizeField(QueryField, BaseModel):
 
     def is_heavy(self) -> bool:
         return True
-    
+
     def supports_aggregation(self) -> bool:
         return True
-    
+
     def as_sql_without_aggregation(
         self,
         pb: ParamBuilder,
         table_alias: str,
     ) -> str:
         return f"{table_alias}.{self.field}"
-
-
-__all__ = [
-    "SimpleField",
-    "DynamicField",
-    "FieldWithTableOverride",
-    "SummaryField",
-    "FeedbackField",
-    "AggregatedDataSizeField",
-    "STORAGE_SIZE_TABLE_NAME",
-    "ROLLED_UP_CALL_MERGED_STATS_TABLE_NAME",
-]
