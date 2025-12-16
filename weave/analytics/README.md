@@ -274,12 +274,26 @@ Generate an LLM-powered summary of a single trace including its execution tree.
 | `--depth` | Max depth for execution tree (default: 5) |
 | `--pretty` | Pretty print with Rich formatting |
 | `-o, --output` | Output file path |
+| `--debug` | Enable Weave tracing for debugging |
 
 ---
 
 ## Deep Trace Analysis
 
-For complex agentic workflows, use the `--depth` option with the cluster command:
+The `--depth` option controls how many levels of nested traces (child calls) are fetched and analyzed.
+
+### Default Depth Values
+
+| Command | Default `--depth` | Behavior |
+|---------|------------------|----------|
+| `cluster` | **0** (disabled) | Only analyzes root traces by default for performance |
+| `summarize` | **5** | Always fetches execution tree since single-trace analysis benefits from full context |
+
+**Important:** A higher depth value retrieves **more** traces. For example, `--depth 5` fetches 5 levels deep (more traces), while `--depth 3` only fetches 3 levels (fewer traces).
+
+### Enabling Deep Analysis for Clustering
+
+For complex agentic workflows, enable deep trace analysis with the cluster command:
 
 ```bash
 weave analytics cluster "..." --depth 5 --pretty
@@ -287,23 +301,44 @@ weave analytics cluster "..." --depth 5 --pretty
 
 This fetches the full execution tree for each trace (nested function calls, tool invocations, etc.) and includes it in the analysis. The depth parameter controls how many levels of nested calls to include. The execution tree is automatically compacted if it exceeds token limits.
 
+### Adjusting Depth for Summarize
+
+By default, `summarize` fetches 5 levels deep. To limit or expand:
+
+```bash
+# Shallower analysis (faster, less context)
+weave analytics summarize "..." --depth 2
+
+# Deeper analysis (slower, more context)
+weave analytics summarize "..." --depth 10
+```
+
+### When to Use Deep Analysis
+
 Deep analysis is useful for:
 
 - Multi-step agent workflows
 - Traces with nested LLM calls
 - Understanding failure cascades
+- Debugging complex tool orchestration
 
 ---
 
 ## Debug Mode
 
-To trace the analytics pipeline itself (useful for debugging or understanding how clustering works):
+To trace the analytics pipeline itself (useful for debugging or understanding how the commands work):
 
 ```bash
+# Debug clustering
 weave analytics cluster "..." --debug
+
+# Debug summarization
+weave analytics summarize "..." --debug
 ```
 
-This logs all LLM calls to your configured debug Weave project, allowing you to inspect the prompts and responses used for categorization.
+This logs all LLM calls to your configured debug Weave project, allowing you to inspect the prompts and responses used for categorization or summarization.
+
+**Setup:** Configure your debug project during `weave analytics setup` or set `DEBUG_ENTITY` and `DEBUG_PROJECT` in the config file (`~/.weave/analytics_config`).
 
 ---
 

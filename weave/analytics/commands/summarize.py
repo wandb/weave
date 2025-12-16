@@ -92,12 +92,18 @@ def get_llm_kwargs(model: str) -> dict:
     type=click.Path(),
     help="Output file path (default: stdout)",
 )
+@click.option(
+    "--debug",
+    is_flag=True,
+    help="Enable Weave tracing for debugging (logs to configured debug project)",
+)
 def summarize(
     url: str,
     model: str | None,
     depth: int,
     pretty: bool,
     output: str | None,
+    debug: bool,
 ) -> None:
     """Generate an LLM-powered summary of a trace.
 
@@ -139,6 +145,18 @@ def summarize(
     # Load config
     load_env_from_config()
     config = load_config()
+
+    # Initialize Weave tracing if debug mode enabled
+    if debug:
+        import weave
+
+        debug_entity = config.get("DEBUG_ENTITY")
+        debug_project = config.get("DEBUG_PROJECT", "weave-analytics-debug")
+        if debug_entity:
+            project_name = f"{debug_entity}/{debug_project}"
+        else:
+            project_name = debug_project
+        weave.init(project_name)
 
     if model is None:
         model = config.get("LLM_MODEL", "gemini/gemini-2.5-flash")

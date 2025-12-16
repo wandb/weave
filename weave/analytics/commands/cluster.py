@@ -513,12 +513,13 @@ def cluster(
             border_style="green",
         ))
 
-        # Show sample traces from largest cluster
+        # Show sample traces from each cluster
         if result.clusters:
-            largest = result.clusters[0]
-            console.print(f"\n[bold]Top cluster: {largest.category_name}[/bold]")
-            console.print(f"[dim]{largest.category_definition}[/dim]\n")
-            console.print("[bold]Sample traces:[/bold]")
-            for trace in largest.traces[:3]:
-                console.print(f"  • [link={trace.trace_url}]{trace.trace_id}[/link]")
-                console.print(f"    [dim]{trace.categorization_reason[:100]}...[/dim]")
+            console.print("\n[bold cyan]Sample Traces by Cluster[/bold cyan]")
+            for cluster_group in result.clusters:
+                console.print(f"\n[bold bright_magenta]{cluster_group.category_name.replace('_', ' ').title()}[/bold bright_magenta] ({cluster_group.count} traces)")
+                console.print(f"[dim]{cluster_group.category_definition}[/dim]")
+                for trace in cluster_group.traces[:3]:
+                    console.print(f"  • [link={trace.trace_url}]{trace.trace_id[:20]}...[/link]")
+                    reason_preview = trace.categorization_reason[:80] + "..." if len(trace.categorization_reason) > 80 else trace.categorization_reason
+                    console.print(f"    [dim]{reason_preview}[/dim]")
