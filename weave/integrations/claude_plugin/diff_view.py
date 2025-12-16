@@ -278,8 +278,12 @@ def generate_turn_diff_html(
 
         try:
             backup_text = backup_content.as_string()
-        except Exception:
-            continue  # Skip binary files
+        except UnicodeDecodeError:
+            logger.debug(f"Skipping binary file: {file_path}")
+            continue
+        except Exception as e:
+            logger.warning(f"Failed to read backup for {file_path}: {type(e).__name__}: {e}")
+            continue
 
         backup_lines = backup_text.splitlines(keepends=True)
         if backup_lines and not backup_lines[-1].endswith("\n"):
