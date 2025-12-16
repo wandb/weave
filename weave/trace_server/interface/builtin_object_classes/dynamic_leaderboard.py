@@ -16,22 +16,18 @@ class VersionGroup(BaseModel):
     method: AggregationMethod
 
 
-class ObjectVersionGroups(BaseModel):
+class ObjectVersionGroup(BaseModel):
     group_mapping: list[
         VersionGroup
-    ]  # List of versions of the object to group together
-    base_ref: list[str]  # The object ref without a version suffix
+    ]  # List of versions of the object to group together. Empty by default
+    base_ref: str  # The object ref without a version suffix. Empty by default
 
 
 class ObjectConfig(BaseModel):
-    version_groups: ObjectVersionGroups
+    version_groups: list[ObjectVersionGroup]
     show_version_indicator: bool
-    display_name_map: dict[
-        str, str
-    ]  # ref/name -> display name (keys can use "*" wildcards)
-    deselected: list[
-        str
-    ]  # List of dataset refs or patterns to exclude (can use "*" for wildcard matching)
+    display_name_map: dict[str, str]  # ref/name -> display name (keys can use "*" wildcards)
+    deselected: list[str]  # List of dataset refs or patterns to exclude (can use "*" for wildcard matching)
 
 
 class DynamicLeaderboardColumnConfig(BaseModel):
@@ -47,4 +43,5 @@ class DynamicLeaderboard(base_object_def.BaseObject):
     model_configuration: ObjectConfig
     dataset_configuration: ObjectConfig
     scorer_configuration: ObjectConfig
-    columns_configuration: list[DynamicLeaderboardColumnConfig]
+    columns_configuration: list[DynamicLeaderboardColumnConfig] # Empty by default
+
