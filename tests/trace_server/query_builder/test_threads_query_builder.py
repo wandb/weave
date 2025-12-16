@@ -122,9 +122,9 @@ def test_clickhouse_basic_query(read_table: ReadTable, table_name: str):
             FROM
                 {table_name}
             WHERE project_id = {{pb_0: String}}
-
+                AND id = turn_id
             GROUP BY thread_id
-            HAVING id = any(turn_id) AND thread_id IS NOT NULL AND thread_id != ''
+            HAVING thread_id IS NOT NULL AND thread_id != ''
             ORDER BY last_updated DESC
             """
 
@@ -234,9 +234,9 @@ def test_clickhouse_custom_sorting(read_table: ReadTable, table_name: str):
             FROM
                 {table_name}
             WHERE project_id = {{pb_0: String}}
-
+                AND id = turn_id
             GROUP BY thread_id
-            HAVING id = any(turn_id) AND thread_id IS NOT NULL AND thread_id != ''
+            HAVING thread_id IS NOT NULL AND thread_id != ''
             ORDER BY turn_count ASC, start_time DESC
             """
 
@@ -349,9 +349,9 @@ def test_clickhouse_with_limit(read_table: ReadTable, table_name: str):
             FROM
                 {table_name}
             WHERE project_id = {{pb_0: String}}
-
+                AND id = turn_id
             GROUP BY thread_id
-            HAVING id = any(turn_id) AND thread_id IS NOT NULL AND thread_id != ''
+            HAVING thread_id IS NOT NULL AND thread_id != ''
             ORDER BY last_updated DESC
             LIMIT {{pb_1: Int64}}
             """
@@ -421,9 +421,9 @@ def test_clickhouse_with_limit_and_offset(read_table: ReadTable, table_name: str
             FROM
                 {table_name}
             WHERE project_id = {{pb_0: String}}
-
+                AND id = turn_id
             GROUP BY thread_id
-            HAVING id = any(turn_id) AND thread_id IS NOT NULL AND thread_id != ''
+            HAVING thread_id IS NOT NULL AND thread_id != ''
             ORDER BY last_updated DESC
             LIMIT {{pb_1: Int64}}
             OFFSET {{pb_2: Int64}}
@@ -539,9 +539,10 @@ def test_clickhouse_with_date_filters(read_table: ReadTable, table_name: str):
             FROM
                 {table_name}
             WHERE project_id = {{pb_0: String}}
+                AND id = turn_id
                 AND sortable_datetime > {{pb_1: String}} AND sortable_datetime < {{pb_2: String}}
             GROUP BY thread_id
-            HAVING id = any(turn_id) AND thread_id IS NOT NULL AND thread_id != ''
+            HAVING thread_id IS NOT NULL AND thread_id != ''
             ORDER BY last_updated DESC
             """
 
@@ -664,9 +665,10 @@ def test_clickhouse_full_featured_query(read_table: ReadTable, table_name: str):
             FROM
                 {table_name}
             WHERE project_id = {{pb_0: String}}
+                AND id = turn_id
                 AND sortable_datetime > {{pb_1: String}} AND sortable_datetime < {{pb_2: String}}
             GROUP BY thread_id
-            HAVING id = any(turn_id) AND thread_id IS NOT NULL AND thread_id != ''
+            HAVING thread_id IS NOT NULL AND thread_id != ''
             ORDER BY turn_count DESC
             LIMIT {{pb_3: Int64}}
             OFFSET {{pb_4: Int64}}
@@ -797,9 +799,10 @@ def test_clickhouse_only_after_date(read_table: ReadTable, table_name: str):
             FROM
                 {table_name}
             WHERE project_id = {{pb_0: String}}
+                AND id = turn_id
                 AND sortable_datetime > {{pb_1: String}}
             GROUP BY thread_id
-            HAVING id = any(turn_id) AND thread_id IS NOT NULL AND thread_id != ''
+            HAVING thread_id IS NOT NULL AND thread_id != ''
             ORDER BY last_updated DESC
             """
 
@@ -990,9 +993,10 @@ def test_clickhouse_with_thread_id_filter(read_table: ReadTable, table_name: str
             FROM
                 {table_name}
             WHERE project_id = {{pb_0: String}}
+                AND id = turn_id
                 AND (thread_id IS NULL OR thread_id IN ({{pb_1: String}}))
             GROUP BY thread_id
-            HAVING id = any(turn_id) AND thread_id IN ({{pb_1: String}})
+            HAVING thread_id IN ({{pb_1: String}})
              ORDER BY last_updated DESC
             """
 
@@ -1101,10 +1105,11 @@ def test_clickhouse_with_thread_id_and_date_filters(
             FROM
                 {table_name}
             WHERE project_id = {{pb_0: String}}
+                AND id = turn_id
                 AND sortable_datetime > {{pb_1: String}} AND sortable_datetime < {{pb_2: String}}
                 AND (thread_id IS NULL OR thread_id IN ({{pb_3: String}}))
             GROUP BY thread_id
-            HAVING id = any(turn_id) AND thread_id IN ({{pb_3: String}})
+            HAVING thread_id IN ({{pb_3: String}})
              ORDER BY last_updated DESC
             """
 
@@ -1234,10 +1239,11 @@ def test_clickhouse_with_thread_id_and_all_options(
             FROM
                 {table_name}
             WHERE project_id = {{pb_0: String}}
+                AND id = turn_id
                 AND sortable_datetime > {{pb_1: String}} AND sortable_datetime < {{pb_2: String}}
                 AND (thread_id IS NULL OR thread_id IN ({{pb_3: String}}))
             GROUP BY thread_id
-            HAVING id = any(turn_id) AND thread_id IN ({{pb_3: String}})
+            HAVING thread_id IN ({{pb_3: String}})
              ORDER BY turn_count DESC
              LIMIT {{pb_4: Int64}}
              OFFSET {{pb_5: Int64}}
@@ -1385,6 +1391,8 @@ def test_query_structure_documentation(read_table: ReadTable):
         # Should include key aggregations using subquery aliases
         assert "min(call_start_time) AS start_time" in query
         assert "max(call_end_time) AS last_updated" in query
+        # Turn filtering in HAVING clause (after aggregation)
+        assert "id = any(turn_id)" in query
     else:
         # CALLS_COMPLETE uses single-level aggregation (no subquery)
         assert "FROM (" not in query  # No subquery
@@ -1392,8 +1400,9 @@ def test_query_structure_documentation(read_table: ReadTable):
         # Should include key aggregations using actual column names
         assert "min(started_at) AS start_time" in query
         assert "max(ended_at) AS last_updated" in query
+        # Turn filtering in WHERE clause (before aggregation)
+        assert "id = turn_id" in query
 
     # Common assertions for both table types
     assert "COUNT(*) AS turn_count" in query
-    assert "id = any(turn_id)" in query  # Turn filtering
     assert "ORDER BY last_updated DESC" in query  # Default ordering

@@ -106,18 +106,16 @@ def make_threads_query(
 
         # HAVING: Filter final thread_id to specified thread_ids only
         having_thread_filter_clause_merged = (
-            f"AND aggregated_thread_id IN {thread_ids_in_clause}"
+            f"aggregated_thread_id IN {thread_ids_in_clause}"
         )
-        having_thread_filter_clause_complete = (
-            f"AND thread_id IN {thread_ids_in_clause}"
-        )
+        having_thread_filter_clause_complete = f"thread_id IN {thread_ids_in_clause}"
     else:
         # Filter out NULL and empty thread_ids when no specific thread_ids are requested
         having_thread_filter_clause_merged = (
-            "AND aggregated_thread_id IS NOT NULL AND aggregated_thread_id != ''"
+            "aggregated_thread_id IS NOT NULL AND aggregated_thread_id != ''"
         )
         having_thread_filter_clause_complete = (
-            "AND thread_id IS NOT NULL AND thread_id != ''"
+            "thread_id IS NOT NULL AND thread_id != ''"
         )
 
     # Two-level aggregation to handle ClickHouse materialized view partial merges
@@ -169,13 +167,15 @@ def make_threads_query(
                 {sortable_datetime_filter_clause}
                 {where_thread_filter_clause}
             GROUP BY (project_id, id)
-            HAVING id = any(turn_id) {having_thread_filter_clause_merged}
+            HAVING id = any(turn_id) AND {having_thread_filter_clause_merged}
         ) AS properly_merged_calls
         GROUP BY aggregated_thread_id
         """
     else:
         # CALLS_COMPLETE doesn't need two-level aggregation since it doesn't have partial merges
         # Use actual column names from the table
+        # Note: For calls_complete, we filter turn calls in WHERE (id = turn_id) not HAVING,
+        # since id is not in GROUP BY or an aggregate function
         query = f"""
         SELECT
             thread_id AS thread_id,
@@ -189,10 +189,11 @@ def make_threads_query(
         FROM
             calls_complete
         WHERE project_id = {{{project_id_param}: String}}
+            AND id = turn_id
             {sortable_datetime_filter_clause}
             {where_thread_filter_clause}
         GROUP BY thread_id
-        HAVING id = any(turn_id) {having_thread_filter_clause_complete}
+        HAVING {having_thread_filter_clause_complete}
         """
 
     # Add sorting
