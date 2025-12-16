@@ -160,6 +160,16 @@ SETTINGS
     enable_block_offset_column = 1;
 
 -- ============================================================================
+-- Add queue_id to feedback table
+-- ============================================================================
+ALTER TABLE feedback
+    /*
+    `queue_id`: The queue ID this feedback was created from.
+    References annotation_queues.id. NULL when feedback is created outside of queues.
+    */
+    ADD COLUMN queue_id Nullable(String) DEFAULT NULL;
+
+-- ============================================================================
 -- annotator_queue_items_progress: Per-annotator workflow state tracking
 -- ============================================================================
 CREATE TABLE annotator_queue_items_progress (
@@ -189,41 +199,24 @@ CREATE TABLE annotator_queue_items_progress (
     call_id String,
 
     /*
-    `annotator_id`: W&B user ID of the annotator. NULL when state is 'pending'.
+    `annotator_id`: W&B user ID of the annotator.
     */
-    annotator_id Nullable(String),
+    annotator_id String,
 
     /*
     `annotation_state`: Workflow state of this item.
-    - pending (0): Available for annotation
-    - completed (1): Annotation finished
-    - skipped (2): Annotator chose to skip
+    - completed (0): Annotation finished
+    - skipped (1): Annotator chose to skip
     */
     annotation_state Enum8(
-        'pending' = 0,
-        'completed' = 1,
-        'skipped' = 2
-    ) DEFAULT 'pending',
-
-    /*
-    `completed_at`: Timestamp when annotation was completed. NULL if not completed.
-    */
-    completed_at Nullable(DateTime64(3)),
-
-    /*
-    `completed_by`: W&B user ID who completed the annotation. NULL if not completed.
-    */
-    completed_by Nullable(String),
+        'completed' = 0,
+        'skipped' = 1
+    ) DEFAULT 'completed',
 
     /*
     `created_at`: Timestamp when the row was created.
     */
     created_at DateTime64(3) DEFAULT now64(3),
-
-    /*
-    `created_by`: W&B user ID who created this record.
-    */
-    created_by String,
 
     /*
     `updated_at`: Timestamp when the row was last modified.
