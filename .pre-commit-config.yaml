@@ -10,6 +10,14 @@ repos:
     rev: v2.1.0
     hooks:
       - id: fixit-fix
+  - repo: local
+    hooks:
+      - id: ty
+        name: ty (type checker)
+        entry: uv run ty check
+        language: python
+        always_run: true
+        pass_filenames: false
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.12.3
     hooks:
@@ -74,11 +82,6 @@ repos:
         args: ["-o", "4", "--strip", "safe", "--alpha"]
   - repo: local
     hooks:
-      - id: ty
-        name: ty type checker
-        entry: uv run ty check
-        language: python
-        always_run: true
       - id: jupyter-nb-clear-output
         name: jupyter-nb-clear-output
         files: ^examples/.*\.ipynb$

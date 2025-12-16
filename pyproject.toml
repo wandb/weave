@@ -494,7 +494,7 @@ omit = ["weave/agent/**"]
 
 [tool.ty.src]
 include = ["weave"]
-exclude = ["tests", "examples"]
+exclude = ["tests", "examples", "pyproject.toml"]
 
 [tool.ty.environment]
 python-version= "3.10"
