@@ -287,7 +287,7 @@ library_cases = [
             "dataset": "weave:///shawn/test-project/object/Dataset:acPomFUR8YXQnrXywT8Y9xrZZQeBk07GzOGCFzB7KO0",
             "scorers": [
                 "weave:///shawn/test-project/object/MyScorer:YZQwofwInVNL3M3cR6IuymuMYH6riXSg30fKWqbxEfo",
-                "weave:///shawn/test-project/object/LLMAsAJudgeScorer:yknqLy4g73ioFXxfXngzX31xRANaFoRvnQmbVOpoE5E",
+                "weave:///shawn/test-project/object/LLMAsAJudgeScorer:erL8bTkANuYOPLwm6Rj2QWMES8iYsvcZm7pAHswfLf8",
             ],
             "preprocess_model_input": None,
             "trials": 1,
@@ -346,13 +346,13 @@ library_cases = [
             },
             {
                 "object_id": "LLMAsAJudgeScorer",
-                "digest": "yknqLy4g73ioFXxfXngzX31xRANaFoRvnQmbVOpoE5E",
+                "digest": "erL8bTkANuYOPLwm6Rj2QWMES8iYsvcZm7pAHswfLf8",
                 "exp_val": {
                     "_type": "LLMAsAJudgeScorer",
                     "name": None,
                     "description": None,
                     "column_map": None,
-                    "model": "weave:///shawn/test-project/object/LLMStructuredCompletionModel:LU9yygX08NYFQ7EWX8sTuLxAGgwtzJESOUtGojAe3hk",
+                    "model": "weave:///shawn/test-project/object/LLMStructuredCompletionModel:ZRj0O2UQTStbLrYHXxim8HKdtatyS9lLbmR3DDPwNIY",
                     "scoring_prompt": "Here are the inputs: {inputs}. Here is the output: {output}. Is the output correct?",
                     "score": "weave:///shawn/test-project/op/LLMAsAJudgeScorer.score:2qBMCi2NKvPsWtfe10WxusvHuQSCeX3khGq7KUMbNpc",
                     "summarize": "weave:///shawn/test-project/op/Scorer.summarize:LYcmOkxmx4hRYtJ65hnd4uy7jhdYJCnhYXys5aakzfo",
@@ -371,7 +371,7 @@ library_cases = [
             },
             {
                 "object_id": "LLMStructuredCompletionModel",
-                "digest": "LU9yygX08NYFQ7EWX8sTuLxAGgwtzJESOUtGojAe3hk",
+                "digest": "ZRj0O2UQTStbLrYHXxim8HKdtatyS9lLbmR3DDPwNIY",
                 "exp_val": {
                     "_type": "LLMStructuredCompletionModel",
                     "name": None,
@@ -403,14 +403,14 @@ library_cases = [
                         "_class_name": "LLMStructuredCompletionModelDefaultParams",
                         "_bases": ["BaseModel"],
                     },
-                    "predict": "weave:///shawn/test-project/op/LLMStructuredCompletionModel.predict:SjfGulYMo1eX8BDv4HxKOfswszec6CVI43rbFrnxB9M",
+                    "predict": "weave:///shawn/test-project/op/LLMStructuredCompletionModel.predict:QQbJYkUdfFRTYWovY1S3O7tOaPvicXZEjjcPX4Rxitc",
                     "_class_name": "LLMStructuredCompletionModel",
                     "_bases": ["Model", "Object", "BaseModel"],
                 },
             },
             {
                 "object_id": "LLMStructuredCompletionModel.predict",
-                "digest": "SjfGulYMo1eX8BDv4HxKOfswszec6CVI43rbFrnxB9M",
+                "digest": "QQbJYkUdfFRTYWovY1S3O7tOaPvicXZEjjcPX4Rxitc",
                 "exp_val": {
                     "_type": "CustomWeaveType",
                     "weave_type": {"type": "Op"},
