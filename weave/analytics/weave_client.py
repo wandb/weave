@@ -5,6 +5,7 @@ import json
 import os
 import time
 from dataclasses import dataclass
+from datetime import datetime
 from functools import wraps
 from typing import Any, Callable
 
@@ -129,51 +130,29 @@ class AnalyticsWeaveClient:
             "attributes",
         ]
 
+        # Build the filter object (server-side filtering per API spec)
+        api_filter: dict[str, Any] = {
+            "trace_roots_only": trace_roots_only,
+        }
+
         query: dict[str, Any] = {
             "project_id": f"{self.config.entity}/{self.config.project}",
-            "filter": {},
+            "filter": api_filter,
             "columns": columns,
-            "sort_by": [{"field": "started_at", "direction": "asc"}],
+            "sort_by": [{"field": "started_at", "direction": "desc"}],
+            "include_feedback": False,
+            "include_costs": False,
         }
 
         expr_conditions = []
 
-        # Add root traces filter
-        if trace_roots_only:
-            expr_conditions.append({
-                "$eq": [
-                    {"$getField": "parent_id"},
-                    {"$literal": None}
-                ]
-            })
-
         # Convert Weave UI filters to API format
         if filters:
-            # Handle opVersionRefs filter (matches op_name patterns)
+            # Handle opVersionRefs filter - pass directly to filter.op_names
+            # The API accepts full refs like "weave:///entity/project/op/OpName:*"
             op_version_refs = filters.get("opVersionRefs", [])
             if op_version_refs:
-                op_conditions = []
-                for ref in op_version_refs:
-                    # Extract op name pattern from ref like "weave:///entity/project/op/OpName:*"
-                    if "/op/" in ref:
-                        op_pattern = ref.split("/op/")[-1]
-                        # Remove version suffix (e.g., ":*" or ":abc123")
-                        if ":" in op_pattern:
-                            op_name = op_pattern.split(":")[0]
-                        else:
-                            op_name = op_pattern
-                        # Match op_name containing this pattern
-                        op_conditions.append({
-                            "$contains": {
-                                "input": {"$getField": "op_name"},
-                                "substr": {"$literal": op_name}
-                            }
-                        })
-                if op_conditions:
-                    if len(op_conditions) == 1:
-                        expr_conditions.append(op_conditions[0])
-                    else:
-                        expr_conditions.append({"$or": op_conditions})
+                api_filter["op_names"] = op_version_refs
 
             # Handle filter items (field/operator/value format)
             filter_items = filters.get("items", [])
@@ -187,7 +166,10 @@ class AnalyticsWeaveClient:
                     expr_conditions.append(condition)
 
         if expr_conditions:
-            query["query"] = {"$expr": {"$and": expr_conditions}}
+            if len(expr_conditions) == 1:
+                query["query"] = {"$expr": expr_conditions[0]}
+            else:
+                query["query"] = {"$expr": {"$and": expr_conditions}}
 
         if limit:
             query["limit"] = limit
@@ -282,18 +264,43 @@ class AnalyticsWeaveClient:
                     ]
                 }]
             }
-        elif "(date):" in operator:
-            # Date filters are not fully supported by the Weave query API
-            # Skip them and let the client-side filtering handle it, or warn user
-            # For now, return None to skip this filter
-            import warnings
-            warnings.warn(
-                f"Date filter '{operator}' on field '{field}' is not fully supported "
-                "by the Weave query API and will be skipped. Results may include "
-                "traces outside the specified date range.",
-                UserWarning,
-                stacklevel=3,
-            )
+        elif "(date): before" in operator:
+            # Convert ISO date to Unix timestamp (seconds)
+            timestamp = self._iso_to_unix_timestamp(value)
+            if timestamp is not None:
+                # "before" = NOT greater than timestamp
+                return {
+                    "$not": [{
+                        "$gt": [
+                            {"$getField": field},
+                            {"$literal": timestamp}
+                        ]
+                    }]
+                }
+            return None
+        elif "(date): after" in operator:
+            # Convert ISO date to Unix timestamp (seconds)
+            timestamp = self._iso_to_unix_timestamp(value)
+            if timestamp is not None:
+                # "after" = greater than timestamp
+                return {
+                    "$gt": [
+                        {"$getField": field},
+                        {"$literal": timestamp}
+                    ]
+                }
+            return None
+        elif "(date): on" in operator or "(date): equals" in operator:
+            # For date equality - this would need range queries for a full day
+            # For now, use exact timestamp match
+            timestamp = self._iso_to_unix_timestamp(value)
+            if timestamp is not None:
+                return {
+                    "$eq": [
+                        {"$getField": field},
+                        {"$literal": timestamp}
+                    ]
+                }
             return None
         # Default equality
         return {
@@ -302,6 +309,24 @@ class AnalyticsWeaveClient:
                 {"$literal": value}
             ]
         }
+
+    @staticmethod
+    def _iso_to_unix_timestamp(iso_string: str) -> int | None:
+        """Convert an ISO datetime string to Unix timestamp (seconds).
+
+        Args:
+            iso_string: ISO format datetime string (e.g., "2025-04-21T22:00:00.000Z")
+
+        Returns:
+            Unix timestamp in seconds, or None if parsing fails
+        """
+        try:
+            # Handle various ISO formats
+            iso_string = iso_string.replace("Z", "+00:00")
+            dt = datetime.fromisoformat(iso_string)
+            return int(dt.timestamp())
+        except (ValueError, AttributeError):
+            return None
 
     def query_by_call_id(
         self,

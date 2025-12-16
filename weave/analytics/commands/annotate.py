@@ -506,22 +506,22 @@ def annotate(
             bar_length = int((count / max_count) * 30)
             bar = "█" * bar_length
 
-            if pct >= 30:
-                pct_style = "bright_magenta"
-            elif pct >= 10:
-                pct_style = "yellow"
-            else:
-                pct_style = "white"
+        if pct >= 30:
+            pct_style = "bright_magenta"
+        elif pct >= 10:
+            pct_style = "yellow"
+        else:
+            pct_style = "white"
 
             histogram_table.add_row(
                 category,
                 str(count),
-                f"[{pct_style}]{pct:.1f}%[/{pct_style}]",
+            f"[{pct_style}]{pct:.1f}%[/{pct_style}]",
                 bar,
-            )
+        )
 
         console.print(histogram_table)
-        console.print()
+    console.print()
 
     # Dry run - show sample annotations
     if dry_run:
@@ -557,7 +557,7 @@ def annotate(
     # Create AnnotationSpec for the failure analysis field
     if pretty:
         spinner = AnalyticsSpinner("Creating annotation spec")
-        spinner.start()
+    spinner.start()
 
     try:
         from weave import AnnotationSpec
@@ -604,7 +604,7 @@ def annotate(
     # Apply annotations to each trace
     if pretty:
         spinner = AnalyticsSpinner(f"Annotating {len(traces)} traces")
-        spinner.start()
+    spinner.start()
 
     from weave.trace_server.interface.feedback_types import ANNOTATION_FEEDBACK_TYPE_PREFIX
     from weave.trace_server.trace_server_interface import FeedbackCreateReq
@@ -704,9 +704,9 @@ def annotate(
 [bold]Categories Found:[/bold] {len(category_counts)}
 
 [bold]Top Categories:[/bold]""" + "".join([
-    f"\n  • {cat}: {count} ({(count/len(traces))*100:.1f}%)"
-    for cat, count in sorted_categories[:5]
-]),
+                f"\n  • {cat}: {count} ({(count/len(traces))*100:.1f}%)"
+                for cat, count in sorted_categories[:5]
+            ]),
             title="Summary",
             border_style="green",
         ))
