@@ -352,7 +352,7 @@ library_cases = [
                     "name": None,
                     "description": None,
                     "column_map": None,
-                    "model": "weave:///shawn/test-project/object/LLMStructuredCompletionModel:QeYfQ8fxFbLOyH0cI6YTgcYTF3ncDnJ7EnmJ9QuDCN8",
+                    "model": "weave:///shawn/test-project/object/LLMStructuredCompletionModel:LU9yygX08NYFQ7EWX8sTuLxAGgwtzJESOUtGojAe3hk",
                     "scoring_prompt": "Here are the inputs: {inputs}. Here is the output: {output}. Is the output correct?",
                     "score": "weave:///shawn/test-project/op/LLMAsAJudgeScorer.score:2qBMCi2NKvPsWtfe10WxusvHuQSCeX3khGq7KUMbNpc",
                     "summarize": "weave:///shawn/test-project/op/Scorer.summarize:LYcmOkxmx4hRYtJ65hnd4uy7jhdYJCnhYXys5aakzfo",
@@ -371,7 +371,7 @@ library_cases = [
             },
             {
                 "object_id": "LLMStructuredCompletionModel",
-                "digest": "QeYfQ8fxFbLOyH0cI6YTgcYTF3ncDnJ7EnmJ9QuDCN8",
+                "digest": "LU9yygX08NYFQ7EWX8sTuLxAGgwtzJESOUtGojAe3hk",
                 "exp_val": {
                     "_type": "LLMStructuredCompletionModel",
                     "name": None,
