@@ -3,7 +3,6 @@ import pytest
 from tests.trace_server.query_builder.utils import assert_sql
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.calls_query_builder.calls_query_builder import (
-    AggregatedDataSizeField,
     CallsQuery,
     HardCodedFilter,
 )
@@ -1555,16 +1554,19 @@ def test_total_storage_size():
 
 
 def test_aggregated_data_size_field():
-    """Test the AggregatedDataSizeField class."""
-    field = AggregatedDataSizeField(
-        field="total_storage_size_bytes", join_table_name="rolled_up_cms"
-    )
+    """Test the AggregatedDataSizeField class (now via get_field_by_name)."""
+    from weave.trace_server.calls_query_builder.calls_query_builder import get_field_by_name
+    from weave.trace_server.project_version.types import ReadTable
+    
+    # Get the field via the new refactored interface
+    field = get_field_by_name("total_storage_size_bytes", ReadTable.CALLS_MERGED)
     pb = ParamBuilder()
 
     # Test SQL generation
     sql = field.as_select_sql(pb, "calls_merged")
     assert "CASE" in sql
     assert "parent_id" in sql
+    # The actual table name used is "rolled_up_cms" (short form)
     assert "rolled_up_cms.total_storage_size_bytes" in sql
 
 

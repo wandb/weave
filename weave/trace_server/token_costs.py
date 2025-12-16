@@ -415,16 +415,14 @@ def _prepare_final_select_fields(
     Returns:
         Final list of field names to select
     """
-    from weave.trace_server.calls_query_builder.calls_query_builder import (
-        CallsMergedFeedbackPayloadField,
-    )
+    from weave.trace_server.calls_query_builder.fields import FeedbackField
 
     # Filter out summary_dump - we generate it ourselves with cost data
     final_fields = [f for f in select_fields if f != "summary_dump"]
 
     # Add fields required for ORDER BY (but not feedback fields - those come from JOIN)
     for order_field in order_fields:
-        if isinstance(order_field.field, CallsMergedFeedbackPayloadField):
+        if isinstance(order_field.field, FeedbackField):
             continue
         field_name = order_field.field.field
         if field_name not in final_fields and field_name != "summary_dump":
@@ -434,22 +432,10 @@ def _prepare_final_select_fields(
 
 
 def _needs_feedback_join(order_fields: list["OrderField"]) -> bool:
-    """Check if any order field requires a feedback JOIN.
+    """Check if feedback JOIN is needed for any of the order fields."""
+    from weave.trace_server.calls_query_builder.fields import FeedbackField
 
-    Args:
-        order_fields: Fields to order by
-
-    Returns:
-        True if feedback JOIN is needed
-    """
-    from weave.trace_server.calls_query_builder.calls_query_builder import (
-        CallsMergedFeedbackPayloadField,
-    )
-
-    return any(
-        isinstance(order_field.field, CallsMergedFeedbackPayloadField)
-        for order_field in order_fields
-    )
+    return any(isinstance(of.field, FeedbackField) for of in order_fields)
 
 
 def _build_feedback_join(
