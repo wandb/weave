@@ -50,7 +50,7 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     build_calls_stats_query,
     combine_conditions,
 )
-from weave.trace_server.calls_query_builder.fields import DynamicField
+from weave.trace_server.calls_query_builder.fields import DynamicField, SimpleField
 from weave.trace_server.calls_query_builder.table_strategy import CallsCompleteStrategy
 from weave.trace_server.clickhouse_schema import (
     ALL_CALL_INSERT_COLUMNS,
@@ -1647,7 +1647,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if not sort_fields:
             sort_fields = [
                 OrderField(
-                    field=QueryBuilderField(field=ROW_ORDER_COLUMN_NAME),
+                    field=SimpleField(field=ROW_ORDER_COLUMN_NAME),
                     direction="ASC",
                 )
             ]
