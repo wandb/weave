@@ -64,7 +64,7 @@ SHARDS_WITHOUT_EXTRAS = {
     "trace_no_server",
     "trace_server",
     "trace_server_bindings",
-    "trace_calls_complete",  # Same as trace but with calls_complete table
+    "trace_dual_write_read_complete",  # Same as trace but with dual write + read from complete
     "openai_realtime",
     "autogen_tests",
     "verifiers_test",
@@ -114,7 +114,7 @@ SHARDS_WITHOUT_EXTRAS = {
         "autogen_tests",
         "trace",
         "trace_no_server",
-        "trace_calls_complete",
+        "trace_dual_write_read_complete",
         "stainless",
     ],
 )
@@ -189,7 +189,12 @@ def tests(session: nox.Session, shard: str):
             "tests/wandb_interface/",
         ],
         "trace_no_server": ["tests/trace/"],
-        "trace_calls_complete": ["tests/trace/"],
+        "trace_dual_write_read_complete": [
+            "tests/trace/",
+            "tests/compat/",
+            "tests/utils/",
+            "tests/wandb_interface/",
+        ],
     }
 
     test_dirs = test_dirs_dict.get(shard, default_test_dirs)
@@ -199,7 +204,7 @@ def tests(session: nox.Session, shard: str):
             raise ValueError(f"Test directory {test_dir} does not exist")
 
     # Enable parallel workers for trace shards (each worker gets isolated database namespace)
-    if shard in ("trace", "trace_calls_complete"):
+    if shard in ("trace", "trace_dual_write_read_complete"):
         cpu_count = os.cpu_count()
         if cpu_count is not None and cpu_count > 1:
             session.posargs.insert(0, f"-n{cpu_count}")
@@ -219,7 +224,7 @@ def tests(session: nox.Session, shard: str):
         pytest_args.extend(["-m", "trace_server"])
     elif shard == "trace_no_server":
         pytest_args.extend(["-m", "not trace_server"])
-    elif shard == "trace_calls_complete":
+    elif shard == "trace_dual_write_read_complete":
         # Run trace tests with calls_complete table instead of legacy calls_merged table
         pytest_args.extend(
             ["-m", "trace_server", "--calls-storage-mode=dual_write_read_complete"]
