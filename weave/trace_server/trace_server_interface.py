@@ -493,29 +493,6 @@ class CallsQueryRes(BaseModel):
     calls: list[CallSchema]
 
 
-class CallsExportParquetReq(BaseModel):
-    """Request for exporting calls as Parquet via ClickHouse native format.
-
-    This endpoint streams Parquet data directly from ClickHouse, which is
-    significantly more efficient than Python-side conversion.
-    """
-
-    project_id: str
-    filter: CallsFilter | None = None
-    query: Query | None = None
-    sort_by: list[SortBy] | None = None
-    columns: list[str] | None = None
-    limit: int | None = None
-    offset: int | None = None
-    include_costs: bool | None = Field(
-        default=False,
-        description="If true, include model costs computed from token usage. "
-        "Costs are calculated entirely in SQL.",
-    )
-    # Note: include_feedback and expand_columns are NOT supported here
-    # as they require Python-side processing. Use CallsQueryReq for those features.
-
-
 class CallsQueryStatsReq(BaseModelStrict):
     project_id: str
     filter: CallsFilter | None = None
@@ -1996,9 +1973,6 @@ class TraceServerInterface(Protocol):
     def call_read(self, req: CallReadReq) -> CallReadRes: ...
     def calls_query(self, req: CallsQueryReq) -> CallsQueryRes: ...
     def calls_query_stream(self, req: CallsQueryReq) -> Iterator[CallSchema]: ...
-    def calls_export_parquet_stream(
-        self, req: CallsExportParquetReq
-    ) -> Iterator[bytes]: ...
     def calls_delete(self, req: CallsDeleteReq) -> CallsDeleteRes: ...
     def calls_query_stats(self, req: CallsQueryStatsReq) -> CallsQueryStatsRes: ...
     def call_update(self, req: CallUpdateReq) -> CallUpdateRes: ...

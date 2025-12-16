@@ -640,24 +640,3 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         if req.wb_user_id is not None:
             req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
         return self._ref_apply(self._internal_trace_server.score_delete, req)
-
-    # Parquet Export
-
-    def calls_export_parquet_stream(
-        self, req: tsi.CallsExportParquetReq
-    ) -> Iterator[bytes]:
-        """Export calls as Parquet, converting project_id."""
-        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        if req.filter is not None:
-            if req.filter.wb_run_ids is not None:
-                req.filter.wb_run_ids = [
-                    self._idc.ext_to_int_run_id(run_id)
-                    for run_id in req.filter.wb_run_ids
-                ]
-            if req.filter.wb_user_ids is not None:
-                req.filter.wb_user_ids = [
-                    self._idc.ext_to_int_user_id(user_id)
-                    for user_id in req.filter.wb_user_ids
-                ]
-        # Parquet bytes don't need ref conversion
-        yield from self._internal_trace_server.calls_export_parquet_stream(req)

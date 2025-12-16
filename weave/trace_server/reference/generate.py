@@ -997,42 +997,6 @@ def generate_routes(
     ) -> tsi.CallsQueryRes:
         return service.trace_server_interface.calls_query(req)
 
-    @router.post(
-        "/calls/export/parquet",
-        tags=[CALLS_TAG_NAME],
-        response_class=StreamingResponse,
-        responses={
-            200: {
-                "description": "Parquet file stream",
-                "content": {"application/octet-stream": {}},
-            }
-        },
-    )
-    def calls_export_parquet(
-        req: tsi.CallsExportParquetReq,
-        service: TraceService = Depends(get_service),  # noqa: B008
-    ) -> StreamingResponse:
-        """Export calls as Parquet file using ClickHouse native format.
-
-        This streams a Parquet file directly from ClickHouse. The file can
-        be opened with DuckDB, Polars, Pandas, or any Parquet-compatible tool.
-
-        Supports:
-        - filter, query, columns, sort_by, limit, offset
-        - include_costs (computed in SQL)
-
-        Not supported (use /calls/stream_query with JSONL instead):
-        - expand_columns (requires Python-side object resolution)
-        - include_feedback (requires Python-side query and join)
-        """
-        return StreamingResponse(
-            service.trace_server_interface.calls_export_parquet_stream(req),
-            media_type="application/octet-stream",
-            headers={
-                "Content-Disposition": 'attachment; filename="calls.parquet"',
-            },
-        )
-
     @router.post("/obj/create", tags=[OBJECTS_TAG_NAME])
     def obj_create(
         req: tsi.ObjCreateReq,
