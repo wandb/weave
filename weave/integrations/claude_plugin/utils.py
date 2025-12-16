@@ -328,6 +328,21 @@ class ToolCallError(Exception):
     pass
 
 
+class SessionParseError(Exception):
+    """Exception raised when session parsing fails."""
+    pass
+
+
+class FileBackupError(Exception):
+    """Exception raised when file backup operations fail."""
+    pass
+
+
+class DaemonConnectionError(Exception):
+    """Exception raised when daemon socket connection fails."""
+    pass
+
+
 @dataclass
 class BufferedToolResult:
     """A tool result waiting to be logged with parallel grouping.
