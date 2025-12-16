@@ -355,6 +355,11 @@ class EvaluationLoggerV2:
         )
         self._evaluation_run_id = run_res.evaluation_run_id
 
+        # Register with the shared cleanup registry
+        from weave.evaluation.eval_imperative import register_evaluation_logger
+
+        register_evaluation_logger(self)
+
     @property
     def ui_url(self) -> str | None:
         """Get the URL to view this evaluation in the UI."""
@@ -404,6 +409,11 @@ class EvaluationLoggerV2:
                 )
 
         self._is_finalized = True
+
+        # Unregister from the shared cleanup registry
+        from weave.evaluation.eval_imperative import unregister_evaluation_logger
+
+        unregister_evaluation_logger(self)
 
     def log_prediction(
         self, inputs: dict[str, Any], output: Any = None
@@ -545,8 +555,10 @@ class EvaluationLoggerV2:
 
     def __del__(self) -> None:
         """Ensure cleanup happens during garbage collection."""
+        # The atexit handler in eval_imperative.py will handle cleanup
+        # This is a fallback in case the object is garbage collected before exit
         if not self._is_finalized:
             try:
                 self.finish()
             except Exception:
-                logger.error("Error during cleanup of EvaluationLoggerV2", exc_info=True)
+                pass  # Suppress errors during GC
