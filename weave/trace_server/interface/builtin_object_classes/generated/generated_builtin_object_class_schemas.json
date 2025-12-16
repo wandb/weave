@@ -1745,7 +1745,11 @@
     "ObjectConfig": {
       "properties": {
         "version_groups": {
-          "$ref": "#/$defs/ObjectVersionGroups"
+          "items": {
+            "$ref": "#/$defs/ObjectVersionGroup"
+          },
+          "title": "Version Groups",
+          "type": "array"
         },
         "show_version_indicator": {
           "title": "Show Version Indicator",
@@ -1811,7 +1815,7 @@
       "title": "ObjectRef",
       "type": "object"
     },
-    "ObjectVersionGroups": {
+    "ObjectVersionGroup": {
       "properties": {
         "group_mapping": {
           "items": {
@@ -1821,18 +1825,15 @@
           "type": "array"
         },
         "base_ref": {
-          "items": {
-            "type": "string"
-          },
           "title": "Base Ref",
-          "type": "array"
+          "type": "string"
         }
       },
       "required": [
         "group_mapping",
         "base_ref"
       ],
-      "title": "ObjectVersionGroups",
+      "title": "ObjectVersionGroup",
       "type": "object"
     },
     "OrOperation": {
