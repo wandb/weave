@@ -197,7 +197,7 @@ class FileBackup:
                     "message_id": self.message_id,
                 },
             )
-        except Exception as e:
+        except (FileNotFoundError, PermissionError, UnicodeDecodeError, OSError) as e:
             logger.debug(f"Failed to load backup file {backup_path}: {e}")
             return None
 
@@ -538,7 +538,8 @@ def parse_session_file(path: Path) -> Session | None:
                                     if backup_time_str
                                     else datetime.datetime.now(tz=datetime.timezone.utc)
                                 )
-                            except Exception:
+                            except (ValueError, TypeError) as e:
+                                logger.debug(f"Failed to parse backup timestamp '{backup_time_str}': {e}")
                                 backup_time = datetime.datetime.now(
                                     tz=datetime.timezone.utc
                                 )
@@ -618,7 +619,7 @@ def parse_session_file(path: Path) -> Session | None:
                                     mimetype=source.get("media_type"),
                                 )
                                 user_images.append(image_content)
-                            except Exception as e:
+                            except (ValueError, TypeError, KeyError) as e:
                                 logger.debug(f"Failed to parse image: {e}")
                     elif c.get("type") == "tool_result":
                         tool_use_id = c.get("tool_use_id")
