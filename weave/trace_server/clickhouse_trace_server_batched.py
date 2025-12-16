@@ -51,7 +51,6 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     combine_conditions,
 )
 from weave.trace_server.calls_query_builder.fields import DynamicField, SimpleField
-from weave.trace_server.calls_query_builder.table_strategy import CallsCompleteStrategy
 from weave.trace_server.clickhouse_schema import (
     ALL_CALL_INSERT_COLUMNS,
     ALL_CALL_JSON_COLUMNS,
@@ -1608,12 +1607,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                         f"Invalid sort field '{sort.field}': field path components cannot be empty"
                     )
 
-                # Use DynamicField with CallsCompleteStrategy (no aggregation)
-                # for table queries which don't use aggregation
                 field = OrderField(
                     field=DynamicField(
                         field=VAL_DUMP_COLUMN_NAME,
-                        strategy=CallsCompleteStrategy(),
                         extra_path=extra_path,
                     ),
                     direction="ASC" if sort.direction.lower() == "asc" else "DESC",
