@@ -10,7 +10,7 @@ from collections import defaultdict
 from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
 from re import sub
-from typing import Any, cast
+from typing import Any, Literal, cast
 from zoneinfo import ZoneInfo
 
 import clickhouse_connect
@@ -137,7 +137,11 @@ from weave.trace_server.project_query_builder import make_project_stats_query
 from weave.trace_server.project_version.project_version import (
     TableRoutingResolver,
 )
-from weave.trace_server.project_version.types import WriteTarget
+from weave.trace_server.project_version.types import (
+    ProjectDataResidence,
+    ReadTable,
+    WriteTarget,
+)
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 from weave.trace_server.table_query_builder import (
     ROW_ORDER_COLUMN_NAME,
@@ -470,6 +474,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             ends=ends,
             completes=completes,
             do_sync_insert=True,
+            source="otel",
         )
 
         if rejected_spans > 0:
@@ -718,6 +723,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         ends: list[tsi.EndedCallSchemaForInsert] | None = None,
         completes: list[tsi.CompletedCallSchemaForInsert] | None = None,
         do_sync_insert: bool = False,
+        source: Literal["sdk", "otel", "completions"] = "sdk",
     ) -> None:
         """Main entry point for inserting calls with automatic dual-write routing.
 
@@ -730,6 +736,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             ends: List of call ends to insert (updates existing calls)
             completes: List of complete calls to insert (start + end in one)
             do_sync_insert: If True, bypass async_insert for immediate consistency
+            source: Source of the call data - "sdk" (default), "otel", or "completions".
+                OTEL and completions only dual-write if residence is already BOTH,
+                not on EMPTY projects.
+
+        Raises:
+            RuntimeError: If write_target is BOTH and writes to both tables fail
         """
         starts = starts or []
         ends = ends or []
@@ -742,10 +754,58 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             project_id, self.ch_client
         )
 
-        if write_target in [WriteTarget.CALLS_MERGED, WriteTarget.BOTH]:
-            self._write_batch_to_merged_table(starts, ends, completes, do_sync_insert)
+        # For OTEL and completions: only dual write if residence is already BOTH
+        # For SDK: dual write on EMPTY projects as well (standard behavior)
+        if write_target == WriteTarget.BOTH and source in ["otel", "completions"]:
+            residence = self.table_routing_resolver._get_residence(
+                project_id, self.ch_client
+            )
+            if residence == ProjectDataResidence.EMPTY:
+                # OTEL/completions on EMPTY projects: write to single table based on read preference
+                read_table = self.table_routing_resolver.resolve_read_table(
+                    project_id, self.ch_client
+                )
+                write_target = (
+                    WriteTarget.CALLS_COMPLETE
+                    if read_table == ReadTable.CALLS_COMPLETE
+                    else WriteTarget.CALLS_MERGED
+                )
 
-        if write_target in [WriteTarget.CALLS_COMPLETE, WriteTarget.BOTH]:
+        # When write_target is BOTH, we must write to both tables or fail entirely
+        # to maintain data consistency. If one write fails, data will be lost on cutover.
+        if write_target == WriteTarget.BOTH:
+            merged_error = None
+            complete_error = None
+
+            try:
+                self._write_batch_to_merged_table(
+                    starts, ends, completes, do_sync_insert
+                )
+            except Exception as e:
+                merged_error = e
+
+            try:
+                self._write_batch_to_complete_table(
+                    starts, ends, completes, do_sync_insert
+                )
+            except Exception as e:
+                complete_error = e
+
+            # If either write failed, raise an error to maintain consistency
+            if merged_error or complete_error:
+                error_details = []
+                if merged_error:
+                    error_details.append(f"calls_merged: {merged_error}")
+                if complete_error:
+                    error_details.append(f"calls_complete: {complete_error}")
+
+                raise RuntimeError(
+                    f"Failed to write to both tables (write_target=BOTH). This would cause data loss on cutover. "
+                    f"Errors: {'; '.join(error_details)}"
+                )
+        elif write_target == WriteTarget.CALLS_MERGED:
+            self._write_batch_to_merged_table(starts, ends, completes, do_sync_insert)
+        elif write_target == WriteTarget.CALLS_COMPLETE:
             self._write_batch_to_complete_table(starts, ends, completes, do_sync_insert)
 
     def _update_calls_complete_batch(
@@ -4523,7 +4583,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             wb_user_id=req.wb_user_id,
         )
 
-        self._dual_write_calls_batch(req.project_id, completes=[complete_call])
+        self._dual_write_calls_batch(
+            req.project_id, completes=[complete_call], source="completions"
+        )
 
         return tsi.CompletionsCreateRes(response=res.response, weave_call_id=call_id)
 
@@ -4585,11 +4647,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # Track start call if requested
         start_call: CallStartCHInsertable | None = None
         if req.track_llm_call:
-            write_target = self.table_routing_resolver.resolve_write_target(
-                req.project_id, self.ch_client
-            )
-            # Prepare inputs for tracking: use original messages (with template syntax)
-            # and include prompt and template_vars
             tracked_inputs = req.inputs.model_dump(exclude_none=True)
             tracked_inputs["model"] = model_name
             tracked_inputs["messages"] = initial_messages
@@ -4606,12 +4663,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 inputs=tracked_inputs,
                 attributes={},
             )
+
+            # Use dual write for start call with completions source
+            self._dual_write_calls_batch(
+                req.project_id,
+                starts=[start],
+                source="completions",
+                do_sync_insert=True,
+            )
             start_call = _start_call_for_insert_to_ch_insertable_start_call(start)
-            if write_target in [WriteTarget.CALLS_MERGED, WriteTarget.BOTH]:
-                # Insert immediately so that callers can see the call in progress
-                self._insert_call(start_call)
-            if write_target in [WriteTarget.CALLS_COMPLETE, WriteTarget.BOTH]:
-                self._insert_ch_insertable_calls_to_complete_table([start_call])
 
         # Set the combined messages (with template vars replaced) for LiteLLM
         req.inputs.messages = combined_messages
@@ -4638,24 +4698,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             return chunk_iter
 
         # Otherwise, wrap the iterator with tracking
-        def insert_call_handler(call: CallEndCHInsertable) -> None:
-            write_target = self.table_routing_resolver.resolve_write_target(
-                req.project_id,
-                self.ch_client,
-            )
-            if write_target in [WriteTarget.CALLS_MERGED, WriteTarget.BOTH]:
-                self._insert_call(call)
-
         def update_call_complete_handler(end: tsi.EndedCallSchemaForInsert) -> None:
-            write_target = self.table_routing_resolver.resolve_write_target(
+            # Use dual write with the complete end call data (has output, summary, etc.)
+            self._dual_write_calls_batch(
                 req.project_id,
-                self.ch_client,
+                ends=[end],
+                source="completions",
             )
-            if write_target in [WriteTarget.CALLS_COMPLETE, WriteTarget.BOTH]:
-                self._update_calls_complete_batch([end])
 
         return _create_tracked_stream_wrapper(
-            insert_call_handler,
             update_call_complete_handler,
             chunk_iter,
             start_call,
@@ -5689,7 +5740,6 @@ def _process_tool_call_delta(
 
 
 def _create_tracked_stream_wrapper(
-    insert_call: Callable[[CallEndCHInsertable], None],
     update_call_complete: Callable[[tsi.EndedCallSchemaForInsert], None],
     chunk_iter: Iterator[dict[str, Any]],
     start_call: CallStartCHInsertable,
@@ -5796,11 +5846,6 @@ def _create_tracked_stream_wrapper(
                 summary=summary,
             )
             update_call_complete(end)
-
-            end_call_insertable = _end_call_for_insert_to_ch_insertable_end_call(
-                end, None
-            )
-            insert_call(end_call_insertable)
 
     return _stream_wrapper()
 
