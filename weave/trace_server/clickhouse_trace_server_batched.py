@@ -59,7 +59,7 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     build_calls_stats_query,
     combine_conditions,
 )
-from weave.trace_server.calls_query_builder.fields import DynamicField
+from weave.trace_server.calls_query_builder.fields import DynamicField, SimpleField
 from weave.trace_server.calls_query_builder.table_strategy import CallsCompleteStrategy
 from weave.trace_server.clickhouse_schema import (
     ALL_CALL_INSERT_COLUMNS,

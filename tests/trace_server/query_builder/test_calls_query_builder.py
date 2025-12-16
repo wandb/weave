@@ -5,9 +5,11 @@ from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.calls_query_builder.calls_query_builder import (
     CallsQuery,
     HardCodedFilter,
+    get_field_by_name,
 )
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.orm import ParamBuilder
+from weave.trace_server.project_version.types import ReadTable
 
 
 def test_query_baseline() -> None:
@@ -1555,9 +1557,6 @@ def test_total_storage_size():
 
 def test_aggregated_data_size_field():
     """Test the AggregatedDataSizeField class (now via get_field_by_name)."""
-    from weave.trace_server.calls_query_builder.calls_query_builder import get_field_by_name
-    from weave.trace_server.project_version.types import ReadTable
-    
     # Get the field via the new refactored interface
     field = get_field_by_name("total_storage_size_bytes", ReadTable.CALLS_MERGED)
     pb = ParamBuilder()
