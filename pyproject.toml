@@ -500,6 +500,8 @@ exclude = ["tests", "examples"]
 python-version= "3.10"
 
 [tool.ty.rules]
+# These are ignored for the sake of getting the type checker added.
+# We should be dilligent in removing these ignores over time.
 invalid-assignment = "ignore"
 possibly-missing-attribute = "ignore"
 unresolved-import = "ignore"
