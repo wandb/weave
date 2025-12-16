@@ -74,6 +74,11 @@ repos:
         args: ["-o", "4", "--strip", "safe", "--alpha"]
   - repo: local
     hooks:
+      - id: ty
+        name: ty type checker
+        entry: uv run ty check
+        language: python
+        always_run: true
       - id: jupyter-nb-clear-output
         name: jupyter-nb-clear-output
         files: ^examples/.*\.ipynb$

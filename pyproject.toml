@@ -381,6 +381,7 @@ dev = [
   # linting
   "pre-commit",
   "jupyter",
+  "ty>=0.0.2",
 ]
 trace_server = [
   # Same dependencies as the trace_server optional dependency, but as a dependency group for tests
@@ -490,3 +491,31 @@ conflicts = [
 [tool.coverage.report]
 exclude_also = ["if TYPE_CHECKING:", "@abstractmethod"]
 omit = ["weave/agent/**"]
+
+[tool.ty.src]
+include = ["weave"]
+exclude = ["tests", "examples"]
+
+[tool.ty.environment]
+python-version= "3.10"
+
+[tool.ty.rules]
+invalid-assignment = "ignore"
+possibly-missing-attribute = "ignore"
+unresolved-import = "ignore"
+call-non-callable = "ignore"
+unresolved-attribute = "ignore"
+invalid-argument-type = "ignore"
+redundant-cast = "ignore"
+invalid-method-override = "ignore"
+deprecated = "ignore"
+missing-typed-dict-key = "ignore"
+invalid-return-type = "ignore"
+unknown-argument = "ignore"
+missing-argument = "ignore"
+non-subscriptable = "ignore"
+unsupported-operator = "ignore"
+no-matching-overload = "ignore"
+possibly-missing-import = "ignore"
+too-many-positional-arguments = "ignore"
+not-iterable = "ignore"
