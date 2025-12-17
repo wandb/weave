@@ -5,8 +5,6 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
-
 
 class TestReadConfig:
     """Tests for _read_config function."""
@@ -17,7 +15,9 @@ class TestReadConfig:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             config_file = Path(tmpdir) / "config.json"
-            with patch("weave.integrations.claude_plugin.config.CONFIG_FILE", config_file):
+            with patch(
+                "weave.integrations.claude_plugin.config.CONFIG_FILE", config_file
+            ):
                 result = _read_config()
                 assert result == {"enabled": False}
 
@@ -29,7 +29,9 @@ class TestReadConfig:
             config_file = Path(tmpdir) / "config.json"
             config_file.write_text('{"enabled": true, "project": "test/proj"}')
 
-            with patch("weave.integrations.claude_plugin.config.CONFIG_FILE", config_file):
+            with patch(
+                "weave.integrations.claude_plugin.config.CONFIG_FILE", config_file
+            ):
                 result = _read_config()
                 assert result == {"enabled": True, "project": "test/proj"}
 
@@ -41,7 +43,9 @@ class TestReadConfig:
             config_file = Path(tmpdir) / "config.json"
             config_file.write_text("not valid json")
 
-            with patch("weave.integrations.claude_plugin.config.CONFIG_FILE", config_file):
+            with patch(
+                "weave.integrations.claude_plugin.config.CONFIG_FILE", config_file
+            ):
                 result = _read_config()
                 assert result == {"enabled": False}
 
@@ -57,8 +61,12 @@ class TestWriteConfig:
             config_dir = Path(tmpdir) / "subdir"
             config_file = config_dir / "config.json"
 
-            with patch("weave.integrations.claude_plugin.config.CONFIG_DIR", config_dir):
-                with patch("weave.integrations.claude_plugin.config.CONFIG_FILE", config_file):
+            with patch(
+                "weave.integrations.claude_plugin.config.CONFIG_DIR", config_dir
+            ):
+                with patch(
+                    "weave.integrations.claude_plugin.config.CONFIG_FILE", config_file
+                ):
                     _write_config({"enabled": True, "project": "my/project"})
 
                     assert config_file.exists()
@@ -75,7 +83,9 @@ class TestGetEnabled:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             config_file = Path(tmpdir) / "config.json"
-            with patch("weave.integrations.claude_plugin.config.CONFIG_FILE", config_file):
+            with patch(
+                "weave.integrations.claude_plugin.config.CONFIG_FILE", config_file
+            ):
                 assert get_enabled() is False
 
     def test_returns_true_when_enabled(self):
@@ -86,7 +96,9 @@ class TestGetEnabled:
             config_file = Path(tmpdir) / "config.json"
             config_file.write_text('{"enabled": true}')
 
-            with patch("weave.integrations.claude_plugin.config.CONFIG_FILE", config_file):
+            with patch(
+                "weave.integrations.claude_plugin.config.CONFIG_FILE", config_file
+            ):
                 assert get_enabled() is True
 
 
@@ -101,8 +113,12 @@ class TestSetEnabled:
             config_dir = Path(tmpdir)
             config_file = config_dir / "config.json"
 
-            with patch("weave.integrations.claude_plugin.config.CONFIG_DIR", config_dir):
-                with patch("weave.integrations.claude_plugin.config.CONFIG_FILE", config_file):
+            with patch(
+                "weave.integrations.claude_plugin.config.CONFIG_DIR", config_dir
+            ):
+                with patch(
+                    "weave.integrations.claude_plugin.config.CONFIG_FILE", config_file
+                ):
                     set_enabled(True)
                     assert get_enabled() is True
 
@@ -115,8 +131,12 @@ class TestSetEnabled:
             config_file = config_dir / "config.json"
             config_file.write_text('{"enabled": true}')
 
-            with patch("weave.integrations.claude_plugin.config.CONFIG_DIR", config_dir):
-                with patch("weave.integrations.claude_plugin.config.CONFIG_FILE", config_file):
+            with patch(
+                "weave.integrations.claude_plugin.config.CONFIG_DIR", config_dir
+            ):
+                with patch(
+                    "weave.integrations.claude_plugin.config.CONFIG_FILE", config_file
+                ):
                     set_enabled(False)
                     assert get_enabled() is False
 
@@ -192,7 +212,9 @@ class TestIsEnabled:
             config_file = config_dir / "config.json"
             config_file.write_text('{"enabled": false}')
 
-            with patch("weave.integrations.claude_plugin.config.CONFIG_FILE", config_file):
+            with patch(
+                "weave.integrations.claude_plugin.config.CONFIG_FILE", config_file
+            ):
                 result = is_enabled(tmpdir)
                 assert result is True
 
@@ -205,7 +227,9 @@ class TestIsEnabled:
             config_file = config_dir / "config.json"
             config_file.write_text('{"enabled": true}')
 
-            with patch("weave.integrations.claude_plugin.config.CONFIG_FILE", config_file):
+            with patch(
+                "weave.integrations.claude_plugin.config.CONFIG_FILE", config_file
+            ):
                 result = is_enabled(tmpdir)
                 assert result is True
 
@@ -215,7 +239,10 @@ class TestSetLocalEnabled:
 
     def test_creates_settings_and_enables(self):
         """Should create settings file and enable weave."""
-        from weave.integrations.claude_plugin.config import get_local_enabled, set_local_enabled
+        from weave.integrations.claude_plugin.config import (
+            get_local_enabled,
+            set_local_enabled,
+        )
 
         with tempfile.TemporaryDirectory() as tmpdir:
             set_local_enabled(True, tmpdir)
@@ -223,7 +250,10 @@ class TestSetLocalEnabled:
 
     def test_disables_in_existing_settings(self):
         """Should disable weave in existing settings."""
-        from weave.integrations.claude_plugin.config import get_local_enabled, set_local_enabled
+        from weave.integrations.claude_plugin.config import (
+            get_local_enabled,
+            set_local_enabled,
+        )
 
         with tempfile.TemporaryDirectory() as tmpdir:
             settings_dir = Path(tmpdir) / ".claude"
@@ -244,7 +274,9 @@ class TestGetStatus:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             config_file = Path(tmpdir) / "config.json"
-            with patch("weave.integrations.claude_plugin.config.CONFIG_FILE", config_file):
+            with patch(
+                "weave.integrations.claude_plugin.config.CONFIG_FILE", config_file
+            ):
                 result = get_status(tmpdir)
                 assert "global" in result
                 assert "local" in result

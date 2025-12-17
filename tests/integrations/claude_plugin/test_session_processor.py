@@ -1,10 +1,8 @@
 """Tests for SessionProcessor factory class."""
 
-import pytest
-from unittest.mock import MagicMock
-from pathlib import Path
 import tempfile
-import os
+from pathlib import Path
+from unittest.mock import MagicMock
 
 
 class TestSessionProcessorInit:
@@ -12,7 +10,9 @@ class TestSessionProcessorInit:
 
     def test_init_stores_client_and_project(self):
         """Verify client and project are stored."""
-        from weave.integrations.claude_plugin.session.session_processor import SessionProcessor
+        from weave.integrations.claude_plugin.session.session_processor import (
+            SessionProcessor,
+        )
 
         mock_client = MagicMock()
         processor = SessionProcessor(
@@ -27,7 +27,9 @@ class TestSessionProcessorInit:
 
     def test_init_default_source_is_plugin(self):
         """Verify default source is 'plugin'."""
-        from weave.integrations.claude_plugin.session.session_processor import SessionProcessor
+        from weave.integrations.claude_plugin.session.session_processor import (
+            SessionProcessor,
+        )
 
         mock_client = MagicMock()
         processor = SessionProcessor(client=mock_client, project="entity/project")
@@ -40,7 +42,9 @@ class TestCreateSessionCall:
 
     def test_create_session_call_returns_call_object(self):
         """Verify create_session_call returns a Call with expected fields."""
-        from weave.integrations.claude_plugin.session.session_processor import SessionProcessor
+        from weave.integrations.claude_plugin.session.session_processor import (
+            SessionProcessor,
+        )
 
         mock_client = MagicMock()
         mock_call = MagicMock()
@@ -73,7 +77,9 @@ class TestCreateSessionCall:
 
     def test_create_session_call_truncates_long_prompt(self):
         """Verify first_prompt is truncated to 1000 chars."""
-        from weave.integrations.claude_plugin.session.session_processor import SessionProcessor
+        from weave.integrations.claude_plugin.session.session_processor import (
+            SessionProcessor,
+        )
 
         mock_client = MagicMock()
         mock_client.create_call.return_value = MagicMock()
@@ -88,11 +94,15 @@ class TestCreateSessionCall:
 
         call_kwargs = mock_client.create_call.call_args.kwargs
         # Should be truncated with "...[truncated]" suffix
-        assert len(call_kwargs["inputs"]["first_prompt"]) <= 1014  # 1000 + "...[truncated]"
+        assert (
+            len(call_kwargs["inputs"]["first_prompt"]) <= 1014
+        )  # 1000 + "...[truncated]"
 
     def test_create_session_call_source_import(self):
         """Verify source='import' produces correct attribute."""
-        from weave.integrations.claude_plugin.session.session_processor import SessionProcessor
+        from weave.integrations.claude_plugin.session.session_processor import (
+            SessionProcessor,
+        )
 
         mock_client = MagicMock()
         mock_client.create_call.return_value = MagicMock()
@@ -112,7 +122,9 @@ class TestCreateTurnCall:
 
     def test_create_turn_call_basic(self):
         """Verify create_turn_call creates turn with correct structure."""
-        from weave.integrations.claude_plugin.session.session_processor import SessionProcessor
+        from weave.integrations.claude_plugin.session.session_processor import (
+            SessionProcessor,
+        )
 
         mock_client = MagicMock()
         mock_client.create_call.return_value = MagicMock()
@@ -140,7 +152,9 @@ class TestCreateTurnCall:
 
     def test_create_turn_call_with_pending_question(self):
         """Verify pending_question is added to inputs."""
-        from weave.integrations.claude_plugin.session.session_processor import SessionProcessor
+        from weave.integrations.claude_plugin.session.session_processor import (
+            SessionProcessor,
+        )
 
         mock_client = MagicMock()
         mock_client.create_call.return_value = MagicMock()
@@ -159,7 +173,9 @@ class TestCreateTurnCall:
 
     def test_create_turn_call_compacted(self):
         """Verify compacted turns get special display name."""
-        from weave.integrations.claude_plugin.session.session_processor import SessionProcessor
+        from weave.integrations.claude_plugin.session.session_processor import (
+            SessionProcessor,
+        )
 
         mock_client = MagicMock()
         mock_client.create_call.return_value = MagicMock()
@@ -183,8 +199,13 @@ class TestFileSnapshotCollection:
 
     def test_collect_turn_file_snapshots(self):
         """Verify _collect_turn_file_snapshots returns Content objects."""
-        from weave.integrations.claude_plugin.session.session_processor import SessionProcessor
-        from weave.integrations.claude_plugin.session.session_parser import Turn, FileBackup
+        from weave.integrations.claude_plugin.session.session_parser import (
+            FileBackup,
+            Turn,
+        )
+        from weave.integrations.claude_plugin.session.session_processor import (
+            SessionProcessor,
+        )
 
         mock_client = MagicMock()
         processor = SessionProcessor(client=mock_client, project="entity/project")
@@ -204,7 +225,9 @@ class TestFileSnapshotCollection:
 
     def test_collect_turn_file_snapshots_skips_failed_loads(self):
         """Verify None results from load_content are skipped."""
-        from weave.integrations.claude_plugin.session.session_processor import SessionProcessor
+        from weave.integrations.claude_plugin.session.session_processor import (
+            SessionProcessor,
+        )
 
         mock_client = MagicMock()
         processor = SessionProcessor(client=mock_client, project="entity/project")
@@ -224,7 +247,9 @@ class TestFileSnapshotCollection:
 
     def test_collect_session_file_snapshots_includes_session_file(self):
         """Verify session JSONL file is included."""
-        from weave.integrations.claude_plugin.session.session_processor import SessionProcessor
+        from weave.integrations.claude_plugin.session.session_processor import (
+            SessionProcessor,
+        )
 
         mock_client = MagicMock()
         processor = SessionProcessor(client=mock_client, project="entity/project")
@@ -240,14 +265,18 @@ class TestFileSnapshotCollection:
             mock_session.cwd = None
             mock_session.get_all_changed_files.return_value = []
 
-            result = processor._collect_session_file_snapshots(mock_session, sessions_dir)
+            result = processor._collect_session_file_snapshots(
+                mock_session, sessions_dir
+            )
 
             # Should have at least the session file
             assert len(result) >= 1
 
     def test_collect_session_file_snapshots_includes_changed_files(self):
         """Verify changed files from disk are included."""
-        from weave.integrations.claude_plugin.session.session_processor import SessionProcessor
+        from weave.integrations.claude_plugin.session.session_processor import (
+            SessionProcessor,
+        )
 
         mock_client = MagicMock()
         processor = SessionProcessor(client=mock_client, project="entity/project")
@@ -266,7 +295,9 @@ class TestFileSnapshotCollection:
             mock_session.cwd = str(cwd)
             mock_session.get_all_changed_files.return_value = ["test.py"]
 
-            result = processor._collect_session_file_snapshots(mock_session, sessions_dir)
+            result = processor._collect_session_file_snapshots(
+                mock_session, sessions_dir
+            )
 
             # Should include the changed file
             assert len(result) >= 1
@@ -277,7 +308,9 @@ class TestFinishTurnCall:
 
     def test_finish_turn_call_builds_output(self):
         """Verify finish_turn_call builds correct output structure."""
-        from weave.integrations.claude_plugin.session.session_processor import SessionProcessor
+        from weave.integrations.claude_plugin.session.session_processor import (
+            SessionProcessor,
+        )
 
         mock_client = MagicMock()
         processor = SessionProcessor(client=mock_client, project="entity/project")
@@ -327,14 +360,18 @@ class TestFinishTurnCall:
 
     def test_finish_turn_call_returns_extracted_question(self):
         """Verify pending question is extracted and returned."""
-        from weave.integrations.claude_plugin.session.session_processor import SessionProcessor
+        from weave.integrations.claude_plugin.session.session_processor import (
+            SessionProcessor,
+        )
 
         mock_client = MagicMock()
         processor = SessionProcessor(client=mock_client, project="entity/project")
 
         mock_turn_call = MagicMock()
         mock_msg = MagicMock()
-        mock_msg.get_text.return_value = "Here's my answer. What would you like to do next?"
+        mock_msg.get_text.return_value = (
+            "Here's my answer. What would you like to do next?"
+        )
 
         mock_turn = MagicMock()
         mock_turn.assistant_messages = [mock_msg]
@@ -364,7 +401,9 @@ class TestFinishTurnCall:
 
     def test_finish_turn_call_interrupted_returns_none(self):
         """Verify interrupted turns don't extract questions."""
-        from weave.integrations.claude_plugin.session.session_processor import SessionProcessor
+        from weave.integrations.claude_plugin.session.session_processor import (
+            SessionProcessor,
+        )
 
         mock_client = MagicMock()
         processor = SessionProcessor(client=mock_client, project="entity/project")
@@ -401,7 +440,9 @@ class TestFinishTurnCall:
 
     def test_finish_turn_call_includes_reasoning_content(self):
         """Verify thinking content is included as reasoning_content."""
-        from weave.integrations.claude_plugin.session.session_processor import SessionProcessor
+        from weave.integrations.claude_plugin.session.session_processor import (
+            SessionProcessor,
+        )
 
         mock_client = MagicMock()
         processor = SessionProcessor(client=mock_client, project="entity/project")
@@ -443,7 +484,9 @@ class TestFinishTurnCall:
 
     def test_finish_turn_call_includes_tool_calls_with_results(self):
         """Verify tool calls are included in OpenAI format with results."""
-        from weave.integrations.claude_plugin.session.session_processor import SessionProcessor
+        from weave.integrations.claude_plugin.session.session_processor import (
+            SessionProcessor,
+        )
 
         mock_client = MagicMock()
         processor = SessionProcessor(client=mock_client, project="entity/project")
@@ -508,7 +551,9 @@ class TestBuildTurnOutput:
 
     def test_build_turn_output_returns_message_format(self):
         """Verify build_turn_output returns proper Message format for ChatView."""
-        from weave.integrations.claude_plugin.session.session_processor import SessionProcessor
+        from weave.integrations.claude_plugin.session.session_processor import (
+            SessionProcessor,
+        )
 
         mock_msg = MagicMock()
         mock_msg.get_text.return_value = "Here's my response."
@@ -525,7 +570,9 @@ class TestBuildTurnOutput:
         mock_turn.all_tool_calls.return_value = [mock_tool_call]
         mock_turn.primary_model.return_value = "claude-3"
 
-        output, assistant_text, thinking_text = SessionProcessor.build_turn_output(mock_turn)
+        output, assistant_text, thinking_text = SessionProcessor.build_turn_output(
+            mock_turn
+        )
 
         # Verify Message format structure
         assert output["role"] == "assistant"
@@ -549,7 +596,9 @@ class TestBuildTurnOutput:
 
     def test_build_turn_output_handles_interrupted(self):
         """Verify interrupted flag is set correctly."""
-        from weave.integrations.claude_plugin.session.session_processor import SessionProcessor
+        from weave.integrations.claude_plugin.session.session_processor import (
+            SessionProcessor,
+        )
 
         mock_msg = MagicMock()
         mock_msg.get_text.return_value = "Response"
@@ -571,7 +620,9 @@ class TestFinishSessionCall:
 
     def test_finish_session_call_builds_summary(self):
         """Verify finish_session_call builds correct summary structure."""
-        from weave.integrations.claude_plugin.session.session_processor import SessionProcessor
+        from weave.integrations.claude_plugin.session.session_processor import (
+            SessionProcessor,
+        )
 
         mock_client = MagicMock()
         processor = SessionProcessor(client=mock_client, project="entity/project")
@@ -609,7 +660,9 @@ class TestFinishSessionCall:
 
     def test_finish_session_call_with_extra_summary(self):
         """Verify extra_summary fields are merged."""
-        from weave.integrations.claude_plugin.session.session_processor import SessionProcessor
+        from weave.integrations.claude_plugin.session.session_processor import (
+            SessionProcessor,
+        )
 
         mock_client = MagicMock()
         processor = SessionProcessor(client=mock_client, project="entity/project")

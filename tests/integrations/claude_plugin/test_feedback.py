@@ -38,7 +38,9 @@ class TestFeedbackMain:
             ):
                 result = main()
                 assert result == 0
-                mock_client.send_event.assert_called_once_with("Feedback", {"emoji": "🤩"})
+                mock_client.send_event.assert_called_once_with(
+                    "Feedback", {"emoji": "🤩"}
+                )
 
     def test_includes_note_when_provided(self):
         """Should include note in feedback payload."""
@@ -48,7 +50,9 @@ class TestFeedbackMain:
         mock_client.is_daemon_running.return_value = True
         mock_client.send_event.return_value = {"status": "ok"}
 
-        with patch.object(sys, "argv", ["feedback", "session-123", "😊", "Great session!"]):
+        with patch.object(
+            sys, "argv", ["feedback", "session-123", "😊", "Great session!"]
+        ):
             with patch(
                 "weave.integrations.claude_plugin.views.feedback.DaemonClient",
                 return_value=mock_client,
@@ -157,7 +161,10 @@ class TestFeedbackMain:
 
         mock_client = MagicMock()
         mock_client.is_daemon_running.return_value = True
-        mock_client.send_event.return_value = {"status": "error", "message": "Session ended"}
+        mock_client.send_event.return_value = {
+            "status": "error",
+            "message": "Session ended",
+        }
 
         with patch.object(sys, "argv", ["feedback", "session-123", "🤩"]):
             with patch(

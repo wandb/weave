@@ -49,7 +49,9 @@ def make_turn_with_tool_call(
 ) -> Turn:
     """Create a Turn with a single tool call."""
     now = datetime.now(timezone.utc)
-    turn = Turn(user_message=UserMessage(uuid="u1", content=user_content, timestamp=now))
+    turn = Turn(
+        user_message=UserMessage(uuid="u1", content=user_content, timestamp=now)
+    )
     turn.assistant_messages.append(
         AssistantMessage(
             uuid="a1",
@@ -82,7 +84,9 @@ class TestToolCallsInOutput:
             user_content="Add todos",
             tool_name="TodoWrite",
             tool_input={
-                "todos": [{"content": "Test", "status": "pending", "activeForm": "Testing"}]
+                "todos": [
+                    {"content": "Test", "status": "pending", "activeForm": "Testing"}
+                ]
             },
         )
         session = make_minimal_session(turns=[turn])
@@ -107,16 +111,36 @@ class TestToolCallsInOutput:
     def test_multiple_tool_calls_counted(self):
         """Multiple tool calls should all be counted."""
         now = datetime.now(timezone.utc)
-        turn = Turn(user_message=UserMessage(uuid="u1", content="Do stuff", timestamp=now))
+        turn = Turn(
+            user_message=UserMessage(uuid="u1", content="Do stuff", timestamp=now)
+        )
         turn.assistant_messages.append(
             AssistantMessage(
                 uuid="a1",
                 model="claude-sonnet-4-20250514",
                 text_content=["Done"],
                 tool_calls=[
-                    ToolCall(id="t1", name="Read", input={"file_path": "/a.txt"}, timestamp=now, result="a"),
-                    ToolCall(id="t2", name="Grep", input={"pattern": "foo"}, timestamp=now, result="b"),
-                    ToolCall(id="t3", name="Edit", input={"file_path": "/a.txt"}, timestamp=now, result="c"),
+                    ToolCall(
+                        id="t1",
+                        name="Read",
+                        input={"file_path": "/a.txt"},
+                        timestamp=now,
+                        result="a",
+                    ),
+                    ToolCall(
+                        id="t2",
+                        name="Grep",
+                        input={"pattern": "foo"},
+                        timestamp=now,
+                        result="b",
+                    ),
+                    ToolCall(
+                        id="t3",
+                        name="Edit",
+                        input={"file_path": "/a.txt"},
+                        timestamp=now,
+                        result="c",
+                    ),
                 ],
                 usage=TokenUsage(),
                 timestamp=now,
@@ -150,7 +174,9 @@ class TestSkillToolCalls:
         now = datetime.now(timezone.utc)
 
         # Create session with skill call
-        turn = Turn(user_message=UserMessage(uuid="u1", content="Use skill", timestamp=now))
+        turn = Turn(
+            user_message=UserMessage(uuid="u1", content="Use skill", timestamp=now)
+        )
         turn.assistant_messages.append(
             AssistantMessage(
                 uuid="a1",
@@ -201,7 +227,9 @@ class TestQAContextTracking:
         now = datetime.now(timezone.utc)
 
         # Create Turn 1 with assistant ending with a question
-        turn1 = Turn(user_message=UserMessage(uuid="u1", content="Help me", timestamp=now))
+        turn1 = Turn(
+            user_message=UserMessage(uuid="u1", content="Help me", timestamp=now)
+        )
         turn1.assistant_messages.append(
             AssistantMessage(
                 uuid="a1",
@@ -252,14 +280,18 @@ class TestQAContextTracking:
             # Second turn should have in_response_to in inputs
             turn2_inputs = turn_calls[1].kwargs.get("inputs", {})
             assert "in_response_to" in turn2_inputs, "Turn 2 should have in_response_to"
-            assert "?" in turn2_inputs["in_response_to"], "in_response_to should be a question"
+            assert "?" in turn2_inputs["in_response_to"], (
+                "in_response_to should be a question"
+            )
 
     def test_no_question_means_no_in_response_to(self):
         """When Turn 1 doesn't end with a question, Turn 2 should NOT have in_response_to."""
         now = datetime.now(timezone.utc)
 
         # Create Turn 1 WITHOUT a question
-        turn1 = Turn(user_message=UserMessage(uuid="u1", content="Help me", timestamp=now))
+        turn1 = Turn(
+            user_message=UserMessage(uuid="u1", content="Help me", timestamp=now)
+        )
         turn1.assistant_messages.append(
             AssistantMessage(
                 uuid="a1",
@@ -309,9 +341,9 @@ class TestQAContextTracking:
 
             # Second turn should NOT have in_response_to
             turn2_inputs = turn_calls[1].kwargs.get("inputs", {})
-            assert (
-                "in_response_to" not in turn2_inputs
-            ), "Turn 2 should NOT have in_response_to when Turn 1 has no question"
+            assert "in_response_to" not in turn2_inputs, (
+                "Turn 2 should NOT have in_response_to when Turn 1 has no question"
+            )
 
 
 class TestTurnSummary:
@@ -333,11 +365,14 @@ class TestTurnSummary:
         )
         session = make_minimal_session(turns=[turn])
 
-        with patch(
-            "weave.integrations.claude_plugin.session.session_importer.require_weave_client"
-        ) as mock_client, patch(
-            "weave.integrations.claude_plugin.session.session_importer.reconstruct_call"
-        ) as mock_reconstruct:
+        with (
+            patch(
+                "weave.integrations.claude_plugin.session.session_importer.require_weave_client"
+            ) as mock_client,
+            patch(
+                "weave.integrations.claude_plugin.session.session_importer.reconstruct_call"
+            ) as mock_reconstruct,
+        ):
             mock_call = MagicMock(id="turn-1")
             mock_call.summary = {}
             mock_client.return_value.create_call.return_value = mock_call
@@ -351,7 +386,9 @@ class TestTurnSummary:
 
             # Turn summary should have been set with model info on the reconstructed call
             # Check that summary was assigned before finish_call
-            assert reconstructed_call.summary is not None, "Turn should have summary set"
+            assert reconstructed_call.summary is not None, (
+                "Turn should have summary set"
+            )
             assert "model" in reconstructed_call.summary, "Summary should have model"
             assert "usage" in reconstructed_call.summary, "Summary should have usage"
 
@@ -483,7 +520,6 @@ class TestDiscoverSessionFiles:
 
     def test_sorts_by_modification_time(self, tmp_path):
         """Should sort files by modification time (newest first)."""
-        import os
         import time
 
         # Create files with different modification times
@@ -512,7 +548,9 @@ class TestImportSessionWithResult:
 
     def test_returns_error_for_unparseable_file(self, tmp_path):
         """Should return error result when file can't be parsed."""
-        from weave.integrations.claude_plugin.session.session_importer import import_session_with_result
+        from weave.integrations.claude_plugin.session.session_importer import (
+            import_session_with_result,
+        )
 
         # Create invalid session file
         session_file = tmp_path / "invalid.jsonl"
@@ -525,16 +563,22 @@ class TestImportSessionWithResult:
 
     def test_returns_error_for_empty_session(self, tmp_path):
         """Should return error result when session has no turns."""
-        from weave.integrations.claude_plugin.session.session_importer import import_session_with_result
         import json
+
+        from weave.integrations.claude_plugin.session.session_importer import (
+            import_session_with_result,
+        )
 
         # Create session file with no turns (just metadata)
         session_file = tmp_path / "12345678-1234-5678-1234-567812345678.jsonl"
         session_file.write_text(
-            json.dumps({
-                "type": "system",
-                "sessionId": "12345678-1234-5678-1234-567812345678",
-            }) + "\n"
+            json.dumps(
+                {
+                    "type": "system",
+                    "sessionId": "12345678-1234-5678-1234-567812345678",
+                }
+            )
+            + "\n"
         )
 
         result = import_session_with_result(session_file)
@@ -544,42 +588,54 @@ class TestImportSessionWithResult:
 
     def test_returns_error_for_active_session(self, tmp_path):
         """Should return error result when session is currently active."""
-        from weave.integrations.claude_plugin.session.session_importer import import_session_with_result
-        from weave.integrations.claude_plugin.core.state import StateManager
         import json
+
+        from weave.integrations.claude_plugin.core.state import StateManager
+        from weave.integrations.claude_plugin.session.session_importer import (
+            import_session_with_result,
+        )
 
         session_id = "active-session-12345678"
 
         # Create session file with one turn
         session_file = tmp_path / f"{session_id}.jsonl"
         session_file.write_text(
-            json.dumps({
-                "type": "user",
-                "sessionId": session_id,
-                "uuid": "msg-1",
-                "timestamp": "2025-01-01T10:00:00Z",
-                "message": {"role": "user", "content": "Hello"},
-            }) + "\n" +
-            json.dumps({
-                "type": "assistant",
-                "sessionId": session_id,
-                "uuid": "msg-2",
-                "timestamp": "2025-01-01T10:00:01Z",
-                "message": {
-                    "role": "assistant",
-                    "model": "claude-sonnet-4-20250514",
-                    "content": [{"type": "text", "text": "Hi!"}],
-                    "usage": {"input_tokens": 10, "output_tokens": 5},
-                },
-            }) + "\n"
+            json.dumps(
+                {
+                    "type": "user",
+                    "sessionId": session_id,
+                    "uuid": "msg-1",
+                    "timestamp": "2025-01-01T10:00:00Z",
+                    "message": {"role": "user", "content": "Hello"},
+                }
+            )
+            + "\n"
+            + json.dumps(
+                {
+                    "type": "assistant",
+                    "sessionId": session_id,
+                    "uuid": "msg-2",
+                    "timestamp": "2025-01-01T10:00:01Z",
+                    "message": {
+                        "role": "assistant",
+                        "model": "claude-sonnet-4-20250514",
+                        "content": [{"type": "text", "text": "Hi!"}],
+                        "usage": {"input_tokens": 10, "output_tokens": 5},
+                    },
+                }
+            )
+            + "\n"
         )
 
         # Mark session as active in state
         with StateManager() as state:
-            state.save_session(session_id, {
-                "project": "test/project",
-                "session_ended": False,
-            })
+            state.save_session(
+                session_id,
+                {
+                    "project": "test/project",
+                    "session_ended": False,
+                },
+            )
 
         try:
             result = import_session_with_result(session_file)
@@ -593,31 +649,40 @@ class TestImportSessionWithResult:
 
     def test_dry_run_does_not_create_traces(self, tmp_path):
         """Should not create traces when dry_run=True."""
-        from weave.integrations.claude_plugin.session.session_importer import import_session_with_result
         import json
+
+        from weave.integrations.claude_plugin.session.session_importer import (
+            import_session_with_result,
+        )
 
         session_id = "dry-run-session-123"
         session_file = tmp_path / f"{session_id}.jsonl"
         session_file.write_text(
-            json.dumps({
-                "type": "user",
-                "sessionId": session_id,
-                "uuid": "msg-1",
-                "timestamp": "2025-01-01T10:00:00Z",
-                "message": {"role": "user", "content": "Hello"},
-            }) + "\n" +
-            json.dumps({
-                "type": "assistant",
-                "sessionId": session_id,
-                "uuid": "msg-2",
-                "timestamp": "2025-01-01T10:00:01Z",
-                "message": {
-                    "role": "assistant",
-                    "model": "claude-sonnet-4-20250514",
-                    "content": [{"type": "text", "text": "Hi!"}],
-                    "usage": {"input_tokens": 10, "output_tokens": 5},
-                },
-            }) + "\n"
+            json.dumps(
+                {
+                    "type": "user",
+                    "sessionId": session_id,
+                    "uuid": "msg-1",
+                    "timestamp": "2025-01-01T10:00:00Z",
+                    "message": {"role": "user", "content": "Hello"},
+                }
+            )
+            + "\n"
+            + json.dumps(
+                {
+                    "type": "assistant",
+                    "sessionId": session_id,
+                    "uuid": "msg-2",
+                    "timestamp": "2025-01-01T10:00:01Z",
+                    "message": {
+                        "role": "assistant",
+                        "model": "claude-sonnet-4-20250514",
+                        "content": [{"type": "text", "text": "Hi!"}],
+                        "usage": {"input_tokens": 10, "output_tokens": 5},
+                    },
+                }
+            )
+            + "\n"
         )
 
         with patch(
@@ -638,8 +703,11 @@ class TestImportSessions:
 
     def test_raises_error_for_nonexistent_path(self, tmp_path):
         """Should raise ValueError for non-existent path."""
-        from weave.integrations.claude_plugin.session.session_importer import import_sessions
         import pytest
+
+        from weave.integrations.claude_plugin.session.session_importer import (
+            import_sessions,
+        )
 
         with pytest.raises(ValueError, match="does not exist"):
             import_sessions(
@@ -649,8 +717,11 @@ class TestImportSessions:
 
     def test_raises_error_for_empty_directory(self, tmp_path):
         """Should raise ValueError when no session files found."""
-        from weave.integrations.claude_plugin.session.session_importer import import_sessions
         import pytest
+
+        from weave.integrations.claude_plugin.session.session_importer import (
+            import_sessions,
+        )
 
         with pytest.raises(ValueError, match="No session files found"):
             import_sessions(
@@ -660,35 +731,46 @@ class TestImportSessions:
 
     def test_dry_run_does_not_initialize_weave(self, tmp_path):
         """Should not initialize weave in dry_run mode."""
-        from weave.integrations.claude_plugin.session.session_importer import import_sessions
         import json
+
+        from weave.integrations.claude_plugin.session.session_importer import (
+            import_sessions,
+        )
 
         # Create a valid session file
         session_id = "12345678-1234-5678-1234-567812345678"
         session_file = tmp_path / f"{session_id}.jsonl"
         session_file.write_text(
-            json.dumps({
-                "type": "user",
-                "sessionId": session_id,
-                "uuid": "msg-1",
-                "timestamp": "2025-01-01T10:00:00Z",
-                "message": {"role": "user", "content": "Hello"},
-            }) + "\n" +
-            json.dumps({
-                "type": "assistant",
-                "sessionId": session_id,
-                "uuid": "msg-2",
-                "timestamp": "2025-01-01T10:00:01Z",
-                "message": {
-                    "role": "assistant",
-                    "model": "claude-sonnet-4-20250514",
-                    "content": [{"type": "text", "text": "Hi!"}],
-                    "usage": {"input_tokens": 10, "output_tokens": 5},
-                },
-            }) + "\n"
+            json.dumps(
+                {
+                    "type": "user",
+                    "sessionId": session_id,
+                    "uuid": "msg-1",
+                    "timestamp": "2025-01-01T10:00:00Z",
+                    "message": {"role": "user", "content": "Hello"},
+                }
+            )
+            + "\n"
+            + json.dumps(
+                {
+                    "type": "assistant",
+                    "sessionId": session_id,
+                    "uuid": "msg-2",
+                    "timestamp": "2025-01-01T10:00:01Z",
+                    "message": {
+                        "role": "assistant",
+                        "model": "claude-sonnet-4-20250514",
+                        "content": [{"type": "text", "text": "Hi!"}],
+                        "usage": {"input_tokens": 10, "output_tokens": 5},
+                    },
+                }
+            )
+            + "\n"
         )
 
-        with patch("weave.integrations.claude_plugin.session.session_importer.weave") as mock_weave:
+        with patch(
+            "weave.integrations.claude_plugin.session.session_importer.weave"
+        ) as mock_weave:
             summary = import_sessions(
                 path=tmp_path,
                 project="test/project",
@@ -702,34 +784,45 @@ class TestImportSessions:
 
     def test_imports_single_file(self, tmp_path):
         """Should import a single file when path is a file."""
-        from weave.integrations.claude_plugin.session.session_importer import import_sessions
         import json
+
+        from weave.integrations.claude_plugin.session.session_importer import (
+            import_sessions,
+        )
 
         session_id = "12345678-1234-5678-1234-567812345678"
         session_file = tmp_path / f"{session_id}.jsonl"
         session_file.write_text(
-            json.dumps({
-                "type": "user",
-                "sessionId": session_id,
-                "uuid": "msg-1",
-                "timestamp": "2025-01-01T10:00:00Z",
-                "message": {"role": "user", "content": "Hello"},
-            }) + "\n" +
-            json.dumps({
-                "type": "assistant",
-                "sessionId": session_id,
-                "uuid": "msg-2",
-                "timestamp": "2025-01-01T10:00:01Z",
-                "message": {
-                    "role": "assistant",
-                    "model": "claude-sonnet-4-20250514",
-                    "content": [{"type": "text", "text": "Hi!"}],
-                    "usage": {"input_tokens": 10, "output_tokens": 5},
-                },
-            }) + "\n"
+            json.dumps(
+                {
+                    "type": "user",
+                    "sessionId": session_id,
+                    "uuid": "msg-1",
+                    "timestamp": "2025-01-01T10:00:00Z",
+                    "message": {"role": "user", "content": "Hello"},
+                }
+            )
+            + "\n"
+            + json.dumps(
+                {
+                    "type": "assistant",
+                    "sessionId": session_id,
+                    "uuid": "msg-2",
+                    "timestamp": "2025-01-01T10:00:01Z",
+                    "message": {
+                        "role": "assistant",
+                        "model": "claude-sonnet-4-20250514",
+                        "content": [{"type": "text", "text": "Hi!"}],
+                        "usage": {"input_tokens": 10, "output_tokens": 5},
+                    },
+                }
+            )
+            + "\n"
         )
 
-        with patch("weave.integrations.claude_plugin.session.session_importer.weave") as mock_weave:
+        with patch(
+            "weave.integrations.claude_plugin.session.session_importer.weave"
+        ) as mock_weave:
             summary = import_sessions(
                 path=session_file,  # Pass file directly
                 project="test/project",
@@ -741,33 +834,42 @@ class TestImportSessions:
 
     def test_full_mode_processes_all_files(self, tmp_path):
         """Should process all files in full mode."""
-        from weave.integrations.claude_plugin.session.session_importer import import_sessions
         import json
+
+        from weave.integrations.claude_plugin.session.session_importer import (
+            import_sessions,
+        )
 
         # Create two session files
         for i in range(2):
             session_id = f"1234567{i}-1234-5678-1234-567812345678"
             session_file = tmp_path / f"{session_id}.jsonl"
             session_file.write_text(
-                json.dumps({
-                    "type": "user",
-                    "sessionId": session_id,
-                    "uuid": "msg-1",
-                    "timestamp": "2025-01-01T10:00:00Z",
-                    "message": {"role": "user", "content": "Hello"},
-                }) + "\n" +
-                json.dumps({
-                    "type": "assistant",
-                    "sessionId": session_id,
-                    "uuid": "msg-2",
-                    "timestamp": "2025-01-01T10:00:01Z",
-                    "message": {
-                        "role": "assistant",
-                        "model": "claude-sonnet-4-20250514",
-                        "content": [{"type": "text", "text": "Hi!"}],
-                        "usage": {"input_tokens": 10, "output_tokens": 5},
-                    },
-                }) + "\n"
+                json.dumps(
+                    {
+                        "type": "user",
+                        "sessionId": session_id,
+                        "uuid": "msg-1",
+                        "timestamp": "2025-01-01T10:00:00Z",
+                        "message": {"role": "user", "content": "Hello"},
+                    }
+                )
+                + "\n"
+                + json.dumps(
+                    {
+                        "type": "assistant",
+                        "sessionId": session_id,
+                        "uuid": "msg-2",
+                        "timestamp": "2025-01-01T10:00:01Z",
+                        "message": {
+                            "role": "assistant",
+                            "model": "claude-sonnet-4-20250514",
+                            "content": [{"type": "text", "text": "Hi!"}],
+                            "usage": {"input_tokens": 10, "output_tokens": 5},
+                        },
+                    }
+                )
+                + "\n"
             )
 
         with patch("weave.integrations.claude_plugin.session.session_importer.weave"):
@@ -783,57 +885,72 @@ class TestImportSessions:
 
     def test_most_recent_only_by_default(self, tmp_path):
         """Should only import most recent file by default."""
-        from weave.integrations.claude_plugin.session.session_importer import import_sessions
         import json
         import time
+
+        from weave.integrations.claude_plugin.session.session_importer import (
+            import_sessions,
+        )
 
         # Create two session files with different mtimes
         session1 = tmp_path / "11111111-1111-1111-1111-111111111111.jsonl"
         session1.write_text(
-            json.dumps({
-                "type": "user",
-                "sessionId": "11111111-1111-1111-1111-111111111111",
-                "uuid": "msg-1",
-                "timestamp": "2025-01-01T10:00:00Z",
-                "message": {"role": "user", "content": "First"},
-            }) + "\n" +
-            json.dumps({
-                "type": "assistant",
-                "sessionId": "11111111-1111-1111-1111-111111111111",
-                "uuid": "msg-2",
-                "timestamp": "2025-01-01T10:00:01Z",
-                "message": {
-                    "role": "assistant",
-                    "model": "claude-sonnet-4-20250514",
-                    "content": [{"type": "text", "text": "Response 1"}],
-                    "usage": {"input_tokens": 10, "output_tokens": 5},
-                },
-            }) + "\n"
+            json.dumps(
+                {
+                    "type": "user",
+                    "sessionId": "11111111-1111-1111-1111-111111111111",
+                    "uuid": "msg-1",
+                    "timestamp": "2025-01-01T10:00:00Z",
+                    "message": {"role": "user", "content": "First"},
+                }
+            )
+            + "\n"
+            + json.dumps(
+                {
+                    "type": "assistant",
+                    "sessionId": "11111111-1111-1111-1111-111111111111",
+                    "uuid": "msg-2",
+                    "timestamp": "2025-01-01T10:00:01Z",
+                    "message": {
+                        "role": "assistant",
+                        "model": "claude-sonnet-4-20250514",
+                        "content": [{"type": "text", "text": "Response 1"}],
+                        "usage": {"input_tokens": 10, "output_tokens": 5},
+                    },
+                }
+            )
+            + "\n"
         )
 
         time.sleep(0.01)  # Ensure different mtime
 
         session2 = tmp_path / "22222222-2222-2222-2222-222222222222.jsonl"
         session2.write_text(
-            json.dumps({
-                "type": "user",
-                "sessionId": "22222222-2222-2222-2222-222222222222",
-                "uuid": "msg-1",
-                "timestamp": "2025-01-01T11:00:00Z",
-                "message": {"role": "user", "content": "Second"},
-            }) + "\n" +
-            json.dumps({
-                "type": "assistant",
-                "sessionId": "22222222-2222-2222-2222-222222222222",
-                "uuid": "msg-2",
-                "timestamp": "2025-01-01T11:00:01Z",
-                "message": {
-                    "role": "assistant",
-                    "model": "claude-sonnet-4-20250514",
-                    "content": [{"type": "text", "text": "Response 2"}],
-                    "usage": {"input_tokens": 10, "output_tokens": 5},
-                },
-            }) + "\n"
+            json.dumps(
+                {
+                    "type": "user",
+                    "sessionId": "22222222-2222-2222-2222-222222222222",
+                    "uuid": "msg-1",
+                    "timestamp": "2025-01-01T11:00:00Z",
+                    "message": {"role": "user", "content": "Second"},
+                }
+            )
+            + "\n"
+            + json.dumps(
+                {
+                    "type": "assistant",
+                    "sessionId": "22222222-2222-2222-2222-222222222222",
+                    "uuid": "msg-2",
+                    "timestamp": "2025-01-01T11:00:01Z",
+                    "message": {
+                        "role": "assistant",
+                        "model": "claude-sonnet-4-20250514",
+                        "content": [{"type": "text", "text": "Response 2"}],
+                        "usage": {"input_tokens": 10, "output_tokens": 5},
+                    },
+                }
+            )
+            + "\n"
         )
 
         with patch("weave.integrations.claude_plugin.session.session_importer.weave"):

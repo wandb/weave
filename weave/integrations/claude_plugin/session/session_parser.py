@@ -145,7 +145,9 @@ class ToolCall:
     result: str | None = None
     result_timestamp: datetime.datetime | None = None
     is_error: bool = False  # True if tool_result had is_error=True
-    explicit_duration_ms: int | None = None  # From toolUseResult.durationMs if available
+    explicit_duration_ms: int | None = (
+        None  # From toolUseResult.durationMs if available
+    )
 
     def duration_ms(self) -> int | None:
         """Get tool execution duration in milliseconds.
@@ -317,10 +319,12 @@ class Turn:
             last_msg = self.assistant_messages[-1]
             if last_msg.tool_calls:
                 tool_calls_with_results = [
-                    tc for tc in last_msg.tool_calls if tc.result_timestamp
+                    tc for tc in last_msg.tool_calls if tc.result_timestamp is not None
                 ]
                 if tool_calls_with_results:
-                    return max(tc.result_timestamp for tc in tool_calls_with_results)
+                    # All tool calls in this list have result_timestamp set (non-None)
+                    timestamps = [tc.result_timestamp for tc in tool_calls_with_results]
+                    return max(t for t in timestamps if t is not None)
             return last_msg.timestamp
         return self.user_message.timestamp
 
@@ -550,7 +554,9 @@ def parse_session_file(path: Path) -> Session | None:
                                     else datetime.datetime.now(tz=datetime.timezone.utc)
                                 )
                             except (ValueError, TypeError) as e:
-                                logger.debug(f"Failed to parse backup timestamp '{backup_time_str}': {e}")
+                                logger.debug(
+                                    f"Failed to parse backup timestamp '{backup_time_str}': {e}"
+                                )
                                 backup_time = datetime.datetime.now(
                                     tz=datetime.timezone.utc
                                 )
@@ -625,11 +631,11 @@ def parse_session_file(path: Path) -> Session | None:
                         source = c.get("source", {})
                         if source.get("type") == "base64" and source.get("data"):
                             try:
-                                image_content = Content.from_base64(
+                                img_content: Content = Content.from_base64(
                                     source["data"],
                                     mimetype=source.get("media_type"),
                                 )
-                                user_images.append(image_content)
+                                user_images.append(img_content)
                             except (ValueError, TypeError, KeyError) as e:
                                 logger.debug(f"Failed to parse image: {e}")
                     elif c.get("type") == "tool_result":
@@ -644,7 +650,10 @@ def parse_session_file(path: Path) -> Session | None:
                                 # List of content blocks - extract text from each
                                 text_parts_result = []
                                 for block in result_content:
-                                    if isinstance(block, dict) and block.get("type") == "text":
+                                    if (
+                                        isinstance(block, dict)
+                                        and block.get("type") == "text"
+                                    ):
                                         text_parts_result.append(block.get("text", ""))
                                 tc.result = "\n".join(text_parts_result)[:10000]
                             tc.result_timestamp = timestamp
@@ -661,7 +670,11 @@ def parse_session_file(path: Path) -> Session | None:
 
             # Only create a new turn if there's actual user text content
             # (not just tool results, empty messages, system messages, or skill expansions)
-            if user_content.strip() and not is_system_message(user_content) and not is_skill_expansion(user_content):
+            if (
+                user_content.strip()
+                and not is_system_message(user_content)
+                and not is_skill_expansion(user_content)
+            ):
                 if current_turn:
                     session.turns.append(current_turn)
                 current_turn = Turn(
@@ -734,9 +747,9 @@ def parse_session_file(path: Path) -> Session | None:
     # Link file backups to turns based on message UUIDs
     # The snapshot messageId corresponds to assistant message UUIDs
     for turn in session.turns:
-        for msg in turn.assistant_messages:
-            if msg.uuid in snapshots_by_message_id:
-                turn.file_backups.extend(snapshots_by_message_id[msg.uuid])
+        for assistant_msg in turn.assistant_messages:
+            if assistant_msg.uuid in snapshots_by_message_id:
+                turn.file_backups.extend(snapshots_by_message_id[assistant_msg.uuid])
         # Also check user message UUID
         if turn.user_message.uuid in snapshots_by_message_id:
             turn.file_backups.extend(snapshots_by_message_id[turn.user_message.uuid])

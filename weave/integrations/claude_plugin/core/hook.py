@@ -74,7 +74,7 @@ def main() -> None:
     try:
         payload: dict[str, Any] = json.load(sys.stdin)
     except json.JSONDecodeError as e:
-        logger.error(f"Failed to parse hook payload: {e}")
+        logger.exception("Failed to parse hook payload")
         sys.exit(1)
 
     event_name = payload.get("hook_event_name")
@@ -109,7 +109,6 @@ def main() -> None:
 
     # Import here to avoid startup overhead
     from weave.integrations.claude_plugin.core.socket_client import (
-        DaemonClient,
         ensure_daemon_running,
     )
     from weave.integrations.claude_plugin.core.state import (
@@ -135,15 +134,15 @@ def main() -> None:
     # Get daemon PID from state for liveness check
     daemon_pid = None
     with StateManager() as state:
-        session_data = state.get_session(session_id)
-        if session_data:
-            daemon_pid = session_data.get("daemon_pid")
+        stored_data = state.get_session(session_id)
+        if stored_data:
+            daemon_pid = stored_data.get("daemon_pid")
 
     # Ensure daemon is running
     try:
         client = ensure_daemon_running(session_id, daemon_pid)
     except Exception as e:
-        logger.error(f"Failed to connect to daemon: {e}")
+        logger.exception("Failed to connect to daemon")
         sys.exit(1)
 
     # Send event to daemon
@@ -175,9 +174,10 @@ def main() -> None:
             logger.warning("No response from daemon")
 
     except Exception as e:
-        logger.error(f"Error sending event to daemon: {e}")
+        logger.exception("Error sending event to daemon")
         if os.environ.get("DEBUG"):
             import traceback
+
             traceback.print_exc(file=sys.stderr)
         sys.exit(1)
 

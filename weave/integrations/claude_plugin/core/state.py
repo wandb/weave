@@ -41,10 +41,11 @@ def _is_expired(last_updated: str) -> bool:
         if updated.tzinfo is None:
             updated = updated.replace(tzinfo=timezone.utc)
         cutoff = datetime.now(timezone.utc) - timedelta(days=RETENTION_DAYS)
-        return updated < cutoff
     except (ValueError, TypeError):
         # Invalid timestamp - treat as expired
         return True
+    else:
+        return updated < cutoff
 
 
 def _cleanup_expired(data: dict[str, Any]) -> dict[str, Any]:
@@ -119,7 +120,7 @@ class StateManager:
         self._lock_file: Any = None
         self._data: dict[str, Any] = {}
 
-    def __enter__(self) -> "StateManager":
+    def __enter__(self) -> StateManager:
         """Acquire lock and load state."""
         STATE_DIR.mkdir(parents=True, exist_ok=True)
 

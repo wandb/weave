@@ -20,7 +20,11 @@ from typing import TYPE_CHECKING, Any
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from weave.integrations.claude_plugin.session.session_parser import FileBackup, Session, Turn
+    from weave.integrations.claude_plugin.session.session_parser import (
+        FileBackup,
+        Session,
+        Turn,
+    )
 
 # File extension to highlight.js language mapping
 EXT_TO_HLJS_LANG: dict[str, str] = {
@@ -180,9 +184,9 @@ def _to_relative_path(file_path: str, cwd: str | None) -> str:
 
 
 def generate_turn_diff_html(
-    turn: "Turn",
+    turn: Turn,
     turn_index: int,
-    all_turns: list["Turn"],
+    all_turns: list[Turn],
     session_id: str,
     *,
     turn_number: int,
@@ -228,7 +232,6 @@ def generate_turn_diff_html(
         HTML string with diff view, or None if no file changes
     """
     # Import here to avoid circular imports
-    from weave.integrations.claude_plugin.session.session_parser import FileBackup
 
     if not turn.file_backups:
         logger.debug("generate_turn_diff_html: no file_backups in turn")
@@ -240,7 +243,9 @@ def generate_turn_diff_html(
     current_backups: dict[str, FileBackup] = {}
     for fb in turn.file_backups:
         if not fb.backup_filename:
-            logger.debug(f"generate_turn_diff_html: skipping {fb.file_path} - no backup_filename")
+            logger.debug(
+                f"generate_turn_diff_html: skipping {fb.file_path} - no backup_filename"
+            )
             continue
         existing = current_backups.get(fb.file_path)
         if not existing or fb.version > existing.version:
@@ -250,7 +255,9 @@ def generate_turn_diff_html(
         logger.debug("generate_turn_diff_html: no current_backups after filtering")
         return None
 
-    logger.debug(f"generate_turn_diff_html: processing {len(current_backups)} files, cwd={cwd}")
+    logger.debug(
+        f"generate_turn_diff_html: processing {len(current_backups)} files, cwd={cwd}"
+    )
 
     # Build map of previous turns' file -> latest backup before this turn
     # This is needed for both historic mode (to generate diffs) and live mode
@@ -282,7 +289,9 @@ def generate_turn_diff_html(
             logger.debug(f"Skipping binary file: {file_path}")
             continue
         except Exception as e:
-            logger.warning(f"Failed to read backup for {file_path}: {type(e).__name__}: {e}")
+            logger.warning(
+                f"Failed to read backup for {file_path}: {type(e).__name__}: {e}"
+            )
             continue
 
         backup_lines = backup_text.splitlines(keepends=True)
@@ -375,7 +384,9 @@ def generate_turn_diff_html(
                         disk_path = Path(cwd) / file_path
                     else:
                         # No cwd available, skip relative path
-                        logger.debug(f"generate_turn_diff_html: skipping {file_path} - relative path and no cwd")
+                        logger.debug(
+                            f"generate_turn_diff_html: skipping {file_path} - relative path and no cwd"
+                        )
                         continue
                 if not disk_path.exists():
                     # File was deleted - show as removal
@@ -472,7 +483,9 @@ def generate_turn_diff_html(
                 continue
 
     if not file_diffs:
-        logger.debug(f"generate_turn_diff_html: no file_diffs generated for {len(current_backups)} files")
+        logger.debug(
+            f"generate_turn_diff_html: no file_diffs generated for {len(current_backups)} files"
+        )
         return None
 
     logger.debug(f"generate_turn_diff_html: generated diff for {len(file_diffs)} files")
@@ -503,7 +516,9 @@ def generate_turn_diff_html(
     # User prompt chat bubble at the very top (if provided)
     if user_prompt:
         # Truncate very long prompts for display
-        display_prompt = user_prompt[:2000] + "..." if len(user_prompt) > 2000 else user_prompt
+        display_prompt = (
+            user_prompt[:2000] + "..." if len(user_prompt) > 2000 else user_prompt
+        )
         html_parts.append('<div class="prompt-section">')
         html_parts.append('<div class="prompt-label">')
         # User icon SVG
@@ -511,12 +526,16 @@ def generate_turn_diff_html(
             '<svg viewBox="0 0 16 16"><path fill-rule="evenodd" d="M10.5 5a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0zm.061 3.073a4 4 0 10-5.123 0 6.004 6.004 0 00-3.431 5.142.75.75 0 001.498.07 4.5 4.5 0 018.99 0 .75.75 0 101.498-.07 6.005 6.005 0 00-3.432-5.142z"></path></svg>'
         )
         html_parts.append("User Prompt</div>")
-        html_parts.append(f'<div class="prompt-bubble">{_html_escape(display_prompt)}</div>')
+        html_parts.append(
+            f'<div class="prompt-bubble">{_html_escape(display_prompt)}</div>'
+        )
         html_parts.append("</div>")
 
     # Header with title and all metadata
     html_parts.append('<div class="diff-header">')
-    html_parts.append(f'<div class="diff-title">File Changes for Turn {turn_number}</div>')
+    html_parts.append(
+        f'<div class="diff-title">File Changes for Turn {turn_number}</div>'
+    )
     html_parts.append('<div class="diff-stats">')
     html_parts.append(f"{len(file_diffs)} file{'s' if len(file_diffs) != 1 else ''}")
     html_parts.append(f' <span class="add">+{total_added}</span>')
@@ -540,7 +559,9 @@ def generate_turn_diff_html(
         html_parts.append(
             '<svg class="file-icon" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M3.75 1.5a.25.25 0 00-.25.25v12.5c0 .138.112.25.25.25h9.5a.25.25 0 00.25-.25V4.664a.25.25 0 00-.073-.177l-2.914-2.914a.25.25 0 00-.177-.073H3.75zM2 1.75C2 .784 2.784 0 3.75 0h6.586c.464 0 .909.184 1.237.513l2.914 2.914c.329.328.513.773.513 1.237v9.586A1.75 1.75 0 0113.25 16h-9.5A1.75 1.75 0 012 14.25V1.75z"></path></svg>'
         )
-        html_parts.append(f'<span class="file-name">{_html_escape(display_path)}</span>')
+        html_parts.append(
+            f'<span class="file-name">{_html_escape(display_path)}</span>'
+        )
         if is_new:
             html_parts.append('<span class="file-badge new">NEW</span>')
         html_parts.append("</div>")
@@ -583,9 +604,7 @@ def generate_turn_diff_html(
                 if line_text.startswith("@@"):
                     # Hunk header - extract line numbers
                     html_parts.append('<tr class="line-hunk">')
-                    html_parts.append(
-                        f'<td colspan="4">{_html_escape(line_text)}</td>'
-                    )
+                    html_parts.append(f'<td colspan="4">{_html_escape(line_text)}</td>')
                     html_parts.append("</tr>")
                     # Parse line numbers from @@ -old,count +new,count @@
                     match = re.search(r"@@ -(\d+)", line_text)
@@ -638,7 +657,9 @@ def generate_turn_diff_html(
     # Initialize highlight.js
     html_parts.append("<script>")
     html_parts.append("document.addEventListener('DOMContentLoaded',()=>{")
-    html_parts.append("document.querySelectorAll('code[class*=language-]').forEach(el=>{")
+    html_parts.append(
+        "document.querySelectorAll('code[class*=language-]').forEach(el=>{"
+    )
     html_parts.append("try{hljs.highlightElement(el)}catch(e){}});});")
     html_parts.append("</script>")
 
@@ -648,7 +669,7 @@ def generate_turn_diff_html(
 
 
 def generate_session_diff_html(
-    session: "Session",
+    session: Session,
     *,
     cwd: str | None = None,
     sessions_dir: Path | None = None,
@@ -673,7 +694,6 @@ def generate_session_diff_html(
         HTML string with session diff view, or None if no file changes
     """
     from weave.integrations.claude_plugin.session.session_parser import (
-        FileBackup,
         parse_session_file,
     )
 
@@ -863,7 +883,9 @@ def generate_session_diff_html(
     # User prompt chat bubble at the very top (if provided)
     if first_prompt:
         # Truncate very long prompts for display
-        display_prompt = first_prompt[:2000] + "..." if len(first_prompt) > 2000 else first_prompt
+        display_prompt = (
+            first_prompt[:2000] + "..." if len(first_prompt) > 2000 else first_prompt
+        )
         html_parts.append('<div class="prompt-section">')
         html_parts.append('<div class="prompt-label">')
         # User icon SVG
@@ -871,17 +893,23 @@ def generate_session_diff_html(
             '<svg viewBox="0 0 16 16"><path fill-rule="evenodd" d="M10.5 5a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0zm.061 3.073a4 4 0 10-5.123 0 6.004 6.004 0 00-3.431 5.142.75.75 0 001.498.07 4.5 4.5 0 018.99 0 .75.75 0 101.498-.07 6.005 6.005 0 00-3.432-5.142z"></path></svg>'
         )
         html_parts.append("User Prompt</div>")
-        html_parts.append(f'<div class="prompt-bubble">{_html_escape(display_prompt)}</div>')
+        html_parts.append(
+            f'<div class="prompt-bubble">{_html_escape(display_prompt)}</div>'
+        )
         html_parts.append("</div>")
 
     # Session-level header
     html_parts.append('<div class="diff-header">')
     html_parts.append('<div class="diff-title">Session File Changes</div>')
     html_parts.append('<div class="diff-stats">')
-    html_parts.append(f"{len(file_diffs)} file{'s' if len(file_diffs) != 1 else ''} changed")
+    html_parts.append(
+        f"{len(file_diffs)} file{'s' if len(file_diffs) != 1 else ''} changed"
+    )
     html_parts.append(f' <span class="add">+{total_added}</span>')
     html_parts.append(f' <span class="del">−{total_removed}</span>')
-    html_parts.append(f" · {len(session.turns)} turn{'s' if len(session.turns) != 1 else ''}")
+    html_parts.append(
+        f" · {len(session.turns)} turn{'s' if len(session.turns) != 1 else ''}"
+    )
     html_parts.append("</div></div>")
 
     # Resume session section (only if project is provided)
@@ -895,12 +923,20 @@ def generate_session_diff_html(
         )
         html_parts.append("Resume this session</div>")
         html_parts.append('<div class="resume-code-wrap">')
-        html_parts.append(f'<pre class="resume-code" id="teleport-cmd">{_html_escape(teleport_cmd)}</pre>')
-        html_parts.append('<button class="resume-copy-btn" onclick="copyTeleportCmd()" title="Copy to clipboard">')
+        html_parts.append(
+            f'<pre class="resume-code" id="teleport-cmd">{_html_escape(teleport_cmd)}</pre>'
+        )
+        html_parts.append(
+            '<button class="resume-copy-btn" onclick="copyTeleportCmd()" title="Copy to clipboard">'
+        )
         # Copy icon
-        html_parts.append('<svg class="copy-icon" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 010 1.5h-1.5a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-1.5a.75.75 0 011.5 0v1.5A1.75 1.75 0 019.25 16h-7.5A1.75 1.75 0 010 14.25v-7.5z"></path><path fill-rule="evenodd" d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0114.25 11h-7.5A1.75 1.75 0 015 9.25v-7.5zm1.75-.25a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-7.5a.25.25 0 00-.25-.25h-7.5z"></path></svg>')
+        html_parts.append(
+            '<svg class="copy-icon" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 010 1.5h-1.5a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-1.5a.75.75 0 011.5 0v1.5A1.75 1.75 0 019.25 16h-7.5A1.75 1.75 0 010 14.25v-7.5z"></path><path fill-rule="evenodd" d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0114.25 11h-7.5A1.75 1.75 0 015 9.25v-7.5zm1.75-.25a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-7.5a.25.25 0 00-.25-.25h-7.5z"></path></svg>'
+        )
         # Check icon (shown after copy)
-        html_parts.append('<svg class="check-icon" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"></path></svg>')
+        html_parts.append(
+            '<svg class="check-icon" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"></path></svg>'
+        )
         html_parts.append("</button>")
         html_parts.append("</div></div>")
 
@@ -919,19 +955,29 @@ def generate_session_diff_html(
         collapse_class = " collapsed" if is_large else ""
 
         html_parts.append(f'<div class="diff-file{collapse_class}">')
-        html_parts.append('<div class="file-header" onclick="this.parentElement.classList.toggle(\'collapsed\')">')
+        html_parts.append(
+            '<div class="file-header" onclick="this.parentElement.classList.toggle(\'collapsed\')">'
+        )
         html_parts.append(
             '<svg class="file-icon" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M3.75 1.5a.25.25 0 00-.25.25v12.5c0 .138.112.25.25.25h9.5a.25.25 0 00.25-.25V4.664a.25.25 0 00-.073-.177l-2.914-2.914a.25.25 0 00-.177-.073H3.75zM2 1.75C2 .784 2.784 0 3.75 0h6.586c.464 0 .909.184 1.237.513l2.914 2.914c.329.328.513.773.513 1.237v9.586A1.75 1.75 0 0113.25 16h-9.5A1.75 1.75 0 012 14.25V1.75z"></path></svg>'
         )
-        html_parts.append(f'<span class="file-name">{_html_escape(display_path)}</span>')
+        html_parts.append(
+            f'<span class="file-name">{_html_escape(display_path)}</span>'
+        )
         if is_new:
             html_parts.append('<span class="file-badge new">NEW</span>')
         if is_deleted:
-            html_parts.append('<span class="file-badge" style="background:#ffebe9;color:#d1242f">DELETED</span>')
+            html_parts.append(
+                '<span class="file-badge" style="background:#ffebe9;color:#d1242f">DELETED</span>'
+            )
         # Add file-level stats
-        html_parts.append(f'<span class="file-stats"><span class="add">+{added}</span> <span class="del">−{removed}</span></span>')
+        html_parts.append(
+            f'<span class="file-stats"><span class="add">+{added}</span> <span class="del">−{removed}</span></span>'
+        )
         # Expand/collapse chevron icon
-        html_parts.append('<svg class="expand-icon" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M12.78 5.22a.75.75 0 010 1.06l-4.25 4.25a.75.75 0 01-1.06 0L3.22 6.28a.75.75 0 011.06-1.06L8 8.94l3.72-3.72a.75.75 0 011.06 0z"></path></svg>')
+        html_parts.append(
+            '<svg class="expand-icon" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M12.78 5.22a.75.75 0 010 1.06l-4.25 4.25a.75.75 0 01-1.06 0L3.22 6.28a.75.75 0 011.06-1.06L8 8.94l3.72-3.72a.75.75 0 011.06 0z"></path></svg>'
+        )
         html_parts.append("</div>")
 
         html_parts.append('<div class="diff-table-wrap">')
@@ -996,7 +1042,9 @@ def generate_session_diff_html(
 
     html_parts.append("<script>")
     html_parts.append("document.addEventListener('DOMContentLoaded',()=>{")
-    html_parts.append("document.querySelectorAll('code[class*=language-]').forEach(el=>{")
+    html_parts.append(
+        "document.querySelectorAll('code[class*=language-]').forEach(el=>{"
+    )
     html_parts.append("try{hljs.highlightElement(el)}catch(e){}});});")
     # Copy to clipboard function for teleport command
     html_parts.append("function copyTeleportCmd(){")
@@ -1008,9 +1056,15 @@ def generate_session_diff_html(
     html_parts.append("setTimeout(()=>btn.classList.remove('copied'),2000);")
     html_parts.append("}).catch(()=>{")
     html_parts.append("const r=document.createRange();r.selectNode(cmd);")
-    html_parts.append("window.getSelection().removeAllRanges();window.getSelection().addRange(r);")
-    html_parts.append("document.execCommand('copy');window.getSelection().removeAllRanges();")
-    html_parts.append("btn.classList.add('copied');setTimeout(()=>btn.classList.remove('copied'),2000);")
+    html_parts.append(
+        "window.getSelection().removeAllRanges();window.getSelection().addRange(r);"
+    )
+    html_parts.append(
+        "document.execCommand('copy');window.getSelection().removeAllRanges();"
+    )
+    html_parts.append(
+        "btn.classList.add('copied');setTimeout(()=>btn.classList.remove('copied'),2000);"
+    )
     html_parts.append("})}}")
     html_parts.append("</script>")
 
@@ -1105,7 +1159,7 @@ def _build_file_diffs_from_edit_data(
 
 
 def generate_diff_html_from_edit_data_for_turn(
-    turn: "Turn",
+    turn: Turn,
     turn_number: int,
     user_prompt: str | None = None,
     cwd: str | None = None,
@@ -1184,7 +1238,9 @@ def generate_diff_html_from_edit_data_for_turn(
     tool_count = len(turn.all_tool_calls())
     model = turn.primary_model() or "unknown"
     html_parts.append('<div class="diff-header">')
-    html_parts.append(f'<div class="diff-title">File Changes for Turn {turn_number}</div>')
+    html_parts.append(
+        f'<div class="diff-title">File Changes for Turn {turn_number}</div>'
+    )
     html_parts.append('<div class="diff-stats">')
     html_parts.append(f"{len(file_diffs)} file{'s' if len(file_diffs) != 1 else ''}")
     html_parts.append(f' <span class="add">+{total_added}</span>')
@@ -1202,7 +1258,9 @@ def generate_diff_html_from_edit_data_for_turn(
     # Initialize highlight.js
     html_parts.append("<script>")
     html_parts.append("document.addEventListener('DOMContentLoaded',()=>{")
-    html_parts.append("document.querySelectorAll('code[class*=language-]').forEach(el=>{")
+    html_parts.append(
+        "document.querySelectorAll('code[class*=language-]').forEach(el=>{"
+    )
     html_parts.append("try{hljs.highlightElement(el)}catch(e){}});});")
     html_parts.append("</script>")
 
@@ -1274,7 +1332,9 @@ def generate_edit_diff_html(
     # Initialize highlight.js
     html_parts.append("<script>")
     html_parts.append("document.addEventListener('DOMContentLoaded',()=>{")
-    html_parts.append("document.querySelectorAll('code[class*=language-]').forEach(el=>{")
+    html_parts.append(
+        "document.querySelectorAll('code[class*=language-]').forEach(el=>{"
+    )
     html_parts.append("try{hljs.highlightElement(el)}catch(e){}});});")
     html_parts.append("</script>")
 
@@ -1470,7 +1530,9 @@ def generate_todo_html(todos: list[dict[str, str]]) -> str:
     html_parts.append('<div class="todo-stats">')
     html_parts.append(f'<span class="completed">{completed} completed</span>')
     if in_progress > 0:
-        html_parts.append(f' · <span class="in-progress">{in_progress} in progress</span>')
+        html_parts.append(
+            f' · <span class="in-progress">{in_progress} in progress</span>'
+        )
     if pending > 0:
         html_parts.append(f' · <span class="pending">{pending} pending</span>')
     html_parts.append(f" · {total} total")

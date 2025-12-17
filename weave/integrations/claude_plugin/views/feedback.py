@@ -20,7 +20,10 @@ from weave.integrations.claude_plugin.core.state import StateManager
 def main() -> int:
     """Send feedback to a Claude Code session daemon."""
     if len(sys.argv) < 3:
-        print("Usage: python -m weave.integrations.claude_plugin.feedback <session_id> <emoji> [note]", file=sys.stderr)
+        print(
+            "Usage: python -m weave.integrations.claude_plugin.feedback <session_id> <emoji> [note]",
+            file=sys.stderr,
+        )
         return 1
 
     session_id = sys.argv[1]
@@ -42,7 +45,10 @@ def main() -> int:
         # Start the daemon
         print(f"Starting daemon for session {session_id}...", file=sys.stderr)
         if not client.start_daemon():
-            print(f"Error: Failed to start daemon for session {session_id}", file=sys.stderr)
+            print(
+                f"Error: Failed to start daemon for session {session_id}",
+                file=sys.stderr,
+            )
             return 1
 
     payload = {"emoji": emoji}

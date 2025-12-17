@@ -24,7 +24,10 @@ import signal
 import sys
 import time
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from weave.trace.call import Call
 
 # Setup logging before other imports
 DEBUG_LOG_DIR = Path("/tmp/weave-claude-logs")
@@ -70,7 +73,9 @@ def setup_logging(session_id: str | None = None) -> logging.Logger:
             weave_trace_handler.setFormatter(
                 logging.Formatter("%(asctime)s [%(name)s] %(levelname)s: %(message)s")
             )
-            weave_trace_handler.setLevel(logging.WARNING)  # Only WARNING+ to avoid noise
+            weave_trace_handler.setLevel(
+                logging.WARNING
+            )  # Only WARNING+ to avoid noise
             logging.getLogger("weave.trace").addHandler(weave_trace_handler)
 
             # Log the session start marker for easy identification
@@ -86,9 +91,8 @@ logger = setup_logging()
 
 # Import after logging setup
 import weave
-from weave.trace.context.weave_client_context import require_weave_client
-from weave.trace.view_utils import set_call_view
-
+from weave.integrations.claude_plugin.core.socket_client import get_socket_path
+from weave.integrations.claude_plugin.core.state import StateManager
 from weave.integrations.claude_plugin.session.session_parser import (
     Session,
     TokenUsage,
@@ -97,30 +101,26 @@ from weave.integrations.claude_plugin.session.session_parser import (
     is_system_message,
     parse_session_file,
 )
-from weave.integrations.claude_plugin.core.socket_client import get_socket_path
-from weave.integrations.claude_plugin.core.state import StateManager
 from weave.integrations.claude_plugin.utils import (
+    INACTIVITY_TIMEOUT,
+    SUBAGENT_DETECTION_TIMEOUT,
     BufferedToolResult,
     ToolResultBuffer,
     extract_question_from_text,
     generate_session_name,
     get_git_info,
     get_subagent_display_name,
-    get_tool_display_name,
-    get_turn_display_name,
-    truncate,
-    sanitize_tool_input,
-    reconstruct_call,
     log_tool_call,
-    MAX_TOOL_INPUT_LENGTH,
-    MAX_TOOL_OUTPUT_LENGTH,
-    INACTIVITY_TIMEOUT,
-    SUBAGENT_DETECTION_TIMEOUT,
+    reconstruct_call,
+    truncate,
 )
 from weave.integrations.claude_plugin.views.diff_view import (
     generate_session_diff_html,
     generate_turn_diff_html,
 )
+from weave.trace.context.weave_client_context import require_weave_client
+from weave.trace.view_utils import set_call_view
+
 try:
     from weave.integrations.claude_plugin.secret_scanner import get_secret_scanner
 except ImportError:
@@ -208,7 +208,9 @@ class WeaveDaemon:
 
         # Weave state
         self.weave_client: Any = None
-        self.processor: Any | None = None  # SessionProcessor, initialized when weave starts
+        self.processor: Any | None = (
+            None  # SessionProcessor, initialized when weave starts
+        )
         self.session_call_id: str | None = None
         self.trace_id: str | None = None
         self.trace_url: str | None = None
@@ -277,7 +279,10 @@ class WeaveDaemon:
             self.weave_client = require_weave_client()
 
             # Initialize SessionProcessor
-            from weave.integrations.claude_plugin.session.session_processor import SessionProcessor
+            from weave.integrations.claude_plugin.session.session_processor import (
+                SessionProcessor,
+            )
+
             self.processor = SessionProcessor(
                 client=self.weave_client,
                 project=self.project,
@@ -348,19 +353,21 @@ class WeaveDaemon:
         )
         with StateManager() as state:
             session_data = state.get_session(self.session_id) or {}
-            session_data.update({
-                "session_call_id": self.session_call_id,
-                "trace_id": self.trace_id,
-                "trace_url": self.trace_url,
-                "turn_call_id": self.current_turn_call_id,
-                "turn_number": self.turn_number,
-                "total_tool_calls": self.total_tool_calls,
-                "tool_counts": self.tool_counts,
-                "last_processed_line": self.last_processed_line,
-                "daemon_pid": os.getpid(),
-                "pending_question": self._pending_question,
-                "compaction_count": self.compaction_count,
-            })
+            session_data.update(
+                {
+                    "session_call_id": self.session_call_id,
+                    "trace_id": self.trace_id,
+                    "trace_url": self.trace_url,
+                    "turn_call_id": self.current_turn_call_id,
+                    "turn_number": self.turn_number,
+                    "total_tool_calls": self.total_tool_calls,
+                    "tool_counts": self.tool_counts,
+                    "last_processed_line": self.last_processed_line,
+                    "daemon_pid": os.getpid(),
+                    "pending_question": self._pending_question,
+                    "compaction_count": self.compaction_count,
+                }
+            )
             state.save_session(self.session_id, session_data)
 
     def _get_sessions_directory(self) -> Path | None:
@@ -412,9 +419,12 @@ class WeaveDaemon:
 
         # Find the tracker (match by parent session)
         tracker = next(
-            (t for t in self._subagent_trackers.values()
-             if not t.is_tailing and t.parent_session_id == session.session_id),
-            None
+            (
+                t
+                for t in self._subagent_trackers.values()
+                if not t.is_tailing and t.parent_session_id == session.session_id
+            ),
+            None,
         )
         if not tracker:
             logger.debug(f"No pending tracker for subagent file {agent_file}")
@@ -423,7 +433,8 @@ class WeaveDaemon:
         # Update tracker with file info
         tracker.agent_id = session.agent_id
         tracker.transcript_path = agent_file
-        self._subagent_by_agent_id[session.agent_id] = tracker
+        if session.agent_id:
+            self._subagent_by_agent_id[session.agent_id] = tracker
 
         # Build display name using helper that strips common prefixes
         first_prompt = session.first_user_prompt() or ""
@@ -439,7 +450,10 @@ class WeaveDaemon:
         )
 
         # Create subagent call with ChatView-compatible inputs
-        from weave.integrations.claude_plugin.session.session_processor import SessionProcessor
+        from weave.integrations.claude_plugin.session.session_processor import (
+            SessionProcessor,
+        )
+
         subagent_call = self.weave_client.create_call(
             op="claude_code.subagent",
             inputs=SessionProcessor.build_subagent_inputs(
@@ -453,7 +467,9 @@ class WeaveDaemon:
 
         tracker.subagent_call_id = subagent_call.id
 
-        logger.info(f"Started tailing subagent {session.agent_id} (type={tracker.subagent_type}): {subagent_call.id}")
+        logger.info(
+            f"Started tailing subagent {session.agent_id} (type={tracker.subagent_type}): {subagent_call.id}"
+        )
 
         # Process any existing content
         await self._process_subagent_updates(tracker)
@@ -593,7 +609,7 @@ class WeaveDaemon:
         except asyncio.TimeoutError:
             logger.warning("Connection timeout")
         except Exception as e:
-            logger.error(f"Error handling connection: {e}")
+            logger.exception("Error handling connection")
         finally:
             writer.close()
             await writer.wait_closed()
@@ -636,9 +652,15 @@ class WeaveDaemon:
 
         # Don't create session call here - wait for UserPromptSubmit
         # which has the actual user prompt in the payload
-        return {"status": "ok", "trace_url": self.trace_url, "session_id": self.session_id}
+        return {
+            "status": "ok",
+            "trace_url": self.trace_url,
+            "session_id": self.session_id,
+        }
 
-    async def _handle_user_prompt_submit(self, payload: dict[str, Any]) -> dict[str, Any]:
+    async def _handle_user_prompt_submit(
+        self, payload: dict[str, Any]
+    ) -> dict[str, Any]:
         """Handle UserPromptSubmit - ensure session exists, return trace URL.
 
         Detects session continuation (when session_ended is True) and creates
@@ -652,7 +674,11 @@ class WeaveDaemon:
                 logger.info(f"Detected session continuation for {self.session_id}")
                 return await self._create_continuation_session_call(payload)
             # Session exists and isn't a continuation - continue normally
-            return {"status": "ok", "trace_url": self.trace_url, "session_id": self.session_id}
+            return {
+                "status": "ok",
+                "trace_url": self.trace_url,
+                "session_id": self.session_id,
+            }
 
         # No session call yet - create a fresh one
         return await self._create_session_call(payload)
@@ -690,7 +716,9 @@ class WeaveDaemon:
 
         return False
 
-    async def _create_continuation_session_call(self, payload: dict[str, Any]) -> dict[str, Any]:
+    async def _create_continuation_session_call(
+        self, payload: dict[str, Any]
+    ) -> dict[str, Any]:
         """Create a new session call for a continued session.
 
         Creates a new trace with "Continued: " prefix and links to the
@@ -726,7 +754,6 @@ class WeaveDaemon:
                         user_prompt = real_prompt
 
         # Generate display name from the continuation's first prompt
-        from weave.integrations.claude_plugin.utils import generate_session_name
         base_name, _ = generate_session_name(user_prompt)
         continuation_display_name = f"Continued: {base_name}"
 
@@ -760,26 +787,34 @@ class WeaveDaemon:
         # Update state with new session info and clear session_ended
         with StateManager() as state:
             session_data = state.get_session(self.session_id) or {}
-            session_data.update({
-                "session_call_id": self.session_call_id,
-                "trace_id": self.trace_id,
-                "trace_url": self.trace_url,
-                "turn_call_id": None,
-                "turn_number": 0,
-                "total_tool_calls": 0,
-                "tool_counts": {},
-                "session_ended": False,  # Clear the ended flag
-                "continuation_count": continuation_count,
-                "pending_question": None,
-                "compaction_count": 0,
-            })
+            session_data.update(
+                {
+                    "session_call_id": self.session_call_id,
+                    "trace_id": self.trace_id,
+                    "trace_url": self.trace_url,
+                    "turn_call_id": None,
+                    "turn_number": 0,
+                    "total_tool_calls": 0,
+                    "tool_counts": {},
+                    "session_ended": False,  # Clear the ended flag
+                    "continuation_count": continuation_count,
+                    "pending_question": None,
+                    "compaction_count": 0,
+                }
+            )
             state.save_session(self.session_id, session_data)
 
         # Flush to ensure call is sent
         self.weave_client.flush()
 
-        logger.info(f"Created continuation session call: {self.session_call_id} (continuation #{continuation_count})")
-        return {"status": "ok", "trace_url": self.trace_url, "session_id": self.session_id}
+        logger.info(
+            f"Created continuation session call: {self.session_call_id} (continuation #{continuation_count})"
+        )
+        return {
+            "status": "ok",
+            "trace_url": self.trace_url,
+            "session_id": self.session_id,
+        }
 
     async def _create_session_call(self, payload: dict[str, Any]) -> dict[str, Any]:
         """Create the session-level Weave call using SessionProcessor."""
@@ -804,7 +839,9 @@ class WeaveDaemon:
                     real_prompt = session.first_user_prompt()
                     if real_prompt:
                         user_prompt = real_prompt
-                        logger.debug(f"Using real first prompt from transcript: {user_prompt[:50]!r}")
+                        logger.debug(
+                            f"Using real first prompt from transcript: {user_prompt[:50]!r}"
+                        )
 
         # Use SessionProcessor to create session call
         session_call, _ = self.processor.create_session_call(
@@ -826,7 +863,11 @@ class WeaveDaemon:
         self.weave_client.flush()
 
         logger.info(f"Created session call: {self.session_call_id}")
-        return {"status": "ok", "trace_url": self.trace_url, "session_id": self.session_id}
+        return {
+            "status": "ok",
+            "trace_url": self.trace_url,
+            "session_id": self.session_id,
+        }
 
     async def _handle_stop(self, payload: dict[str, Any]) -> dict[str, Any]:
         """Handle Stop - finish current turn with full data.
@@ -864,13 +905,21 @@ class WeaveDaemon:
         agent_id_from_payload = payload.get("agent_id")
         transcript_path = payload.get("agent_transcript_path")
 
-        logger.info(f"SubagentStop: agent_id={agent_id_from_payload}, transcript={transcript_path}")
+        logger.info(
+            f"SubagentStop: agent_id={agent_id_from_payload}, transcript={transcript_path}"
+        )
 
         # Check if we're already tailing this subagent (FAST PATH)
-        tracker = self._subagent_by_agent_id.get(agent_id_from_payload)
+        tracker = (
+            self._subagent_by_agent_id.get(agent_id_from_payload)
+            if agent_id_from_payload
+            else None
+        )
 
         if tracker and tracker.is_tailing:
-            logger.info(f"SubagentStop: fast path for tailed subagent {agent_id_from_payload}")
+            logger.info(
+                f"SubagentStop: fast path for tailed subagent {agent_id_from_payload}"
+            )
 
             # Process any remaining content
             await self._process_subagent_updates(tracker)
@@ -884,6 +933,9 @@ class WeaveDaemon:
             )
 
             # Parse file for final output
+            if not tracker.transcript_path:
+                logger.warning("No transcript path for subagent")
+                return {"status": "error", "message": "No transcript path"}
             session = parse_session_file(tracker.transcript_path)
             total_usage = None
             tool_counts: dict[str, int] = {}
@@ -906,7 +958,10 @@ class WeaveDaemon:
                             file_snapshots.append(content)
 
             # Build output in Message format using shared helper
-            from weave.integrations.claude_plugin.session.session_processor import SessionProcessor
+            from weave.integrations.claude_plugin.session.session_processor import (
+                SessionProcessor,
+            )
+
             output = SessionProcessor.build_subagent_output(session)
 
             if file_snapshots:
@@ -918,7 +973,9 @@ class WeaveDaemon:
                 if turn_call_id not in self._subagent_file_snapshots:
                     self._subagent_file_snapshots[turn_call_id] = []
                 self._subagent_file_snapshots[turn_call_id].extend(file_snapshots)
-                logger.debug(f"Stored {len(file_snapshots)} file snapshots for parent turn {turn_call_id}")
+                logger.debug(
+                    f"Stored {len(file_snapshots)} file snapshots for parent turn {turn_call_id}"
+                )
 
             # Build summary (metadata)
             model = session.primary_model() if session else None
@@ -943,11 +1000,15 @@ class WeaveDaemon:
             if agent_id_from_payload in self._subagent_by_agent_id:
                 del self._subagent_by_agent_id[agent_id_from_payload]
 
-            logger.info(f"SubagentStop: finished tailed subagent {agent_id_from_payload}")
+            logger.info(
+                f"SubagentStop: finished tailed subagent {agent_id_from_payload}"
+            )
             return {"status": "ok"}
 
         # FALLBACK PATH: Not tailing, use original behavior
-        logger.info(f"SubagentStop: fallback path for {agent_id_from_payload} (not tailed)")
+        logger.info(
+            f"SubagentStop: fallback path for {agent_id_from_payload} (not tailed)"
+        )
 
         # Clean up any orphaned tracker
         if tracker and tracker.tool_use_id in self._subagent_trackers:
@@ -1003,11 +1064,16 @@ class WeaveDaemon:
 
         # Create subagent call with ChatView-compatible inputs
         # Use tracker's subagent_type if available (from when Task tool was detected)
-        from weave.integrations.claude_plugin.session.session_processor import SessionProcessor
+        from weave.integrations.claude_plugin.session.session_processor import (
+            SessionProcessor,
+        )
+
         subagent_type = tracker.subagent_type if tracker else None
         subagent_call = self.weave_client.create_call(
             op="claude_code.subagent",
-            inputs=SessionProcessor.build_subagent_inputs(first_prompt, agent_id, subagent_type),
+            inputs=SessionProcessor.build_subagent_inputs(
+                first_prompt, agent_id, subagent_type
+            ),
             parent=parent_call,
             display_name=display_name,
             attributes={"agent_id": agent_id, "is_sidechain": True},
@@ -1015,7 +1081,7 @@ class WeaveDaemon:
         )
 
         # Collect all tool calls and counts
-        tool_counts: dict[str, int] = {}
+        tool_counts = {}
 
         # Check if this is a "simple" subagent (single turn, no user interaction)
         # Simple subagents get a flat structure: tool calls directly under subagent
@@ -1081,12 +1147,16 @@ class WeaveDaemon:
                     "tool_call_count": len(turn.all_tool_calls()),
                 }
                 if turn_model and turn_usage:
-                    turn_call.summary["usage"] = {turn_model: turn_usage.to_weave_usage()}
+                    turn_call.summary["usage"] = {
+                        turn_model: turn_usage.to_weave_usage()
+                    }
 
                 self.weave_client.finish_call(
                     turn_call,
                     output={
-                        "response": truncate(turn_response, 5000) if turn_response else None,
+                        "response": truncate(turn_response, 5000)
+                        if turn_response
+                        else None,
                     },
                 )
 
@@ -1094,7 +1164,7 @@ class WeaveDaemon:
         total_usage = agent_session.total_usage()
 
         # Collect file snapshots from all subagent turns (list format)
-        file_snapshots: list[Any] = []
+        file_snapshots = []
         for turn in agent_session.turns:
             for fb in turn.file_backups:
                 content = fb.load_content(agent_session.session_id)
@@ -1126,7 +1196,9 @@ class WeaveDaemon:
         )
         self.weave_client.flush()
 
-        logger.info(f"Created subagent trace: {agent_id} with {sum(tool_counts.values())} tool calls")
+        logger.info(
+            f"Created subagent trace: {agent_id} with {sum(tool_counts.values())} tool calls"
+        )
         return {"status": "ok"}
 
     async def _handle_session_end(self, payload: dict[str, Any]) -> dict[str, Any]:
@@ -1198,7 +1270,9 @@ class WeaveDaemon:
                         first_prompt=session.first_user_prompt(),
                     )
                     if diff_html:
-                        logger.debug("Generated session diff HTML view (will attach after summary assignment)")
+                        logger.debug(
+                            "Generated session diff HTML view (will attach after summary assignment)"
+                        )
                     else:
                         logger.debug("No session diff HTML generated (no file changes)")
 
@@ -1207,21 +1281,27 @@ class WeaveDaemon:
                     git_info = get_git_info(session.cwd)
                     if git_info:
                         session_summary["git"] = git_info
-                        logger.debug(f"Attached git info: branch={git_info.get('branch')}")
+                        logger.debug(
+                            f"Attached git info: branch={git_info.get('branch')}"
+                        )
 
                 # Collect file snapshots with secret scanning (using SessionProcessor helper)
                 # Includes: session.jsonl + all modified/created files
                 if session and self.processor:
                     scanner = get_secret_scanner()
-                    file_snapshots_list, redaction_count = self.processor.collect_session_file_snapshots_with_scanner(
-                        session=session,
-                        sessions_dir=sessions_dir,
-                        secret_scanner=scanner,
+                    file_snapshots_list, redaction_count = (
+                        self.processor.collect_session_file_snapshots_with_scanner(
+                            session=session,
+                            sessions_dir=sessions_dir,
+                            secret_scanner=scanner,
+                        )
                     )
                     self._redacted_count += redaction_count
                     if file_snapshots_list:
                         session_output["file_snapshots"] = file_snapshots_list
-                        logger.debug(f"Attached {len(file_snapshots_list)} file snapshots to output")
+                        logger.debug(
+                            f"Attached {len(file_snapshots_list)} file snapshots to output"
+                        )
 
             # Include redacted_secrets count if any secrets were redacted
             if self._redacted_count > 0:
@@ -1249,14 +1329,14 @@ class WeaveDaemon:
             logger.debug("finish_call completed, calling flush")
 
             # Log pending jobs before flush
-            if hasattr(self.weave_client, '_get_pending_jobs'):
+            if hasattr(self.weave_client, "_get_pending_jobs"):
                 jobs = self.weave_client._get_pending_jobs()
                 logger.debug(f"Pending jobs before flush: {jobs}")
 
             self.weave_client.flush()
 
             # Log pending jobs after flush
-            if hasattr(self.weave_client, '_get_pending_jobs'):
+            if hasattr(self.weave_client, "_get_pending_jobs"):
                 jobs = self.weave_client._get_pending_jobs()
                 logger.debug(f"Pending jobs after flush: {jobs}")
 
@@ -1294,12 +1374,14 @@ class WeaveDaemon:
             if note:
                 session_call.feedback.add_note(note, creator="user")
 
-            logger.info(f"Added feedback to session: emoji={emoji}, has_note={bool(note)}")
-            return {"status": "ok"}
-
+            logger.info(
+                f"Added feedback to session: emoji={emoji}, has_note={bool(note)}"
+            )
         except Exception as e:
-            logger.error(f"Failed to add feedback: {e}")
+            logger.exception("Failed to add feedback")
             return {"status": "error", "message": str(e)}
+        else:
+            return {"status": "ok"}
 
     async def _run_file_tailer(self) -> None:
         """Tail the session file for new content."""
@@ -1330,7 +1412,7 @@ class WeaveDaemon:
                 self._flush_buffered_tool_results()
 
             except Exception as e:
-                logger.error(f"Error processing session file: {e}")
+                logger.exception("Error processing session file")
 
             await asyncio.sleep(0.5)  # Poll every 500ms
 
@@ -1349,7 +1431,9 @@ class WeaveDaemon:
                 old_line_num = self.last_processed_line
                 line_num = self.last_processed_line
                 for line in f:
-                    line_num += 1  # Count every physical line to match f.readline() skip
+                    line_num += (
+                        1  # Count every physical line to match f.readline() skip
+                    )
                     line = line.strip()
                     if not line:
                         continue  # Skip processing but line was counted
@@ -1367,7 +1451,7 @@ class WeaveDaemon:
                     self._save_state()
 
         except Exception as e:
-            logger.error(f"Error reading session file: {e}")
+            logger.exception("Error reading session file")
 
     async def _process_session_line(self, obj: dict[str, Any], line_num: int) -> None:
         """Process a single line from the session file."""
@@ -1380,11 +1464,14 @@ class WeaveDaemon:
 
     async def _handle_user_message(self, obj: dict[str, Any], line_num: int) -> None:
         """Handle a user message from the session file - create turn call."""
-        if not self.weave_client or not self.session_call_id:
+        if not self.weave_client or not self.session_call_id or not self.processor:
             return
 
         # Parse message timestamp for tool result duration calculation
-        from weave.integrations.claude_plugin.session.session_parser import parse_timestamp
+        from weave.integrations.claude_plugin.session.session_parser import (
+            parse_timestamp,
+        )
+
         msg_timestamp_str = obj.get("timestamp")
         msg_timestamp = (
             parse_timestamp(msg_timestamp_str)
@@ -1412,11 +1499,12 @@ class WeaveDaemon:
                     if source.get("type") == "base64" and source.get("data"):
                         try:
                             from weave.type_wrappers.Content.content import Content
-                            image_content = Content.from_base64(
+
+                            img_content: Content = Content.from_base64(
                                 source["data"],
                                 mimetype=source.get("media_type"),
                             )
-                            user_images.append(image_content)
+                            user_images.append(img_content)
                         except Exception as e:
                             logger.debug(f"Failed to parse image: {e}")
                 elif c.get("type") == "tool_result":
@@ -1430,14 +1518,19 @@ class WeaveDaemon:
                     # - By buffering, we can group tools with close timestamps
                     # - Aged results (> 1s) are flushed with parallel grouping
                     elif tool_use_id in self._pending_tool_calls:
-                        tool_name, tool_input, tool_timestamp = self._pending_tool_calls[tool_use_id]
+                        tool_name, tool_input, tool_timestamp = (
+                            self._pending_tool_calls[tool_use_id]
+                        )
 
                         # Extract result content
                         result_content = c.get("content", "")
                         if isinstance(result_content, list):
                             text_parts = []
                             for item in result_content:
-                                if isinstance(item, dict) and item.get("type") == "text":
+                                if (
+                                    isinstance(item, dict)
+                                    and item.get("type") == "text"
+                                ):
                                     text_parts.append(item.get("text", ""))
                             result_content = "\n".join(text_parts)
 
@@ -1469,7 +1562,9 @@ class WeaveDaemon:
 
         # Check for skill expansion - don't create new turn for these
         # Skill expansions start with "Base directory for this skill:"
-        if self._pending_skill_calls and user_text.strip().startswith("Base directory for this skill:"):
+        if self._pending_skill_calls and user_text.strip().startswith(
+            "Base directory for this skill:"
+        ):
             await self._handle_skill_expansion(user_text)
             return
 
@@ -1531,7 +1626,9 @@ class WeaveDaemon:
 
         logger.debug(f"Created turn {self.turn_number}: {turn_call.id}")
 
-    async def _handle_assistant_message(self, obj: dict[str, Any], line_num: int) -> None:
+    async def _handle_assistant_message(
+        self, obj: dict[str, Any], line_num: int
+    ) -> None:
         """Handle an assistant message - create tool calls as children of turn."""
         if not self.weave_client or not self.current_turn_call_id:
             return
@@ -1545,7 +1642,10 @@ class WeaveDaemon:
         # Get the actual message timestamp from JSONL (not poll time)
         # This is critical for parallel tool detection - poll timing can exceed
         # the 1000ms threshold even for truly parallel calls
-        from weave.integrations.claude_plugin.session.session_parser import parse_timestamp
+        from weave.integrations.claude_plugin.session.session_parser import (
+            parse_timestamp,
+        )
+
         msg_timestamp_str = obj.get("timestamp")
         msg_timestamp = (
             parse_timestamp(msg_timestamp_str)
@@ -1583,7 +1683,9 @@ class WeaveDaemon:
                     )
                     self._subagent_trackers[tool_id] = tracker
 
-                    logger.debug(f"Subagent detected: tool_id={tool_id}, type={tracker.subagent_type}, will scan for file")
+                    logger.debug(
+                        f"Subagent detected: tool_id={tool_id}, type={tracker.subagent_type}, will scan for file"
+                    )
                     continue
 
                 # Handle EnterPlanMode tool - creates inline parent container
@@ -1598,7 +1700,10 @@ class WeaveDaemon:
 
                 # Handle ExitPlanMode tool - finishes plan mode inline parent
                 if tool_name == "ExitPlanMode":
-                    if self._pending_inline_parent and self._pending_inline_parent.is_active:
+                    if (
+                        self._pending_inline_parent
+                        and self._pending_inline_parent.is_active
+                    ):
                         # Capture plan from ExitPlanMode input for output
                         plan = tool_input.get("plan")
                         await self._finish_inline_parent(
@@ -1610,7 +1715,10 @@ class WeaveDaemon:
                 # Handle Skill tool - track for skill expansion detection
                 if tool_name == "Skill":
                     skill = tool_input.get("skill", "unknown")
-                    self._pending_skill_calls[tool_id] = (skill, datetime.now(timezone.utc))
+                    self._pending_skill_calls[tool_id] = (
+                        skill,
+                        datetime.now(timezone.utc),
+                    )
                     logger.debug(f"Skill tool detected: {skill} ({tool_id})")
                     # Don't track as pending tool call - handled specially
                     continue
@@ -1619,7 +1727,10 @@ class WeaveDaemon:
                 if tool_name == "SlashCommand":
                     command = tool_input.get("command", "unknown")
                     # Track as skill expansion (slash commands expand similarly)
-                    self._pending_skill_calls[tool_id] = (command, datetime.now(timezone.utc))
+                    self._pending_skill_calls[tool_id] = (
+                        command,
+                        datetime.now(timezone.utc),
+                    )
                     logger.debug(f"SlashCommand tool detected: {command} ({tool_id})")
                     continue
 
@@ -1634,7 +1745,9 @@ class WeaveDaemon:
                             if q_text:
                                 question_texts.append(q_text)
 
-                        display_name = question_texts[0][:50] if question_texts else "Question"
+                        display_name = (
+                            question_texts[0][:50] if question_texts else "Question"
+                        )
                         if len(question_texts) > 1:
                             display_name += f" (+{len(question_texts) - 1} more)"
 
@@ -1652,7 +1765,9 @@ class WeaveDaemon:
                             question_call.id,
                             questions,
                         )
-                        logger.debug(f"Created question call for {len(questions)} questions")
+                        logger.debug(
+                            f"Created question call for {len(questions)} questions"
+                        )
                     continue
 
                 # Track pending tool call with full info for real-time logging
@@ -1720,10 +1835,15 @@ class WeaveDaemon:
                     parent=turn_call,
                     use_stack=False,
                 )
-                logger.debug(f"Created thinking trace with {len(thinking_content_parts)} blocks")
+                logger.debug(
+                    f"Created thinking trace with {len(thinking_content_parts)} blocks"
+                )
 
             # Build output using shared helper from SessionProcessor
-            from weave.integrations.claude_plugin.session.session_processor import SessionProcessor
+            from weave.integrations.claude_plugin.session.session_processor import (
+                SessionProcessor,
+            )
+
             turn_output, assistant_text, _ = SessionProcessor.build_turn_output(
                 turn, interrupted=interrupted
             )
@@ -1761,9 +1881,13 @@ class WeaveDaemon:
 
             # Merge file snapshots from subagents that ran during this turn
             if self.current_turn_call_id in self._subagent_file_snapshots:
-                subagent_snapshots = self._subagent_file_snapshots.pop(self.current_turn_call_id)
+                subagent_snapshots = self._subagent_file_snapshots.pop(
+                    self.current_turn_call_id
+                )
                 file_snapshots.extend(subagent_snapshots)
-                logger.debug(f"Merged {len(subagent_snapshots)} file snapshots from subagents")
+                logger.debug(
+                    f"Merged {len(subagent_snapshots)} file snapshots from subagents"
+                )
 
             if file_snapshots:
                 output["file_snapshots"] = file_snapshots
@@ -1805,7 +1929,7 @@ class WeaveDaemon:
         logger.debug(f"Finished turn {self.turn_number}")
         self.current_turn_call_id = None
 
-    async def _log_turn_tool_calls(self, turn: Turn, turn_call: "Call") -> None:
+    async def _log_turn_tool_calls(self, turn: Turn, turn_call: Call) -> None:
         """Log all tool calls from a turn with their results.
 
         This is called at turn finish time when the session file has been parsed
@@ -1824,7 +1948,6 @@ class WeaveDaemon:
 
         from weave.integrations.claude_plugin.utils import (
             log_tool_calls_grouped,
-            _generate_parallel_display_name,
         )
 
         # Tools to skip (handled elsewhere)
@@ -1854,7 +1977,8 @@ class WeaveDaemon:
 
         for group in groups:
             filtered = [
-                tc for tc in group
+                tc
+                for tc in group
                 if tc.id not in self._logged_tool_call_ids
                 and tc.name not in skip_tools
                 and not (tc.name == "Task" and tc.input.get("subagent_type"))
@@ -1873,7 +1997,9 @@ class WeaveDaemon:
             for tc in group:
                 self.tool_counts[tc.name] = self.tool_counts.get(tc.name, 0) + 1
                 self.total_tool_calls += 1
-                logger.debug(f"Logged tool call: {tc.name} (result={'yes' if tc.result else 'no'})")
+                logger.debug(
+                    f"Logged tool call: {tc.name} (result={'yes' if tc.result else 'no'})"
+                )
 
         # Clear tracked tool calls for this turn
         self._current_turn_tool_calls = []
@@ -1918,7 +2044,9 @@ class WeaveDaemon:
 
             log_tool_call(
                 tool_name=tool_type,
-                tool_input={"skill": skill_name} if not is_slash_command else {"command": skill_name},
+                tool_input={"skill": skill_name}
+                if not is_slash_command
+                else {"command": skill_name},
                 tool_output=skill_content,
                 tool_use_id=tool_id,
                 duration_ms=duration_ms,
@@ -2035,7 +2163,7 @@ class WeaveDaemon:
             matches = re.findall(pattern, result_content)
 
             # Build answers array in order matching the questions
-            question_to_answer = {q: a for q, a in matches}
+            question_to_answer = dict(matches)
             for q in questions:
                 q_text = q.get("question", "")
                 if q_text in question_to_answer:
@@ -2092,7 +2220,9 @@ class WeaveDaemon:
         for tool_use_id, tool_result in tool_results:
             if tool_use_id in self._pending_tool_calls:
                 name, input_data, started_at = self._pending_tool_calls[tool_use_id]
-                tool_data.append((tool_use_id, tool_result, name, input_data, started_at))
+                tool_data.append(
+                    (tool_use_id, tool_result, name, input_data, started_at)
+                )
 
         if not tool_data:
             return
@@ -2101,7 +2231,7 @@ class WeaveDaemon:
         tool_data.sort(key=lambda x: x[4])
 
         # Group by timestamp proximity (1000ms threshold, matching session_parser)
-        PARALLEL_THRESHOLD_MS = 1000
+        parallel_threshold_ms = 1000
         groups: list[list[tuple[str, dict, str, dict, datetime]]] = []
         current_group: list[tuple[str, dict, str, dict, datetime]] = [tool_data[0]]
 
@@ -2109,7 +2239,7 @@ class WeaveDaemon:
             prev_started = current_group[-1][4]
             gap_ms = abs((td[4] - prev_started).total_seconds() * 1000)
 
-            if gap_ms <= PARALLEL_THRESHOLD_MS:
+            if gap_ms <= parallel_threshold_ms:
                 current_group.append(td)
             else:
                 groups.append(current_group)
@@ -2138,7 +2268,12 @@ class WeaveDaemon:
                 # Single tool - log directly
                 tool_use_id, tool_result, tool_name, tool_input, started_at = group[0]
                 self._log_single_tool_call(
-                    tool_use_id, tool_result, tool_name, tool_input, started_at, tool_parent
+                    tool_use_id,
+                    tool_result,
+                    tool_name,
+                    tool_input,
+                    started_at,
+                    tool_parent,
                 )
             else:
                 # Multiple tools - create parallel wrapper
@@ -2236,7 +2371,12 @@ class WeaveDaemon:
         # Log each tool under the parallel wrapper
         for tool_use_id, tool_result, tool_name, tool_input, tool_started_at in group:
             self._log_single_tool_call(
-                tool_use_id, tool_result, tool_name, tool_input, tool_started_at, parallel_call
+                tool_use_id,
+                tool_result,
+                tool_name,
+                tool_input,
+                tool_started_at,
+                parallel_call,
             )
 
         # Finish parallel wrapper
@@ -2302,7 +2442,9 @@ class WeaveDaemon:
         """Log a single buffered tool call."""
         # Calculate duration from actual message timestamps (tool_use to tool_result)
         # This is the time between when Claude sent the tool call and when the result was written
-        duration_ms = int((tool.result_timestamp - tool.timestamp).total_seconds() * 1000)
+        duration_ms = int(
+            (tool.result_timestamp - tool.timestamp).total_seconds() * 1000
+        )
 
         log_tool_call(
             tool_name=tool.name,

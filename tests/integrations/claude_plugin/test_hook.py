@@ -51,7 +51,11 @@ class TestHookMain:
         from weave.integrations.claude_plugin.core.hook import main
 
         # Create clean environment without WEAVE_PROJECT or WEAVE_HOOK_DISABLED
-        clean_env = {k: v for k, v in os.environ.items() if k not in ("WEAVE_PROJECT", "WEAVE_HOOK_DISABLED")}
+        clean_env = {
+            k: v
+            for k, v in os.environ.items()
+            if k not in ("WEAVE_PROJECT", "WEAVE_HOOK_DISABLED")
+        }
         with patch.dict("os.environ", clean_env, clear=True):
             with pytest.raises(SystemExit) as exc:
                 main()
@@ -134,7 +138,10 @@ class TestHookMain:
                     captured = capsys.readouterr()
                     output = json.loads(captured.out)
                     assert "hookSpecificOutput" in output
-                    assert "disabled" in output["hookSpecificOutput"]["additionalContext"].lower()
+                    assert (
+                        "disabled"
+                        in output["hookSpecificOutput"]["additionalContext"].lower()
+                    )
 
     def test_initializes_state_on_session_start(self):
         """Should initialize state for SessionStart event."""
@@ -255,7 +262,10 @@ class TestHookMain:
                             captured = capsys.readouterr()
                             output = json.loads(captured.out)
                             assert "hookSpecificOutput" in output
-                            assert "https://weave.wandb.ai/trace/123" in output["hookSpecificOutput"]["additionalContext"]
+                            assert (
+                                "https://weave.wandb.ai/trace/123"
+                                in output["hookSpecificOutput"]["additionalContext"]
+                            )
 
     @pytest.mark.disable_logging_error_check
     def test_exits_on_daemon_connection_failure(self):

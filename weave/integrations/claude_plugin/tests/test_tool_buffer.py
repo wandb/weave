@@ -2,10 +2,7 @@
 
 from datetime import datetime, timedelta, timezone
 
-import pytest
-
 from weave.integrations.claude_plugin.utils import (
-    BufferedToolResult,
     ToolResultBuffer,
 )
 
@@ -107,7 +104,9 @@ class TestToolResultBuffer:
         """is_error flag should be preserved through buffer."""
         buffer = ToolResultBuffer()
         t1 = make_timestamp(-5000)
-        buffer.add("t1", "Bash", {}, t1, "error", make_result_timestamp(t1), is_error=True)
+        buffer.add(
+            "t1", "Bash", {}, t1, "error", make_result_timestamp(t1), is_error=True
+        )
 
         groups = buffer.get_ready_to_flush(force=True)
         assert groups[0][0].is_error is True
