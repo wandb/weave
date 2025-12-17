@@ -14,12 +14,12 @@ class AggregationMethod(str, Enum):
 class ObjectVersionGroup(BaseModel):
     label: str  # label for the combination of the groups
     versionRefs: list[str]  # Digests of the versions to group
+    show_version_indicator: bool
     method: AggregationMethod
 
 
 class ObjectConfig(BaseModel):
     version_groups: list[ObjectVersionGroup]
-    show_version_indicator: bool
     display_name_map: dict[str, str]  # ref/name -> display name (keys can use "*" wildcards)
     deselected: list[str]  # List of dataset refs or patterns to exclude (can use "*" for wildcard matching)
 

@@ -75,7 +75,7 @@
                 "$ref": "#/$defs/ConvertOperation"
               },
               {
-                "title": "AndOperation"
+                "$ref": "#/$defs/AndOperation"
               },
               {
                 "$ref": "#/$defs/OrOperation"
@@ -606,7 +606,7 @@
               "$ref": "#/$defs/ConvertOperation"
             },
             {
-              "title": "AndOperation"
+              "$ref": "#/$defs/AndOperation"
             },
             {
               "$ref": "#/$defs/OrOperation"
@@ -627,7 +627,7 @@
               "$ref": "#/$defs/InOperation"
             },
             {
-              "title": "ContainsOperation"
+              "$ref": "#/$defs/ContainsOperation"
             }
           ],
           "title": "Input"
@@ -644,7 +644,7 @@
               "$ref": "#/$defs/ConvertOperation"
             },
             {
-              "title": "AndOperation"
+              "$ref": "#/$defs/AndOperation"
             },
             {
               "$ref": "#/$defs/OrOperation"
@@ -665,7 +665,7 @@
               "$ref": "#/$defs/InOperation"
             },
             {
-              "title": "ContainsOperation"
+              "$ref": "#/$defs/ContainsOperation"
             }
           ],
           "title": "Substr"
@@ -737,10 +737,10 @@
               "$ref": "#/$defs/GetFieldOperator"
             },
             {
-              "title": "ConvertOperation"
+              "$ref": "#/$defs/ConvertOperation"
             },
             {
-              "title": "AndOperation"
+              "$ref": "#/$defs/AndOperation"
             },
             {
               "$ref": "#/$defs/OrOperation"
@@ -761,7 +761,7 @@
               "$ref": "#/$defs/InOperation"
             },
             {
-              "title": "ContainsOperation"
+              "$ref": "#/$defs/ContainsOperation"
             }
           ],
           "title": "Input"
@@ -891,10 +891,10 @@
                   "$ref": "#/$defs/GetFieldOperator"
                 },
                 {
-                  "title": "ConvertOperation"
+                  "$ref": "#/$defs/ConvertOperation"
                 },
                 {
-                  "title": "AndOperation"
+                  "$ref": "#/$defs/AndOperation"
                 },
                 {
                   "$ref": "#/$defs/OrOperation"
@@ -903,7 +903,7 @@
                   "$ref": "#/$defs/NotOperation"
                 },
                 {
-                  "title": "EqOperation"
+                  "$ref": "#/$defs/EqOperation"
                 },
                 {
                   "$ref": "#/$defs/GtOperation"
@@ -915,7 +915,7 @@
                   "$ref": "#/$defs/InOperation"
                 },
                 {
-                  "title": "ContainsOperation"
+                  "$ref": "#/$defs/ContainsOperation"
                 }
               ]
             },
@@ -928,10 +928,10 @@
                   "$ref": "#/$defs/GetFieldOperator"
                 },
                 {
-                  "title": "ConvertOperation"
+                  "$ref": "#/$defs/ConvertOperation"
                 },
                 {
-                  "title": "AndOperation"
+                  "$ref": "#/$defs/AndOperation"
                 },
                 {
                   "$ref": "#/$defs/OrOperation"
@@ -940,7 +940,7 @@
                   "$ref": "#/$defs/NotOperation"
                 },
                 {
-                  "title": "EqOperation"
+                  "$ref": "#/$defs/EqOperation"
                 },
                 {
                   "$ref": "#/$defs/GtOperation"
@@ -952,7 +952,7 @@
                   "$ref": "#/$defs/InOperation"
                 },
                 {
-                  "title": "ContainsOperation"
+                  "$ref": "#/$defs/ContainsOperation"
                 }
               ]
             }
@@ -997,10 +997,10 @@
                   "$ref": "#/$defs/GetFieldOperator"
                 },
                 {
-                  "title": "ConvertOperation"
+                  "$ref": "#/$defs/ConvertOperation"
                 },
                 {
-                  "title": "AndOperation"
+                  "$ref": "#/$defs/AndOperation"
                 },
                 {
                   "$ref": "#/$defs/OrOperation"
@@ -1009,10 +1009,10 @@
                   "$ref": "#/$defs/NotOperation"
                 },
                 {
-                  "title": "EqOperation"
+                  "$ref": "#/$defs/EqOperation"
                 },
                 {
-                  "title": "GtOperation"
+                  "$ref": "#/$defs/GtOperation"
                 },
                 {
                   "$ref": "#/$defs/GteOperation"
@@ -1021,7 +1021,7 @@
                   "$ref": "#/$defs/InOperation"
                 },
                 {
-                  "title": "ContainsOperation"
+                  "$ref": "#/$defs/ContainsOperation"
                 }
               ]
             },
@@ -1034,10 +1034,10 @@
                   "$ref": "#/$defs/GetFieldOperator"
                 },
                 {
-                  "title": "ConvertOperation"
+                  "$ref": "#/$defs/ConvertOperation"
                 },
                 {
-                  "title": "AndOperation"
+                  "$ref": "#/$defs/AndOperation"
                 },
                 {
                   "$ref": "#/$defs/OrOperation"
@@ -1046,10 +1046,10 @@
                   "$ref": "#/$defs/NotOperation"
                 },
                 {
-                  "title": "EqOperation"
+                  "$ref": "#/$defs/EqOperation"
                 },
                 {
-                  "title": "GtOperation"
+                  "$ref": "#/$defs/GtOperation"
                 },
                 {
                   "$ref": "#/$defs/GteOperation"
@@ -1058,7 +1058,7 @@
                   "$ref": "#/$defs/InOperation"
                 },
                 {
-                  "title": "ContainsOperation"
+                  "$ref": "#/$defs/ContainsOperation"
                 }
               ]
             }
@@ -1089,10 +1089,10 @@
                   "$ref": "#/$defs/GetFieldOperator"
                 },
                 {
-                  "title": "ConvertOperation"
+                  "$ref": "#/$defs/ConvertOperation"
                 },
                 {
-                  "title": "AndOperation"
+                  "$ref": "#/$defs/AndOperation"
                 },
                 {
                   "$ref": "#/$defs/OrOperation"
@@ -1101,19 +1101,19 @@
                   "$ref": "#/$defs/NotOperation"
                 },
                 {
-                  "title": "EqOperation"
+                  "$ref": "#/$defs/EqOperation"
                 },
                 {
-                  "title": "GtOperation"
+                  "$ref": "#/$defs/GtOperation"
                 },
                 {
-                  "title": "GteOperation"
+                  "$ref": "#/$defs/GteOperation"
                 },
                 {
                   "$ref": "#/$defs/InOperation"
                 },
                 {
-                  "title": "ContainsOperation"
+                  "$ref": "#/$defs/ContainsOperation"
                 }
               ]
             },
@@ -1126,10 +1126,10 @@
                   "$ref": "#/$defs/GetFieldOperator"
                 },
                 {
-                  "title": "ConvertOperation"
+                  "$ref": "#/$defs/ConvertOperation"
                 },
                 {
-                  "title": "AndOperation"
+                  "$ref": "#/$defs/AndOperation"
                 },
                 {
                   "$ref": "#/$defs/OrOperation"
@@ -1138,19 +1138,19 @@
                   "$ref": "#/$defs/NotOperation"
                 },
                 {
-                  "title": "EqOperation"
+                  "$ref": "#/$defs/EqOperation"
                 },
                 {
-                  "title": "GtOperation"
+                  "$ref": "#/$defs/GtOperation"
                 },
                 {
-                  "title": "GteOperation"
+                  "$ref": "#/$defs/GteOperation"
                 },
                 {
                   "$ref": "#/$defs/InOperation"
                 },
                 {
-                  "title": "ContainsOperation"
+                  "$ref": "#/$defs/ContainsOperation"
                 }
               ]
             }
@@ -1181,10 +1181,10 @@
                   "$ref": "#/$defs/GetFieldOperator"
                 },
                 {
-                  "title": "ConvertOperation"
+                  "$ref": "#/$defs/ConvertOperation"
                 },
                 {
-                  "title": "AndOperation"
+                  "$ref": "#/$defs/AndOperation"
                 },
                 {
                   "$ref": "#/$defs/OrOperation"
@@ -1193,19 +1193,19 @@
                   "$ref": "#/$defs/NotOperation"
                 },
                 {
-                  "title": "EqOperation"
+                  "$ref": "#/$defs/EqOperation"
                 },
                 {
-                  "title": "GtOperation"
+                  "$ref": "#/$defs/GtOperation"
                 },
                 {
-                  "title": "GteOperation"
+                  "$ref": "#/$defs/GteOperation"
                 },
                 {
-                  "title": "InOperation"
+                  "$ref": "#/$defs/InOperation"
                 },
                 {
-                  "title": "ContainsOperation"
+                  "$ref": "#/$defs/ContainsOperation"
                 }
               ]
             },
@@ -1219,10 +1219,10 @@
                     "$ref": "#/$defs/GetFieldOperator"
                   },
                   {
-                    "title": "ConvertOperation"
+                    "$ref": "#/$defs/ConvertOperation"
                   },
                   {
-                    "title": "AndOperation"
+                    "$ref": "#/$defs/AndOperation"
                   },
                   {
                     "$ref": "#/$defs/OrOperation"
@@ -1231,19 +1231,19 @@
                     "$ref": "#/$defs/NotOperation"
                   },
                   {
-                    "title": "EqOperation"
+                    "$ref": "#/$defs/EqOperation"
                   },
                   {
-                    "title": "GtOperation"
+                    "$ref": "#/$defs/GtOperation"
                   },
                   {
-                    "title": "GteOperation"
+                    "$ref": "#/$defs/GteOperation"
                   },
                   {
-                    "title": "InOperation"
+                    "$ref": "#/$defs/InOperation"
                   },
                   {
-                    "title": "ContainsOperation"
+                    "$ref": "#/$defs/ContainsOperation"
                   }
                 ]
               },
@@ -1560,13 +1560,13 @@
             },
             {
               "additionalProperties": {
-                "title": "LiteralOperation"
+                "$ref": "#/$defs/LiteralOperation"
               },
               "type": "object"
             },
             {
               "items": {
-                "title": "LiteralOperation"
+                "$ref": "#/$defs/LiteralOperation"
               },
               "type": "array"
             },
@@ -1703,31 +1703,31 @@
                   "$ref": "#/$defs/GetFieldOperator"
                 },
                 {
-                  "title": "ConvertOperation"
+                  "$ref": "#/$defs/ConvertOperation"
                 },
                 {
-                  "title": "AndOperation"
+                  "$ref": "#/$defs/AndOperation"
                 },
                 {
                   "$ref": "#/$defs/OrOperation"
                 },
                 {
-                  "title": "NotOperation"
+                  "$ref": "#/$defs/NotOperation"
                 },
                 {
-                  "title": "EqOperation"
+                  "$ref": "#/$defs/EqOperation"
                 },
                 {
-                  "title": "GtOperation"
+                  "$ref": "#/$defs/GtOperation"
                 },
                 {
-                  "title": "GteOperation"
+                  "$ref": "#/$defs/GteOperation"
                 },
                 {
-                  "title": "InOperation"
+                  "$ref": "#/$defs/InOperation"
                 },
                 {
-                  "title": "ContainsOperation"
+                  "$ref": "#/$defs/ContainsOperation"
                 }
               ]
             }
@@ -1751,10 +1751,6 @@
           "title": "Version Groups",
           "type": "array"
         },
-        "show_version_indicator": {
-          "title": "Show Version Indicator",
-          "type": "boolean"
-        },
         "display_name_map": {
           "additionalProperties": {
             "type": "string"
@@ -1772,7 +1768,6 @@
       },
       "required": [
         "version_groups",
-        "show_version_indicator",
         "display_name_map",
         "deselected"
       ],
@@ -1828,6 +1823,10 @@
           "title": "Versionrefs",
           "type": "array"
         },
+        "show_version_indicator": {
+          "title": "Show Version Indicator",
+          "type": "boolean"
+        },
         "method": {
           "$ref": "#/$defs/AggregationMethod"
         }
@@ -1835,6 +1834,7 @@
       "required": [
         "label",
         "versionRefs",
+        "show_version_indicator",
         "method"
       ],
       "title": "ObjectVersionGroup",
@@ -1853,31 +1853,31 @@
                 "$ref": "#/$defs/GetFieldOperator"
               },
               {
-                "title": "ConvertOperation"
+                "$ref": "#/$defs/ConvertOperation"
               },
               {
-                "title": "AndOperation"
+                "$ref": "#/$defs/AndOperation"
               },
               {
-                "title": "OrOperation"
+                "$ref": "#/$defs/OrOperation"
               },
               {
-                "title": "NotOperation"
+                "$ref": "#/$defs/NotOperation"
               },
               {
-                "title": "EqOperation"
+                "$ref": "#/$defs/EqOperation"
               },
               {
-                "title": "GtOperation"
+                "$ref": "#/$defs/GtOperation"
               },
               {
-                "title": "GteOperation"
+                "$ref": "#/$defs/GteOperation"
               },
               {
-                "title": "InOperation"
+                "$ref": "#/$defs/InOperation"
               },
               {
-                "title": "ContainsOperation"
+                "$ref": "#/$defs/ContainsOperation"
               }
             ]
           },
