@@ -381,6 +381,7 @@ dev = [
   # linting
   "pre-commit",
   "jupyter",
+  "ty>=0.0.2",
 ]
 trace_server = [
   # Same dependencies as the trace_server optional dependency, but as a dependency group for tests
