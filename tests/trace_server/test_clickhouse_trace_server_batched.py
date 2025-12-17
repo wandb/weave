@@ -1,4 +1,3 @@
-import json
 from datetime import datetime, timezone
 from unittest.mock import MagicMock, Mock, patch
 
@@ -350,7 +349,9 @@ def test_completions_create_stream_custom_provider_with_tracking():
             "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
         ) as mock_litellm,
         patch.object(chts.ClickHouseTraceServer, "obj_read") as mock_obj_read,
-        patch.object(chts.ClickHouseTraceServer, "_insert_call") as mock_insert_call,
+        patch.object(
+            chts.ClickHouseTraceServer, "_dual_write_calls_batch"
+        ) as mock_dual_write,
         patch.object(chts.ClickHouseTraceServer, "_mint_client") as mock_mint_client,
         patch(
             "weave.trace_server.project_version.project_version.TableRoutingResolver.resolve_write_target",
@@ -435,9 +436,13 @@ def test_completions_create_stream_custom_provider_with_tracking():
         assert "usage" in chunks[2]
 
         # Verify call tracking
-        assert mock_insert_call.call_count == 2  # Start and end calls
-        start_call = mock_insert_call.call_args_list[0][0][0]
-        end_call = mock_insert_call.call_args_list[1][0][0]
+        assert mock_dual_write.call_count == 2  # Start and end calls
+        start_call_args = mock_dual_write.call_args_list[0]
+        end_call_args = mock_dual_write.call_args_list[1]
+        assert start_call_args[0][0] == "dGVzdF9wcm9qZWN0"
+        assert end_call_args[0][0] == "dGVzdF9wcm9qZWN0"
+        start_call = start_call_args[1]["starts"][0]
+        end_call = end_call_args[1]["ends"][0]
         assert start_call.project_id == "dGVzdF9wcm9qZWN0"
         assert end_call.project_id == "dGVzdF9wcm9qZWN0"
         assert end_call.id == start_call.id
@@ -523,7 +528,9 @@ def test_completions_create_stream_multiple_choices():
         patch(
             "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
         ) as mock_litellm,
-        patch.object(chts.ClickHouseTraceServer, "_insert_call") as mock_insert_call,
+        patch.object(
+            chts.ClickHouseTraceServer, "_dual_write_calls_batch"
+        ) as mock_dual_write,
         patch.object(chts.ClickHouseTraceServer, "_mint_client") as mock_mint_client,
         patch(
             "weave.trace_server.project_version.project_version.TableRoutingResolver.resolve_write_target",
@@ -565,12 +572,13 @@ def test_completions_create_stream_multiple_choices():
         assert chunks[3]["choices"][1]["finish_reason"] == "stop"
 
         # Verify call tracking - should have 1 start call + 1 end call = 2 total
-        assert mock_insert_call.call_count == 2
+        assert mock_dual_write.call_count == 2
 
         # Get all the calls
-        call_args = [call[0][0] for call in mock_insert_call.call_args_list]
-        start_calls = [call for call in call_args if hasattr(call, "started_at")]
-        end_calls = [call for call in call_args if hasattr(call, "ended_at")]
+        start_call_args = mock_dual_write.call_args_list[0]
+        end_call_args = mock_dual_write.call_args_list[1]
+        start_calls = start_call_args[1]["starts"]
+        end_calls = end_call_args[1]["ends"]
 
         # Should have 1 start call and 1 end call
         assert len(start_calls) == 1
@@ -579,7 +587,7 @@ def test_completions_create_stream_multiple_choices():
         # Verify start call
         start_call = start_calls[0]
         assert start_call.project_id == "dGVzdF9wcm9qZWN0"
-        start_call_inputs = json.loads(start_call.inputs_dump)
+        start_call_inputs = start_call.inputs
         assert start_call_inputs["model"] == "gpt-3.5-turbo"
         assert start_call_inputs["n"] == 2
         assert "choice_index" not in start_call_inputs  # Should not have choice_index
@@ -587,7 +595,7 @@ def test_completions_create_stream_multiple_choices():
         # Verify end call has correct output with BOTH choices
         end_call = end_calls[0]
         assert end_call.project_id == "dGVzdF9wcm9qZWN0"
-        end_call_output = json.loads(end_call.output_dump)
+        end_call_output = end_call.output
         assert "choices" in end_call_output
         assert len(end_call_output["choices"]) == 2  # Should have both choices
 
@@ -657,7 +665,9 @@ def test_completions_create_stream_single_choice_unified_wrapper():
         patch(
             "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
         ) as mock_litellm,
-        patch.object(chts.ClickHouseTraceServer, "_insert_call") as mock_insert_call,
+        patch.object(
+            chts.ClickHouseTraceServer, "_dual_write_calls_batch"
+        ) as mock_dual_write,
         patch.object(chts.ClickHouseTraceServer, "_mint_client") as mock_mint_client,
         patch(
             "weave.trace_server.project_version.project_version.TableRoutingResolver.resolve_write_target",
@@ -695,12 +705,13 @@ def test_completions_create_stream_single_choice_unified_wrapper():
         assert chunks[2]["choices"][0]["finish_reason"] == "stop"
 
         # Verify call tracking - should have 1 start call + 1 end call = 2 total
-        assert mock_insert_call.call_count == 2
+        assert mock_dual_write.call_count == 2
 
         # Get all the calls
-        call_args = [call[0][0] for call in mock_insert_call.call_args_list]
-        start_calls = [call for call in call_args if hasattr(call, "started_at")]
-        end_calls = [call for call in call_args if hasattr(call, "ended_at")]
+        start_call_args = mock_dual_write.call_args_list[0]
+        end_call_args = mock_dual_write.call_args_list[1]
+        start_calls = start_call_args[1]["starts"]
+        end_calls = end_call_args[1]["ends"]
 
         # Should have 1 start call and 1 end call
         assert len(start_calls) == 1
@@ -709,7 +720,7 @@ def test_completions_create_stream_single_choice_unified_wrapper():
         # Verify start call
         start_call = start_calls[0]
         assert start_call.project_id == "dGVzdF9wcm9qZWN0"
-        start_call_inputs = json.loads(start_call.inputs_dump)
+        start_call_inputs = start_call.inputs
         assert start_call_inputs["model"] == "gpt-3.5-turbo"
         assert start_call_inputs["n"] == 1
         assert "choice_index" not in start_call_inputs  # Should not have choice_index
@@ -717,7 +728,7 @@ def test_completions_create_stream_single_choice_unified_wrapper():
         # Verify end call has correct output
         end_call = end_calls[0]
         assert end_call.project_id == "dGVzdF9wcm9qZWN0"
-        end_call_output = json.loads(end_call.output_dump)
+        end_call_output = end_call.output
         assert "choices" in end_call_output
         assert len(end_call_output["choices"]) == 1
         choice = end_call_output["choices"][0]
