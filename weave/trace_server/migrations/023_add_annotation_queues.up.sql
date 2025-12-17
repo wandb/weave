@@ -205,13 +205,15 @@ CREATE TABLE annotator_queue_items_progress (
 
     /*
     `annotation_state`: Workflow state of this item.
-    - completed (0): Annotation finished
-    - skipped (1): Annotator chose to skip
+    - in_progress (0): Annotation is currently being worked on
+    - completed (1): Annotation finished
+    - skipped (2): Annotator chose to skip
     */
     annotation_state Enum8(
-        'completed' = 0,
-        'skipped' = 1
-    ) DEFAULT 'completed',
+        'in_progress' = 0,
+        'completed' = 1,
+        'skipped' = 2
+    ) DEFAULT 'in_progress',
 
     /*
     `created_at`: Timestamp when the row was created.
