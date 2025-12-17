@@ -737,6 +737,16 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
             tsi.AnnotationQueueAddCallsRes,
         )
 
+    def annotation_queues_stats(
+        self, req: tsi.AnnotationQueuesStatsReq
+    ) -> tsi.AnnotationQueuesStatsRes:
+        return self._generic_request(
+            "/annotation_queues/stats",
+            req,
+            tsi.AnnotationQueuesStatsReq,
+            tsi.AnnotationQueuesStatsRes,
+        )
+
     def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
         raise NotImplementedError("evaluate_model is not implemented")
 
