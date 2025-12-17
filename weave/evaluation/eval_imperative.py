@@ -6,6 +6,7 @@ from typing import Any, Union
 
 from weave.dataset.dataset import Dataset
 from weave.flow.model import Model
+from weave.flow.scorer import Scorer
 from weave.trace.settings import should_use_evaluation_logger_v2
 
 logger = logging.getLogger(__name__)
