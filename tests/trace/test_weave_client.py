@@ -1744,7 +1744,7 @@ def test_get_calls_storage_size_with_filter(client):
         client.get_calls(
             filter=tsi.CallsFilter(op_names=[call0.op_name]),
             include_storage_size=True,
-            include_total_storage_size=True
+            include_total_storage_size=True,
         )
     )
     assert len(calls_filtered) == 2
@@ -1830,7 +1830,7 @@ def test_get_calls_storage_size_values(client, clickhouse_client):
                 == client_call.total_storage_size_bytes
             )
             assert server_call.storage_size_bytes is not None
-            
+
             # total_storage_size_bytes is only set for root calls (parent_id is None)
             # For child calls, it is intentionally None
             expect_total_storage_size_bytes = server_call.parent_id is None
