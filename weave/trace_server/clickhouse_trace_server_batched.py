@@ -10,7 +10,7 @@ from collections import defaultdict
 from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
 from re import sub
-from typing import Any, Literal, cast
+from typing import Any, cast
 from zoneinfo import ZoneInfo
 
 import clickhouse_connect
@@ -137,7 +137,7 @@ from weave.trace_server.project_query_builder import make_project_stats_query
 from weave.trace_server.project_version.project_version import (
     TableRoutingResolver,
 )
-from weave.trace_server.project_version.types import WriteTarget
+from weave.trace_server.project_version.types import CallSource, WriteTarget
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 from weave.trace_server.table_query_builder import (
     ROW_ORDER_COLUMN_NAME,
@@ -433,13 +433,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         self._dual_write_calls_batch(
             req.project_id,
+            source=CallSource.SERVER,
             starts=starts,
             ends=ends,
             completes=completes,
             # Don't do async inserts for OTEL, in case the insert fails we don't want
             # to reject the other inserts in the batch
             do_sync_insert=True,
-            source="server",
         )
 
         if rejected_spans > 0:
@@ -495,6 +495,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         write_target = self.table_routing_resolver.resolve_write_target(
             req.start.project_id,
             self.ch_client,
+            source=CallSource.SDK_CALLS_MERGED,
         )
         if write_target in (WriteTarget.CALLS_COMPLETE, WriteTarget.BOTH):
             raise InvalidRequest(
@@ -528,6 +529,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         write_target = self.table_routing_resolver.resolve_write_target(
             req.end.project_id,
             self.ch_client,
+            source=CallSource.SDK_CALLS_MERGED,
         )
         if write_target in (WriteTarget.CALLS_COMPLETE, WriteTarget.BOTH):
             raise InvalidRequest(
@@ -573,7 +575,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             elif item.mode == "complete":
                 completes.append(item.req.complete)
 
-        self._dual_write_calls_batch(req.project_id, starts=starts, completes=completes)
+        self._dual_write_calls_batch(
+            req.project_id,
+            source=CallSource.SDK_CALLS_COMPLETE,
+            starts=starts,
+            completes=completes,
+        )
 
         res = [
             tsi.CallUpsertRes(id=c.id, trace_id=c.trace_id) for c in starts + completes
@@ -683,11 +690,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def _dual_write_calls_batch(
         self,
         project_id: str,
+        source: CallSource,
         starts: list[tsi.StartedCallSchemaForInsert] | None = None,
         ends: list[tsi.EndedCallSchemaForInsert] | None = None,
         completes: list[tsi.CompletedCallSchemaForInsert] | None = None,
         do_sync_insert: bool = False,
-        source: Literal["sdk", "server"] = "sdk",
     ) -> None:
         """Main entry point for inserting calls with automatic dual-write routing.
 
@@ -696,12 +703,14 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         Args:
             project_id: Project ID (required)
+            source: Source of the call data (required):
+                - CallSource.SDK_CALLS_COMPLETE: New SDK with dual-write capability
+                - CallSource.SDK_CALLS_MERGED: Old SDK with single-table writes only
+                - CallSource.SERVER: Server-side sources (OTEL, completions)
             starts: List of call starts to insert
             ends: List of call ends to insert (updates existing calls)
             completes: List of complete calls to insert (start + end in one)
             do_sync_insert: If True, bypass async_insert for immediate consistency
-            source: Source of the call data - "sdk" (default) or "server" (OTEL, completions).
-                Server sources use calls_complete write path to avoid dual-write consistency issues.
 
         Raises:
             RuntimeError: If write_target is BOTH and writes to both tables fail
@@ -781,7 +790,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # Extract ends from batch
         end_calls = [item.req.end for item in req.batch]
 
-        self._dual_write_calls_batch(req.project_id, ends=end_calls)
+        self._dual_write_calls_batch(
+            req.project_id, source=CallSource.SDK_CALLS_COMPLETE, ends=end_calls
+        )
 
         return tsi.CallsEndBatchRes()
 
@@ -4530,7 +4541,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
 
         self._dual_write_calls_batch(
-            req.project_id, completes=[complete_call], source="server"
+            req.project_id, source=CallSource.SERVER, completes=[complete_call]
         )
 
         return tsi.CompletionsCreateRes(response=res.response, weave_call_id=call_id)
@@ -4602,6 +4613,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 tracked_inputs["template_vars"] = template_vars
 
             start = tsi.StartedCallSchemaForInsert(
+                id=generate_id(),
                 project_id=req.project_id,
                 wb_user_id=req.wb_user_id,
                 op_name=COMPLETIONS_CREATE_OP_NAME,
@@ -4612,7 +4624,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
             # Use dual write for start call with server source
             self._dual_write_calls_batch(
-                req.project_id, starts=[start], source="server"
+                req.project_id, source=CallSource.SERVER, starts=[start]
             )
 
         # Set the combined messages (with template vars replaced) for LiteLLM
@@ -4645,7 +4657,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # Otherwise, wrap the iterator with tracking
         def finish_call_handler(end_call: tsi.EndedCallSchemaForInsert) -> None:
             self._dual_write_calls_batch(
-                req.project_id, ends=[end_call], source="server"
+                req.project_id, source=CallSource.SERVER, ends=[end_call]
             )
 
         return _create_tracked_stream_wrapper(
