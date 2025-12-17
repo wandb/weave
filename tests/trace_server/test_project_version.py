@@ -111,9 +111,11 @@ def test_version_resolution_by_table_duel_write(client, trace_server):
         resolver.resolve_read_table(merged_proj, ch_server.ch_client)
         == ReadTable.CALLS_MERGED
     )
+    # Edge case: COMPLETE_ONLY shouldn't happen in dual-write mode, but if it does
+    # read from where the data actually is (calls_complete)
     assert (
         resolver.resolve_read_table(complete_proj, ch_server.ch_client)
-        == ReadTable.CALLS_MERGED
+        == ReadTable.CALLS_COMPLETE
     )
     assert (
         resolver.resolve_read_table(both_proj, ch_server.ch_client)
