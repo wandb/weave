@@ -774,7 +774,9 @@ class EvaluationLoggerV1:
 
         unregister_evaluation_logger(self)
 
-    def log_prediction(self, inputs: dict[str, Any], output: Any = None) -> ScoreLoggerV1:
+    def log_prediction(
+        self, inputs: dict[str, Any], output: Any = None
+    ) -> ScoreLoggerV1:
         """Log a prediction to the Evaluation.
 
         Returns a ScoreLoggerV1 that can be used directly or as a context manager.

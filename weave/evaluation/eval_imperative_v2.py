@@ -287,7 +287,9 @@ class EvaluationLoggerV2:
                 self._dataset_ref = dataset
                 dataset_obj = None
             else:
-                dataset_obj = Dataset(name=dataset, rows=Table([{"dataset_id": dataset}]))
+                dataset_obj = Dataset(
+                    name=dataset, rows=Table([{"dataset_id": dataset}])
+                )
         elif isinstance(dataset, list):
             dataset_obj = Dataset(rows=Table(dataset))
         elif isinstance(dataset, Dataset):
@@ -329,7 +331,9 @@ class EvaluationLoggerV2:
                     scorer_refs.append(scorer_name)
                 else:
                     scorer_obj = Scorer(name=scorer_name)
-                    scorer_refs.append(_get_or_publish_ref(scorer_obj, name=scorer_name))
+                    scorer_refs.append(
+                        _get_or_publish_ref(scorer_obj, name=scorer_name)
+                    )
 
         # Create the evaluation object
         eval_name = self.name or f"Evaluation-{make_memorable_name()}"
@@ -384,7 +388,9 @@ class EvaluationLoggerV2:
                 pass
 
     def _finalize_evaluation(
-        self, summary: dict[str, Any] | None = None, exception: BaseException | None = None
+        self,
+        summary: dict[str, Any] | None = None,
+        exception: BaseException | None = None,
     ) -> None:
         """Handles the final steps of the evaluation."""
         if self._is_finalized:
@@ -405,7 +411,8 @@ class EvaluationLoggerV2:
                 )
             except Exception:
                 logger.error(
-                    "Failed to finish evaluation run during finalization.", exc_info=True
+                    "Failed to finish evaluation run during finalization.",
+                    exc_info=True,
                 )
 
         self._is_finalized = True

@@ -1,7 +1,6 @@
 import asyncio
 import inspect
 import json
-import os
 from collections.abc import Callable
 from typing import TypedDict
 
@@ -14,7 +13,6 @@ from weave.evaluation.eval_imperative_v2 import EvaluationLoggerV2
 from weave.integrations.integration_utilities import op_name_from_call
 from weave.trace.context import call_context
 from weave.trace.serialization.serialize import to_json
-from weave.trace.settings import should_use_evaluation_logger_v2
 from weave.trace_server.trace_server_interface import ObjectVersionFilter
 
 
@@ -1221,7 +1219,10 @@ def test_evaluation_logger_v2_attributes_accessible(client, monkeypatch):
 
 @pytest.mark.parametrize("use_v2", [False, True], indirect=True)
 def test_basic_evaluation_both_versions(
-    client, use_v2, user_dataset: list[ExampleRow], user_model: Callable[[int, int], int]
+    client,
+    use_v2,
+    user_dataset: list[ExampleRow],
+    user_model: Callable[[int, int], int],
 ):
     """Test basic evaluation workflow works with both V1 and V2."""
     ev = EvaluationLogger()

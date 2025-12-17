@@ -2,12 +2,16 @@ from __future__ import annotations
 
 import atexit
 import logging
-from typing import Any, Union
+from typing import Any
 
 from weave.dataset.dataset import Dataset
+from weave.evaluation.eval_imperative_v1 import EvaluationLoggerV1, ScoreLoggerV1
+from weave.evaluation.eval_imperative_v2 import EvaluationLoggerV2, ScoreLoggerV2
 from weave.flow.model import Model
-from weave.flow.scorer import Scorer
 from weave.trace.settings import should_use_evaluation_logger_v2
+
+ScoreLogger = ScoreLoggerV1 | ScoreLoggerV2
+
 
 logger = logging.getLogger(__name__)
 
@@ -43,20 +47,6 @@ def unregister_evaluation_logger(eval_logger: Any) -> None:
 
 
 atexit.register(_cleanup_all_evaluations)
-
-
-# Import V1 and V2 after defining the registry functions they need
-from weave.evaluation.eval_imperative_v1 import (  # noqa: E402
-    EvaluationLoggerV1,
-    ScoreLoggerV1,
-)
-from weave.evaluation.eval_imperative_v2 import (  # noqa: E402
-    EvaluationLoggerV2,
-    ScoreLoggerV2,
-)
-
-# Type alias for ScoreLogger - users get either V1 or V2 depending on their EvaluationLogger
-ScoreLogger = Union[ScoreLoggerV1, ScoreLoggerV2]
 
 
 class EvaluationLogger:
