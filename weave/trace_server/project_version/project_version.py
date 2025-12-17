@@ -50,7 +50,7 @@ class TableRoutingResolver:
             with _project_residence_cache_lock:
                 _project_residence_cache[project_id] = residence
 
-        # TODO: remove me, this is temporary to guage cache size impact
+        # TODO: remove me, this is temporary to gauge cache size impact
         if root_span := ddtrace.tracer.current_root_span():
             root_span.set_tag("cache_size", len(_project_residence_cache))
 

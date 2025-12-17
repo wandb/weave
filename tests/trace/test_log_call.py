@@ -228,7 +228,9 @@ def test_log_call_with_started_at(client: WeaveClient):
     """Test log_call with a custom started_at timestamp."""
     import datetime
 
-    custom_start = datetime.datetime(2024, 1, 15, 10, 30, 0, tzinfo=datetime.timezone.utc)
+    custom_start = datetime.datetime(
+        2024, 1, 15, 10, 30, 0, tzinfo=datetime.timezone.utc
+    )
     call = weave.log_call("test_op", {"x": 1}, 2, started_at=custom_start)
 
     fetched_calls = client.get_calls()
@@ -254,7 +256,9 @@ def test_log_call_with_both_timestamps(client: WeaveClient):
     """Test log_call with both started_at and ended_at timestamps."""
     import datetime
 
-    custom_start = datetime.datetime(2024, 1, 15, 10, 30, 0, tzinfo=datetime.timezone.utc)
+    custom_start = datetime.datetime(
+        2024, 1, 15, 10, 30, 0, tzinfo=datetime.timezone.utc
+    )
     custom_end = datetime.datetime(2024, 1, 15, 10, 35, 0, tzinfo=datetime.timezone.utc)
     call = weave.log_call(
         "test_op", {"x": 1}, 2, started_at=custom_start, ended_at=custom_end
@@ -299,7 +303,9 @@ def test_log_call_with_timestamps_and_all_params(client: WeaveClient):
 
     parent_call = weave.log_call("parent", {}, "parent_result")
 
-    custom_start = datetime.datetime(2024, 3, 20, 14, 0, 0, tzinfo=datetime.timezone.utc)
+    custom_start = datetime.datetime(
+        2024, 3, 20, 14, 0, 0, tzinfo=datetime.timezone.utc
+    )
     custom_end = datetime.datetime(2024, 3, 20, 14, 10, 0, tzinfo=datetime.timezone.utc)
 
     call = weave.log_call(

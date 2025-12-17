@@ -372,7 +372,9 @@ def test_call_create_with_started_at(client):
     """Test create_call with a custom started_at timestamp."""
     import datetime
 
-    custom_start = datetime.datetime(2024, 1, 15, 10, 30, 0, tzinfo=datetime.timezone.utc)
+    custom_start = datetime.datetime(
+        2024, 1, 15, 10, 30, 0, tzinfo=datetime.timezone.utc
+    )
     call = client.create_call("x", {"a": 5, "b": 10}, started_at=custom_start)
     client.finish_call(call, "hello")
 
@@ -396,7 +398,9 @@ def test_call_create_and_finish_with_custom_timestamps(client):
     """Test both create_call and finish_call with custom timestamps."""
     import datetime
 
-    custom_start = datetime.datetime(2024, 1, 15, 10, 30, 0, tzinfo=datetime.timezone.utc)
+    custom_start = datetime.datetime(
+        2024, 1, 15, 10, 30, 0, tzinfo=datetime.timezone.utc
+    )
     custom_end = datetime.datetime(2024, 1, 15, 10, 35, 0, tzinfo=datetime.timezone.utc)
 
     call = client.create_call("x", {"a": 5, "b": 10}, started_at=custom_start)
