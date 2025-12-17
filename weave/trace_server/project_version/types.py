@@ -69,3 +69,16 @@ class WriteTarget(str, Enum):
     CALLS_MERGED = "calls_merged"
     CALLS_COMPLETE = "calls_complete"
     BOTH = "both"
+
+
+class CallSource(str, Enum):
+    """Source of call data being inserted.
+
+    SDK_CALLS_MERGED: Old SDK with single-table writes only (calls_merged).
+    SDK_CALLS_COMPLETE: New SDK with dual-write capability.
+    SERVER: Server-side sources (OTEL, completions).
+    """
+
+    SDK_CALLS_MERGED = "sdk_calls_merged"
+    SDK_CALLS_COMPLETE = "sdk_calls_complete"
+    SERVER = "server"

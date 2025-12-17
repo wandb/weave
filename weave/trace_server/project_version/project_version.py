@@ -1,6 +1,5 @@
 import logging
 import threading
-from typing import Literal
 
 import ddtrace
 from cachetools import LRUCache
@@ -11,6 +10,7 @@ from weave.trace_server.project_version.clickhouse_project_version import (
     get_project_data_residence,
 )
 from weave.trace_server.project_version.types import (
+    CallSource,
     CallsStorageServerMode,
     ProjectDataResidence,
     ReadTable,
@@ -107,7 +107,7 @@ class TableRoutingResolver:
         self,
         project_id: str,
         ch_client: CHClient,
-        source: Literal["sdk", "server"] = "sdk",
+        source: CallSource,
     ) -> WriteTarget:
         """Resolve which table(s) to write to for a given project.
 
@@ -115,7 +115,8 @@ class TableRoutingResolver:
             project_id: The project ID
             ch_client: ClickHouse client
             source: Source of the data. Supported values:
-                - "sdk": Weave SDK (Python/JS) - fully controlled, guarantees data consistency
+                - "sdk_calls_merged": Old SDK using call_start/call_end (calls_merged only)
+                - "sdk_calls_complete": New SDK using calls_start_batch/calls_end_batch (dual-write capable)
                 - "server": Server-side operations (OTEL, completions) - external sources
 
         Returns:
@@ -142,25 +143,34 @@ class TableRoutingResolver:
             # INVARIANT: If data exists in both tables, always write to both tables
             # regardless of source to maintain data consistency
             if residence == ProjectDataResidence.BOTH:
+                print(">>> residence == ProjectDataResidence.BOTH -> BOTH")
                 return WriteTarget.BOTH
 
-            # EMPTY projects: SDK can initiate dual-write, server sources write single table
-            # to avoid dual-write consistency issues during SDK rollout
+            # EMPTY projects: behavior depends on SDK capability
             if residence == ProjectDataResidence.EMPTY:
-                # TODO: remove this safeguard when SDK's can write to calls_complete.
-                if source == "server":
+                if source == CallSource.SDK_CALLS_MERGED:
+                    # Old SDK: don't initiate dual-write even in dual-write mode
                     return WriteTarget.CALLS_MERGED
-                elif source == "sdk":
+                elif source == CallSource.SERVER:
+                    # Server sources: don't initiate dual-write (safe rollout)
+                    return WriteTarget.CALLS_MERGED
+                elif source == CallSource.SDK_CALLS_COMPLETE:
+                    # New SDK: initiate dual-write
                     return WriteTarget.BOTH
                 else:
                     raise ValueError(f"Invalid source: {source}")
 
-            # COMPLETE_ONLY projects: SDK can start dual-write, server sources stay single table
+            # COMPLETE_ONLY projects: behavior depends on SDK capability
             # (This case is unlikely but handle it explicitly)
             if residence == ProjectDataResidence.COMPLETE_ONLY:
-                if source == "server":
+                if source == CallSource.SDK_CALLS_MERGED:
+                    # Old SDK: don't initiate dual-write
                     return WriteTarget.CALLS_MERGED
-                elif source == "sdk":
+                elif source == CallSource.SERVER:
+                    # Server sources: don't initiate dual-write
+                    return WriteTarget.CALLS_MERGED
+                elif source == CallSource.SDK_CALLS_COMPLETE:
+                    # New SDK: initiate dual-write
                     return WriteTarget.BOTH
                 else:
                     raise ValueError(f"Invalid source: {source}")
