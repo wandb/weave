@@ -180,10 +180,20 @@ class TableRoutingResolver:
             if residence in (
                 ProjectDataResidence.COMPLETE_ONLY,
                 ProjectDataResidence.BOTH,
-                ProjectDataResidence.EMPTY,
             ):
                 return WriteTarget.CALLS_COMPLETE
             if residence == ProjectDataResidence.MERGED_ONLY:
                 return WriteTarget.CALLS_MERGED
+
+            # EMPTY projects: behavior depends on SDK capability
+            if residence == ProjectDataResidence.EMPTY:
+                if source == CallSource.SDK_CALLS_MERGED:
+                    return WriteTarget.CALLS_MERGED
+                elif source == CallSource.SERVER:
+                    return WriteTarget.CALLS_COMPLETE
+                elif source == CallSource.SDK_CALLS_COMPLETE:
+                    return WriteTarget.CALLS_COMPLETE
+                else:
+                    raise ValueError(f"Invalid source: {source}")
 
         raise ValueError(f"Invalid mode/residence: {self._mode}/{residence}")

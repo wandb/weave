@@ -132,6 +132,116 @@ MODE_PARAMS = [
     ("force_legacy_mode", ProjectDataResidence.BOTH, False, True, "sdk_calls_complete"),
 ]
 
+# Old SDK mode parameters (call_start/call_end endpoints)
+# Format: (mode_fixture_name, ProjectDataResidence, should_succeed, writes_to_calls_complete, writes_to_calls_merged)
+# Old SDK uses CallSource.SDK_CALLS_MERGED and gets rejected if write_target is CALLS_COMPLETE or BOTH
+MODE_PARAMS_OLD_SDK = [
+    # EMPTY projects (new projects with no data)
+    (
+        "auto_mode",
+        ProjectDataResidence.EMPTY,
+        True,
+        False,
+        True,
+    ),  # Fixed by resolve_write_target check
+    (
+        "dual_write_read_merged_mode",
+        ProjectDataResidence.EMPTY,
+        True,
+        False,
+        True,
+    ),  # Allowed: old SDK writes to merged only, doesn't initiate dual-write
+    (
+        "dual_write_read_complete_mode",
+        ProjectDataResidence.EMPTY,
+        True,
+        False,
+        True,
+    ),  # Allowed: old SDK writes to merged only, doesn't initiate dual-write
+    (
+        "force_legacy_mode",
+        ProjectDataResidence.EMPTY,
+        True,
+        False,
+        True,
+    ),  # Allowed: writes to merged only
+    # MERGED_ONLY projects (legacy projects with only calls_merged data)
+    ("auto_mode", ProjectDataResidence.MERGED_ONLY, True, False, True),
+    (
+        "dual_write_read_merged_mode",
+        ProjectDataResidence.MERGED_ONLY,
+        True,
+        False,
+        True,
+    ),
+    (
+        "dual_write_read_complete_mode",
+        ProjectDataResidence.MERGED_ONLY,
+        True,
+        False,
+        True,
+    ),
+    ("force_legacy_mode", ProjectDataResidence.MERGED_ONLY, True, False, True),
+    # COMPLETE_ONLY projects (should never accept old SDK writes)
+    (
+        "auto_mode",
+        ProjectDataResidence.COMPLETE_ONLY,
+        False,
+        False,
+        False,
+    ),  # Rejected: write_target is CALLS_COMPLETE
+    (
+        "dual_write_read_merged_mode",
+        ProjectDataResidence.COMPLETE_ONLY,
+        False,
+        False,
+        False,
+    ),  # Rejected: edge case
+    (
+        "dual_write_read_complete_mode",
+        ProjectDataResidence.COMPLETE_ONLY,
+        False,
+        False,
+        False,
+    ),  # Rejected: edge case
+    (
+        "force_legacy_mode",
+        ProjectDataResidence.COMPLETE_ONLY,
+        True,
+        False,
+        True,
+    ),  # Allowed: force_legacy always writes merged
+    # BOTH projects (dual-write projects with data in both tables)
+    (
+        "auto_mode",
+        ProjectDataResidence.BOTH,
+        False,
+        False,
+        False,
+    ),  # Rejected: write_target is CALLS_COMPLETE
+    (
+        "dual_write_read_merged_mode",
+        ProjectDataResidence.BOTH,
+        False,
+        False,
+        False,
+    ),  # Rejected: write_target is BOTH
+    (
+        "dual_write_read_complete_mode",
+        ProjectDataResidence.BOTH,
+        False,
+        False,
+        False,
+    ),  # Rejected: write_target is BOTH
+    (
+        "force_legacy_mode",
+        ProjectDataResidence.BOTH,
+        True,
+        False,
+        True,
+    ),  # Allowed: force_legacy always writes merged
+]
+
 # ============================================================================
 # FIXTURES
 # ============================================================================
@@ -1590,7 +1700,7 @@ def test_start_call_routing_across_modes(
         pytest.skip("Skipping test for sqlite clients")
 
     # Apply the mode fixture
-    mode_fixture = request.getfixturevalue(mode_fixture_name)
+    request.getfixturevalue(mode_fixture_name)
 
     # Setup project residence state
     setup_project_residence(clickhouse_client, project_id, residence_state)
@@ -1658,7 +1768,7 @@ def test_delete_routing_across_modes(
         pytest.skip("Skipping test for sqlite clients")
 
     # Apply the mode fixture
-    mode_fixture = request.getfixturevalue(mode_fixture_name)
+    request.getfixturevalue(mode_fixture_name)
 
     # Setup project residence state
     setup_project_residence(clickhouse_client, project_id, residence_state)
@@ -1741,7 +1851,7 @@ def test_update_display_name_routing_across_modes(
         pytest.skip("Skipping test for sqlite clients")
 
     # Apply the mode fixture
-    mode_fixture = request.getfixturevalue(mode_fixture_name)
+    request.getfixturevalue(mode_fixture_name)
 
     # Setup project residence state
     setup_project_residence(clickhouse_client, project_id, residence_state)
@@ -1790,4 +1900,142 @@ def test_update_display_name_routing_across_modes(
         )
         assert merged_rows[0]["display_name"] == display_name, (
             f"Mode {mode_fixture_name}, Residence {residence_state.value}: Display name not updated in calls_merged"
+        )
+
+
+# ============================================================================
+# OLD SDK COMPATIBILITY TESTS (call_start/call_end)
+# ============================================================================
+
+
+@pytest.mark.parametrize(
+    (
+        "mode_fixture_name",
+        "residence_state",
+        "should_succeed",
+        "expected_complete_table",
+        "expected_merged_table",
+    ),
+    MODE_PARAMS_OLD_SDK,
+)
+@pytest.mark.skip_clickhouse_client
+def test_old_sdk_call_start_end_compatibility(
+    client,
+    clickhouse_client,
+    request,
+    server,
+    project_id,
+    mode_fixture_name,
+    residence_state,
+    should_succeed,
+    expected_complete_table,
+    expected_merged_table,
+):
+    """Test old SDK (call_start/call_end) compatibility across all mode/residence combinations.
+
+    The old SDK uses call_start/call_end endpoints (not batch) which internally use
+    CallSource.SDK_CALLS_MERGED. These endpoints reject writes if write_target is
+    CALLS_COMPLETE or BOTH.
+
+    This test validates:
+    1. Old SDK CAN write to MERGED_ONLY projects in all modes
+    2. Old SDK CAN write to EMPTY projects in AUTO/FORCE_LEGACY (but not dual-write modes)
+    3. Old SDK CANNOT write to COMPLETE_ONLY/BOTH projects (except FORCE_LEGACY)
+    4. When writes succeed, data goes to calls_merged only
+
+    Regression test for bug where old SDK was rejected when writing to EMPTY
+    projects in AUTO mode with error:
+    "The project has been created with a newer version of the SDK"
+    """
+    if client_is_sqlite(client):
+        pytest.skip("ClickHouse-only test")
+
+    # Apply the mode fixture
+    request.getfixturevalue(mode_fixture_name)
+
+    # Setup project residence state
+    setup_project_residence(clickhouse_client, project_id, residence_state)
+
+    # Create a call using OLD SDK endpoint (call_start, not calls_start_batch)
+    call_id = generate_id()
+    trace_id = generate_id()
+    wb_user_id = base64.b64encode(b"test_user").decode()
+
+    call_req = tsi.CallStartReq(
+        start=tsi.StartedCallSchemaForInsert(
+            project_id=project_id,
+            id=call_id,
+            op_name=f"old_sdk_test_{mode_fixture_name}_{residence_state.value}",
+            trace_id=trace_id,
+            started_at=datetime.datetime.now(),
+            wb_user_id=wb_user_id,
+            attributes={},
+            inputs={"mode": mode_fixture_name, "residence": residence_state.value},
+        )
+    )
+
+    if should_succeed:
+        # Call should succeed
+        result = server.call_start(call_req)
+        assert result.id == call_id, (
+            f"Mode {mode_fixture_name}, Residence {residence_state.value}: call_start should return correct call_id"
+        )
+
+        # End the call
+        end_req = tsi.CallEndReq(
+            end=tsi.EndedCallSchemaForInsert(
+                project_id=project_id,
+                id=call_id,
+                ended_at=datetime.datetime.now(),
+                summary={},
+                outputs={"result": "success"},
+            )
+        )
+        server.call_end(end_req)
+
+        # Verify data in expected tables using helper functions
+        in_complete = verify_call_exists_in_table(
+            client, clickhouse_client, project_id, call_id, "calls_complete"
+        )
+        in_merged = verify_call_exists_in_table(
+            client, clickhouse_client, project_id, call_id, "calls_merged"
+        )
+
+        assert in_complete == expected_complete_table, (
+            f"Mode {mode_fixture_name}, Residence {residence_state.value}: Expected call in calls_complete={expected_complete_table}, got {in_complete}"
+        )
+        assert in_merged == expected_merged_table, (
+            f"Mode {mode_fixture_name}, Residence {residence_state.value}: Expected call in calls_merged={expected_merged_table}, got {in_merged}"
+        )
+
+        # Verify client read path works
+        client_calls = list(client.get_calls(filter=CallsFilter(call_ids=[call_id])))
+        assert len(client_calls) == 1, (
+            f"Mode {mode_fixture_name}, Residence {residence_state.value}: Expected to find call via client.get_calls()"
+        )
+        assert client_calls[0].id == call_id
+    else:
+        # Call should be rejected with InvalidRequest
+        from weave.trace_server.errors import InvalidRequest
+
+        with pytest.raises(InvalidRequest) as exc_info:
+            server.call_start(call_req)
+
+        assert "newer version of the SDK" in str(exc_info.value), (
+            f"Mode {mode_fixture_name}, Residence {residence_state.value}: Expected 'newer version' error message"
+        )
+
+        # Verify this specific call was NOT written using helper functions
+        in_complete = verify_call_exists_in_table(
+            client, clickhouse_client, project_id, call_id, "calls_complete"
+        )
+        in_merged = verify_call_exists_in_table(
+            client, clickhouse_client, project_id, call_id, "calls_merged"
+        )
+
+        assert not in_complete, (
+            f"Mode {mode_fixture_name}, Residence {residence_state.value}: Call {call_id} should not be in calls_complete after rejection"
+        )
+        assert not in_merged, (
+            f"Mode {mode_fixture_name}, Residence {residence_state.value}: Call {call_id} should not be in calls_merged after rejection"
         )
