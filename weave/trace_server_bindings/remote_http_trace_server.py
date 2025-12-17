@@ -568,7 +568,7 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         handle_response_error(r, "/files/content")
         # TODO: Should stream to disk rather than to memory
         bytes = io.BytesIO()
-        bytes.writelines(r.iter_content())
+        bytes.writelines(r.iter_bytes())
         bytes.seek(0)
         return tsi.FileContentReadRes(content=bytes.read())
 

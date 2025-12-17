@@ -60,9 +60,9 @@ rich = ["rich"]           # Optional dependency for enhanced console output
 #    weave_server_sdk @ git+https://github.com/wandb/weave-stainless@daf91fdd07535c570eb618b343e2d125f9b09e25
 # 2. For deploys, pin to a specific version and remove allow-direct-references.  This will look like:
 #    weave_server_sdk==0.0.1
-stainless = [
-  "weave_server_sdk @ git+https://github.com/wandb/weave-stainless.git@9ce4f0792a54f05fba22531faee0c439ae9d70fa",
-]
+# stainless = [
+#   "weave_server_sdk @ git+https://github.com/wandb/weave-stainless.git@9ce4f0792a54f05fba22531faee0c439ae9d70fa",
+# ]
 
 # `trace_server` is the dependency list of the trace server itself. We eventually will extract
 # this to a separate package. Note, when that happens, we will need to pull along some of the
@@ -329,7 +329,7 @@ disallow_untyped_defs = true
 disallow_untyped_calls = true
 
 [tool.bumpversion]
-current_version = "0.52.19-dev0"
+current_version = "0.52.23-dev0"
 parse = """(?x)
     (?P<major>0|[1-9]\\d*)\\.
     (?P<minor>0|[1-9]\\d*)\\.

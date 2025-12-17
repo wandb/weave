@@ -115,8 +115,7 @@ jobs:
             "14",
             #
           ]
-        nox-shard:
-          [
+        nox-shard: [
             "trace",
             "flow",
             "trace_server",
@@ -142,7 +141,7 @@ jobs:
             "pandas_test",
             "mcp",
             "smolagents",
-            "stainless",
+            # "stainless",
             "autogen_tests",
           ]
       fail-fast: false
@@ -170,7 +169,7 @@ jobs:
         ports:
           - "10000:10000"
       weave_clickhouse:
-        image: clickhouse/clickhouse-server:25.4
+        image: clickhouse/clickhouse-server:25.11.2.24
         env:
           CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
           CLICKHOUSE_USER: default
@@ -301,8 +300,7 @@ jobs:
             "14",
             #
           ]
-        nox-shard:
-          [
+        nox-shard: [
             "trace",
             "flow",
             "trace_server",
@@ -327,7 +325,7 @@ jobs:
             "pandas_test",
             "mcp",
             "smolagents",
-            "stainless",
+            # "stainless",
             "autogen_tests",
           ]
       fail-fast: false

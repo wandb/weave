@@ -128,8 +128,6 @@ def publish(obj: Any, name: str | None = None) -> ObjectRef:
     Returns:
         A Weave Ref to the saved object.
     """
-    client = weave_client_context.require_weave_client()
-
     save_name: str
     if name:
         save_name = name
@@ -137,6 +135,17 @@ def publish(obj: Any, name: str | None = None) -> ObjectRef:
         save_name = n
     else:
         save_name = obj.__class__.__name__
+
+    # If weave is disabled, return a dummy ref without making network calls
+    if should_disable_weave():
+        return weave_client.ObjectRef(
+            entity="DISABLED",
+            project="DISABLED",
+            name=save_name,
+            _digest="DISABLED",
+        )
+
+    client = weave_client_context.require_weave_client()
 
     ref = client._save_object(obj, save_name, "latest")
 

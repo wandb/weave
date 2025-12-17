@@ -4,12 +4,14 @@ import urllib
 from concurrent.futures import Future
 from dataclasses import asdict, dataclass, fields
 from datetime import datetime
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from typing_extensions import Self
 
 from weave.trace_server import refs_internal
-from weave.trace_server.errors import ObjectDeletedError
+
+if TYPE_CHECKING:
+    from weave.trace_server.errors import ObjectDeletedError
 
 DICT_KEY_EDGE_NAME = refs_internal.DICT_KEY_EDGE_NAME
 LIST_INDEX_EDGE_NAME = refs_internal.LIST_INDEX_EDGE_NAME
