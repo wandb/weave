@@ -7,6 +7,7 @@ import re
 import sys
 import time
 import uuid
+from unittest.mock import patch
 
 import httpx
 import pydantic
@@ -45,7 +46,7 @@ from weave.trace.serialization.serializer import (
     register_serializer,
 )
 from weave.trace_server.clickhouse_trace_server_batched import NotFoundError
-from weave.trace_server.constants import MAX_DISPLAY_NAME_LENGTH
+from weave.trace_server.constants import EVALUATION_RUN_OP_NAME, MAX_DISPLAY_NAME_LENGTH
 from weave.trace_server.ids import generate_id
 from weave.trace_server.interface.builtin_object_classes.llm_structured_model import (
     LLMStructuredCompletionModel,
@@ -4217,3 +4218,81 @@ def test_evaluate_with_llm_completion_model_and_prompt_template_vars(client):
     assert req_with_input.inputs.messages == [
         {"role": "user", "content": "Additional context"}
     ]
+
+
+def test_call_start_delay_modes(client):
+    """Test different call start delay modes and their behavior."""
+    # Test 1: delay=0 sends immediately (call visible during execution)
+    with patch.object(settings, "call_start_delay", return_value=0.0):
+
+        @weave.op
+        def immediate_op(x):
+            # With delay=0, call should be visible immediately during execution
+            immediate_op_ref = f"weave:///{client._project_id()}/op/immediate_op:*"
+            calls = client.get_calls(filter={"op_names": [immediate_op_ref]})
+            assert len(calls) == 1, "Call should be visible immediately with delay=0"
+            assert calls[0].started_at is not None
+            assert calls[0].ended_at is None
+            return x + 1
+
+        result = immediate_op(1)
+        assert result == 2
+
+    # Test 2: positive delay means call not visible during execution (sent after delay)
+    with patch.object(settings, "call_start_delay", return_value=0.5):
+
+        @weave.op
+        def delayed_op(x):
+            # With positive delay, call should NOT be visible during execution
+            delayed_op_ref = f"weave:///{client._project_id()}/op/delayed_op:*"
+            calls = client.get_calls(filter={"op_names": [delayed_op_ref]})
+            assert len(calls) == 0, (
+                "Call should not be visible yet (waiting for 0.5s delay)"
+            )
+            time.sleep(0.6)  # Wait longer than delay
+            # Now it should be visible
+            calls = client.get_calls(filter={"op_names": [delayed_op_ref]})
+            assert len(calls) == 1, "Call visible after delay timer fires"
+            assert calls[0].started_at is not None
+            assert calls[0].ended_at is None
+            return x + 1
+
+        result = delayed_op(1)
+        assert result == 2
+
+    # Test 3: delay=-1 waits for end (call not visible during execution)
+    with patch.object(settings, "call_start_delay", return_value=-1.0):
+
+        @weave.op
+        def end_only_op(x):
+            # With delay=-1, call should NOT be visible during execution
+            end_only_op_ref = f"weave:///{client._project_id()}/op/end_only_op:*"
+            calls = client.get_calls(filter={"op_names": [end_only_op_ref]})
+            assert len(calls) == 0, "Call not visible during execution"
+            return x + 1
+
+        result = end_only_op(1)
+        assert result == 2
+
+        # After completion, call should be visible
+        end_only_op_ref = f"weave:///{client._project_id()}/op/end_only_op:*"
+        calls = client.get_calls(filter={"op_names": [end_only_op_ref]})
+        assert len(calls) == 1, "Call should be visible after op completes"
+
+    # Test 4: evaluation ops bypass delay (visible immediately)
+    with patch.object(settings, "call_start_delay", return_value=10.0):
+
+        @weave.op(name=EVALUATION_RUN_OP_NAME)
+        def eval_op(x):
+            # Evaluation ops bypass delay, so call should be visible immediately
+            eval_op_ref = (
+                f"weave:///{client._project_id()}/op/{EVALUATION_RUN_OP_NAME}:*"
+            )
+            calls = client.get_calls(filter={"op_names": [eval_op_ref]})
+            assert len(calls) == 1, (
+                "Eval op should be visible immediately despite 10s delay"
+            )
+            return x + 1
+
+        result = eval_op(1)
+        assert result == 2

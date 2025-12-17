@@ -91,15 +91,11 @@ def server(request, server_class):
     """Common server fixture that uses server_class based on the CLI flag."""
     server_ = server_class("http://example.com", should_batch=True)
 
-    # Create a shared mock that tracks all batch sends (both starts and ends)
-    # This allows tests to check total number of batches sent
     shared_mock = MagicMock()
 
     if request.param == "normal":
         server_._send_calls_start_batch_to_server = shared_mock
         server_._send_calls_end_batch_to_server = shared_mock
-        # For backward compatibility with tests that check _send_batch_to_server
-        server_._send_batch_to_server = shared_mock
     elif request.param == "small_limit":
         server_.remote_request_bytes_limit = 1024  # 1kb
         server_._send_calls_start_batch_to_server = shared_mock
@@ -111,7 +107,6 @@ def server(request, server_class):
             stop=tenacity.stop_after_attempt(2),
             reraise=True,
         )
-        # For fast retrying, we need to wrap the actual methods
         unwrapped_start = MethodType(
             server_._send_calls_start_batch_to_server.__wrapped__,  # type: ignore[attr-defined]
             server_,
