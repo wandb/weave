@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import atexit
 import logging
-from typing import Any
+from typing import Any, cast
 
 from weave.dataset.dataset import Dataset
 from weave.evaluation.eval_imperative_v1 import EvaluationLoggerV1, ScoreLoggerV1
@@ -101,10 +101,11 @@ class EvaluationLogger:
         dataset: Dataset | list[dict] | str | None = None,
         eval_attributes: dict[str, Any] | None = None,
         scorers: list[str] | None = None,
-    ) -> EvaluationLoggerV1 | EvaluationLoggerV2:
+    ) -> EvaluationLogger:
         """Create and return either a V1 or V2 EvaluationLogger based on settings."""
+        instance: EvaluationLoggerV1 | EvaluationLoggerV2
         if should_use_evaluation_logger_v2():
-            return EvaluationLoggerV2(
+            instance = EvaluationLoggerV2(
                 name=name,
                 model=model,
                 dataset=dataset,
@@ -112,13 +113,34 @@ class EvaluationLogger:
                 scorers=scorers,
             )
         else:
-            return EvaluationLoggerV1(
+            instance = EvaluationLoggerV1(
                 name=name,
                 model=model,
                 dataset=dataset,
                 eval_attributes=eval_attributes,
                 scorers=scorers,
             )
+        return cast(EvaluationLogger, instance)
+
+    def log_prediction(self, inputs: dict[str, Any], output: Any = None) -> ScoreLogger:
+        """Log a prediction to the Evaluation.
+
+        This method is implemented by EvaluationLoggerV1 and EvaluationLoggerV2.
+        This stub exists for type checking purposes only.
+        """
+        raise NotImplementedError("This method should be implemented by V1 or V2")
+
+    def log_summary(
+        self,
+        summary: dict | None = None,
+        auto_summarize: bool = True,
+    ) -> None:
+        """Log a summary dict to the Evaluation.
+
+        This method is implemented by EvaluationLoggerV1 and EvaluationLoggerV2.
+        This stub exists for type checking purposes only.
+        """
+        raise NotImplementedError("This method should be implemented by V1 or V2")
 
 
 class ImperativeEvaluationLogger(EvaluationLogger):
@@ -135,13 +157,13 @@ class ImperativeEvaluationLogger(EvaluationLogger):
         dataset: Dataset | list[dict] | str | None = None,
         eval_attributes: dict[str, Any] | None = None,
         scorers: list[str] | None = None,
-    ) -> EvaluationLoggerV1 | EvaluationLoggerV2:
+    ) -> ImperativeEvaluationLogger:
         logger.warning(
             "ImperativeEvaluationLogger was renamed to EvaluationLogger in 0.51.44. "
             "Please use EvaluationLogger instead. ImperativeEvaluationLogger will "
             "be removed in a future version."
         )
-        return super().__new__(
+        instance = super().__new__(
             cls,
             name=name,
             model=model,
@@ -149,3 +171,4 @@ class ImperativeEvaluationLogger(EvaluationLogger):
             eval_attributes=eval_attributes,
             scorers=scorers,
         )
+        return cast(ImperativeEvaluationLogger, instance)

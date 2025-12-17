@@ -336,6 +336,10 @@ class EvaluationLoggerV2:
                     )
 
         # Create the evaluation object
+        # Ensure dataset_ref is set (it should always be set by this point)
+        assert self._dataset_ref is not None, (
+            "Dataset ref should be set during initialization"
+        )
         eval_name = self.name or f"Evaluation-{make_memorable_name()}"
         eval_res = wc.server.evaluation_create(
             tsi.EvaluationCreateReq(
@@ -350,6 +354,10 @@ class EvaluationLoggerV2:
         self._evaluation_ref = eval_res.evaluation_ref
 
         # Create the evaluation run
+        # Ensure model_ref is set (it should always be set by this point)
+        assert self._model_ref is not None, (
+            "Model ref should be set during initialization"
+        )
         run_res = wc.server.evaluation_run_create(
             tsi.EvaluationRunCreateReq(
                 project_id=wc._project_id(),
@@ -450,6 +458,13 @@ class EvaluationLoggerV2:
         wc = require_weave_client()
 
         # Create the prediction via server
+        # Ensure model_ref and evaluation_run_id are set (they should always be set by this point)
+        assert self._model_ref is not None, (
+            "Model ref should be set during initialization"
+        )
+        assert self._evaluation_run_id is not None, (
+            "Evaluation run ID should be set during initialization"
+        )
         pred_res = wc.server.prediction_create(
             tsi.PredictionCreateReq(
                 project_id=wc._project_id(),
