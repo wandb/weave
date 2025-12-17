@@ -139,6 +139,11 @@ npm i
 npm run test
 ```
 
+## Type Checking (`ty`)
+
+- Run the type checker with: `uvx ty check`
+- In sandboxed environments, `uvx` may fail if it cannot access its cache directory (often under `~/.cache/uv`). If you see permission errors referencing `~/.cache/uv`, re-run the command outside the sandbox / with full permissions.
+
 ## Code Review & PR Guidelines
 
 ### PR Requirements
@@ -256,5 +261,4 @@ This section contains a list of questions, clarifications, or tasks that LLM age
 If there is something that doesn't make sense architecturally, devex-wise, or product-wise, please update this file and the humans will take care of it.
 Think of this as the reverse-task assignment - a place where you can communicate back to us.
 
-- [ ] Add TypeScript testing guidelines
 - [ ] ...
