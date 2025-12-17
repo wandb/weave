@@ -1830,6 +1830,13 @@ def test_get_calls_storage_size_values(client, clickhouse_client):
                 == client_call.total_storage_size_bytes
             )
             assert server_call.storage_size_bytes is not None
+            
+            # total_storage_size_bytes is only set for root calls (parent_id is None)
+            # For child calls, it is intentionally None
+            expect_total_storage_size_bytes = server_call.parent_id is None
+            assert expect_total_storage_size_bytes == (
+                server_call.total_storage_size_bytes is not None
+            )
 
 
 def test_ref_in_dict(client):
