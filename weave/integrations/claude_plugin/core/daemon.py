@@ -1383,6 +1383,15 @@ class WeaveDaemon:
         if not self.weave_client or not self.session_call_id:
             return
 
+        # Parse message timestamp for tool result duration calculation
+        from weave.integrations.claude_plugin.session.session_parser import parse_timestamp
+        msg_timestamp_str = obj.get("timestamp")
+        msg_timestamp = (
+            parse_timestamp(msg_timestamp_str)
+            if msg_timestamp_str
+            else datetime.now(timezone.utc)
+        )
+
         # Parse user content and images first to check if this is a real prompt
         msg_data = obj.get("message", {})
         content = msg_data.get("content", "")
@@ -1436,12 +1445,15 @@ class WeaveDaemon:
                         is_error = c.get("is_error", False)
 
                         # Buffer for grouped logging
+                        # msg_timestamp is when the tool_result was received (user message)
+                        # tool_timestamp is when the tool_use was sent (assistant message)
                         self._tool_buffer.add(
                             tool_use_id=tool_use_id,
                             name=tool_name,
                             input=tool_input,
                             timestamp=tool_timestamp,
                             result=result_content,
+                            result_timestamp=msg_timestamp,
                             is_error=is_error,
                         )
                         del self._pending_tool_calls[tool_use_id]
@@ -2288,8 +2300,9 @@ class WeaveDaemon:
         parent: Any,
     ) -> None:
         """Log a single buffered tool call."""
-        ended_at = datetime.now(timezone.utc)
-        duration_ms = int((ended_at - tool.timestamp).total_seconds() * 1000)
+        # Calculate duration from actual message timestamps (tool_use to tool_result)
+        # This is the time between when Claude sent the tool call and when the result was written
+        duration_ms = int((tool.result_timestamp - tool.timestamp).total_seconds() * 1000)
 
         log_tool_call(
             tool_name=tool.name,
@@ -2331,9 +2344,9 @@ class WeaveDaemon:
                 parts.append(name)
         display_name = f"Parallel ({', '.join(parts)})"
 
-        # Calculate timing for the parallel group
+        # Calculate timing for the parallel group using actual message timestamps
         started_at = min(t.timestamp for t in group)
-        ended_at = datetime.now(timezone.utc)
+        ended_at = max(t.result_timestamp for t in group)
 
         # Create parallel wrapper
         parallel_call = self.weave_client.create_call(

@@ -16,6 +16,11 @@ def make_timestamp(offset_ms: int = 0) -> datetime:
     return base + timedelta(milliseconds=offset_ms)
 
 
+def make_result_timestamp(tool_use_time: datetime, duration_ms: int = 500) -> datetime:
+    """Create a result timestamp based on tool_use time plus duration."""
+    return tool_use_time + timedelta(milliseconds=duration_ms)
+
+
 class TestToolResultBuffer:
     """Tests for ToolResultBuffer."""
 
@@ -28,24 +33,28 @@ class TestToolResultBuffer:
     def test_single_tool_not_aged_returns_empty(self) -> None:
         """Tool added just now should not be ready."""
         buffer = ToolResultBuffer()
+        now = datetime.now(timezone.utc)
         buffer.add(
             tool_use_id="t1",
             name="Read",
             input={"file": "test.py"},
-            timestamp=datetime.now(timezone.utc),
+            timestamp=now,
             result="content",
+            result_timestamp=make_result_timestamp(now),
         )
         assert buffer.get_ready_to_flush() == []
 
     def test_single_tool_force_flush(self) -> None:
         """Force flush should return tool regardless of age."""
         buffer = ToolResultBuffer()
+        now = datetime.now(timezone.utc)
         buffer.add(
             tool_use_id="t1",
             name="Read",
             input={"file": "test.py"},
-            timestamp=datetime.now(timezone.utc),
+            timestamp=now,
             result="content",
+            result_timestamp=make_result_timestamp(now),
         )
         groups = buffer.get_ready_to_flush(force=True)
         assert len(groups) == 1
@@ -57,9 +66,12 @@ class TestToolResultBuffer:
         buffer = ToolResultBuffer()
         base = make_timestamp(-5000)  # 5 seconds ago (aged)
 
-        buffer.add("t1", "Read", {}, base, "r1")
-        buffer.add("t2", "Grep", {}, base + timedelta(milliseconds=500), "r2")
-        buffer.add("t3", "Glob", {}, base + timedelta(milliseconds=800), "r3")
+        t1 = base
+        t2 = base + timedelta(milliseconds=500)
+        t3 = base + timedelta(milliseconds=800)
+        buffer.add("t1", "Read", {}, t1, "r1", make_result_timestamp(t1))
+        buffer.add("t2", "Grep", {}, t2, "r2", make_result_timestamp(t2))
+        buffer.add("t3", "Glob", {}, t3, "r3", make_result_timestamp(t3))
 
         groups = buffer.get_ready_to_flush(force=True)
         assert len(groups) == 1
@@ -70,8 +82,10 @@ class TestToolResultBuffer:
         buffer = ToolResultBuffer()
         base = make_timestamp(-10000)  # 10 seconds ago
 
-        buffer.add("t1", "Read", {}, base, "r1")
-        buffer.add("t2", "Edit", {}, base + timedelta(milliseconds=2000), "r2")
+        t1 = base
+        t2 = base + timedelta(milliseconds=2000)
+        buffer.add("t1", "Read", {}, t1, "r1", make_result_timestamp(t1))
+        buffer.add("t2", "Edit", {}, t2, "r2", make_result_timestamp(t2))
 
         groups = buffer.get_ready_to_flush(force=True)
         assert len(groups) == 2
@@ -81,7 +95,8 @@ class TestToolResultBuffer:
     def test_remove_clears_flushed_tools(self) -> None:
         """Remove should clear tools from buffer."""
         buffer = ToolResultBuffer()
-        buffer.add("t1", "Read", {}, make_timestamp(-5000), "r1")
+        t1 = make_timestamp(-5000)
+        buffer.add("t1", "Read", {}, t1, "r1", make_result_timestamp(t1))
 
         groups = buffer.get_ready_to_flush(force=True)
         buffer.remove(groups)
@@ -91,7 +106,8 @@ class TestToolResultBuffer:
     def test_error_flag_preserved(self) -> None:
         """is_error flag should be preserved through buffer."""
         buffer = ToolResultBuffer()
-        buffer.add("t1", "Bash", {}, make_timestamp(-5000), "error", is_error=True)
+        t1 = make_timestamp(-5000)
+        buffer.add("t1", "Bash", {}, t1, "error", make_result_timestamp(t1), is_error=True)
 
         groups = buffer.get_ready_to_flush(force=True)
         assert groups[0][0].is_error is True
@@ -104,8 +120,10 @@ class TestToolResultBuffer:
         # New tool within parallel threshold of old (not aged)
         new_time = datetime.now(timezone.utc) - timedelta(milliseconds=500)
 
-        buffer.add("t1", "Read", {}, old_time, "r1")
-        buffer.add("t2", "Grep", {}, old_time + timedelta(milliseconds=500), "r2")
+        t1 = old_time
+        t2 = old_time + timedelta(milliseconds=500)
+        buffer.add("t1", "Read", {}, t1, "r1", make_result_timestamp(t1))
+        buffer.add("t2", "Grep", {}, t2, "r2", make_result_timestamp(t2))
 
         # Both are in same parallel window, both should be aged
         groups = buffer.get_ready_to_flush()
