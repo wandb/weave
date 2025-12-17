@@ -13,7 +13,7 @@ class AggregationMethod(str, Enum):
 
 class ObjectVersionGroup(BaseModel):
     label: str  # label for the combination of the groups
-    versionRefs: list[str]  # Digests of the versions to group
+    version_refs: list[str]  # Digests of the versions to group
     show_version_indicator: bool
     method: AggregationMethod
 

@@ -1816,11 +1816,11 @@
           "title": "Label",
           "type": "string"
         },
-        "versionRefs": {
+        "version_refs": {
           "items": {
             "type": "string"
           },
-          "title": "Versionrefs",
+          "title": "Version Refs",
           "type": "array"
         },
         "show_version_indicator": {
@@ -1833,7 +1833,7 @@
       },
       "required": [
         "label",
-        "versionRefs",
+        "version_refs",
         "show_version_indicator",
         "method"
       ],
