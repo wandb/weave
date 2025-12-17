@@ -96,14 +96,14 @@ MODE_PARAMS = [
         "dual_write_read_merged_mode",
         ProjectDataResidence.COMPLETE_ONLY,
         True,
-        True,
+        False,  # Edge case: COMPLETE_ONLY in dual-write shouldn't happen (no AUTO->dual-write switch)
         "sdk_calls_complete",
     ),
     (
         "dual_write_read_complete_mode",
         ProjectDataResidence.COMPLETE_ONLY,
         True,
-        True,
+        False,  # Edge case: COMPLETE_ONLY in dual-write shouldn't happen (no AUTO->dual-write switch)
         "sdk_calls_complete",
     ),
     (
