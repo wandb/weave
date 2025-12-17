@@ -1791,7 +1791,9 @@ def build_calls_stats_query(
 
     cq.add_field("id")
     if req.filter is not None:
-        cq.set_hardcoded_filter(HardCodedFilter(filter=req.filter))
+        cq.set_hardcoded_filter(
+            HardCodedFilter(filter=req.filter, read_table=read_table)
+        )
     if req.query is not None:
         cq.add_condition(req.query.expr_)
     if req.limit is not None:

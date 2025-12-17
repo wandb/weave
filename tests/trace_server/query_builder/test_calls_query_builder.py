@@ -5,6 +5,7 @@ from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.calls_query_builder.calls_query_builder import (
     CallsQuery,
     HardCodedFilter,
+    build_calls_stats_query,
     get_field_by_name,
 )
 from weave.trace_server.interface import query as tsi_query
@@ -2447,3 +2448,13 @@ def test_query_filter_with_escaped_dots_in_field_names() -> None:
             "pb_3": "project",
         },
     )
+
+
+def test_calls_complete_parent_ids_filter_no_aggregate() -> None:
+    req = tsi.CallsQueryStatsReq(
+        project_id="test-project",
+        filter=tsi.CallsFilter(parent_ids=["parent-call-id"]),
+    )
+    pb = ParamBuilder()
+    query_sql, _ = build_calls_stats_query(req, pb, ReadTable.CALLS_COMPLETE)
+    assert "calls_complete.parent_id IN" in query_sql
