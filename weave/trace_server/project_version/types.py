@@ -6,7 +6,7 @@ from enum import Enum
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_SERVER_MODE = "dual_write_read_merged"
+DEFAULT_SERVER_MODE = "dual_write_read_complete"
 
 # Project Version Routing Matrix
 # ==============================
@@ -17,12 +17,12 @@ DEFAULT_SERVER_MODE = "dual_write_read_merged"
 # ├─────────────────────────┼──────────────────────┼─────────────────────────────┼────────────────────────────────┼──────────────────────┼──────────────────────┤
 # │ EMPTY                   │ COMPLETE / COMPLETE  │ MERGED / BOTH               │ COMPLETE / BOTH                │ MERGED / MERGED      │ MERGED / MERGED      │
 # │ MERGED_ONLY             │ MERGED / MERGED      │ MERGED / MERGED             │ MERGED / MERGED                │ MERGED / MERGED      │ MERGED / MERGED      │
-# │ COMPLETE_ONLY           │ COMPLETE / COMPLETE  │ MERGED / COMPLETE*          │ COMPLETE / COMPLETE*           │ MERGED / MERGED      │ MERGED / MERGED      │
+# │ COMPLETE_ONLY           │ COMPLETE / COMPLETE  │ COMPLETE / COMPLETE*        │ COMPLETE / COMPLETE*           │ MERGED / MERGED      │ MERGED / MERGED      │
 # │ BOTH                    │ COMPLETE / COMPLETE  │ MERGED / BOTH               │ COMPLETE / BOTH                │ MERGED / MERGED      │ MERGED / MERGED      │
 # └─────────────────────────┴──────────────────────┴─────────────────────────────┴────────────────────────────────┴──────────────────────┴──────────────────────┘
 #
 # * COMPLETE_ONLY in dual-write modes is an edge case that should never occur in production.
-#   We never switch from AUTO to dual-write modes. Writes go to COMPLETE only to avoid inconsistent state.
+#   We never switch from AUTO to dual-write modes. When this edge case occurs, read from where the data actually is (calls_complete).
 
 
 class ProjectDataResidence(Enum):
