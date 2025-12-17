@@ -1,18 +1,15 @@
 """Tests for claude_plugin utilities."""
 
-import os
 import tempfile
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from weave.integrations.claude_plugin.utils import (
-    extract_question_from_text,
-    sanitize_tool_input,
-    reconstruct_call,
-    log_tool_call,
-    get_git_info,
     MAX_TOOL_INPUT_LENGTH,
+    extract_question_from_text,
+    get_git_info,
+    log_tool_call,
+    reconstruct_call,
+    sanitize_tool_input,
 )
 
 
@@ -364,7 +361,10 @@ class TestExtractQuestionFromText:
         text = "I can help you with that. What file would you like me to look at?"
         result = extract_question_from_text(text)
         # Extracts entire last paragraph up to first "?"
-        assert result == "I can help you with that. What file would you like me to look at?"
+        assert (
+            result
+            == "I can help you with that. What file would you like me to look at?"
+        )
 
     def test_extracts_question_from_last_paragraph(self):
         """Should only look at the last paragraph for questions."""

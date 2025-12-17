@@ -3,13 +3,10 @@
 from __future__ import annotations
 
 import os
-import socket
 import subprocess
 import tempfile
 from pathlib import Path
 from unittest import mock
-
-import pytest
 
 from weave.integrations.claude_plugin.core.socket_client import (
     SOCKET_DIR,
@@ -77,7 +74,7 @@ class TestDaemonClientIsDaemonRunning:
 
         # Mock socket to raise error on connect
         mock_sock = mock.MagicMock()
-        mock_sock.connect.side_effect = socket.error("Connection refused")
+        mock_sock.connect.side_effect = OSError("Connection refused")
 
         with mock.patch("socket.socket", return_value=mock_sock):
             with mock.patch("pathlib.Path.exists", return_value=True):
@@ -103,7 +100,7 @@ class TestDaemonClientIsDaemonRunning:
 
         # Mock socket to raise error on connect
         mock_sock = mock.MagicMock()
-        mock_sock.connect.side_effect = socket.error("Connection refused")
+        mock_sock.connect.side_effect = OSError("Connection refused")
 
         with mock.patch("socket.socket", return_value=mock_sock):
             with mock.patch("pathlib.Path.exists", return_value=True):
@@ -165,13 +162,21 @@ class TestDaemonClientCleanupStaleSocket:
 
         client = DaemonClient("test-session-id")
 
-        with caplog.at_level(logging.WARNING, logger="weave.integrations.claude_plugin.core.socket_client"):
+        with caplog.at_level(
+            logging.WARNING,
+            logger="weave.integrations.claude_plugin.core.socket_client",
+        ):
             with mock.patch("pathlib.Path.exists", return_value=True):
-                with mock.patch("pathlib.Path.unlink", side_effect=OSError("Permission denied")):
+                with mock.patch(
+                    "pathlib.Path.unlink", side_effect=OSError("Permission denied")
+                ):
                     client.cleanup_stale_socket()
 
                     # Check that warning was logged
-                    assert any("Failed to clean up socket" in record.message for record in caplog.records)
+                    assert any(
+                        "Failed to clean up socket" in record.message
+                        for record in caplog.records
+                    )
 
 
 class TestDaemonClientStartDaemon:
@@ -184,9 +189,14 @@ class TestDaemonClientStartDaemon:
             socket_dir = Path(tmpdir) / "test-dir"
             client.socket_path = socket_dir / "daemon.sock"
 
-            with mock.patch("weave.integrations.claude_plugin.core.socket_client.SOCKET_DIR", socket_dir):
+            with mock.patch(
+                "weave.integrations.claude_plugin.core.socket_client.SOCKET_DIR",
+                socket_dir,
+            ):
                 with mock.patch("subprocess.Popen"):
-                    with mock.patch.object(client, "is_daemon_running", return_value=True):
+                    with mock.patch.object(
+                        client, "is_daemon_running", return_value=True
+                    ):
                         client.start_daemon()
 
                         assert socket_dir.exists()
@@ -209,7 +219,9 @@ class TestDaemonClientStartDaemon:
 
         with mock.patch("subprocess.Popen") as mock_popen:
             with mock.patch.object(client, "is_daemon_running", return_value=True):
-                with mock.patch("weave.integrations.claude_plugin.core.socket_client.SOCKET_DIR") as mock_dir:
+                with mock.patch(
+                    "weave.integrations.claude_plugin.core.socket_client.SOCKET_DIR"
+                ) as mock_dir:
                     mock_dir.mkdir = mock.MagicMock()
                     client.start_daemon()
 
@@ -217,7 +229,11 @@ class TestDaemonClientStartDaemon:
                     mock_popen.assert_called_once()
                     args = mock_popen.call_args
                     assert args[0][0][0] == mock.ANY  # sys.executable
-                    assert args[0][0][1:] == ["-m", "weave.integrations.claude_plugin.core.daemon", session_id]
+                    assert args[0][0][1:] == [
+                        "-m",
+                        "weave.integrations.claude_plugin.core.daemon",
+                        session_id,
+                    ]
                     assert args[1]["start_new_session"] is True
                     assert args[1]["stdout"] == subprocess.DEVNULL
                     assert args[1]["stderr"] == subprocess.DEVNULL
@@ -229,7 +245,9 @@ class TestDaemonClientStartDaemon:
 
         with mock.patch("subprocess.Popen"):
             with mock.patch.object(client, "is_daemon_running", return_value=True):
-                with mock.patch("weave.integrations.claude_plugin.core.socket_client.SOCKET_DIR") as mock_dir:
+                with mock.patch(
+                    "weave.integrations.claude_plugin.core.socket_client.SOCKET_DIR"
+                ) as mock_dir:
                     mock_dir.mkdir = mock.MagicMock()
                     result = client.start_daemon()
 
@@ -242,7 +260,9 @@ class TestDaemonClientStartDaemon:
         with mock.patch("subprocess.Popen"):
             with mock.patch.object(client, "is_daemon_running", return_value=False):
                 with mock.patch("time.sleep"):  # Speed up test
-                    with mock.patch("weave.integrations.claude_plugin.core.socket_client.SOCKET_DIR") as mock_dir:
+                    with mock.patch(
+                        "weave.integrations.claude_plugin.core.socket_client.SOCKET_DIR"
+                    ) as mock_dir:
                         mock_dir.mkdir = mock.MagicMock()
                         result = client.start_daemon()
 
@@ -257,7 +277,9 @@ class TestDaemonClientStartDaemon:
         # Suppress error logs during this test
         with caplog.at_level(logging.CRITICAL):
             with mock.patch("subprocess.Popen", side_effect=Exception("Test error")):
-                with mock.patch("weave.integrations.claude_plugin.core.socket_client.SOCKET_DIR") as mock_dir:
+                with mock.patch(
+                    "weave.integrations.claude_plugin.core.socket_client.SOCKET_DIR"
+                ) as mock_dir:
                     mock_dir.mkdir = mock.MagicMock()
                     result = client.start_daemon()
 
@@ -308,7 +330,7 @@ class TestDaemonClientSendEvent:
         client = DaemonClient("test-session-id")
 
         mock_sock = mock.MagicMock()
-        mock_sock.connect.side_effect = socket.timeout("Timed out")
+        mock_sock.connect.side_effect = TimeoutError("Timed out")
 
         with mock.patch("socket.socket", return_value=mock_sock):
             result = client.send_event("TestEvent", {"key": "value"})
@@ -320,7 +342,7 @@ class TestDaemonClientSendEvent:
         client = DaemonClient("test-session-id")
 
         mock_sock = mock.MagicMock()
-        mock_sock.connect.side_effect = socket.error("Connection refused")
+        mock_sock.connect.side_effect = OSError("Connection refused")
 
         with mock.patch("socket.socket", return_value=mock_sock):
             result = client.send_event("TestEvent", {"key": "value"})
@@ -344,7 +366,7 @@ class TestDaemonClientSendEvent:
         client = DaemonClient("test-session-id")
 
         mock_sock = mock.MagicMock()
-        mock_sock.recv.return_value = b'invalid json\n'
+        mock_sock.recv.return_value = b"invalid json\n"
 
         with mock.patch("socket.socket", return_value=mock_sock):
             result = client.send_event("TestEvent", {"key": "value"})
@@ -358,7 +380,9 @@ class TestDaemonClientSendEvent:
         mock_sock = mock.MagicMock()
 
         with mock.patch("socket.socket", return_value=mock_sock):
-            result = client.send_event("TestEvent", {"key": "value"}, wait_response=False)
+            result = client.send_event(
+                "TestEvent", {"key": "value"}, wait_response=False
+            )
 
             # Should not call recv
             mock_sock.recv.assert_not_called()
@@ -371,7 +395,7 @@ class TestDaemonClientSendEvent:
         client = DaemonClient("test-session-id")
 
         mock_sock = mock.MagicMock()
-        mock_sock.connect.side_effect = socket.error("Connection refused")
+        mock_sock.connect.side_effect = OSError("Connection refused")
 
         with mock.patch("socket.socket", return_value=mock_sock):
             client.send_event("TestEvent", {"key": "value"})
@@ -458,10 +482,14 @@ class TestEnsureDaemonRunning:
         daemon_pid = 999999999  # Invalid PID
 
         with mock.patch.object(DaemonClient, "is_daemon_running", return_value=False):
-            with mock.patch.object(DaemonClient, "is_process_alive", return_value=False):
+            with mock.patch.object(
+                DaemonClient, "is_process_alive", return_value=False
+            ):
                 with mock.patch.object(DaemonClient, "cleanup_stale_socket"):
                     with mock.patch.object(DaemonClient, "start_daemon") as mock_start:
-                        client = ensure_daemon_running(session_id, daemon_pid=daemon_pid)
+                        client = ensure_daemon_running(
+                            session_id, daemon_pid=daemon_pid
+                        )
 
                         # Verify daemon was started
                         mock_start.assert_called_once()
@@ -471,7 +499,9 @@ class TestEnsureDaemonRunning:
         session_id = "test-session-id"
 
         with mock.patch.object(DaemonClient, "is_daemon_running", return_value=False):
-            with mock.patch.object(DaemonClient, "cleanup_stale_socket") as mock_cleanup:
+            with mock.patch.object(
+                DaemonClient, "cleanup_stale_socket"
+            ) as mock_cleanup:
                 with mock.patch.object(DaemonClient, "start_daemon"):
                     ensure_daemon_running(session_id)
 

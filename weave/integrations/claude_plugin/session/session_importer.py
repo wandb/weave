@@ -30,11 +30,19 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import weave
+from weave.integrations.claude_plugin.core.state import (
+    load_session as get_session_state,
+)
+from weave.integrations.claude_plugin.session.session_parser import (
+    Session,
+    parse_session_file,
+)
+from weave.integrations.claude_plugin.utils import (
+    generate_session_name,
+    reconstruct_call,
+)
 from weave.trace.context.weave_client_context import require_weave_client
-
-from weave.integrations.claude_plugin.session.session_parser import Session, parse_session_file
-from weave.integrations.claude_plugin.core.state import load_session as get_session_state
-from weave.integrations.claude_plugin.utils import generate_session_name, reconstruct_call
+from weave.type_wrappers.Content.content import Content
 
 if TYPE_CHECKING:
     from weave.integrations.claude_plugin.views.cli_output import ImportResult
@@ -74,7 +82,9 @@ def extract_agent_id(tool_result: str | None) -> str | None:
     return match.group(1) if match else None
 
 
-def discover_session_files(sessions_dir: Path, most_recent_only: bool = True) -> list[Path]:
+def discover_session_files(
+    sessions_dir: Path, most_recent_only: bool = True
+) -> list[Path]:
     """Find session files in a directory.
 
     Only includes files with UUID-style names, filtering out agent-xxxx files.
@@ -86,10 +96,7 @@ def discover_session_files(sessions_dir: Path, most_recent_only: bool = True) ->
     Returns:
         List of session file paths, sorted by modification time (newest first)
     """
-    files = [
-        f for f in sessions_dir.glob("*.jsonl")
-        if is_uuid_filename(f.name)
-    ]
+    files = [f for f in sessions_dir.glob("*.jsonl") if is_uuid_filename(f.name)]
 
     # Sort by modification time, newest first
     files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
@@ -136,7 +143,9 @@ def _create_subagent_call(
     Returns:
         Tuple of (calls_created, file_snapshots)
     """
-    from weave.integrations.claude_plugin.session.session_processor import SessionProcessor
+    from weave.integrations.claude_plugin.session.session_processor import (
+        SessionProcessor,
+    )
 
     # Find the agent file
     agent_file = sessions_dir / f"agent-{agent_id}.jsonl"
@@ -158,12 +167,15 @@ def _create_subagent_call(
     # Build display name using helper that strips common prefixes
     first_prompt = subagent_session.first_user_prompt() or ""
     from weave.integrations.claude_plugin.utils import get_subagent_display_name
+
     display_name = get_subagent_display_name(first_prompt, agent_id)
 
     # Create subagent call with ChatView-compatible inputs and timestamp from parsed session
     subagent_call = client.create_call(
         op="claude_code.subagent",
-        inputs=SessionProcessor.build_subagent_inputs(first_prompt, agent_id, subagent_type),
+        inputs=SessionProcessor.build_subagent_inputs(
+            first_prompt, agent_id, subagent_type
+        ),
         parent=parent_call,
         display_name=display_name,
         attributes={"agent_id": agent_id, "is_sidechain": True},
@@ -184,6 +196,7 @@ def _create_subagent_call(
             from weave.integrations.claude_plugin.views.diff_utils import (
                 extract_edit_data_from_raw_messages,
             )
+
             for edit_data in extract_edit_data_from_raw_messages(turn.raw_messages):
                 file_path = edit_data.get("file_path")
                 if file_path:
@@ -267,15 +280,16 @@ def _create_subagent_call(
             from weave.integrations.claude_plugin.views.diff_utils import (
                 extract_edit_data_from_raw_messages,
             )
+
             all_edit_data.extend(extract_edit_data_from_raw_messages(turn.raw_messages))
 
     if all_edit_data:
+        from weave.integrations.claude_plugin.utils import set_call_view
         from weave.integrations.claude_plugin.views.diff_view import (
+            DIFF_HTML_STYLES,
             _build_file_diffs_from_edit_data,
             _render_file_diff_html,
-            DIFF_HTML_STYLES,
         )
-        from weave.integrations.claude_plugin.utils import set_call_view
 
         # Get cwd from the subagent session for relative paths
         cwd = subagent_session.cwd
@@ -307,9 +321,13 @@ def _create_subagent_call(
             )
 
     # Finish the subagent call
-    client.finish_call(subagent_call, output=subagent_output, ended_at=subagent_session.ended_at())
+    client.finish_call(
+        subagent_call, output=subagent_output, ended_at=subagent_session.ended_at()
+    )
 
-    logger.debug(f"Created subagent {agent_id}: {calls_created} calls, {sum(tool_counts.values())} tool calls, {len(file_snapshots)} file snapshots")
+    logger.debug(
+        f"Created subagent {agent_id}: {calls_created} calls, {sum(tool_counts.values())} tool calls, {len(file_snapshots)} file snapshots"
+    )
     return calls_created, file_snapshots
 
 
@@ -329,7 +347,9 @@ def _import_session_to_weave(
 
     Returns: (turns, tool_calls, calls_created, call_id)
     """
-    from weave.integrations.claude_plugin.session.session_processor import SessionProcessor
+    from weave.integrations.claude_plugin.session.session_processor import (
+        SessionProcessor,
+    )
 
     client = require_weave_client()
     processor = SessionProcessor(
@@ -398,6 +418,7 @@ def _import_session_to_weave(
             from weave.integrations.claude_plugin.views.diff_utils import (
                 extract_edit_data_from_raw_messages,
             )
+
             # Build a map of file_path -> edit data for matching
             for edit_data in extract_edit_data_from_raw_messages(turn.raw_messages):
                 file_path = edit_data.get("file_path")
@@ -453,7 +474,9 @@ def _import_session_to_weave(
             turn=turn,
             session=session,
             turn_index=i,
-            extra_file_snapshots=subagent_file_snapshots if subagent_file_snapshots else None,
+            extra_file_snapshots=subagent_file_snapshots
+            if subagent_file_snapshots
+            else None,
             ended_at=turn.ended_at(),
         )
 
@@ -492,7 +515,7 @@ def import_session_with_result(
     use_ollama: bool = True,
     include_details: bool = True,
     include_tool_traces: bool = False,
-) -> "ImportResult":
+) -> ImportResult:
     """Import a single session file and return structured result.
 
     Args:
@@ -505,7 +528,10 @@ def import_session_with_result(
     Returns:
         ImportResult with session details and success/error status
     """
-    from weave.integrations.claude_plugin.views.cli_output import ImportResult, extract_session_details
+    from weave.integrations.claude_plugin.views.cli_output import (
+        ImportResult,
+        extract_session_details,
+    )
 
     try:
         session = parse_session_file(session_path)
@@ -665,7 +691,7 @@ def import_session(
         return turns, tool_calls, calls
     else:
         # Actually import using weave.log_call()
-        turns, tool_calls, calls = _import_session_to_weave(
+        turns, tool_calls, calls, _session_call_id = _import_session_to_weave(
             session,
             session_file_path=session_path,
             use_ollama=use_ollama,
@@ -713,10 +739,14 @@ def import_sessions(
         raise ValueError(f"Path does not exist: {path}")
 
     if not session_files:
-        raise ValueError("No session files found (only UUID-named files are imported, agent-* files are skipped)")
+        raise ValueError(
+            "No session files found (only UUID-named files are imported, agent-* files are skipped)"
+        )
 
     if full:
-        logger.info(f"Found {len(session_files)} session files (--full mode, excluding agent-* files)")
+        logger.info(
+            f"Found {len(session_files)} session files (--full mode, excluding agent-* files)"
+        )
     else:
         logger.info(f"Importing most recent session: {session_files[0].name}")
 
@@ -756,13 +786,14 @@ def import_sessions(
                 time.sleep(0.5)
 
         except Exception as e:
-            logger.error(f"Error importing {session_path.name}: {e}")
+            logger.exception(f"Error importing {session_path.name}")
             if verbose:
                 import traceback
+
                 traceback.print_exc()
 
     # Build summary
-    summary = {
+    summary: dict[str, int | str] = {
         "sessions_imported": imported,
         "total_turns": total_turns,
         "total_tool_calls": total_tool_calls,

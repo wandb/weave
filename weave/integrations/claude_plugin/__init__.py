@@ -28,11 +28,28 @@ Usage:
     )
 """
 
+from weave.integrations.claude_plugin.core.socket_client import (
+    DaemonClient,
+    ensure_daemon_running,
+    get_socket_path,
+)
+from weave.integrations.claude_plugin.core.state import (
+    StateManager,
+    create_session_data,
+    delete_session,
+    load_session,
+    save_session,
+)
 from weave.integrations.claude_plugin.credentials import (
     OAUTH_BETA_HEADER,
     OAuthCredentials,
     get_api_headers,
     get_oauth_credentials,
+)
+from weave.integrations.claude_plugin.session.session_importer import (
+    discover_session_files,
+    import_session,
+    import_sessions,
 )
 from weave.integrations.claude_plugin.session.session_parser import (
     AssistantMessage,
@@ -50,13 +67,6 @@ from weave.integrations.claude_plugin.session.session_title import (
     analyze_session_title,
     generate_session_title,
 )
-from weave.integrations.claude_plugin.core.state import (
-    StateManager,
-    create_session_data,
-    delete_session,
-    load_session,
-    save_session,
-)
 from weave.integrations.claude_plugin.utils import (
     generate_session_name,
     get_tool_display_name,
@@ -66,56 +76,38 @@ from weave.integrations.claude_plugin.views.diff_view import (
     generate_edit_diff_html,
     generate_turn_diff_html,
 )
-from weave.integrations.claude_plugin.session.session_importer import (
-    discover_session_files,
-    import_session,
-    import_sessions,
-)
-from weave.integrations.claude_plugin.core.socket_client import (
-    DaemonClient,
-    ensure_daemon_running,
-    get_socket_path,
-)
 
 __all__ = [
-    # Session parser
+    "OAUTH_BETA_HEADER",
+    "AssistantMessage",
+    "DaemonClient",
+    "FileBackup",
+    "OAuthCredentials",
     "Session",
-    "Turn",
+    "StateManager",
     "TokenUsage",
     "ToolCall",
-    "FileBackup",
-    "AssistantMessage",
+    "Turn",
     "UserMessage",
-    "parse_session_file",
-    "parse_timestamp",
-    "is_system_message",
-    # State
-    "StateManager",
-    "create_session_data",
-    "load_session",
-    "save_session",
-    "delete_session",
-    # Credentials
-    "OAuthCredentials",
-    "get_oauth_credentials",
-    "get_api_headers",
-    "OAUTH_BETA_HEADER",
-    # Session title
     "analyze_session_title",
-    "generate_session_title",
-    # Utils
-    "truncate",
-    "get_tool_display_name",
+    "create_session_data",
+    "delete_session",
+    "discover_session_files",
+    "ensure_daemon_running",
     "generate_edit_diff_html",
     "generate_session_name",
-    # Diff view
+    "generate_session_title",
     "generate_turn_diff_html",
-    # Socket client
-    "DaemonClient",
-    "ensure_daemon_running",
+    "get_api_headers",
+    "get_oauth_credentials",
     "get_socket_path",
-    # Session importer
-    "discover_session_files",
+    "get_tool_display_name",
     "import_session",
     "import_sessions",
+    "is_system_message",
+    "load_session",
+    "parse_session_file",
+    "parse_timestamp",
+    "save_session",
+    "truncate",
 ]

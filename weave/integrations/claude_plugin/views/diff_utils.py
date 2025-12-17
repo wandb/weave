@@ -57,7 +57,7 @@ def apply_structured_patch(
             # Lines starting with - are removed, so we skip them
 
         # Replace the old lines with new lines
-        original_lines[old_start:old_start + old_lines_count] = new_lines
+        original_lines[old_start : old_start + old_lines_count] = new_lines
 
     result = "\n".join(original_lines)
     if has_final_newline:
@@ -98,13 +98,15 @@ def extract_edit_data_from_raw_messages(
         structured_patch = tool_use_result.get("structuredPatch")
 
         if file_path and structured_patch:
-            edits.append({
-                "file_path": file_path,
-                "original_file": original_file or "",
-                "structured_patch": structured_patch,
-                "old_string": tool_use_result.get("oldString", ""),
-                "new_string": tool_use_result.get("newString", ""),
-            })
+            edits.append(
+                {
+                    "file_path": file_path,
+                    "original_file": original_file or "",
+                    "structured_patch": structured_patch,
+                    "old_string": tool_use_result.get("oldString", ""),
+                    "new_string": tool_use_result.get("newString", ""),
+                }
+            )
 
     return edits
 
@@ -140,11 +142,13 @@ def extract_write_data_from_raw_messages(
         content = tool_use_result.get("content")
 
         if result_type == "create" and file_path and content is not None:
-            writes.append({
-                "file_path": file_path,
-                "content": content,
-                "is_new_file": True,
-            })
+            writes.append(
+                {
+                    "file_path": file_path,
+                    "content": content,
+                    "is_new_file": True,
+                }
+            )
 
     return writes
 
@@ -173,18 +177,20 @@ def collect_all_file_changes_from_session(
             }
         }
     """
-    from pathlib import Path
-
-    from weave.integrations.claude_plugin.session.session_parser import parse_session_file
-
     # Regex to extract agentId from Task tool results
     import re
-    AGENT_ID_PATTERN = re.compile(r"^agentId:\s*(\w+)", re.MULTILINE)
+    from pathlib import Path
+
+    from weave.integrations.claude_plugin.session.session_parser import (
+        parse_session_file,
+    )
+
+    agent_id_pattern = re.compile(r"^agentId:\s*(\w+)", re.MULTILINE)
 
     def extract_agent_id(tool_result: str | None) -> str | None:
         if not tool_result:
             return None
-        match = AGENT_ID_PATTERN.search(tool_result)
+        match = agent_id_pattern.search(tool_result)
         return match.group(1) if match else None
 
     file_changes: dict[str, dict[str, Any]] = {}
@@ -211,7 +217,11 @@ def collect_all_file_changes_from_session(
             # Apply patch to get after state
             if edit_data["structured_patch"]:
                 # Use current "after" state as base if it exists, otherwise use "before"
-                base = file_changes[file_path]["after"] or file_changes[file_path]["before"] or ""
+                base = (
+                    file_changes[file_path]["after"]
+                    or file_changes[file_path]["before"]
+                    or ""
+                )
                 try:
                     after = apply_structured_patch(base, edit_data["structured_patch"])
                     file_changes[file_path]["after"] = after
@@ -271,7 +281,7 @@ def build_file_diffs_from_file_changes(
     from pathlib import Path
 
     # Extension to highlight.js language mapping
-    EXT_TO_HLJS_LANG = {
+    ext_to_hljs_lang = {
         ".py": "python",
         ".js": "javascript",
         ".ts": "typescript",
@@ -331,25 +341,29 @@ def build_file_diffs_from_file_changes(
 
         if diff_lines:
             added = sum(
-                1 for line in diff_lines
+                1
+                for line in diff_lines
                 if line.startswith("+") and not line.startswith("+++")
             )
             removed = sum(
-                1 for line in diff_lines
+                1
+                for line in diff_lines
                 if line.startswith("-") and not line.startswith("---")
             )
 
             ext = Path(file_path).suffix.lower()
-            lang = EXT_TO_HLJS_LANG.get(ext, "plaintext")
+            lang = ext_to_hljs_lang.get(ext, "plaintext")
 
-            file_diffs.append({
-                "path": file_path,
-                "lang": lang,
-                "is_new": is_new_file,
-                "is_deleted": False,
-                "diff_lines": diff_lines[2:],  # Skip --- and +++ headers
-                "added": added,
-                "removed": removed,
-            })
+            file_diffs.append(
+                {
+                    "path": file_path,
+                    "lang": lang,
+                    "is_new": is_new_file,
+                    "is_deleted": False,
+                    "diff_lines": diff_lines[2:],  # Skip --- and +++ headers
+                    "added": added,
+                    "removed": removed,
+                }
+            )
 
     return file_diffs

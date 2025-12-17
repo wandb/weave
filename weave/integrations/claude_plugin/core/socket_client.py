@@ -9,7 +9,6 @@ from __future__ import annotations
 import json
 import logging
 import os
-import signal
 import socket
 import subprocess
 import sys
@@ -55,27 +54,30 @@ class DaemonClient:
             return False
 
         sock = None
+        connected = False
         try:
             sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
             sock.settimeout(1.0)
             sock.connect(str(self.socket_path))
-            return True
-        except (socket.error, OSError):
-            return False
+            connected = True
+        except OSError:
+            connected = False
         finally:
             if sock:
                 try:
                     sock.close()
                 except Exception:
                     pass
+        return connected
 
     def is_process_alive(self, pid: int) -> bool:
         """Check if a process with given PID is alive."""
         try:
             os.kill(pid, 0)  # Signal 0 just checks existence
-            return True
         except OSError:
             return False
+        else:
+            return True
 
     def cleanup_stale_socket(self) -> None:
         """Remove socket file if daemon is not running."""
@@ -97,6 +99,7 @@ class DaemonClient:
         # Clean up any stale socket
         self.cleanup_stale_socket()
 
+        started = False
         try:
             # Start daemon as detached subprocess
             subprocess.Popen(
@@ -117,14 +120,16 @@ class DaemonClient:
                 time.sleep(0.1)
                 if self.is_daemon_running():
                     logger.debug(f"Daemon started for session {self.session_id}")
-                    return True
+                    started = True
+                    break
 
-            logger.warning(f"Daemon did not start within timeout for {self.session_id}")
-            return False
-
-        except Exception as e:
-            logger.error(f"Failed to start daemon: {e}")
-            return False
+            if not started:
+                logger.warning(
+                    f"Daemon did not start within timeout for {self.session_id}"
+                )
+        except Exception:
+            logger.exception("Failed to start daemon")
+        return started
 
     def send_event(
         self,
@@ -148,6 +153,7 @@ class DaemonClient:
         }
 
         sock = None
+        result: dict[str, Any] | None = {"status": "ok"}
         try:
             sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
             sock.settimeout(self.timeout)
@@ -168,28 +174,28 @@ class DaemonClient:
                         break
 
                 if response_data:
-                    return json.loads(response_data.decode().strip())
-
-            return {"status": "ok"}
-
-        except socket.timeout:
+                    result = json.loads(response_data.decode().strip())
+        except TimeoutError:
             logger.warning(f"Timeout sending {event_name} to daemon")
-            return None
-        except (socket.error, OSError) as e:
+            result = None
+        except OSError as e:
             logger.warning(f"Socket error sending {event_name}: {e}")
-            return None
+            result = None
         except json.JSONDecodeError as e:
             logger.warning(f"Invalid response from daemon: {e}")
-            return None
+            result = None
         finally:
             if sock:
                 try:
                     sock.close()
                 except Exception:
                     pass
+        return result
 
 
-def ensure_daemon_running(session_id: str, daemon_pid: int | None = None) -> DaemonClient:
+def ensure_daemon_running(
+    session_id: str, daemon_pid: int | None = None
+) -> DaemonClient:
     """Ensure daemon is running, starting it if necessary.
 
     Args:

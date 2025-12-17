@@ -30,6 +30,7 @@ def get_hostname() -> str:
     except Exception:
         return "unknown"
 
+
 if TYPE_CHECKING:
     from weave.trace.weave_client import WeaveClient
 
@@ -47,7 +48,7 @@ class SessionProcessor:
 
     def __init__(
         self,
-        client: "WeaveClient",
+        client: WeaveClient,
         project: str,
         source: str = "plugin",
     ) -> None:
@@ -65,7 +66,7 @@ class SessionProcessor:
     @staticmethod
     def _get_mimetype_for_extension(ext: str) -> str:
         """Get MIME type for a file extension."""
-        EXT_TO_MIMETYPE = {
+        ext_to_mimetype = {
             ".py": "text/x-python",
             ".js": "text/javascript",
             ".ts": "text/typescript",
@@ -81,7 +82,7 @@ class SessionProcessor:
             ".toml": "text/toml",
             ".txt": "text/plain",
         }
-        return EXT_TO_MIMETYPE.get(ext, "text/plain")
+        return ext_to_mimetype.get(ext, "text/plain")
 
     def create_session_call(
         self,
@@ -170,7 +171,7 @@ class SessionProcessor:
             Created Call object
         """
         # Build Anthropic-format message content for chat view detection
-        user_content: str | list[dict[str, Any]] = truncate(user_message, 5000)
+        user_content: str | list[dict[str, Any]] = truncate(user_message, 5000) or ""
         if images:
             # Include images in Anthropic format alongside text
             content_parts: list[dict[str, Any]] = [
@@ -270,7 +271,7 @@ class SessionProcessor:
         session_file = sessions_dir / f"{session.session_id}.jsonl"
         if session_file.exists():
             try:
-                content = Content.from_path(
+                file_content: Content = Content.from_path(
                     session_file,
                     metadata={
                         "session_id": session.session_id,
@@ -278,7 +279,7 @@ class SessionProcessor:
                         "relative_path": "session.jsonl",
                     },
                 )
-                snapshots.append(content)
+                snapshots.append(file_content)
             except Exception:
                 pass
 
@@ -314,7 +315,7 @@ class SessionProcessor:
                     ext = abs_path.suffix.lower()
                     mimetype = self._get_mimetype_for_extension(ext)
 
-                    content = Content.from_bytes(
+                    edit_content: Content = Content.from_bytes(
                         after_content.encode("utf-8"),
                         mimetype=mimetype,
                         extension=ext or ".txt",
@@ -324,7 +325,7 @@ class SessionProcessor:
                             "source": "edit_data",
                         },
                     )
-                    snapshots.append(content)
+                    snapshots.append(edit_content)
                 except Exception:
                     pass
         else:
@@ -343,14 +344,14 @@ class SessionProcessor:
                             except ValueError:
                                 rel_path = Path(abs_path.name)
 
-                            content = Content.from_path(
+                            snap_content: Content = Content.from_path(
                                 abs_path,
                                 metadata={
                                     "original_path": str(file_path),
                                     "relative_path": str(rel_path),
                                 },
                             )
-                            snapshots.append(content)
+                            snapshots.append(snap_content)
                     except Exception:
                         pass
 
@@ -385,7 +386,7 @@ class SessionProcessor:
         session_file = sessions_dir / f"{session.session_id}.jsonl"
         if session_file.exists():
             try:
-                content = Content.from_path(
+                session_content: Content = Content.from_path(
                     session_file,
                     metadata={
                         "session_id": session.session_id,
@@ -395,9 +396,11 @@ class SessionProcessor:
                 )
                 # Scan for secrets if scanner provided
                 if secret_scanner:
-                    content, count = secret_scanner.scan_content(content)
+                    session_content, count = secret_scanner.scan_content(
+                        session_content
+                    )
                     redacted_count += count
-                snapshots.append(content)
+                snapshots.append(session_content)
                 logger.debug(f"Attached session file: {session_file.name}")
             except Exception as e:
                 logger.debug(f"Failed to attach session file: {e}")
@@ -417,7 +420,7 @@ class SessionProcessor:
                         except ValueError:
                             rel_path = Path(abs_path.name)
 
-                        content = Content.from_path(
+                        file_snap: Content = Content.from_path(
                             abs_path,
                             metadata={
                                 "original_path": str(file_path),
@@ -426,9 +429,9 @@ class SessionProcessor:
                         )
                         # Scan for secrets if scanner provided
                         if secret_scanner:
-                            content, count = secret_scanner.scan_content(content)
+                            file_snap, count = secret_scanner.scan_content(file_snap)
                             redacted_count += count
-                        snapshots.append(content)
+                        snapshots.append(file_snap)
                         logger.debug(f"Attached file snapshot: {rel_path}")
                 except Exception as e:
                     logger.debug(f"Failed to attach file {file_path}: {e}")
@@ -636,7 +639,9 @@ class SessionProcessor:
         model = turn.primary_model()
 
         # Build output using shared helper
-        output, assistant_text, _ = self.build_turn_output(turn, interrupted=interrupted)
+        output, assistant_text, _ = self.build_turn_output(
+            turn, interrupted=interrupted
+        )
 
         # Collect file snapshots
         file_snapshots = self._collect_turn_file_snapshots(turn, session.session_id)
@@ -686,8 +691,8 @@ class SessionProcessor:
     ) -> None:
         """Generate and attach turn-level diff HTML view."""
         from weave.integrations.claude_plugin.views.diff_view import (
-            generate_turn_diff_html,
             generate_diff_html_from_edit_data_for_turn,
+            generate_turn_diff_html,
         )
 
         # Try file-history-based diff first

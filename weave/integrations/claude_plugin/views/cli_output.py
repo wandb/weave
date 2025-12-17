@@ -10,10 +10,11 @@ from __future__ import annotations
 import logging
 import os
 from collections import defaultdict
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Iterator
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from rich.console import Console
@@ -26,7 +27,14 @@ try:
     from rich.console import Console
     from rich.markdown import Markdown
     from rich.panel import Panel
-    from rich.progress import BarColumn, Progress, SpinnerColumn, TaskID, TextColumn, TimeElapsedColumn
+    from rich.progress import (
+        BarColumn,
+        Progress,
+        SpinnerColumn,
+        TaskID,
+        TextColumn,
+        TimeElapsedColumn,
+    )
     from rich.table import Table
     from rich.text import Text
 
@@ -94,7 +102,10 @@ class TurnStats:
             color_counts[color] += count
 
         # Sort by count descending for consistent ordering
-        return [(color, count / total) for color, count in sorted(color_counts.items(), key=lambda x: -x[1])]
+        return [
+            (color, count / total)
+            for color, count in sorted(color_counts.items(), key=lambda x: -x[1])
+        ]
 
 
 @dataclass
@@ -225,7 +236,7 @@ def format_duration(duration_ms: int) -> str:
     return f"{hours}h"
 
 
-def extract_session_details(session: "Session") -> SessionDetails:
+def extract_session_details(session: Session) -> SessionDetails:
     """Extract visualization details from a parsed session.
 
     Args:
@@ -333,9 +344,9 @@ class RichOutput:
 
     def __init__(self, verbose: bool = False) -> None:
         self.verbose = verbose
-        self.console: "Console" = Console()
-        self._progress: "Progress | None" = None
-        self._task_id: "TaskID | None" = None
+        self.console: Console = Console()
+        self._progress: Progress | None = None
+        self._task_id: TaskID | None = None
 
     def print_starting(self, session_count: int, project: str, dry_run: bool) -> None:
         """Print import starting message."""
@@ -343,10 +354,12 @@ class RichOutput:
         if session_count == 1:
             self.console.print(f"{mode}Importing 1 session to [cyan]{project}[/cyan]")
         else:
-            self.console.print(f"{mode}Importing {session_count} sessions to [cyan]{project}[/cyan]")
+            self.console.print(
+                f"{mode}Importing {session_count} sessions to [cyan]{project}[/cyan]"
+            )
 
     @contextmanager
-    def progress_context(self, total: int) -> Iterator["Progress"]:
+    def progress_context(self, total: int) -> Iterator[Progress]:
         """Create a progress bar context."""
         with Progress(
             SpinnerColumn(),
@@ -360,7 +373,9 @@ class RichOutput:
             yield progress
 
     @contextmanager
-    def line_progress_context(self, total_lines: int, session_name: str) -> Iterator[Callable[[int, int, str], None]]:
+    def line_progress_context(
+        self, total_lines: int, session_name: str
+    ) -> Iterator[Callable[[int, int, str], None]]:
         """Create a line-based progress bar context for single session import.
 
         Args:
@@ -378,9 +393,13 @@ class RichOutput:
             console=self.console,
             transient=True,
         ) as progress:
-            task = progress.add_task(f"Importing {session_name[:30]}...", total=total_lines)
+            task = progress.add_task(
+                f"Importing {session_name[:30]}...", total=total_lines
+            )
 
-            def update_progress(current_line: int, turn_number: int, tool_name: str) -> None:
+            def update_progress(
+                current_line: int, turn_number: int, tool_name: str
+            ) -> None:
                 desc = f"Turn {turn_number}"
                 if tool_name:
                     desc += f": {tool_name}"
@@ -412,7 +431,9 @@ class RichOutput:
 
             yield update_status
 
-    def _render_colored_bar(self, width: int, color_distribution: list[tuple[str, float]]) -> Text:
+    def _render_colored_bar(
+        self, width: int, color_distribution: list[tuple[str, float]]
+    ) -> Text:
         """Render a bar with colored segments based on tool distribution."""
         text = Text()
         remaining_width = width
@@ -439,7 +460,9 @@ class RichOutput:
         for stats in details.turn_stats:
             # Calculate bar width proportional to duration
             if details.max_duration_ms > 0:
-                bar_width = max(1, int(self.BAR_WIDTH * stats.duration_ms / details.max_duration_ms))
+                bar_width = max(
+                    1, int(self.BAR_WIDTH * stats.duration_ms / details.max_duration_ms)
+                )
             else:
                 bar_width = 1
 
@@ -464,7 +487,9 @@ class RichOutput:
 
         content = Group(*lines)
         self.console.print()
-        self.console.print(Panel(content, title="Session Timeline", border_style="cyan"))
+        self.console.print(
+            Panel(content, title="Session Timeline", border_style="cyan")
+        )
 
         # Print legend
         legend = Text()
@@ -481,7 +506,9 @@ class RichOutput:
             if len(prompt_text) > 200:
                 prompt_text = prompt_text[:200] + "..."
             self.console.print()
-            self.console.print(Panel(prompt_text, title="Latest Prompt", border_style="blue"))
+            self.console.print(
+                Panel(prompt_text, title="Latest Prompt", border_style="blue")
+            )
 
         # Latest Response (render as markdown)
         if details.latest_response:
@@ -491,11 +518,15 @@ class RichOutput:
             try:
                 md = Markdown(response_text)
                 self.console.print()
-                self.console.print(Panel(md, title="Latest Response", border_style="green"))
+                self.console.print(
+                    Panel(md, title="Latest Response", border_style="green")
+                )
             except Exception:
                 # Fallback to plain text if markdown fails
                 self.console.print()
-                self.console.print(Panel(response_text, title="Latest Response", border_style="green"))
+                self.console.print(
+                    Panel(response_text, title="Latest Response", border_style="green")
+                )
 
         # Todos
         if details.todos:
@@ -508,11 +539,17 @@ class RichOutput:
                 else:
                     icon = "[dim]○[/dim]"
                 # Truncate long todo content
-                content = todo.content[:60] + "..." if len(todo.content) > 60 else todo.content
+                content = (
+                    todo.content[:60] + "..."
+                    if len(todo.content) > 60
+                    else todo.content
+                )
                 todo_lines.append(f"{icon} {content}")
 
             self.console.print()
-            self.console.print(Panel("\n".join(todo_lines), title="Todos", border_style="magenta"))
+            self.console.print(
+                Panel("\n".join(todo_lines), title="Todos", border_style="magenta")
+            )
 
     def print_file_changes(self, details: SessionDetails) -> None:
         """Print file change summary if there are changes."""
@@ -545,7 +582,9 @@ class RichOutput:
 
         self.console.print()
         summary_text = "  ".join(parts) + breakdown
-        self.console.print(Panel(summary_text, title="File Changes", border_style="yellow"))
+        self.console.print(
+            Panel(summary_text, title="File Changes", border_style="yellow")
+        )
 
     def print_session_details(self, details: SessionDetails) -> None:
         """Print full session details (timeline + latest content)."""
@@ -564,7 +603,11 @@ class RichOutput:
         table.add_column("Metric", style="dim")
         table.add_column("Value", style="bold")
 
-        prefix = "[yellow]Would import[/yellow]" if summary.dry_run else "[green]Imported[/green]"
+        prefix = (
+            "[yellow]Would import[/yellow]"
+            if summary.dry_run
+            else "[green]Imported[/green]"
+        )
         table.add_row("Sessions", f"{prefix} {summary.sessions_imported}")
 
         if summary.sessions_failed > 0:
@@ -584,7 +627,13 @@ class RichOutput:
         # Print table in a panel
         title = "Dry Run Summary" if summary.dry_run else "Import Summary"
         self.console.print()
-        self.console.print(Panel(table, title=title, border_style="green" if not summary.dry_run else "yellow"))
+        self.console.print(
+            Panel(
+                table,
+                title=title,
+                border_style="green" if not summary.dry_run else "yellow",
+            )
+        )
 
         # Print traces URL if available
         if summary.traces_url and not summary.dry_run:
@@ -593,9 +642,13 @@ class RichOutput:
             if len(summary.results) == 1 and summary.results[0].call_id:
                 call_id = summary.results[0].call_id
                 trace_url = f"{summary.traces_url}?peekPath=%2F%3Aid%2F{call_id}"
-                self.console.print(f"[bold]View trace:[/bold] [link={trace_url}]{trace_url}[/link]")
+                self.console.print(
+                    f"[bold]View trace:[/bold] [link={trace_url}]{trace_url}[/link]"
+                )
             else:
-                self.console.print(f"[bold]View traces:[/bold] [link={summary.traces_url}]{summary.traces_url}[/link]")
+                self.console.print(
+                    f"[bold]View traces:[/bold] [link={summary.traces_url}]{summary.traces_url}[/link]"
+                )
 
     def print_error(self, message: str) -> None:
         """Print an error message."""
@@ -607,14 +660,20 @@ class RichOutput:
             return
 
         if result.success:
-            prefix = "[yellow]Would import[/yellow]" if dry_run else "[green]Imported[/green]"
+            prefix = (
+                "[yellow]Would import[/yellow]"
+                if dry_run
+                else "[green]Imported[/green]"
+            )
             self.console.print(
                 f"  {prefix} [dim]{result.session_name}[/dim]: "
                 f"{result.turns} turns, {result.tool_calls} tool calls, "
                 f"{format_tokens(result.tokens)} tokens"
             )
         else:
-            self.console.print(f"  [red]Failed[/red] [dim]{result.session_name}[/dim]: {result.error}")
+            self.console.print(
+                f"  [red]Failed[/red] [dim]{result.session_name}[/dim]: {result.error}"
+            )
 
 
 class BasicOutput:

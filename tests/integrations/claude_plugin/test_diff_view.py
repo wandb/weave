@@ -1,7 +1,5 @@
 """Tests for diff_view fallback functions."""
 
-import pytest
-
 
 class TestBuildFileDiffsFromEditData:
     """Test _build_file_diffs_from_edit_data function."""
@@ -84,10 +82,11 @@ class TestGenerateDiffHtmlFromEditDataForTurn:
 
     def test_returns_none_when_no_raw_messages(self):
         """Verify None is returned when turn has no raw_messages."""
+        from unittest.mock import MagicMock
+
         from weave.integrations.claude_plugin.views.diff_view import (
             generate_diff_html_from_edit_data_for_turn,
         )
-        from unittest.mock import MagicMock
 
         mock_turn = MagicMock()
         mock_turn.raw_messages = None
@@ -101,11 +100,11 @@ class TestGenerateDiffHtmlFromEditDataForTurn:
 
     def test_uses_diff_html_styles(self):
         """Verify output uses DIFF_HTML_STYLES (not ugly inline styles)."""
+        from unittest.mock import MagicMock
+
         from weave.integrations.claude_plugin.views.diff_view import (
             generate_diff_html_from_edit_data_for_turn,
-            DIFF_HTML_STYLES,
         )
-        from unittest.mock import MagicMock
 
         mock_turn = MagicMock()
         mock_turn.raw_messages = [
@@ -149,12 +148,14 @@ class TestGenerateSessionDiffHtmlWithEditDataFallback:
 
     def test_returns_html_when_subagent_has_edit_data_but_no_backups(self):
         """Verify session diff is generated from subagent Edit data when no backups exist."""
+        import json
         from pathlib import Path
         from tempfile import TemporaryDirectory
         from unittest.mock import MagicMock
-        import json
 
-        from weave.integrations.claude_plugin.views.diff_view import generate_session_diff_html
+        from weave.integrations.claude_plugin.views.diff_view import (
+            generate_session_diff_html,
+        )
 
         with TemporaryDirectory() as tmpdir:
             sessions_dir = Path(tmpdir)
@@ -228,7 +229,9 @@ class TestGenerateSessionDiffHtmlWithEditDataFallback:
         from tempfile import TemporaryDirectory
         from unittest.mock import MagicMock
 
-        from weave.integrations.claude_plugin.views.diff_view import generate_session_diff_html
+        from weave.integrations.claude_plugin.views.diff_view import (
+            generate_session_diff_html,
+        )
 
         with TemporaryDirectory() as tmpdir:
             sessions_dir = Path(tmpdir)
@@ -253,12 +256,14 @@ class TestGenerateSessionDiffHtmlWithEditDataFallback:
 
     def test_aggregates_edit_data_from_multiple_subagents(self):
         """Verify Edit data is collected from all subagent sessions."""
+        import json
         from pathlib import Path
         from tempfile import TemporaryDirectory
         from unittest.mock import MagicMock
-        import json
 
-        from weave.integrations.claude_plugin.views.diff_view import generate_session_diff_html
+        from weave.integrations.claude_plugin.views.diff_view import (
+            generate_session_diff_html,
+        )
 
         with TemporaryDirectory() as tmpdir:
             sessions_dir = Path(tmpdir)

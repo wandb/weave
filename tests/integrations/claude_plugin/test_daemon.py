@@ -1,8 +1,6 @@
 """Tests for Claude plugin daemon."""
 
-import asyncio
 import json
-import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -30,7 +28,6 @@ class TestWeaveDaemon:
     def test_state_manager_with_new_fields(self):
         """Test state manager handles new daemon fields."""
         from weave.integrations.claude_plugin.core.state import (
-            StateManager,
             create_session_data,
         )
 
@@ -134,8 +131,8 @@ class TestWeaveDaemonTrackerDicts:
 
         daemon = WeaveDaemon("test-session-123")
 
-        assert hasattr(daemon, '_subagent_trackers')
-        assert hasattr(daemon, '_subagent_by_agent_id')
+        assert hasattr(daemon, "_subagent_trackers")
+        assert hasattr(daemon, "_subagent_by_agent_id")
         assert isinstance(daemon._subagent_trackers, dict)
         assert isinstance(daemon._subagent_by_agent_id, dict)
 
@@ -146,7 +143,10 @@ class TestTaskToolWithSubagentType:
     @pytest.mark.anyio
     async def test_task_tool_with_subagent_type_creates_tracker(self):
         """Task tool with subagent_type creates SubagentTracker."""
-        from weave.integrations.claude_plugin.core.daemon import WeaveDaemon, SubagentTracker
+        from weave.integrations.claude_plugin.core.daemon import (
+            SubagentTracker,
+            WeaveDaemon,
+        )
 
         daemon = WeaveDaemon("test-session-123")
         daemon.weave_client = MagicMock()
@@ -166,10 +166,10 @@ class TestTaskToolWithSubagentType:
                         "input": {
                             "prompt": "Search the codebase",
                             "subagent_type": "Explore",
-                        }
+                        },
                     }
                 ]
-            }
+            },
         }
 
         await daemon._handle_assistant_message(obj, line_num=10)
@@ -194,7 +194,9 @@ class TestSessionsDirectoryHelper:
         from weave.integrations.claude_plugin.core.daemon import WeaveDaemon
 
         daemon = WeaveDaemon("test-session-123")
-        daemon.transcript_path = Path("/Users/test/.claude/projects/abc123/session-xyz.jsonl")
+        daemon.transcript_path = Path(
+            "/Users/test/.claude/projects/abc123/session-xyz.jsonl"
+        )
 
         sessions_dir = daemon._get_sessions_directory()
 
@@ -218,10 +220,13 @@ class TestScanForSubagentFiles:
     @pytest.mark.anyio
     async def test_scan_for_subagent_files_finds_matching_file(self, tmp_path):
         """_scan_for_subagent_files finds and matches subagent files by sessionId."""
-        from datetime import datetime, timezone
         import time
+        from datetime import datetime, timezone
 
-        from weave.integrations.claude_plugin.core.daemon import WeaveDaemon, SubagentTracker
+        from weave.integrations.claude_plugin.core.daemon import (
+            SubagentTracker,
+            WeaveDaemon,
+        )
 
         daemon = WeaveDaemon("parent-session-uuid")
         daemon.session_id = "parent-session-uuid"
@@ -242,18 +247,25 @@ class TestScanForSubagentFiles:
 
         # Create a subagent file with matching sessionId
         agent_file = tmp_path / "agent-abc123.jsonl"
-        agent_file.write_text(json.dumps({
-            "type": "assistant",
-            "sessionId": "parent-session-uuid",
-            "agentId": "abc123",
-            "isSidechain": True,
-            "message": {"content": [{"type": "text", "text": "Hello"}]}
-        }) + "\n")
+        agent_file.write_text(
+            json.dumps(
+                {
+                    "type": "assistant",
+                    "sessionId": "parent-session-uuid",
+                    "agentId": "abc123",
+                    "isSidechain": True,
+                    "message": {"content": [{"type": "text", "text": "Hello"}]},
+                }
+            )
+            + "\n"
+        )
 
         # Mock _start_tailing_subagent to track if it gets called
         start_tailing_called = []
+
         async def mock_start_tailing(session, path):
             start_tailing_called.append((session.agent_id, path))
+
         daemon._start_tailing_subagent = mock_start_tailing
 
         await daemon._scan_for_subagent_files()
@@ -266,7 +278,10 @@ class TestScanForSubagentFiles:
         """_scan_for_subagent_files ignores files from other sessions."""
         from datetime import datetime, timezone
 
-        from weave.integrations.claude_plugin.core.daemon import WeaveDaemon, SubagentTracker
+        from weave.integrations.claude_plugin.core.daemon import (
+            SubagentTracker,
+            WeaveDaemon,
+        )
 
         daemon = WeaveDaemon("parent-session-uuid")
         daemon.session_id = "parent-session-uuid"
@@ -284,17 +299,24 @@ class TestScanForSubagentFiles:
 
         # Create a subagent file with DIFFERENT sessionId
         agent_file = tmp_path / "agent-other.jsonl"
-        agent_file.write_text(json.dumps({
-            "type": "assistant",
-            "sessionId": "different-session-uuid",
-            "agentId": "other",
-            "isSidechain": True,
-            "message": {"content": [{"type": "text", "text": "Hello"}]}
-        }) + "\n")
+        agent_file.write_text(
+            json.dumps(
+                {
+                    "type": "assistant",
+                    "sessionId": "different-session-uuid",
+                    "agentId": "other",
+                    "isSidechain": True,
+                    "message": {"content": [{"type": "text", "text": "Hello"}]},
+                }
+            )
+            + "\n"
+        )
 
         start_tailing_called = []
+
         async def mock_start_tailing(session, path):
             start_tailing_called.append((session.agent_id, path))
+
         daemon._start_tailing_subagent = mock_start_tailing
 
         await daemon._scan_for_subagent_files()
@@ -312,7 +334,10 @@ class TestStartTailingSubagent:
         from datetime import datetime, timezone
         from unittest.mock import AsyncMock
 
-        from weave.integrations.claude_plugin.core.daemon import WeaveDaemon, SubagentTracker
+        from weave.integrations.claude_plugin.core.daemon import (
+            SubagentTracker,
+            WeaveDaemon,
+        )
         from weave.integrations.claude_plugin.session.session_parser import Session
 
         daemon = WeaveDaemon("parent-session-uuid")
@@ -377,7 +402,10 @@ class TestProcessSubagentUpdates:
         from datetime import datetime, timezone
         from unittest.mock import patch
 
-        from weave.integrations.claude_plugin.core.daemon import WeaveDaemon, SubagentTracker
+        from weave.integrations.claude_plugin.core.daemon import (
+            SubagentTracker,
+            WeaveDaemon,
+        )
 
         daemon = WeaveDaemon("parent-session-uuid")
         daemon.session_id = "parent-session-uuid"
@@ -398,39 +426,48 @@ class TestProcessSubagentUpdates:
 
         # Create an agent file with tool calls
         agent_file = tmp_path / "agent-abc123.jsonl"
-        agent_file.write_text(json.dumps({
-            "type": "assistant",
-            "sessionId": "parent-session-uuid",
-            "agentId": "abc123",
-            "isSidechain": True,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "message": {
-                "id": "msg-1",
-                "model": "claude-opus-4",
-                "role": "assistant",
-                "content": [
-                    {
-                        "type": "tool_use",
-                        "id": "tool-call-1",
-                        "name": "Read",
-                        "input": {"file_path": "/tmp/test.py"}
-                    }
-                ]
-            }
-        }) + "\n" + json.dumps({
-            "type": "user",
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "message": {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "tool_result",
-                        "tool_use_id": "tool-call-1",
-                        "content": "file contents"
-                    }
-                ]
-            }
-        }) + "\n")
+        agent_file.write_text(
+            json.dumps(
+                {
+                    "type": "assistant",
+                    "sessionId": "parent-session-uuid",
+                    "agentId": "abc123",
+                    "isSidechain": True,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "message": {
+                        "id": "msg-1",
+                        "model": "claude-opus-4",
+                        "role": "assistant",
+                        "content": [
+                            {
+                                "type": "tool_use",
+                                "id": "tool-call-1",
+                                "name": "Read",
+                                "input": {"file_path": "/tmp/test.py"},
+                            }
+                        ],
+                    },
+                }
+            )
+            + "\n"
+            + json.dumps(
+                {
+                    "type": "user",
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "message": {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "tool_result",
+                                "tool_use_id": "tool-call-1",
+                                "content": "file contents",
+                            }
+                        ],
+                    },
+                }
+            )
+            + "\n"
+        )
 
         tracker.transcript_path = agent_file
         daemon._subagent_trackers["tool-123"] = tracker
@@ -447,7 +484,10 @@ class TestProcessSubagentUpdates:
                 logged_tool_ids.append(kwargs.get("op", "unknown"))
 
         # Call _process_subagent_updates TWICE
-        with patch("weave.integrations.claude_plugin.core.daemon.weave.log_call", side_effect=mock_log_call):
+        with patch(
+            "weave.integrations.claude_plugin.core.daemon.weave.log_call",
+            side_effect=mock_log_call,
+        ):
             await daemon._process_subagent_updates(tracker)
             first_call_count = log_call_count
 
@@ -456,8 +496,12 @@ class TestProcessSubagentUpdates:
             second_call_count = log_call_count
 
         # Verify tool calls are only logged ONCE (not duplicated)
-        assert first_call_count == 1, f"Expected 1 tool call logged on first processing, got {first_call_count}"
-        assert second_call_count == 1, f"Expected still 1 tool call total after second processing, got {second_call_count}"
+        assert first_call_count == 1, (
+            f"Expected 1 tool call logged on first processing, got {first_call_count}"
+        )
+        assert second_call_count == 1, (
+            f"Expected still 1 tool call total after second processing, got {second_call_count}"
+        )
 
         # Verify the tracker tracked the tool ID
         assert "tool-call-1" in tracker.logged_tool_ids
@@ -507,7 +551,10 @@ class TestSubagentStopFastPath:
         from datetime import datetime, timezone
         from unittest.mock import AsyncMock
 
-        from weave.integrations.claude_plugin.core.daemon import WeaveDaemon, SubagentTracker
+        from weave.integrations.claude_plugin.core.daemon import (
+            SubagentTracker,
+            WeaveDaemon,
+        )
 
         daemon = WeaveDaemon("parent-session-uuid")
         daemon.weave_client = MagicMock()
@@ -517,19 +564,24 @@ class TestSubagentStopFastPath:
 
         # Create agent file
         agent_file = tmp_path / "agent-abc123.jsonl"
-        agent_file.write_text(json.dumps({
-            "type": "assistant",
-            "sessionId": "parent-session-uuid",
-            "agentId": "abc123",
-            "isSidechain": True,
-            "uuid": "msg-1",
-            "timestamp": "2025-01-01T10:00:00Z",
-            "message": {
-                "role": "assistant",
-                "content": [{"type": "text", "text": "Done!"}],
-                "usage": {"input_tokens": 100, "output_tokens": 50}
-            }
-        }) + "\n")
+        agent_file.write_text(
+            json.dumps(
+                {
+                    "type": "assistant",
+                    "sessionId": "parent-session-uuid",
+                    "agentId": "abc123",
+                    "isSidechain": True,
+                    "uuid": "msg-1",
+                    "timestamp": "2025-01-01T10:00:00Z",
+                    "message": {
+                        "role": "assistant",
+                        "content": [{"type": "text", "text": "Done!"}],
+                        "usage": {"input_tokens": 100, "output_tokens": 50},
+                    },
+                }
+            )
+            + "\n"
+        )
 
         # Create tracker in tailing state
         tracker = SubagentTracker(
@@ -575,7 +627,10 @@ class TestSubagentFileBackups:
         from datetime import datetime, timezone
         from unittest.mock import AsyncMock
 
-        from weave.integrations.claude_plugin.core.daemon import WeaveDaemon, SubagentTracker
+        from weave.integrations.claude_plugin.core.daemon import (
+            SubagentTracker,
+            WeaveDaemon,
+        )
 
         daemon = WeaveDaemon("parent-session-uuid")
         daemon.session_id = "parent-session-uuid"
@@ -596,44 +651,58 @@ class TestSubagentFileBackups:
         # Create agent file with file-history-snapshot
         agent_file = tmp_path / "agent-abc123.jsonl"
         agent_file.write_text(
-            json.dumps({
-                "type": "user",
-                "sessionId": "parent-session-uuid",
-                "agentId": "abc123",
-                "isSidechain": True,
-                "uuid": "user-msg-1",
-                "timestamp": "2025-01-01T10:00:00Z",
-                "message": {"role": "user", "content": "Edit the file"}
-            }) + "\n" +
-            json.dumps({
-                "type": "assistant",
-                "sessionId": "parent-session-uuid",
-                "agentId": "abc123",
-                "isSidechain": True,
-                "uuid": "msg-1",
-                "timestamp": "2025-01-01T10:00:01Z",
-                "message": {
-                    "role": "assistant",
-                    "model": "claude-sonnet-4-20250514",
-                    "content": [
-                        {"type": "tool_use", "id": "tool-1", "name": "Edit", "input": {"file_path": "/tmp/test.py"}}
-                    ],
-                    "usage": {"input_tokens": 100, "output_tokens": 50}
+            json.dumps(
+                {
+                    "type": "user",
+                    "sessionId": "parent-session-uuid",
+                    "agentId": "abc123",
+                    "isSidechain": True,
+                    "uuid": "user-msg-1",
+                    "timestamp": "2025-01-01T10:00:00Z",
+                    "message": {"role": "user", "content": "Edit the file"},
                 }
-            }) + "\n" +
-            json.dumps({
-                "type": "file-history-snapshot",
-                "snapshot": {
-                    "messageId": "msg-1",
-                    "trackedFileBackups": {
-                        "/tmp/test.py": {
-                            "backupFileName": "abc123hash@v1",
-                            "version": 1,
-                            "backupTime": "2025-01-01T10:00:01Z"
-                        }
-                    }
+            )
+            + "\n"
+            + json.dumps(
+                {
+                    "type": "assistant",
+                    "sessionId": "parent-session-uuid",
+                    "agentId": "abc123",
+                    "isSidechain": True,
+                    "uuid": "msg-1",
+                    "timestamp": "2025-01-01T10:00:01Z",
+                    "message": {
+                        "role": "assistant",
+                        "model": "claude-sonnet-4-20250514",
+                        "content": [
+                            {
+                                "type": "tool_use",
+                                "id": "tool-1",
+                                "name": "Edit",
+                                "input": {"file_path": "/tmp/test.py"},
+                            }
+                        ],
+                        "usage": {"input_tokens": 100, "output_tokens": 50},
+                    },
                 }
-            }) + "\n"
+            )
+            + "\n"
+            + json.dumps(
+                {
+                    "type": "file-history-snapshot",
+                    "snapshot": {
+                        "messageId": "msg-1",
+                        "trackedFileBackups": {
+                            "/tmp/test.py": {
+                                "backupFileName": "abc123hash@v1",
+                                "version": 1,
+                                "backupTime": "2025-01-01T10:00:01Z",
+                            }
+                        },
+                    },
+                }
+            )
+            + "\n"
         )
 
         # Create tracker in tailing state
@@ -661,10 +730,13 @@ class TestSubagentFileBackups:
 
         # Patch FileBackup.load_content to use our tmp_path
         from weave.integrations.claude_plugin.session.session_parser import FileBackup
+
         original_load_content = FileBackup.load_content
 
         def patched_load_content(self, session_id, claude_dir=None):
-            return original_load_content(self, session_id, claude_dir=tmp_path / ".claude")
+            return original_load_content(
+                self, session_id, claude_dir=tmp_path / ".claude"
+            )
 
         with patch.object(FileBackup, "load_content", patched_load_content):
             result = await daemon._handle_subagent_stop(payload)
@@ -678,12 +750,22 @@ class TestSubagentFileBackups:
         output = call_args.kwargs.get("output") or call_args[1].get("output", {})
 
         # Should have file_snapshots as a list
-        assert "file_snapshots" in output, f"Expected file_snapshots in output, got: {output.keys()}"
+        assert "file_snapshots" in output, (
+            f"Expected file_snapshots in output, got: {output.keys()}"
+        )
         file_snapshots = output["file_snapshots"]
-        assert isinstance(file_snapshots, list), f"Expected list, got {type(file_snapshots)}"
+        assert isinstance(file_snapshots, list), (
+            f"Expected list, got {type(file_snapshots)}"
+        )
         # Check that at least one Content object has the expected original_path
-        original_paths = [c.metadata.get("original_path") for c in file_snapshots if hasattr(c, "metadata")]
-        assert "/tmp/test.py" in original_paths, f"Expected /tmp/test.py in {original_paths}"
+        original_paths = [
+            c.metadata.get("original_path")
+            for c in file_snapshots
+            if hasattr(c, "metadata")
+        ]
+        assert "/tmp/test.py" in original_paths, (
+            f"Expected /tmp/test.py in {original_paths}"
+        )
 
 
 class TestParentTurnAggregatesSubagentFileBackups:
@@ -706,31 +788,43 @@ class TestParentTurnAggregatesSubagentFileBackups:
         # Create a parent session file (no file edits directly in parent)
         session_file = tmp_path / "session.jsonl"
         session_file.write_text(
-            json.dumps({
-                "type": "user",
-                "uuid": "msg-1",
-                "timestamp": "2025-01-01T10:00:00Z",
-                "sessionId": "test-session-123",
-                "message": {"role": "user", "content": "Edit some files"},
-            }) + "\n" +
-            json.dumps({
-                "type": "assistant",
-                "uuid": "msg-2",
-                "timestamp": "2025-01-01T10:00:01Z",
-                "message": {
-                    "role": "assistant",
-                    "model": "claude-sonnet-4-20250514",
-                    "content": [
-                        {"type": "tool_use", "id": "task-1", "name": "Task", "input": {"prompt": "Edit the file"}}
-                    ],
-                    "usage": {"input_tokens": 50, "output_tokens": 10},
-                },
-            }) + "\n"
+            json.dumps(
+                {
+                    "type": "user",
+                    "uuid": "msg-1",
+                    "timestamp": "2025-01-01T10:00:00Z",
+                    "sessionId": "test-session-123",
+                    "message": {"role": "user", "content": "Edit some files"},
+                }
+            )
+            + "\n"
+            + json.dumps(
+                {
+                    "type": "assistant",
+                    "uuid": "msg-2",
+                    "timestamp": "2025-01-01T10:00:01Z",
+                    "message": {
+                        "role": "assistant",
+                        "model": "claude-sonnet-4-20250514",
+                        "content": [
+                            {
+                                "type": "tool_use",
+                                "id": "task-1",
+                                "name": "Task",
+                                "input": {"prompt": "Edit the file"},
+                            }
+                        ],
+                        "usage": {"input_tokens": 50, "output_tokens": 10},
+                    },
+                }
+            )
+            + "\n"
         )
         daemon.transcript_path = session_file
 
         # Simulate that a subagent finished and stored file snapshots for this turn
         from weave.type_wrappers.Content.content import Content
+
         mock_content = MagicMock(spec=Content)
         daemon._subagent_file_snapshots = {
             "turn-call-789": {
@@ -747,7 +841,9 @@ class TestParentTurnAggregatesSubagentFileBackups:
         call_args = daemon.weave_client.finish_call.call_args
         output = call_args.kwargs.get("output") or call_args[1].get("output", {})
 
-        assert "file_snapshots" in output, f"Expected file_snapshots in output, got: {output.keys()}"
+        assert "file_snapshots" in output, (
+            f"Expected file_snapshots in output, got: {output.keys()}"
+        )
         assert "/tmp/edited_by_subagent.py" in output["file_snapshots"]
 
         # Verify the subagent file snapshots were cleaned up
@@ -760,12 +856,11 @@ class TestCleanupStaleSubagentTrackers:
     @pytest.mark.anyio
     async def test_cleanup_stale_subagent_trackers(self):
         """Stale subagent trackers are cleaned up after timeout."""
-        from datetime import datetime, timezone, timedelta
+        from datetime import datetime, timedelta, timezone
 
         from weave.integrations.claude_plugin.core.daemon import (
-            WeaveDaemon,
             SubagentTracker,
-            SUBAGENT_DETECTION_TIMEOUT,
+            WeaveDaemon,
         )
 
         daemon = WeaveDaemon("test-session")
@@ -815,49 +910,66 @@ class TestThinkingTraceCreation:
         # Create a session file with thinking content in assistant message
         session_file = tmp_path / "session.jsonl"
         session_file.write_text(
-            json.dumps({
-                "type": "user",
-                "uuid": "msg-1",
-                "timestamp": "2025-01-01T10:00:00Z",
-                "sessionId": "test-session-123",
-                "message": {
-                    "role": "user",
-                    "content": "What is 2 + 2?",
-                },
-            }) + "\n" +
-            json.dumps({
-                "type": "assistant",
-                "uuid": "msg-2",
-                "timestamp": "2025-01-01T10:00:01Z",
-                "message": {
-                    "role": "assistant",
-                    "model": "claude-opus-4-5-20251101",
-                    "content": [
-                        {
-                            "type": "thinking",
-                            "thinking": "Let me calculate: 2 + 2 = 4. This is basic arithmetic.",
-                            "signature": "abc123",
-                        },
-                        {"type": "text", "text": "2 + 2 = 4"},
-                    ],
-                    "usage": {"input_tokens": 100, "output_tokens": 10},
-                },
-            }) + "\n"
+            json.dumps(
+                {
+                    "type": "user",
+                    "uuid": "msg-1",
+                    "timestamp": "2025-01-01T10:00:00Z",
+                    "sessionId": "test-session-123",
+                    "message": {
+                        "role": "user",
+                        "content": "What is 2 + 2?",
+                    },
+                }
+            )
+            + "\n"
+            + json.dumps(
+                {
+                    "type": "assistant",
+                    "uuid": "msg-2",
+                    "timestamp": "2025-01-01T10:00:01Z",
+                    "message": {
+                        "role": "assistant",
+                        "model": "claude-opus-4-5-20251101",
+                        "content": [
+                            {
+                                "type": "thinking",
+                                "thinking": "Let me calculate: 2 + 2 = 4. This is basic arithmetic.",
+                                "signature": "abc123",
+                            },
+                            {"type": "text", "text": "2 + 2 = 4"},
+                        ],
+                        "usage": {"input_tokens": 100, "output_tokens": 10},
+                    },
+                }
+            )
+            + "\n"
         )
         daemon.transcript_path = session_file
 
         # Track log_call invocations
         log_call_invocations = []
-        with patch("weave.integrations.claude_plugin.core.daemon.weave.log_call") as mock_log_call:
-            mock_log_call.side_effect = lambda **kwargs: log_call_invocations.append(kwargs)
+        with patch(
+            "weave.integrations.claude_plugin.core.daemon.weave.log_call"
+        ) as mock_log_call:
+            mock_log_call.side_effect = lambda **kwargs: log_call_invocations.append(
+                kwargs
+            )
             await daemon._finish_current_turn()
 
         # Verify thinking trace was created
-        thinking_calls = [c for c in log_call_invocations if c.get("op") == "claude_code.thinking"]
-        assert len(thinking_calls) == 1, f"Expected 1 thinking trace, got {len(thinking_calls)}"
+        thinking_calls = [
+            c for c in log_call_invocations if c.get("op") == "claude_code.thinking"
+        ]
+        assert len(thinking_calls) == 1, (
+            f"Expected 1 thinking trace, got {len(thinking_calls)}"
+        )
 
         thinking_call = thinking_calls[0]
-        assert thinking_call["inputs"]["content"] == "Let me calculate: 2 + 2 = 4. This is basic arithmetic."
+        assert (
+            thinking_call["inputs"]["content"]
+            == "Let me calculate: 2 + 2 = 4. This is basic arithmetic."
+        )
         assert thinking_call["display_name"] == "Thinking..."
         # Verify usage data is included
         assert "output" in thinking_call
@@ -881,41 +993,55 @@ class TestThinkingTraceCreation:
         # Create a session file WITHOUT thinking content
         session_file = tmp_path / "session.jsonl"
         session_file.write_text(
-            json.dumps({
-                "type": "user",
-                "uuid": "msg-1",
-                "timestamp": "2025-01-01T10:00:00Z",
-                "sessionId": "test-session-123",
-                "message": {
-                    "role": "user",
-                    "content": "Hello",
-                },
-            }) + "\n" +
-            json.dumps({
-                "type": "assistant",
-                "uuid": "msg-2",
-                "timestamp": "2025-01-01T10:00:01Z",
-                "message": {
-                    "role": "assistant",
-                    "model": "claude-sonnet-4-20250514",
-                    "content": [
-                        {"type": "text", "text": "Hi there!"},
-                    ],
-                    "usage": {"input_tokens": 10, "output_tokens": 5},
-                },
-            }) + "\n"
+            json.dumps(
+                {
+                    "type": "user",
+                    "uuid": "msg-1",
+                    "timestamp": "2025-01-01T10:00:00Z",
+                    "sessionId": "test-session-123",
+                    "message": {
+                        "role": "user",
+                        "content": "Hello",
+                    },
+                }
+            )
+            + "\n"
+            + json.dumps(
+                {
+                    "type": "assistant",
+                    "uuid": "msg-2",
+                    "timestamp": "2025-01-01T10:00:01Z",
+                    "message": {
+                        "role": "assistant",
+                        "model": "claude-sonnet-4-20250514",
+                        "content": [
+                            {"type": "text", "text": "Hi there!"},
+                        ],
+                        "usage": {"input_tokens": 10, "output_tokens": 5},
+                    },
+                }
+            )
+            + "\n"
         )
         daemon.transcript_path = session_file
 
         # Track log_call invocations
         log_call_invocations = []
-        with patch("weave.integrations.claude_plugin.core.daemon.weave.log_call") as mock_log_call:
-            mock_log_call.side_effect = lambda **kwargs: log_call_invocations.append(kwargs)
+        with patch(
+            "weave.integrations.claude_plugin.core.daemon.weave.log_call"
+        ) as mock_log_call:
+            mock_log_call.side_effect = lambda **kwargs: log_call_invocations.append(
+                kwargs
+            )
             await daemon._finish_current_turn()
 
         # Verify NO thinking trace was created
-        thinking_calls = [c for c in log_call_invocations if c.get("op") == "claude_code.thinking"]
-        assert len(thinking_calls) == 0, f"Expected 0 thinking traces, got {len(thinking_calls)}"
+        thinking_calls = [
+            c for c in log_call_invocations if c.get("op") == "claude_code.thinking"
+        ]
+        assert len(thinking_calls) == 0, (
+            f"Expected 0 thinking traces, got {len(thinking_calls)}"
+        )
 
     @pytest.mark.anyio
     async def test_multiple_assistant_messages_aggregates_thinking(self, tmp_path):
@@ -933,52 +1059,77 @@ class TestThinkingTraceCreation:
         # Create a session file with multiple assistant messages with thinking
         session_file = tmp_path / "session.jsonl"
         session_file.write_text(
-            json.dumps({
-                "type": "user",
-                "uuid": "msg-1",
-                "timestamp": "2025-01-01T10:00:00Z",
-                "sessionId": "test-session-123",
-                "message": {"role": "user", "content": "Help me"},
-            }) + "\n" +
-            json.dumps({
-                "type": "assistant",
-                "uuid": "msg-2",
-                "timestamp": "2025-01-01T10:00:01Z",
-                "message": {
-                    "role": "assistant",
-                    "model": "claude-opus-4-5-20251101",
-                    "content": [
-                        {"type": "thinking", "thinking": "First thought", "signature": "sig1"},
-                        {"type": "text", "text": "First response"},
-                    ],
-                    "usage": {"input_tokens": 50, "output_tokens": 5},
-                },
-            }) + "\n" +
-            json.dumps({
-                "type": "assistant",
-                "uuid": "msg-3",
-                "timestamp": "2025-01-01T10:00:02Z",
-                "message": {
-                    "role": "assistant",
-                    "model": "claude-opus-4-5-20251101",
-                    "content": [
-                        {"type": "thinking", "thinking": "Second thought", "signature": "sig2"},
-                        {"type": "text", "text": "Second response"},
-                    ],
-                    "usage": {"input_tokens": 60, "output_tokens": 6},
-                },
-            }) + "\n"
+            json.dumps(
+                {
+                    "type": "user",
+                    "uuid": "msg-1",
+                    "timestamp": "2025-01-01T10:00:00Z",
+                    "sessionId": "test-session-123",
+                    "message": {"role": "user", "content": "Help me"},
+                }
+            )
+            + "\n"
+            + json.dumps(
+                {
+                    "type": "assistant",
+                    "uuid": "msg-2",
+                    "timestamp": "2025-01-01T10:00:01Z",
+                    "message": {
+                        "role": "assistant",
+                        "model": "claude-opus-4-5-20251101",
+                        "content": [
+                            {
+                                "type": "thinking",
+                                "thinking": "First thought",
+                                "signature": "sig1",
+                            },
+                            {"type": "text", "text": "First response"},
+                        ],
+                        "usage": {"input_tokens": 50, "output_tokens": 5},
+                    },
+                }
+            )
+            + "\n"
+            + json.dumps(
+                {
+                    "type": "assistant",
+                    "uuid": "msg-3",
+                    "timestamp": "2025-01-01T10:00:02Z",
+                    "message": {
+                        "role": "assistant",
+                        "model": "claude-opus-4-5-20251101",
+                        "content": [
+                            {
+                                "type": "thinking",
+                                "thinking": "Second thought",
+                                "signature": "sig2",
+                            },
+                            {"type": "text", "text": "Second response"},
+                        ],
+                        "usage": {"input_tokens": 60, "output_tokens": 6},
+                    },
+                }
+            )
+            + "\n"
         )
         daemon.transcript_path = session_file
 
         log_call_invocations = []
-        with patch("weave.integrations.claude_plugin.core.daemon.weave.log_call") as mock_log_call:
-            mock_log_call.side_effect = lambda **kwargs: log_call_invocations.append(kwargs)
+        with patch(
+            "weave.integrations.claude_plugin.core.daemon.weave.log_call"
+        ) as mock_log_call:
+            mock_log_call.side_effect = lambda **kwargs: log_call_invocations.append(
+                kwargs
+            )
             await daemon._finish_current_turn()
 
         # Should create ONE thinking trace with aggregated content
-        thinking_calls = [c for c in log_call_invocations if c.get("op") == "claude_code.thinking"]
-        assert len(thinking_calls) == 1, f"Expected 1 aggregated thinking trace, got {len(thinking_calls)}"
+        thinking_calls = [
+            c for c in log_call_invocations if c.get("op") == "claude_code.thinking"
+        ]
+        assert len(thinking_calls) == 1, (
+            f"Expected 1 aggregated thinking trace, got {len(thinking_calls)}"
+        )
 
         thinking_call = thinking_calls[0]
         # Content should include both thinking blocks
@@ -1038,7 +1189,10 @@ class TestTurnCreationWithProcessor:
         daemon.turn_number = 0
 
         # Initialize processor
-        from weave.integrations.claude_plugin.session.session_processor import SessionProcessor
+        from weave.integrations.claude_plugin.session.session_processor import (
+            SessionProcessor,
+        )
+
         daemon.processor = SessionProcessor(
             client=daemon.weave_client,
             project="test/project",
@@ -1068,7 +1222,9 @@ class TestTurnCreationWithProcessor:
         # Verify the arguments
         assert call_args.kwargs["turn_number"] == 1
         assert "Write a Python function" in call_args.kwargs["user_message"]
-        assert call_args.kwargs.get("images") is None or call_args.kwargs["images"] == []
+        assert (
+            call_args.kwargs.get("images") is None or call_args.kwargs["images"] == []
+        )
         assert call_args.kwargs.get("is_compacted") is False
 
         # Verify turn call ID was stored
@@ -1089,7 +1245,10 @@ class TestTurnCreationWithProcessor:
         daemon.turn_number = 0
 
         # Initialize processor
-        from weave.integrations.claude_plugin.session.session_processor import SessionProcessor
+        from weave.integrations.claude_plugin.session.session_processor import (
+            SessionProcessor,
+        )
+
         daemon.processor = SessionProcessor(
             client=daemon.weave_client,
             project="test/project",
@@ -1145,7 +1304,10 @@ class TestTurnCreationWithProcessor:
         daemon._pending_question = "What file should I edit?"
 
         # Initialize processor
-        from weave.integrations.claude_plugin.session.session_processor import SessionProcessor
+        from weave.integrations.claude_plugin.session.session_processor import (
+            SessionProcessor,
+        )
+
         daemon.processor = SessionProcessor(
             client=daemon.weave_client,
             project="test/project",
@@ -1192,7 +1354,10 @@ class TestTurnCreationWithProcessor:
         daemon.compaction_count = 0
 
         # Initialize processor
-        from weave.integrations.claude_plugin.session.session_processor import SessionProcessor
+        from weave.integrations.claude_plugin.session.session_processor import (
+            SessionProcessor,
+        )
+
         daemon.processor = SessionProcessor(
             client=daemon.weave_client,
             project="test/project",
@@ -1240,11 +1405,14 @@ class TestSessionContinuationDetection:
 
             # Set up state with session_ended=True
             with StateManager() as state:
-                state.save_session("test-session-123", {
-                    "session_call_id": "old-session-call-id",
-                    "trace_id": "trace-123",
-                    "session_ended": True,
-                })
+                state.save_session(
+                    "test-session-123",
+                    {
+                        "session_call_id": "old-session-call-id",
+                        "trace_id": "trace-123",
+                        "session_ended": True,
+                    },
+                )
 
             # Check continuation detection
             result = await daemon._check_session_continuation()
@@ -1255,7 +1423,9 @@ class TestSessionContinuationDetection:
                 state.delete_session("test-session-123")
 
     @pytest.mark.anyio
-    async def test_check_session_continuation_returns_false_when_session_not_ended(self):
+    async def test_check_session_continuation_returns_false_when_session_not_ended(
+        self,
+    ):
         """Test that _check_session_continuation returns False when session is not ended."""
         from weave.integrations.claude_plugin.core.daemon import WeaveDaemon
         from weave.integrations.claude_plugin.core.state import StateManager
@@ -1271,11 +1441,14 @@ class TestSessionContinuationDetection:
 
             # Set up state with session_ended=False
             with StateManager() as state:
-                state.save_session("test-session-456", {
-                    "session_call_id": "session-call-id",
-                    "trace_id": "trace-456",
-                    "session_ended": False,
-                })
+                state.save_session(
+                    "test-session-456",
+                    {
+                        "session_call_id": "session-call-id",
+                        "trace_id": "trace-456",
+                        "session_ended": False,
+                    },
+                )
 
             # Check continuation detection
             result = await daemon._check_session_continuation()
@@ -1303,11 +1476,14 @@ class TestSessionContinuationDetection:
 
             # Set up state with session_ended=False (not set)
             with StateManager() as state:
-                state.save_session("test-session-789", {
-                    "session_call_id": "session-call-id",
-                    "trace_id": "trace-789",
-                    "session_ended": False,
-                })
+                state.save_session(
+                    "test-session-789",
+                    {
+                        "session_call_id": "session-call-id",
+                        "trace_id": "trace-789",
+                        "session_ended": False,
+                    },
+                )
 
             # Check continuation detection - should use API fallback
             result = await daemon._check_session_continuation()
@@ -1346,22 +1522,30 @@ class TestCreateContinuationSession:
             mock_new_call.id = "new-call-id"
             mock_new_call.trace_id = "new-trace-id"
             mock_new_call.ui_url = "https://example.com/new"
-            daemon.processor.create_session_call.return_value = (mock_new_call, "Continued: New Task Name")
+            daemon.processor.create_session_call.return_value = (
+                mock_new_call,
+                "Continued: New Task Name",
+            )
 
             # Set up state (no display_name needed)
             with StateManager() as state:
-                state.save_session("test-continuation-session", {
-                    "session_call_id": "old-call-id",
-                    "trace_id": "old-trace-id",
-                    "session_ended": True,
-                    "continuation_count": 0,
-                })
+                state.save_session(
+                    "test-continuation-session",
+                    {
+                        "session_call_id": "old-call-id",
+                        "trace_id": "old-trace-id",
+                        "session_ended": True,
+                        "continuation_count": 0,
+                    },
+                )
 
             # Create continuation session
-            result = await daemon._create_continuation_session_call({
-                "prompt": "Now let's work on a new task",
-                "cwd": "/test/path",
-            })
+            result = await daemon._create_continuation_session_call(
+                {
+                    "prompt": "Now let's work on a new task",
+                    "cwd": "/test/path",
+                }
+            )
 
             # Verify result
             assert result["status"] == "ok"
@@ -1382,7 +1566,10 @@ class TestCreateContinuationSession:
                 assert session_data["session_ended"] is False
                 assert session_data["continuation_count"] == 1
                 # display_name should not be stored in state anymore
-                assert "display_name" not in session_data or session_data.get("display_name") is None
+                assert (
+                    "display_name" not in session_data
+                    or session_data.get("display_name") is None
+                )
                 state.delete_session("test-continuation-session")
 
 
@@ -1475,7 +1662,7 @@ class TestHandleUserMessage:
             "type": "user",
             "message": {
                 "role": "user",
-                "content": "This session is being continued from a previous conversation that ran out of context."
+                "content": "This session is being continued from a previous conversation that ran out of context.",
             },
         }
 
@@ -1488,8 +1675,9 @@ class TestHandleUserMessage:
     @pytest.mark.anyio
     async def test_buffers_tool_results(self):
         """Tool results should be buffered for parallel grouping."""
-        from weave.integrations.claude_plugin.core.daemon import WeaveDaemon
         from datetime import datetime, timezone
+
+        from weave.integrations.claude_plugin.core.daemon import WeaveDaemon
 
         daemon = WeaveDaemon("test-session")
         daemon.weave_client = MagicMock()
@@ -1508,7 +1696,11 @@ class TestHandleUserMessage:
             "message": {
                 "role": "user",
                 "content": [
-                    {"type": "tool_result", "tool_use_id": "tool-123", "content": "file contents"}
+                    {
+                        "type": "tool_result",
+                        "tool_use_id": "tool-123",
+                        "content": "file contents",
+                    }
                 ],
             },
         }
@@ -1541,7 +1733,12 @@ class TestHandleAssistantMessage:
             "message": {
                 "role": "assistant",
                 "content": [
-                    {"type": "tool_use", "id": "tool-789", "name": "Read", "input": {"file_path": "/tmp/test.py"}}
+                    {
+                        "type": "tool_use",
+                        "id": "tool-789",
+                        "name": "Read",
+                        "input": {"file_path": "/tmp/test.py"},
+                    }
                 ],
             },
         }
@@ -1609,7 +1806,12 @@ class TestHandleAssistantMessage:
             "message": {
                 "role": "assistant",
                 "content": [
-                    {"type": "tool_use", "id": "plan-123", "name": "EnterPlanMode", "input": {}}
+                    {
+                        "type": "tool_use",
+                        "id": "plan-123",
+                        "name": "EnterPlanMode",
+                        "input": {},
+                    }
                 ],
             },
         }
@@ -1638,7 +1840,12 @@ class TestHandleAssistantMessage:
             "message": {
                 "role": "assistant",
                 "content": [
-                    {"type": "tool_use", "id": "skill-123", "name": "Skill", "input": {"skill": "test-skill"}}
+                    {
+                        "type": "tool_use",
+                        "id": "skill-123",
+                        "name": "Skill",
+                        "input": {"skill": "test-skill"},
+                    }
                 ],
             },
         }
@@ -1674,7 +1881,11 @@ class TestHandleAssistantMessage:
                         "type": "tool_use",
                         "id": "question-123",
                         "name": "AskUserQuestion",
-                        "input": {"questions": [{"question": "What should I do?", "options": []}]},
+                        "input": {
+                            "questions": [
+                                {"question": "What should I do?", "options": []}
+                            ]
+                        },
                     }
                 ],
             },
@@ -1692,8 +1903,9 @@ class TestToolBuffering:
 
     def test_tool_buffer_detects_parallel_calls(self):
         """Tools with close timestamps should be grouped as parallel."""
+        from datetime import datetime, timedelta, timezone
+
         from weave.integrations.claude_plugin.utils import ToolResultBuffer
-        from datetime import datetime, timezone, timedelta
 
         buffer = ToolResultBuffer()
         base_time = datetime.now(timezone.utc)
@@ -1701,7 +1913,14 @@ class TestToolBuffering:
         # Add tools with same timestamp (parallel)
         buffer.add("tool-1", "Read", {"file": "a.py"}, base_time, "content a", False)
         buffer.add("tool-2", "Read", {"file": "b.py"}, base_time, "content b", False)
-        buffer.add("tool-3", "Read", {"file": "c.py"}, base_time + timedelta(milliseconds=100), "content c", False)
+        buffer.add(
+            "tool-3",
+            "Read",
+            {"file": "c.py"},
+            base_time + timedelta(milliseconds=100),
+            "content c",
+            False,
+        )
 
         # Force flush
         groups = buffer.get_ready_to_flush(force=True)
@@ -1712,8 +1931,9 @@ class TestToolBuffering:
 
     def test_tool_buffer_separates_sequential_calls(self):
         """Tools with distant timestamps should be separate."""
+        from datetime import datetime, timedelta, timezone
+
         from weave.integrations.claude_plugin.utils import ToolResultBuffer
-        from datetime import datetime, timezone, timedelta
 
         buffer = ToolResultBuffer()
         base_time = datetime.now(timezone.utc)
@@ -1722,7 +1942,14 @@ class TestToolBuffering:
         buffer.add("tool-1", "Read", {"file": "a.py"}, base_time, "content a", False)
 
         # Add second tool 2 seconds later (beyond threshold)
-        buffer.add("tool-2", "Read", {"file": "b.py"}, base_time + timedelta(seconds=2), "content b", False)
+        buffer.add(
+            "tool-2",
+            "Read",
+            {"file": "b.py"},
+            base_time + timedelta(seconds=2),
+            "content b",
+            False,
+        )
 
         # Force flush
         groups = buffer.get_ready_to_flush(force=True)
@@ -1750,23 +1977,29 @@ class TestFinishCurrentTurn:
         # Create minimal session file
         session_file = tmp_path / "session.jsonl"
         session_file.write_text(
-            json.dumps({
-                "type": "user",
-                "uuid": "msg-1",
-                "timestamp": "2025-01-01T10:00:00Z",
-                "message": {"role": "user", "content": "Hello"},
-            }) + "\n" +
-            json.dumps({
-                "type": "assistant",
-                "uuid": "msg-2",
-                "timestamp": "2025-01-01T10:00:01Z",
-                "message": {
-                    "role": "assistant",
-                    "model": "claude-sonnet-4-20250514",
-                    "content": [{"type": "text", "text": "Hi there!"}],
-                    "usage": {"input_tokens": 10, "output_tokens": 5},
-                },
-            }) + "\n"
+            json.dumps(
+                {
+                    "type": "user",
+                    "uuid": "msg-1",
+                    "timestamp": "2025-01-01T10:00:00Z",
+                    "message": {"role": "user", "content": "Hello"},
+                }
+            )
+            + "\n"
+            + json.dumps(
+                {
+                    "type": "assistant",
+                    "uuid": "msg-2",
+                    "timestamp": "2025-01-01T10:00:01Z",
+                    "message": {
+                        "role": "assistant",
+                        "model": "claude-sonnet-4-20250514",
+                        "content": [{"type": "text", "text": "Hi there!"}],
+                        "usage": {"input_tokens": 10, "output_tokens": 5},
+                    },
+                }
+            )
+            + "\n"
         )
         daemon.transcript_path = session_file
 
@@ -1791,12 +2024,15 @@ class TestFinishCurrentTurn:
         # Create minimal session file
         session_file = tmp_path / "session.jsonl"
         session_file.write_text(
-            json.dumps({
-                "type": "user",
-                "uuid": "msg-1",
-                "timestamp": "2025-01-01T10:00:00Z",
-                "message": {"role": "user", "content": "Hello"},
-            }) + "\n"
+            json.dumps(
+                {
+                    "type": "user",
+                    "uuid": "msg-1",
+                    "timestamp": "2025-01-01T10:00:00Z",
+                    "message": {"role": "user", "content": "Hello"},
+                }
+            )
+            + "\n"
         )
         daemon.transcript_path = session_file
 
@@ -1836,20 +2072,23 @@ class TestLoadState:
 
         # Create session state
         with StateManager() as state:
-            state.save_session(session_id, {
-                "project": "test/project",
-                "transcript_path": transcript_path,
-                "last_processed_line": 42,
-                "session_call_id": "call-123",
-                "trace_id": "trace-456",
-                "trace_url": "https://weave.wandb.ai/trace/456",
-                "turn_call_id": "turn-789",
-                "turn_number": 3,
-                "total_tool_calls": 10,
-                "tool_counts": {"Read": 5, "Edit": 3},
-                "pending_question": "What do you prefer?",
-                "compaction_count": 2,
-            })
+            state.save_session(
+                session_id,
+                {
+                    "project": "test/project",
+                    "transcript_path": transcript_path,
+                    "last_processed_line": 42,
+                    "session_call_id": "call-123",
+                    "trace_id": "trace-456",
+                    "trace_url": "https://weave.wandb.ai/trace/456",
+                    "turn_call_id": "turn-789",
+                    "turn_number": 3,
+                    "total_tool_calls": 10,
+                    "tool_counts": {"Read": 5, "Edit": 3},
+                    "pending_question": "What do you prefer?",
+                    "compaction_count": 2,
+                },
+            )
 
         try:
             daemon = WeaveDaemon(session_id)
@@ -1998,12 +2237,15 @@ class TestHandleStop:
         # Create minimal transcript
         session_file = tmp_path / "session.jsonl"
         session_file.write_text(
-            json.dumps({
-                "type": "user",
-                "uuid": "msg-1",
-                "timestamp": "2025-01-01T10:00:00Z",
-                "message": {"role": "user", "content": "Hello"},
-            }) + "\n"
+            json.dumps(
+                {
+                    "type": "user",
+                    "uuid": "msg-1",
+                    "timestamp": "2025-01-01T10:00:00Z",
+                    "message": {"role": "user", "content": "Hello"},
+                }
+            )
+            + "\n"
         )
         daemon.transcript_path = session_file
 
@@ -2087,7 +2329,9 @@ class TestHandleFeedback:
         result = await daemon._handle_feedback({"note": "Great session!"})
 
         assert result["status"] == "ok"
-        mock_call.feedback.add_note.assert_called_once_with("Great session!", creator="user")
+        mock_call.feedback.add_note.assert_called_once_with(
+            "Great session!", creator="user"
+        )
 
     @pytest.mark.anyio
     async def test_adds_both_emoji_and_note(self):
@@ -2197,31 +2441,39 @@ class TestProcessSessionFile:
         # Create session file with user and assistant messages
         session_file = tmp_path / "session.jsonl"
         session_file.write_text(
-            json.dumps({
-                "type": "user",
-                "uuid": "msg-1",
-                "timestamp": "2025-01-01T10:00:00Z",
-                "sessionId": "test-session",
-                "message": {"role": "user", "content": "Hello"},
-            }) + "\n" +
-            json.dumps({
-                "type": "assistant",
-                "uuid": "msg-2",
-                "timestamp": "2025-01-01T10:00:01Z",
-                "sessionId": "test-session",
-                "message": {
-                    "role": "assistant",
-                    "model": "claude-sonnet-4-20250514",
-                    "content": [{"type": "text", "text": "Hi!"}],
-                    "usage": {"input_tokens": 10, "output_tokens": 5},
-                },
-            }) + "\n"
+            json.dumps(
+                {
+                    "type": "user",
+                    "uuid": "msg-1",
+                    "timestamp": "2025-01-01T10:00:00Z",
+                    "sessionId": "test-session",
+                    "message": {"role": "user", "content": "Hello"},
+                }
+            )
+            + "\n"
+            + json.dumps(
+                {
+                    "type": "assistant",
+                    "uuid": "msg-2",
+                    "timestamp": "2025-01-01T10:00:01Z",
+                    "sessionId": "test-session",
+                    "message": {
+                        "role": "assistant",
+                        "model": "claude-sonnet-4-20250514",
+                        "content": [{"type": "text", "text": "Hi!"}],
+                        "usage": {"input_tokens": 10, "output_tokens": 5},
+                    },
+                }
+            )
+            + "\n"
         )
         daemon.transcript_path = session_file
 
         with patch.object(daemon, "_save_state"):
             with patch.object(daemon, "_handle_user_message") as mock_user:
-                with patch.object(daemon, "_handle_assistant_message") as mock_assistant:
+                with patch.object(
+                    daemon, "_handle_assistant_message"
+                ) as mock_assistant:
                     mock_user.return_value = None
                     mock_assistant.return_value = None
                     await daemon._process_session_file()
@@ -2260,20 +2512,26 @@ class TestProcessSessionFile:
 
         session_file = tmp_path / "session.jsonl"
         session_file.write_text(
-            json.dumps({
-                "type": "user",
-                "uuid": "msg-1",
-                "timestamp": "2025-01-01T10:00:00Z",
-                "sessionId": "test-session",
-                "message": {"role": "user", "content": "First"},
-            }) + "\n" +
-            json.dumps({
-                "type": "user",
-                "uuid": "msg-2",
-                "timestamp": "2025-01-01T10:00:01Z",
-                "sessionId": "test-session",
-                "message": {"role": "user", "content": "Second"},
-            }) + "\n"
+            json.dumps(
+                {
+                    "type": "user",
+                    "uuid": "msg-1",
+                    "timestamp": "2025-01-01T10:00:00Z",
+                    "sessionId": "test-session",
+                    "message": {"role": "user", "content": "First"},
+                }
+            )
+            + "\n"
+            + json.dumps(
+                {
+                    "type": "user",
+                    "uuid": "msg-2",
+                    "timestamp": "2025-01-01T10:00:01Z",
+                    "sessionId": "test-session",
+                    "message": {"role": "user", "content": "Second"},
+                }
+            )
+            + "\n"
         )
         daemon.transcript_path = session_file
 
@@ -2300,13 +2558,16 @@ class TestProcessSessionFile:
 
         session_file = tmp_path / "session.jsonl"
         session_file.write_text(
-            "not valid json\n" +
-            json.dumps({
-                "type": "user",
-                "uuid": "msg-1",
-                "timestamp": "2025-01-01T10:00:00Z",
-                "message": {"role": "user", "content": "Hello"},
-            }) + "\n"
+            "not valid json\n"
+            + json.dumps(
+                {
+                    "type": "user",
+                    "uuid": "msg-1",
+                    "timestamp": "2025-01-01T10:00:00Z",
+                    "message": {"role": "user", "content": "Hello"},
+                }
+            )
+            + "\n"
         )
         daemon.transcript_path = session_file
 

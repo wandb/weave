@@ -256,7 +256,9 @@ def main() -> int:
         print(f"  Global: {'enabled' if status['global'] else 'disabled'}")
 
         if status["local"] is not None:
-            print(f"  Local (.claude/settings.json): {'enabled' if status['local'] else 'disabled'}")
+            print(
+                f"  Local (.claude/settings.json): {'enabled' if status['local'] else 'disabled'}"
+            )
         else:
             print("  Local (.claude/settings.json): not set")
 

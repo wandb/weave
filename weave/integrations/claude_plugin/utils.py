@@ -17,18 +17,18 @@ from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
 
 import weave
-from weave.trace.context.weave_client_context import require_weave_client
-from weave.trace.view_utils import set_call_view
-
 from weave.integrations.claude_plugin.constants import (
     DaemonConfig,
     ParallelGrouping,
     PromptLimits,
     ToolCallLimits,
 )
+from weave.trace.context.weave_client_context import require_weave_client
+from weave.trace.view_utils import set_call_view
 
 if TYPE_CHECKING:
     from weave.integrations.claude_plugin.session.session_parser import ToolCall
+    from weave.trace.call import Call
 
 logger = logging.getLogger(__name__)
 
@@ -256,7 +256,9 @@ def extract_command_output(text: str) -> str:
     return ""
 
 
-def truncate(s: str | None, max_len: int = ToolCallLimits.MAX_INPUT_LENGTH) -> str | None:
+def truncate(
+    s: str | None, max_len: int = ToolCallLimits.MAX_INPUT_LENGTH
+) -> str | None:
     """Truncate a string to max_len characters.
 
     Args:
@@ -297,10 +299,10 @@ def sanitize_tool_input(
 
 def reconstruct_call(
     project_id: str,
-    call_id: str,
-    trace_id: str,
+    call_id: str | None,
+    trace_id: str | None,
     parent_id: str | None = None,
-) -> "Call":
+) -> Call:
     """Reconstruct a minimal Call object for use as a parent reference.
 
     This creates a Call object that can be used as a parent for weave.log_call()
@@ -309,13 +311,21 @@ def reconstruct_call(
 
     Args:
         project_id: Weave project ID (e.g., "entity/project")
-        call_id: The call ID to reconstruct
-        trace_id: The trace ID this call belongs to
+        call_id: The call ID to reconstruct (must not be None)
+        trace_id: The trace ID this call belongs to (must not be None)
         parent_id: Optional parent call ID
 
     Returns:
         Call object suitable for use as parent in weave.log_call()
+
+    Raises:
+        ValueError: If call_id or trace_id is None
     """
+    if call_id is None:
+        raise ValueError("call_id is required to reconstruct a Call")
+    if trace_id is None:
+        raise ValueError("trace_id is required to reconstruct a Call")
+
     from weave.trace.call import Call
 
     return Call(
@@ -330,21 +340,25 @@ def reconstruct_call(
 
 class ToolCallError(Exception):
     """Exception raised when a tool call fails."""
+
     pass
 
 
 class SessionParseError(Exception):
     """Exception raised when session parsing fails."""
+
     pass
 
 
 class FileBackupError(Exception):
     """Exception raised when file backup operations fail."""
+
     pass
 
 
 class DaemonConnectionError(Exception):
     """Exception raised when daemon socket connection fails."""
+
     pass
 
 
@@ -355,6 +369,7 @@ class BufferedToolResult:
     Replaces the fragile tuple-based buffering:
     (name, input, tool_use_timestamp, result_content, is_error)
     """
+
     tool_use_id: str
     name: str
     input: dict[str, Any]
@@ -420,9 +435,7 @@ class ToolResultBuffer:
         """Clear all buffered results."""
         self._buffer.clear()
 
-    def get_ready_to_flush(
-        self, force: bool = False
-    ) -> list[list[BufferedToolResult]]:
+    def get_ready_to_flush(self, force: bool = False) -> list[list[BufferedToolResult]]:
         """Get tool result groups ready to be logged.
 
         Args:
@@ -497,7 +510,7 @@ def log_tool_call(
     tool_input: dict[str, Any],
     tool_output: str | None,
     tool_use_id: str,
-    duration_ms: int,
+    duration_ms: int | None,
     parent: Any,
     max_input_length: int = ToolCallLimits.MAX_INPUT_LENGTH,
     max_output_length: int = ToolCallLimits.MAX_OUTPUT_LENGTH,
@@ -544,22 +557,25 @@ def log_tool_call(
     tool_display = get_tool_display_name(tool_name, tool_input)
 
     # Build output dict
-    output = {"result": truncate(tool_output, max_output_length)} if tool_output else None
+    output = (
+        {"result": truncate(tool_output, max_output_length)} if tool_output else None
+    )
 
     # Create exception if this is an error
     exception: BaseException | None = None
     if is_error:
         # Extract error message from tool_output (strip <tool_use_error> tags if present)
         error_msg = tool_output or "Tool call failed"
-        if error_msg.startswith("<tool_use_error>") and error_msg.endswith("</tool_use_error>"):
+        if error_msg.startswith("<tool_use_error>") and error_msg.endswith(
+            "</tool_use_error>"
+        ):
             error_msg = error_msg[16:-17]  # Strip tags
         exception = ToolCallError(error_msg)
 
     # For tools with HTML views (TodoWrite, Edit), we need to attach the view
     # BEFORE finishing the call, so we use create_call + set_call_view + finish_call
-    needs_html_view = (
-        tool_name == "TodoWrite"
-        or (tool_name == "Edit" and structured_patch is not None)
+    needs_html_view = tool_name == "TodoWrite" or (
+        tool_name == "Edit" and structured_patch is not None
     )
 
     if needs_html_view:
@@ -583,7 +599,9 @@ def log_tool_call(
 
             # Attach HTML view BEFORE finishing
             if tool_name == "TodoWrite":
-                from weave.integrations.claude_plugin.views.diff_view import generate_todo_html
+                from weave.integrations.claude_plugin.views.diff_view import (
+                    generate_todo_html,
+                )
 
                 todos = tool_input.get("todos", [])
                 if todos:
@@ -620,8 +638,9 @@ def log_tool_call(
                     )
 
             # Now finish the call (with exception if error)
-            client.finish_call(call, output=output, exception=exception, ended_at=ended_at)
-            return call
+            client.finish_call(
+                call, output=output, exception=exception, ended_at=ended_at
+            )
         except Exception as e:
             logger.debug(f"Failed to log {tool_name} with view: {e}")
             # Fallback to regular log_call if something goes wrong
@@ -641,6 +660,8 @@ def log_tool_call(
                 started_at=started_at,
                 ended_at=ended_at,
             )
+        else:
+            return call
     else:
         return weave.log_call(
             op=f"claude_code.tool.{tool_name}",
@@ -772,9 +793,10 @@ def get_tool_display_name(tool_name: str, tool_input: dict[str, Any]) -> str:
         if url:
             try:
                 domain = urlparse(url).netloc
-                return f"WebFetch: {domain}"
             except Exception:
                 pass
+            else:
+                return f"WebFetch: {domain}"
     elif tool_name == "WebSearch":
         query = tool_input.get("query", "")
         if query:
@@ -800,6 +822,7 @@ def get_git_info(cwd: str) -> dict[str, str] | None:
     Returns:
         Dict with 'remote', 'branch', 'commit' keys, or None if not a git repo
     """
+    result: dict[str, str] | None = None
     try:
         # Check if directory exists
         if not Path(cwd).exists():
@@ -841,14 +864,14 @@ def get_git_info(cwd: str) -> dict[str, str] | None:
             return None
         commit = commit_result.stdout.strip()
 
-        return {
+        result = {
             "remote": remote,
             "branch": branch,
             "commit": commit,
         }
     except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as e:
         logger.debug(f"Failed to get git info for {cwd}: {e}")
-        return None
+    return result
 
 
 def extract_question_from_text(text: str) -> str | None:
@@ -961,7 +984,7 @@ def generate_session_name(
     return fallback_name or "Claude Session", ""
 
 
-def _generate_parallel_display_name(tool_calls: list["ToolCall"]) -> str:
+def _generate_parallel_display_name(tool_calls: list[ToolCall]) -> str:
     """Generate a display name for a parallel execution group.
 
     Examples:
@@ -988,7 +1011,7 @@ def _generate_parallel_display_name(tool_calls: list["ToolCall"]) -> str:
 
 
 def log_tool_calls_grouped(
-    tool_call_groups: list[list["ToolCall"]],
+    tool_call_groups: list[list[ToolCall]],
     parent: Any,
     *,
     skip_tool_names: set[str] | None = None,
@@ -1011,8 +1034,6 @@ def log_tool_calls_grouped(
     Returns:
         Number of calls created (including parallel wrappers)
     """
-    from weave.integrations.claude_plugin.session.session_parser import ToolCall
-
     skip_names = skip_tool_names or set()
     edit_data = edit_data_by_path or {}
     calls_created = 0
@@ -1063,7 +1084,9 @@ def log_tool_calls_grouped(
 
             # Calculate timing for the parallel group
             started_at = min(tc.timestamp for tc in filtered_group)
-            result_timestamps = [tc.result_timestamp for tc in filtered_group if tc.result_timestamp]
+            result_timestamps = [
+                tc.result_timestamp for tc in filtered_group if tc.result_timestamp
+            ]
             ended_at = max(result_timestamps) if result_timestamps else None
 
             # Create parallel wrapper call

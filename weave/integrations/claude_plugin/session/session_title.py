@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -106,9 +105,10 @@ def analyze_session_title(
             isinstance(parsed, dict)
             and "isNewTopic" in parsed
             and "title" in parsed
+            and parsed["isNewTopic"]
+            and parsed["title"]
         ):
-            if parsed["isNewTopic"] and parsed["title"]:
-                return True, str(parsed["title"])
+            return True, str(parsed["title"])
 
     except requests.exceptions.Timeout:
         logger.debug("Session title API call timed out")
