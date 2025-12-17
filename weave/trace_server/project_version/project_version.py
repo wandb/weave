@@ -37,6 +37,16 @@ class TableRoutingResolver:
     def __init__(self) -> None:
         self._mode = CallsStorageServerMode.from_env()
 
+    def update_cache(
+        self, project_id: str, residence: ProjectDataResidence | None
+    ) -> None:
+        """Update the residence cache for a project with a known state."""
+        with _project_residence_cache_lock:
+            if residence is None:
+                _project_residence_cache.pop(project_id, None)
+            else:
+                _project_residence_cache[project_id] = residence
+
     def _get_residence(
         self, project_id: str, ch_client: CHClient
     ) -> ProjectDataResidence:
@@ -143,7 +153,6 @@ class TableRoutingResolver:
             # INVARIANT: If data exists in both tables, always write to both tables
             # regardless of source to maintain data consistency
             if residence == ProjectDataResidence.BOTH:
-                print(">>> residence == ProjectDataResidence.BOTH -> BOTH")
                 return WriteTarget.BOTH
 
             # EMPTY projects: behavior depends on SDK capability
@@ -161,19 +170,11 @@ class TableRoutingResolver:
                     raise ValueError(f"Invalid source: {source}")
 
             # COMPLETE_ONLY projects: behavior depends on SDK capability
-            # (This case is unlikely but handle it explicitly)
+            # This is an edge error case, we should never be in dual write mode and
+            # see projects that only have calls_complete data. Rather than error
+            # only return complete_only, let caller deal with erroring.
             if residence == ProjectDataResidence.COMPLETE_ONLY:
-                if source == CallSource.SDK_CALLS_MERGED:
-                    # Old SDK: don't initiate dual-write
-                    return WriteTarget.CALLS_MERGED
-                elif source == CallSource.SERVER:
-                    # Server sources: don't initiate dual-write
-                    return WriteTarget.CALLS_MERGED
-                elif source == CallSource.SDK_CALLS_COMPLETE:
-                    # New SDK: initiate dual-write
-                    return WriteTarget.BOTH
-                else:
-                    raise ValueError(f"Invalid source: {source}")
+                return WriteTarget.CALLS_COMPLETE
 
         if self._mode == CallsStorageServerMode.AUTO:
             if residence in (

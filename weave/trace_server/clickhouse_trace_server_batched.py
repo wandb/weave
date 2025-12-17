@@ -137,7 +137,11 @@ from weave.trace_server.project_query_builder import make_project_stats_query
 from weave.trace_server.project_version.project_version import (
     TableRoutingResolver,
 )
-from weave.trace_server.project_version.types import CallSource, WriteTarget
+from weave.trace_server.project_version.types import (
+    CallSource,
+    ProjectDataResidence,
+    WriteTarget,
+)
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 from weave.trace_server.table_query_builder import (
     ROW_ORDER_COLUMN_NAME,
@@ -729,6 +733,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # When write_target is BOTH, we must write to both tables or fail entirely
         # to maintain data consistency. If one write fails, data will be lost on cutover.
         if write_target == WriteTarget.BOTH:
+            # Update cache to reflect that we are going to be inserting into both tables.
+            self.table_routing_resolver.update_cache(
+                project_id, ProjectDataResidence.BOTH
+            )
+
             merged_error = None
             complete_error = None
 
@@ -748,6 +757,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
             # If either write failed, raise an error to maintain consistency
             if merged_error or complete_error:
+                self.table_routing_resolver.update_cache(project_id, None)
+
                 error_details = []
                 if merged_error:
                     error_details.append(f"calls_merged: {merged_error}")
@@ -1082,6 +1093,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         write_target = self.table_routing_resolver.resolve_write_target(
             req.project_id,
             self.ch_client,
+            source=CallSource.SDK_CALLS_MERGED,
         )
 
         # Delete from calls_complete if needed
@@ -1160,6 +1172,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         write_target = self.table_routing_resolver.resolve_write_target(
             req.project_id,
             self.ch_client,
+            source=CallSource.SDK_CALLS_MERGED,
         )
 
         # Update calls_complete if needed

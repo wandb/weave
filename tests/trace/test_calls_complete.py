@@ -34,29 +34,102 @@ from weave.trace_server.project_version.types import (
 # ============================================================================
 
 # Mode configurations for parametrized tests
-# Format: (mode_fixture_name, ProjectDataResidence, writes_to_calls_complete, writes_to_calls_merged)
+# Format: (mode_fixture_name, ProjectDataResidence, writes_to_calls_complete, writes_to_calls_merged, source)
 # Based on routing matrix from types.py - covers all mode * residence combinations
+# source is always SDK_CALLS_COMPLETE for these tests since they use the new batch endpoints
 MODE_PARAMS = [
     # EMPTY projects (new projects with no data)
-    ("auto_mode", ProjectDataResidence.EMPTY, True, False),
-    ("dual_write_read_merged_mode", ProjectDataResidence.EMPTY, True, True),
-    ("dual_write_read_complete_mode", ProjectDataResidence.EMPTY, True, True),
-    ("force_legacy_mode", ProjectDataResidence.EMPTY, False, True),
+    ("auto_mode", ProjectDataResidence.EMPTY, True, False, "sdk_calls_complete"),
+    (
+        "dual_write_read_merged_mode",
+        ProjectDataResidence.EMPTY,
+        True,
+        True,
+        "sdk_calls_complete",
+    ),
+    (
+        "dual_write_read_complete_mode",
+        ProjectDataResidence.EMPTY,
+        True,
+        True,
+        "sdk_calls_complete",
+    ),
+    (
+        "force_legacy_mode",
+        ProjectDataResidence.EMPTY,
+        False,
+        True,
+        "sdk_calls_complete",
+    ),
     # MERGED_ONLY projects (legacy projects with only calls_merged data)
-    ("auto_mode", ProjectDataResidence.MERGED_ONLY, False, True),
-    ("dual_write_read_merged_mode", ProjectDataResidence.MERGED_ONLY, False, True),
-    ("dual_write_read_complete_mode", ProjectDataResidence.MERGED_ONLY, False, True),
-    ("force_legacy_mode", ProjectDataResidence.MERGED_ONLY, False, True),
+    ("auto_mode", ProjectDataResidence.MERGED_ONLY, False, True, "sdk_calls_complete"),
+    (
+        "dual_write_read_merged_mode",
+        ProjectDataResidence.MERGED_ONLY,
+        False,
+        True,
+        "sdk_calls_complete",
+    ),
+    (
+        "dual_write_read_complete_mode",
+        ProjectDataResidence.MERGED_ONLY,
+        False,
+        True,
+        "sdk_calls_complete",
+    ),
+    (
+        "force_legacy_mode",
+        ProjectDataResidence.MERGED_ONLY,
+        False,
+        True,
+        "sdk_calls_complete",
+    ),
     # COMPLETE_ONLY projects (new projects with only calls_complete data)
-    ("auto_mode", ProjectDataResidence.COMPLETE_ONLY, True, False),
-    ("dual_write_read_merged_mode", ProjectDataResidence.COMPLETE_ONLY, True, True),
-    ("dual_write_read_complete_mode", ProjectDataResidence.COMPLETE_ONLY, True, True),
-    ("force_legacy_mode", ProjectDataResidence.COMPLETE_ONLY, False, True),
+    (
+        "auto_mode",
+        ProjectDataResidence.COMPLETE_ONLY,
+        True,
+        False,
+        "sdk_calls_complete",
+    ),
+    (
+        "dual_write_read_merged_mode",
+        ProjectDataResidence.COMPLETE_ONLY,
+        True,
+        True,
+        "sdk_calls_complete",
+    ),
+    (
+        "dual_write_read_complete_mode",
+        ProjectDataResidence.COMPLETE_ONLY,
+        True,
+        True,
+        "sdk_calls_complete",
+    ),
+    (
+        "force_legacy_mode",
+        ProjectDataResidence.COMPLETE_ONLY,
+        False,
+        True,
+        "sdk_calls_complete",
+    ),
     # BOTH projects (dual-write projects with data in both tables)
-    ("auto_mode", ProjectDataResidence.BOTH, True, False),
-    ("dual_write_read_merged_mode", ProjectDataResidence.BOTH, True, True),
-    ("dual_write_read_complete_mode", ProjectDataResidence.BOTH, True, True),
-    ("force_legacy_mode", ProjectDataResidence.BOTH, False, True),
+    ("auto_mode", ProjectDataResidence.BOTH, True, False, "sdk_calls_complete"),
+    (
+        "dual_write_read_merged_mode",
+        ProjectDataResidence.BOTH,
+        True,
+        True,
+        "sdk_calls_complete",
+    ),
+    (
+        "dual_write_read_complete_mode",
+        ProjectDataResidence.BOTH,
+        True,
+        True,
+        "sdk_calls_complete",
+    ),
+    ("force_legacy_mode", ProjectDataResidence.BOTH, False, True, "sdk_calls_complete"),
 ]
 
 # ============================================================================
@@ -1496,6 +1569,7 @@ def test_force_legacy_mode_comprehensive(
         "residence_state",
         "expected_complete_table",
         "expected_merged_table",
+        "source",
     ),
     MODE_PARAMS,
 )
@@ -1508,6 +1582,7 @@ def test_start_call_routing_across_modes(
     residence_state,
     expected_complete_table,
     expected_merged_table,
+    source,
     request,
 ):
     """Parametrized test verifying start call routing across all modes and residence states."""
@@ -1562,6 +1637,7 @@ def test_start_call_routing_across_modes(
         "residence_state",
         "expected_complete_table",
         "expected_merged_table",
+        "source",
     ),
     MODE_PARAMS,
 )
@@ -1574,6 +1650,7 @@ def test_delete_routing_across_modes(
     residence_state,
     expected_complete_table,
     expected_merged_table,
+    source,
     request,
 ):
     """Parametrized test verifying delete routing across all modes and residence states."""
@@ -1643,6 +1720,7 @@ def test_delete_routing_across_modes(
         "residence_state",
         "expected_complete_table",
         "expected_merged_table",
+        "source",
     ),
     MODE_PARAMS,
 )
@@ -1655,6 +1733,7 @@ def test_update_display_name_routing_across_modes(
     residence_state,
     expected_complete_table,
     expected_merged_table,
+    source,
     request,
 ):
     """Parametrized test verifying display name update routing across all modes and residence states."""
