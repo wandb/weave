@@ -177,7 +177,7 @@ Tests are split up into shards, which include:
 
 Nox is the most thorough way to run the tests, and sets important environment variables needed to run specific integrations and shards. However, it is slower. A combination of `uv` and `pytest` can be used for faster iteration when your code is agnostic to integration type, python version, etc.
 ```sh
-uv sync –group test –active
+uv sync --group test --active
 uv run pytest
 ```
 
@@ -187,7 +187,7 @@ uv run pytest tests/trace/test_weave_client.py
 ```
 or
 ```sh
-uv run pytest tests/trace/test_weave_client.py::test_get_calls_storage_size_values
+uv run pytest tests/trace/test_weave_client.py::test_table_create
 ```
 
 
