@@ -145,8 +145,19 @@ class ToolCall:
     result: str | None = None
     result_timestamp: datetime.datetime | None = None
     is_error: bool = False  # True if tool_result had is_error=True
+    explicit_duration_ms: int | None = None  # From toolUseResult.durationMs if available
 
     def duration_ms(self) -> int | None:
+        """Get tool execution duration in milliseconds.
+
+        Prefers explicit_duration_ms (from toolUseResult.durationMs) when available,
+        as this is the actual execution time reported by Claude Code. Falls back to
+        calculating from message timestamps (result_timestamp - timestamp).
+        """
+        # Prefer explicit duration from toolUseResult.durationMs (actual execution time)
+        if self.explicit_duration_ms is not None:
+            return self.explicit_duration_ms
+        # Fall back to message timestamp delta
         if self.result_timestamp:
             delta = self.result_timestamp - self.timestamp
             return int(delta.total_seconds() * 1000)
@@ -639,6 +650,13 @@ def parse_session_file(path: Path) -> Session | None:
                             tc.result_timestamp = timestamp
                             # Capture error status from tool_result
                             tc.is_error = c.get("is_error", False)
+                            # Extract explicit duration from toolUseResult if available
+                            # This is the actual tool execution time reported by Claude Code
+                            tool_use_result = msg.get("toolUseResult", {})
+                            if isinstance(tool_use_result, dict):
+                                explicit_duration = tool_use_result.get("durationMs")
+                                if explicit_duration is not None:
+                                    tc.explicit_duration_ms = explicit_duration
                 user_content = "\n".join(text_parts)
 
             # Only create a new turn if there's actual user text content

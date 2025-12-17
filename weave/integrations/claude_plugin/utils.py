@@ -358,8 +358,9 @@ class BufferedToolResult:
     tool_use_id: str
     name: str
     input: dict[str, Any]
-    timestamp: datetime
+    timestamp: datetime  # When tool_use was sent (from assistant message)
     result: str
+    result_timestamp: datetime  # When tool_result was received (from user message)
     is_error: bool = False
 
 
@@ -397,6 +398,7 @@ class ToolResultBuffer:
         input: dict[str, Any],
         timestamp: datetime,
         result: str,
+        result_timestamp: datetime,
         is_error: bool = False,
     ) -> None:
         """Add a tool result to the buffer."""
@@ -406,6 +408,7 @@ class ToolResultBuffer:
             input=input,
             timestamp=timestamp,
             result=result,
+            result_timestamp=result_timestamp,
             is_error=is_error,
         )
 
