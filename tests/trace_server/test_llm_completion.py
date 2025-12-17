@@ -444,7 +444,6 @@ class TestLLMCompletionStreaming(unittest.TestCase):
 
         # Track calls made to dual_write_calls_batch
         dual_write_calls = []
-        original_dual_write = self.server._dual_write_calls_batch
 
         def mock_dual_write(
             project_id,
