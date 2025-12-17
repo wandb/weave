@@ -121,7 +121,10 @@ from weave.integrations.claude_plugin.views.diff_view import (
     generate_session_diff_html,
     generate_turn_diff_html,
 )
-from weave.integrations.claude_plugin.secret_scanner import get_secret_scanner
+try:
+    from weave.integrations.claude_plugin.secret_scanner import get_secret_scanner
+except ImportError:
+    get_secret_scanner = lambda: None  # No-op if secret_scanner not installed
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
