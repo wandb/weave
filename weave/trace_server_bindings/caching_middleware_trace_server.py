@@ -153,7 +153,12 @@ class CachingMiddlewareTraceServer(TraceServerClientInterface):
             return object.__getattribute__(self, name)
 
         # For everything else, delegate to the underlying trace server
-        next_server = object.__getattribute__(self, "_next_trace_server")
+        # Use try/except to handle subclasses that may not have _next_trace_server
+        try:
+            next_server = object.__getattribute__(self, "_next_trace_server")
+        except AttributeError:
+            # Fall back to normal attribute lookup (for subclasses or test mocks)
+            return object.__getattribute__(self, name)
         return getattr(next_server, name)
 
     def get_call_processor(self) -> AsyncBatchProcessor | None:
