@@ -17,9 +17,12 @@ DEFAULT_SERVER_MODE = "dual_write_read_merged"
 # ├─────────────────────────┼──────────────────────┼─────────────────────────────┼────────────────────────────────┼──────────────────────┼──────────────────────┤
 # │ EMPTY                   │ COMPLETE / COMPLETE  │ MERGED / BOTH               │ COMPLETE / BOTH                │ MERGED / MERGED      │ MERGED / MERGED      │
 # │ MERGED_ONLY             │ MERGED / MERGED      │ MERGED / MERGED             │ MERGED / MERGED                │ MERGED / MERGED      │ MERGED / MERGED      │
-# │ COMPLETE_ONLY           │ COMPLETE / COMPLETE  │ MERGED / BOTH               │ COMPLETE / BOTH                │ MERGED / MERGED      │ MERGED / MERGED      │
+# │ COMPLETE_ONLY           │ COMPLETE / COMPLETE  │ MERGED / COMPLETE*          │ COMPLETE / COMPLETE*           │ MERGED / MERGED      │ MERGED / MERGED      │
 # │ BOTH                    │ COMPLETE / COMPLETE  │ MERGED / BOTH               │ COMPLETE / BOTH                │ MERGED / MERGED      │ MERGED / MERGED      │
 # └─────────────────────────┴──────────────────────┴─────────────────────────────┴────────────────────────────────┴──────────────────────┴──────────────────────┘
+#
+# * COMPLETE_ONLY in dual-write modes is an edge case that should never occur in production.
+#   We never switch from AUTO to dual-write modes. Writes go to COMPLETE only to avoid inconsistent state.
 
 
 class ProjectDataResidence(Enum):
