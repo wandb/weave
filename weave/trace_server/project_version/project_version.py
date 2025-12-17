@@ -86,6 +86,10 @@ class TableRoutingResolver:
             return ReadTable.CALLS_MERGED
 
         if self._mode == CallsStorageServerMode.DUAL_WRITE_READ_MERGED:
+            # Edge case: COMPLETE_ONLY shouldn't happen in dual-write mode
+            # but if it does, read from where the data actually is
+            if residence == ProjectDataResidence.COMPLETE_ONLY:
+                return ReadTable.CALLS_COMPLETE
             return ReadTable.CALLS_MERGED
 
         if self._mode == CallsStorageServerMode.DUAL_WRITE_READ_COMPLETE:
