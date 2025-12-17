@@ -150,6 +150,7 @@ from weave.trace_server.project_version.types import (
     ProjectDataResidence,
     ReadTable,
     WriteTarget,
+    ReadTable
 )
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 from weave.trace_server.table_query_builder import (
