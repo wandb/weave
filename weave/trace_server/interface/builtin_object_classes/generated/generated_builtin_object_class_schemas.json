@@ -1816,12 +1816,24 @@
           "title": "Label",
           "type": "string"
         },
-        "version_refs": {
-          "items": {
-            "type": "string"
-          },
-          "title": "Version Refs",
-          "type": "array"
+        "base_ref": {
+          "title": "Base Ref",
+          "type": "string"
+        },
+        "versions": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "const": "*",
+              "type": "string"
+            }
+          ],
+          "title": "Versions"
         },
         "show_version_indicator": {
           "title": "Show Version Indicator",
@@ -1833,7 +1845,8 @@
       },
       "required": [
         "label",
-        "version_refs",
+        "base_ref",
+        "versions",
         "show_version_indicator",
         "method"
       ],
