@@ -34,9 +34,9 @@ CREATE TABLE annotation_queues (
     name String,
 
     /*
-    `description`: Optional description of the queue's purpose.
+    `description`: Description of the queue's purpose.
     */
-    description Nullable(String),
+    description String,
 
     /*
     `scorer_refs`: Array of scorer weave refs for annotation.
@@ -63,7 +63,10 @@ CREATE TABLE annotation_queues (
     /*
     `deleted_at`: Soft delete timestamp. NULL means not deleted.
     */
-    deleted_at Nullable(DateTime64(3))
+    deleted_at Nullable(DateTime64(3)),
+
+    -- Minmax index for filtering by creator
+    INDEX idx_created_by created_by TYPE minmax GRANULARITY 1
 ) ENGINE = MergeTree()
 ORDER BY (project_id, id)
 SETTINGS
@@ -123,11 +126,6 @@ CREATE TABLE annotation_queue_items (
     Focuses annotator attention on relevant fields. Specified per batch when adding calls.
     */
     display_fields Array(String),
-
-    /*
-    `added_at`: Timestamp when this call was added to the queue.
-    */
-    added_at DateTime64(3) DEFAULT now64(3),
 
     /*
     `added_by`: W&B user ID who added this call to the queue.
@@ -194,24 +192,26 @@ CREATE TABLE annotator_queue_items_progress (
     queue_id String,
 
     /*
-    `call_id`: Denormalized from queue_item for efficient querying without joins.
-    */
-    call_id String,
-
-    /*
     `annotator_id`: W&B user ID of the annotator.
     */
     annotator_id String,
 
     /*
     `annotation_state`: Workflow state of this item.
-    - completed (0): Annotation finished
-    - skipped (1): Annotator chose to skip
+    - unstarted (0): No annotator has worked on this item yet (default)
+    - in_progress (1): Annotation is currently being worked on
+    - completed (2): Annotation finished
+    - skipped (3): Annotator chose to skip
+
+    Note: 'unstarted' has the lowest numeric code (0) so that argMax() naturally
+    returns 'unstarted' when no progress records exist for an item.
     */
     annotation_state Enum8(
-        'completed' = 0,
-        'skipped' = 1
-    ) DEFAULT 'completed',
+        'unstarted' = 0,
+        'in_progress' = 1,
+        'completed' = 2,
+        'skipped' = 3
+    ) DEFAULT 'unstarted',
 
     /*
     `created_at`: Timestamp when the row was created.
