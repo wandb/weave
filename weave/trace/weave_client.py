@@ -91,7 +91,7 @@ from weave.trace.wandb_run_context import (
     get_global_wb_run_context,
 )
 from weave.trace.weave_client_send_file_cache import WeaveClientSendFileCache
-from weave.trace_server.constants import MAX_OBJECT_NAME_LENGTH
+from weave.trace_server.constants import EVALUATION_RUN_OP_NAME, MAX_OBJECT_NAME_LENGTH
 from weave.trace_server.ids import generate_id
 from weave.trace_server.interface.feedback_types import (
     RUNNABLE_FEEDBACK_TYPE_PREFIX,
@@ -828,10 +828,12 @@ class WeaveClient:
                 if root_call_did_not_error and should_print_call_link_:
                     print_call_link(call)
             except Exception:
-                pass
+                logger.exception(f"Failed to execute start call for {call_id}")
+                start_enqueued_event.set()
 
         call_start_delay = settings.call_start_delay()
-        is_eval_op = op.name == "Evaluation.evaluate"
+        # Evaluations are always long running, don't try to wait
+        is_eval_op = op.name == EVALUATION_RUN_OP_NAME
 
         should_delay = (call_start_delay != 0) and (not is_eval_op)
 
@@ -978,14 +980,19 @@ class WeaveClient:
             # Wait for start to be enqueued before we enqueue end
             assert isinstance(call.id, str)
 
+            # Execute pending start if it hasn't fired yet
             with self._pending_starts_lock:
                 if call.id in self._pending_starts:
                     start_func = self._pending_starts.pop(call.id)
                     start_func()
 
+            # Wait for start to be enqueued with timeout
             start_event = self._call_start_enqueued.pop(call.id, None)
-            if start_event is not None:
-                start_event.wait()
+            if start_event is not None and not start_event.wait(timeout=30.0):
+                logger.error(
+                    f"Timeout waiting for start to enqueue for call {call.id}. "
+                    "Proceeding with end anyway."
+                )
 
             maybe_redacted_output_as_refs = output_as_refs
             if should_redact_pii():
