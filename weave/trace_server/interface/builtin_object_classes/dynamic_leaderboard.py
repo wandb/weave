@@ -3,7 +3,7 @@ from enum import Enum
 from pydantic import BaseModel
 
 from weave.trace_server.interface.builtin_object_classes import base_object_def
-from typing import TypeVar, Generic
+from typing import Literal
 
 
 class AggregationMethod(str, Enum):
@@ -13,7 +13,8 @@ class AggregationMethod(str, Enum):
 
 class ObjectVersionGroup(BaseModel):
     label: str  # label for the combination of the groups
-    version_refs: list[str]  # Digests of the versions to group
+    base_ref: str
+    versions: list[str] | Literal["*"]
     show_version_indicator: bool
     method: AggregationMethod
 
