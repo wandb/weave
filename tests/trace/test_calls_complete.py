@@ -1629,7 +1629,9 @@ def test_start_call_routing_across_modes(
         pytest.skip("Skipping test for sqlite clients")
     # Apply the mode fixture
     request.getfixturevalue(mode_fixture_name)
-    setup_project_residence(clickhouse_client, project_id, residence_state)
+    setup_project_residence(
+        server, project_id, residence_state, table_routing_resolver._mode
+    )
 
     # Create a start call
     call_id = generate_id()
