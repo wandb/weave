@@ -12,7 +12,6 @@ from weave.trace_server.errors import (
     NotFoundError,
 )
 from weave.trace_server.llm_completion import get_custom_provider_info
-from weave.trace_server.project_version.types import WriteTarget
 from weave.trace_server.secret_fetcher_context import (
     _secret_fetcher_context,
 )
@@ -443,19 +442,35 @@ class TestLLMCompletionStreaming(unittest.TestCase):
             },
         ]
 
+        # Track calls made to dual_write_calls_batch
+        dual_write_calls = []
+        original_dual_write = self.server._dual_write_calls_batch
+
+        def mock_dual_write(
+            project_id,
+            source,
+            starts=None,
+            ends=None,
+            completes=None,
+            do_sync_insert=False,
+        ):
+            """Mock that tracks calls but doesn't write to database."""
+            dual_write_calls.append(
+                {
+                    "project_id": project_id,
+                    "source": source,
+                    "starts": starts or [],
+                    "ends": ends or [],
+                    "completes": completes or [],
+                }
+            )
+
         with (
             patch(
                 "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
             ) as mock_litellm,
             patch.object(
-                chts.ClickHouseTraceServer, "_insert_call"
-            ) as mock_insert_call,
-            patch.object(
-                chts.ClickHouseTraceServer, "_mint_client"
-            ) as mock_mint_client,
-            patch(
-                "weave.trace_server.project_version.project_version.TableRoutingResolver.resolve_write_target",
-                return_value=WriteTarget.CALLS_MERGED,
+                self.server, "_dual_write_calls_batch", side_effect=mock_dual_write
             ),
         ):
             # Mock the litellm completion stream
@@ -487,10 +502,20 @@ class TestLLMCompletionStreaming(unittest.TestCase):
             self.assertEqual(chunks[2]["choices"][0]["finish_reason"], "stop")
 
             # Verify call tracking
-            self.assertEqual(mock_insert_call.call_count, 2)  # Start and end calls
-            start_call = mock_insert_call.call_args_list[0][0][0]
-            end_call = mock_insert_call.call_args_list[1][0][0]
+            self.assertEqual(len(dual_write_calls), 2)  # Start and end calls
+
+            # Verify start call
+            start_batch = dual_write_calls[0]
+            self.assertEqual(start_batch["project_id"], "dGVzdF9wcm9qZWN0")
+            self.assertEqual(len(start_batch["starts"]), 1)
+            start_call = start_batch["starts"][0]
             self.assertEqual(start_call.project_id, "dGVzdF9wcm9qZWN0")
+
+            # Verify end call
+            end_batch = dual_write_calls[1]
+            self.assertEqual(end_batch["project_id"], "dGVzdF9wcm9qZWN0")
+            self.assertEqual(len(end_batch["ends"]), 1)
+            end_call = end_batch["ends"][0]
             self.assertEqual(end_call.project_id, "dGVzdF9wcm9qZWN0")
             self.assertEqual(end_call.id, start_call.id)
 
