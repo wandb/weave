@@ -4575,7 +4575,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     def _run_migrations(self) -> None:
         logger.info("Running migrations")
-        migrator = wf_migrator.ClickHouseTraceServerMigrator(self._mint_client())
+        migrator = wf_migrator.ClickHouseTraceServerMigrator(
+            self._mint_client(),
+            replicated=wf_env.wf_clickhouse_replicated(),
+            replicated_path=wf_env.wf_clickhouse_replicated_path(),
+            replicated_cluster=wf_env.wf_clickhouse_replicated_cluster(),
+            use_distributed=wf_env.wf_clickhouse_use_distributed_tables(),
+        )
         migrator.apply_migrations(self._database)
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._query_stream")
