@@ -1187,18 +1187,14 @@ class TestSemanticConventionParsing:
 
         call_with_cost = res_with_cost.calls[0]
         call_no_cost = res_no_cost.calls[0]
+        assert call_with_cost.summary is not None
 
-        # Verify cost information is present when requested
-        assert "weave" in call_with_cost.summary
-        assert "costs" in call_with_cost.summary["weave"]
-        assert "gpt-4" in call_with_cost.summary["weave"]["costs"]
+        # Verify model cost information is present when requested
+        assert "gpt-4" in call_with_cost.summary["weave"]["costs"]  # type: ignore
 
-        gpt4_cost = call_with_cost.summary["weave"]["costs"]["gpt-4"]
-
-        # Delete timestamp fields that vary
-        del gpt4_cost["effective_date"]
-        del gpt4_cost["created_at"]
-
+        gpt4_cost = call_with_cost.summary["weave"]["costs"]["gpt-4"]  # type: ignore
+        del gpt4_cost["effective_date"]  # type: ignore
+        del gpt4_cost["created_at"]  # type: ignore
         # Verify cost calculation matches expected values
         assert (
             gpt4_cost
@@ -1221,7 +1217,7 @@ class TestSemanticConventionParsing:
         )
 
         # Verify no cost information when not requested
-        assert "costs" not in call_no_cost.summary.get("weave", {})
+        assert "costs" not in call_no_cost.summary.get("weave", {})  # type: ignore
 
 
 class TestHelpers:
