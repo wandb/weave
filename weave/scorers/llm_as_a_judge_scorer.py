@@ -1,8 +1,12 @@
 from typing import Any
 
+from pydantic import field_validator
+
 from weave.flow.scorer import Scorer
-from weave.trace.objectify import register_object
+from weave.prompt.prompt import MessagesPrompt
+from weave.trace.objectify import maybe_objectify, register_object
 from weave.trace.op import op
+from weave.trace.vals import make_trace_obj
 from weave.trace_server.interface.builtin_object_classes.llm_structured_model import (
     LLMStructuredCompletionModel,
 )
@@ -10,13 +14,36 @@ from weave.trace_server.interface.builtin_object_classes.llm_structured_model im
 
 @register_object
 class LLMAsAJudgeScorer(Scorer):
+    """LLM as a judge scorer that uses a prompt to score outputs.
+
+    Attributes:
+        model: The LLM model to use for scoring.
+        scoring_prompt: Either a string template with {variable} placeholders,
+            or a MessagesPrompt object (can be passed via weave.ref()).
+    """
+
     model: LLMStructuredCompletionModel
-    scoring_prompt: str
+    scoring_prompt: str | MessagesPrompt
+
+    @field_validator("scoring_prompt", mode="before")
+    @classmethod
+    def validate_scoring_prompt(cls, v: Any) -> str | MessagesPrompt:
+        """Convert ObjectRecord to MessagesPrompt if needed."""
+        if isinstance(v, (str, MessagesPrompt)):
+            return v
+        # Handle ObjectRecord from deserialization
+        trace_obj = make_trace_obj(v, None, None, None)
+        result = maybe_objectify(trace_obj)
+        if isinstance(result, MessagesPrompt):
+            return result
+        return v
 
     @op
     def score(self, *, output: str, **kwargs: Any) -> Any:
-        scoring_prompt = self.scoring_prompt.format(output=output, **kwargs)
-        model_input = [
-            {"role": "user", "content": scoring_prompt},
-        ]
+        """Score the output using the scoring_prompt."""
+        if isinstance(self.scoring_prompt, MessagesPrompt):
+            model_input = self.scoring_prompt.format(output=output, **kwargs)
+        else:
+            scoring_prompt = self.scoring_prompt.format(output=output, **kwargs)
+            model_input = [{"role": "user", "content": scoring_prompt}]
         return self.model.predict(model_input)
