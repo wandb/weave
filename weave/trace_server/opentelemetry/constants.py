@@ -52,8 +52,8 @@ INPUT_KEYS = [
     "gen_ai.prompt",  # From OpenTelemetry AI semantic conventions
     "input.value",  # From OpenInference standard
     "mlflow.spanInputs",  # From MLFlow's tracking format
-    "gen_ai.input.messages", # Logfire V2 - see logfire pydantic instrumentation notes
-    "pydantic_ai.all_messages", # Includes inputs and outputs - see logfire pydantic instrumentation notes
+    "gen_ai.input.messages",  # Logfire V2 - see logfire pydantic instrumentation notes
+    "pydantic_ai.all_messages",  # Includes inputs and outputs - see logfire pydantic instrumentation notes
     "traceloop.entity.input",  # From Traceloop's conventions
     "gcp.vertex.agent.tool_call_args",  # From Google's Vertex AI
     "gcp.vertex.agent.llm_request",  # From Google's Vertex AI
@@ -68,7 +68,7 @@ OUTPUT_KEYS = [
     "ai.response",  # Vercel
     "gen_ai.completion",  # From OpenTelemetry AI semantic conventions
     "output.value",  # From OpenInference standard - highest priority
-    "gen_ai.output.messages", # Logfire v2 - see logfire pydantic instrumentation notes
+    "gen_ai.output.messages",  # Logfire v2 - see logfire pydantic instrumentation notes
     "mlflow.spanOutputs",  # From MLFlow's tracking format
     "gen_ai.content.completion",  # From OpenLit project's format
     "traceloop.entity.output",  # From Traceloop's conventions
@@ -115,7 +115,7 @@ ATTRIBUTE_KEYS = {
     "system": [
         "gen_ai.system",  # OpenTelemetry AI
         "llm.system",  # OpenInference
-        "gen_ai.system_instructions"
+        "gen_ai.system_instructions",
     ],
     # Span kind - identifies the type of operation
     "kind": [
