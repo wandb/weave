@@ -193,6 +193,7 @@ class OpKwargs(TypedDict, total=False):
     tracing_sample_rate: float
     enable_code_capture: bool
     accumulator: Callable[[Any | None, Any], Any] | None
+    kind: str | None
 
 
 def setup_dunder_weave_dict(d: WeaveKwargs | None = None) -> WeaveKwargs:
@@ -384,6 +385,12 @@ def _set_python_function_type_on_weave_dict(
     weave_dict["type"] = type_str
 
 
+def _set_kind_on_weave_dict(__weave: WeaveKwargs, kind: str) -> None:
+    """Sets the op kind (e.g., 'tool') on the __weave dict attributes."""
+    weave_dict = __weave.setdefault("attributes", {}).setdefault("weave", {})
+    weave_dict["kind"] = kind
+
+
 def _call_sync_func(
     op: Op,
     *args: Any,
@@ -412,6 +419,8 @@ def _call_sync_func(
 
     __weave = setup_dunder_weave_dict(__weave)
     _set_python_function_type_on_weave_dict(__weave, "function")
+    if op.kind:
+        _set_kind_on_weave_dict(__weave, op.kind)
 
     # Proceed with tracing. Note that we don't check the sample rate here.
     # Only root calls get sampling applied.
@@ -557,6 +566,8 @@ async def _call_async_func(
 
     __weave = setup_dunder_weave_dict(__weave)
     _set_python_function_type_on_weave_dict(__weave, "async_function")
+    if op.kind:
+        _set_kind_on_weave_dict(__weave, op.kind)
 
     # Proceed with tracing
     try:
@@ -688,6 +699,8 @@ def _call_sync_gen(
 
     __weave = setup_dunder_weave_dict(__weave)
     _set_python_function_type_on_weave_dict(__weave, "generator")
+    if op._kind:
+        _set_kind_on_weave_dict(__weave, op._kind)
 
     # Proceed with tracing
     try:
@@ -898,6 +911,8 @@ async def _call_async_gen(
 
     __weave = setup_dunder_weave_dict(__weave)
     _set_python_function_type_on_weave_dict(__weave, "async_generator")
+    if op._kind:
+        _set_kind_on_weave_dict(__weave, op._kind)
 
     # Proceed with tracing
     try:
@@ -1169,6 +1184,7 @@ def op(
     tracing_sample_rate: float = 1.0,
     enable_code_capture: bool = True,
     accumulator: Callable[[Any | None, Any], Any] | None = None,
+    kind: str | None = None,
 ) -> Callable[[Callable[P, R]], Op[P, R]] | Op[P, R]:
     """A decorator to weave op-ify a function or method. Works for both sync and async.
     Automatically detects iterator functions and applies appropriate behavior.
@@ -1275,6 +1291,9 @@ def op(
             wrapper._is_async = is_async  # type: ignore
             wrapper._is_generator = is_sync_generator  # type: ignore
             wrapper._is_async_generator = is_async_generator  # type: ignore
+
+            # Store the op kind (e.g., "tool") if provided
+            wrapper._kind = kind  # type: ignore
 
             return cast(Op[P, R], wrapper)
 

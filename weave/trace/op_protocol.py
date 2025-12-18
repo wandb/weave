@@ -85,6 +85,9 @@ class Op(Protocol[P, R]):
 
     tracing_sample_rate: float
 
+    # The kind of op (e.g., "tool"). Used to identify special op types in the UI.
+    kind: str | None
+
 
 @dataclass
 class ProcessedInputs:
