@@ -274,11 +274,12 @@ def test_create_distributed_table_sql(migrator):
     # Test creating distributed table SQL
     cluster_name = "test_cluster"
     sql = _create_distributed_table_sql("test", "test", cluster_name)
-    assert "CREATE TABLE IF NOT EXISTS test ON CLUSTER test_cluster" in sql
-    assert (
-        "ENGINE = Distributed(test_cluster, currentDatabase(), test_local, rand())"
-        in sql
-    )
+    expected = """
+        CREATE TABLE IF NOT EXISTS test ON CLUSTER test_cluster
+        AS test_local
+        ENGINE = Distributed(test_cluster, currentDatabase(), test_local, rand())
+    """
+    assert sql.strip() == expected.strip()
 
 
 def test_format_distributed_sql(migrator):
@@ -326,13 +327,17 @@ def test_execute_migration_command_with_distributed(migrator):
 
     # Check that local table was created with replicated engine and _local suffix
     first_call = ch_client.command.call_args_list[0][0][0]
-    assert "test_local" in first_call
-    assert "ENGINE = ReplicatedMergeTree" in first_call
+    expected_local = "CREATE TABLE test_local (id Int32) ENGINE = ReplicatedMergeTree"
+    assert first_call == expected_local
 
     # Check that distributed table was created
     second_call = ch_client.command.call_args_list[1][0][0]
-    assert "CREATE TABLE IF NOT EXISTS test ON CLUSTER test_cluster" in second_call
-    assert "ENGINE = Distributed" in second_call
+    expected_distributed = """
+        CREATE TABLE IF NOT EXISTS test ON CLUSTER test_cluster
+        AS test_local
+        ENGINE = Distributed(test_cluster, currentDatabase(), test_local, rand())
+    """
+    assert second_call.strip() == expected_distributed.strip()
 
 
 def test_execute_migration_command_with_alter(migrator):
@@ -373,12 +378,12 @@ def test_format_replicated_sql_idempotent(migrator):
     # Test that applying _format_replicated_sql twice doesn't double-apply the Replicated prefix
     sql = "CREATE TABLE test (id Int32) ENGINE = MergeTree"
     formatted_once = _format_replicated_sql(sql)
-    assert "ENGINE = ReplicatedMergeTree" in formatted_once
+    expected = "CREATE TABLE test (id Int32) ENGINE = ReplicatedMergeTree"
+    assert formatted_once == expected
 
     # Applying again should not change it (idempotent)
     formatted_twice = _format_replicated_sql(formatted_once)
-    assert "ENGINE = ReplicatedMergeTree" in formatted_twice
-    assert "ReplicatedReplicatedMergeTree" not in formatted_twice
+    assert formatted_twice == expected
 
 
 def test_non_replicated_preserves_table_names(migrator):
