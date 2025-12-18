@@ -2,6 +2,7 @@
 import logging
 import os
 import re
+from dataclasses import dataclass
 
 from clickhouse_connect.driver.client import Client as CHClient
 
@@ -15,6 +16,14 @@ DEFAULT_REPLICATED_PATH = "/clickhouse/tables/{db}"
 DEFAULT_REPLICATED_CLUSTER = "weave_cluster"
 
 
+@dataclass
+class DistributedTransformResult:
+    """Result of transforming SQL for distributed tables."""
+
+    local_command: str
+    distributed_command: str | None
+
+
 class MigrationError(RuntimeError):
     """Raised when a migration error occurs."""
 
@@ -24,6 +33,7 @@ class ClickHouseTraceServerMigrator:
     replicated: bool
     replicated_path: str
     replicated_cluster: str
+    use_distributed: bool
     management_db: str
 
     def __init__(
@@ -32,6 +42,7 @@ class ClickHouseTraceServerMigrator:
         replicated: bool | None = None,
         replicated_path: str | None = None,
         replicated_cluster: str | None = None,
+        use_distributed: bool | None = None,
         management_db: str = "db_management",
     ):
         super().__init__()
@@ -45,7 +56,16 @@ class ClickHouseTraceServerMigrator:
             if replicated_cluster is None
             else replicated_cluster
         )
+        self.use_distributed = False if use_distributed is None else use_distributed
         self.management_db = management_db
+
+        # Validate configuration
+        if self.use_distributed and not self.replicated:
+            raise MigrationError(
+                "Distributed tables can only be used with replicated tables. "
+                "Set replicated=True or use_distributed=False."
+            )
+
         self._initialize_migration_db()
 
     def _is_safe_identifier(self, value: str) -> bool:
@@ -58,13 +78,101 @@ class ClickHouseTraceServerMigrator:
             return sql_query
 
         # Match "ENGINE = <optional words>MergeTree" followed by word boundary
+        # but only if it doesn't already start with "Replicated"
         pattern = r"ENGINE\s*=\s*(\w+)?MergeTree\b"
 
         def replace_engine(match: re.Match[str]) -> str:
             engine_prefix = match.group(1) or ""
+            # Don't add "Replicated" if it's already there
+            if engine_prefix.lower().startswith("replicated"):
+                return match.group(0)
             return f"ENGINE = Replicated{engine_prefix}MergeTree"
 
         return re.sub(pattern, replace_engine, sql_query, flags=re.IGNORECASE)
+
+    def _add_on_cluster_to_alter(self, sql_query: str) -> str:
+        """Add ON CLUSTER clause to ALTER TABLE statements if replicated mode is enabled."""
+        if not self.replicated:
+            return sql_query
+
+        # Check if this is an ALTER TABLE statement and doesn't already have ON CLUSTER
+        if re.search(r"\bALTER\s+TABLE\b", sql_query, flags=re.IGNORECASE):
+            # Don't add if already present
+            if re.search(r"\bON\s+CLUSTER\b", sql_query, flags=re.IGNORECASE):
+                return sql_query
+
+            # Insert ON CLUSTER after the table name
+            # Pattern: ALTER TABLE [table_name] [rest of command]
+            pattern = r"(\bALTER\s+TABLE\s+)([a-zA-Z0-9_]+)(\s+)"
+
+            def add_cluster(match: re.Match[str]) -> str:
+                return f"{match.group(1)}{match.group(2)} ON CLUSTER {self.replicated_cluster}{match.group(3)}"
+
+            return re.sub(pattern, add_cluster, sql_query, flags=re.IGNORECASE)
+
+        return sql_query
+
+    def _extract_table_name(self, sql_query: str) -> str | None:
+        """Extract table name from CREATE TABLE statement."""
+        # Match "CREATE TABLE [IF NOT EXISTS] table_name"
+        pattern = r"CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([a-zA-Z0-9_]+)"
+        match = re.search(pattern, sql_query, flags=re.IGNORECASE)
+        if match:
+            return match.group(1)
+        return None
+
+    def _rename_table_to_local(self, sql_query: str, table_name: str) -> str:
+        """Rename table in CREATE TABLE statement to table_name_local."""
+        # Replace the table name with table_name_local
+        pattern = rf"(CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?){table_name}\b"
+        return re.sub(pattern, rf"\1{table_name}_local", sql_query, flags=re.IGNORECASE)
+
+    def _create_distributed_table_sql(
+        self, table_name: str, local_table_name: str
+    ) -> str:
+        """Generate SQL to create a distributed table on top of a local replicated table."""
+        if not self._is_safe_identifier(table_name):
+            raise MigrationError(f"Invalid table name: {table_name}")
+        if not self._is_safe_identifier(local_table_name):
+            raise MigrationError(f"Invalid local table name: {local_table_name}")
+        if not self._is_safe_identifier(self.replicated_cluster):
+            raise MigrationError(f"Invalid cluster name: {self.replicated_cluster}")
+
+        # Create distributed table that routes to the local tables across the cluster
+        distributed_sql = f"""
+            CREATE TABLE IF NOT EXISTS {table_name} ON CLUSTER {self.replicated_cluster}
+            AS {local_table_name}_local
+            ENGINE = Distributed({self.replicated_cluster}, currentDatabase(), {local_table_name}_local, rand())
+        """
+        return distributed_sql
+
+    def _transform_for_distributed(self, sql_query: str) -> DistributedTransformResult:
+        """Transform SQL to create distributed tables if use_distributed is enabled.
+
+        Returns:
+            DistributedTransformResult with local_command and optional distributed_command.
+        """
+        if not self.use_distributed or not self.replicated:
+            return DistributedTransformResult(
+                local_command=sql_query, distributed_command=None
+            )
+
+        # Check if this is a CREATE TABLE statement
+        table_name = self._extract_table_name(sql_query)
+        if not table_name:
+            return DistributedTransformResult(
+                local_command=sql_query, distributed_command=None
+            )
+
+        # Rename the table to table_name_local
+        local_command = self._rename_table_to_local(sql_query, table_name)
+
+        # Create the distributed table
+        distributed_command = self._create_distributed_table_sql(table_name, table_name)
+
+        return DistributedTransformResult(
+            local_command=local_command, distributed_command=distributed_command
+        )
 
     def _create_db_sql(self, db_name: str) -> str:
         """Generate SQL database create string for normal and replicated databases."""
@@ -259,7 +367,27 @@ class ClickHouseTraceServerMigrator:
             return
         curr_db = self.ch_client.database
         self.ch_client.database = target_db
-        self.ch_client.command(self._format_replicated_sql(command))
+
+        # If not in replicated mode, execute command as-is without any transformations
+        if not self.replicated:
+            self.ch_client.command(command)
+            self.ch_client.database = curr_db
+            return
+
+        # Apply replicated transformations
+        formatted_command = self._format_replicated_sql(command)
+        formatted_command = self._add_on_cluster_to_alter(formatted_command)
+
+        # Then check if we need to create distributed tables
+        result = self._transform_for_distributed(formatted_command)
+
+        # Execute the local table creation (or original command if not a CREATE TABLE)
+        self.ch_client.command(result.local_command)
+
+        # If we have a distributed table to create, execute that too
+        if result.distributed_command:
+            self.ch_client.command(result.distributed_command)
+
         self.ch_client.database = curr_db
 
     def _update_migration_status(
