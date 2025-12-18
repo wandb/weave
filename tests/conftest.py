@@ -373,19 +373,19 @@ def make_server_recorder(server: tsi.TraceServerInterface):  # type: ignore
         attribute_access_log: list[str]
 
         def __init__(self, server: tsi.TraceServerInterface):
-            self.server = server
-            self.attribute_access_log = []
+            # Use object.__setattr__ to avoid triggering any parent __setattr__
+            object.__setattr__(self, "server", server)
+            object.__setattr__(self, "attribute_access_log", [])
 
-        def __getattribute__(self, name):
-            self_server = super().__getattribute__("server")
-            access_log = super().__getattribute__("attribute_access_log")
-            if name == "server":
-                return self_server
-            if name == "attribute_access_log":
-                return access_log
-            attr = self_server.__getattribute__(name)
-            if name != "attribute_access_log":
-                access_log.append(name)
+        def __getattribute__(self, name: str):
+            # Use object.__getattribute__ directly for our own attributes
+            # to avoid going through parent class __getattribute__ implementations
+            if name in ("server", "attribute_access_log"):
+                return object.__getattribute__(self, name)
+            self_server = object.__getattribute__(self, "server")
+            access_log = object.__getattribute__(self, "attribute_access_log")
+            attr = getattr(self_server, name)
+            access_log.append(name)
             return attr
 
     return ServerRecorder(server)
