@@ -4,6 +4,7 @@ from pydantic import field_validator
 
 from weave.flow.scorer import Scorer
 from weave.prompt.prompt import MessagesPrompt
+from weave.trace.context.weave_client_context import get_weave_client
 from weave.trace.objectify import maybe_objectify, register_object
 from weave.trace.op import op
 from weave.trace.vals import make_trace_obj
@@ -32,7 +33,10 @@ class LLMAsAJudgeScorer(Scorer):
         if isinstance(v, (str, MessagesPrompt)):
             return v
         # Handle ObjectRecord from deserialization
-        trace_obj = make_trace_obj(v, None, None, None)
+        client = get_weave_client()
+        if client is None:
+            return v
+        trace_obj = make_trace_obj(v, None, client.server, None)
         result = maybe_objectify(trace_obj)
         if isinstance(result, MessagesPrompt):
             return result
