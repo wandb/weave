@@ -148,16 +148,19 @@ def test_create_db_sql_validation(migrator):
         migrator._create_db_sql("test_db")
 
 
-def test_create_db_sql(migrator):
+def test_create_db_sql_non_replicated(migrator):
     # Test non-replicated mode
     migrator.replicated = False
     sql = migrator._create_db_sql("test_db")
     assert sql.strip() == "CREATE DATABASE IF NOT EXISTS test_db"
 
+
+def test_create_db_sql_replicated(migrator):
     # Test replicated mode
     migrator.replicated = True
     migrator.replicated_path = "/clickhouse/tables/{db}"
     migrator.replicated_cluster = "test_cluster"
+
     sql = migrator._create_db_sql("test_db")
     expected = """
         CREATE DATABASE IF NOT EXISTS test_db ON CLUSTER test_cluster ENGINE=Replicated('/clickhouse/tables/test_db', '{shard}', '{replica}')
@@ -165,17 +168,23 @@ def test_create_db_sql(migrator):
     assert sql.strip() == expected
 
 
-def test_format_replicated_sql(migrator):
+def test_format_replicated_sql_non_replicated(migrator):
     # Test that SQL is unchanged when replicated=False
     migrator.replicated = False
-    for sql in [
+    test_cases = [
         "CREATE TABLE test (id Int32) ENGINE = MergeTree",
         "CREATE TABLE test (id Int32) ENGINE = SummingMergeTree",
-    ]:
+        "CREATE TABLE test (id Int32) ENGINE=ReplacingMergeTree",
+    ]
+
+    for sql in test_cases:
         assert migrator._format_replicated_sql(sql) == sql
 
+
+def test_format_replicated_sql_replicated(migrator):
     # Test that MergeTree engines are converted to Replicated variants
     migrator.replicated = True
+
     test_cases = [
         (
             "CREATE TABLE test (id Int32) ENGINE = MergeTree",
@@ -189,20 +198,35 @@ def test_format_replicated_sql(migrator):
             "CREATE TABLE test (id Int32) ENGINE=ReplacingMergeTree",
             "CREATE TABLE test (id Int32) ENGINE = ReplicatedReplacingMergeTree",
         ),
+        # Test with extra whitespace
         (
             "CREATE TABLE test (id Int32) ENGINE  =   MergeTree",
             "CREATE TABLE test (id Int32) ENGINE = ReplicatedMergeTree",
         ),
+        # Test with parameters
+        (
+            "CREATE TABLE test (id Int32) ENGINE = MergeTree()",
+            "CREATE TABLE test (id Int32) ENGINE = ReplicatedMergeTree()",
+        ),
     ]
+
     for input_sql, expected_sql in test_cases:
         assert migrator._format_replicated_sql(input_sql) == expected_sql
 
+
+def test_format_replicated_sql_non_mergetree(migrator):
     # Test that non-MergeTree engines are left unchanged
-    for sql in [
+    migrator.replicated = True
+
+    test_cases = [
         "CREATE TABLE test (id Int32) ENGINE = Memory",
         "CREATE TABLE test (id Int32) ENGINE = Log",
+        "CREATE TABLE test (id Int32) ENGINE = TinyLog",
+        # This should not be changed as it's not a complete word match
         "CREATE TABLE test (id Int32) ENGINE = MyMergeTreeCustom",
-    ]:
+    ]
+
+    for sql in test_cases:
         assert migrator._format_replicated_sql(sql) == sql
 
 
