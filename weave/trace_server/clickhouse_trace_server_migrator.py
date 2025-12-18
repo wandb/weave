@@ -2,6 +2,7 @@
 import logging
 import os
 import re
+from dataclasses import dataclass
 
 from clickhouse_connect.driver.client import Client as CHClient
 
@@ -13,6 +14,14 @@ logger = logging.getLogger(__name__)
 # self managed clickhouse instances.
 DEFAULT_REPLICATED_PATH = "/clickhouse/tables/{db}"
 DEFAULT_REPLICATED_CLUSTER = "weave_cluster"
+
+
+@dataclass
+class DistributedTransformResult:
+    """Result of transforming SQL for distributed tables."""
+
+    local_command: str
+    distributed_command: str | None
 
 
 class MigrationError(RuntimeError):
@@ -137,20 +146,23 @@ class ClickHouseTraceServerMigrator:
         """
         return distributed_sql
 
-    def _transform_for_distributed(self, sql_query: str) -> tuple[str, str | None]:
+    def _transform_for_distributed(self, sql_query: str) -> DistributedTransformResult:
         """Transform SQL to create distributed tables if use_distributed is enabled.
 
         Returns:
-            A tuple of (transformed_command, distributed_table_command).
-            If no distributed table is needed, the second element is None.
+            DistributedTransformResult with local_command and optional distributed_command.
         """
         if not self.use_distributed or not self.replicated:
-            return (sql_query, None)
+            return DistributedTransformResult(
+                local_command=sql_query, distributed_command=None
+            )
 
         # Check if this is a CREATE TABLE statement
         table_name = self._extract_table_name(sql_query)
         if not table_name:
-            return (sql_query, None)
+            return DistributedTransformResult(
+                local_command=sql_query, distributed_command=None
+            )
 
         # Rename the table to table_name_local
         local_command = self._rename_table_to_local(sql_query, table_name)
@@ -158,7 +170,9 @@ class ClickHouseTraceServerMigrator:
         # Create the distributed table
         distributed_command = self._create_distributed_table_sql(table_name, table_name)
 
-        return (local_command, distributed_command)
+        return DistributedTransformResult(
+            local_command=local_command, distributed_command=distributed_command
+        )
 
     def _create_db_sql(self, db_name: str) -> str:
         """Generate SQL database create string for normal and replicated databases."""
@@ -365,16 +379,14 @@ class ClickHouseTraceServerMigrator:
         formatted_command = self._add_on_cluster_to_alter(formatted_command)
 
         # Then check if we need to create distributed tables
-        local_command, distributed_command = self._transform_for_distributed(
-            formatted_command
-        )
+        result = self._transform_for_distributed(formatted_command)
 
         # Execute the local table creation (or original command if not a CREATE TABLE)
-        self.ch_client.command(local_command)
+        self.ch_client.command(result.local_command)
 
         # If we have a distributed table to create, execute that too
-        if distributed_command:
-            self.ch_client.command(distributed_command)
+        if result.distributed_command:
+            self.ch_client.command(result.distributed_command)
 
         self.ch_client.database = curr_db
 

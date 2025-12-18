@@ -333,22 +333,22 @@ def test_transform_for_distributed_skipped_cases(migrator):
     # Case 1: use_distributed=False
     migrator.use_distributed = False
     migrator.replicated = True
-    local_cmd, dist_cmd = migrator._transform_for_distributed(sql)
-    assert local_cmd == sql
-    assert dist_cmd is None
+    result = migrator._transform_for_distributed(sql)
+    assert result.local_command == sql
+    assert result.distributed_command is None
 
     # Case 2: replicated=False
     migrator.use_distributed = True
     migrator.replicated = False
-    local_cmd, dist_cmd = migrator._transform_for_distributed(sql)
-    assert local_cmd == sql
-    assert dist_cmd is None
+    result = migrator._transform_for_distributed(sql)
+    assert result.local_command == sql
+    assert result.distributed_command is None
 
     # Case 3: Non-CREATE TABLE statements
     migrator.replicated = True
-    local_cmd, dist_cmd = migrator._transform_for_distributed(alter_sql)
-    assert local_cmd == alter_sql
-    assert dist_cmd is None
+    result = migrator._transform_for_distributed(alter_sql)
+    assert result.local_command == alter_sql
+    assert result.distributed_command is None
 
 
 def test_transform_for_distributed_enabled(migrator):
@@ -358,14 +358,19 @@ def test_transform_for_distributed_enabled(migrator):
     migrator.replicated_cluster = "test_cluster"
 
     sql = "CREATE TABLE test (id Int32) ENGINE = MergeTree"
-    local_cmd, dist_cmd = migrator._transform_for_distributed(sql)
+    result = migrator._transform_for_distributed(sql)
 
-    assert "CREATE TABLE test_local (id Int32) ENGINE = MergeTree" == local_cmd
-    assert dist_cmd is not None
-    assert "CREATE TABLE IF NOT EXISTS test ON CLUSTER test_cluster" in dist_cmd
+    assert (
+        "CREATE TABLE test_local (id Int32) ENGINE = MergeTree" == result.local_command
+    )
+    assert result.distributed_command is not None
+    assert (
+        "CREATE TABLE IF NOT EXISTS test ON CLUSTER test_cluster"
+        in result.distributed_command
+    )
     assert (
         "ENGINE = Distributed(test_cluster, currentDatabase(), test_local, rand())"
-        in dist_cmd
+        in result.distributed_command
     )
 
 
