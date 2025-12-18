@@ -699,8 +699,8 @@ def _call_sync_gen(
 
     __weave = setup_dunder_weave_dict(__weave)
     _set_python_function_type_on_weave_dict(__weave, "generator")
-    if op._kind:
-        _set_kind_on_weave_dict(__weave, op._kind)
+    if op.kind:
+        _set_kind_on_weave_dict(__weave, op.kind)
 
     # Proceed with tracing
     try:
@@ -911,8 +911,8 @@ async def _call_async_gen(
 
     __weave = setup_dunder_weave_dict(__weave)
     _set_python_function_type_on_weave_dict(__weave, "async_generator")
-    if op._kind:
-        _set_kind_on_weave_dict(__weave, op._kind)
+    if op.kind:
+        _set_kind_on_weave_dict(__weave, op.kind)
 
     # Proceed with tracing
     try:
@@ -1293,7 +1293,7 @@ def op(
             wrapper._is_async_generator = is_async_generator  # type: ignore
 
             # Store the op kind (e.g., "tool") if provided
-            wrapper._kind = kind  # type: ignore
+            wrapper.kind = kind  # type: ignore
 
             return cast(Op[P, R], wrapper)
 
