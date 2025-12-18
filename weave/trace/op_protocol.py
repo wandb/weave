@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import (
     TYPE_CHECKING,
     Any,
+    Literal,
     Protocol,
     overload,
     runtime_checkable,
@@ -18,6 +19,12 @@ if TYPE_CHECKING:
 
 P = ParamSpec("P")
 R = TypeVar("R")
+
+# Valid op kinds for categorizing operations in the UI
+OpKind = Literal["agent", "llm", "tool", "search"]
+
+# Valid op colors for customizing the kind icon color in the UI
+OpColor = Literal["red", "orange", "yellow", "green", "blue", "purple"]
 
 
 @runtime_checkable
@@ -86,7 +93,10 @@ class Op(Protocol[P, R]):
     tracing_sample_rate: float
 
     # The kind of op (e.g., "tool"). Used to identify special op types in the UI.
-    kind: str | None
+    kind: OpKind | None
+
+    # The color for the kind icon in the UI. Overrides the default color for the kind.
+    color: OpColor | None
 
 
 @dataclass
