@@ -1,14 +1,5 @@
 """The top-level functions and classes for working with Weave."""
 
-import sys
-import warnings
-
-if sys.version_info < (3, 10):  # noqa: UP036
-    warnings.warn(
-        "Weave only supports Python 3.10 or higher; please upgrade your Python version to avoid potential issues.",
-        stacklevel=2,
-    )
-
 from weave import version
 from weave.trace.api import *
 

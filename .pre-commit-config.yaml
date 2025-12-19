@@ -14,7 +14,7 @@ repos:
     hooks:
       - id: ty
         name: ty (type checker)
-        entry: uv run ty check
+        entry: uv run --frozen ty check
         language: python
         always_run: true
         pass_filenames: false
