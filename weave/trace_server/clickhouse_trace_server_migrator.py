@@ -15,6 +15,65 @@ logger = logging.getLogger(__name__)
 DEFAULT_REPLICATED_PATH = "/clickhouse/tables/{db}"
 DEFAULT_REPLICATED_CLUSTER = "weave_cluster"
 
+# Constants for table naming conventions
+LOCAL_TABLE_SUFFIX = "_local"
+VIEW_SUFFIX = "_view"
+
+
+"""
+Differences between cloud, replicated, and distributed modes:
+
+## Cloud Mode (replicated=False, use_distributed=False)
+- Single-node ClickHouse deployment managed by cloud provider (e.g., ClickHouse Cloud)
+- All SQL commands executed as-is without transformation
+
+## Replicated Mode (replicated=True, use_distributed=False)
+- Multi-node ClickHouse cluster with automatic replication
+- Tables have 'Replicated' prepended to MergeTree engine with ZooKeeper coordination
+- All DDL statements include `ON CLUSTER {cluster_name}` for cluster-wide execution
+
+## Distributed Mode (replicated=True, use_distributed=True)
+- Extends replicated mode with sharding and distributed query capabilities
+- Requires replicated mode as foundation (distributed tables reference local replicated tables)
+- Two-tier table structure:
+  - Local tables (`table_name_local`): ReplicatedMergeTree, store actual data on each shard
+  - Distributed tables (`table_name`): Distributed engine, query router across all shards
+- All DDL statements include `ON CLUSTER {cluster_name}`
+
+### Distributed Mode Special Handling:
+
+**CREATE TABLE:**
+  - Creates `table_name_local` (ReplicatedMergeTree on each node)
+  - Creates `table_name` (Distributed table pointing to `table_name_local`)
+
+**ALTER TABLE (regular columns):**
+  - Alters both `table_name_local` AND `table_name` (both need schema updates)
+
+**ALTER TABLE ADD/DROP INDEX:**
+  - Only alters `table_name_local` (distributed tables don't support indexes)
+  - Skips altering the distributed table
+
+**ALTER TABLE ... MODIFY QUERY (materialized views):**
+  - Uses DROP/CREATE pattern instead of ALTER
+  - Drops `view_name_local` ON CLUSTER
+  - Creates `view_name_local` ON CLUSTER with `TO target_table_local`
+  - All `FROM` clauses and qualified column references renamed to `_local` suffix
+
+**CREATE/DROP VIEW:**
+  - Only adds `ON CLUSTER` clause (views are metadata-only, no local/distributed split)
+
+**MATERIALIZE commands:**
+  - Skipped entirely (not supported by distributed tables)
+"""
+
+
+@dataclass
+class DistributedTransformResult:
+    """Result of transforming SQL for distributed tables."""
+
+    local_command: str
+    distributed_command: str | None
+
 
 @dataclass
 class DistributedTransformResult:
@@ -134,7 +193,6 @@ class ClickHouseTraceServerMigrator:
             create_table_sql = _format_create_table_with_on_cluster_sql(
                 create_table_sql, self.replicated_cluster
             )
-        logger.info(f"Creating migration table: {create_table_sql}")
         self.ch_client.command(create_table_sql)
 
     def _get_migration_status(self, db_name: str) -> dict:
@@ -294,62 +352,149 @@ class ClickHouseTraceServerMigrator:
         command = command.strip()
         if len(command) == 0:
             return
+
         curr_db = self.ch_client.database
         self.ch_client.database = target_db
 
-        # If not in replicated mode, execute command as-is without any transformations
         if not self.replicated:
             self.ch_client.command(command)
             self.ch_client.database = curr_db
             return
 
+<<<<<<< HEAD
         formatted_command = _format_replicated_sql(
             command, use_distributed=self.use_distributed, target_db=target_db
         )
         formatted_command = _format_create_table_with_on_cluster_sql(
             formatted_command, self.replicated_cluster
         )
-
-        if self.use_distributed:
-            is_alter = re.search(
-                r"\bALTER\s+TABLE\b", formatted_command, flags=re.IGNORECASE
-            )
-
-            if is_alter:
-                formatted_command = _rename_alter_table_to_local(formatted_command)
-
-            formatted_command = _format_alter_with_on_cluster_sql(
-                formatted_command, self.replicated_cluster
-            )
-
-            if is_alter:
-                print("alter command: ", formatted_command)
-                self.ch_client.command(formatted_command)
-            else:
-                result = _format_distributed_sql(
-                    formatted_command, self.replicated_cluster
-                )
-                print("local command: ", result.local_command)
-                self.ch_client.command(result.local_command)
-                if result.distributed_command:
-                    print("distributed command: ", result.distributed_command)
-                    self.ch_client.command(result.distributed_command)
         else:
-            formatted_command = _format_alter_with_on_cluster_sql(
-                formatted_command, self.replicated_cluster
-            )
-            print("normal command: ", formatted_command)
-            self.ch_client.command(formatted_command)
+            self._execute_replicated_command(formatted_command)
 
         self.ch_client.database = curr_db
 
+    def _execute_replicated_command(self, command: str) -> None:
+        """Execute command in replicated mode."""
+        formatted_command = _format_with_on_cluster_sql(
+            command, self.replicated_cluster
+        )
+        self.ch_client.command(formatted_command)
+
+    def _execute_distributed_command(self, command: str) -> None:
+        """Execute command in distributed mode."""
+        # Skip MATERIALIZE commands (not supported by distributed tables)
+        if re.search(r"\bMATERIALIZE\b", command, flags=re.IGNORECASE):
+            logger.warning(
+                f"Skipping MATERIALIZE command (not supported in distributed mode): {command}"
+            )
+            return
+
+        # Check for ALTER TABLE
+        is_alter = re.search(r"\bALTER\s+TABLE\b", command, flags=re.IGNORECASE)
+        if is_alter:
+            self._execute_distributed_alter(command)
+            return
+
+        # Handle CREATE TABLE and other DDL
+        self._execute_distributed_ddl(command)
+
+    def _execute_distributed_alter(self, command: str) -> None:
+        """Execute ALTER TABLE in distributed mode."""
+        # Materialized view modification (MODIFY QUERY)
+        is_modify_query = re.search(r"\bMODIFY\s+QUERY\b", command, flags=re.IGNORECASE)
+        if is_modify_query:
+            self._execute_materialized_view_alter(command)
+            return
+
+        # Index operations (ADD/DROP INDEX)
+        is_index_op = re.search(r"\b(ADD|DROP)\s+INDEX\b", command, flags=re.IGNORECASE)
+        if is_index_op:
+            self._execute_index_operation(command)
+            return
+
+        # Regular ALTER: apply to both local and distributed tables
+        local_command = _rename_alter_table_to_local(command)
+        local_command = _format_with_on_cluster_sql(
+            local_command, self.replicated_cluster
+        )
+        self.ch_client.command(local_command)
+
+        distributed_command = _format_with_on_cluster_sql(
+            command, self.replicated_cluster
+        )
+        self.ch_client.command(distributed_command)
+
+    def _execute_materialized_view_alter(self, command: str) -> None:
+        """Handle ALTER TABLE MODIFY QUERY for materialized views in distributed mode."""
+        view_name = _extract_alter_table_name(command)
+        if not view_name:
+            raise MigrationError(f"Could not extract view name from: {command}")
+
+        # Extract SELECT query
+        modify_query_match = re.search(
+            r"MODIFY\s+QUERY\s+(SELECT.+)",
+            command,
+            flags=re.IGNORECASE | re.DOTALL,
+        )
+        if not modify_query_match:
+            raise MigrationError(
+                f"Could not extract query from MODIFY QUERY: {command}"
+            )
+
+        select_query = modify_query_match.group(1).strip()
+        select_query_local = _rename_from_tables_to_local(select_query)
+
+        # Determine local view and target table names
+        view_name_local = _add_local_suffix(view_name)
+        if view_name.endswith(VIEW_SUFFIX):
+            target_table = view_name[: -len(VIEW_SUFFIX)] + LOCAL_TABLE_SUFFIX
+        else:
+            target_table = view_name + LOCAL_TABLE_SUFFIX
+
+        # DROP and CREATE the materialized view
+        drop_statement = f"DROP TABLE IF EXISTS {view_name_local} ON CLUSTER {self.replicated_cluster}"
+        self.ch_client.command(drop_statement)
+
+        create_statement = (
+            f"CREATE MATERIALIZED VIEW {view_name_local}\n"
+            f"ON CLUSTER {self.replicated_cluster}\n"
+            f"TO {target_table}\n"
+            f"AS\n"
+            f"{select_query_local}"
+        )
+        self.ch_client.command(create_statement)
+
+    def _execute_index_operation(self, command: str) -> None:
+        """Execute ADD/DROP INDEX (only on local tables)."""
+        local_command = _rename_alter_table_to_local(command)
+        local_command = _format_with_on_cluster_sql(
+            local_command, self.replicated_cluster
+        )
+        self.ch_client.command(local_command)
+
+    def _execute_distributed_ddl(self, command: str) -> None:
+        """Execute DDL in distributed mode (CREATE TABLE, CREATE/DROP VIEW)."""
+        formatted_command = _format_with_on_cluster_sql(
+            command, self.replicated_cluster
+        )
+        result = _format_distributed_sql(formatted_command, self.replicated_cluster)
+
+        self.ch_client.command(result.local_command)
+        if result.distributed_command:
+            self.ch_client.command(result.distributed_command)
+
+
+def _add_local_suffix(name: str) -> str:
+    """Add _local suffix to a name if it doesn't already have it."""
+    return name if name.endswith(LOCAL_TABLE_SUFFIX) else name + LOCAL_TABLE_SUFFIX
+
+>>>>>>> griffin/distributed-replicated-migration
 
 def _is_safe_identifier(value: str) -> bool:
     """Check if a string is safe to use as an identifier in SQL."""
     return bool(re.match(r"^[a-zA-Z0-9_\.]+$", value))
 
 
-def _extract_table_name(sql_query: str) -> str | None:
     """Extract table name from CREATE TABLE statement."""
     # Match "CREATE TABLE [IF NOT EXISTS] table_name"
     # Note: table_name can be qualified with database name (e.g., db.table)
@@ -363,20 +508,106 @@ def _extract_table_name(sql_query: str) -> str | None:
 def _rename_table_to_local(sql_query: str, table_name: str) -> str:
     """Rename table in CREATE TABLE statement to table_name_local."""
     pattern = rf"(CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?){table_name}\b"
-    return re.sub(pattern, rf"\1{table_name}_local", sql_query, flags=re.IGNORECASE)
+    return re.sub(
+        pattern, rf"\1{table_name}{LOCAL_TABLE_SUFFIX}", sql_query, flags=re.IGNORECASE
+    )
 
 
 def _rename_alter_table_to_local(sql_query: str) -> str:
     """Rename table in ALTER TABLE statement to table_name_local."""
     pattern = r"(ALTER\s+TABLE\s+)([a-zA-Z0-9_.]+)(\s+)"
 
-    def add_local_suffix(match: re.Match[str]) -> str:
+    def add_suffix(match: re.Match[str]) -> str:
         table_name = match.group(2)
-        if not table_name.endswith("_local"):
-            table_name = f"{table_name}_local"
+        table_name = _add_local_suffix(table_name)
         return f"{match.group(1)}{table_name}{match.group(3)}"
 
-    return re.sub(pattern, add_local_suffix, sql_query, flags=re.IGNORECASE)
+    return re.sub(pattern, add_suffix, sql_query, flags=re.IGNORECASE)
+
+
+def _extract_alter_table_name(sql_query: str) -> str | None:
+    """Extract table name from ALTER TABLE statement."""
+    pattern = r"ALTER\s+TABLE\s+([a-zA-Z0-9_.]+)"
+    match = re.search(pattern, sql_query, flags=re.IGNORECASE)
+    if match:
+        return match.group(1)
+    return None
+
+
+def _rename_from_tables_to_local(sql_query: str) -> str:
+    """Rename table references in FROM clauses and qualified column names to use _local suffix.
+
+    This is needed for materialized views in distributed mode where the local view
+    should reference local tables (e.g., FROM call_parts_local and call_parts_local.column).
+
+    Args:
+        sql_query: The SQL query containing FROM clauses and table references
+
+    Returns:
+        SQL query with table names in FROM clauses and qualified column references renamed to include _local suffix
+    """
+    # First, strip out SQL comments to avoid matching "from" in comments
+    # Remove single-line comments (-- comment)
+    lines = sql_query.split("\n")
+    sql_without_comments = []
+    comment_lines = {}  # Store comments to restore later
+    for i, line in enumerate(lines):
+        if "--" in line:
+            # Split on first occurrence of --
+            code_part, comment_part = line.split("--", 1)
+            sql_without_comments.append(code_part)
+            comment_lines[i] = comment_part
+        else:
+            sql_without_comments.append(line)
+
+    sql_to_process = "\n".join(sql_without_comments)
+
+    # Match FROM keyword followed by table name
+    # Use lookbehind to ensure FROM is either at start or preceded by whitespace/newline
+    from_pattern = r"(?<=\s)FROM\s+([a-zA-Z0-9_.]+)\b|^FROM\s+([a-zA-Z0-9_.]+)\b"
+
+    def add_suffix_to_from(match: re.Match[str]) -> str:
+        # Group 1 is for FROM after whitespace, Group 2 is for FROM at start
+        table_name = match.group(1) if match.group(1) else match.group(2)
+        table_name = _add_local_suffix(table_name)
+        return f"FROM {table_name}"
+
+    # Collect table names from FROM clauses before renaming
+    table_names = set()
+    for match in re.finditer(
+        from_pattern, sql_to_process, flags=re.IGNORECASE | re.MULTILINE
+    ):
+        table_name = match.group(1) if match.group(1) else match.group(2)
+        # Handle database.table format - extract just the table name
+        if "." in table_name:
+            table_name = table_name.split(".")[-1]
+        if not table_name.endswith(LOCAL_TABLE_SUFFIX):
+            table_names.add(table_name)
+
+    # Now rename FROM clauses
+    sql_to_process = re.sub(
+        from_pattern,
+        add_suffix_to_from,
+        sql_to_process,
+        flags=re.IGNORECASE | re.MULTILINE,
+    )
+
+    # Second, handle qualified column references (table_name.column_name) for tables we found in FROM clauses
+    for table_name in table_names:
+        # Match table_name.column_name
+        qualified_pattern = rf"\b{re.escape(table_name)}\.([a-zA-Z0-9_]+)\b"
+        replacement = rf"{table_name}{LOCAL_TABLE_SUFFIX}.\1"
+        sql_to_process = re.sub(
+            qualified_pattern, replacement, sql_to_process, flags=re.IGNORECASE
+        )
+
+    # Restore comments
+    result_lines = sql_to_process.split("\n")
+    for i, comment in comment_lines.items():
+        if i < len(result_lines):
+            result_lines[i] = result_lines[i] + "--" + comment
+
+    return "\n".join(result_lines)
 
 
 def _create_db_sql(
@@ -420,7 +651,8 @@ def _format_replicated_sql(
     Returns:
         SQL with MergeTree engines converted to ReplicatedMergeTree variants
     """
-    pattern = r"ENGINE\s*=\s*(\w+)?MergeTree(\(\))?"
+    # Match any MergeTree variant engine (including custom ones)
+    pattern = r"ENGINE\s*=\s*(\w+)?MergeTree\b(\(\))?"
 
     def replace_engine(match: re.Match[str]) -> str:
         engine_prefix = match.group(1) or ""
@@ -433,7 +665,9 @@ def _format_replicated_sql(
                 if "." in table_name:
                     table_name = table_name.split(".")[-1]
 
-                return f"ENGINE = Replicated{engine_prefix}MergeTree('/clickhouse/tables/{{shard}}/{target_db}/{table_name}', '{{replica}}')"
+                # When using distributed tables, append _local suffix to the table name in the path
+                local_table_name = table_name + LOCAL_TABLE_SUFFIX
+                return f"ENGINE = Replicated{engine_prefix}MergeTree('/clickhouse/tables/{{shard}}/{target_db}/{local_table_name}', '{{replica}}')"
 
         return f"ENGINE = Replicated{engine_prefix}MergeTree"
 
@@ -496,6 +730,86 @@ def _format_create_table_with_on_cluster_sql(sql_query: str, cluster_name: str) 
     return sql_query
 
 
+def _format_drop_view_with_on_cluster_sql(sql_query: str, cluster_name: str) -> str:
+    """Format DROP VIEW statements to include ON CLUSTER clause.
+
+    Args:
+        sql_query: The SQL query to transform
+        cluster_name: The cluster name to use in the ON CLUSTER clause
+
+    Returns:
+        Transformed SQL with ON CLUSTER added if applicable
+    """
+    # Check if this is a DROP VIEW statement and doesn't already have ON CLUSTER
+    if re.search(r"\bDROP\s+VIEW\b", sql_query, flags=re.IGNORECASE):
+        # Don't add if already present
+        if re.search(r"\bON\s+CLUSTER\b", sql_query, flags=re.IGNORECASE):
+            return sql_query
+
+        # Match "DROP VIEW [IF EXISTS] view_name" and add ON CLUSTER after view name
+        # Note: view_name can be qualified with database name (e.g., db.view)
+        pattern = r"(\bDROP\s+VIEW\s+(?:IF\s+EXISTS\s+)?)([a-zA-Z0-9_.]+)(\s|$)"
+
+        def add_cluster(match: re.Match[str]) -> str:
+            return f"{match.group(1)}{match.group(2)} ON CLUSTER {cluster_name}{match.group(3)}"
+
+        return re.sub(pattern, add_cluster, sql_query, flags=re.IGNORECASE)
+
+    return sql_query
+
+
+def _format_create_view_with_on_cluster_sql(sql_query: str, cluster_name: str) -> str:
+    """Format CREATE VIEW statements to include ON CLUSTER clause.
+
+    Args:
+        sql_query: The SQL query to transform
+        cluster_name: The cluster name to use in the ON CLUSTER clause
+
+    Returns:
+        Transformed SQL with ON CLUSTER added if applicable
+    """
+    # Check if this is a CREATE VIEW statement and doesn't already have ON CLUSTER
+    if re.search(r"\bCREATE\s+VIEW\b", sql_query, flags=re.IGNORECASE):
+        # Don't add if already present
+        if re.search(r"\bON\s+CLUSTER\b", sql_query, flags=re.IGNORECASE):
+            return sql_query
+
+        # Match "CREATE VIEW [IF NOT EXISTS] view_name" and add ON CLUSTER after view name
+        # Note: view_name can be qualified with database name (e.g., db.view)
+        pattern = r"(\bCREATE\s+VIEW\s+(?:IF\s+NOT\s+EXISTS\s+)?)([a-zA-Z0-9_.]+)(\s+)"
+
+        def add_cluster(match: re.Match[str]) -> str:
+            return f"{match.group(1)}{match.group(2)} ON CLUSTER {cluster_name}{match.group(3)}"
+
+        return re.sub(pattern, add_cluster, sql_query, flags=re.IGNORECASE)
+
+    return sql_query
+
+
+def _format_with_on_cluster_sql(sql_query: str, cluster_name: str) -> str:
+    """Generic function to format various DDL statements with ON CLUSTER clause.
+
+    This function consolidates the logic for adding ON CLUSTER to multiple DDL types:
+    - ALTER TABLE
+    - CREATE TABLE
+    - DROP VIEW
+    - CREATE VIEW
+
+    Args:
+        sql_query: The SQL query to transform
+        cluster_name: The cluster name to use in the ON CLUSTER clause
+
+    Returns:
+        Transformed SQL with ON CLUSTER added if applicable
+    """
+    # Apply transformations in order
+    sql_query = _format_alter_with_on_cluster_sql(sql_query, cluster_name)
+    sql_query = _format_create_table_with_on_cluster_sql(sql_query, cluster_name)
+    sql_query = _format_drop_view_with_on_cluster_sql(sql_query, cluster_name)
+    sql_query = _format_create_view_with_on_cluster_sql(sql_query, cluster_name)
+    return sql_query
+
+
 def _create_distributed_table_sql(
     table_name: str, local_table_name: str, cluster_name: str
 ) -> str:
@@ -511,8 +825,8 @@ def _create_distributed_table_sql(
     """
     distributed_sql = f"""
         CREATE TABLE IF NOT EXISTS {table_name} ON CLUSTER {cluster_name}
-        AS {local_table_name}_local
-        ENGINE = Distributed({cluster_name}, currentDatabase(), {local_table_name}_local, rand())
+        AS {local_table_name}{LOCAL_TABLE_SUFFIX}
+        ENGINE = Distributed({cluster_name}, currentDatabase(), {local_table_name}{LOCAL_TABLE_SUFFIX}, rand())
     """
     return distributed_sql
 
