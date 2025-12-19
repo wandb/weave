@@ -20,6 +20,33 @@ _PATCHED_INTEGRATIONS: set[str] = set()
 # Global reference to the import hook, so we can unregister it if needed
 _IMPORT_HOOK: Optional["WeaveImportHook"] = None
 
+OPENAI_IMPORT_TARGET = "openai"
+ANTHROPIC_IMPORT_TARGET = "anthropic"
+MISTRALAI_IMPORT_TARGET = "mistralai"
+GROQ_IMPORT_TARGET = "groq"
+LITELLM_IMPORT_TARGET = "litellm"
+CEREBRAS_IMPORT_TARGET = "cerebras"
+COHERE_IMPORT_TARGET = "cohere"
+GOOGLE_GENAI_IMPORT_TARGET = "google.genai"
+VERTEXAI_IMPORT_TARGET = "vertexai"
+HUGGINGFACE_HUB_IMPORT_TARGET = "huggingface_hub"
+INSTRUCTOR_IMPORT_TARGET = "instructor"
+DSPY_IMPORT_TARGET = "dspy"
+CREWAI_IMPORT_TARGET = "crewai"
+CREWAI_TOOLS_IMPORT_TARGET = "crewai_tools"
+NOTDIAMOND_IMPORT_TARGET = "notdiamond"
+MCP_IMPORT_TARGET = "mcp"
+LANGCHAIN_NVIDIA_AI_ENDPOINTS_IMPORT_TARGET = "langchain_nvidia_ai_endpoints"
+SMOLAGENTS_IMPORT_TARGET = "smolagents"
+AGENTS_IMPORT_TARGET = "agents"
+OPENAI_AGENTS_IMPORT_TARGET = "openai_agents"
+VERDICT_IMPORT_TARGET = "verdict"
+VERIFIERS_IMPORT_TARGET = "verifiers"
+AUTOGEN_IMPORT_TARGET = "autogen"
+LANGCHAIN_IMPORT_TARGET = "langchain"
+LLAMA_INDEX_IMPORT_TARGET = "llama_index"
+OPENAI_REALTIME_IMPORT_TARGET = "openai_realtime"
+
 
 def patch_openai(settings: IntegrationSettings | None = None) -> None:
     """Enable Weave tracing for OpenAI.
@@ -36,7 +63,7 @@ def patch_openai(settings: IntegrationSettings | None = None) -> None:
     if settings is None:
         settings = IntegrationSettings()
     if get_openai_patcher(settings).attempt_patch():
-        _PATCHED_INTEGRATIONS.add("openai")
+        _PATCHED_INTEGRATIONS.add(OPENAI_IMPORT_TARGET)
 
 
 def patch_anthropic(settings: IntegrationSettings | None = None) -> None:
@@ -46,7 +73,7 @@ def patch_anthropic(settings: IntegrationSettings | None = None) -> None:
     if settings is None:
         settings = IntegrationSettings()
     if get_anthropic_patcher(settings).attempt_patch():
-        _PATCHED_INTEGRATIONS.add("anthropic")
+        _PATCHED_INTEGRATIONS.add(ANTHROPIC_IMPORT_TARGET)
 
 
 def patch_mistral(settings: IntegrationSettings | None = None) -> None:
@@ -56,7 +83,7 @@ def patch_mistral(settings: IntegrationSettings | None = None) -> None:
     if settings is None:
         settings = IntegrationSettings()
     if get_mistral_patcher(settings).attempt_patch():
-        _PATCHED_INTEGRATIONS.add("mistralai")
+        _PATCHED_INTEGRATIONS.add(MISTRALAI_IMPORT_TARGET)
 
 
 def patch_groq(settings: IntegrationSettings | None = None) -> None:
@@ -66,7 +93,7 @@ def patch_groq(settings: IntegrationSettings | None = None) -> None:
     if settings is None:
         settings = IntegrationSettings()
     if get_groq_patcher(settings).attempt_patch():
-        _PATCHED_INTEGRATIONS.add("groq")
+        _PATCHED_INTEGRATIONS.add(GROQ_IMPORT_TARGET)
 
 
 def patch_litellm(settings: IntegrationSettings | None = None) -> None:
@@ -76,7 +103,7 @@ def patch_litellm(settings: IntegrationSettings | None = None) -> None:
     if settings is None:
         settings = IntegrationSettings()
     if get_litellm_patcher(settings).attempt_patch():
-        _PATCHED_INTEGRATIONS.add("litellm")
+        _PATCHED_INTEGRATIONS.add(LITELLM_IMPORT_TARGET)
 
 
 def patch_cerebras(settings: IntegrationSettings | None = None) -> None:
@@ -86,7 +113,7 @@ def patch_cerebras(settings: IntegrationSettings | None = None) -> None:
     if settings is None:
         settings = IntegrationSettings()
     if get_cerebras_patcher(settings).attempt_patch():
-        _PATCHED_INTEGRATIONS.add("cerebras")
+        _PATCHED_INTEGRATIONS.add(CEREBRAS_IMPORT_TARGET)
 
 
 def patch_cohere(settings: IntegrationSettings | None = None) -> None:
@@ -96,7 +123,7 @@ def patch_cohere(settings: IntegrationSettings | None = None) -> None:
     if settings is None:
         settings = IntegrationSettings()
     if get_cohere_patcher(settings).attempt_patch():
-        _PATCHED_INTEGRATIONS.add("cohere")
+        _PATCHED_INTEGRATIONS.add(COHERE_IMPORT_TARGET)
 
 
 def patch_google_genai(settings: IntegrationSettings | None = None) -> None:
@@ -108,7 +135,7 @@ def patch_google_genai(settings: IntegrationSettings | None = None) -> None:
     if settings is None:
         settings = IntegrationSettings()
     if get_google_genai_patcher(settings).attempt_patch():
-        _PATCHED_INTEGRATIONS.add("google.genai")
+        _PATCHED_INTEGRATIONS.add(GOOGLE_GENAI_IMPORT_TARGET)
 
 
 def patch_vertexai(settings: IntegrationSettings | None = None) -> None:
@@ -118,7 +145,7 @@ def patch_vertexai(settings: IntegrationSettings | None = None) -> None:
     if settings is None:
         settings = IntegrationSettings()
     if get_vertexai_patcher(settings).attempt_patch():
-        _PATCHED_INTEGRATIONS.add("vertexai")
+        _PATCHED_INTEGRATIONS.add(VERTEXAI_IMPORT_TARGET)
 
 
 def patch_huggingface(settings: IntegrationSettings | None = None) -> None:
@@ -130,7 +157,7 @@ def patch_huggingface(settings: IntegrationSettings | None = None) -> None:
     if settings is None:
         settings = IntegrationSettings()
     if get_huggingface_patcher(settings).attempt_patch():
-        _PATCHED_INTEGRATIONS.add("huggingface_hub")
+        _PATCHED_INTEGRATIONS.add(HUGGINGFACE_HUB_IMPORT_TARGET)
 
 
 def patch_instructor(settings: IntegrationSettings | None = None) -> None:
@@ -140,7 +167,7 @@ def patch_instructor(settings: IntegrationSettings | None = None) -> None:
     if settings is None:
         settings = IntegrationSettings()
     if get_instructor_patcher(settings).attempt_patch():
-        _PATCHED_INTEGRATIONS.add("instructor")
+        _PATCHED_INTEGRATIONS.add(INSTRUCTOR_IMPORT_TARGET)
 
 
 def patch_dspy(settings: IntegrationSettings | None = None) -> None:
@@ -150,7 +177,7 @@ def patch_dspy(settings: IntegrationSettings | None = None) -> None:
     if settings is None:
         settings = IntegrationSettings()
     if get_dspy_patcher(settings).attempt_patch():
-        _PATCHED_INTEGRATIONS.add("dspy")
+        _PATCHED_INTEGRATIONS.add(DSPY_IMPORT_TARGET)
 
 
 def patch_crewai(settings: IntegrationSettings | None = None) -> None:
@@ -160,8 +187,8 @@ def patch_crewai(settings: IntegrationSettings | None = None) -> None:
     if settings is None:
         settings = IntegrationSettings()
     if get_crewai_patcher(settings).attempt_patch():
-        _PATCHED_INTEGRATIONS.add("crewai")
-        _PATCHED_INTEGRATIONS.add("crewai_tools")
+        _PATCHED_INTEGRATIONS.add(CREWAI_IMPORT_TARGET)
+        _PATCHED_INTEGRATIONS.add(CREWAI_TOOLS_IMPORT_TARGET)
 
 
 def patch_notdiamond(settings: IntegrationSettings | None = None) -> None:
@@ -171,7 +198,7 @@ def patch_notdiamond(settings: IntegrationSettings | None = None) -> None:
     if settings is None:
         settings = IntegrationSettings()
     if get_notdiamond_patcher(settings).attempt_patch():
-        _PATCHED_INTEGRATIONS.add("notdiamond")
+        _PATCHED_INTEGRATIONS.add(NOTDIAMOND_IMPORT_TARGET)
 
 
 def patch_mcp(settings: IntegrationSettings | None = None) -> None:
@@ -183,7 +210,7 @@ def patch_mcp(settings: IntegrationSettings | None = None) -> None:
     server_patched = get_mcp_server_patcher(settings).attempt_patch()
     client_patched = get_mcp_client_patcher(settings).attempt_patch()
     if server_patched or client_patched:
-        _PATCHED_INTEGRATIONS.add("mcp")
+        _PATCHED_INTEGRATIONS.add(MCP_IMPORT_TARGET)
 
 
 def patch_nvidia(settings: IntegrationSettings | None = None) -> None:
@@ -195,7 +222,7 @@ def patch_nvidia(settings: IntegrationSettings | None = None) -> None:
     if settings is None:
         settings = IntegrationSettings()
     if get_nvidia_ai_patcher(settings).attempt_patch():
-        _PATCHED_INTEGRATIONS.add("langchain_nvidia_ai_endpoints")
+        _PATCHED_INTEGRATIONS.add(LANGCHAIN_NVIDIA_AI_ENDPOINTS_IMPORT_TARGET)
 
 
 def patch_smolagents(settings: IntegrationSettings | None = None) -> None:
@@ -205,7 +232,7 @@ def patch_smolagents(settings: IntegrationSettings | None = None) -> None:
     if settings is None:
         settings = IntegrationSettings()
     if get_smolagents_patcher(settings).attempt_patch():
-        _PATCHED_INTEGRATIONS.add("smolagents")
+        _PATCHED_INTEGRATIONS.add(SMOLAGENTS_IMPORT_TARGET)
 
 
 def patch_openai_agents(settings: IntegrationSettings | None = None) -> None:
@@ -215,7 +242,7 @@ def patch_openai_agents(settings: IntegrationSettings | None = None) -> None:
     if settings is None:
         settings = IntegrationSettings()
     if get_openai_agents_patcher(settings).attempt_patch():
-        _PATCHED_INTEGRATIONS.add("openai_agents")
+        _PATCHED_INTEGRATIONS.add(OPENAI_AGENTS_IMPORT_TARGET)
 
 
 def patch_verdict(settings: IntegrationSettings | None = None) -> None:
@@ -225,7 +252,7 @@ def patch_verdict(settings: IntegrationSettings | None = None) -> None:
     if settings is None:
         settings = IntegrationSettings()
     if get_verdict_patcher(settings).attempt_patch():
-        _PATCHED_INTEGRATIONS.add("verdict")
+        _PATCHED_INTEGRATIONS.add(VERDICT_IMPORT_TARGET)
 
 
 def patch_verifiers(settings: IntegrationSettings | None = None) -> None:
@@ -235,7 +262,7 @@ def patch_verifiers(settings: IntegrationSettings | None = None) -> None:
     if settings is None:
         settings = IntegrationSettings()
     if get_verifiers_patcher(settings).attempt_patch():
-        _PATCHED_INTEGRATIONS.add("verifiers")
+        _PATCHED_INTEGRATIONS.add(VERIFIERS_IMPORT_TARGET)
 
 
 def patch_autogen(settings: IntegrationSettings | None = None) -> None:
@@ -245,7 +272,7 @@ def patch_autogen(settings: IntegrationSettings | None = None) -> None:
     if settings is None:
         settings = IntegrationSettings()
     if get_autogen_patcher(settings).attempt_patch():
-        _PATCHED_INTEGRATIONS.add("autogen")
+        _PATCHED_INTEGRATIONS.add(AUTOGEN_IMPORT_TARGET)
 
 
 def patch_langchain() -> None:
@@ -253,7 +280,7 @@ def patch_langchain() -> None:
     from weave.integrations.langchain.langchain import langchain_patcher
 
     if langchain_patcher.attempt_patch():
-        _PATCHED_INTEGRATIONS.add("langchain")
+        _PATCHED_INTEGRATIONS.add(LANGCHAIN_IMPORT_TARGET)
 
 
 def patch_llamaindex() -> None:
@@ -261,7 +288,7 @@ def patch_llamaindex() -> None:
     from weave.integrations.llamaindex.llamaindex import llamaindex_patcher
 
     if llamaindex_patcher.attempt_patch():
-        _PATCHED_INTEGRATIONS.add("llama_index")
+        _PATCHED_INTEGRATIONS.add(LLAMA_INDEX_IMPORT_TARGET)
 
 
 def patch_openai_realtime(settings: IntegrationSettings | None = None) -> None:
@@ -270,38 +297,38 @@ def patch_openai_realtime(settings: IntegrationSettings | None = None) -> None:
     if settings is None:
         settings = IntegrationSettings()
     if get_openai_realtime_websocket_patcher(settings).attempt_patch():
-        _PATCHED_INTEGRATIONS.add("openai_realtime")
+        _PATCHED_INTEGRATIONS.add(OPENAI_REALTIME_IMPORT_TARGET)
 
 
 # Mapping of module names to patch functions for implicit patching
 # When a module is already imported, we'll automatically call its patch function
 
 INTEGRATION_MODULE_MAPPING: dict[str, Callable[[], None]] = {
-    "openai": patch_openai,
-    "anthropic": patch_anthropic,
-    "mistralai": patch_mistral,
-    "groq": patch_groq,
-    "litellm": patch_litellm,
-    "cerebras": patch_cerebras,
-    "cohere": patch_cohere,
-    "google.genai": patch_google_genai,
-    "vertexai": patch_vertexai,
-    "huggingface_hub": patch_huggingface,
-    "instructor": patch_instructor,
-    "dspy": patch_dspy,
-    "crewai": patch_crewai,
-    "crewai_tools": patch_crewai,
-    "notdiamond": patch_notdiamond,
-    "mcp": patch_mcp,
-    "langchain_nvidia_ai_endpoints": patch_nvidia,
-    "smolagents": patch_smolagents,
-    "agents": patch_openai_agents,
-    "verdict": patch_verdict,
-    "verifiers": patch_verifiers,
-    "autogen": patch_autogen,
-    "langchain": patch_langchain,
-    "llama_index": patch_llamaindex,
-    "openai_realtime": patch_openai_realtime,
+    OPENAI_IMPORT_TARGET: patch_openai,
+    ANTHROPIC_IMPORT_TARGET: patch_anthropic,
+    MISTRALAI_IMPORT_TARGET: patch_mistral,
+    GROQ_IMPORT_TARGET: patch_groq,
+    LITELLM_IMPORT_TARGET: patch_litellm,
+    CEREBRAS_IMPORT_TARGET: patch_cerebras,
+    COHERE_IMPORT_TARGET: patch_cohere,
+    GOOGLE_GENAI_IMPORT_TARGET: patch_google_genai,
+    VERTEXAI_IMPORT_TARGET: patch_vertexai,
+    HUGGINGFACE_HUB_IMPORT_TARGET: patch_huggingface,
+    INSTRUCTOR_IMPORT_TARGET: patch_instructor,
+    DSPY_IMPORT_TARGET: patch_dspy,
+    CREWAI_IMPORT_TARGET: patch_crewai,
+    CREWAI_TOOLS_IMPORT_TARGET: patch_crewai,
+    NOTDIAMOND_IMPORT_TARGET: patch_notdiamond,
+    MCP_IMPORT_TARGET: patch_mcp,
+    LANGCHAIN_NVIDIA_AI_ENDPOINTS_IMPORT_TARGET: patch_nvidia,
+    SMOLAGENTS_IMPORT_TARGET: patch_smolagents,
+    AGENTS_IMPORT_TARGET: patch_openai_agents,
+    VERDICT_IMPORT_TARGET: patch_verdict,
+    VERIFIERS_IMPORT_TARGET: patch_verifiers,
+    AUTOGEN_IMPORT_TARGET: patch_autogen,
+    LANGCHAIN_IMPORT_TARGET: patch_langchain,
+    LLAMA_INDEX_IMPORT_TARGET: patch_llamaindex,
+    OPENAI_REALTIME_IMPORT_TARGET: patch_openai_realtime,
 }
 
 
