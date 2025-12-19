@@ -6,8 +6,13 @@ from typing import Any
 
 from weave.trace.call import Call
 from weave.trace.serialization.serialize import to_json
+from weave.trace.table import Table
 from weave.trace.weave_client import WeaveClient
+from weave.trace.widgets import Widget
 from weave.type_wrappers.Content.content import Content
+
+ViewItem = Content | str | Widget | Table
+ViewSpec = ViewItem | list[ViewItem]
 
 
 def resolve_view_content(
@@ -62,12 +67,93 @@ def resolve_view_content(
     return result
 
 
+def serialize_view_item(
+    item: ViewItem,
+    project_id: str,
+    client: WeaveClient,
+    *,
+    extension: str | None = None,
+    mimetype: str | None = None,
+    metadata: dict[str, Any] | None = None,
+    encoding: str = "utf-8",
+) -> dict[str, Any] | str:
+    """Serialize a single view item to JSON.
+
+    Args:
+        item: A Content, string, Widget, or Table to serialize.
+        project_id: The project ID for serialization context.
+        client: The WeaveClient for serialization.
+        extension: Optional file extension for string content.
+        mimetype: Optional MIME type for string content.
+        metadata: Optional metadata for string content.
+        encoding: Encoding for string content.
+
+    Returns:
+        A JSON-serializable dictionary or string (for Table refs).
+    """
+    if isinstance(item, Widget):
+        return item.model_dump()
+    elif isinstance(item, Table):
+        # Publish the table and return its ref URI
+        table_ref = client._save_table(item)
+        return table_ref.uri()
+    elif isinstance(item, (Content, str)):
+        content_obj = resolve_view_content(
+            item,
+            extension=extension,
+            mimetype=mimetype,
+            metadata=metadata,
+            encoding=encoding,
+        )
+        return to_json(content_obj, project_id, client, use_dictify=False)
+    else:
+        raise TypeError(f"Unsupported view item type: {type(item)}")
+
+
+def serialize_view_spec(
+    spec: ViewSpec,
+    project_id: str,
+    client: WeaveClient,
+    *,
+    extension: str | None = None,
+    mimetype: str | None = None,
+    metadata: dict[str, Any] | None = None,
+    encoding: str = "utf-8",
+) -> dict[str, Any] | str | list[dict[str, Any] | str]:
+    """Serialize a view specification to JSON.
+
+    Args:
+        spec: A single view item or list of view items.
+        project_id: The project ID for serialization context.
+        client: The WeaveClient for serialization.
+        extension: Optional file extension for string content.
+        mimetype: Optional MIME type for string content.
+        metadata: Optional metadata for string content.
+        encoding: Encoding for string content.
+
+    Returns:
+        A JSON-serializable dictionary, string (for Table refs), or list of these.
+    """
+    if isinstance(spec, list):
+        return [serialize_view_item(item, project_id, client) for item in spec]
+    else:
+        return serialize_view_item(
+            spec,
+            project_id,
+            client,
+            extension=extension,
+            mimetype=mimetype,
+            metadata=metadata,
+            encoding=encoding,
+        )
+
+
 def set_call_view(
     *,
     call: Call,
     client: WeaveClient,
     name: str,
-    content: Content | str,
+    content: ViewSpec,
     extension: str | None = None,
     mimetype: str | None = None,
     metadata: dict[str, Any] | None = None,
@@ -79,7 +165,8 @@ def set_call_view(
         call: The call whose summary should receive the view entry.
         client: The active ``WeaveClient`` used for serialization.
         name: Key to store the view under within ``summary.weave.views``.
-        content: ``weave.Content`` or raw text to serialize into the view.
+        content: A ``weave.Content``, raw text, ``Widget``, ``Table``, or list of these
+            to serialize into the view.
         extension: Optional file extension used when converting text content.
         mimetype: Optional MIME type applied when converting text content.
         metadata: Optional metadata for newly created ``Content`` objects.
@@ -102,14 +189,6 @@ def set_call_view(
         ...     extension="html",
         ... )
     """
-    content_obj = resolve_view_content(
-        content,
-        extension=extension,
-        mimetype=mimetype,
-        metadata=metadata,
-        encoding=encoding,
-    )
-
     if call.summary is None:
         call.summary = {}
 
@@ -133,4 +212,12 @@ def set_call_view(
         views.update(legacy_views)
 
     project_id = client._project_id()
-    views[name] = to_json(content_obj, project_id, client, use_dictify=False)
+    views[name] = serialize_view_spec(
+        content,
+        project_id,
+        client,
+        extension=extension,
+        mimetype=mimetype,
+        metadata=metadata,
+        encoding=encoding,
+    )
