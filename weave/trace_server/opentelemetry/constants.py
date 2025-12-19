@@ -45,11 +45,15 @@ This would be the resulting dict dumped to clickhouse:
 # Priority is given to standards in this order:
 # This is used to populate the `inputs_dump` column in clickhouse
 
+# Logfire pydantic instrumentation notes here: https://github.com/pydantic/logfire/blob/0782da9c021a54246cc46429c28627c9d9a480e8/logfire/_internal/main.py#L1067
+
 INPUT_KEYS = [
     "ai.prompt",  # Vercel
     "gen_ai.prompt",  # From OpenTelemetry AI semantic conventions
     "input.value",  # From OpenInference standard
     "mlflow.spanInputs",  # From MLFlow's tracking format
+    "gen_ai.input.messages",  # Logfire V2 - see logfire pydantic instrumentation notes
+    "pydantic_ai.all_messages",  # Includes all messages for Pydantic AI agent run
     "traceloop.entity.input",  # From Traceloop's conventions
     "gcp.vertex.agent.tool_call_args",  # From Google's Vertex AI
     "gcp.vertex.agent.llm_request",  # From Google's Vertex AI
@@ -64,7 +68,9 @@ OUTPUT_KEYS = [
     "ai.response",  # Vercel
     "gen_ai.completion",  # From OpenTelemetry AI semantic conventions
     "output.value",  # From OpenInference standard - highest priority
+    "gen_ai.output.messages",  # Logfire v2 - see logfire pydantic instrumentation notes
     "mlflow.spanOutputs",  # From MLFlow's tracking format
+    "final_result",  # Output for PydanticAI agent run
     "gen_ai.content.completion",  # From OpenLit project's format
     "traceloop.entity.output",  # From Traceloop's conventions
     "gcp.vertex.agent.tool_response",  # From Google's Vertex AI
@@ -110,6 +116,7 @@ ATTRIBUTE_KEYS = {
     "system": [
         "gen_ai.system",  # OpenTelemetry AI
         "llm.system",  # OpenInference
+        "gen_ai.system_instructions",
     ],
     # Span kind - identifies the type of operation
     "kind": [
