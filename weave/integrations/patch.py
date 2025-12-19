@@ -108,7 +108,7 @@ def patch_google_genai(settings: IntegrationSettings | None = None) -> None:
     if settings is None:
         settings = IntegrationSettings()
     if get_google_genai_patcher(settings).attempt_patch():
-        _PATCHED_INTEGRATIONS.add("google.generativeai")
+        _PATCHED_INTEGRATIONS.add("google.genai")
 
 
 def patch_vertexai(settings: IntegrationSettings | None = None) -> None:
