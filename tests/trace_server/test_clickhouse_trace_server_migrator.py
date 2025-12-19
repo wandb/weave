@@ -101,7 +101,8 @@ def test_execute_migration_command(migrator):
     ch_client.command.assert_called_once_with("CREATE TABLE test (id Int32)")
 
 
-def test_migration_replicated(migrator):
+def test_migration_non_replicated(migrator):
+    # Test that non-replicated mode doesn't transform the SQL
     ch_client = migrator.ch_client
     orig = "CREATE TABLE test (id String, project_id String) ENGINE = MergeTree ORDER BY (project_id, id);"
     migrator._execute_migration_command("test_db", orig)
@@ -142,32 +143,22 @@ def test_is_safe_identifier(migrator):
 
 
 def test_create_db_sql(migrator):
-    # Test invalid database name
     with pytest.raises(MigrationError, match="Invalid database name"):
         _create_db_sql("test;db", False, "test_cluster", "/clickhouse/tables/{db}")
 
-    # Test with invalid cluster name
     with pytest.raises(MigrationError, match="Invalid cluster name"):
         _create_db_sql("test_db", True, "test;cluster", "/clickhouse/tables/{db}")
 
-    # Test with invalid replicated path
-    with pytest.raises(MigrationError, match="Invalid replicated path"):
-        _create_db_sql("test_db", True, "test_cluster", "/clickhouse/bad;path/{db}")
-
-    # Test non-replicated mode
     sql = _create_db_sql("test_db", False, "test_cluster", "/clickhouse/tables/{db}")
     assert sql.strip() == "CREATE DATABASE IF NOT EXISTS test_db"
 
-    # Test replicated mode
     sql = _create_db_sql("test_db", True, "test_cluster", "/clickhouse/tables/{db}")
-    expected = """
-        CREATE DATABASE IF NOT EXISTS test_db ON CLUSTER test_cluster ENGINE=Replicated('/clickhouse/tables/test_db', '{shard}', '{replica}')
-    """.strip()
-    assert sql.strip() == expected
+    assert (
+        sql.strip() == "CREATE DATABASE IF NOT EXISTS test_db ON CLUSTER test_cluster"
+    )
 
 
 def test_format_replicated_sql(migrator):
-    # Test that MergeTree engines are converted to Replicated variants
     test_cases = [
         (
             "CREATE TABLE test (id Int32) ENGINE = MergeTree",
@@ -181,27 +172,33 @@ def test_format_replicated_sql(migrator):
             "CREATE TABLE test (id Int32) ENGINE=ReplacingMergeTree",
             "CREATE TABLE test (id Int32) ENGINE = ReplicatedReplacingMergeTree",
         ),
-        # Test with extra whitespace
         (
             "CREATE TABLE test (id Int32) ENGINE  =   MergeTree",
             "CREATE TABLE test (id Int32) ENGINE = ReplicatedMergeTree",
         ),
-        # Test with parameters
         (
             "CREATE TABLE test (id Int32) ENGINE = MergeTree()",
-            "CREATE TABLE test (id Int32) ENGINE = ReplicatedMergeTree()",
+            "CREATE TABLE test (id Int32) ENGINE = ReplicatedMergeTree",
         ),
     ]
 
     for input_sql, expected_sql in test_cases:
         assert _format_replicated_sql(input_sql) == expected_sql
 
-    # Test that non-MergeTree engines are left unchanged
+    result = _format_replicated_sql(
+        "CREATE TABLE test (id Int32) ENGINE = MergeTree",
+        use_distributed=True,
+        target_db="test_db",
+    )
+    assert (
+        "ReplicatedMergeTree('/clickhouse/tables/{shard}/test_db/test', '{replica}')"
+        in result
+    )
+
     non_mergetree_cases = [
         "CREATE TABLE test (id Int32) ENGINE = Memory",
         "CREATE TABLE test (id Int32) ENGINE = Log",
         "CREATE TABLE test (id Int32) ENGINE = TinyLog",
-        # This should not be changed as it's not a complete word match
         "CREATE TABLE test (id Int32) ENGINE = MyMergeTreeCustom",
     ]
 
@@ -210,7 +207,6 @@ def test_format_replicated_sql(migrator):
 
 
 def test_format_alter_with_on_cluster_sql(migrator):
-    # Test that ALTER TABLE gets ON CLUSTER added
     cluster_name = "test_cluster"
 
     test_cases = [
@@ -230,16 +226,14 @@ def test_format_alter_with_on_cluster_sql(migrator):
 
     for input_sql, expected_sql in test_cases:
         result = _format_alter_with_on_cluster_sql(input_sql, cluster_name)
-        assert result == expected_sql, f"Failed for: {input_sql}"
+        assert result == expected_sql
 
-    # Should not modify if ON CLUSTER already present (idempotent)
     sql_with_cluster = "ALTER TABLE test ON CLUSTER existing_cluster ADD COLUMN x Int32"
     assert (
         _format_alter_with_on_cluster_sql(sql_with_cluster, cluster_name)
         == sql_with_cluster
     )
 
-    # Non-ALTER statements should be left unchanged
     for sql in [
         "CREATE TABLE test (id Int32) ENGINE = MergeTree",
         "INSERT INTO test VALUES (1)",
@@ -249,7 +243,6 @@ def test_format_alter_with_on_cluster_sql(migrator):
 
 
 def test_table_name_operations(migrator):
-    # Test extracting table names from CREATE TABLE statements
     assert _extract_table_name("CREATE TABLE test (id Int32)") == "test"
     assert (
         _extract_table_name("CREATE TABLE IF NOT EXISTS my_table (id Int32)")
@@ -257,7 +250,6 @@ def test_table_name_operations(migrator):
     )
     assert _extract_table_name("ALTER TABLE test ADD COLUMN x Int32") is None
 
-    # Test renaming tables to _local suffix
     assert (
         _rename_table_to_local("CREATE TABLE test (id Int32)", "test")
         == "CREATE TABLE test_local (id Int32)"
@@ -271,28 +263,21 @@ def test_table_name_operations(migrator):
 
 
 def test_create_distributed_table_sql(migrator):
-    # Test creating distributed table SQL
     cluster_name = "test_cluster"
     sql = _create_distributed_table_sql("test", "test", cluster_name)
-    expected = """
-        CREATE TABLE IF NOT EXISTS test ON CLUSTER test_cluster
-        AS test_local
-        ENGINE = Distributed(test_cluster, currentDatabase(), test_local, rand())
-    """
+    expected = "CREATE TABLE IF NOT EXISTS test ON CLUSTER test_cluster\n        AS test_local\n        ENGINE = Distributed(test_cluster, currentDatabase(), test_local, rand())"
     assert sql.strip() == expected.strip()
 
 
 def test_format_distributed_sql(migrator):
-    # Test that non-CREATE TABLE statements are unchanged
-    sql = "CREATE TABLE test (id Int32) ENGINE = MergeTree"
-    alter_sql = "ALTER TABLE test ADD COLUMN x Int32"
     cluster_name = "test_cluster"
+    alter_sql = "ALTER TABLE test ADD COLUMN x Int32"
 
     result = _format_distributed_sql(alter_sql, cluster_name)
     assert result.local_command == alter_sql
     assert result.distributed_command is None
 
-    # Test full transformation for CREATE TABLE statements
+    sql = "CREATE TABLE test (id Int32) ENGINE = MergeTree"
     result = _format_distributed_sql(sql, cluster_name)
     assert (
         "CREATE TABLE test_local (id Int32) ENGINE = MergeTree" == result.local_command
@@ -309,56 +294,51 @@ def test_format_distributed_sql(migrator):
 
 
 def test_execute_migration_command_with_distributed(migrator):
-    # Setup
     migrator.use_distributed = True
     migrator.replicated = True
     migrator.replicated_cluster = "test_cluster"
+    migrator.replicated_path = "/clickhouse/tables/{db}"
     ch_client = migrator.ch_client
     ch_client.database = "original_db"
 
-    # Execute with non-replicated engine (as it appears in migration files)
     migrator._execute_migration_command(
         "test_db", "CREATE TABLE test (id Int32) ENGINE = MergeTree"
     )
 
-    # Verify - should have called command twice: once for local table, once for distributed
     assert ch_client.command.call_count == 2
-    assert ch_client.database == "original_db"  # Should restore original database
+    assert ch_client.database == "original_db"
 
-    # Check that local table was created with replicated engine and _local suffix
     first_call = ch_client.command.call_args_list[0][0][0]
-    expected_local = "CREATE TABLE test_local (id Int32) ENGINE = ReplicatedMergeTree"
-    assert first_call == expected_local
+    assert "CREATE TABLE test_local ON CLUSTER test_cluster" in first_call
+    assert (
+        "ReplicatedMergeTree('/clickhouse/tables/{shard}/test_db/test_local', '{replica}')"
+        in first_call
+    )
 
-    # Check that distributed table was created
     second_call = ch_client.command.call_args_list[1][0][0]
-    expected_distributed = """
-        CREATE TABLE IF NOT EXISTS test ON CLUSTER test_cluster
-        AS test_local
-        ENGINE = Distributed(test_cluster, currentDatabase(), test_local, rand())
-    """
-    assert second_call.strip() == expected_distributed.strip()
+    assert "CREATE TABLE IF NOT EXISTS test ON CLUSTER test_cluster" in second_call
+    assert "AS test_local" in second_call
+    assert (
+        "ENGINE = Distributed(test_cluster, currentDatabase(), test_local, rand())"
+        in second_call
+    )
 
 
 def test_execute_migration_command_with_alter(migrator):
-    # Setup
     migrator.replicated = True
     migrator.replicated_cluster = "test_cluster"
     ch_client = migrator.ch_client
     ch_client.database = "original_db"
 
-    # Execute ALTER TABLE command
     migrator._execute_migration_command(
         "test_db", "ALTER TABLE test ADD COLUMN x Int32"
     )
 
-    # Verify - should have called command once with ON CLUSTER added
     assert ch_client.command.call_count == 1
-    assert ch_client.database == "original_db"  # Should restore original database
+    assert ch_client.database == "original_db"
 
-    # Check that ON CLUSTER was added to ALTER TABLE
     call_sql = ch_client.command.call_args_list[0][0][0]
-    assert "ALTER TABLE test ON CLUSTER test_cluster ADD COLUMN x Int32" == call_sql
+    assert call_sql == "ALTER TABLE test ON CLUSTER test_cluster ADD COLUMN x Int32"
 
 
 def test_distributed_requires_replicated():
@@ -375,32 +355,27 @@ def test_distributed_requires_replicated():
 
 
 def test_format_replicated_sql_idempotent(migrator):
-    # Test that applying _format_replicated_sql twice doesn't double-apply the Replicated prefix
     sql = "CREATE TABLE test (id Int32) ENGINE = MergeTree"
     formatted_once = _format_replicated_sql(sql)
     expected = "CREATE TABLE test (id Int32) ENGINE = ReplicatedMergeTree"
     assert formatted_once == expected
 
-    # Applying again should not change it (idempotent)
     formatted_twice = _format_replicated_sql(formatted_once)
     assert formatted_twice == expected
 
 
 def test_non_replicated_preserves_table_names(migrator):
-    # Test that in non-replicated mode, table names are not changed
     migrator.replicated = False
     migrator.use_distributed = False
     ch_client = migrator.ch_client
     ch_client.database = "original_db"
 
-    # Execute
     migrator._execute_migration_command(
         "test_db", "CREATE TABLE test (id Int32) ENGINE = MergeTree"
     )
 
-    # Verify - should have called command once with original table name
     assert ch_client.command.call_count == 1
     call_sql = ch_client.command.call_args_list[0][0][0]
-    assert "CREATE TABLE test (id Int32) ENGINE = MergeTree" == call_sql
-    assert "test_local" not in call_sql  # Should NOT have _local suffix
-    assert "Distributed" not in call_sql  # Should NOT create distributed table
+    assert call_sql == "CREATE TABLE test (id Int32) ENGINE = MergeTree"
+    assert "test_local" not in call_sql
+    assert "Distributed" not in call_sql
