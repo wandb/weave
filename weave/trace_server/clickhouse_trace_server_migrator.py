@@ -309,16 +309,36 @@ class ClickHouseTraceServerMigrator:
         formatted_command = _format_create_table_with_on_cluster_sql(
             formatted_command, self.replicated_cluster
         )
-        formatted_command = _format_alter_with_on_cluster_sql(
-            formatted_command, self.replicated_cluster
-        )
 
         if self.use_distributed:
-            result = _format_distributed_sql(formatted_command, self.replicated_cluster)
-            self.ch_client.command(result.local_command)
-            if result.distributed_command:
-                self.ch_client.command(result.distributed_command)
+            is_alter = re.search(
+                r"\bALTER\s+TABLE\b", formatted_command, flags=re.IGNORECASE
+            )
+
+            if is_alter:
+                formatted_command = _rename_alter_table_to_local(formatted_command)
+
+            formatted_command = _format_alter_with_on_cluster_sql(
+                formatted_command, self.replicated_cluster
+            )
+
+            if is_alter:
+                print("alter command: ", formatted_command)
+                self.ch_client.command(formatted_command)
+            else:
+                result = _format_distributed_sql(
+                    formatted_command, self.replicated_cluster
+                )
+                print("local command: ", result.local_command)
+                self.ch_client.command(result.local_command)
+                if result.distributed_command:
+                    print("distributed command: ", result.distributed_command)
+                    self.ch_client.command(result.distributed_command)
         else:
+            formatted_command = _format_alter_with_on_cluster_sql(
+                formatted_command, self.replicated_cluster
+            )
+            print("normal command: ", formatted_command)
             self.ch_client.command(formatted_command)
 
         self.ch_client.database = curr_db
@@ -342,9 +362,21 @@ def _extract_table_name(sql_query: str) -> str | None:
 
 def _rename_table_to_local(sql_query: str, table_name: str) -> str:
     """Rename table in CREATE TABLE statement to table_name_local."""
-    # Replace the table name with table_name_local
     pattern = rf"(CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?){table_name}\b"
     return re.sub(pattern, rf"\1{table_name}_local", sql_query, flags=re.IGNORECASE)
+
+
+def _rename_alter_table_to_local(sql_query: str) -> str:
+    """Rename table in ALTER TABLE statement to table_name_local."""
+    pattern = r"(ALTER\s+TABLE\s+)([a-zA-Z0-9_.]+)(\s+)"
+
+    def add_local_suffix(match: re.Match[str]) -> str:
+        table_name = match.group(2)
+        if not table_name.endswith("_local"):
+            table_name = f"{table_name}_local"
+        return f"{match.group(1)}{table_name}{match.group(3)}"
+
+    return re.sub(pattern, add_local_suffix, sql_query, flags=re.IGNORECASE)
 
 
 def _create_db_sql(

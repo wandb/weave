@@ -13,6 +13,7 @@ from weave.trace_server.clickhouse_trace_server_migrator import (
     _format_distributed_sql,
     _format_replicated_sql,
     _is_safe_identifier,
+    _rename_alter_table_to_local,
     _rename_table_to_local,
 )
 
@@ -339,6 +340,46 @@ def test_execute_migration_command_with_alter(migrator):
 
     call_sql = ch_client.command.call_args_list[0][0][0]
     assert call_sql == "ALTER TABLE test ON CLUSTER test_cluster ADD COLUMN x Int32"
+
+
+def test_execute_migration_command_with_alter_distributed(migrator):
+    migrator.use_distributed = True
+    migrator.replicated = True
+    migrator.replicated_cluster = "test_cluster"
+    migrator.replicated_path = "/clickhouse/tables/{db}"
+    ch_client = migrator.ch_client
+    ch_client.database = "original_db"
+
+    migrator._execute_migration_command(
+        "test_db", "ALTER TABLE test ADD COLUMN x Int32"
+    )
+
+    assert ch_client.command.call_count == 1
+    assert ch_client.database == "original_db"
+
+    call_sql = ch_client.command.call_args_list[0][0][0]
+    assert (
+        call_sql == "ALTER TABLE test_local ON CLUSTER test_cluster ADD COLUMN x Int32"
+    )
+
+
+def test_rename_alter_table_to_local(migrator):
+    assert (
+        _rename_alter_table_to_local("ALTER TABLE test ADD COLUMN x Int32")
+        == "ALTER TABLE test_local ADD COLUMN x Int32"
+    )
+    assert (
+        _rename_alter_table_to_local("ALTER TABLE my_table DROP COLUMN old_col")
+        == "ALTER TABLE my_table_local DROP COLUMN old_col"
+    )
+    assert (
+        _rename_alter_table_to_local("alter table users modify column name String")
+        == "alter table users_local modify column name String"
+    )
+    assert (
+        _rename_alter_table_to_local("ALTER TABLE test_local ADD COLUMN x Int32")
+        == "ALTER TABLE test_local ADD COLUMN x Int32"
+    )
 
 
 def test_distributed_requires_replicated():
