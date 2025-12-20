@@ -2,6 +2,7 @@
 import logging
 import os
 import re
+from dataclasses import dataclass
 
 from clickhouse_connect.driver.client import Client as CHClient
 
@@ -17,6 +18,26 @@ DEFAULT_REPLICATED_CLUSTER = "weave_cluster"
 
 class MigrationError(RuntimeError):
     """Raised when a migration error occurs."""
+
+
+@dataclass
+class MigrationFileEntry:
+    version: int
+    name: str
+    is_up: bool
+
+
+@dataclass
+class MigrationStatus:
+    db_name: str
+    curr_version: int
+    partially_applied_version: int | None
+
+
+@dataclass
+class MigrationInfo:
+    up: str | None = None
+    down: str | None = None
 
 
 class ClickHouseTraceServerMigrator:
@@ -100,26 +121,26 @@ class ClickHouseTraceServerMigrator:
     ) -> None:
         status = self._get_migration_status(target_db)
         logger.info(f"""`{target_db}` migration status: {status}""")
-        if status["partially_applied_version"]:
+        if status.partially_applied_version:
             logger.info(
-                f"Unable to apply migrations to `{target_db}`. Found partially applied migration version {status['partially_applied_version']}. Please fix the database manually and try again."
+                f"Unable to apply migrations to `{target_db}`. Found partially applied migration version {status.partially_applied_version}. Please fix the database manually and try again."
             )
             return
         migration_map = self._get_migrations()
         migrations_to_apply = self._determine_migrations_to_apply(
-            status["curr_version"], migration_map, target_version
+            status.curr_version, migration_map, target_version
         )
         if len(migrations_to_apply) == 0:
             logger.info(f"No migrations to apply to `{target_db}`")
-            if should_insert_costs(status["curr_version"], target_version):
+            if should_insert_costs(status.curr_version, target_version):
                 insert_costs(self.ch_client, target_db)
             return
         logger.info(f"Migrations to apply: {migrations_to_apply}")
-        if status["curr_version"] == 0:
+        if status.curr_version == 0:
             self.ch_client.command(self._create_db_sql(target_db))
         for target_version, migration_file in migrations_to_apply:
             self._apply_migration(target_db, target_version, migration_file)
-        if should_insert_costs(status["curr_version"], target_version):
+        if should_insert_costs(status.curr_version, target_version):
             insert_costs(self.ch_client, target_db)
 
     def _initialize_migration_db(self) -> None:
@@ -136,7 +157,7 @@ class ClickHouseTraceServerMigrator:
         """
         self.ch_client.command(self._format_replicated_sql(create_table_sql))
 
-    def _get_migration_status(self, db_name: str) -> dict:
+    def _get_migration_status(self, db_name: str) -> MigrationStatus:
         column_names = ["db_name", "curr_version", "partially_applied_version"]
         select_columns = ", ".join(column_names)
         query = f"""
@@ -155,45 +176,100 @@ class ClickHouseTraceServerMigrator:
         if res is None or len(result_rows) == 0:
             raise MigrationError("Migration table not found")
 
-        return dict(zip(column_names, result_rows[0], strict=False))
+        row = dict(zip(column_names, result_rows[0], strict=False))
+        return MigrationStatus(
+            db_name=row["db_name"],
+            curr_version=row["curr_version"],
+            partially_applied_version=row["partially_applied_version"],
+        )
 
-    def _get_migrations(
-        self,
-    ) -> dict[int, dict[str, str | None]]:
+    def _parse_migration_filename(self, filename: str) -> MigrationFileEntry:
+        """Parses a migration filename into its components.
+
+        Args:
+            filename: The migration filename (e.g., '1_init.up.sql').
+
+        Returns:
+            A MigrationFileEntry containing:
+                - version (int): The migration version number.
+                - name (str): The descriptive name of the migration.
+                - is_up (bool): True if this is an 'up' migration, False for 'down'.
+
+        Raises:
+            MigrationError: If the filename format is invalid.
+
+        Example:
+            >>> migrator._parse_migration_filename('2_feature.up.sql')
+            MigrationFileEntry(version=2, name='feature', is_up=True)
+        """
+        if not filename.endswith(".up.sql") and not filename.endswith(".down.sql"):
+            raise MigrationError(f"Invalid migration file: {filename}")
+
+        file_name_parts = filename.split("_", 1)
+        if len(file_name_parts) <= 1:
+            raise MigrationError(f"Invalid migration file: {filename}")
+
+        try:
+            version = int(file_name_parts[0], 10)
+        except ValueError:
+            raise MigrationError(
+                f"Invalid migration version in file: {filename}"
+            ) from None
+
+        if version < 1:
+            raise MigrationError(f"Invalid migration file: {filename}")
+
+        is_up = filename.endswith(".up.sql")
+        suffix = ".up.sql" if is_up else ".down.sql"
+
+        # Remove suffix
+        name_part = file_name_parts[1]
+        if name_part.endswith(suffix):
+            name_part = name_part[: -len(suffix)]
+
+        return MigrationFileEntry(version=version, name=name_part, is_up=is_up)
+
+    def _get_migrations(self) -> dict[int, MigrationInfo]:
+        """Gets all migration files and returns a map of version to MigrationInfo.
+
+        Returns:
+            A dict mapping version number to MigrationInfo objects containing up and down migration filenames.
+
+        Raises:
+            MigrationError: If migrations are invalid or missing.
+        """
         migration_dir = os.path.join(os.path.dirname(__file__), "migrations")
         migration_files = os.listdir(migration_dir)
-        migration_map: dict[int, dict[str, str | None]] = {}
+        migration_map: dict[int, MigrationInfo] = {}
         max_version = 0
+
         for file in migration_files:
             if not file.endswith(".up.sql") and not file.endswith(".down.sql"):
-                raise MigrationError(f"Invalid migration file: {file}")
-            file_name_parts = file.split("_", 1)
-            if len(file_name_parts) <= 1:
-                raise MigrationError(f"Invalid migration file: {file}")
-            version = int(file_name_parts[0], 10)
-            if version < 1:
-                raise MigrationError(f"Invalid migration file: {file}")
+                continue  # Skip non-migration files
 
-            is_up = file.endswith(".up.sql")
+            try:
+                entry = self._parse_migration_filename(file)
+            except MigrationError:
+                raise MigrationError(f"Invalid migration file: {file}") from None
 
-            if version not in migration_map:
-                migration_map[version] = {"up": None, "down": None}
+            if entry.version not in migration_map:
+                migration_map[entry.version] = MigrationInfo()
 
-            if is_up:
-                if migration_map[version]["up"] is not None:
+            if entry.is_up:
+                if migration_map[entry.version].up is not None:
                     raise MigrationError(
-                        f"Duplicate migration file for version {version}"
+                        f"Duplicate up migration file for version {entry.version}"
                     )
-                migration_map[version]["up"] = file
+                migration_map[entry.version].up = file
             else:
-                if migration_map[version]["down"] is not None:
+                if migration_map[entry.version].down is not None:
                     raise MigrationError(
-                        f"Duplicate migration file for version {version}"
+                        f"Duplicate down migration file for version {entry.version}"
                     )
-                migration_map[version]["down"] = file
+                migration_map[entry.version].down = file
 
-            if version > max_version:
-                max_version = version
+            if entry.version > max_version:
+                max_version = entry.version
 
         if len(migration_map) == 0:
             raise MigrationError("No migrations found")
@@ -206,9 +282,9 @@ class ClickHouseTraceServerMigrator:
         for version in range(1, max_version + 1):
             if version not in migration_map:
                 raise MigrationError(f"Missing migration file for version {version}")
-            if migration_map[version]["up"] is None:
+            if migration_map[version].up is None:
                 raise MigrationError(f"Missing up migration file for version {version}")
-            if migration_map[version]["down"] is None:
+            if migration_map[version].down is None:
                 raise MigrationError(
                     f"Missing down migration file for version {version}"
                 )
@@ -218,7 +294,7 @@ class ClickHouseTraceServerMigrator:
     def _determine_migrations_to_apply(
         self,
         current_version: int,
-        migration_map: dict,
+        migration_map: dict[int, MigrationInfo],
         target_version: int | None = None,
     ) -> list[tuple[int, str]]:
         if target_version is None:
@@ -235,9 +311,10 @@ class ClickHouseTraceServerMigrator:
         if target_version > current_version:
             res = []
             for i in range(current_version + 1, target_version + 1):
-                if migration_map[i]["up"] is None:
+                up_file = migration_map[i].up
+                if up_file is None:
                     raise MigrationError(f"Missing up migration file for version {i}")
-                res.append((i, f"{migration_map[i]['up']}"))
+                res.append((i, up_file))
             return res
         if target_version < current_version:
             logger.warning(
@@ -245,9 +322,10 @@ class ClickHouseTraceServerMigrator:
             )
             # res = []
             # for i in range(current_version, target_version, -1):
-            #     if migration_map[i]["down"] is None:
+            #     down_file = migration_map[i].down
+            #     if down_file is None:
             #         raise MigrationError(f"Missing down migration file for version {i}")
-            #     res.append((i - 1, f"{migration_map[i]['down']}"))
+            #     res.append((i - 1, down_file))
             # return res
 
         return []
