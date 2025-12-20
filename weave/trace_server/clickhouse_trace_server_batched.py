@@ -49,6 +49,9 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     build_calls_stats_query,
     combine_conditions,
 )
+from weave.trace_server.calls_query_builder.usage_query_builder import (
+    build_usage_analytics_query,
+)
 from weave.trace_server.clickhouse_schema import (
     ALL_CALL_INSERT_COLUMNS,
     ALL_CALL_JSON_COLUMNS,
@@ -144,7 +147,11 @@ from weave.trace_server.table_query_builder import (
 )
 from weave.trace_server.threads_query_builder import make_threads_query
 from weave.trace_server.token_costs import (
+    DEFAULT_PRICING_LEVEL_ID,
     LLM_TOKEN_PRICES_TABLE,
+    LLM_TOKEN_PRICES_TABLE_NAME,
+    PRICING_LEVELS,
+    is_project_id_sql_injection_safe,
     validate_cost_purge_req,
 )
 from weave.trace_server.trace_server_common import (
@@ -564,6 +571,138 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         return tsi.CallsQueryStatsRes(
             count=res_dict.get("count", 0),
             total_storage_size_bytes=res_dict.get("total_storage_size_bytes"),
+        )
+
+    def usage_analytics(self, req: tsi.UsageAnalyticsReq) -> tsi.UsageAnalyticsRes:
+        """Return usage analytics grouped by bucket and model with requested aggregations.
+
+        This augments token-based usage metrics with computed cost metrics using
+        per-token prices from the llm_token_prices table.
+        """
+        pb = ParamBuilder()
+        sql, columns, parameters, bucket_size = build_usage_analytics_query(req, pb)
+        query_result = self._query(sql, parameters)
+
+        rows: list[dict[str, Any]] = []
+        for tup in query_result.result_rows:
+            row: dict[str, Any] = {}
+            for idx, col in enumerate(columns):
+                val = tup[idx] if idx < len(tup) else None
+                if col == "bucket" and isinstance(val, datetime.datetime):
+                    row[col] = val.isoformat()
+                else:
+                    row[col] = val
+            rows.append(row)
+
+        # Derive cost metrics (sum_cost / avg_cost) using token counts and
+        # per-token prices from the llm_token_prices table.
+        # If pricing data is missing for a model, cost metrics are omitted.
+        model_ids: set[str] = set()
+        for row in rows:
+            model = row.get("model")
+            if isinstance(model, str) and model:
+                model_ids.add(model)
+
+        prices_by_model: dict[str, dict[str, float]] = {}
+
+        if model_ids:
+            price_pb = ParamBuilder()
+            # ClickHouse row_number() window currently can't use parameters in
+            # ORDER BY, so we validate the project_id before interpolating.
+            is_project_id_sql_injection_safe(req.project_id)
+
+            models_param = price_pb.add_param(sorted(model_ids))
+            project_param = price_pb.add_param(req.project_id)
+
+            row_number_clause = f"""
+                ROW_NUMBER() OVER (
+                  PARTITION BY llm_id
+                  ORDER BY
+                    CASE
+                      WHEN pricing_level = '{PRICING_LEVELS["PROJECT"]}' AND pricing_level_id = {{{project_param}:String}} THEN 1
+                      WHEN pricing_level = '{PRICING_LEVELS["DEFAULT"]}' AND pricing_level_id = '{DEFAULT_PRICING_LEVEL_ID}' THEN 2
+                      ELSE 3
+                    END,
+                    effective_date DESC
+                ) AS rank
+            """
+
+            prices_sql = f"""
+                SELECT
+                  llm_id,
+                  prompt_token_cost,
+                  completion_token_cost,
+                  prompt_token_cost_unit,
+                  completion_token_cost_unit
+                FROM (
+                  SELECT
+                    llm_id,
+                    prompt_token_cost,
+                    completion_token_cost,
+                    prompt_token_cost_unit,
+                    completion_token_cost_unit,
+                    pricing_level,
+                    pricing_level_id,
+                    effective_date,
+                    {row_number_clause}
+                  FROM {LLM_TOKEN_PRICES_TABLE_NAME}
+                  WHERE
+                    pricing_level_id IN (
+                      '{DEFAULT_PRICING_LEVEL_ID}',
+                      '',
+                      {{{project_param}:String}}
+                    )
+                    AND llm_id IN {{{models_param}:Array(String)}}
+                )
+                WHERE rank = 1
+            """
+
+            prices_result = self._query(prices_sql, price_pb.get_params())
+            for (
+                llm_id,
+                prompt_token_cost,
+                completion_token_cost,
+                _prompt_unit,
+                _completion_unit,
+            ) in prices_result.result_rows:
+                # Store numeric prices only; units are not surfaced in usage analytics.
+                try:
+                    p_cost = float(prompt_token_cost or 0.0)
+                    c_cost = float(completion_token_cost or 0.0)
+                except (TypeError, ValueError):
+                    continue
+                prices_by_model[str(llm_id)] = {
+                    "prompt": p_cost,
+                    "completion": c_cost,
+                }
+
+        if prices_by_model:
+            for row in rows:
+                model = row.get("model")
+                if not isinstance(model, str):
+                    continue
+                prices = prices_by_model.get(model)
+                if not prices:
+                    continue
+
+                for agg in ("sum", "avg"):
+                    prompt_key = f"{agg}_prompt_tokens"
+                    completion_key = f"{agg}_completion_tokens"
+
+                    try:
+                        prompt_tokens = float(row.get(prompt_key) or 0.0)
+                        completion_tokens = float(row.get(completion_key) or 0.0)
+                    except (TypeError, ValueError):
+                        continue
+
+                    cost_value = (
+                        prompt_tokens * prices["prompt"]
+                        + completion_tokens * prices["completion"]
+                    )
+                    row[f"{agg}_cost"] = cost_value
+
+        return tsi.UsageAnalyticsRes(
+            bucket_size=bucket_size, timezone=req.timezone or "UTC", rows=rows
         )
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.calls_query_stream")
