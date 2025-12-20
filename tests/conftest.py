@@ -577,16 +577,13 @@ def network_proxy_client(client):
             kwargs.pop("stream", None)
             return c.post(url, data=data, json=json, **kwargs)
 
-        orig_post = weave.utils.http_requests.post
-        weave.utils.http_requests.post = post
-
         remote_client = RemoteHTTPTraceServer(
             trace_server_url="",
             should_batch=True,
         )
+        # Patch the post method on the instance
+        remote_client.post = post
         yield (client, remote_client, records)
-
-        weave.utils.http_requests.post = orig_post
 
 
 @pytest.fixture(autouse=True)
