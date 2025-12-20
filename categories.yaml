@@ -1,0 +1,41 @@
+name: hiring-agent-demo-public Trace Clusters
+weave_project: hiring-agent-demo-public
+weave_entity: wandb-smle
+last_clustering: '2025-12-12'
+trace_list: https://wandb.ai/wandb-smle/hiring-agent-demo-public/weave/traces?view=traces_2025-06-09_18-20-14-627&filter=%7B%22opVersionRefs%22%3A%5B%22weave%3A%2F%2F%2Fwandb-smle%2Fhiring-agent-demo-public%2Fop%2FHiringAgent.predict%3A*%22%5D%7D&filters=%7B%22items%22%3A%5B%7B%22field%22%3A%22summary.weave.status%22%2C%22operator%22%3A%22%28string%29%3A+in%22%2C%22value%22%3A%22success%22%2C%22id%22%3A0%7D%2C%7B%22field%22%3A%22inputs.self%22%2C%22operator%22%3A%22%28string%29%3A+equals%22%2C%22value%22%3A%22weave%3A%2F%2F%2Fwandb-smle%2Fhiring-agent-demo-public%2Fobject%2FHiringAgent%3AZGdayotgIveClOaQIMsHNUXU74PhjfQxXWij9NqAmM4%22%2C%22id%22%3A1%7D%5D%2C%22logicOperator%22%3A%22and%22%7D&sort=%5B%7B%22field%22%3A%22started_at%22%2C%22sort%22%3A%22desc%22%7D%5D
+clusters:
+- cluster_name: successful_utility_task
+  cluster_definition: The trace shows the successful execution of a discrete, supporting
+    task, such as file conversion or data extraction, that is not part of the core
+    reasoning process.
+  sample_traces:
+  - https://wandb.ai/wandb-smle/hiring-agent-demo-public/weave/calls/01962573-28c6-7f02-a7d7-ecc604af60f0
+  - https://wandb.ai/wandb-smle/hiring-agent-demo-public/weave/calls/01962573-28f9-7cb2-933f-a0f79f1cc275
+  - https://wandb.ai/wandb-smle/hiring-agent-demo-public/weave/calls/01962574-a444-7201-9670-09306640f4b1
+- cluster_name: correct_decision_flawed_reasoning
+  cluster_definition: The model arrives at the correct final decision, but the justification
+    is weak, incomplete, factually incorrect (e.g., contains hallucinations), or doesn't
+    logically support the outcome.
+  sample_traces:
+  - https://wandb.ai/wandb-smle/hiring-agent-demo-public/weave/calls/01962574-a462-7e72-b390-03b8535d224e
+  - https://wandb.ai/wandb-smle/hiring-agent-demo-public/weave/calls/019625ec-cf50-75f3-acda-ed95434ef51a
+  - https://wandb.ai/wandb-smle/hiring-agent-demo-public/weave/calls/019625f6-33c4-7070-ba6d-cd4fcf4e4caf
+- cluster_name: contradictory_output
+  cluster_definition: The model's output contains internal contradictions, such as
+    making a positive recommendation while simultaneously flagging a critical reasoning
+    error like a hallucination.
+  sample_traces:
+  - https://wandb.ai/wandb-smle/hiring-agent-demo-public/weave/calls/01962574-a462-7e72-b390-03b8535d224e
+  - https://wandb.ai/wandb-smle/hiring-agent-demo-public/weave/calls/019625f6-33c4-7070-ba6d-cd4fcf4e4caf
+  - https://wandb.ai/wandb-smle/hiring-agent-demo-public/weave/calls/019625fe-d78d-71f3-a51b-ef16fec821b6
+- cluster_name: false_negative
+  cluster_definition: The model incorrectly rejects a case that should have been accepted,
+    failing to identify a positive match.
+  sample_traces:
+  - https://wandb.ai/wandb-smle/hiring-agent-demo-public/weave/calls/019625ec-cf50-75f3-acda-ed95434ef51a
+  - https://wandb.ai/wandb-smle/hiring-agent-demo-public/weave/calls/019625fe-d78d-71f3-a51b-ef16fec821b6
+- cluster_name: correct_decision_strong_reasoning
+  cluster_definition: The model produces the correct final decision, and the supporting
+    reasoning is complete, accurate, and aligns with the provided context.
+  sample_traces:
+  - https://wandb.ai/wandb-smle/hiring-agent-demo-public/weave/calls/01962573-2904-75a1-a369-d3c0f6eaf823
