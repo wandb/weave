@@ -409,8 +409,12 @@ def create_client(
     # Keeping off for now until it is the default behavior.
     # os.environ["WEAVE_USE_SERVER_CACHE"] = "true"
     caching_server = CachingMiddlewareTraceServer.from_env(server)
+    from weave.utils.project_id import to_project_id
+    
+    project_id = to_project_id(TEST_ENTITY, "test-project")
+    weave_client_context.set_project_id(project_id)
     client = TestOnlyFlushingWeaveClient(
-        TEST_ENTITY, "test-project", make_server_recorder(caching_server)
+        make_server_recorder(caching_server)
     )
     weave_client_context.set_weave_client_global(client)
     if global_attributes is not None:

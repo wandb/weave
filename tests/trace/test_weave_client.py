@@ -1518,9 +1518,8 @@ def test_table_partitioning(network_proxy_client, use_parallel_table_upload):
     )  # Small enough to get multiple updates
 
     # Set the client to use the remote server so calls get recorded
+    # project_id contextvar is already set from the existing client
     client = TestOnlyFlushingWeaveClient(
-        entity=client.entity,
-        project=client.project,
         server=remote_client,
         ensure_project_exists=False,
     )
@@ -3607,9 +3606,8 @@ def test_feedback_batching(network_proxy_client):
     # Set up advanced client that uses the RemoteHttpTraceServer handler
     # with batching
     basic_client, remote_client, records = network_proxy_client
+    # project_id contextvar is already set from basic_client
     client = TestOnlyFlushingWeaveClient(
-        entity=basic_client.entity,
-        project=basic_client.project,
         server=remote_client,
         ensure_project_exists=False,
     )
@@ -3833,9 +3831,8 @@ def test_parallel_table_uploads_digest_consistency(
 def test_table_create_from_digests(network_proxy_client):
     """Test that table_create_from_digests works correctly to merge existing row digests."""
     basic_client, remote_client, records = network_proxy_client
+    # project_id contextvar is already set from basic_client
     client = TestOnlyFlushingWeaveClient(
-        entity=basic_client.entity,
-        project=basic_client.project,
         server=remote_client,
         ensure_project_exists=False,
     )

@@ -143,6 +143,7 @@ from weave.trace_server_bindings.http_utils import (
 from weave.utils.attributes_dict import AttributesDict
 from weave.utils.dict_utils import sum_dict_leaves, zip_dicts
 from weave.utils.exception import exception_to_json_str
+from weave.trace.context import weave_client_context
 from weave.utils.project_id import from_project_id, to_project_id
 from weave.utils.sanitize import REDACTED_VALUE, redact_dataclass_fields, should_redact
 
@@ -307,21 +308,15 @@ class WeaveClient:
     A client for interacting with the Weave trace server.
 
     Args:
-        entity: The entity name.
-        project: The project name.
         server: The server to use for communication.
         ensure_project_exists: Whether to ensure the project exists on the server.
     """
 
     def __init__(
         self,
-        entity: str,
-        project: str,
         server: TraceServerInterface,
         ensure_project_exists: bool = True,
     ):
-        self.entity = entity
-        self.project = project
         self.server = server
         self._anonymous_ops: dict[str, Op] = {}
         self._wandb_run_context: WandbRunContext | None = None
@@ -331,9 +326,13 @@ class WeaveClient:
         self.ensure_project_exists = ensure_project_exists
 
         if ensure_project_exists:
+            project_id = weave_client_context.require_project_id()
+            entity, project = from_project_id(project_id)
             resp = self.server.ensure_project_exists(entity, project)
-            # Set Client project name with updated project name
-            self.project = resp.project_name
+            # Update project_id if project name changed
+            if resp.project_name != project:
+                project_id = to_project_id(entity, resp.project_name)
+                weave_client_context.set_project_id(project_id)
 
         self._server_call_processor = None
         self._server_feedback_processor = None
@@ -1871,8 +1870,22 @@ class WeaveClient:
     def _ref_is_own(self, ref: Ref) -> bool:
         return isinstance(ref, Ref)
 
+    @property
+    def entity(self) -> str:
+        """Get the entity name from the project_id contextvar."""
+        project_id = weave_client_context.require_project_id()
+        entity, _ = from_project_id(project_id)
+        return entity
+
+    @property
+    def project(self) -> str:
+        """Get the project name from the project_id contextvar."""
+        project_id = weave_client_context.require_project_id()
+        _, project = from_project_id(project_id)
+        return project
+
     def _project_id(self) -> str:
-        return f"{self.entity}/{self.project}"
+        return weave_client_context.require_project_id()
 
     @trace_sentry.global_trace_sentry.watch()
     def _op_calls(self, op: Op) -> CallsIter:

@@ -22,6 +22,7 @@ from weave.trace_server_bindings.caching_middleware_trace_server import (
 )
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface
 from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
+from weave.utils.project_id import to_project_id
 
 logger = logging.getLogger(__name__)
 
@@ -99,10 +100,16 @@ def init_weave(
         raise ValueError("project_name must be non-empty")
 
     current_client = weave_client_context.get_weave_client()
+    current_project_id = weave_client_context.get_project_id()
     if current_client is not None:
         # TODO: Prob should move into settings
+        # Compare project_id instead of project name
+        entity_name, project_name_resolved = get_entity_project_from_project_name(
+            project_name
+        )
+        project_id = to_project_id(entity_name, project_name_resolved)
         if (
-            current_client.project == project_name
+            current_project_id == project_id
             and current_client.ensure_project_exists == ensure_project_exists
         ):
             return current_client
@@ -110,6 +117,7 @@ def init_weave(
             # Flush any pending calls before switching to a new project
             current_client.finish()
             weave_client_context.set_weave_client_global(None)
+            weave_client_context.set_project_id(None)
 
     from weave.wandb_interface import (
         context as wandb_context_module,  # type: ignore
@@ -147,12 +155,17 @@ def init_weave(
     if use_server_cache():
         server = CachingMiddlewareTraceServer.from_env(server)
 
-    client = weave_client.WeaveClient(
-        entity_name, project_name, server, ensure_project_exists
-    )
+    # Set project_id in context before creating client
+    project_id = to_project_id(entity_name, project_name)
+    weave_client_context.set_project_id(project_id)
+
+    client = weave_client.WeaveClient(server, ensure_project_exists)
 
     # If the project name was formatted by init, update the project name
     project_name = client.project
+    # Update project_id if project name changed
+    project_id = to_project_id(client.entity, project_name)
+    weave_client_context.set_project_id(project_id)
 
     weave_client_context.set_weave_client_global(client)
 
@@ -214,9 +227,9 @@ def init_weave_disabled() -> weave_client.WeaveClient:
     if current_client is not None:
         weave_client_context.set_weave_client_global(None)
 
+    weave_client_context.set_project_id("DISABLED/DISABLED")
+
     client = weave_client.WeaveClient(
-        "DISABLED",
-        "DISABLED",
         init_weave_get_server("DISABLED", should_batch=False),
         ensure_project_exists=False,
     )
@@ -247,6 +260,7 @@ def finish() -> None:
     current_client = weave_client_context.get_weave_client()
     if current_client is not None:
         weave_client_context.set_weave_client_global(None)
+        weave_client_context.set_project_id(None)
 
     # Unregister the import hook
     from weave.integrations.patch import unregister_import_hook

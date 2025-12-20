@@ -3,6 +3,7 @@ from __future__ import annotations
 import threading
 from collections.abc import Generator
 from contextlib import contextmanager
+from contextvars import ContextVar
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -10,6 +11,9 @@ if TYPE_CHECKING:
 
 _global_weave_client: WeaveClient | None = None
 lock = threading.Lock()
+
+# Context variable for project_id set during weave.init()
+_project_id: ContextVar[str | None] = ContextVar("project_id", default=None)
 
 
 class WeaveInitError(Exception): ...
@@ -47,6 +51,39 @@ def require_weave_client() -> WeaveClient:
     return client
 
 
+def set_project_id(project_id: str | None) -> None:
+    """Set the project_id in the current context.
+
+    Args:
+        project_id: The project_id to set (format: "entity/project").
+    """
+    _project_id.set(project_id)
+
+
+def get_project_id() -> str | None:
+    """Get the current project_id from context.
+
+    Returns:
+        The current project_id if set, None otherwise.
+    """
+    return _project_id.get()
+
+
+def require_project_id() -> str:
+    """Get the current project_id from context, raising if not set.
+
+    Returns:
+        The current project_id.
+
+    Raises:
+        WeaveInitError: If project_id is not set.
+    """
+    project_id = _project_id.get()
+    if project_id is None:
+        raise WeaveInitError("You must call `weave.init(<project_name>)` first")
+    return project_id
+
+
 @contextmanager
 def with_weave_client(
     entity: str | None, project: str | None, required: bool = True
@@ -65,6 +102,7 @@ def with_weave_client(
         and required=False
     """
     current_client = get_weave_client()
+    current_project_id = get_project_id()
     if entity is None and project is None:
         if required and current_client is None:
             raise WeaveInitError("You must call `weave.init(<project_name>)` first")
@@ -78,3 +116,4 @@ def with_weave_client(
             yield client
         finally:
             set_weave_client_global(current_client)
+            set_project_id(current_project_id)

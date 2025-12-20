@@ -6,8 +6,13 @@ client factory callback that can construct a WeaveClient, and executes functions
 on behalf of a user in an isolated process. For example:
 
 ```python
+from weave.trace.context import weave_client_context
+from weave.utils.project_id import to_project_id
+
 def create_client():
-    return WeaveClient(entity="my-entity", project="my-project")
+    project_id = to_project_id("my-entity", "my-project")
+    weave_client_context.set_project_id(project_id)
+    return WeaveClient(server)
 
 runner = IsolatedClientExecutor(client_factory=create_client)
 try:
@@ -118,8 +123,12 @@ class IsolatedClientExecutor:
     - Graceful shutdown and resource cleanup
 
     Examples:
+        >>> from weave.trace.context import weave_client_context
+        >>> from weave.utils.project_id import to_project_id
         >>> def create_client():
-        ...     return WeaveClient(entity="my-entity", project="my-project")
+        ...     project_id = to_project_id("my-entity", "my-project")
+        ...     weave_client_context.set_project_id(project_id)
+        ...     return WeaveClient(server)
         >>> runner = IsolatedClientExecutor(client_factory=create_client)
         >>> try:
         ...     result = await runner.execute(my_function, request)
