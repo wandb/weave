@@ -12,6 +12,7 @@ from tests.trace_server.conftest_lib.trace_server_external_adapter import (
     TestOnlyUserInjectingExternalTraceServer,
     externalize_trace_server,
 )
+from tests.trace_server.mock_clickhouse.in_memory_trace_server import InMemoryTraceServer
 from tests.trace_server.workers.evaluate_model_test_worker import (
     EvaluateModelTestDispatcher,
 )
@@ -37,7 +38,7 @@ def pytest_addoption(parser):
             "--trace-server",
             action="store",
             default="clickhouse",
-            help="Specify the backend to use: sqlite or clickhouse",
+            help="Specify the backend to use: sqlite, clickhouse, or mock",
         )
         parser.addoption(
             "--ch",
@@ -50,6 +51,12 @@ def pytest_addoption(parser):
             "--sqlite",
             action="store_true",
             help="Use sqlite server (shorthand for --trace-server=sqlite)",
+        )
+        parser.addoption(
+            "--mock",
+            "--mock-clickhouse",
+            action="store_true",
+            help="Use mock clickhouse backend (shorthand for --trace-server=mock)",
         )
         parser.addoption(
             "--clickhouse-process",
@@ -72,6 +79,13 @@ def pytest_collection_modifyitems(config, items):
     # 1. All tests in the trace_server directory (regardless of fixture usage)
     # 2. All tests that use the trace_server fixture (for tests outside this directory)
     # Note: Filtering based on remote-http-trace-server flag is handled in tests/trace_server_bindings/conftest.py
+
+    # Check if running with --mock flag
+    using_mock = config.getoption("--mock", default=False) or config.getoption(
+        "--trace-server", default=""
+    ) == "mock"
+    skip_mock = pytest.mark.skip(reason="Test not supported with mock backend")
+
     for item in items:
         # Check if the test is in the trace_server directory by checking parent directories
         if "trace_server" in item.path.parts:
@@ -80,12 +94,18 @@ def pytest_collection_modifyitems(config, items):
         elif "trace_server" in item.fixturenames:
             item.add_marker(pytest.mark.trace_server)
 
+        # Skip tests marked with skip_mock_client when running with --mock
+        if using_mock and item.get_closest_marker("skip_mock_client"):
+            item.add_marker(skip_mock)
+
 
 def get_trace_server_flag(request):
     if request.config.getoption("--clickhouse"):
         return "clickhouse"
     if request.config.getoption("--sqlite"):
         return "sqlite"
+    if request.config.getoption("--mock"):
+        return "mock"
     weave_server_flag = request.config.getoption("--trace-server")
 
     # When running with `-m "not trace_server"` (e.g. trace_no_server shard),
@@ -253,6 +273,40 @@ def get_sqlite_trace_server(
             pass  # Best effort cleanup
 
 
+@pytest.fixture
+def get_mock_ch_trace_server(
+    request,
+) -> Callable[[], TestOnlyUserInjectingExternalTraceServer]:
+    """Provide a factory for creating in-memory trace servers for testing.
+
+    This fixture creates an InMemoryTraceServer that stores all data in Python
+    data structures. It's much faster than using a real database and implements
+    the full trace server interface.
+
+    Usage:
+        pytest --mock  # or --mock-clickhouse or --trace-server=mock
+    """
+    servers_to_cleanup: list[InMemoryTraceServer] = []
+
+    def mock_trace_server_inner() -> TestOnlyUserInjectingExternalTraceServer:
+        id_converter = DummyIdConverter()
+        server = InMemoryTraceServer()
+        servers_to_cleanup.append(server)
+
+        return externalize_trace_server(
+            server, TEST_ENTITY, id_converter=id_converter
+        )
+
+    yield mock_trace_server_inner
+
+    # Cleanup
+    for server in servers_to_cleanup:
+        try:
+            server.clear()
+        except Exception:
+            pass
+
+
 class LocalSecretFetcher:
     def fetch(self, secret_name: str) -> dict:
         return {"secrets": {secret_name: os.getenv(secret_name)}}
@@ -266,13 +320,19 @@ def local_secret_fetcher():
 
 @pytest.fixture
 def trace_server(
-    request, local_secret_fetcher, get_ch_trace_server, get_sqlite_trace_server
+    request,
+    local_secret_fetcher,
+    get_ch_trace_server,
+    get_sqlite_trace_server,
+    get_mock_ch_trace_server,
 ) -> TestOnlyUserInjectingExternalTraceServer:
     trace_server_flag = get_trace_server_flag(request)
     if trace_server_flag == "clickhouse":
         return get_ch_trace_server()
     elif trace_server_flag == "sqlite":
         return get_sqlite_trace_server()
+    elif trace_server_flag == "mock":
+        return get_mock_ch_trace_server()
     else:
         # Once we split the trace server and client code, we can raise here.
         # For now, just return the sqlite trace server so we don't break existing tests.

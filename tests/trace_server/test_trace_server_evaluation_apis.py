@@ -4,6 +4,10 @@ from unittest import mock
 
 import pytest
 
+# Skip all tests in this module when running with mock backend
+# as these tests require evaluation_status and evaluate_model which are not supported
+pytestmark = pytest.mark.skip_mock_client
+
 import weave
 from tests.trace.util import client_is_sqlite
 from tests.trace_server.completions_util import with_simple_mock_litellm_completion

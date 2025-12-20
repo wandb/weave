@@ -63,6 +63,7 @@ SHARDS_WITHOUT_EXTRAS = {
     "trace",
     "trace_no_server",
     "trace_server",
+    "trace_server_mock",
     "trace_server_bindings",
     "openai_realtime",
     "autogen_tests",
@@ -83,6 +84,7 @@ SHARDS_WITHOUT_EXTRAS = {
         "custom",
         "flow",
         "trace_server",
+        "trace_server_mock",
         "trace_server_bindings",
         "anthropic",
         "cerebras",
@@ -133,8 +135,8 @@ def tests(session: nox.Session, shard: str):
         sync_args.extend(["--extra", shard])
     elif shard in ("autogen_tests", "verifiers_test", "pandas_test"):
         sync_args.extend(["--group", shard])
-    elif shard == "trace_server":
-        # trace_server shard needs both trace_server dependency group and trace_server_tests
+    elif shard in ("trace_server", "trace_server_mock"):
+        # trace_server shards need both trace_server dependency group and trace_server_tests
         sync_args.extend(["--group", "trace_server", "--group", "trace_server_tests"])
 
     session.run(*sync_args)
@@ -175,6 +177,7 @@ def tests(session: nox.Session, shard: str):
         "custom": [],
         "flow": ["tests/flow/"],
         "trace_server": ["tests/trace_server/"],
+        "trace_server_mock": ["tests/trace_server/"],
         "trace_server_bindings": ["tests/trace_server_bindings/"],
         "stainless": ["tests/trace_server_bindings/"],
         "scorers": ["tests/scorers/"],
@@ -222,6 +225,10 @@ def tests(session: nox.Session, shard: str):
     # Set trace-server flag for stainless shard
     if shard == "stainless":
         pytest_args.extend(["--remote-http-trace-server=stainless"])
+
+    # Use mock ClickHouse backend for trace_server_mock shard
+    if shard == "trace_server_mock":
+        pytest_args.extend(["--mock"])
 
     if shard == "verifiers_test":
         # Pinning to this commit because the latest version of the gsm8k environment is broken.

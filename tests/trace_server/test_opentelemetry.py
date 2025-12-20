@@ -6,6 +6,10 @@ from datetime import datetime
 from typing import Any
 
 import pytest
+
+# Skip all tests in this module when running with mock backend
+# as OTEL export is not supported in the mock
+pytestmark = pytest.mark.skip_mock_client
 from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
     ExportTraceServiceRequest,
 )
