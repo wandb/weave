@@ -49,11 +49,10 @@ from weave.trace.object_record import (
 from weave.trace.objectify import maybe_objectify
 from weave.trace.op import (
     as_op,
+    is_noop_call,
     is_op,
-    is_placeholder_call,
     is_tracing_setting_disabled,
     maybe_unbind_method,
-    placeholder_call,
     should_skip_tracing_for_op,
 )
 from weave.trace.op import op as op_deco
@@ -656,7 +655,9 @@ class WeaveClient:
         if is_tracing_setting_disabled() or (
             is_op(op) and should_skip_tracing_for_op(cast(Op, op))
         ):
-            return placeholder_call()
+            from weave.trace.call import Call
+
+            return Call.as_noop()
 
         from weave.trace.api import _global_attributes, _global_postprocess_inputs
 
@@ -837,7 +838,7 @@ class WeaveClient:
         if (
             is_tracing_setting_disabled()
             or (op is not None and should_skip_tracing_for_op(op))
-            or is_placeholder_call(call)
+            or is_noop_call(call)
         ):
             return None
 
