@@ -67,7 +67,6 @@ class WeaveTracingProcessor(TracingProcessor):  # pyright: ignore[reportGeneralT
         self._trace_calls: dict[str, Call] = {}
         self._span_calls: dict[str, Call] = {}
         self._ended_traces: set[str] = set()
-        self._span_parents: dict[str, str] = {}
 
     def on_trace_start(self, trace: Trace) -> None:
         """Called when a trace starts."""
@@ -92,6 +91,10 @@ class WeaveTracingProcessor(TracingProcessor):  # pyright: ignore[reportGeneralT
         )
         self._trace_calls[trace.trace_id] = trace_call
 
+        # Push the trace call onto the call context stack so nested spans
+        # and OpenAI calls can find it as their parent
+        call_context.push_call(trace_call)
+
     def on_trace_end(self, trace: Trace) -> None:
         """Called when a trace ends."""
         if (wc := get_weave_client()) is None:
@@ -106,13 +109,21 @@ class WeaveTracingProcessor(TracingProcessor):  # pyright: ignore[reportGeneralT
         trace_data = self._trace_data[tid]
         self._ended_traces.add(tid)
 
-        # Finish the trace call
+        # Finish the trace call (note: finish_call automatically pops from stack)
+        trace_call = self._trace_calls[tid]
         output = {
             "status": "completed",
             "metrics": trace_data.get("metrics", {}),
             "metadata": trace_data.get("metadata", {}),
         }
-        wc.finish_call(self._trace_calls[tid], output=output)
+        wc.finish_call(trace_call, output=output)
+
+        # Safety net: pop any spans that weren't properly finished via on_span_end
+        # (e.g., due to errors or cancellation). pop_call gracefully handles
+        # already-popped calls. Pop in reverse order (LIFO).
+        for _, span_call in reversed(list(self._span_calls.items())):
+            if span_call.trace_id == trace_call.trace_id:
+                call_context.pop_call(span_call.id)
 
         # Clean up internal storage to prevent memory leaks
         self._trace_calls.pop(tid, None)
@@ -291,10 +302,6 @@ class WeaveTracingProcessor(TracingProcessor):  # pyright: ignore[reportGeneralT
         if (wc := get_weave_client()) is None:
             return
 
-        # For Response spans, we'll defer call creation until on_span_end when we have input data
-        if isinstance(span.span_data, ResponseSpanData):
-            return
-
         # Spans must have a parent (either another span or the trace root)
         if not self._get_parent_call(span):
             return
@@ -307,6 +314,38 @@ class WeaveTracingProcessor(TracingProcessor):  # pyright: ignore[reportGeneralT
         span_name = _call_name(span)
         span_type = _call_type(span)
         parent_call = self._get_parent_call(span)
+
+        # For Response spans, create the call immediately (even without input data)
+        # so it's on the stack when the OpenAI call happens. We'll update the inputs
+        # in on_span_end when we have the full data.
+        if isinstance(span.span_data, ResponseSpanData):
+            # Check if we've already created a call for this span (shouldn't happen, but be safe)
+            if span.span_id in self._span_calls:
+                return
+
+            # Create with minimal inputs - we'll update in on_span_end
+            span_call = wc.create_call(
+                op=f"openai_agent_{span_type}",
+                inputs={"name": span_name},
+                parent=parent_call,
+                attributes={
+                    "type": span_type,
+                    "agent_span_id": span.span_id,
+                    "agent_trace_id": tid,
+                    "parent_span_id": getattr(span, "parent_id", None),
+                },
+                display_name=span_name,
+            )
+            self._span_calls[span.span_id] = span_call
+
+            # Push immediately so nested OpenAI calls can find it
+            call_context.push_call(span_call)
+            return
+
+        # For other spans, create and push normally
+        # Check if we've already created a call for this span (shouldn't happen, but be safe)
+        if span.span_id in self._span_calls:
+            return
 
         span_call = wc.create_call(
             op=f"openai_agent_{span_type}",
@@ -322,6 +361,10 @@ class WeaveTracingProcessor(TracingProcessor):  # pyright: ignore[reportGeneralT
         )
         self._span_calls[span.span_id] = span_call
 
+        # Push the call onto the call context stack so nested OpenAI calls
+        # can find it as their parent
+        call_context.push_call(span_call)
+
     def on_span_end(self, span: Span) -> None:
         """Called when a span ends."""
         if (wc := get_weave_client()) is None:
@@ -331,40 +374,6 @@ class WeaveTracingProcessor(TracingProcessor):  # pyright: ignore[reportGeneralT
         span_name = _call_name(span)
         span_type = _call_type(span)
         log_data = self._log_data(span)
-
-        # For Response spans, create the call here so we can include input data
-        if (
-            isinstance(span.span_data, ResponseSpanData)
-            and span.span_id not in self._span_calls
-            and trace_id in self._trace_data
-            and (parent_call := self._get_parent_call(span))
-        ):
-            # Create attributes
-            attributes = {
-                "type": span_type,
-                "agent_span_id": span.span_id,
-                "agent_trace_id": trace_id,
-            }
-
-            # Add parent span ID if present
-            if pid := getattr(span, "parent_id", None):
-                attributes["parent_span_id"] = pid
-
-            # Create inputs with both name and input data if available
-            inputs = {
-                "name": span_name,
-                "input": log_data["inputs"].get("input"),
-            }
-
-            # Create the call now that we have the input data
-            span_call = wc.create_call(
-                op=f"openai_agent_{span_type}",
-                inputs=inputs,
-                parent=parent_call,
-                attributes=attributes,
-                display_name=span_name,
-            )
-            self._span_calls[span.span_id] = span_call
 
         # If this span has a call, finish it
         if (span_call := self._span_calls.get(span.span_id)) is None:
@@ -377,14 +386,20 @@ class WeaveTracingProcessor(TracingProcessor):  # pyright: ignore[reportGeneralT
             "error": log_data["error"],
         }
 
-        # Add error if present
+        # Convert span error to exception if present
+        exception: BaseException | None = None
         if span.error:
             output["error"] = span.error
+            # Create an exception from the span error for proper error handling
+            error_message = span.error.get("message", "Span ended with error")
+            exception = RuntimeError(error_message)
         elif log_data["error"]:
             output["error"] = log_data["error"]
 
-        # Finish the call with the collected data
-        wc.finish_call(span_call, output=output)
+        # Finish the call with the collected data, even if interrupted/cancelled
+        # This ensures all calls are properly finalized
+        # Note: finish_call automatically pops the call from the stack
+        wc.finish_call(span_call, output=output, exception=exception)
 
         # Clean up internal storage to prevent memory leaks
         self._span_calls.pop(span.span_id, None)
