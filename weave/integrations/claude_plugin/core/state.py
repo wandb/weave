@@ -132,7 +132,7 @@ class StateManager:
         self._data = _read_state_file()
         return self
 
-    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+    def __exit__(self, _exc_type: Any, _exc_val: Any, _exc_tb: Any) -> None:
         """Release lock."""
         if self._lock_file:
             fcntl.flock(self._lock_file, fcntl.LOCK_UN)

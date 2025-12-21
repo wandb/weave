@@ -80,7 +80,7 @@ class ClaudeParser:
     async def parse_stream(
         self,
         source: Path,
-        from_line: int = 0,
+        _from_line: int = 0,  # TODO: Implement incremental parsing
         *,
         redact_secrets: bool = True,
     ) -> AsyncIterator[AgentEvent]:
@@ -92,7 +92,7 @@ class ClaudeParser:
 
         Args:
             source: Path to the session file
-            from_line: Line number to resume from (0-indexed) - not yet implemented
+            _from_line: Line number to resume from (0-indexed) - not yet implemented
             redact_secrets: If True, redact detected secrets from event content
 
         Yields:
