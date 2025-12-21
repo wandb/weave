@@ -1,15 +1,18 @@
 """Tests for claude_plugin utilities."""
 
+import subprocess
 import tempfile
 from unittest.mock import MagicMock, patch
 
 from weave.integrations.claude_plugin.utils import (
     MAX_TOOL_INPUT_LENGTH,
     extract_question_from_text,
+    generate_session_name,
     get_git_info,
     log_tool_call,
     reconstruct_call,
     sanitize_tool_input,
+    truncate,
 )
 
 
@@ -474,3 +477,123 @@ Should I use option A?
 Additional notes and context that doesn't end with a question mark."""
         result = extract_question_from_text(text)
         assert result == "Should I use option A?"
+
+
+class TestTruncate:
+    """Tests for truncate() function."""
+
+    def test_returns_none_for_none_input(self):
+        """Should return None when input is None."""
+        result = truncate(None)
+        assert result is None
+
+    def test_returns_empty_string_for_empty_input(self):
+        """Should return empty string when input is empty."""
+        result = truncate("")
+        assert result == ""
+
+    def test_returns_string_unchanged_if_under_limit(self):
+        """Should return string unchanged if under max_len."""
+        result = truncate("short string", max_len=100)
+        assert result == "short string"
+
+    def test_truncates_long_string(self):
+        """Should truncate long string and add marker."""
+        long_string = "x" * 1000
+        result = truncate(long_string, max_len=100)
+        assert len(result) == 100 + len("...[truncated]")
+        assert result.endswith("...[truncated]")
+        assert result.startswith("x" * 100)
+
+    def test_string_exactly_at_limit_unchanged(self):
+        """String exactly at max_len should remain unchanged."""
+        exact_string = "x" * 100
+        result = truncate(exact_string, max_len=100)
+        assert result == exact_string
+        assert not result.endswith("...[truncated]")
+
+
+class TestSessionNaming:
+    """Tests for session name generation error handling."""
+
+    @patch("weave.integrations.claude_plugin.utils._generate_session_name_claude")
+    @patch("weave.integrations.claude_plugin.utils._generate_session_name_ollama")
+    def test_ollama_timeout_fallback(self, mock_ollama, mock_claude):
+        """Ollama timeout falls back to prompt truncation."""
+        # Claude API fails
+        mock_claude.return_value = None
+        # Ollama times out
+        mock_ollama.return_value = None
+
+        display_name, branch = generate_session_name(
+            "Test prompt for naming session title"
+        )
+
+        # Should fall back to truncated prompt
+        assert display_name is not None
+        assert len(display_name) > 0
+        assert "Test prompt" in display_name
+
+    @patch("weave.integrations.claude_plugin.utils._generate_session_name_claude")
+    @patch("weave.integrations.claude_plugin.utils._generate_session_name_ollama")
+    def test_ollama_not_found_fallback(self, mock_ollama, mock_claude):
+        """Ollama not found falls back to prompt truncation."""
+        # Claude API fails
+        mock_claude.return_value = None
+        # Ollama not found
+        mock_ollama.return_value = None
+
+        display_name, branch = generate_session_name("Test prompt for naming")
+
+        assert display_name is not None
+        assert len(display_name) > 0
+
+    @patch("weave.integrations.claude_plugin.utils._generate_session_name_claude")
+    @patch("weave.integrations.claude_plugin.utils._generate_session_name_ollama")
+    def test_claude_api_success(self, mock_ollama, mock_claude):
+        """Claude API success returns title."""
+        mock_claude.return_value = "Generated Title from Claude"
+
+        display_name, branch = generate_session_name("Test prompt")
+
+        assert display_name == "Generated Title from Claude"
+        assert branch == ""
+        # Ollama should not be called if Claude succeeds
+        mock_ollama.assert_not_called()
+
+    @patch("weave.integrations.claude_plugin.utils._generate_session_name_claude")
+    @patch("weave.integrations.claude_plugin.utils._generate_session_name_ollama")
+    def test_ollama_success_after_claude_fails(self, mock_ollama, mock_claude):
+        """Ollama success after Claude fails returns Ollama result."""
+        mock_claude.return_value = None
+        mock_ollama.return_value = ("Ollama Title", "feature/branch")
+
+        display_name, branch = generate_session_name("Test prompt")
+
+        assert display_name == "Ollama Title"
+        assert branch == "feature/branch"
+
+    @patch("weave.integrations.claude_plugin.utils._generate_session_name_claude")
+    @patch("weave.integrations.claude_plugin.utils._generate_session_name_ollama")
+    def test_fallback_truncates_long_prompt(self, mock_ollama, mock_claude):
+        """Fallback truncates prompts longer than 50 chars."""
+        mock_claude.return_value = None
+        mock_ollama.return_value = None
+
+        long_prompt = "This is a very long prompt that exceeds fifty characters and should be truncated"
+        display_name, branch = generate_session_name(long_prompt)
+
+        assert len(display_name) <= 53  # 50 + "..."
+        assert display_name.endswith("...")
+
+    @patch("weave.integrations.claude_plugin.utils._generate_session_name_claude")
+    @patch("weave.integrations.claude_plugin.utils._generate_session_name_ollama")
+    def test_empty_prompt_fallback(self, mock_ollama, mock_claude):
+        """Empty prompt falls back to default."""
+        mock_claude.return_value = None
+        mock_ollama.return_value = None
+
+        display_name, branch = generate_session_name("")
+
+        assert display_name == "Claude Session"
+        assert branch == ""
