@@ -1291,3 +1291,376 @@ class TestFileSnapshots:
 
         # Verify cleanup
         assert "step-1" not in builder._step_file_snapshots
+
+
+class TestQAContextTracking:
+    """Test Q&A context tracking for question/answer flows."""
+
+    def test_pending_question_detected_from_text(self):
+        """Test that pending question is detected from assistant text ending with '?'."""
+        mock_client = MagicMock()
+        mock_step_call = MagicMock(id="step-call")
+        mock_client.create_call.side_effect = [
+            MagicMock(id="run-call"),
+            mock_step_call,
+        ]
+
+        builder = AgentTraceBuilder(
+            weave_client=mock_client,
+            agent_name="Claude Code",
+        )
+
+        # Setup run and step
+        builder.handle(
+            RunStartedEvent(run_id="run-1", timestamp=datetime.now(timezone.utc))
+        )
+        builder.handle(
+            StepStartedEvent(
+                step_id="step-1",
+                run_id="run-1",
+                timestamp=datetime.now(timezone.utc),
+            )
+        )
+
+        # Add assistant message that ends with a question
+        from weave.integrations.ag_ui.events import TextMessageStartEvent
+
+        builder.handle(
+            TextMessageStartEvent(
+                message_id="msg-1",
+                role="assistant",
+                timestamp=datetime.now(timezone.utc),
+            )
+        )
+        builder.handle(
+            TextMessageContentEvent(
+                message_id="msg-1",
+                delta="I found two approaches. Which one would you prefer?",
+                timestamp=datetime.now(timezone.utc),
+            )
+        )
+
+        # Finish step
+        builder.handle(
+            StepFinishedEvent(step_id="step-1", timestamp=datetime.now(timezone.utc))
+        )
+
+        # Verify pending question was detected and stored
+        assert builder._pending_question is not None
+        assert "Which one would you prefer?" in builder._pending_question
+
+        # Verify output includes pending_question
+        mock_client.finish_call.assert_called_once()
+        call_args = mock_client.finish_call.call_args
+        output = call_args[1]["output"]
+        assert "pending_question" in output
+
+    def test_explicit_pending_question_from_event(self):
+        """Test that explicit pending_question from StepFinishedEvent is used."""
+        mock_client = MagicMock()
+        mock_step_call = MagicMock(id="step-call")
+        mock_client.create_call.side_effect = [
+            MagicMock(id="run-call"),
+            mock_step_call,
+        ]
+
+        builder = AgentTraceBuilder(
+            weave_client=mock_client,
+            agent_name="Claude Code",
+        )
+
+        # Setup run and step
+        builder.handle(
+            RunStartedEvent(run_id="run-1", timestamp=datetime.now(timezone.utc))
+        )
+        builder.handle(
+            StepStartedEvent(
+                step_id="step-1",
+                run_id="run-1",
+                timestamp=datetime.now(timezone.utc),
+            )
+        )
+
+        # Finish step with explicit pending question
+        builder.handle(
+            StepFinishedEvent(
+                step_id="step-1",
+                timestamp=datetime.now(timezone.utc),
+                pending_question="Should I proceed with this approach?",
+            )
+        )
+
+        # Verify pending question was stored
+        assert builder._pending_question == "Should I proceed with this approach?"
+
+    def test_qa_context_added_to_next_step(self):
+        """Test that pending question is added as context to next step's inputs."""
+        mock_client = MagicMock()
+        mock_step1_call = MagicMock(id="step-1-call")
+        mock_step2_call = MagicMock(id="step-2-call")
+        mock_client.create_call.side_effect = [
+            MagicMock(id="run-call"),
+            mock_step1_call,
+            mock_step2_call,
+        ]
+
+        builder = AgentTraceBuilder(
+            weave_client=mock_client,
+            agent_name="Claude Code",
+        )
+
+        # Setup run and first step
+        builder.handle(
+            RunStartedEvent(run_id="run-1", timestamp=datetime.now(timezone.utc))
+        )
+        builder.handle(
+            StepStartedEvent(
+                step_id="step-1",
+                run_id="run-1",
+                timestamp=datetime.now(timezone.utc),
+            )
+        )
+
+        # Add assistant message with question
+        from weave.integrations.ag_ui.events import TextMessageStartEvent
+
+        builder.handle(
+            TextMessageStartEvent(
+                message_id="msg-1",
+                role="assistant",
+                timestamp=datetime.now(timezone.utc),
+            )
+        )
+        builder.handle(
+            TextMessageContentEvent(
+                message_id="msg-1",
+                delta="Which approach should I use?",
+                timestamp=datetime.now(timezone.utc),
+            )
+        )
+
+        # Finish first step
+        builder.handle(
+            StepFinishedEvent(step_id="step-1", timestamp=datetime.now(timezone.utc))
+        )
+
+        # Start second step with user response
+        builder.handle(
+            StepStartedEvent(
+                step_id="step-2",
+                run_id="run-1",
+                timestamp=datetime.now(timezone.utc),
+                metadata={"user_message": "Use the first approach"},
+            )
+        )
+
+        # Verify that step 2 was created with Q&A context
+        # The third create_call should be step-2 (after run and step-1)
+        assert len(mock_client.create_call.call_args_list) >= 3
+        step2_create_call = mock_client.create_call.call_args_list[2]
+
+        inputs = step2_create_call[1]["inputs"]
+        assert "messages" in inputs
+        assert len(inputs["messages"]) == 2
+        assert inputs["messages"][0]["role"] == "assistant"
+        assert "Which approach should I use?" in inputs["messages"][0]["content"]
+        assert inputs["messages"][1]["role"] == "user"
+        assert inputs["messages"][1]["content"] == "Use the first approach"
+        assert "in_response_to" in inputs
+        assert "Which approach should I use?" in inputs["in_response_to"]
+
+    def test_pending_question_cleared_when_no_question(self):
+        """Test that pending question is cleared when step doesn't end with question."""
+        mock_client = MagicMock()
+        mock_client.create_call.return_value = MagicMock(id="call")
+
+        builder = AgentTraceBuilder(
+            weave_client=mock_client,
+            agent_name="Claude Code",
+        )
+
+        # Setup run and step with question
+        builder.handle(
+            RunStartedEvent(run_id="run-1", timestamp=datetime.now(timezone.utc))
+        )
+        builder.handle(
+            StepStartedEvent(
+                step_id="step-1",
+                run_id="run-1",
+                timestamp=datetime.now(timezone.utc),
+            )
+        )
+
+        from weave.integrations.ag_ui.events import TextMessageStartEvent
+
+        builder.handle(
+            TextMessageStartEvent(
+                message_id="msg-1",
+                role="assistant",
+                timestamp=datetime.now(timezone.utc),
+            )
+        )
+        builder.handle(
+            TextMessageContentEvent(
+                message_id="msg-1",
+                delta="Should I proceed?",
+                timestamp=datetime.now(timezone.utc),
+            )
+        )
+
+        builder.handle(
+            StepFinishedEvent(step_id="step-1", timestamp=datetime.now(timezone.utc))
+        )
+
+        # Verify question was stored
+        assert builder._pending_question is not None
+
+        # Second step without question
+        builder.handle(
+            StepStartedEvent(
+                step_id="step-2",
+                run_id="run-1",
+                timestamp=datetime.now(timezone.utc),
+            )
+        )
+        builder.handle(
+            TextMessageStartEvent(
+                message_id="msg-2",
+                role="assistant",
+                timestamp=datetime.now(timezone.utc),
+            )
+        )
+        builder.handle(
+            TextMessageContentEvent(
+                message_id="msg-2",
+                delta="Task completed successfully.",
+                timestamp=datetime.now(timezone.utc),
+            )
+        )
+        builder.handle(
+            StepFinishedEvent(step_id="step-2", timestamp=datetime.now(timezone.utc))
+        )
+
+        # Verify pending question was cleared
+        assert builder._pending_question is None
+
+    def test_detect_question_method(self):
+        """Test the _detect_question helper method."""
+        mock_client = MagicMock()
+        builder = AgentTraceBuilder(
+            weave_client=mock_client,
+            agent_name="Claude Code",
+        )
+
+        # Test question at end
+        result = builder._detect_question("I analyzed the code. Should I proceed?")
+        assert result == "Should I proceed?"
+
+        # Test no question
+        result = builder._detect_question("I completed the task successfully.")
+        assert result is None
+
+        # Test question in middle paragraph
+        result = builder._detect_question(
+            "I found two options.\n\nOption 1 is faster. Option 2 is safer. Which do you prefer?"
+        )
+        assert result == "Which do you prefer?"
+
+        # Test multiple sentences in last paragraph
+        result = builder._detect_question(
+            "I analyzed the code. I found an issue. Should I fix it now?"
+        )
+        assert result == "Should I fix it now?"
+
+        # Test empty text
+        result = builder._detect_question("")
+        assert result is None
+
+        # Test None
+        result = builder._detect_question(None)
+        assert result is None
+
+    def test_qa_flow_with_multiple_steps(self):
+        """Test complete Q&A flow across multiple steps."""
+        mock_client = MagicMock()
+        mock_client.create_call.return_value = MagicMock(id="call")
+
+        builder = AgentTraceBuilder(
+            weave_client=mock_client,
+            agent_name="Claude Code",
+        )
+
+        from weave.integrations.ag_ui.events import TextMessageStartEvent
+
+        # Step 1: Assistant asks a question
+        builder.handle(
+            RunStartedEvent(run_id="run-1", timestamp=datetime.now(timezone.utc))
+        )
+        builder.handle(
+            StepStartedEvent(
+                step_id="step-1",
+                run_id="run-1",
+                timestamp=datetime.now(timezone.utc),
+            )
+        )
+        builder.handle(
+            TextMessageStartEvent(
+                message_id="msg-1",
+                role="assistant",
+                timestamp=datetime.now(timezone.utc),
+            )
+        )
+        builder.handle(
+            TextMessageContentEvent(
+                message_id="msg-1",
+                delta="I found two bugs. Which should I fix first?",
+                timestamp=datetime.now(timezone.utc),
+            )
+        )
+        builder.handle(
+            StepFinishedEvent(step_id="step-1", timestamp=datetime.now(timezone.utc))
+        )
+
+        assert builder._pending_question is not None
+
+        # Step 2: User responds, assistant continues
+        builder.handle(
+            StepStartedEvent(
+                step_id="step-2",
+                run_id="run-1",
+                timestamp=datetime.now(timezone.utc),
+                metadata={"user_message": "Fix the first bug"},
+            )
+        )
+        builder.handle(
+            TextMessageStartEvent(
+                message_id="msg-2",
+                role="assistant",
+                timestamp=datetime.now(timezone.utc),
+            )
+        )
+        builder.handle(
+            TextMessageContentEvent(
+                message_id="msg-2",
+                delta="I'll fix the first bug now.",
+                timestamp=datetime.now(timezone.utc),
+            )
+        )
+        builder.handle(
+            StepFinishedEvent(step_id="step-2", timestamp=datetime.now(timezone.utc))
+        )
+
+        # Pending question should be cleared after non-question response
+        assert builder._pending_question is None
+
+        # Verify step 2 had Q&A context
+        step2_calls = [
+            c
+            for c in mock_client.create_call.call_args_list
+            if c[1].get("inputs", {}).get("messages")
+        ]
+        assert len(step2_calls) >= 1
+        step2_inputs = step2_calls[0][1]["inputs"]
+        assert "messages" in step2_inputs
+        assert step2_inputs["messages"][0]["role"] == "assistant"
+        assert "Which should I fix first?" in step2_inputs["messages"][0]["content"]

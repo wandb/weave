@@ -100,6 +100,9 @@ class AgentTraceBuilder:
         # File snapshot tracking per step: step_id → list of Content objects
         self._step_file_snapshots: dict[str, list[Any]] = {}  # Any = Content
 
+        # Q&A context tracking: pending question from previous step
+        self._pending_question: str | None = None
+
     def handle(self, event: AgentEvent) -> None:
         """Process a single event, updating trace state.
 
@@ -193,9 +196,28 @@ class AgentTraceBuilder:
         if not parent:
             return
 
+        # Build inputs
+        inputs: dict[str, Any] = {}
+        if event.step_name:
+            inputs["step_name"] = event.step_name
+
+        # Add Q&A context if we have a pending question from previous step
+        if self._pending_question:
+            # Build messages in conversation format showing the Q&A flow
+            user_message = event.metadata.get("user_message", "")
+            if user_message:  # Only add if user provided a message
+                inputs["messages"] = [
+                    {"role": "assistant", "content": self._pending_question},
+                    {"role": "user", "content": user_message},
+                ]
+                inputs["in_response_to"] = self._pending_question
+
+            # Clear immediately - question consumed by this step
+            self._pending_question = None
+
         call = self.client.create_call(
             op=f"{event.step_type}",
-            inputs={"step_name": event.step_name} if event.step_name else {},
+            inputs=inputs if inputs else {},
             parent=parent,
         )
         self._step_calls[event.step_id] = call
@@ -243,15 +265,25 @@ class AgentTraceBuilder:
                 usage_by_model[usage.model]["output_tokens"] += usage.output_tokens or 0
 
         # Add aggregated content to output
+        full_assistant_text = ""
         if assistant_text_parts:
-            output["content"] = "".join(assistant_text_parts).strip()
+            full_assistant_text = "".join(assistant_text_parts).strip()
+            output["content"] = full_assistant_text
 
         if thinking_text_parts:
             output["reasoning_content"] = "".join(thinking_text_parts).strip()
 
-        # Add pending question if present
-        if event.pending_question:
-            output["pending_question"] = event.pending_question
+        # Detect and store pending question for Q&A flow
+        # Priority: 1) Explicit pending_question from event, 2) Detect from assistant text
+        pending_question = event.pending_question
+        if not pending_question and full_assistant_text:
+            # Simple question detection: check if text ends with '?' or contains question patterns
+            pending_question = self._detect_question(full_assistant_text)
+
+        if pending_question:
+            output["pending_question"] = pending_question
+            # Store for next step's Q&A context
+            self._pending_question = pending_question
 
         # Add ChatView-compatible message format
         output["role"] = "assistant"
@@ -464,3 +496,43 @@ class AgentTraceBuilder:
         if event.content:
             current = self._message_thinking.get(event.message_id, "")
             self._message_thinking[event.message_id] = current + event.content
+
+    def _detect_question(self, text: str) -> str | None:
+        """Detect if assistant text ends with a question.
+
+        Simple heuristic for Q&A flow detection:
+        - Check if text ends with '?'
+        - Extract the last sentence/paragraph that contains the question
+
+        Args:
+            text: Full assistant response text
+
+        Returns:
+            The detected question text, or None if no question detected
+        """
+        if not text:
+            return None
+
+        # Strip and check if ends with question mark
+        text = text.strip()
+        if not text.endswith("?"):
+            return None
+
+        # Extract the last paragraph or sentence containing the question
+        # Split by double newlines to get paragraphs
+        paragraphs = text.split("\n\n")
+        last_para = paragraphs[-1].strip()
+
+        if last_para.endswith("?"):
+            # If last paragraph is just the question, return it
+            # Otherwise, try to extract the last sentence
+            sentences = last_para.split(". ")
+            last_sentence = sentences[-1].strip()
+            if last_sentence.endswith("?"):
+                return last_sentence
+
+            # Fallback: return the whole last paragraph if it contains '?'
+            if "?" in last_para:
+                return last_para
+
+        return None
