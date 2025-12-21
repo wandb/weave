@@ -1,0 +1,64 @@
+"""
+AG-UI Protocol Integration for Weave
+
+Provides shared abstractions for tracing agentic coding tools:
+- Event types based on AG-UI protocol
+- Parser protocol for agent-specific implementations
+- Trace builder for converting events to Weave traces
+
+Supported agents:
+- Claude Code (claude_plugin)
+- Google Gemini CLI (future)
+- OpenAI Codex CLI (future)
+
+References:
+- AG-UI Protocol: https://docs.ag-ui.com/
+"""
+
+# Imports will be added when events.py and parser.py are implemented:
+# from weave.integrations.ag_ui.events import (
+#     # Lifecycle events
+#     RunStartedEvent,
+#     RunFinishedEvent,
+#     RunErrorEvent,
+#     StepStartedEvent,
+#     StepFinishedEvent,
+#     # Message events
+#     TextMessageStartEvent,
+#     TextMessageContentEvent,
+#     TextMessageEndEvent,
+#     # Tool events
+#     ToolCallStartEvent,
+#     ToolCallArgsEvent,
+#     ToolCallEndEvent,
+#     ToolCallResultEvent,
+#     # Tracing extensions
+#     UsageRecordedEvent,
+#     FileSnapshotEvent,
+#     ThinkingContentEvent,
+#     # Union type
+#     AgentEvent,
+# )
+# from weave.integrations.ag_ui.parser import AgentEventParser
+
+__all__ = [
+    # Events (to be uncommented when events.py exists)
+    # "RunStartedEvent",
+    # "RunFinishedEvent",
+    # "RunErrorEvent",
+    # "StepStartedEvent",
+    # "StepFinishedEvent",
+    # "TextMessageStartEvent",
+    # "TextMessageContentEvent",
+    # "TextMessageEndEvent",
+    # "ToolCallStartEvent",
+    # "ToolCallArgsEvent",
+    # "ToolCallEndEvent",
+    # "ToolCallResultEvent",
+    # "UsageRecordedEvent",
+    # "FileSnapshotEvent",
+    # "ThinkingContentEvent",
+    # "AgentEvent",
+    # Parser (to be uncommented when parser.py exists)
+    # "AgentEventParser",
+]
