@@ -58,6 +58,7 @@ class AgentTraceBuilder:
         weave_client: Any,  # weave.WeaveClient
         agent_name: str,
         on_tool_call: Callable[[ToolCallResultEvent, Any], None] | None = None,
+        on_step_finished: Callable[[StepFinishedEvent, Any], None] | None = None,
     ):
         """Initialize the trace builder.
 
@@ -66,11 +67,14 @@ class AgentTraceBuilder:
             agent_name: Agent name for tool registry lookup
             on_tool_call: Optional hook called after each tool result.
                          Use for integration-specific views (diffs, etc.)
+            on_step_finished: Optional hook called after each step finishes.
+                            Use for integration-specific behavior (attach diff views, etc.)
         """
         self.client = weave_client
         self.agent_name = agent_name
         self.tool_registry = get_tool_registry(agent_name)
         self.on_tool_call = on_tool_call
+        self.on_step_finished = on_step_finished
 
         # State tracking
         self._run_calls: dict[str, Any] = {}  # run_id → Call
@@ -268,6 +272,10 @@ class AgentTraceBuilder:
             call.summary = {"usage": usage_by_model}
 
         self.client.finish_call(call, output=output if output else None)
+
+        # Invoke hook for integration-specific behavior (e.g., attach diff views)
+        if self.on_step_finished:
+            self.on_step_finished(event, call)
 
         # Clean up state for this step's messages
         for message_id, step_id in list(self._message_to_step.items()):

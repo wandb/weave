@@ -139,6 +139,217 @@ class TestTraceBuilderToolHook:
         assert hook_called[0][0] == "tool-1"
 
 
+class TestTraceBuilderStepFinishedHook:
+    def test_on_step_finished_hook_invoked(self):
+        """Test that on_step_finished hook is called after step finishes."""
+        mock_client = MagicMock()
+        mock_step_call = MagicMock(id="step-call")
+        mock_client.create_call.side_effect = [
+            MagicMock(id="run-call"),
+            mock_step_call,
+        ]
+
+        hook_called = []
+
+        def on_step(event, call):
+            hook_called.append((event.step_id, call.id))
+
+        builder = AgentTraceBuilder(
+            weave_client=mock_client,
+            agent_name="Claude Code",
+            on_step_finished=on_step,
+        )
+
+        # Setup run and step
+        builder.handle(
+            RunStartedEvent(run_id="run-1", timestamp=datetime.now(timezone.utc))
+        )
+        builder.handle(
+            StepStartedEvent(
+                step_id="step-1",
+                run_id="run-1",
+                timestamp=datetime.now(timezone.utc),
+            )
+        )
+
+        # Finish step
+        builder.handle(
+            StepFinishedEvent(step_id="step-1", timestamp=datetime.now(timezone.utc))
+        )
+
+        assert len(hook_called) == 1
+        assert hook_called[0][0] == "step-1"
+        assert hook_called[0][1] == "step-call"
+
+    def test_on_step_finished_hook_receives_event_and_call(self):
+        """Test that hook receives both the event and the call object."""
+        mock_client = MagicMock()
+        mock_step_call = MagicMock(id="step-call")
+        mock_client.create_call.side_effect = [
+            MagicMock(id="run-call"),
+            mock_step_call,
+        ]
+
+        received_event = None
+        received_call = None
+
+        def on_step(event, call):
+            nonlocal received_event, received_call
+            received_event = event
+            received_call = call
+
+        builder = AgentTraceBuilder(
+            weave_client=mock_client,
+            agent_name="Claude Code",
+            on_step_finished=on_step,
+        )
+
+        # Setup run and step
+        builder.handle(
+            RunStartedEvent(run_id="run-1", timestamp=datetime.now(timezone.utc))
+        )
+        builder.handle(
+            StepStartedEvent(
+                step_id="step-1",
+                run_id="run-1",
+                timestamp=datetime.now(timezone.utc),
+            )
+        )
+
+        # Finish step
+        finish_event = StepFinishedEvent(
+            step_id="step-1", timestamp=datetime.now(timezone.utc)
+        )
+        builder.handle(finish_event)
+
+        assert received_event is finish_event
+        assert received_call is mock_step_call
+
+    def test_on_step_finished_hook_optional(self):
+        """Test that step finishes work without hook."""
+        mock_client = MagicMock()
+        mock_step_call = MagicMock(id="step-call")
+        mock_client.create_call.side_effect = [
+            MagicMock(id="run-call"),
+            mock_step_call,
+        ]
+
+        builder = AgentTraceBuilder(
+            weave_client=mock_client,
+            agent_name="Claude Code",
+            # No on_step_finished hook provided
+        )
+
+        # Setup run and step
+        builder.handle(
+            RunStartedEvent(run_id="run-1", timestamp=datetime.now(timezone.utc))
+        )
+        builder.handle(
+            StepStartedEvent(
+                step_id="step-1",
+                run_id="run-1",
+                timestamp=datetime.now(timezone.utc),
+            )
+        )
+
+        # Finish step - should not crash
+        builder.handle(
+            StepFinishedEvent(step_id="step-1", timestamp=datetime.now(timezone.utc))
+        )
+
+        # Verify step was finished
+        mock_client.finish_call.assert_called_once()
+
+    def test_on_step_finished_hook_called_after_finish_call(self):
+        """Test that hook is called after the step call is finished."""
+        mock_client = MagicMock()
+        mock_step_call = MagicMock(id="step-call")
+        mock_client.create_call.side_effect = [
+            MagicMock(id="run-call"),
+            mock_step_call,
+        ]
+
+        call_order = []
+
+        def track_finish_call(*args, **kwargs):
+            call_order.append("finish_call")
+
+        def on_step(event, call):
+            call_order.append("hook")
+
+        mock_client.finish_call.side_effect = track_finish_call
+
+        builder = AgentTraceBuilder(
+            weave_client=mock_client,
+            agent_name="Claude Code",
+            on_step_finished=on_step,
+        )
+
+        # Setup run and step
+        builder.handle(
+            RunStartedEvent(run_id="run-1", timestamp=datetime.now(timezone.utc))
+        )
+        builder.handle(
+            StepStartedEvent(
+                step_id="step-1",
+                run_id="run-1",
+                timestamp=datetime.now(timezone.utc),
+            )
+        )
+
+        # Finish step
+        builder.handle(
+            StepFinishedEvent(step_id="step-1", timestamp=datetime.now(timezone.utc))
+        )
+
+        # Verify hook was called after finish_call
+        assert call_order == ["finish_call", "hook"]
+
+    def test_on_step_finished_hook_with_pending_question(self):
+        """Test that hook is called even when step has pending question."""
+        mock_client = MagicMock()
+        mock_step_call = MagicMock(id="step-call")
+        mock_client.create_call.side_effect = [
+            MagicMock(id="run-call"),
+            mock_step_call,
+        ]
+
+        hook_called = []
+
+        def on_step(event, call):
+            hook_called.append(event.pending_question)
+
+        builder = AgentTraceBuilder(
+            weave_client=mock_client,
+            agent_name="Claude Code",
+            on_step_finished=on_step,
+        )
+
+        # Setup run and step
+        builder.handle(
+            RunStartedEvent(run_id="run-1", timestamp=datetime.now(timezone.utc))
+        )
+        builder.handle(
+            StepStartedEvent(
+                step_id="step-1",
+                run_id="run-1",
+                timestamp=datetime.now(timezone.utc),
+            )
+        )
+
+        # Finish step with pending question
+        builder.handle(
+            StepFinishedEvent(
+                step_id="step-1",
+                timestamp=datetime.now(timezone.utc),
+                pending_question="Should I proceed?",
+            )
+        )
+
+        assert len(hook_called) == 1
+        assert hook_called[0] == "Should I proceed?"
+
+
 class TestTraceBuilderToolArgs:
     """Test ToolCallArgsEvent handling."""
 
