@@ -147,21 +147,6 @@ class SessionDetails:
 
 
 @dataclass
-class ImportProgress:
-    """Progress update during session import."""
-
-    session_index: int
-    total_sessions: int
-    session_name: str
-    status: str  # "parsing", "importing", "done", "error"
-    turns: int = 0
-    tool_calls: int = 0
-    current_line: int = 0
-    total_lines: int = 0
-    current_tool: str = ""
-
-
-@dataclass
 class ImportResult:
     """Result of importing a single session."""
 
