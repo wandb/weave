@@ -13,14 +13,20 @@ from weave.integrations.ag_ui.views.diff_view import (
     generate_turn_diff_html,
 )
 from weave.integrations.ag_ui.views.diff_utils import (
-    apply_edit_operation,
-    compute_unified_diff,
+    apply_structured_patch,
+    build_file_diffs_from_file_changes,
+    collect_all_file_changes_from_session,
+    extract_edit_data_from_raw_messages,
+    extract_write_data_from_raw_messages,
 )
 
 __all__ = [
     "generate_edit_diff_html",
     "generate_todo_html",
     "generate_turn_diff_html",
-    "apply_edit_operation",
-    "compute_unified_diff",
+    "apply_structured_patch",
+    "build_file_diffs_from_file_changes",
+    "collect_all_file_changes_from_session",
+    "extract_edit_data_from_raw_messages",
+    "extract_write_data_from_raw_messages",
 ]
