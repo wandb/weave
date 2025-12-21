@@ -39,6 +39,7 @@ from weave.integrations.ag_ui.events import (
     AgentEvent,
 )
 from weave.integrations.ag_ui.parser import AgentEventParser
+from weave.integrations.ag_ui.secret_scanner import SecretScanner
 
 __all__ = [
     # Events
@@ -60,4 +61,6 @@ __all__ = [
     "AgentEvent",
     # Parser
     "AgentEventParser",
+    # Secret scanner
+    "SecretScanner",
 ]
