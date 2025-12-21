@@ -287,8 +287,8 @@ def fetch_session_from_weave(
             "summary": dict(call.summary) if call.summary else {},
             "attributes": dict(call.attributes) if call.attributes else {},
         }
-    except Exception as e:
-        logger.error(f"Failed to fetch session from Weave: {e}")
+    except Exception:
+        logger.exception("Failed to fetch session from Weave")
         return None
 
 
@@ -372,7 +372,6 @@ def main() -> int:
         python -m weave.integrations.claude_plugin.teleport <session_id> <project> [--cwd <path>] [--skip-git-check]
     """
     import argparse
-    import sys
 
     parser = argparse.ArgumentParser(
         description="Teleport a Claude Code session from Weave"
