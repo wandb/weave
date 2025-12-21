@@ -1305,3 +1305,413 @@ class TestSubagentImport:
             assert (
                 inputs["subagent_type"] == "code-reviewer"
             ), "subagent_type should match what was passed"
+
+
+class TestFileSnapshotCollection:
+    """Tests for file snapshot collection during session import."""
+
+    def test_file_backup_loads_with_correct_mimetype(self, tmp_path):
+        """File backups from file-history load with correct mimetype."""
+        from datetime import datetime, timezone
+
+        from weave.integrations.claude_plugin.session.session_parser import FileBackup
+
+        # Create a mock file-history directory structure
+        session_id = "test-session-123"
+        file_history_dir = tmp_path / ".claude" / "file-history" / session_id
+        file_history_dir.mkdir(parents=True)
+
+        # Create a Python file backup
+        backup_file = file_history_dir / "test.py.bak"
+        backup_file.write_text("print('hello')")
+
+        # Create FileBackup instance
+        file_backup = FileBackup(
+            file_path="/path/to/test.py",
+            backup_filename="test.py.bak",
+            version=1,
+            backup_time=datetime.now(timezone.utc),
+            message_id="msg-1",
+        )
+
+        # Load content using the backup
+        content = file_backup.load_content(session_id, claude_dir=tmp_path / ".claude")
+
+        # Verify content loaded with correct mimetype
+        assert content is not None, "Content should be loaded"
+        assert content.mimetype == "text/x-python", "Python files should have text/x-python mimetype"
+
+    def test_file_backup_handles_different_extensions(self, tmp_path):
+        """Different file extensions get appropriate mimetypes."""
+        from datetime import datetime, timezone
+
+        from weave.integrations.claude_plugin.session.session_parser import FileBackup
+
+        session_id = "test-session-456"
+        file_history_dir = tmp_path / ".claude" / "file-history" / session_id
+        file_history_dir.mkdir(parents=True)
+
+        # Test various file types
+        test_cases = [
+            ("test.js", "text/javascript", "console.log('hi');"),
+            ("config.json", "application/json", '{"key": "value"}'),
+            ("styles.css", "text/css", "body { margin: 0; }"),
+            ("README.md", "text/plain", "# README"),
+            ("unknown.xyz", "text/plain", "unknown content"),
+        ]
+
+        for filename, expected_mimetype, content_text in test_cases:
+            backup_file = file_history_dir / f"{filename}.bak"
+            backup_file.write_text(content_text)
+
+            file_backup = FileBackup(
+                file_path=f"/path/{filename}",
+                backup_filename=f"{filename}.bak",
+                version=1,
+                backup_time=datetime.now(timezone.utc),
+                message_id="msg-1",
+            )
+
+            content = file_backup.load_content(session_id, claude_dir=tmp_path / ".claude")
+
+            assert content is not None, f"Content should load for {filename}"
+            assert content.mimetype == expected_mimetype, (
+                f"{filename} should have mimetype {expected_mimetype}, got {content.mimetype}"
+            )
+
+    def test_file_backup_returns_none_for_missing_file(self, tmp_path):
+        """Missing backup files return None gracefully."""
+        from datetime import datetime, timezone
+
+        from weave.integrations.claude_plugin.session.session_parser import FileBackup
+
+        session_id = "test-session-789"
+        # Don't create the file-history directory
+
+        file_backup = FileBackup(
+            file_path="/path/to/missing.py",
+            backup_filename="missing.py.bak",
+            version=1,
+            backup_time=datetime.now(timezone.utc),
+            message_id="msg-1",
+        )
+
+        content = file_backup.load_content(session_id, claude_dir=tmp_path / ".claude")
+
+        assert content is None, "Missing files should return None"
+
+    def test_file_backup_metadata_preserved(self, tmp_path):
+        """File backup metadata is preserved in Content object."""
+        from datetime import datetime, timezone
+
+        from weave.integrations.claude_plugin.session.session_parser import FileBackup
+
+        session_id = "test-session-meta"
+        file_history_dir = tmp_path / ".claude" / "file-history" / session_id
+        file_history_dir.mkdir(parents=True)
+
+        backup_file = file_history_dir / "script.py.bak"
+        backup_file.write_text("# script")
+
+        backup_time = datetime(2025, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+        file_backup = FileBackup(
+            file_path="/workspace/script.py",
+            backup_filename="script.py.bak",
+            version=3,
+            backup_time=backup_time,
+            message_id="msg-123",
+        )
+
+        content = file_backup.load_content(session_id, claude_dir=tmp_path / ".claude")
+
+        assert content is not None
+        assert content.metadata["original_path"] == "/workspace/script.py"
+        assert content.metadata["backup_filename"] == "script.py.bak"
+        assert content.metadata["version"] == 3
+        assert content.metadata["message_id"] == "msg-123"
+        assert "2025-01-01T12:00:00" in content.metadata["backup_time"]
+
+    def test_write_tool_file_snapshots_collected(self, tmp_path):
+        """File snapshots from Write tool calls are collected during subagent import."""
+        from weave.integrations.claude_plugin.session.session_importer import (
+            _create_subagent_call,
+        )
+
+        agent_id = "writer123"
+        agent_file = tmp_path / f"agent-{agent_id}.jsonl"
+
+        # Create a subagent session with a Write tool call
+        # The Write tool result has type="create", filePath, and content
+        agent_file.write_text(
+            json.dumps(
+                {
+                    "type": "user",
+                    "sessionId": f"agent-{agent_id}",
+                    "uuid": "msg-1",
+                    "timestamp": "2025-01-01T10:00:00Z",
+                    "message": {"role": "user", "content": "Create a new file"},
+                }
+            )
+            + "\n"
+            + json.dumps(
+                {
+                    "type": "assistant",
+                    "sessionId": f"agent-{agent_id}",
+                    "uuid": "msg-2",
+                    "timestamp": "2025-01-01T10:00:01Z",
+                    "message": {
+                        "role": "assistant",
+                        "model": "claude-sonnet-4-20250514",
+                        "content": [
+                            {
+                                "type": "tool_use",
+                                "id": "tool-1",
+                                "name": "Write",
+                                "input": {
+                                    "file_path": "/new_file.py",
+                                    "content": "# New file\nprint('created')",
+                                },
+                            }
+                        ],
+                        "usage": {"input_tokens": 10, "output_tokens": 5},
+                    },
+                }
+            )
+            + "\n"
+            + json.dumps(
+                {
+                    "type": "tool_result",
+                    "sessionId": f"agent-{agent_id}",
+                    "uuid": "tool-result-1",
+                    "timestamp": "2025-01-01T10:00:02Z",
+                    "toolUseResult": {
+                        "type": "create",
+                        "filePath": "/new_file.py",
+                        "content": "# New file\nprint('created')",
+                    },
+                    "tool_result": {
+                        "type": "tool_result",
+                        "tool_use_id": "tool-1",
+                        "content": "File written successfully",
+                    },
+                }
+            )
+            + "\n"
+            + json.dumps(
+                {
+                    "type": "assistant",
+                    "sessionId": f"agent-{agent_id}",
+                    "uuid": "msg-3",
+                    "timestamp": "2025-01-01T10:00:03Z",
+                    "message": {
+                        "role": "assistant",
+                        "model": "claude-sonnet-4-20250514",
+                        "content": [{"type": "text", "text": "File created!"}],
+                        "usage": {"input_tokens": 20, "output_tokens": 8},
+                    },
+                }
+            )
+            + "\n"
+        )
+
+        with patch(
+            "weave.integrations.claude_plugin.session.session_importer.require_weave_client"
+        ) as mock_client_fn:
+            mock_client = MagicMock()
+            mock_call = MagicMock(id="subagent-call-1")
+            mock_call.summary = {}
+            mock_client.create_call.return_value = mock_call
+            mock_client.finish_call = MagicMock()
+            mock_client_fn.return_value = mock_client
+
+            parent_call = MagicMock(id="parent-call-1")
+
+            calls_created, file_snapshots = _create_subagent_call(
+                agent_id=agent_id,
+                parent_call=parent_call,
+                sessions_dir=tmp_path,
+                client=mock_client,
+                session_id="main-session-123",
+                trace_id="trace-123",
+            )
+
+            # Verify file snapshots were collected from Write tool
+            assert len(file_snapshots) > 0, "Should collect file snapshots from Write tool"
+
+            # Check that the snapshot has the correct metadata
+            snapshot = file_snapshots[0]
+            assert snapshot.metadata["original_path"] == "/new_file.py"
+            assert snapshot.metadata["source"] == "write_tool"
+
+    def test_file_snapshots_avoid_duplicates(self, tmp_path):
+        """File snapshots from multiple sources avoid duplicates by path."""
+        from weave.integrations.claude_plugin.session.session_importer import (
+            _create_subagent_call,
+        )
+
+        agent_id = "dedup123"
+        agent_file = tmp_path / f"agent-{agent_id}.jsonl"
+
+        # Create a session where the same file is written twice
+        agent_file.write_text(
+            json.dumps(
+                {
+                    "type": "user",
+                    "sessionId": f"agent-{agent_id}",
+                    "uuid": "msg-1",
+                    "timestamp": "2025-01-01T10:00:00Z",
+                    "message": {"role": "user", "content": "Edit file"},
+                }
+            )
+            + "\n"
+            + json.dumps(
+                {
+                    "type": "assistant",
+                    "sessionId": f"agent-{agent_id}",
+                    "uuid": "msg-2",
+                    "timestamp": "2025-01-01T10:00:01Z",
+                    "message": {
+                        "role": "assistant",
+                        "model": "claude-sonnet-4-20250514",
+                        "content": [
+                            {
+                                "type": "tool_use",
+                                "id": "tool-1",
+                                "name": "Write",
+                                "input": {"file_path": "/same.py", "content": "v1"},
+                            }
+                        ],
+                        "usage": {"input_tokens": 10, "output_tokens": 5},
+                    },
+                }
+            )
+            + "\n"
+            + json.dumps(
+                {
+                    "type": "tool_result",
+                    "sessionId": f"agent-{agent_id}",
+                    "uuid": "tool-result-1",
+                    "timestamp": "2025-01-01T10:00:02Z",
+                    "toolUseResult": {
+                        "type": "create",
+                        "filePath": "/same.py",
+                        "content": "v1",
+                    },
+                    "tool_result": {
+                        "type": "tool_result",
+                        "tool_use_id": "tool-1",
+                        "content": "OK",
+                    },
+                }
+            )
+            + "\n"
+            + json.dumps(
+                {
+                    "type": "assistant",
+                    "sessionId": f"agent-{agent_id}",
+                    "uuid": "msg-3",
+                    "timestamp": "2025-01-01T10:00:03Z",
+                    "message": {
+                        "role": "assistant",
+                        "model": "claude-sonnet-4-20250514",
+                        "content": [{"type": "text", "text": "Done"}],
+                        "usage": {"input_tokens": 20, "output_tokens": 8},
+                    },
+                }
+            )
+            + "\n"
+            # Second turn with same file
+            + json.dumps(
+                {
+                    "type": "user",
+                    "sessionId": f"agent-{agent_id}",
+                    "uuid": "msg-4",
+                    "timestamp": "2025-01-01T10:01:00Z",
+                    "message": {"role": "user", "content": "Edit again"},
+                }
+            )
+            + "\n"
+            + json.dumps(
+                {
+                    "type": "assistant",
+                    "sessionId": f"agent-{agent_id}",
+                    "uuid": "msg-5",
+                    "timestamp": "2025-01-01T10:01:01Z",
+                    "message": {
+                        "role": "assistant",
+                        "model": "claude-sonnet-4-20250514",
+                        "content": [
+                            {
+                                "type": "tool_use",
+                                "id": "tool-2",
+                                "name": "Write",
+                                "input": {"file_path": "/same.py", "content": "v2"},
+                            }
+                        ],
+                        "usage": {"input_tokens": 10, "output_tokens": 5},
+                    },
+                }
+            )
+            + "\n"
+            + json.dumps(
+                {
+                    "type": "tool_result",
+                    "sessionId": f"agent-{agent_id}",
+                    "uuid": "tool-result-2",
+                    "timestamp": "2025-01-01T10:01:02Z",
+                    "toolUseResult": {
+                        "type": "create",
+                        "filePath": "/same.py",
+                        "content": "v2",
+                    },
+                    "tool_result": {
+                        "type": "tool_result",
+                        "tool_use_id": "tool-2",
+                        "content": "OK",
+                    },
+                }
+            )
+            + "\n"
+            + json.dumps(
+                {
+                    "type": "assistant",
+                    "sessionId": f"agent-{agent_id}",
+                    "uuid": "msg-6",
+                    "timestamp": "2025-01-01T10:01:03Z",
+                    "message": {
+                        "role": "assistant",
+                        "model": "claude-sonnet-4-20250514",
+                        "content": [{"type": "text", "text": "Updated"}],
+                        "usage": {"input_tokens": 20, "output_tokens": 8},
+                    },
+                }
+            )
+            + "\n"
+        )
+
+        with patch(
+            "weave.integrations.claude_plugin.session.session_importer.require_weave_client"
+        ) as mock_client_fn:
+            mock_client = MagicMock()
+            mock_call = MagicMock(id="subagent-call-1")
+            mock_call.summary = {}
+            mock_client.create_call.return_value = mock_call
+            mock_client.finish_call = MagicMock()
+            mock_client_fn.return_value = mock_client
+
+            parent_call = MagicMock(id="parent-call-1")
+
+            calls_created, file_snapshots = _create_subagent_call(
+                agent_id=agent_id,
+                parent_call=parent_call,
+                sessions_dir=tmp_path,
+                client=mock_client,
+                session_id="main-session-123",
+                trace_id="trace-123",
+            )
+
+            # Should only have one snapshot for /same.py (no duplicates)
+            # The deduplication is done by file_paths_seen set in _create_subagent_call
+            assert len(file_snapshots) == 1, (
+                f"Should deduplicate same file path, got {len(file_snapshots)} snapshots"
+            )

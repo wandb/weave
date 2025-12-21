@@ -408,8 +408,8 @@ def _create_subagent_call(
                     file_content = write_data["content"]
                     # Create a Content object for the new file
                     try:
-                        content = Content(
-                            content=file_content.encode("utf-8"),
+                        content = Content.from_bytes(
+                            file_content.encode("utf-8"),
                             metadata={
                                 "original_path": file_path,
                                 "relative_path": Path(file_path).name,

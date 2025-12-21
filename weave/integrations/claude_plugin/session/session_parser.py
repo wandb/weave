@@ -741,6 +741,12 @@ def parse_session_file(path: Path) -> Session | None:
             current_turn.assistant_messages.append(assistant_msg)
             current_turn.raw_messages.append(msg)  # Collect raw payload
 
+        else:
+            # Handle other message types (tool_result, etc.)
+            # These messages belong to the current turn if one exists
+            if current_turn:
+                current_turn.raw_messages.append(msg)
+
     if current_turn:
         session.turns.append(current_turn)
 
