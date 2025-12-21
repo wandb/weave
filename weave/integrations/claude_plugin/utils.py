@@ -72,9 +72,6 @@ SUBAGENT_BOILERPLATE_REPLACEMENTS = [
 # Regex patterns for extracting command info from XML-tagged messages
 _COMMAND_NAME_PATTERN = re.compile(r"<command-name>([^<]+)</command-name>")
 _COMMAND_MESSAGE_PATTERN = re.compile(r"<command-message>([^<]+)</command-message>")
-_COMMAND_OUTPUT_PATTERN = re.compile(
-    r"<local-command-(stdout|stderr)>([^<]*)</local-command-(?:stdout|stderr)>"
-)
 # Pattern to extract content from any XML tag for display names
 _XML_TAG_CONTENT_PATTERN = re.compile(r"<([a-z-]+)>([^<]*)</\1>")
 
@@ -230,40 +227,6 @@ def get_turn_display_name(
     # Regular prompt - truncate to 50 chars
     turn_preview = truncate(user_prompt, 50) or f"Turn {turn_number}"
     return f"Turn {turn_number}: {turn_preview}"
-
-
-def is_command_output(text: str) -> bool:
-    """Check if text is a command output message.
-
-    Args:
-        text: Message content to check
-
-    Returns:
-        True if this is a <local-command-stdout> or <local-command-stderr> message
-    """
-    if not text:
-        return False
-    text_stripped = text.strip()
-    return text_stripped.startswith(
-        ("<local-command-stdout>", "<local-command-stderr>")
-    )
-
-
-def extract_command_output(text: str) -> str:
-    """Extract content from command output XML tags.
-
-    Args:
-        text: Message with <local-command-stdout>content</local-command-stdout>
-
-    Returns:
-        The extracted content, or empty string if no match
-    """
-    if not text:
-        return ""
-    match = _COMMAND_OUTPUT_PATTERN.search(text)
-    if match:
-        return match.group(2).strip()
-    return ""
 
 
 def truncate(
