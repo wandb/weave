@@ -2,6 +2,7 @@
 
 import subprocess
 import tempfile
+from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
 
 from weave.integrations.claude_plugin.utils import (
@@ -234,6 +235,87 @@ class TestLogToolCall:
 
         call_kwargs = mock_weave.log_call.call_args.kwargs
         assert call_kwargs["output"] is None
+
+    @patch("weave.integrations.claude_plugin.utils.weave")
+    def test_passes_started_at_timestamp(self, mock_weave):
+        """Should pass started_at timestamp to weave.log_call."""
+        parent_call = MagicMock()
+        started_at = datetime(2025, 1, 15, 10, 30, 0, tzinfo=timezone.utc)
+
+        log_tool_call(
+            tool_name="Read",
+            tool_input={"file_path": "/test/file.py"},
+            tool_output="contents",
+            tool_use_id="tool-123",
+            duration_ms=100,
+            parent=parent_call,
+            started_at=started_at,
+        )
+
+        call_kwargs = mock_weave.log_call.call_args.kwargs
+        assert call_kwargs["started_at"] == started_at
+
+    @patch("weave.integrations.claude_plugin.utils.weave")
+    def test_passes_ended_at_timestamp(self, mock_weave):
+        """Should pass ended_at timestamp to weave.log_call."""
+        parent_call = MagicMock()
+        ended_at = datetime(2025, 1, 15, 10, 30, 5, tzinfo=timezone.utc)
+
+        log_tool_call(
+            tool_name="Read",
+            tool_input={"file_path": "/test/file.py"},
+            tool_output="contents",
+            tool_use_id="tool-123",
+            duration_ms=5000,
+            parent=parent_call,
+            ended_at=ended_at,
+        )
+
+        call_kwargs = mock_weave.log_call.call_args.kwargs
+        assert call_kwargs["ended_at"] == ended_at
+
+    @patch("weave.integrations.claude_plugin.utils.weave")
+    def test_passes_both_timestamps(self, mock_weave):
+        """Should pass both started_at and ended_at timestamps."""
+        parent_call = MagicMock()
+        started_at = datetime(2025, 1, 15, 10, 30, 0, tzinfo=timezone.utc)
+        ended_at = datetime(2025, 1, 15, 10, 30, 5, tzinfo=timezone.utc)
+
+        log_tool_call(
+            tool_name="Grep",
+            tool_input={"pattern": "test"},
+            tool_output="file.py:10:test case",
+            tool_use_id="tool-456",
+            duration_ms=5000,
+            parent=parent_call,
+            started_at=started_at,
+            ended_at=ended_at,
+        )
+
+        call_kwargs = mock_weave.log_call.call_args.kwargs
+        assert call_kwargs["started_at"] == started_at
+        assert call_kwargs["ended_at"] == ended_at
+        # Duration in milliseconds should match
+        actual_duration = (ended_at - started_at).total_seconds() * 1000
+        assert call_kwargs["attributes"]["duration_ms"] == 5000
+
+    @patch("weave.integrations.claude_plugin.utils.weave")
+    def test_timestamps_default_to_none(self, mock_weave):
+        """When not provided, started_at and ended_at should be None."""
+        parent_call = MagicMock()
+
+        log_tool_call(
+            tool_name="Read",
+            tool_input={"file_path": "/test/file.py"},
+            tool_output="contents",
+            tool_use_id="tool-123",
+            duration_ms=100,
+            parent=parent_call,
+        )
+
+        call_kwargs = mock_weave.log_call.call_args.kwargs
+        assert call_kwargs.get("started_at") is None
+        assert call_kwargs.get("ended_at") is None
 
 
 class TestLogToolCallEdgeCases:

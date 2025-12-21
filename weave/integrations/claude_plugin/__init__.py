@@ -28,6 +28,10 @@ Usage:
     )
 """
 
+from weave.integrations.ag_ui.views.diff_view import (
+    generate_edit_diff_html,
+    generate_turn_diff_html,
+)
 from weave.integrations.claude_plugin.core.socket_client import (
     DaemonClient,
     ensure_daemon_running,
@@ -71,10 +75,6 @@ from weave.integrations.claude_plugin.utils import (
     generate_session_name,
     get_tool_display_name,
     truncate,
-)
-from weave.integrations.ag_ui.views.diff_view import (
-    generate_edit_diff_html,
-    generate_turn_diff_html,
 )
 
 __all__ = [

@@ -91,8 +91,17 @@ logger = setup_logging()
 
 # Import after logging setup
 import weave
+from weave.integrations.ag_ui.views.diff_view import (
+    generate_session_diff_html,
+    generate_turn_diff_html,
+)
 from weave.integrations.claude_plugin.core.socket_client import get_socket_path
 from weave.integrations.claude_plugin.core.state import StateManager
+from weave.integrations.claude_plugin.session.session_importer import (
+    _build_subagent_inputs,
+    _build_subagent_output,
+    _build_turn_output,
+)
 from weave.integrations.claude_plugin.session.session_parser import (
     Session,
     TokenUsage,
@@ -100,11 +109,6 @@ from weave.integrations.claude_plugin.session.session_parser import (
     Turn,
     is_system_message,
     parse_session_file,
-)
-from weave.integrations.claude_plugin.session.session_importer import (
-    _build_subagent_inputs,
-    _build_subagent_output,
-    _build_turn_output,
 )
 from weave.integrations.claude_plugin.utils import (
     INACTIVITY_TIMEOUT,
@@ -120,10 +124,6 @@ from weave.integrations.claude_plugin.utils import (
     log_tool_call,
     reconstruct_call,
     truncate,
-)
-from weave.integrations.ag_ui.views.diff_view import (
-    generate_session_diff_html,
-    generate_turn_diff_html,
 )
 from weave.trace.context.weave_client_context import require_weave_client
 from weave.trace.view_utils import set_call_view
@@ -520,6 +520,9 @@ class WeaveDaemon:
                     tool_use_id=tool_call.id,
                     duration_ms=tool_call.duration_ms(),
                     parent=subagent_call,
+                    started_at=tool_call.timestamp,
+                    ended_at=tool_call.result_timestamp,
+                    is_error=tool_call.is_error,
                 )
 
         tracker.last_processed_line = total_lines
@@ -1120,6 +1123,9 @@ class WeaveDaemon:
                     tool_use_id=tool_call.id,
                     duration_ms=tool_call.duration_ms(),
                     parent=subagent_call,
+                    started_at=tool_call.timestamp,
+                    ended_at=tool_call.result_timestamp,
+                    is_error=tool_call.is_error,
                 )
                 tool_counts[tool_name] = tool_counts.get(tool_name, 0) + 1
         else:
@@ -1149,6 +1155,9 @@ class WeaveDaemon:
                         tool_use_id=tool_call.id,
                         duration_ms=tool_call.duration_ms(),
                         parent=turn_call,
+                        started_at=tool_call.timestamp,
+                        ended_at=tool_call.result_timestamp,
+                        is_error=tool_call.is_error,
                     )
                     tool_counts[tool_name] = tool_counts.get(tool_name, 0) + 1
 
@@ -2158,6 +2167,8 @@ class WeaveDaemon:
                 duration_ms=duration_ms,
                 parent=turn_call,
                 max_output_length=10000,
+                started_at=started_at,
+                ended_at=ended_at,
             )
 
             # Update counts
@@ -2419,6 +2430,8 @@ class WeaveDaemon:
             duration_ms=duration_ms,
             parent=parent,
             max_output_length=10000,
+            started_at=started_at,
+            ended_at=ended_at,
         )
 
         # Update counts and tracking
@@ -2561,6 +2574,8 @@ class WeaveDaemon:
             parent=parent,
             max_output_length=10000,
             is_error=tool.is_error,
+            started_at=tool.timestamp,
+            ended_at=tool.result_timestamp,
         )
 
         # Update counts and tracking
@@ -2684,6 +2699,8 @@ class WeaveDaemon:
             duration_ms=duration_ms,
             parent=tool_parent,
             max_output_length=10000,
+            started_at=started_at,
+            ended_at=ended_at,
         )
 
         # Update counts

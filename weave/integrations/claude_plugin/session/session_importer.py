@@ -28,26 +28,44 @@ import logging
 import re
 import time
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import weave
+from weave.integrations.ag_ui.trace_builder import AgentTraceBuilder
+from weave.integrations.ag_ui.views.diff_utils import (
+    collect_all_file_changes_from_session,
+    extract_edit_data_from_raw_messages,
+    extract_write_data_from_raw_messages,
+)
+from weave.integrations.ag_ui.views.diff_view import (
+    DIFF_HTML_STYLES,
+    _build_file_diffs_from_edit_data,
+    _render_file_diff_html,
+    generate_session_diff_html,
+    generate_turn_diff_html,
+)
 from weave.integrations.claude_plugin.core.state import (
     load_session as get_session_state,
 )
+from weave.integrations.claude_plugin.parser import ClaudeParser
 from weave.integrations.claude_plugin.session.session_parser import (
     Session,
     parse_session_file,
 )
 from weave.integrations.claude_plugin.utils import (
     generate_session_name,
-    reconstruct_call,
+    get_git_info,
+    get_subagent_display_name,
+    log_tool_calls_grouped,
+    set_call_view,
     truncate,
+)
+from weave.integrations.claude_plugin.views.cli_output import (
+    ImportResult,
+    extract_session_details,
 )
 from weave.trace.context.weave_client_context import require_weave_client
 from weave.type_wrappers.Content.content import Content
-
-if TYPE_CHECKING:
-    from weave.integrations.claude_plugin.views.cli_output import ImportResult
 
 logger = logging.getLogger(__name__)
 
@@ -336,8 +354,6 @@ def _create_subagent_call(
 
     # Build display name using helper that strips common prefixes
     first_prompt = subagent_session.first_user_prompt() or ""
-    from weave.integrations.claude_plugin.utils import get_subagent_display_name
-
     display_name = get_subagent_display_name(first_prompt, agent_id)
 
     # Create subagent call with ChatView-compatible inputs and timestamp from parsed session
@@ -361,10 +377,6 @@ def _create_subagent_call(
         # Pre-extract Edit tool data for this turn if we need tool traces
         edit_data_by_path: dict[str, dict] = {}
         if include_tool_traces and turn.raw_messages:
-            from weave.integrations.ag_ui.views.diff_utils import (
-                extract_edit_data_from_raw_messages,
-            )
-
             for edit_data in extract_edit_data_from_raw_messages(turn.raw_messages):
                 file_path = edit_data.get("file_path")
                 if file_path:
@@ -376,8 +388,6 @@ def _create_subagent_call(
 
         # Log tool calls with parallel grouping (subagents often use parallel calls)
         if include_tool_traces:
-            from weave.integrations.claude_plugin.utils import log_tool_calls_grouped
-
             calls_created += log_tool_calls_grouped(
                 tool_call_groups=turn.grouped_tool_calls(),
                 parent=subagent_call,
@@ -397,10 +407,6 @@ def _create_subagent_call(
         # Also collect file content from Write tool calls in raw messages
         # This captures new files created in subagents (which don't have file-history)
         if turn.raw_messages:
-            from weave.integrations.ag_ui.views.diff_utils import (
-                extract_write_data_from_raw_messages,
-            )
-
             write_data_list = extract_write_data_from_raw_messages(turn.raw_messages)
             for write_data in write_data_list:
                 file_path = write_data["file_path"]
@@ -445,20 +451,9 @@ def _create_subagent_call(
     all_edit_data: list[dict] = []
     for turn in subagent_session.turns:
         if turn.raw_messages:
-            from weave.integrations.ag_ui.views.diff_utils import (
-                extract_edit_data_from_raw_messages,
-            )
-
             all_edit_data.extend(extract_edit_data_from_raw_messages(turn.raw_messages))
 
     if all_edit_data:
-        from weave.integrations.claude_plugin.utils import set_call_view
-        from weave.integrations.ag_ui.views.diff_view import (
-            DIFF_HTML_STYLES,
-            _build_file_diffs_from_edit_data,
-            _render_file_diff_html,
-        )
-
         # Get cwd from the subagent session for relative paths
         cwd = subagent_session.cwd
 
@@ -520,15 +515,6 @@ def _import_session_to_weave(
 
     Returns: (turns, tool_calls, calls_created, call_id)
     """
-    from weave.integrations.claude_plugin.parser import ClaudeParser
-    from weave.integrations.ag_ui.trace_builder import AgentTraceBuilder
-    from weave.integrations.ag_ui.views.diff_view import generate_turn_diff_html
-    from weave.integrations.claude_plugin.utils import (
-        generate_session_name,
-        get_git_info,
-    )
-    from weave.trace.view_utils import set_call_view
-
     client = require_weave_client()
     sessions_dir = session_file_path.parent
 
@@ -637,8 +623,6 @@ def _import_session_to_weave(
         session_call.summary = summary
 
     # Attach session-level diff view
-    from weave.integrations.ag_ui.views.diff_view import generate_session_diff_html
-
     session_diff_html = generate_session_diff_html(
         session=session,
         sessions_dir=sessions_dir,
@@ -654,10 +638,6 @@ def _import_session_to_weave(
         )
 
     # Attach file snapshots to session output
-    from weave.integrations.ag_ui.views.diff_utils import (
-        collect_all_file_changes_from_session,
-    )
-
     file_changes = collect_all_file_changes_from_session(session, sessions_dir)
     file_snapshots = []
 
@@ -776,11 +756,6 @@ def import_session_with_result(
     Returns:
         ImportResult with session details and success/error status
     """
-    from weave.integrations.claude_plugin.views.cli_output import (
-        ImportResult,
-        extract_session_details,
-    )
-
     try:
         session = parse_session_file(session_path)
         if not session:
