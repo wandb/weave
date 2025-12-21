@@ -4,6 +4,7 @@ Tool calls are embedded in turn/subagent output using build_turn_output(),
 not as separate child traces. This enables ChatView rendering.
 """
 
+import json
 from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -964,3 +965,343 @@ class TestImportSessions:
 
             # Should only process 1 session (the most recent)
             assert summary["total_turns"] == 1
+
+
+class TestSubagentImport:
+    """Tests for subagent import in session_importer."""
+
+    def test_subagent_import_creates_call(self, tmp_path):
+        """Subagent import creates a call with proper structure."""
+        from weave.integrations.claude_plugin.session.session_importer import (
+            _create_subagent_call,
+        )
+
+        # Create a simple agent file with one turn
+        agent_id = "abc123"
+        agent_file = tmp_path / f"agent-{agent_id}.jsonl"
+        agent_file.write_text(
+            json.dumps(
+                {
+                    "type": "user",
+                    "sessionId": f"agent-{agent_id}",
+                    "uuid": "msg-1",
+                    "timestamp": "2025-01-01T10:00:00Z",
+                    "message": {"role": "user", "content": "Fix the bug"},
+                }
+            )
+            + "\n"
+            + json.dumps(
+                {
+                    "type": "assistant",
+                    "sessionId": f"agent-{agent_id}",
+                    "uuid": "msg-2",
+                    "timestamp": "2025-01-01T10:00:01Z",
+                    "message": {
+                        "role": "assistant",
+                        "model": "claude-sonnet-4-20250514",
+                        "content": [{"type": "text", "text": "Fixed!"}],
+                        "usage": {"input_tokens": 10, "output_tokens": 5},
+                    },
+                }
+            )
+            + "\n"
+        )
+
+        # Mock the client
+        with patch(
+            "weave.integrations.claude_plugin.session.session_importer.require_weave_client"
+        ) as mock_client_fn:
+            mock_client = MagicMock()
+            mock_call = MagicMock(id="subagent-call-1")
+            mock_call.summary = {}
+            mock_client.create_call.return_value = mock_call
+            mock_client.finish_call = MagicMock()
+            mock_client_fn.return_value = mock_client
+
+            # Create a parent call mock
+            parent_call = MagicMock(id="parent-call-1")
+
+            # Call the function
+            calls_created, file_snapshots = _create_subagent_call(
+                agent_id=agent_id,
+                parent_call=parent_call,
+                sessions_dir=tmp_path,
+                client=mock_client,
+                session_id="main-session-123",
+                trace_id="trace-123",
+            )
+
+            # Verify a call was created
+            assert calls_created >= 1, "Should create at least 1 call for the subagent"
+            assert mock_client.create_call.called, "Should call create_call"
+            assert mock_client.finish_call.called, "Should call finish_call"
+
+    def test_subagent_display_name_uses_prompt(self, tmp_path):
+        """Subagent display name uses the first user prompt."""
+        from weave.integrations.claude_plugin.session.session_importer import (
+            _create_subagent_call,
+        )
+
+        agent_id = "xyz789"
+        agent_file = tmp_path / f"agent-{agent_id}.jsonl"
+        agent_file.write_text(
+            json.dumps(
+                {
+                    "type": "user",
+                    "sessionId": f"agent-{agent_id}",
+                    "uuid": "msg-1",
+                    "timestamp": "2025-01-01T10:00:00Z",
+                    "message": {"role": "user", "content": "Review the code"},
+                }
+            )
+            + "\n"
+            + json.dumps(
+                {
+                    "type": "assistant",
+                    "sessionId": f"agent-{agent_id}",
+                    "uuid": "msg-2",
+                    "timestamp": "2025-01-01T10:00:01Z",
+                    "message": {
+                        "role": "assistant",
+                        "model": "claude-sonnet-4-20250514",
+                        "content": [{"type": "text", "text": "Done"}],
+                        "usage": {"input_tokens": 10, "output_tokens": 5},
+                    },
+                }
+            )
+            + "\n"
+        )
+
+        with patch(
+            "weave.integrations.claude_plugin.session.session_importer.require_weave_client"
+        ) as mock_client_fn:
+            mock_client = MagicMock()
+            mock_call = MagicMock(id="subagent-call-1")
+            mock_call.summary = {}
+            mock_client.create_call.return_value = mock_call
+            mock_client_fn.return_value = mock_client
+
+            parent_call = MagicMock(id="parent-call-1")
+
+            _create_subagent_call(
+                agent_id=agent_id,
+                parent_call=parent_call,
+                sessions_dir=tmp_path,
+                client=mock_client,
+                session_id="main-session-123",
+                trace_id="trace-123",
+            )
+
+            # Check that create_call was called with a display_name containing prompt text
+            create_call_args = mock_client.create_call.call_args
+            display_name = create_call_args.kwargs.get("display_name", "")
+            assert "SubAgent:" in display_name, "Display name should start with SubAgent:"
+            assert (
+                "Review" in display_name or "code" in display_name
+            ), f"Display name should include prompt content: {display_name}"
+
+    def test_missing_subagent_file_handled(self, tmp_path):
+        """Missing subagent file is handled gracefully."""
+        from weave.integrations.claude_plugin.session.session_importer import (
+            _create_subagent_call,
+        )
+
+        # Don't create the agent file - it's missing
+        agent_id = "missing123"
+
+        with patch(
+            "weave.integrations.claude_plugin.session.session_importer.require_weave_client"
+        ) as mock_client_fn:
+            mock_client = MagicMock()
+            mock_client_fn.return_value = mock_client
+
+            parent_call = MagicMock(id="parent-call-1")
+
+            # Should not raise an exception
+            calls_created, file_snapshots = _create_subagent_call(
+                agent_id=agent_id,
+                parent_call=parent_call,
+                sessions_dir=tmp_path,
+                client=mock_client,
+                session_id="main-session-123",
+                trace_id="trace-123",
+            )
+
+            # Should return 0 calls created and empty file snapshots
+            assert calls_created == 0, "Should create 0 calls for missing file"
+            assert file_snapshots == [], "Should return empty file snapshots"
+            assert not mock_client.create_call.called, "Should not create any calls"
+
+    def test_subagent_with_tool_calls(self, tmp_path):
+        """Subagent with tool calls embeds them in output."""
+        from weave.integrations.claude_plugin.session.session_importer import (
+            _create_subagent_call,
+        )
+
+        agent_id = "tooluser"
+        agent_file = tmp_path / f"agent-{agent_id}.jsonl"
+
+        # Create a subagent session with a tool call
+        agent_file.write_text(
+            json.dumps(
+                {
+                    "type": "user",
+                    "sessionId": f"agent-{agent_id}",
+                    "uuid": "msg-1",
+                    "timestamp": "2025-01-01T10:00:00Z",
+                    "message": {"role": "user", "content": "Read file.py"},
+                }
+            )
+            + "\n"
+            + json.dumps(
+                {
+                    "type": "assistant",
+                    "sessionId": f"agent-{agent_id}",
+                    "uuid": "msg-2",
+                    "timestamp": "2025-01-01T10:00:01Z",
+                    "message": {
+                        "role": "assistant",
+                        "model": "claude-sonnet-4-20250514",
+                        "content": [
+                            {
+                                "type": "tool_use",
+                                "id": "tool-1",
+                                "name": "Read",
+                                "input": {"file_path": "/test.py"},
+                            }
+                        ],
+                        "usage": {"input_tokens": 10, "output_tokens": 5},
+                    },
+                }
+            )
+            + "\n"
+            + json.dumps(
+                {
+                    "type": "tool_result",
+                    "sessionId": f"agent-{agent_id}",
+                    "uuid": "tool-result-1",
+                    "timestamp": "2025-01-01T10:00:02Z",
+                    "tool_result": {
+                        "type": "tool_result",
+                        "tool_use_id": "tool-1",
+                        "content": "print('hello')",
+                    },
+                }
+            )
+            + "\n"
+            + json.dumps(
+                {
+                    "type": "assistant",
+                    "sessionId": f"agent-{agent_id}",
+                    "uuid": "msg-3",
+                    "timestamp": "2025-01-01T10:00:03Z",
+                    "message": {
+                        "role": "assistant",
+                        "model": "claude-sonnet-4-20250514",
+                        "content": [{"type": "text", "text": "I see it prints hello"}],
+                        "usage": {"input_tokens": 20, "output_tokens": 8},
+                    },
+                }
+            )
+            + "\n"
+        )
+
+        with patch(
+            "weave.integrations.claude_plugin.session.session_importer.require_weave_client"
+        ) as mock_client_fn:
+            mock_client = MagicMock()
+            mock_call = MagicMock(id="subagent-call-1")
+            mock_call.summary = {}
+            mock_client.create_call.return_value = mock_call
+            mock_client.finish_call = MagicMock()
+            mock_client_fn.return_value = mock_client
+
+            parent_call = MagicMock(id="parent-call-1")
+
+            _create_subagent_call(
+                agent_id=agent_id,
+                parent_call=parent_call,
+                sessions_dir=tmp_path,
+                client=mock_client,
+                session_id="main-session-123",
+                trace_id="trace-123",
+            )
+
+            # Verify finish_call was called with output containing tool_calls
+            finish_call_args = mock_client.finish_call.call_args
+            output = finish_call_args.kwargs.get("output", {})
+
+            assert "tool_calls" in output, "Output should contain tool_calls"
+            assert len(output["tool_calls"]) > 0, "Should have at least one tool call"
+            # Check tool call structure
+            tool_call = output["tool_calls"][0]
+            assert tool_call["id"] == "tool-1"
+            assert tool_call["type"] == "function"
+            assert tool_call["function"]["name"] == "Read"
+
+    def test_subagent_type_passed_to_inputs(self, tmp_path):
+        """Subagent type is included in inputs when provided."""
+        from weave.integrations.claude_plugin.session.session_importer import (
+            _create_subagent_call,
+        )
+
+        agent_id = "typed123"
+        agent_file = tmp_path / f"agent-{agent_id}.jsonl"
+        agent_file.write_text(
+            json.dumps(
+                {
+                    "type": "user",
+                    "sessionId": f"agent-{agent_id}",
+                    "uuid": "msg-1",
+                    "timestamp": "2025-01-01T10:00:00Z",
+                    "message": {"role": "user", "content": "Task prompt"},
+                }
+            )
+            + "\n"
+            + json.dumps(
+                {
+                    "type": "assistant",
+                    "sessionId": f"agent-{agent_id}",
+                    "uuid": "msg-2",
+                    "timestamp": "2025-01-01T10:00:01Z",
+                    "message": {
+                        "role": "assistant",
+                        "model": "claude-sonnet-4-20250514",
+                        "content": [{"type": "text", "text": "Done"}],
+                        "usage": {"input_tokens": 10, "output_tokens": 5},
+                    },
+                }
+            )
+            + "\n"
+        )
+
+        with patch(
+            "weave.integrations.claude_plugin.session.session_importer.require_weave_client"
+        ) as mock_client_fn:
+            mock_client = MagicMock()
+            mock_call = MagicMock(id="subagent-call-1")
+            mock_call.summary = {}
+            mock_client.create_call.return_value = mock_call
+            mock_client_fn.return_value = mock_client
+
+            parent_call = MagicMock(id="parent-call-1")
+
+            _create_subagent_call(
+                agent_id=agent_id,
+                parent_call=parent_call,
+                sessions_dir=tmp_path,
+                client=mock_client,
+                session_id="main-session-123",
+                trace_id="trace-123",
+                subagent_type="code-reviewer",
+            )
+
+            # Check that create_call was called with subagent_type in inputs
+            create_call_args = mock_client.create_call.call_args
+            inputs = create_call_args.kwargs.get("inputs", {})
+            assert (
+                "subagent_type" in inputs
+            ), "Inputs should contain subagent_type when provided"
+            assert (
+                inputs["subagent_type"] == "code-reviewer"
+            ), "subagent_type should match what was passed"
