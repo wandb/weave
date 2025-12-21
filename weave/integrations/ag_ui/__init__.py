@@ -15,50 +15,46 @@ References:
 - AG-UI Protocol: https://docs.ag-ui.com/
 """
 
-# Imports will be added when events.py and parser.py are implemented:
-# from weave.integrations.ag_ui.events import (
-#     # Lifecycle events
-#     RunStartedEvent,
-#     RunFinishedEvent,
-#     RunErrorEvent,
-#     StepStartedEvent,
-#     StepFinishedEvent,
-#     # Message events
-#     TextMessageStartEvent,
-#     TextMessageContentEvent,
-#     TextMessageEndEvent,
-#     # Tool events
-#     ToolCallStartEvent,
-#     ToolCallArgsEvent,
-#     ToolCallEndEvent,
-#     ToolCallResultEvent,
-#     # Tracing extensions
-#     UsageRecordedEvent,
-#     FileSnapshotEvent,
-#     ThinkingContentEvent,
-#     # Union type
-#     AgentEvent,
-# )
-# from weave.integrations.ag_ui.parser import AgentEventParser
+from weave.integrations.ag_ui.events import (
+    # Lifecycle events
+    RunStartedEvent,
+    RunFinishedEvent,
+    RunErrorEvent,
+    StepStartedEvent,
+    StepFinishedEvent,
+    # Message events
+    TextMessageStartEvent,
+    TextMessageContentEvent,
+    TextMessageEndEvent,
+    # Tool events
+    ToolCallStartEvent,
+    ToolCallArgsEvent,
+    ToolCallEndEvent,
+    ToolCallResultEvent,
+    # Tracing extensions
+    UsageRecordedEvent,
+    FileSnapshotEvent,
+    ThinkingContentEvent,
+    # Union type
+    AgentEvent,
+)
 
 __all__ = [
-    # Events (to be uncommented when events.py exists)
-    # "RunStartedEvent",
-    # "RunFinishedEvent",
-    # "RunErrorEvent",
-    # "StepStartedEvent",
-    # "StepFinishedEvent",
-    # "TextMessageStartEvent",
-    # "TextMessageContentEvent",
-    # "TextMessageEndEvent",
-    # "ToolCallStartEvent",
-    # "ToolCallArgsEvent",
-    # "ToolCallEndEvent",
-    # "ToolCallResultEvent",
-    # "UsageRecordedEvent",
-    # "FileSnapshotEvent",
-    # "ThinkingContentEvent",
-    # "AgentEvent",
-    # Parser (to be uncommented when parser.py exists)
-    # "AgentEventParser",
+    # Events
+    "RunStartedEvent",
+    "RunFinishedEvent",
+    "RunErrorEvent",
+    "StepStartedEvent",
+    "StepFinishedEvent",
+    "TextMessageStartEvent",
+    "TextMessageContentEvent",
+    "TextMessageEndEvent",
+    "ToolCallStartEvent",
+    "ToolCallArgsEvent",
+    "ToolCallEndEvent",
+    "ToolCallResultEvent",
+    "UsageRecordedEvent",
+    "FileSnapshotEvent",
+    "ThinkingContentEvent",
+    "AgentEvent",
 ]
