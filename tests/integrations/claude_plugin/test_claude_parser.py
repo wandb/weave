@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from weave.integrations.ag_ui.events import (
+    FileSnapshotEvent,
     RunFinishedEvent,
     RunStartedEvent,
     StepFinishedEvent,
@@ -127,6 +128,8 @@ class TestClaudeParser:
 
             assert isinstance(events[1], StepStartedEvent)
             assert events[1].step_type == "turn"
+            assert events[1].metadata["user_message"] == "Hello Claude"
+            assert events[1].metadata["turn_number"] == 1
 
             assert isinstance(events[2], TextMessageStartEvent)
             assert events[2].role == "user"
@@ -422,6 +425,86 @@ class TestClaudeParser:
             assert len(events) > 0
             assert isinstance(events[0], RunStartedEvent)
             assert isinstance(events[-1], RunFinishedEvent)
+
+        finally:
+            session_jsonl.unlink()
+
+    def test_parse_with_pending_question(self):
+        """Parse a session where assistant ends with a question."""
+        session_jsonl = create_session_jsonl([
+            {
+                "type": "user",
+                "uuid": "msg-1",
+                "timestamp": "2025-01-01T10:00:00Z",
+                "sessionId": "test-session",
+                "message": {
+                    "role": "user",
+                    "content": "Help me choose",
+                },
+            },
+            {
+                "type": "assistant",
+                "uuid": "msg-2",
+                "timestamp": "2025-01-01T10:00:01Z",
+                "message": {
+                    "role": "assistant",
+                    "model": "claude-sonnet-4-20250514",
+                    "content": [
+                        {"type": "text", "text": "Would you prefer option A or option B?"}
+                    ],
+                    "usage": {"input_tokens": 50, "output_tokens": 10},
+                },
+            },
+        ])
+
+        try:
+            parser = ClaudeParser()
+            events = list(parser.parse(session_jsonl))
+
+            # Find StepFinishedEvent
+            step_finished_events = [e for e in events if isinstance(e, StepFinishedEvent)]
+            assert len(step_finished_events) == 1
+            assert step_finished_events[0].pending_question == "Would you prefer option A or option B?"
+
+        finally:
+            session_jsonl.unlink()
+
+    def test_parse_without_pending_question(self):
+        """Parse a session where assistant does NOT end with a question."""
+        session_jsonl = create_session_jsonl([
+            {
+                "type": "user",
+                "uuid": "msg-1",
+                "timestamp": "2025-01-01T10:00:00Z",
+                "sessionId": "test-session",
+                "message": {
+                    "role": "user",
+                    "content": "What is 2+2",
+                },
+            },
+            {
+                "type": "assistant",
+                "uuid": "msg-2",
+                "timestamp": "2025-01-01T10:00:01Z",
+                "message": {
+                    "role": "assistant",
+                    "model": "claude-sonnet-4-20250514",
+                    "content": [
+                        {"type": "text", "text": "The answer is 4."}
+                    ],
+                    "usage": {"input_tokens": 50, "output_tokens": 10},
+                },
+            },
+        ])
+
+        try:
+            parser = ClaudeParser()
+            events = list(parser.parse(session_jsonl))
+
+            # Find StepFinishedEvent
+            step_finished_events = [e for e in events if isinstance(e, StepFinishedEvent)]
+            assert len(step_finished_events) == 1
+            assert step_finished_events[0].pending_question is None
 
         finally:
             session_jsonl.unlink()

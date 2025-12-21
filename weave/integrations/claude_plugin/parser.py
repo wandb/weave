@@ -12,6 +12,7 @@ from pathlib import Path
 
 from weave.integrations.ag_ui.events import (
     AgentEvent,
+    FileSnapshotEvent,
     RunFinishedEvent,
     RunStartedEvent,
     StepFinishedEvent,
@@ -147,6 +148,11 @@ class ClaudeParser:
         for turn_idx, turn in enumerate(session.turns):
             step_id = f"{session.session_id}-turn-{turn_idx}"
 
+            # Get user content for metadata and events
+            user_content = turn.user_message.content
+            if scanner:
+                user_content, _ = scanner.redact_text(user_content)
+
             # StepStartedEvent
             yield StepStartedEvent(
                 step_id=step_id,
@@ -154,14 +160,14 @@ class ClaudeParser:
                 timestamp=turn.started_at(),
                 step_type="turn",
                 step_name=f"Turn {turn_idx + 1}",
-                metadata={},
+                metadata={
+                    "user_message": user_content,
+                    "turn_number": turn_idx + 1,
+                },
             )
 
             # User message events
             user_message_id = turn.user_message.uuid or f"{step_id}-user"
-            user_content = turn.user_message.content
-            if scanner:
-                user_content, _ = scanner.redact_text(user_content)
 
             yield TextMessageStartEvent(
                 message_id=user_message_id,
@@ -292,13 +298,44 @@ class ClaudeParser:
                         metadata={},
                     )
 
-            # StepFinishedEvent
+            # StepFinishedEvent - extract pending question from assistant text
+            pending_question = None
+            assistant_text = ""
+            for am in turn.assistant_messages:
+                text = am.get_text()
+                if text:
+                    assistant_text += text + "\n"
+
+            # Simple question detection (text ends with ?)
+            assistant_text = assistant_text.strip()
+            if assistant_text.endswith("?"):
+                pending_question = assistant_text
+                if scanner:
+                    pending_question, _ = scanner.redact_text(pending_question)
+
             yield StepFinishedEvent(
                 step_id=step_id,
                 timestamp=turn.ended_at(),
-                pending_question=None,
+                pending_question=pending_question,
                 metadata={},
             )
+
+            # Emit FileSnapshotEvents for file backups
+            for file_backup in turn.file_backups:
+                content = file_backup.load_content(session.session_id)
+                if content:
+                    # Convert Content to string
+                    content_str = content.as_string() if hasattr(content, 'as_string') else str(content)
+                    if scanner:
+                        content_str, _ = scanner.redact_text(content_str)
+
+                    yield FileSnapshotEvent(
+                        file_path=file_backup.file_path,
+                        timestamp=turn.ended_at(),
+                        content=content_str,
+                        is_backup=True,
+                        metadata={"backup_filename": file_backup.backup_filename},
+                    )
 
         # Generate RunFinishedEvent
         from datetime import datetime, timezone
