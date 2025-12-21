@@ -2529,3 +2529,215 @@ class TestProcessSessionFile:
 
         # Should have processed 2 lines (even though first was invalid)
         assert daemon.last_processed_line == 2
+
+
+class TestToolCallLogging:
+    """Tests for tool call logging with grouping detection."""
+
+    @pytest.mark.anyio
+    async def test_parallel_tool_calls_grouped(self):
+        """Multiple tool calls with same timestamp are grouped."""
+        from datetime import datetime, timezone
+        from unittest.mock import AsyncMock
+
+        from weave.integrations.claude_plugin.core.daemon import WeaveDaemon
+
+        daemon = WeaveDaemon("test-session")
+        daemon.weave_client = MagicMock()
+        daemon.session_call_id = "session-123"
+        daemon.trace_id = "trace-abc"
+        daemon.current_turn_call_id = "turn-456"
+
+        # Mock the weave client methods
+        daemon.weave_client._project_id.return_value = "test/project"
+        daemon.weave_client.create_call = MagicMock()
+        daemon.weave_client.finish_call = MagicMock()
+        daemon.weave_client.flush = MagicMock()
+
+        # Create two tool calls with the same timestamp
+        same_timestamp = datetime.now(timezone.utc)
+        daemon._pending_tool_calls = {
+            "tc1": ("Read", {"file_path": "/test1.py"}, same_timestamp),
+            "tc2": ("Read", {"file_path": "/test2.py"}, same_timestamp),
+        }
+
+        # Tool results with same timestamp
+        tool_results = [
+            ("tc1", {"content": "File 1 content"}),
+            ("tc2", {"content": "File 2 content"}),
+        ]
+
+        # Mock weave.log_call to avoid the started_at/ended_at issue
+        with patch("weave.integrations.claude_plugin.utils.weave.log_call") as mock_log_call:
+            # Log the tool calls
+            await daemon._log_pending_tool_calls_grouped(tool_results)
+
+            # Verify a parallel group wrapper was created
+            assert daemon.weave_client.create_call.called
+            create_calls = daemon.weave_client.create_call.call_args_list
+
+            # Should have created: 1 parallel wrapper
+            # The parallel wrapper should be created
+            parallel_call_created = False
+            for call in create_calls:
+                if call.kwargs.get("op") == "claude_code.parallel":
+                    parallel_call_created = True
+                    display_name = call.kwargs.get("display_name", "")
+                    assert "parallel" in display_name.lower() or "read" in display_name.lower()
+                    break
+
+            assert parallel_call_created, "Parallel wrapper was not created"
+
+    @pytest.mark.anyio
+    async def test_single_tool_call_not_grouped(self):
+        """Single tool call is logged directly without wrapper."""
+        from datetime import datetime, timezone
+
+        from weave.integrations.claude_plugin.core.daemon import WeaveDaemon
+
+        daemon = WeaveDaemon("test-session")
+        daemon.weave_client = MagicMock()
+        daemon.session_call_id = "session-123"
+        daemon.trace_id = "trace-abc"
+        daemon.current_turn_call_id = "turn-456"
+
+        # Mock the weave client methods
+        daemon.weave_client._project_id.return_value = "test/project"
+        daemon.weave_client.flush = MagicMock()
+
+        # Create single tool call
+        timestamp = datetime.now(timezone.utc)
+        daemon._pending_tool_calls = {
+            "tc1": ("Bash", {"command": "ls"}, timestamp),
+        }
+
+        tool_results = [
+            ("tc1", {"content": "file1.txt\nfile2.txt"}),
+        ]
+
+        # Mock log_tool_call to track calls
+        with patch(
+            "weave.integrations.claude_plugin.core.daemon.log_tool_call"
+        ) as mock_log:
+            await daemon._log_pending_tool_calls_grouped(tool_results)
+
+            # Verify single call was logged (no parallel wrapper)
+            assert mock_log.called
+            call_args = mock_log.call_args
+            assert call_args.kwargs["tool_name"] == "Bash"
+
+        # Verify no parallel wrapper was created
+        if daemon.weave_client.create_call.called:
+            create_calls = daemon.weave_client.create_call.call_args_list
+            for call in create_calls:
+                op = call.kwargs.get("op", "")
+                assert "parallel" not in op, "Parallel wrapper should not be created for single tool"
+
+    @pytest.mark.anyio
+    async def test_edit_tool_with_diff_view(self):
+        """Edit tool call includes diff view attachment."""
+        from datetime import datetime, timezone
+
+        from weave.integrations.claude_plugin.core.daemon import WeaveDaemon
+
+        daemon = WeaveDaemon("test-session")
+        daemon.weave_client = MagicMock()
+        daemon.session_call_id = "session-123"
+        daemon.trace_id = "trace-abc"
+        daemon.current_turn_call_id = "turn-456"
+
+        # Mock the weave client methods
+        daemon.weave_client._project_id.return_value = "test/project"
+        daemon.weave_client.flush = MagicMock()
+
+        # Create Edit tool call
+        timestamp = datetime.now(timezone.utc)
+        daemon._pending_tool_calls = {
+            "tc1": (
+                "Edit",
+                {
+                    "file_path": "/test.py",
+                    "old_string": "old code",
+                    "new_string": "new code",
+                },
+                timestamp,
+            ),
+        }
+
+        tool_results = [
+            ("tc1", {"content": "Successfully edited /test.py"}),
+        ]
+
+        # Mock log_tool_call to verify it's called with Edit tool
+        with patch(
+            "weave.integrations.claude_plugin.core.daemon.log_tool_call"
+        ) as mock_log:
+            await daemon._log_pending_tool_calls_grouped(tool_results)
+
+            # Verify Edit tool was logged
+            assert mock_log.called
+            call_args = mock_log.call_args
+            assert call_args.kwargs["tool_name"] == "Edit"
+            assert call_args.kwargs["tool_input"]["file_path"] == "/test.py"
+
+    @pytest.mark.anyio
+    async def test_parallel_grouping_threshold(self):
+        """Tool calls within 1000ms are grouped, others are not."""
+        from datetime import datetime, timedelta, timezone
+
+        from weave.integrations.claude_plugin.core.daemon import WeaveDaemon
+
+        daemon = WeaveDaemon("test-session")
+        daemon.weave_client = MagicMock()
+        daemon.session_call_id = "session-123"
+        daemon.trace_id = "trace-abc"
+        daemon.current_turn_call_id = "turn-456"
+
+        # Mock the weave client methods
+        daemon.weave_client._project_id.return_value = "test/project"
+        daemon.weave_client.create_call = MagicMock()
+        daemon.weave_client.finish_call = MagicMock()
+        daemon.weave_client.flush = MagicMock()
+
+        # Create tool calls with different timestamps
+        base_time = datetime.now(timezone.utc)
+        # tc1 and tc2 within 500ms (should be grouped)
+        # tc3 is 2000ms later (should be separate)
+        daemon._pending_tool_calls = {
+            "tc1": ("Read", {"file_path": "/test1.py"}, base_time),
+            "tc2": (
+                "Read",
+                {"file_path": "/test2.py"},
+                base_time + timedelta(milliseconds=500),
+            ),
+            "tc3": (
+                "Grep",
+                {"pattern": "test"},
+                base_time + timedelta(milliseconds=2000),
+            ),
+        }
+
+        tool_results = [
+            ("tc1", {"content": "File 1"}),
+            ("tc2", {"content": "File 2"}),
+            ("tc3", {"content": "Match found"}),
+        ]
+
+        with patch(
+            "weave.integrations.claude_plugin.core.daemon.log_tool_call"
+        ) as mock_log:
+            await daemon._log_pending_tool_calls_grouped(tool_results)
+
+            # Should have 2 groups created:
+            # 1. Parallel group with tc1 and tc2
+            # 2. Single tc3
+            # Total calls logged should be 3 (tc1, tc2, tc3)
+            assert mock_log.call_count == 3
+
+        # Verify parallel wrapper was created for first two
+        create_calls = daemon.weave_client.create_call.call_args_list
+        parallel_calls = [
+            c for c in create_calls if c.kwargs.get("op") == "claude_code.parallel"
+        ]
+        # Should have exactly 1 parallel wrapper (for tc1 and tc2)
+        assert len(parallel_calls) == 1
