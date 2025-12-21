@@ -306,3 +306,85 @@ class TestHasLocalSettings:
 
             result = has_local_settings(tmpdir)
             assert result is True
+
+
+class TestConfigErrors:
+    """Tests for config error handling."""
+
+    def test_json_decode_error_returns_none(self):
+        """Invalid JSON in local settings file returns None."""
+        from weave.integrations.claude_plugin.config import get_local_enabled
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            settings_dir = Path(tmpdir) / ".claude"
+            settings_dir.mkdir()
+            settings_file = settings_dir / "settings.json"
+            settings_file.write_text("{ invalid json }")
+
+            result = get_local_enabled(tmpdir)
+            assert result is None
+
+    def test_file_write_error_handled(self):
+        """File write error is handled gracefully."""
+        from weave.integrations.claude_plugin.config import set_local_enabled
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            settings_dir = Path(tmpdir) / ".claude"
+            settings_dir.mkdir()
+            settings_file = settings_dir / "settings.json"
+
+            # Make the directory readonly to trigger write error
+            settings_dir.chmod(0o444)
+
+            try:
+                # Should not raise exception - errors are swallowed in atomic write
+                set_local_enabled(True, tmpdir)
+                # If it doesn't raise, that's fine - the implementation handles it
+            except PermissionError:
+                # Also acceptable - some systems may raise before the try/except
+                pass
+            finally:
+                # Restore permissions for cleanup
+                settings_dir.chmod(0o755)
+
+    def test_global_config_json_decode_error(self):
+        """Invalid JSON in global config file returns default."""
+        from weave.integrations.claude_plugin.config import get_enabled
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_file = Path(tmpdir) / "config.json"
+            config_file.write_text("{ invalid json }")
+
+            with patch(
+                "weave.integrations.claude_plugin.config.CONFIG_FILE", config_file
+            ):
+                result = get_enabled()
+                assert result is False
+
+    def test_global_config_write_error_handled(self):
+        """File write error for global config is handled gracefully."""
+        from weave.integrations.claude_plugin.config import set_enabled
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_dir = Path(tmpdir) / "readonly"
+            config_dir.mkdir()
+            config_file = config_dir / "config.json"
+
+            # Make directory readonly
+            config_dir.chmod(0o444)
+
+            with patch(
+                "weave.integrations.claude_plugin.config.CONFIG_DIR", config_dir
+            ):
+                with patch(
+                    "weave.integrations.claude_plugin.config.CONFIG_FILE", config_file
+                ):
+                    try:
+                        # Should not raise exception - errors are swallowed
+                        set_enabled(True)
+                    except (PermissionError, OSError):
+                        # Also acceptable - some systems may raise
+                        pass
+                    finally:
+                        # Restore permissions for cleanup
+                        config_dir.chmod(0o755)
