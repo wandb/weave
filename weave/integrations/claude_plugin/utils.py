@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 import re
+import socket
 import subprocess
 from collections import Counter
 from dataclasses import dataclass
@@ -31,6 +32,15 @@ if TYPE_CHECKING:
     from weave.trace.call import Call
 
 logger = logging.getLogger(__name__)
+
+
+def get_hostname() -> str:
+    """Get the hostname of the current machine."""
+    try:
+        return socket.gethostname()
+    except Exception:
+        return "unknown"
+
 
 # Re-export constants for backward compatibility
 MAX_TOOL_INPUT_LENGTH = ToolCallLimits.MAX_INPUT_LENGTH

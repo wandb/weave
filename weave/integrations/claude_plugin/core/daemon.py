@@ -106,7 +106,6 @@ from weave.integrations.claude_plugin.session.session_importer import (
     _build_subagent_output,
     _build_turn_output,
 )
-from weave.integrations.claude_plugin.session.session_processor import get_hostname
 from weave.integrations.claude_plugin.utils import (
     INACTIVITY_TIMEOUT,
     SUBAGENT_DETECTION_TIMEOUT,
@@ -115,6 +114,7 @@ from weave.integrations.claude_plugin.utils import (
     extract_question_from_text,
     generate_session_name,
     get_git_info,
+    get_hostname,
     get_subagent_display_name,
     get_turn_display_name,
     log_tool_call,
