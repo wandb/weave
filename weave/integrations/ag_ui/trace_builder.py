@@ -6,6 +6,7 @@ parent-child relationships and metadata.
 """
 
 import json
+import logging
 from collections.abc import Callable, Iterator
 from datetime import datetime
 from typing import Any
@@ -91,6 +92,9 @@ class AgentTraceBuilder:
 
         # Tool call tracking for ChatView format: step_id → list of tool call data
         self._step_tool_calls: dict[str, list[dict[str, Any]]] = {}
+
+        # File snapshot tracking per step: step_id → list of Content objects
+        self._step_file_snapshots: dict[str, list[Any]] = {}  # Any = Content
 
     def handle(self, event: AgentEvent) -> None:
         """Process a single event, updating trace state.
@@ -254,6 +258,11 @@ class AgentTraceBuilder:
         if tool_calls:
             output["tool_calls"] = tool_calls
 
+        # Add file snapshots if any were recorded in this step
+        file_snapshots = self._step_file_snapshots.get(event.step_id, [])
+        if file_snapshots:
+            output["file_snapshots"] = file_snapshots
+
         # Set usage summary
         if usage_by_model:
             call.summary = {"usage": usage_by_model}
@@ -268,8 +277,9 @@ class AgentTraceBuilder:
                 self._message_usage.pop(message_id, None)
                 del self._message_to_step[message_id]
 
-        # Clean up tool calls for this step
+        # Clean up tool calls and file snapshots for this step
         self._step_tool_calls.pop(event.step_id, None)
+        self._step_file_snapshots.pop(event.step_id, None)
 
         if self._current_step_id == event.step_id:
             self._current_step_id = None
@@ -391,14 +401,54 @@ class AgentTraceBuilder:
         self._message_usage[event.message_id] = event
 
     def _handle_file_snapshot(self, event: FileSnapshotEvent) -> None:
-        """Record file snapshot.
+        """Record file snapshot as Content object.
 
-        File snapshots are typically handled by the on_tool_call hook
-        for generating diff views. This is a placeholder for future
-        direct file snapshot handling.
+        Converts FileSnapshotEvent to Content object and tracks it per step.
+        File snapshots can be used for displaying file diffs or pre-edit backups.
         """
-        # File snapshots are event-specific and may be used by hooks
-        pass
+        if not self._current_step_id or not event.content:
+            return
+
+        # Import Content here to avoid circular dependency
+        from weave.type_wrappers.Content.content import Content
+
+        # Initialize snapshot list for this step if needed
+        if self._current_step_id not in self._step_file_snapshots:
+            self._step_file_snapshots[self._current_step_id] = []
+
+        # Create Content object from snapshot
+        try:
+            if isinstance(event.content, bytes):
+                content_obj = Content.from_bytes(
+                    event.content,
+                    mimetype=event.mimetype,
+                    metadata={
+                        **(event.metadata or {}),
+                        "file_path": event.file_path,
+                        "is_backup": event.is_backup,
+                        "timestamp": event.timestamp.isoformat(),
+                    },
+                )
+            else:
+                # String content
+                content_obj = Content.from_text(
+                    event.content,
+                    mimetype=event.mimetype,
+                    metadata={
+                        **(event.metadata or {}),
+                        "file_path": event.file_path,
+                        "is_backup": event.is_backup,
+                        "timestamp": event.timestamp.isoformat(),
+                    },
+                )
+
+            self._step_file_snapshots[self._current_step_id].append(content_obj)
+        except Exception as e:
+            # Log error but don't crash the trace builder
+            logging.warning(
+                f"Failed to create Content from FileSnapshotEvent: {e}",
+                exc_info=True,
+            )
 
     def _handle_thinking(self, event: ThinkingContentEvent) -> None:
         """Accumulate thinking/reasoning content for a message."""

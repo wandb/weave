@@ -6,6 +6,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from weave.integrations.ag_ui.events import (
+    FileSnapshotEvent,
     RunFinishedEvent,
     RunStartedEvent,
     StepFinishedEvent,
@@ -776,3 +777,306 @@ class TestChatViewFormat:
 
         # Should not crash - tool call created but not tracked for ChatView
         assert len(builder._step_tool_calls) == 0
+
+
+class TestFileSnapshots:
+    """Test file snapshot tracking."""
+
+    def test_file_snapshot_creates_content_object(self):
+        """Test that FileSnapshotEvent creates Content object in output."""
+        mock_client = MagicMock()
+        mock_step_call = MagicMock(id="step-call")
+        mock_client.create_call.side_effect = [
+            MagicMock(id="run-call"),
+            mock_step_call,
+        ]
+
+        builder = AgentTraceBuilder(
+            weave_client=mock_client,
+            agent_name="Claude Code",
+        )
+
+        # Setup run and step
+        builder.handle(
+            RunStartedEvent(run_id="run-1", timestamp=datetime.now(timezone.utc))
+        )
+        builder.handle(
+            StepStartedEvent(
+                step_id="step-1",
+                run_id="run-1",
+                timestamp=datetime.now(timezone.utc),
+            )
+        )
+
+        # Record file snapshot
+        builder.handle(
+            FileSnapshotEvent(
+                file_path="/path/to/file.py",
+                content="print('hello world')",
+                mimetype="text/x-python",
+                is_backup=False,
+                timestamp=datetime.now(timezone.utc),
+                metadata={"edit_type": "create"},
+            )
+        )
+
+        # Finish step
+        builder.handle(
+            StepFinishedEvent(step_id="step-1", timestamp=datetime.now(timezone.utc))
+        )
+
+        # Check that finish_call was called with file_snapshots
+        mock_client.finish_call.assert_called_once()
+        call_args = mock_client.finish_call.call_args
+        output = call_args[1]["output"]
+        assert "file_snapshots" in output
+        assert len(output["file_snapshots"]) == 1
+
+        # Verify Content object properties
+        snapshot = output["file_snapshots"][0]
+        assert snapshot.mimetype == "text/x-python"
+        assert snapshot.as_string() == "print('hello world')"
+        assert snapshot.metadata["file_path"] == "/path/to/file.py"
+        assert snapshot.metadata["is_backup"] is False
+        assert snapshot.metadata["edit_type"] == "create"
+
+    def test_multiple_file_snapshots_in_step(self):
+        """Test that multiple file snapshots are tracked."""
+        mock_client = MagicMock()
+        mock_step_call = MagicMock(id="step-call")
+        mock_client.create_call.side_effect = [
+            MagicMock(id="run-call"),
+            mock_step_call,
+        ]
+
+        builder = AgentTraceBuilder(
+            weave_client=mock_client,
+            agent_name="Claude Code",
+        )
+
+        # Setup run and step
+        builder.handle(
+            RunStartedEvent(run_id="run-1", timestamp=datetime.now(timezone.utc))
+        )
+        builder.handle(
+            StepStartedEvent(
+                step_id="step-1",
+                run_id="run-1",
+                timestamp=datetime.now(timezone.utc),
+            )
+        )
+
+        # Record multiple file snapshots
+        builder.handle(
+            FileSnapshotEvent(
+                file_path="/path/to/file1.py",
+                content="# File 1 backup",
+                is_backup=True,
+                timestamp=datetime.now(timezone.utc),
+            )
+        )
+        builder.handle(
+            FileSnapshotEvent(
+                file_path="/path/to/file1.py",
+                content="# File 1 edited",
+                is_backup=False,
+                timestamp=datetime.now(timezone.utc),
+            )
+        )
+        builder.handle(
+            FileSnapshotEvent(
+                file_path="/path/to/file2.py",
+                content="# File 2 new",
+                is_backup=False,
+                timestamp=datetime.now(timezone.utc),
+            )
+        )
+
+        # Finish step
+        builder.handle(
+            StepFinishedEvent(step_id="step-1", timestamp=datetime.now(timezone.utc))
+        )
+
+        # Check that all snapshots are in output
+        mock_client.finish_call.assert_called_once()
+        call_args = mock_client.finish_call.call_args
+        output = call_args[1]["output"]
+        assert "file_snapshots" in output
+        assert len(output["file_snapshots"]) == 3
+
+        # Verify snapshots are in order
+        assert output["file_snapshots"][0].as_string() == "# File 1 backup"
+        assert output["file_snapshots"][0].metadata["is_backup"] is True
+        assert output["file_snapshots"][1].as_string() == "# File 1 edited"
+        assert output["file_snapshots"][1].metadata["is_backup"] is False
+        assert output["file_snapshots"][2].as_string() == "# File 2 new"
+
+    def test_file_snapshot_with_bytes_content(self):
+        """Test that FileSnapshotEvent with bytes content works."""
+        mock_client = MagicMock()
+        mock_step_call = MagicMock(id="step-call")
+        mock_client.create_call.side_effect = [
+            MagicMock(id="run-call"),
+            mock_step_call,
+        ]
+
+        builder = AgentTraceBuilder(
+            weave_client=mock_client,
+            agent_name="Claude Code",
+        )
+
+        # Setup run and step
+        builder.handle(
+            RunStartedEvent(run_id="run-1", timestamp=datetime.now(timezone.utc))
+        )
+        builder.handle(
+            StepStartedEvent(
+                step_id="step-1",
+                run_id="run-1",
+                timestamp=datetime.now(timezone.utc),
+            )
+        )
+
+        # Record file snapshot with bytes
+        binary_content = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR"
+        builder.handle(
+            FileSnapshotEvent(
+                file_path="/path/to/image.png",
+                content=binary_content,
+                mimetype="image/png",
+                timestamp=datetime.now(timezone.utc),
+            )
+        )
+
+        # Finish step
+        builder.handle(
+            StepFinishedEvent(step_id="step-1", timestamp=datetime.now(timezone.utc))
+        )
+
+        # Check that snapshot was created
+        mock_client.finish_call.assert_called_once()
+        call_args = mock_client.finish_call.call_args
+        output = call_args[1]["output"]
+        assert "file_snapshots" in output
+        assert len(output["file_snapshots"]) == 1
+
+        # Verify Content object
+        snapshot = output["file_snapshots"][0]
+        assert snapshot.mimetype == "image/png"
+        assert snapshot.data == binary_content
+
+    def test_file_snapshot_without_step(self):
+        """Test that file snapshot outside step doesn't crash."""
+        mock_client = MagicMock()
+        mock_client.create_call.return_value = MagicMock(id="call")
+
+        builder = AgentTraceBuilder(
+            weave_client=mock_client,
+            agent_name="Claude Code",
+        )
+
+        # Setup run but no step
+        builder.handle(
+            RunStartedEvent(run_id="run-1", timestamp=datetime.now(timezone.utc))
+        )
+
+        # File snapshot without a step (edge case)
+        builder.handle(
+            FileSnapshotEvent(
+                file_path="/path/to/file.py",
+                content="some content",
+                timestamp=datetime.now(timezone.utc),
+            )
+        )
+
+        # Should not crash - snapshot not tracked
+        assert len(builder._step_file_snapshots) == 0
+
+    def test_file_snapshot_without_content(self):
+        """Test that file snapshot without content is ignored."""
+        mock_client = MagicMock()
+        mock_step_call = MagicMock(id="step-call")
+        mock_client.create_call.side_effect = [
+            MagicMock(id="run-call"),
+            mock_step_call,
+        ]
+
+        builder = AgentTraceBuilder(
+            weave_client=mock_client,
+            agent_name="Claude Code",
+        )
+
+        # Setup run and step
+        builder.handle(
+            RunStartedEvent(run_id="run-1", timestamp=datetime.now(timezone.utc))
+        )
+        builder.handle(
+            StepStartedEvent(
+                step_id="step-1",
+                run_id="run-1",
+                timestamp=datetime.now(timezone.utc),
+            )
+        )
+
+        # Record file snapshot without content
+        builder.handle(
+            FileSnapshotEvent(
+                file_path="/path/to/file.py",
+                content=None,
+                timestamp=datetime.now(timezone.utc),
+            )
+        )
+
+        # Finish step
+        builder.handle(
+            StepFinishedEvent(step_id="step-1", timestamp=datetime.now(timezone.utc))
+        )
+
+        # Check that no file_snapshots in output
+        mock_client.finish_call.assert_called_once()
+        call_args = mock_client.finish_call.call_args
+        output = call_args[1]["output"]
+        assert "file_snapshots" not in output
+
+    def test_file_snapshots_cleaned_up_after_step(self):
+        """Test that file snapshots are cleaned up after step finishes."""
+        mock_client = MagicMock()
+        mock_client.create_call.return_value = MagicMock(id="call")
+
+        builder = AgentTraceBuilder(
+            weave_client=mock_client,
+            agent_name="Claude Code",
+        )
+
+        # Setup run and step
+        builder.handle(
+            RunStartedEvent(run_id="run-1", timestamp=datetime.now(timezone.utc))
+        )
+        builder.handle(
+            StepStartedEvent(
+                step_id="step-1",
+                run_id="run-1",
+                timestamp=datetime.now(timezone.utc),
+            )
+        )
+
+        # Record file snapshot
+        builder.handle(
+            FileSnapshotEvent(
+                file_path="/path/to/file.py",
+                content="content",
+                timestamp=datetime.now(timezone.utc),
+            )
+        )
+
+        # Verify snapshot is tracked
+        assert "step-1" in builder._step_file_snapshots
+        assert len(builder._step_file_snapshots["step-1"]) == 1
+
+        # Finish step
+        builder.handle(
+            StepFinishedEvent(step_id="step-1", timestamp=datetime.now(timezone.utc))
+        )
+
+        # Verify cleanup
+        assert "step-1" not in builder._step_file_snapshots

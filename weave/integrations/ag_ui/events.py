@@ -21,6 +21,19 @@ from typing import Any, Literal, Union
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Base Event
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+@dataclass
+class BaseEvent:
+    """Base class for all AG-UI events."""
+
+    timestamp: datetime
+    metadata: dict[str, Any] = field(default_factory=dict, kw_only=True)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Lifecycle Events
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -249,7 +262,7 @@ class UsageRecordedEvent:
 
 
 @dataclass
-class FileSnapshotEvent:
+class FileSnapshotEvent(BaseEvent):
     """Records a file snapshot for tracing.
 
     This is a Weave tracing extension, not part of the AG-UI spec.
@@ -257,11 +270,10 @@ class FileSnapshotEvent:
     """
 
     file_path: str
-    timestamp: datetime
-    content: str | None = None
-    backup_path: str | None = None
+    content: str | bytes | None = None
+    mimetype: str = "text/plain"
+    is_backup: bool = False
     linked_message_id: str | None = None
-    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
