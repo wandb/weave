@@ -5,6 +5,7 @@ Consumes AG-UI events and produces Weave traces with proper
 parent-child relationships and metadata.
 """
 
+import json
 from collections.abc import Callable, Iterator
 from datetime import datetime
 from typing import Any
@@ -87,6 +88,9 @@ class AgentTraceBuilder:
 
         # Message to step mapping: message_id → step_id
         self._message_to_step: dict[str, str] = {}
+
+        # Tool call tracking for ChatView format: step_id → list of tool call data
+        self._step_tool_calls: dict[str, list[dict[str, Any]]] = {}
 
     def handle(self, event: AgentEvent) -> None:
         """Process a single event, updating trace state.
@@ -204,6 +208,7 @@ class AgentTraceBuilder:
         assistant_text_parts = []
         thinking_text_parts = []
         usage_by_model: dict[str, dict[str, int]] = {}
+        first_model = None
 
         for message_id, step_id in list(self._message_to_step.items()):
             if step_id != event.step_id:
@@ -222,6 +227,8 @@ class AgentTraceBuilder:
             # Collect usage
             usage = self._message_usage.get(message_id)
             if usage and usage.model:
+                if first_model is None:
+                    first_model = usage.model
                 if usage.model not in usage_by_model:
                     usage_by_model[usage.model] = {"input_tokens": 0, "output_tokens": 0}
                 usage_by_model[usage.model]["input_tokens"] += usage.input_tokens or 0
@@ -238,6 +245,15 @@ class AgentTraceBuilder:
         if event.pending_question:
             output["pending_question"] = event.pending_question
 
+        # Add ChatView-compatible message format
+        output["role"] = "assistant"
+        output["model"] = first_model or "unknown"
+
+        # Add tool_calls in OpenAI format if any tools were called in this step
+        tool_calls = self._step_tool_calls.get(event.step_id, [])
+        if tool_calls:
+            output["tool_calls"] = tool_calls
+
         # Set usage summary
         if usage_by_model:
             call.summary = {"usage": usage_by_model}
@@ -252,6 +268,9 @@ class AgentTraceBuilder:
                 self._message_usage.pop(message_id, None)
                 del self._message_to_step[message_id]
 
+        # Clean up tool calls for this step
+        self._step_tool_calls.pop(event.step_id, None)
+
         if self._current_step_id == event.step_id:
             self._current_step_id = None
 
@@ -265,7 +284,7 @@ class AgentTraceBuilder:
             self._tool_args[event.tool_call_id] = event.args
 
     def _handle_tool_result(self, event: ToolCallResultEvent) -> None:
-        """Create tool call using log_tool_call and invoke hook."""
+        """Create tool call and invoke hook."""
         start_event = self._pending_tools.pop(event.tool_call_id, None)
         if not start_event:
             return
@@ -288,41 +307,67 @@ class AgentTraceBuilder:
 
         # Calculate duration if we have timestamps
         duration_ms = None
+        started_at = None
+        ended_at = None
         if hasattr(event, "timestamp") and hasattr(start_event, "timestamp"):
             duration = (event.timestamp - start_event.timestamp).total_seconds() * 1000
             duration_ms = int(duration)
+            started_at = start_event.timestamp
+            ended_at = event.timestamp
 
-        # Check if tool has diff view capability
-        tool_config = self.tool_registry.get(start_event.tool_name, {})
-        has_diff_view = tool_config.get("has_diff_view", False)
-
-        # For Edit tool, check if we can generate diff view
-        original_file = None
-        structured_patch = None
-        if has_diff_view and start_event.tool_name == "Edit":
-            # Diff view generation will be handled by on_tool_call hook
-            # which has access to the full event context
-            pass
-
-        # Import log_tool_call from claude_plugin/utils
-        from weave.integrations.claude_plugin.utils import log_tool_call
-
-        # Create and log the tool call
-        call = log_tool_call(
-            tool_name=start_event.tool_name,
-            tool_input=tool_input,
-            tool_output=event.content,
-            tool_use_id=event.tool_call_id,
-            duration_ms=duration_ms,
+        # Create tool call directly (inlined from log_tool_call to avoid circular dependency)
+        call = self.client.create_call(
+            op=start_event.tool_name,
+            inputs=tool_input,
             parent=parent,
-            started_at=start_event.timestamp if hasattr(start_event, "timestamp") else None,
-            ended_at=event.timestamp if hasattr(event, "timestamp") else None,
-            is_error=event.is_error,
-            original_file=original_file,
-            structured_patch=structured_patch,
+            started_at=started_at,
         )
 
+        # Finish with result or error
+        if event.is_error:
+            self.client.finish_call(
+                call,
+                exception=Exception(event.content or "Tool execution error"),
+                ended_at=ended_at,
+            )
+        else:
+            self.client.finish_call(
+                call,
+                output={"result": event.content},
+                ended_at=ended_at,
+            )
+
+        # Store summary with duration if available
+        if duration_ms is not None:
+            call.summary = {"duration_ms": duration_ms}
+
         self._tool_calls[event.tool_call_id] = call
+
+        # Track tool call in OpenAI format for ChatView compatibility
+        if self._current_step_id:
+            if self._current_step_id not in self._step_tool_calls:
+                self._step_tool_calls[self._current_step_id] = []
+
+            # Build tool call in OpenAI format with embedded result
+            tool_call_data = {
+                "id": event.tool_call_id,
+                "type": "function",
+                "function": {
+                    "name": start_event.tool_name,
+                    "arguments": json.dumps(tool_input) if tool_input else "{}",
+                },
+                # Embed the result directly in the tool_call for ChatView
+                "response": {
+                    "role": "tool",
+                    "content": event.content,
+                    "tool_call_id": event.tool_call_id,
+                },
+                "is_error": event.is_error,
+            }
+            if duration_ms is not None:
+                tool_call_data["duration_ms"] = duration_ms
+
+            self._step_tool_calls[self._current_step_id].append(tool_call_data)
 
         # Invoke hook for integration-specific behavior (e.g., diff view generation)
         if self.on_tool_call:
