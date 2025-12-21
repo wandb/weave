@@ -38,6 +38,7 @@ from weave.integrations.ag_ui.events import (
     # Union type
     AgentEvent,
 )
+from weave.integrations.ag_ui.parser import AgentEventParser
 
 __all__ = [
     # Events
@@ -57,4 +58,6 @@ __all__ = [
     "FileSnapshotEvent",
     "ThinkingContentEvent",
     "AgentEvent",
+    # Parser
+    "AgentEventParser",
 ]
