@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, ClassVar
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +39,7 @@ class SecretScanner:
     """Scans text content for secrets and provides redaction."""
 
     # Default detect-secrets plugins to use
-    DEFAULT_PLUGINS = [
+    DEFAULT_PLUGINS: ClassVar[list[dict[str, Any]]] = [
         {"name": "AWSKeyDetector"},
         {"name": "AzureStorageKeyDetector"},
         {"name": "BasicAuthDetector"},
@@ -52,7 +52,7 @@ class SecretScanner:
     ]
 
     # Custom patterns for AI provider keys (not in detect-secrets by default)
-    AI_PROVIDER_PATTERNS = [
+    AI_PROVIDER_PATTERNS: ClassVar[list[tuple[str, str]]] = [
         # OpenAI - sk-... or sk-proj-...
         (r"sk-(?:proj-)?[A-Za-z0-9_-]{20,}", "openai_api_key"),
         # Anthropic - sk-ant-...
@@ -270,9 +270,10 @@ class SecretScanner:
         # Try to decode as UTF-8
         try:
             sample.decode("utf-8")
-            return True
         except UnicodeDecodeError:
             return False
+        else:
+            return True
 
 
 # Module-level scanner instance (lazy initialized)

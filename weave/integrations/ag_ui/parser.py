@@ -1,5 +1,4 @@
-"""
-Parser Protocol for Agent Event Streams
+"""Parser Protocol for Agent Event Streams
 
 Defines the interface that agent-specific parsers must implement.
 Each agentic tool (Claude Code, Gemini CLI, Codex CLI) provides

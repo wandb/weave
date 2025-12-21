@@ -1,5 +1,4 @@
-"""
-Agent-Specific Tool Registries
+"""Agent-Specific Tool Registries
 
 Each agentic tool (Claude, Gemini, Codex) has its own set of tools
 with specific behaviors. This module provides registries that map

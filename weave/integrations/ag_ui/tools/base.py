@@ -1,5 +1,4 @@
-"""
-Base types for tool configuration.
+"""Base types for tool configuration.
 
 Tool configurations describe special behaviors that tools exhibit,
 which the trace builder uses to create appropriate traces and views.

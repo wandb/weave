@@ -1,5 +1,4 @@
-"""
-Claude Code Tool Registry
+"""Claude Code Tool Registry
 
 Defines special behaviors for Claude Code tools.
 Used by the trace builder to create appropriate traces and views.

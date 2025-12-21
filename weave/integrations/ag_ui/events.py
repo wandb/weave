@@ -1,5 +1,4 @@
-"""
-AG-UI Protocol Event Types for Weave
+"""AG-UI Protocol Event Types for Weave
 
 Event types inspired by the AG-UI protocol for standardizing agentic tool communication.
 Extended with tracing-specific events for observability.
@@ -17,8 +16,7 @@ References:
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Literal, Union
-
+from typing import Any, Literal
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Base Event
@@ -294,25 +292,25 @@ class ThinkingContentEvent:
 # Event Union Type
 # ─────────────────────────────────────────────────────────────────────────────
 
-AgentEvent = Union[
+AgentEvent = (
     # Lifecycle
-    RunStartedEvent,
-    RunFinishedEvent,
-    RunErrorEvent,
+    RunStartedEvent
+    | RunFinishedEvent
+    | RunErrorEvent
     # Steps
-    StepStartedEvent,
-    StepFinishedEvent,
+    | StepStartedEvent
+    | StepFinishedEvent
     # Messages
-    TextMessageStartEvent,
-    TextMessageContentEvent,
-    TextMessageEndEvent,
+    | TextMessageStartEvent
+    | TextMessageContentEvent
+    | TextMessageEndEvent
     # Tool calls
-    ToolCallStartEvent,
-    ToolCallArgsEvent,
-    ToolCallEndEvent,
-    ToolCallResultEvent,
+    | ToolCallStartEvent
+    | ToolCallArgsEvent
+    | ToolCallEndEvent
+    | ToolCallResultEvent
     # Tracing extensions
-    UsageRecordedEvent,
-    FileSnapshotEvent,
-    ThinkingContentEvent,
-]
+    | UsageRecordedEvent
+    | FileSnapshotEvent
+    | ThinkingContentEvent
+)

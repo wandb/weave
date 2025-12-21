@@ -1,5 +1,4 @@
-"""
-AG-UI Protocol Integration for Weave
+"""AG-UI Protocol Integration for Weave
 
 Provides shared abstractions for tracing agentic coding tools:
 - Event types based on AG-UI protocol
@@ -16,51 +15,48 @@ References:
 """
 
 from weave.integrations.ag_ui.events import (
+    # Union type
+    AgentEvent,
+    FileSnapshotEvent,
+    RunErrorEvent,
+    RunFinishedEvent,
     # Lifecycle events
     RunStartedEvent,
-    RunFinishedEvent,
-    RunErrorEvent,
-    StepStartedEvent,
     StepFinishedEvent,
-    # Message events
-    TextMessageStartEvent,
+    StepStartedEvent,
     TextMessageContentEvent,
     TextMessageEndEvent,
-    # Tool events
-    ToolCallStartEvent,
+    # Message events
+    TextMessageStartEvent,
+    ThinkingContentEvent,
     ToolCallArgsEvent,
     ToolCallEndEvent,
     ToolCallResultEvent,
+    # Tool events
+    ToolCallStartEvent,
     # Tracing extensions
     UsageRecordedEvent,
-    FileSnapshotEvent,
-    ThinkingContentEvent,
-    # Union type
-    AgentEvent,
 )
 from weave.integrations.ag_ui.parser import AgentEventParser
 from weave.integrations.ag_ui.secret_scanner import SecretScanner
 
 __all__ = [
-    # Events
-    "RunStartedEvent",
-    "RunFinishedEvent",
+    "AgentEvent",
+    "AgentEventParser",
+    "FileSnapshotEvent",
     "RunErrorEvent",
-    "StepStartedEvent",
+    "RunFinishedEvent",
+    "RunStartedEvent",
+    "SecretScanner",
     "StepFinishedEvent",
-    "TextMessageStartEvent",
+    "StepStartedEvent",
     "TextMessageContentEvent",
     "TextMessageEndEvent",
-    "ToolCallStartEvent",
+    "TextMessageStartEvent",
+    "ThinkingContentEvent",
     "ToolCallArgsEvent",
     "ToolCallEndEvent",
     "ToolCallResultEvent",
+    "ToolCallStartEvent",
     "UsageRecordedEvent",
-    "FileSnapshotEvent",
-    "ThinkingContentEvent",
-    "AgentEvent",
-    # Parser
-    "AgentEventParser",
-    # Secret scanner
-    "SecretScanner",
 ]

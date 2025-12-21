@@ -1,5 +1,4 @@
-"""
-Trace Builder for Converting AG-UI Events to Weave Traces
+"""Trace Builder for Converting AG-UI Events to Weave Traces
 
 Consumes AG-UI events and produces Weave traces with proper
 parent-child relationships and metadata.
@@ -8,7 +7,6 @@ parent-child relationships and metadata.
 import json
 import logging
 from collections.abc import Callable, Iterator
-from datetime import datetime
 from typing import Any
 
 from weave.integrations.ag_ui.events import (
@@ -641,11 +639,11 @@ class AgentTraceBuilder:
                     git_info["commit_hash"] = commit_hash
                 return git_info
 
-            return None
-
         except (subprocess.TimeoutExpired, subprocess.SubprocessError, OSError):
             # Silently fail on any errors
-            return None
+            pass
+
+        return None
 
     def _detect_question(self, text: str) -> str | None:
         """Detect if assistant text ends with a question.
