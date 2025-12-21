@@ -2741,3 +2741,186 @@ class TestToolCallLogging:
         ]
         # Should have exactly 1 parallel wrapper (for tc1 and tc2)
         assert len(parallel_calls) == 1
+
+
+class TestSkillHandling:
+    """Tests for skill and slash command handling."""
+
+    @pytest.mark.anyio
+    async def test_skill_expansion_detected(self):
+        """Skill tool expansion creates skill call."""
+        from datetime import datetime, timezone
+
+        from weave.integrations.claude_plugin.core.daemon import WeaveDaemon
+
+        daemon = WeaveDaemon("test-session")
+        daemon.weave_client = MagicMock()
+        daemon.weave_client._project_id.return_value = "test-project"
+        daemon.session_call_id = "session-123"
+        daemon.trace_id = "trace-abc"
+        daemon.current_turn_call_id = "turn-456"
+
+        # Add a pending skill call
+        tool_id = "skill-tool-123"
+        daemon._pending_skill_calls[tool_id] = ("commit", datetime.now(timezone.utc))
+
+        # Simulate skill expansion content
+        skill_content = "# Commit Skill\n\nThis skill commits changes..."
+
+        # Mock log_tool_call
+        with patch(
+            "weave.integrations.claude_plugin.core.daemon.log_tool_call"
+        ) as mock_log:
+            await daemon._handle_skill_expansion(skill_content)
+
+            # Verify skill call was logged
+            assert mock_log.called
+            call_kwargs = mock_log.call_args.kwargs
+            assert call_kwargs["tool_name"] == "Skill"
+            assert call_kwargs["tool_input"]["skill"] == "commit"
+            assert call_kwargs["tool_output"] == skill_content
+
+    @pytest.mark.anyio
+    async def test_slash_command_vs_skill(self):
+        """SlashCommand is distinguished from Skill."""
+        from datetime import datetime, timezone
+
+        from weave.integrations.claude_plugin.core.daemon import WeaveDaemon
+
+        daemon = WeaveDaemon("test-session")
+        daemon.weave_client = MagicMock()
+        daemon.weave_client._project_id.return_value = "test-project"
+        daemon.session_call_id = "session-123"
+        daemon.trace_id = "trace-abc"
+        daemon.current_turn_call_id = "turn-456"
+
+        # Add a Skill call
+        skill_id = "skill-123"
+        daemon._pending_skill_calls[skill_id] = ("commit", datetime.now(timezone.utc))
+
+        # Add a SlashCommand call (starts with /)
+        slash_id = "slash-123"
+        daemon._pending_skill_calls[slash_id] = ("/help", datetime.now(timezone.utc))
+
+        skill_content = "Skill documentation..."
+
+        with patch(
+            "weave.integrations.claude_plugin.core.daemon.log_tool_call"
+        ) as mock_log:
+            await daemon._handle_skill_expansion(skill_content)
+
+            # Should have logged 2 calls
+            assert mock_log.call_count == 2
+
+            # Extract all calls
+            calls = mock_log.call_args_list
+
+            # Find Skill and SlashCommand calls
+            skill_call = None
+            slash_call = None
+            for call in calls:
+                tool_name = call.kwargs["tool_name"]
+                if tool_name == "Skill":
+                    skill_call = call
+                elif tool_name == "SlashCommand":
+                    slash_call = call
+
+            # Verify both were logged with correct types
+            assert skill_call is not None
+            assert slash_call is not None
+            assert skill_call.kwargs["tool_input"]["skill"] == "commit"
+            assert slash_call.kwargs["tool_input"]["command"] == "/help"
+
+
+class TestQATracking:
+    """Tests for Q&A question extraction and tracking."""
+
+    @pytest.mark.anyio
+    async def test_question_extraction(self):
+        """Question is extracted from tool result and answers are parsed."""
+        from weave.integrations.claude_plugin.core.daemon import WeaveDaemon
+
+        daemon = WeaveDaemon("test-session")
+        daemon.weave_client = MagicMock()
+        daemon.weave_client._project_id.return_value = "test-project"
+        daemon.session_call_id = "session-123"
+        daemon.trace_id = "trace-abc"
+        daemon.current_turn_call_id = "turn-456"
+
+        # Set up a pending question call
+        tool_use_id = "question-tool-123"
+        call_id = "question-call-456"
+        questions = [
+            {"question": "Would you like me to proceed with the refactoring?"}
+        ]
+        daemon._pending_question_calls[tool_use_id] = (call_id, questions)
+
+        # Simulate tool result with answer
+        tool_result = {
+            "content": 'User has answered your questions: "Would you like me to proceed with the refactoring?"="Yes, please proceed".'
+        }
+
+        await daemon._finish_question_call(tool_use_id, tool_result)
+
+        # Verify finish_call was called
+        daemon.weave_client.finish_call.assert_called_once()
+        call_args = daemon.weave_client.finish_call.call_args
+        output = call_args.kwargs.get("output") or call_args[1]
+        assert "answers" in output
+        assert len(output["answers"]) == 1
+        assert "Yes, please proceed" in output["answers"][0]
+
+    @pytest.mark.anyio
+    async def test_multiple_questions_parsed(self):
+        """Multiple questions and answers are parsed correctly."""
+        from weave.integrations.claude_plugin.core.daemon import WeaveDaemon
+
+        daemon = WeaveDaemon("test-session")
+        daemon.weave_client = MagicMock()
+        daemon.weave_client._project_id.return_value = "test-project"
+        daemon.session_call_id = "session-123"
+        daemon.trace_id = "trace-abc"
+        daemon.current_turn_call_id = "turn-456"
+
+        # Set up a pending question call with multiple questions
+        tool_use_id = "question-tool-123"
+        call_id = "question-call-456"
+        questions = [
+            {"question": "What file should I edit?"},
+            {"question": "Should I create a backup?"},
+        ]
+        daemon._pending_question_calls[tool_use_id] = (call_id, questions)
+
+        # Simulate tool result with multiple answers
+        tool_result = {
+            "content": 'User has answered your questions: "What file should I edit?"="main.py". "Should I create a backup?"="Yes".'
+        }
+
+        await daemon._finish_question_call(tool_use_id, tool_result)
+
+        # Verify finish_call was called with both answers
+        daemon.weave_client.finish_call.assert_called_once()
+        call_args = daemon.weave_client.finish_call.call_args
+        output = call_args.kwargs.get("output") or call_args[1]
+        assert "answers" in output
+        assert len(output["answers"]) == 2
+        assert "main.py" in output["answers"][0]
+        assert "Yes" in output["answers"][1]
+
+    @pytest.mark.anyio
+    async def test_no_question_when_not_pending(self):
+        """No action when tool_use_id is not in pending questions."""
+        from weave.integrations.claude_plugin.core.daemon import WeaveDaemon
+
+        daemon = WeaveDaemon("test-session")
+        daemon.weave_client = MagicMock()
+
+        # No pending question calls
+        daemon._pending_question_calls = {}
+
+        tool_result = {"content": "Some answer"}
+
+        # Should not raise and should not call finish_call
+        await daemon._finish_question_call("nonexistent-tool", tool_result)
+
+        daemon.weave_client.finish_call.assert_not_called()
