@@ -350,7 +350,7 @@ class TestTurnSummary:
     """Test that turns have proper summary/output separation."""
 
     def test_turn_has_summary_with_metadata(self):
-        """Turn metadata (model, usage, duration) should be in summary."""
+        """Turn metadata (model, usage) should be in summary."""
         now = datetime.now(timezone.utc)
         turn = Turn(user_message=UserMessage(uuid="u1", content="Hello", timestamp=now))
         turn.assistant_messages.append(
@@ -365,32 +365,33 @@ class TestTurnSummary:
         )
         session = make_minimal_session(turns=[turn])
 
-        with (
-            patch(
-                "weave.integrations.claude_plugin.session.session_importer.require_weave_client"
-            ) as mock_client,
-            patch(
-                "weave.integrations.claude_plugin.session.session_importer.reconstruct_call"
-            ) as mock_reconstruct,
-        ):
-            mock_call = MagicMock(id="turn-1")
-            mock_call.summary = {}
-            mock_client.return_value.create_call.return_value = mock_call
+        with patch(
+            "weave.integrations.claude_plugin.session.session_importer.require_weave_client"
+        ) as mock_client:
+            # Track all created calls to find the turn call
+            created_calls = []
+
+            def create_call_side_effect(*args, **kwargs):
+                mock = MagicMock(id=f"call-{len(created_calls)}")
+                mock.summary = {}
+                created_calls.append(mock)
+                return mock
+
+            mock_client.return_value.create_call.side_effect = create_call_side_effect
             mock_client.return_value.finish_call = MagicMock()
-            # Make reconstruct_call return a call with settable summary
-            reconstructed_call = MagicMock(id="turn-1")
-            reconstructed_call.summary = {}
-            mock_reconstruct.return_value = reconstructed_call
+            mock_client.return_value._project_id.return_value = "test/project"
 
             _import_session_to_weave(session, Path("/tmp/test.jsonl"), use_ollama=False)
 
-            # Turn summary should have been set with model info on the reconstructed call
-            # Check that summary was assigned before finish_call
-            assert reconstructed_call.summary is not None, (
-                "Turn should have summary set"
-            )
-            assert "model" in reconstructed_call.summary, "Summary should have model"
-            assert "usage" in reconstructed_call.summary, "Summary should have usage"
+            # Find the turn call (should be the second call created)
+            # First call is session, second is turn
+            assert len(created_calls) >= 2, "Should have created session and turn calls"
+            turn_call = created_calls[1]
+
+            # Turn summary should have been set with model info
+            assert turn_call.summary is not None, "Turn should have summary set"
+            assert "model" in turn_call.summary, "Summary should have model"
+            assert "usage" in turn_call.summary, "Summary should have usage"
 
     def test_turn_output_uses_message_format(self):
         """Turn output uses Message format for chat view detection."""
