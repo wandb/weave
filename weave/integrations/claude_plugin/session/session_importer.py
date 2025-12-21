@@ -193,7 +193,7 @@ def _create_subagent_call(
         # Pre-extract Edit tool data for this turn if we need tool traces
         edit_data_by_path: dict[str, dict] = {}
         if include_tool_traces and turn.raw_messages:
-            from weave.integrations.claude_plugin.views.diff_utils import (
+            from weave.integrations.ag_ui.views.diff_utils import (
                 extract_edit_data_from_raw_messages,
             )
 
@@ -229,7 +229,7 @@ def _create_subagent_call(
         # Also collect file content from Write tool calls in raw messages
         # This captures new files created in subagents (which don't have file-history)
         if turn.raw_messages:
-            from weave.integrations.claude_plugin.views.diff_utils import (
+            from weave.integrations.ag_ui.views.diff_utils import (
                 extract_write_data_from_raw_messages,
             )
 
@@ -277,7 +277,7 @@ def _create_subagent_call(
     all_edit_data: list[dict] = []
     for turn in subagent_session.turns:
         if turn.raw_messages:
-            from weave.integrations.claude_plugin.views.diff_utils import (
+            from weave.integrations.ag_ui.views.diff_utils import (
                 extract_edit_data_from_raw_messages,
             )
 
@@ -285,7 +285,7 @@ def _create_subagent_call(
 
     if all_edit_data:
         from weave.integrations.claude_plugin.utils import set_call_view
-        from weave.integrations.claude_plugin.views.diff_view import (
+        from weave.integrations.ag_ui.views.diff_view import (
             DIFF_HTML_STYLES,
             _build_file_diffs_from_edit_data,
             _render_file_diff_html,
@@ -415,7 +415,7 @@ def _import_session_to_weave(
         # Pre-extract Edit tool data from raw_messages for structured_patch
         edit_data_by_path: dict[str, dict] = {}
         if include_tool_traces and turn.raw_messages:
-            from weave.integrations.claude_plugin.views.diff_utils import (
+            from weave.integrations.ag_ui.views.diff_utils import (
                 extract_edit_data_from_raw_messages,
             )
 
