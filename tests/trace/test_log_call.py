@@ -224,6 +224,115 @@ def test_log_call_with_use_stack_false(client: WeaveClient):
     assert current_call is None
 
 
+def test_log_call_with_started_at(client: WeaveClient):
+    """Test log_call with a custom started_at timestamp."""
+    import datetime
+
+    custom_start = datetime.datetime(
+        2024, 1, 15, 10, 30, 0, tzinfo=datetime.timezone.utc
+    )
+    call = weave.log_call("test_op", {"x": 1}, 2, started_at=custom_start)
+
+    fetched_calls = client.get_calls()
+    assert len(fetched_calls) == 1
+    fetched_call = fetched_calls[0]
+    assert fetched_call.started_at == custom_start
+
+
+def test_log_call_with_ended_at(client: WeaveClient):
+    """Test log_call with a custom ended_at timestamp."""
+    import datetime
+
+    custom_end = datetime.datetime(2024, 1, 15, 11, 45, 0, tzinfo=datetime.timezone.utc)
+    call = weave.log_call("test_op", {"x": 1}, 2, ended_at=custom_end)
+
+    fetched_calls = client.get_calls()
+    assert len(fetched_calls) == 1
+    fetched_call = fetched_calls[0]
+    assert fetched_call.ended_at == custom_end
+
+
+def test_log_call_with_both_timestamps(client: WeaveClient):
+    """Test log_call with both started_at and ended_at timestamps."""
+    import datetime
+
+    custom_start = datetime.datetime(
+        2024, 1, 15, 10, 30, 0, tzinfo=datetime.timezone.utc
+    )
+    custom_end = datetime.datetime(2024, 1, 15, 10, 35, 0, tzinfo=datetime.timezone.utc)
+    call = weave.log_call(
+        "test_op", {"x": 1}, 2, started_at=custom_start, ended_at=custom_end
+    )
+
+    fetched_calls = client.get_calls()
+    assert len(fetched_calls) == 1
+    fetched_call = fetched_calls[0]
+    assert fetched_call.started_at == custom_start
+    assert fetched_call.ended_at == custom_end
+
+
+def test_log_call_retroactive_logging(client: WeaveClient):
+    """Test log_call for retroactive logging of past operations."""
+    import datetime
+
+    # Simulate logging an operation that happened in the past
+    past_start = datetime.datetime(2023, 6, 1, 9, 0, 0, tzinfo=datetime.timezone.utc)
+    past_end = datetime.datetime(2023, 6, 1, 9, 5, 30, tzinfo=datetime.timezone.utc)
+
+    call = weave.log_call(
+        op="historical_data_processing",
+        inputs={"batch_id": "batch_001", "records": 1000},
+        output={"processed": 1000, "errors": 0},
+        started_at=past_start,
+        ended_at=past_end,
+    )
+
+    fetched_calls = client.get_calls()
+    assert len(fetched_calls) == 1
+    fetched_call = fetched_calls[0]
+    assert fetched_call.started_at == past_start
+    assert fetched_call.ended_at == past_end
+    # Verify duration can be calculated
+    duration = fetched_call.ended_at - fetched_call.started_at
+    assert duration.total_seconds() == 330  # 5 minutes 30 seconds
+
+
+def test_log_call_with_timestamps_and_all_params(client: WeaveClient):
+    """Test log_call with timestamps combined with all other parameters."""
+    import datetime
+
+    parent_call = weave.log_call("parent", {}, "parent_result")
+
+    custom_start = datetime.datetime(
+        2024, 3, 20, 14, 0, 0, tzinfo=datetime.timezone.utc
+    )
+    custom_end = datetime.datetime(2024, 3, 20, 14, 10, 0, tzinfo=datetime.timezone.utc)
+
+    call = weave.log_call(
+        op="full_test_op",
+        inputs={"x": 1, "y": 2},
+        output={"result": 3},
+        parent=parent_call,
+        attributes={"env": "production", "version": "2.0"},
+        display_name="Full Test Operation",
+        started_at=custom_start,
+        ended_at=custom_end,
+    )
+
+    fetched_calls = client.get_calls()
+    assert len(fetched_calls) == 2
+
+    child = next(c for c in fetched_calls if c.id == call.id)
+    assert child.inputs == {"x": 1, "y": 2}
+    assert child.output == {"result": 3}
+    assert child.parent_id == parent_call.id
+    assert child.attributes["env"] == "production"
+    assert child.attributes["version"] == "2.0"
+    assert child.display_name == "Full Test Operation"
+    assert child.started_at == custom_start
+    assert child.ended_at == custom_end
+
+
 def test_log_call_with_use_stack_true(client: WeaveClient):
     """Test log_call with use_stack=True adds to and removes from call stack."""
 
