@@ -9,15 +9,25 @@ from typing import Any
 from weave.trace_server import environment as wf_env
 
 # File and batch processing settings
-FILE_CHUNK_SIZE = 100000
-MAX_DELETE_CALLS_COUNT = 1000
-INITIAL_CALLS_STREAM_BATCH_SIZE = 50
-MAX_CALLS_STREAM_BATCH_SIZE = 500
+FILE_CHUNK_SIZE = wf_env.weave_trace_server_file_chunk_size() or 100000
+MAX_DELETE_CALLS_COUNT = wf_env.weave_trace_server_max_delete_calls_count() or 1000
+INITIAL_CALLS_STREAM_BATCH_SIZE = (
+    wf_env.weave_trace_server_initial_calls_stream_batch_size() or 50
+)
+MAX_CALLS_STREAM_BATCH_SIZE = (
+    wf_env.weave_trace_server_max_calls_stream_batch_size() or 500
+)
 
 
 # ClickHouse size limits and error handling
-CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT = 3.5 * 1024 * 1024  # 3.5 MiB
-CLICKHOUSE_MAX_FEEDBACK_PAYLOAD_SIZE = 1 * 1024 * 1024  # 1 MiB
+CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT = (
+    wf_env.weave_trace_server_clickhouse_single_row_insert_bytes_limit()
+    or 3.5 * 1024 * 1024  # 3.5 MiB
+)
+CLICKHOUSE_MAX_FEEDBACK_PAYLOAD_SIZE = (
+    wf_env.weave_trace_server_clickhouse_max_feedback_payload_size()
+    or 1 * 1024 * 1024  # 1 MiB
+)
 ENTITY_TOO_LARGE_PAYLOAD = '{"_weave": {"error":"<EXCEEDS_LIMITS>"}}'
 
 
