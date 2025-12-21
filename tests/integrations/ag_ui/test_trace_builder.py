@@ -1293,6 +1293,262 @@ class TestFileSnapshots:
         assert "step-1" not in builder._step_file_snapshots
 
 
+class TestSessionSummary:
+    """Test session-level summary generation."""
+
+    def test_run_finished_sets_summary_with_turn_count(self):
+        """Test that run summary includes turn count."""
+        mock_client = MagicMock()
+        mock_run_call = MagicMock(id="run-call")
+        mock_client.create_call.return_value = mock_run_call
+
+        builder = AgentTraceBuilder(
+            weave_client=mock_client,
+            agent_name="Claude Code",
+        )
+
+        # Start run
+        builder.handle(
+            RunStartedEvent(run_id="run-1", timestamp=datetime.now(timezone.utc))
+        )
+
+        # Add multiple steps
+        for i in range(3):
+            builder.handle(
+                StepStartedEvent(
+                    step_id=f"step-{i}",
+                    run_id="run-1",
+                    timestamp=datetime.now(timezone.utc),
+                )
+            )
+            builder.handle(
+                StepFinishedEvent(
+                    step_id=f"step-{i}", timestamp=datetime.now(timezone.utc)
+                )
+            )
+
+        # Finish run
+        builder.handle(
+            RunFinishedEvent(run_id="run-1", timestamp=datetime.now(timezone.utc))
+        )
+
+        # Verify summary was set
+        assert mock_run_call.summary is not None
+        assert mock_run_call.summary["turn_count"] == 3
+
+    def test_run_finished_sets_summary_with_tool_count(self):
+        """Test that run summary includes tool call count."""
+        mock_client = MagicMock()
+        mock_run_call = MagicMock(id="run-call")
+        mock_client.create_call.return_value = mock_run_call
+
+        builder = AgentTraceBuilder(
+            weave_client=mock_client,
+            agent_name="Claude Code",
+        )
+
+        # Start run and step
+        builder.handle(
+            RunStartedEvent(run_id="run-1", timestamp=datetime.now(timezone.utc))
+        )
+        builder.handle(
+            StepStartedEvent(
+                step_id="step-1",
+                run_id="run-1",
+                timestamp=datetime.now(timezone.utc),
+            )
+        )
+
+        # Add multiple tool calls
+        for i in range(5):
+            builder.handle(
+                ToolCallStartEvent(
+                    tool_call_id=f"tool-{i}",
+                    tool_name="Read",
+                    timestamp=datetime.now(timezone.utc),
+                )
+            )
+            builder.handle(
+                ToolCallResultEvent(
+                    tool_call_id=f"tool-{i}",
+                    content="result",
+                    timestamp=datetime.now(timezone.utc),
+                )
+            )
+
+        # Finish step and run
+        builder.handle(
+            StepFinishedEvent(step_id="step-1", timestamp=datetime.now(timezone.utc))
+        )
+        builder.handle(
+            RunFinishedEvent(run_id="run-1", timestamp=datetime.now(timezone.utc))
+        )
+
+        # Verify summary was set
+        assert mock_run_call.summary is not None
+        assert mock_run_call.summary["tool_call_count"] == 5
+
+    def test_run_finished_sets_summary_with_model(self):
+        """Test that run summary includes model from metadata."""
+        mock_client = MagicMock()
+        mock_run_call = MagicMock(id="run-call")
+        mock_client.create_call.return_value = mock_run_call
+
+        builder = AgentTraceBuilder(
+            weave_client=mock_client,
+            agent_name="Claude Code",
+        )
+
+        # Start run with model in metadata
+        builder.handle(
+            RunStartedEvent(
+                run_id="run-1",
+                timestamp=datetime.now(timezone.utc),
+                metadata={"model": "claude-sonnet-4-5"},
+            )
+        )
+
+        # Finish run
+        builder.handle(
+            RunFinishedEvent(run_id="run-1", timestamp=datetime.now(timezone.utc))
+        )
+
+        # Verify summary includes model
+        assert mock_run_call.summary is not None
+        assert mock_run_call.summary["model"] == "claude-sonnet-4-5"
+
+    def test_run_finished_sets_summary_with_git_info(self):
+        """Test that run summary includes git info when cwd is in metadata."""
+        mock_client = MagicMock()
+        mock_run_call = MagicMock(id="run-call")
+        mock_client.create_call.return_value = mock_run_call
+
+        builder = AgentTraceBuilder(
+            weave_client=mock_client,
+            agent_name="Claude Code",
+        )
+
+        # Start run with cwd in metadata (use current directory)
+        import os
+
+        cwd = os.getcwd()
+        builder.handle(
+            RunStartedEvent(
+                run_id="run-1",
+                timestamp=datetime.now(timezone.utc),
+                metadata={"cwd": cwd},
+            )
+        )
+
+        # Finish run
+        builder.handle(
+            RunFinishedEvent(run_id="run-1", timestamp=datetime.now(timezone.utc))
+        )
+
+        # Verify summary was set (git_info may or may not be present depending on whether cwd is a git repo)
+        assert mock_run_call.summary is not None
+        # If git_info is present, it should have the right structure
+        if "git_info" in mock_run_call.summary:
+            git_info = mock_run_call.summary["git_info"]
+            assert isinstance(git_info, dict)
+
+    def test_run_finished_comprehensive_summary(self):
+        """Test that run summary includes all available fields."""
+        mock_client = MagicMock()
+        mock_run_call = MagicMock(id="run-call")
+        mock_client.create_call.return_value = mock_run_call
+
+        builder = AgentTraceBuilder(
+            weave_client=mock_client,
+            agent_name="Claude Code",
+        )
+
+        # Start run with full metadata
+        import os
+
+        cwd = os.getcwd()
+        builder.handle(
+            RunStartedEvent(
+                run_id="run-1",
+                timestamp=datetime.now(timezone.utc),
+                metadata={"model": "claude-opus-4-5", "cwd": cwd},
+            )
+        )
+
+        # Add steps
+        builder.handle(
+            StepStartedEvent(
+                step_id="step-1",
+                run_id="run-1",
+                timestamp=datetime.now(timezone.utc),
+            )
+        )
+
+        # Add tool calls
+        builder.handle(
+            ToolCallStartEvent(
+                tool_call_id="tool-1",
+                tool_name="Read",
+                timestamp=datetime.now(timezone.utc),
+            )
+        )
+        builder.handle(
+            ToolCallResultEvent(
+                tool_call_id="tool-1",
+                content="result",
+                timestamp=datetime.now(timezone.utc),
+            )
+        )
+
+        # Finish step and run
+        builder.handle(
+            StepFinishedEvent(step_id="step-1", timestamp=datetime.now(timezone.utc))
+        )
+        builder.handle(
+            RunFinishedEvent(run_id="run-1", timestamp=datetime.now(timezone.utc))
+        )
+
+        # Verify comprehensive summary
+        assert mock_run_call.summary is not None
+        assert mock_run_call.summary["turn_count"] == 1
+        assert mock_run_call.summary["tool_call_count"] == 1
+        assert mock_run_call.summary["model"] == "claude-opus-4-5"
+
+    def test_run_metadata_cleanup(self):
+        """Test that run metadata is cleaned up after run finishes."""
+        mock_client = MagicMock()
+        mock_client.create_call.return_value = MagicMock(id="call")
+
+        builder = AgentTraceBuilder(
+            weave_client=mock_client,
+            agent_name="Claude Code",
+        )
+
+        # Start run
+        builder.handle(
+            RunStartedEvent(
+                run_id="run-1",
+                timestamp=datetime.now(timezone.utc),
+                metadata={"model": "claude-sonnet-4"},
+            )
+        )
+
+        # Verify metadata is stored
+        assert "run-1" in builder._run_metadata
+        assert "run-1" in builder._run_step_count
+        assert "run-1" in builder._run_tool_count
+
+        # Finish run
+        builder.handle(
+            RunFinishedEvent(run_id="run-1", timestamp=datetime.now(timezone.utc))
+        )
+
+        # Verify cleanup
+        assert "run-1" not in builder._run_metadata
+        assert "run-1" not in builder._run_step_count
+        assert "run-1" not in builder._run_tool_count
+
+
 class TestQAContextTracking:
     """Test Q&A context tracking for question/answer flows."""
 

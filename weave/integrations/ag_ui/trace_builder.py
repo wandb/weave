@@ -84,6 +84,12 @@ class AgentTraceBuilder:
         self._tool_args: dict[str, dict[str, Any]] = {}  # tool_call_id → args
         self._current_step_id: str | None = None
 
+        # Session-level tracking for summary
+        self._run_metadata: dict[str, dict] = {}  # run_id → metadata
+        self._run_step_count: dict[str, int] = {}  # run_id → step count
+        self._run_tool_count: dict[str, int] = {}  # run_id → tool count
+        self._step_to_run: dict[str, str] = {}  # step_id → run_id
+
         # Usage tracking: message_id → usage event
         self._message_usage: dict[str, UsageRecordedEvent] = {}
 
@@ -172,14 +178,55 @@ class AgentTraceBuilder:
         )
         self._run_calls[event.run_id] = call
 
+        # Store metadata for summary generation
+        self._run_metadata[event.run_id] = event.metadata.copy()
+
+        # Initialize counters
+        self._run_step_count[event.run_id] = 0
+        self._run_tool_count[event.run_id] = 0
+
     def _handle_run_finished(self, event: RunFinishedEvent) -> None:
-        """Finish session call."""
+        """Finish session call with summary."""
         call = self._run_calls.get(event.run_id)
         if call:
+            # Build comprehensive summary
+            summary: dict[str, Any] = {}
+
+            # Add turn/step count
+            step_count = self._run_step_count.get(event.run_id, 0)
+            if step_count > 0:
+                summary["turn_count"] = step_count
+
+            # Add tool call count
+            tool_count = self._run_tool_count.get(event.run_id, 0)
+            if tool_count > 0:
+                summary["tool_call_count"] = tool_count
+
+            # Add model from metadata if available
+            metadata = self._run_metadata.get(event.run_id, {})
+            if "model" in metadata:
+                summary["model"] = metadata["model"]
+
+            # Add git info if cwd is in metadata
+            if "cwd" in metadata:
+                git_info = self._get_git_info(metadata["cwd"])
+                if git_info:
+                    summary["git_info"] = git_info
+
+            # Set summary on call
+            if summary:
+                call.summary = summary
+
+            # Finish the call
             self.client.finish_call(
                 call,
                 output={"result": event.result} if event.result else {},
             )
+
+            # Clean up run metadata and counters
+            self._run_metadata.pop(event.run_id, None)
+            self._run_step_count.pop(event.run_id, None)
+            self._run_tool_count.pop(event.run_id, None)
 
     def _handle_run_error(self, event: RunErrorEvent) -> None:
         """Finish session call with error."""
@@ -222,6 +269,10 @@ class AgentTraceBuilder:
         )
         self._step_calls[event.step_id] = call
         self._current_step_id = event.step_id
+
+        # Track step-to-run mapping and increment step count
+        self._step_to_run[event.step_id] = event.run_id
+        self._run_step_count[event.run_id] = self._run_step_count.get(event.run_id, 0) + 1
 
     def _handle_step_finished(self, event: StepFinishedEvent) -> None:
         """Finish turn call with aggregated output and usage."""
@@ -393,6 +444,12 @@ class AgentTraceBuilder:
 
         self._tool_calls[event.tool_call_id] = call
 
+        # Increment tool count for the run
+        if self._current_step_id:
+            run_id = self._step_to_run.get(self._current_step_id)
+            if run_id:
+                self._run_tool_count[run_id] = self._run_tool_count.get(run_id, 0) + 1
+
         # Track tool call in OpenAI format for ChatView compatibility
         if self._current_step_id:
             if self._current_step_id not in self._step_tool_calls:
@@ -496,6 +553,99 @@ class AgentTraceBuilder:
         if event.content:
             current = self._message_thinking.get(event.message_id, "")
             self._message_thinking[event.message_id] = current + event.content
+
+    def _get_git_info(self, cwd: str) -> dict[str, str] | None:
+        """Get git repository information for a working directory.
+
+        Uses subprocess with timeout to run git commands safely.
+        Returns None on any errors to avoid blocking trace generation.
+
+        Args:
+            cwd: Working directory path to check for git repo
+
+        Returns:
+            Dict with repo, branch, commit_hash if successful, None otherwise
+        """
+        import subprocess
+        from pathlib import Path
+
+        try:
+            cwd_path = Path(cwd)
+            if not cwd_path.exists():
+                return None
+
+            # Check if it's a git repo
+            result = subprocess.run(
+                ["git", "rev-parse", "--is-inside-work-tree"],
+                cwd=cwd,
+                capture_output=True,
+                text=True,
+                timeout=2,
+            )
+            if result.returncode != 0:
+                return None
+
+            # Get repo name from remote URL
+            repo = None
+            result = subprocess.run(
+                ["git", "config", "--get", "remote.origin.url"],
+                cwd=cwd,
+                capture_output=True,
+                text=True,
+                timeout=2,
+            )
+            if result.returncode == 0:
+                url = result.stdout.strip()
+                # Extract repo name from URL
+                if url:
+                    # Handle both https://github.com/user/repo.git and git@github.com:user/repo.git
+                    parts = url.rstrip("/").rstrip(".git").split("/")
+                    if len(parts) >= 2:
+                        repo = f"{parts[-2]}/{parts[-1]}"
+                    elif ":" in url:
+                        # Handle git@github.com:user/repo format
+                        repo = url.split(":")[-1].rstrip(".git")
+
+            # Get current branch
+            branch = None
+            result = subprocess.run(
+                ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+                cwd=cwd,
+                capture_output=True,
+                text=True,
+                timeout=2,
+            )
+            if result.returncode == 0:
+                branch = result.stdout.strip()
+
+            # Get commit hash
+            commit_hash = None
+            result = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                cwd=cwd,
+                capture_output=True,
+                text=True,
+                timeout=2,
+            )
+            if result.returncode == 0:
+                commit_hash = result.stdout.strip()
+
+            # Only return if we got at least some info
+            if repo or branch or commit_hash:
+                git_info: dict[str, str] = {}
+                if repo:
+                    git_info["repo"] = repo
+                if branch:
+                    git_info["branch"] = branch
+                if commit_hash:
+                    git_info["commit_hash"] = commit_hash
+                return git_info
+
+            return None
+
+        except (subprocess.TimeoutExpired, subprocess.SubprocessError, OSError):
+            # Silently fail on any errors
+            return None
 
     def _detect_question(self, text: str) -> str | None:
         """Detect if assistant text ends with a question.
