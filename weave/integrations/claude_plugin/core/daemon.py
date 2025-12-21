@@ -114,7 +114,7 @@ from weave.integrations.claude_plugin.utils import (
     reconstruct_call,
     truncate,
 )
-from weave.integrations.claude_plugin.views.diff_view import (
+from weave.integrations.ag_ui.views.diff_view import (
     generate_session_diff_html,
     generate_turn_diff_html,
 )
@@ -122,7 +122,7 @@ from weave.trace.context.weave_client_context import require_weave_client
 from weave.trace.view_utils import set_call_view
 
 try:
-    from weave.integrations.claude_plugin.secret_scanner import get_secret_scanner
+    from weave.integrations.ag_ui.secret_scanner import get_secret_scanner
 except ImportError:
     get_secret_scanner = lambda: None  # No-op if secret_scanner not installed
 from dataclasses import dataclass, field

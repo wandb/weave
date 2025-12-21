@@ -599,7 +599,7 @@ def log_tool_call(
 
             # Attach HTML view BEFORE finishing
             if tool_name == "TodoWrite":
-                from weave.integrations.claude_plugin.views.diff_view import (
+                from weave.integrations.ag_ui.views.diff_view import (
                     generate_todo_html,
                 )
 
@@ -617,7 +617,7 @@ def log_tool_call(
                         )
 
             elif tool_name == "Edit" and structured_patch:
-                from weave.integrations.claude_plugin.views.diff_view import (
+                from weave.integrations.ag_ui.views.diff_view import (
                     generate_edit_diff_html,
                 )
 
