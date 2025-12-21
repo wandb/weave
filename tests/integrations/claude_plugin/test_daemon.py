@@ -1173,11 +1173,11 @@ class TestCleanupIntegration:
 
 
 class TestTurnCreationWithProcessor:
-    """Test that daemon uses SessionProcessor for turn creation."""
+    """Test that daemon creates turn calls directly (SessionProcessor inlined)."""
 
     @pytest.mark.anyio
     async def test_handle_user_message_uses_processor(self):
-        """_handle_user_message should use processor.create_turn_call()."""
+        """_handle_user_message should create turn call via weave_client.create_call()."""
         from weave.integrations.claude_plugin.core.daemon import WeaveDaemon
 
         daemon = WeaveDaemon("test-session-123")
@@ -1188,21 +1188,10 @@ class TestTurnCreationWithProcessor:
         daemon.trace_id = "trace-abc"
         daemon.turn_number = 0
 
-        # Initialize processor
-        from weave.integrations.claude_plugin.session.session_processor import (
-            SessionProcessor,
-        )
-
-        daemon.processor = SessionProcessor(
-            client=daemon.weave_client,
-            project="test/project",
-            source="plugin",
-        )
-
-        # Mock the processor's create_turn_call method
+        # Mock the weave_client's create_call method
         mock_turn_call = MagicMock()
         mock_turn_call.id = "turn-call-789"
-        daemon.processor.create_turn_call = MagicMock(return_value=mock_turn_call)
+        daemon.weave_client.create_call = MagicMock(return_value=mock_turn_call)
 
         # Simulate a user message
         obj = {
@@ -1215,17 +1204,14 @@ class TestTurnCreationWithProcessor:
 
         await daemon._handle_user_message(obj, line_num=1)
 
-        # Verify processor.create_turn_call was called
-        daemon.processor.create_turn_call.assert_called_once()
-        call_args = daemon.processor.create_turn_call.call_args
+        # Verify weave_client.create_call was called
+        daemon.weave_client.create_call.assert_called_once()
+        call_args = daemon.weave_client.create_call.call_args
 
         # Verify the arguments
-        assert call_args.kwargs["turn_number"] == 1
-        assert "Write a Python function" in call_args.kwargs["user_message"]
-        assert (
-            call_args.kwargs.get("images") is None or call_args.kwargs["images"] == []
-        )
-        assert call_args.kwargs.get("is_compacted") is False
+        assert call_args.kwargs["op"] == "claude_code.turn"
+        assert call_args.kwargs["attributes"]["turn_number"] == 1
+        assert "Write a Python function" in call_args.kwargs["inputs"]["messages"][-1]["content"]
 
         # Verify turn call ID was stored
         assert daemon.current_turn_call_id == "turn-call-789"
@@ -1233,7 +1219,7 @@ class TestTurnCreationWithProcessor:
 
     @pytest.mark.anyio
     async def test_handle_user_message_with_images(self):
-        """_handle_user_message should pass images to processor."""
+        """_handle_user_message should handle images in turn creation."""
         from weave.integrations.claude_plugin.core.daemon import WeaveDaemon
 
         daemon = WeaveDaemon("test-session-123")
@@ -1244,21 +1230,10 @@ class TestTurnCreationWithProcessor:
         daemon.trace_id = "trace-abc"
         daemon.turn_number = 0
 
-        # Initialize processor
-        from weave.integrations.claude_plugin.session.session_processor import (
-            SessionProcessor,
-        )
-
-        daemon.processor = SessionProcessor(
-            client=daemon.weave_client,
-            project="test/project",
-            source="plugin",
-        )
-
-        # Mock the processor's create_turn_call method
+        # Mock the weave_client's create_call method
         mock_turn_call = MagicMock()
         mock_turn_call.id = "turn-call-789"
-        daemon.processor.create_turn_call = MagicMock(return_value=mock_turn_call)
+        daemon.weave_client.create_call = MagicMock(return_value=mock_turn_call)
 
         # Simulate a user message with an image
         obj = {
@@ -1281,17 +1256,19 @@ class TestTurnCreationWithProcessor:
 
         await daemon._handle_user_message(obj, line_num=1)
 
-        # Verify processor.create_turn_call was called with images
-        daemon.processor.create_turn_call.assert_called_once()
-        call_args = daemon.processor.create_turn_call.call_args
+        # Verify weave_client.create_call was called
+        daemon.weave_client.create_call.assert_called_once()
+        call_args = daemon.weave_client.create_call.call_args
 
-        # Verify images were passed
-        assert "images" in call_args.kwargs
-        assert len(call_args.kwargs["images"]) == 1
+        # Verify the message has images in Anthropic format
+        messages = call_args.kwargs["inputs"]["messages"]
+        user_content = messages[-1]["content"]
+        assert isinstance(user_content, list)
+        assert len(user_content) == 2  # text + image
 
     @pytest.mark.anyio
     async def test_handle_user_message_with_pending_question(self):
-        """_handle_user_message should pass pending question context to processor."""
+        """_handle_user_message should include pending question context in messages."""
         from weave.integrations.claude_plugin.core.daemon import WeaveDaemon
 
         daemon = WeaveDaemon("test-session-123")
@@ -1303,21 +1280,10 @@ class TestTurnCreationWithProcessor:
         daemon.turn_number = 0
         daemon._pending_question = "What file should I edit?"
 
-        # Initialize processor
-        from weave.integrations.claude_plugin.session.session_processor import (
-            SessionProcessor,
-        )
-
-        daemon.processor = SessionProcessor(
-            client=daemon.weave_client,
-            project="test/project",
-            source="plugin",
-        )
-
-        # Mock the processor's create_turn_call method
+        # Mock the weave_client's create_call method
         mock_turn_call = MagicMock()
         mock_turn_call.id = "turn-call-789"
-        daemon.processor.create_turn_call = MagicMock(return_value=mock_turn_call)
+        daemon.weave_client.create_call = MagicMock(return_value=mock_turn_call)
 
         # Simulate a user message
         obj = {
@@ -1330,12 +1296,17 @@ class TestTurnCreationWithProcessor:
 
         await daemon._handle_user_message(obj, line_num=1)
 
-        # Verify processor.create_turn_call was called with pending question
-        daemon.processor.create_turn_call.assert_called_once()
-        call_args = daemon.processor.create_turn_call.call_args
+        # Verify weave_client.create_call was called
+        daemon.weave_client.create_call.assert_called_once()
+        call_args = daemon.weave_client.create_call.call_args
 
-        # Verify pending question was passed
-        assert call_args.kwargs["pending_question"] == "What file should I edit?"
+        # Verify pending question was included in messages
+        messages = call_args.kwargs["inputs"]["messages"]
+        assert len(messages) == 2  # assistant question + user response
+        assert messages[0]["role"] == "assistant"
+        assert messages[0]["content"] == "What file should I edit?"
+        # Verify in_response_to was set
+        assert call_args.kwargs["inputs"]["in_response_to"] == "What file should I edit?"
         # Verify it was cleared
         assert daemon._pending_question is None
 
@@ -1353,21 +1324,10 @@ class TestTurnCreationWithProcessor:
         daemon.turn_number = 5
         daemon.compaction_count = 0
 
-        # Initialize processor
-        from weave.integrations.claude_plugin.session.session_processor import (
-            SessionProcessor,
-        )
-
-        daemon.processor = SessionProcessor(
-            client=daemon.weave_client,
-            project="test/project",
-            source="plugin",
-        )
-
-        # Mock the processor's create_turn_call method
+        # Mock the weave_client's create_call method
         mock_turn_call = MagicMock()
         mock_turn_call.id = "turn-call-789"
-        daemon.processor.create_turn_call = MagicMock(return_value=mock_turn_call)
+        daemon.weave_client.create_call = MagicMock(return_value=mock_turn_call)
 
         # Simulate a compaction message
         obj = {
@@ -1380,12 +1340,12 @@ class TestTurnCreationWithProcessor:
 
         await daemon._handle_user_message(obj, line_num=1)
 
-        # Verify processor.create_turn_call was called with is_compacted=True
-        daemon.processor.create_turn_call.assert_called_once()
-        call_args = daemon.processor.create_turn_call.call_args
+        # Verify weave_client.create_call was called
+        daemon.weave_client.create_call.assert_called_once()
+        call_args = daemon.weave_client.create_call.call_args
 
-        # Verify compaction was detected
-        assert call_args.kwargs["is_compacted"] is True
+        # Verify compaction was detected via attributes
+        assert call_args.kwargs["attributes"]["compacted"] is True
         assert daemon.compaction_count == 1
 
 
@@ -1515,17 +1475,13 @@ class TestCreateContinuationSession:
             daemon = WeaveDaemon("test-continuation-session")
             daemon.session_call_id = "old-call-id"
             daemon.weave_client = MagicMock()
-            daemon.processor = MagicMock()
 
-            # Mock the processor to return a new call
+            # Mock weave_client.create_call to return a new call
             mock_new_call = MagicMock()
             mock_new_call.id = "new-call-id"
             mock_new_call.trace_id = "new-trace-id"
             mock_new_call.ui_url = "https://example.com/new"
-            daemon.processor.create_session_call.return_value = (
-                mock_new_call,
-                "Continued: New Task Name",
-            )
+            daemon.weave_client.create_call.return_value = mock_new_call
 
             # Set up state (no display_name needed)
             with StateManager() as state:
@@ -1552,12 +1508,12 @@ class TestCreateContinuationSession:
             assert daemon.session_call_id == "new-call-id"
             assert daemon.trace_id == "new-trace-id"
 
-            # Verify create_session_call was called with continuation parameters
-            daemon.processor.create_session_call.assert_called_once()
-            call_kwargs = daemon.processor.create_session_call.call_args.kwargs
+            # Verify weave_client.create_call was called with continuation parameters
+            daemon.weave_client.create_call.assert_called_once()
+            call_kwargs = daemon.weave_client.create_call.call_args.kwargs
             # Display name should start with "Continued: " and be generated from the new prompt
             assert call_kwargs["display_name"].startswith("Continued: ")
-            assert call_kwargs["continuation_of"] == "old-call-id"
+            assert call_kwargs["attributes"]["continuation_of"] == "old-call-id"
 
             # Verify state was updated
             with StateManager() as state:
@@ -1586,10 +1542,9 @@ class TestHandleUserMessage:
         daemon.weave_client._project_id.return_value = "test-project"
         daemon.session_call_id = "session-123"
         daemon.trace_id = "trace-abc"
-        daemon.processor = MagicMock()
         mock_turn_call = MagicMock()
         mock_turn_call.id = "turn-456"
-        daemon.processor.create_turn_call.return_value = mock_turn_call
+        daemon.weave_client.create_call.return_value = mock_turn_call
 
         obj = {
             "type": "user",
@@ -1601,7 +1556,7 @@ class TestHandleUserMessage:
 
         assert daemon.turn_number == 1
         assert daemon.current_turn_call_id == "turn-456"
-        daemon.processor.create_turn_call.assert_called_once()
+        daemon.weave_client.create_call.assert_called_once()
 
     @pytest.mark.anyio
     async def test_skips_empty_content(self):
@@ -1611,7 +1566,6 @@ class TestHandleUserMessage:
         daemon = WeaveDaemon("test-session")
         daemon.weave_client = MagicMock()
         daemon.session_call_id = "session-123"
-        daemon.processor = MagicMock()
 
         obj = {
             "type": "user",
@@ -1621,7 +1575,7 @@ class TestHandleUserMessage:
         await daemon._handle_user_message(obj, line_num=1)
 
         assert daemon.turn_number == 0
-        daemon.processor.create_turn_call.assert_not_called()
+        daemon.weave_client.create_call.assert_not_called()
 
     @pytest.mark.anyio
     async def test_skips_system_messages(self):
@@ -1631,7 +1585,6 @@ class TestHandleUserMessage:
         daemon = WeaveDaemon("test-session")
         daemon.weave_client = MagicMock()
         daemon.session_call_id = "session-123"
-        daemon.processor = MagicMock()
 
         obj = {
             "type": "user",
@@ -1641,7 +1594,7 @@ class TestHandleUserMessage:
         await daemon._handle_user_message(obj, line_num=1)
 
         assert daemon.turn_number == 0
-        daemon.processor.create_turn_call.assert_not_called()
+        daemon.weave_client.create_call.assert_not_called()
 
     @pytest.mark.anyio
     async def test_detects_compaction_message(self):
@@ -1653,10 +1606,9 @@ class TestHandleUserMessage:
         daemon.weave_client._project_id.return_value = "test-project"
         daemon.session_call_id = "session-123"
         daemon.trace_id = "trace-abc"
-        daemon.processor = MagicMock()
         mock_turn_call = MagicMock()
         mock_turn_call.id = "turn-456"
-        daemon.processor.create_turn_call.return_value = mock_turn_call
+        daemon.weave_client.create_call.return_value = mock_turn_call
 
         obj = {
             "type": "user",
@@ -1670,7 +1622,7 @@ class TestHandleUserMessage:
 
         assert daemon.compaction_count == 1
         # Should still create a turn
-        daemon.processor.create_turn_call.assert_called_once()
+        daemon.weave_client.create_call.assert_called_once()
 
     @pytest.mark.anyio
     async def test_buffers_tool_results(self):

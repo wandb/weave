@@ -175,6 +175,87 @@ def _build_subagent_output(
     return output
 
 
+def _build_turn_output(
+    turn: Any,
+    *,
+    interrupted: bool = False,
+) -> tuple[dict[str, Any], str, str]:
+    """Build turn output in Message format for ChatView.
+
+    Creates output compatible with Weave's ChatView Message format:
+    - role: "assistant"
+    - content: Main text response (string)
+    - model: Model name
+    - reasoning_content: Thinking content (for collapsible UI)
+    - tool_calls: Tool calls in OpenAI format with embedded results
+
+    Args:
+        turn: Parsed turn data with assistant_messages and tool calls
+        interrupted: True if user interrupted this turn
+
+    Returns:
+        Tuple of (output_dict, assistant_text, thinking_text)
+    """
+    model = turn.primary_model()
+
+    # Collect assistant text and thinking content from all assistant messages
+    assistant_text = ""
+    thinking_text = ""
+    for msg in turn.assistant_messages:
+        text = msg.get_text()
+        if text:
+            assistant_text += text + "\n"
+        if msg.thinking_content:
+            thinking_text += msg.thinking_content + "\n"
+
+    # Build output in Message format for ChatView
+    # Note: We use Message format (not Anthropic's native format with type: "message")
+    # because the ChatView Anthropic normalizer requires all content blocks to be text-only.
+    # By omitting "type", the output passes through as a raw Message object which gives us:
+    # - reasoning_content: Collapsible "Thinking" UI
+    # - tool_calls: Expandable tool calls with embedded results
+    # Note: Don't truncate turn content - it's the primary output and truncation
+    # breaks Q&A detection when questions appear at the end of long responses
+    output: dict[str, Any] = {
+        "role": "assistant",
+        "content": assistant_text.strip(),
+        "model": model or "claude-sonnet-4-20250514",
+    }
+
+    # Add thinking/reasoning content for collapsible UI
+    # Note: Don't truncate reasoning either - it's important context
+    if thinking_text.strip():
+        output["reasoning_content"] = thinking_text.strip()
+
+    # Add tool calls with results in OpenAI format for expandable tool UI
+    tool_calls = turn.all_tool_calls()
+    if tool_calls:
+        output["tool_calls"] = []
+        for tc in tool_calls:
+            tool_call_entry: dict[str, Any] = {
+                "id": tc.id,
+                "type": "function",
+                "function": {
+                    "name": tc.name,
+                    "arguments": json.dumps(tc.input) if tc.input else "{}",
+                },
+            }
+            # Include tool result as response if available
+            if tc.result is not None:
+                tool_call_entry["response"] = {
+                    "role": "tool",
+                    "content": truncate(tc.result),
+                    "tool_call_id": tc.id,
+                }
+            output["tool_calls"].append(tool_call_entry)
+
+    if interrupted:
+        output["interrupted"] = True
+        output["stop_reason"] = "user_interrupt"
+
+    return output, assistant_text.strip(), thinking_text.strip()
+
+
 def discover_session_files(
     sessions_dir: Path, most_recent_only: bool = True
 ) -> list[Path]:

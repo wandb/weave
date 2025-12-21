@@ -101,6 +101,12 @@ from weave.integrations.claude_plugin.session.session_parser import (
     is_system_message,
     parse_session_file,
 )
+from weave.integrations.claude_plugin.session.session_importer import (
+    _build_subagent_inputs,
+    _build_subagent_output,
+    _build_turn_output,
+)
+from weave.integrations.claude_plugin.session.session_processor import get_hostname
 from weave.integrations.claude_plugin.utils import (
     INACTIVITY_TIMEOUT,
     SUBAGENT_DETECTION_TIMEOUT,
@@ -110,6 +116,7 @@ from weave.integrations.claude_plugin.utils import (
     generate_session_name,
     get_git_info,
     get_subagent_display_name,
+    get_turn_display_name,
     log_tool_call,
     reconstruct_call,
     truncate,
@@ -208,9 +215,6 @@ class WeaveDaemon:
 
         # Weave state
         self.weave_client: Any = None
-        self.processor: Any | None = (
-            None  # SessionProcessor, initialized when weave starts
-        )
         self.session_call_id: str | None = None
         self.trace_id: str | None = None
         self.trace_url: str | None = None
@@ -277,17 +281,6 @@ class WeaveDaemon:
         if self.project:
             weave.init(self.project)
             self.weave_client = require_weave_client()
-
-            # Initialize SessionProcessor
-            from weave.integrations.claude_plugin.session.session_processor import (
-                SessionProcessor,
-            )
-
-            self.processor = SessionProcessor(
-                client=self.weave_client,
-                project=self.project,
-                source="plugin",
-            )
 
         # Setup signal handlers
         loop = asyncio.get_event_loop()
@@ -450,13 +443,9 @@ class WeaveDaemon:
         )
 
         # Create subagent call with ChatView-compatible inputs
-        from weave.integrations.claude_plugin.session.session_processor import (
-            SessionProcessor,
-        )
-
         subagent_call = self.weave_client.create_call(
             op="claude_code.subagent",
-            inputs=SessionProcessor.build_subagent_inputs(
+            inputs=_build_subagent_inputs(
                 first_prompt, session.agent_id, tracker.subagent_type
             ),
             parent=parent_call,
@@ -725,7 +714,7 @@ class WeaveDaemon:
         original session via continuation_of attribute. The display name
         is generated from the new user prompt, not the original session.
         """
-        if not self.weave_client or not self.processor:
+        if not self.weave_client:
             return {"status": "error", "message": "Weave not initialized"}
 
         user_prompt = payload.get("prompt", "")
@@ -761,14 +750,34 @@ class WeaveDaemon:
         continuation_count += 1
 
         # Create new session call with continuation naming
-        session_call, display_name = self.processor.create_session_call(
-            session_id=self.session_id,
-            first_prompt=user_prompt,
-            cwd=cwd,
-            display_name=continuation_display_name,
-            continuation_of=previous_call_id,
-            git_branch=git_branch,
-            claude_code_version=claude_code_version,
+        # Inline create_session_call logic
+        display_name = continuation_display_name
+
+        # Build attributes
+        attributes: dict[str, Any] = {
+            "session_id": self.session_id,
+            "filename": f"{self.session_id}.jsonl",
+            "git_branch": git_branch,
+            "source": "claude-code-plugin",
+            "hostname": get_hostname(),
+        }
+
+        # Add continuation metadata if this is a continuation
+        if previous_call_id:
+            attributes["continuation_of"] = previous_call_id
+
+        session_call = self.weave_client.create_call(
+            op="claude_code.session",
+            inputs={
+                "session_id": self.session_id,
+                "cwd": cwd,
+                "git_branch": git_branch,
+                "claude_code_version": claude_code_version,
+                "first_prompt": truncate(user_prompt, 1000),
+            },
+            attributes=attributes,
+            display_name=display_name,
+            use_stack=False,
         )
 
         # Reset daemon state for the new session
@@ -817,8 +826,8 @@ class WeaveDaemon:
         }
 
     async def _create_session_call(self, payload: dict[str, Any]) -> dict[str, Any]:
-        """Create the session-level Weave call using SessionProcessor."""
-        if not self.weave_client or not self.processor:
+        """Create the session-level Weave call."""
+        if not self.weave_client:
             return {"status": "error", "message": "Weave not initialized"}
 
         user_prompt = payload.get("prompt", "")
@@ -843,13 +852,31 @@ class WeaveDaemon:
                             f"Using real first prompt from transcript: {user_prompt[:50]!r}"
                         )
 
-        # Use SessionProcessor to create session call
-        session_call, _ = self.processor.create_session_call(
-            session_id=self.session_id,
-            first_prompt=user_prompt,
-            cwd=cwd,
-            git_branch=git_branch,
-            claude_code_version=claude_code_version,
+        # Inline create_session_call logic
+        # Generate display name
+        display_name, _ = generate_session_name(user_prompt)
+
+        # Build attributes
+        attributes: dict[str, Any] = {
+            "session_id": self.session_id,
+            "filename": f"{self.session_id}.jsonl",
+            "git_branch": git_branch,
+            "source": "claude-code-plugin",
+            "hostname": get_hostname(),
+        }
+
+        session_call = self.weave_client.create_call(
+            op="claude_code.session",
+            inputs={
+                "session_id": self.session_id,
+                "cwd": cwd,
+                "git_branch": git_branch,
+                "claude_code_version": claude_code_version,
+                "first_prompt": truncate(user_prompt, 1000),
+            },
+            attributes=attributes,
+            display_name=display_name,
+            use_stack=False,
         )
 
         self.session_call_id = session_call.id
@@ -958,11 +985,7 @@ class WeaveDaemon:
                             file_snapshots.append(content)
 
             # Build output in Message format using shared helper
-            from weave.integrations.claude_plugin.session.session_processor import (
-                SessionProcessor,
-            )
-
-            output = SessionProcessor.build_subagent_output(session)
+            output = _build_subagent_output(session)
 
             if file_snapshots:
                 output["file_snapshots"] = file_snapshots
@@ -1064,14 +1087,10 @@ class WeaveDaemon:
 
         # Create subagent call with ChatView-compatible inputs
         # Use tracker's subagent_type if available (from when Task tool was detected)
-        from weave.integrations.claude_plugin.session.session_processor import (
-            SessionProcessor,
-        )
-
         subagent_type = tracker.subagent_type if tracker else None
         subagent_call = self.weave_client.create_call(
             op="claude_code.subagent",
-            inputs=SessionProcessor.build_subagent_inputs(
+            inputs=_build_subagent_inputs(
                 first_prompt, agent_id, subagent_type
             ),
             parent=parent_call,
@@ -1172,7 +1191,7 @@ class WeaveDaemon:
                     file_snapshots.append(content)
 
         # Build output in Message format using shared helper
-        subagent_output = SessionProcessor.build_subagent_output(agent_session)
+        subagent_output = _build_subagent_output(agent_session)
 
         if file_snapshots:
             subagent_output["file_snapshots"] = file_snapshots
@@ -1285,18 +1304,70 @@ class WeaveDaemon:
                             f"Attached git info: branch={git_info.get('branch')}"
                         )
 
-                # Collect file snapshots with secret scanning (using SessionProcessor helper)
+                # Collect file snapshots with secret scanning
                 # Includes: session.jsonl + all modified/created files
-                if session and self.processor:
+                if session:
+                    from weave.type_wrappers.Content.content import Content
+
                     scanner = get_secret_scanner()
-                    file_snapshots_list, redaction_count = (
-                        self.processor.collect_session_file_snapshots_with_scanner(
-                            session=session,
-                            sessions_dir=sessions_dir,
-                            secret_scanner=scanner,
-                        )
-                    )
-                    self._redacted_count += redaction_count
+                    file_snapshots_list: list[Any] = []
+                    redacted_count = 0
+
+                    # Add session JSONL file
+                    session_file = sessions_dir / f"{session.session_id}.jsonl"
+                    if session_file.exists():
+                        try:
+                            session_content: Content = Content.from_path(
+                                session_file,
+                                metadata={
+                                    "session_id": session.session_id,
+                                    "filename": session_file.name,
+                                    "relative_path": "session.jsonl",
+                                },
+                            )
+                            # Scan for secrets if scanner provided
+                            if scanner:
+                                session_content, count = scanner.scan_content(
+                                    session_content
+                                )
+                                redacted_count += count
+                            file_snapshots_list.append(session_content)
+                            logger.debug(f"Attached session file: {session_file.name}")
+                        except Exception as e:
+                            logger.debug(f"Failed to attach session file: {e}")
+
+                    # Add final state of changed files
+                    if session.cwd:
+                        cwd_path = Path(session.cwd)
+                        for file_path in session.get_all_changed_files():
+                            try:
+                                abs_path = Path(file_path)
+                                if not abs_path.is_absolute():
+                                    abs_path = cwd_path / file_path
+
+                                if abs_path.exists():
+                                    try:
+                                        rel_path = abs_path.relative_to(cwd_path)
+                                    except ValueError:
+                                        rel_path = Path(abs_path.name)
+
+                                    file_snap: Content = Content.from_path(
+                                        abs_path,
+                                        metadata={
+                                            "original_path": str(file_path),
+                                            "relative_path": str(rel_path),
+                                        },
+                                    )
+                                    # Scan for secrets if scanner provided
+                                    if scanner:
+                                        file_snap, count = scanner.scan_content(file_snap)
+                                        redacted_count += count
+                                    file_snapshots_list.append(file_snap)
+                                    logger.debug(f"Attached file snapshot: {rel_path}")
+                            except Exception as e:
+                                logger.debug(f"Failed to attach file {file_path}: {e}")
+
+                    self._redacted_count += redacted_count
                     if file_snapshots_list:
                         session_output["file_snapshots"] = file_snapshots_list
                         logger.debug(
@@ -1464,7 +1535,7 @@ class WeaveDaemon:
 
     async def _handle_user_message(self, obj: dict[str, Any], line_num: int) -> None:
         """Handle a user message from the session file - create turn call."""
-        if not self.weave_client or not self.session_call_id or not self.processor:
+        if not self.weave_client or not self.session_call_id:
             return
 
         # Parse message timestamp for tool result duration calculation
@@ -1611,14 +1682,53 @@ class WeaveDaemon:
             parent_id=None,
         )
 
-        # Use SessionProcessor to create turn call
-        turn_call = self.processor.create_turn_call(
+        # Inline create_turn_call logic
+        # Build Anthropic-format message content for chat view detection
+        user_content: str | list[dict[str, Any]] = truncate(user_text, 5000) or ""
+        if user_images:
+            # Include images in Anthropic format alongside text
+            content_parts: list[dict[str, Any]] = [
+                {"type": "text", "text": truncate(user_text, 5000)}
+            ]
+            for img in user_images:
+                # Content objects have to_anthropic_format() or we use dict format
+                if hasattr(img, "to_dict"):
+                    content_parts.append({"type": "image", "source": img.to_dict()})
+                else:
+                    content_parts.append({"type": "image", "source": img})
+            user_content = content_parts
+
+        # Build messages array for ChatView
+        # For Q&A flow, prepend the question as an assistant message
+        messages: list[dict[str, Any]] = []
+        if pending_question:
+            messages.append({"role": "assistant", "content": pending_question})
+        messages.append({"role": "user", "content": user_content})
+
+        inputs: dict[str, Any] = {
+            # Anthropic-format messages for chat view detection
+            "messages": messages,
+        }
+        if pending_question:
+            inputs["in_response_to"] = pending_question
+
+        display_name = (
+            f"Turn {self.turn_number}: Compacted, resuming..."
+            if is_compacted
+            else get_turn_display_name(self.turn_number, user_text, pending_question)
+        )
+
+        attributes: dict[str, Any] = {"turn_number": self.turn_number}
+        if is_compacted:
+            attributes["compacted"] = True
+
+        turn_call = self.weave_client.create_call(
+            op="claude_code.turn",
+            inputs=inputs,
             parent=session_call,
-            turn_number=self.turn_number,
-            user_message=user_text,
-            pending_question=pending_question,
-            images=user_images if user_images else None,
-            is_compacted=is_compacted,
+            attributes=attributes,
+            display_name=display_name,
+            use_stack=False,
         )
 
         self.current_turn_call_id = turn_call.id
@@ -1839,12 +1949,8 @@ class WeaveDaemon:
                     f"Created thinking trace with {len(thinking_content_parts)} blocks"
                 )
 
-            # Build output using shared helper from SessionProcessor
-            from weave.integrations.claude_plugin.session.session_processor import (
-                SessionProcessor,
-            )
-
-            turn_output, assistant_text, _ = SessionProcessor.build_turn_output(
+            # Build output using shared helper from session_importer
+            turn_output, assistant_text, _ = _build_turn_output(
                 turn, interrupted=interrupted
             )
             output.update(turn_output)
