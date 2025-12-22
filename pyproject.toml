@@ -364,6 +364,7 @@ optional_value = "final"
 
 [tool.typos.default.extend-words]
 fasion = "fasion" # Wandb lore
+gauge = "gauge"
 
 [tool.typos.default.extend-identifiers]
 alog_score = "alog_score"
