@@ -88,7 +88,7 @@ def make_safe_name(name: str | None) -> str:
     """
     if name is None:
         name = "unknown"
-    return name.replace(" ", "_").replace("/", "_").lower()
+    return name.replace(" ", "_").replace("/", "_").lower().replace("<", "").replace(">", "")
 
 
 def make_object_id(name: str | None, default: str) -> str:
