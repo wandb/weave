@@ -424,7 +424,7 @@ def test_non_replicated_preserves_table_names(migrator):
 
 
 def test_format_views_with_on_cluster_sql(migrator):
-    """Test CREATE VIEW and DROP VIEW get ON CLUSTER clause added."""
+    """Test CREATE VIEW, CREATE MATERIALIZED VIEW, and DROP VIEW get ON CLUSTER clause added."""
     cluster_name = "test_cluster"
 
     # Test cases for various DDL types
@@ -447,6 +447,15 @@ def test_format_views_with_on_cluster_sql(migrator):
         (
             "CREATE VIEW IF NOT EXISTS my_view AS SELECT id FROM test",
             "CREATE VIEW IF NOT EXISTS my_view ON CLUSTER test_cluster AS SELECT id FROM test",
+        ),
+        # CREATE MATERIALIZED VIEW cases
+        (
+            "CREATE MATERIALIZED VIEW calls_merged_view TO calls_merged AS SELECT * FROM call_parts",
+            "CREATE MATERIALIZED VIEW calls_merged_view ON CLUSTER test_cluster TO calls_merged AS SELECT * FROM call_parts",
+        ),
+        (
+            "CREATE MATERIALIZED VIEW IF NOT EXISTS calls_merged_view TO calls_merged AS SELECT * FROM call_parts",
+            "CREATE MATERIALIZED VIEW IF NOT EXISTS calls_merged_view ON CLUSTER test_cluster TO calls_merged AS SELECT * FROM call_parts",
         ),
         # ALTER TABLE cases
         (
@@ -518,6 +527,20 @@ def test_execute_views_in_replicated_and_distributed_modes(
     assert (
         call_sql == "CREATE VIEW my_view ON CLUSTER test_cluster AS SELECT * FROM test"
     )
+
+
+def test_execute_materialized_view_in_replicated_mode(replicated_migrator):
+    """Test that CREATE MATERIALIZED VIEW gets ON CLUSTER in replicated mode."""
+    command = "CREATE MATERIALIZED VIEW calls_merged_view TO calls_merged AS SELECT project_id, id FROM call_parts GROUP BY project_id, id"
+
+    replicated_migrator._execute_migration_command("test_db", command)
+
+    assert replicated_migrator.ch_client.command.call_count == 1
+    assert replicated_migrator.ch_client.database == "original_db"
+
+    call_sql = replicated_migrator.ch_client.command.call_args_list[0][0][0]
+    expected_sql = "CREATE MATERIALIZED VIEW calls_merged_view ON CLUSTER test_cluster TO calls_merged AS SELECT project_id, id FROM call_parts GROUP BY project_id, id"
+    assert call_sql == expected_sql
 
 
 def test_extract_alter_table_name(migrator):
