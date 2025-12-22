@@ -75,14 +75,6 @@ class DistributedTransformResult:
     distributed_command: str | None
 
 
-@dataclass
-class DistributedTransformResult:
-    """Result of transforming SQL for distributed tables."""
-
-    local_command: str
-    distributed_command: str | None
-
-
 class MigrationError(RuntimeError):
     """Raised when a migration error occurs."""
 
@@ -361,12 +353,13 @@ class ClickHouseTraceServerMigrator:
             self.ch_client.database = curr_db
             return
 
+        # Format for replicated tables
         formatted_command = _format_replicated_sql(
             command, use_distributed=self.use_distributed, target_db=target_db
         )
-        formatted_command = _format_create_table_with_on_cluster_sql(
-            formatted_command, self.replicated_cluster
-        )
+
+        if self.use_distributed:
+            self._execute_distributed_command(formatted_command)
         else:
             self._execute_replicated_command(formatted_command)
 
@@ -493,6 +486,7 @@ def _is_safe_identifier(value: str) -> bool:
     return bool(re.match(r"^[a-zA-Z0-9_\.]+$", value))
 
 
+def _extract_table_name(sql_query: str) -> str | None:
     """Extract table name from CREATE TABLE statement."""
     # Match "CREATE TABLE [IF NOT EXISTS] table_name"
     # Note: table_name can be qualified with database name (e.g., db.table)
