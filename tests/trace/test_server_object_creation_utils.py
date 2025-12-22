@@ -228,4 +228,6 @@ def test_make_safe_name_with_angle_brackets() -> None:
             return x + 1
 
         # Verify the op was successfully created
-        assert test_op.name == "opname", f"Op creation failed for input '{test_input}': got name '{test_op.name}'"
+        assert test_op.name == "opname", (
+            f"Op creation failed for input '{test_input}': got name '{test_op.name}'"
+        )
