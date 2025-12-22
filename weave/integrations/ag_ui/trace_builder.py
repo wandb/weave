@@ -57,6 +57,7 @@ class AgentTraceBuilder:
         agent_name: str,
         on_tool_call: Callable[[ToolCallResultEvent, Any], None] | None = None,
         on_step_finished: Callable[[StepFinishedEvent, Any], None] | None = None,
+        create_tool_traces: bool = True,
     ):
         """Initialize the trace builder.
 
@@ -67,12 +68,16 @@ class AgentTraceBuilder:
                          Use for integration-specific views (diffs, etc.)
             on_step_finished: Optional hook called after each step finishes.
                             Use for integration-specific behavior (attach diff views, etc.)
+            create_tool_traces: If True, create child traces for tool calls.
+                              If False, only embed tool calls in step output.
+                              Default: True
         """
         self.client = weave_client
         self.agent_name = agent_name
         self.tool_registry = get_tool_registry(agent_name)
         self.on_tool_call = on_tool_call
         self.on_step_finished = on_step_finished
+        self.create_tool_traces = create_tool_traces
 
         # State tracking
         self._run_calls: dict[str, Any] = {}  # run_id → Call
@@ -260,8 +265,12 @@ class AgentTraceBuilder:
             # Clear immediately - question consumed by this step
             self._pending_question = None
 
+        # Build op name: agent_name.step_type (e.g., "claude_code.turn")
+        agent_prefix = self.agent_name.lower().replace(" ", "_")
+        op_name = f"{agent_prefix}.{event.step_type}"
+
         call = self.client.create_call(
-            op=f"{event.step_type}",
+            op=op_name,
             inputs=inputs if inputs else {},
             parent=parent,
         )
@@ -348,9 +357,28 @@ class AgentTraceBuilder:
         if file_snapshots:
             output["file_snapshots"] = file_snapshots
 
-        # Set usage summary
+        # Build comprehensive summary
+        summary: dict[str, Any] = {}
+
+        # Add model
+        if first_model:
+            summary["model"] = first_model
+
+        # Add tool call count
+        if tool_calls:
+            summary["tool_call_count"] = len(tool_calls)
+
+        # Add usage if available
         if usage_by_model:
-            call.summary = {"usage": usage_by_model}
+            summary["usage"] = usage_by_model
+
+        # Calculate duration from step metadata if available
+        # This will be populated by subclasses or hooks that track timing
+        # For now, we don't have step-level timestamps in the basic events
+
+        # Set summary
+        if summary:
+            call.summary = summary
 
         self.client.finish_call(call, output=output if output else None)
 
@@ -388,19 +416,6 @@ class AgentTraceBuilder:
         if not start_event:
             return
 
-        # Find parent (current step or run)
-        parent = None
-        if self._current_step_id:
-            parent = self._step_calls.get(self._current_step_id)
-        if not parent:
-            # Fallback to finding any active run
-            for run_call in self._run_calls.values():
-                parent = run_call
-                break
-
-        if not parent:
-            return
-
         # Get tool arguments
         tool_input = self._tool_args.pop(event.tool_call_id, {})
 
@@ -414,41 +429,55 @@ class AgentTraceBuilder:
             started_at = start_event.timestamp
             ended_at = event.timestamp
 
-        # Create tool call directly (inlined from log_tool_call to avoid circular dependency)
-        call = self.client.create_call(
-            op=start_event.tool_name,
-            inputs=tool_input,
-            parent=parent,
-            started_at=started_at,
-        )
+        # Optionally create child trace for tool call
+        call = None
+        if self.create_tool_traces:
+            # Find parent (current step or run)
+            parent = None
+            if self._current_step_id:
+                parent = self._step_calls.get(self._current_step_id)
+            if not parent:
+                # Fallback to finding any active run
+                for run_call in self._run_calls.values():
+                    parent = run_call
+                    break
 
-        # Finish with result or error
-        if event.is_error:
-            self.client.finish_call(
-                call,
-                exception=Exception(event.content or "Tool execution error"),
-                ended_at=ended_at,
-            )
-        else:
-            self.client.finish_call(
-                call,
-                output={"result": event.content},
-                ended_at=ended_at,
-            )
+            if parent:
+                # Create tool call directly (inlined from log_tool_call to avoid circular dependency)
+                call = self.client.create_call(
+                    op=start_event.tool_name,
+                    inputs=tool_input,
+                    parent=parent,
+                    started_at=started_at,
+                )
 
-        # Store summary with duration if available
-        if duration_ms is not None:
-            call.summary = {"duration_ms": duration_ms}
+                # Finish with result or error
+                if event.is_error:
+                    self.client.finish_call(
+                        call,
+                        exception=Exception(event.content or "Tool execution error"),
+                        ended_at=ended_at,
+                    )
+                else:
+                    self.client.finish_call(
+                        call,
+                        output={"result": event.content},
+                        ended_at=ended_at,
+                    )
 
-        self._tool_calls[event.tool_call_id] = call
+                # Store summary with duration if available
+                if duration_ms is not None:
+                    call.summary = {"duration_ms": duration_ms}
 
-        # Increment tool count for the run
+                self._tool_calls[event.tool_call_id] = call
+
+        # Increment tool count for the run (always, regardless of create_tool_traces)
         if self._current_step_id:
             run_id = self._step_to_run.get(self._current_step_id)
             if run_id:
                 self._run_tool_count[run_id] = self._run_tool_count.get(run_id, 0) + 1
 
-        # Track tool call in OpenAI format for ChatView compatibility
+        # Track tool call in OpenAI format for ChatView compatibility (always)
         if self._current_step_id:
             if self._current_step_id not in self._step_tool_calls:
                 self._step_tool_calls[self._current_step_id] = []
@@ -475,7 +504,8 @@ class AgentTraceBuilder:
             self._step_tool_calls[self._current_step_id].append(tool_call_data)
 
         # Invoke hook for integration-specific behavior (e.g., diff view generation)
-        if self.on_tool_call:
+        # Pass call if created, otherwise None
+        if self.on_tool_call and call:
             self.on_tool_call(event, call)
 
     def _handle_message_start(self, event: TextMessageStartEvent) -> None:
