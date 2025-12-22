@@ -59,8 +59,10 @@ Differences between cloud, replicated, and distributed modes:
   - Creates `view_name_local` ON CLUSTER with `TO target_table_local`
   - All `FROM` clauses and qualified column references renamed to `_local` suffix
 
-**CREATE/DROP VIEW:**
+**CREATE/DROP VIEW and CREATE MATERIALIZED VIEW:**
   - Only adds `ON CLUSTER` clause (views are metadata-only, no local/distributed split)
+  - Note: In distributed mode, materialized views from initial CREATE statements should reference
+    base tables (not _local), as the migrator doesn't transform initial CREATE statements
 
 **MATERIALIZE commands:**
   - Skipped entirely (not supported by distributed tables)
@@ -751,7 +753,7 @@ def _format_drop_view_with_on_cluster_sql(sql_query: str, cluster_name: str) -> 
 
 
 def _format_create_view_with_on_cluster_sql(sql_query: str, cluster_name: str) -> str:
-    """Format CREATE VIEW statements to include ON CLUSTER clause.
+    """Format CREATE VIEW and CREATE MATERIALIZED VIEW statements to include ON CLUSTER clause.
 
     Args:
         sql_query: The SQL query to transform
@@ -760,15 +762,17 @@ def _format_create_view_with_on_cluster_sql(sql_query: str, cluster_name: str) -
     Returns:
         Transformed SQL with ON CLUSTER added if applicable
     """
-    # Check if this is a CREATE VIEW statement and doesn't already have ON CLUSTER
-    if re.search(r"\bCREATE\s+VIEW\b", sql_query, flags=re.IGNORECASE):
+    # Check if this is a CREATE [MATERIALIZED] VIEW statement and doesn't already have ON CLUSTER
+    if re.search(
+        r"\bCREATE\s+(?:MATERIALIZED\s+)?VIEW\b", sql_query, flags=re.IGNORECASE
+    ):
         # Don't add if already present
         if re.search(r"\bON\s+CLUSTER\b", sql_query, flags=re.IGNORECASE):
             return sql_query
 
-        # Match "CREATE VIEW [IF NOT EXISTS] view_name" and add ON CLUSTER after view name
+        # Match "CREATE [MATERIALIZED] VIEW [IF NOT EXISTS] view_name" and add ON CLUSTER after view name
         # Note: view_name can be qualified with database name (e.g., db.view)
-        pattern = r"(\bCREATE\s+VIEW\s+(?:IF\s+NOT\s+EXISTS\s+)?)([a-zA-Z0-9_.]+)(\s+)"
+        pattern = r"(\bCREATE\s+(?:MATERIALIZED\s+)?VIEW\s+(?:IF\s+NOT\s+EXISTS\s+)?)([a-zA-Z0-9_.]+)(\s+)"
 
         def add_cluster(match: re.Match[str]) -> str:
             return f"{match.group(1)}{match.group(2)} ON CLUSTER {cluster_name}{match.group(3)}"
@@ -786,6 +790,7 @@ def _format_with_on_cluster_sql(sql_query: str, cluster_name: str) -> str:
     - CREATE TABLE
     - DROP VIEW
     - CREATE VIEW
+    - CREATE MATERIALIZED VIEW
 
     Args:
         sql_query: The SQL query to transform
