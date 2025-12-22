@@ -3,6 +3,7 @@ import logging
 import os
 import re
 from dataclasses import dataclass
+from datetime import datetime
 
 from clickhouse_connect.driver.client import Client as CHClient
 
@@ -121,6 +122,7 @@ class ClickHouseTraceServerMigrator:
 
         # Log configuration
         logger.info(
+            f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} "
             f"ClickHouseTraceServerMigrator initialized with: "
             f"replicated={self.replicated}, "
             f"use_distributed={self.use_distributed}, "
@@ -172,6 +174,9 @@ class ClickHouseTraceServerMigrator:
             self.replicated_path,
         )
         self.ch_client.command(db_sql)
+
+        # Management table should be replicated but not sharded
+        # In distributed mode, we still want all pods to see the same migration state
         create_table_sql = f"""
             CREATE TABLE IF NOT EXISTS {self.management_db}.migrations
             (
@@ -182,11 +187,29 @@ class ClickHouseTraceServerMigrator:
             ENGINE = MergeTree()
             ORDER BY (db_name)
         """
+
         if self.replicated:
-            create_table_sql = _format_replicated_sql(create_table_sql)
-            create_table_sql = _format_create_table_with_on_cluster_sql(
-                create_table_sql, self.replicated_cluster
-            )
+            # Use ReplicatedMergeTree but with a fixed path (no {shard} macro)
+            # This ensures all shards share the same underlying data
+            if self.use_distributed:
+                # In distributed mode, use a fixed path without {shard} so all nodes
+                # replicate the same data (not sharded per-shard)
+                create_table_sql = f"""
+                    CREATE TABLE IF NOT EXISTS {self.management_db}.migrations ON CLUSTER {self.replicated_cluster}
+                    (
+                        db_name String,
+                        curr_version UInt64,
+                        partially_applied_version UInt64 NULL,
+                    )
+                    ENGINE = ReplicatedMergeTree('/clickhouse/tables/{self.management_db}/migrations', '{{replica}}')
+                    ORDER BY (db_name)
+                """
+            else:
+                create_table_sql = _format_replicated_sql(create_table_sql)
+                create_table_sql = _format_create_table_with_on_cluster_sql(
+                    create_table_sql, self.replicated_cluster
+                )
+
         self.ch_client.command(create_table_sql)
 
     def _get_migration_status(self, db_name: str) -> dict:
