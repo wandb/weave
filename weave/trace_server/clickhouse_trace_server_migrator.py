@@ -361,7 +361,6 @@ class ClickHouseTraceServerMigrator:
             self.ch_client.database = curr_db
             return
 
-<<<<<<< HEAD
         formatted_command = _format_replicated_sql(
             command, use_distributed=self.use_distributed, target_db=target_db
         )
@@ -488,7 +487,6 @@ def _add_local_suffix(name: str) -> str:
     """Add _local suffix to a name if it doesn't already have it."""
     return name if name.endswith(LOCAL_TABLE_SUFFIX) else name + LOCAL_TABLE_SUFFIX
 
->>>>>>> griffin/distributed-replicated-migration
 
 def _is_safe_identifier(value: str) -> bool:
     """Check if a string is safe to use as an identifier in SQL."""
