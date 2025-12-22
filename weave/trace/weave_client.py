@@ -287,6 +287,8 @@ BACKGROUND_PARALLELISM_MIX = 0.5
 # This size is correlated with the maximum single row insert size
 # in clickhouse, which is currently unavoidable.
 MAX_TRACE_PAYLOAD_SIZE = int(3.5 * 1024 * 1024)  # 3.5 MiB
+# Maximum delay (in seconds) before sending a call start when call_start_delay is -1
+MAX_CALL_START_DELAY = 600.0  # 10 minutes
 
 
 class WeaveClient:
@@ -835,7 +837,12 @@ class WeaveClient:
             with self._pending_starts_lock:
                 self._pending_starts[call_id] = execute_start_call
 
-            if call_start_delay > 0:
+            delay_seconds = min(
+                MAX_CALL_START_DELAY if call_start_delay == -1 else call_start_delay,
+                MAX_CALL_START_DELAY,
+            )
+
+            if delay_seconds > 0:
 
                 def on_timeout() -> None:
                     with self._pending_starts_lock:
@@ -843,7 +850,7 @@ class WeaveClient:
                             func = self._pending_starts.pop(call_id)
                             self.future_executor.defer(func)
 
-                Timer(call_start_delay, on_timeout).start()
+                Timer(delay_seconds, on_timeout).start()
         else:
 
             def on_complete(f: Future) -> None:
