@@ -2034,6 +2034,7 @@ def _build_array_value_clause(
 def build_calls_complete_batch_update_query(
     end_calls: list["tsi.EndedCallSchemaForInsert"],
     pb: ParamBuilder,
+    table_name: str = "calls_complete",
 ) -> str:
     """Build a parameterized batch UPDATE query for calls_complete table.
 
@@ -2045,6 +2046,7 @@ def build_calls_complete_batch_update_query(
     Args:
         end_calls: List of ended call schemas to update
         pb: Parameter builder for query parameterization
+        table_name: Name of the table to update (defaults to "calls_complete")
 
     Returns:
         Formatted SQL UPDATE command string
@@ -2119,7 +2121,7 @@ def build_calls_complete_batch_update_query(
 
     # Construct the final UPDATE command
     raw_sql = f"""
-    UPDATE calls_complete
+    UPDATE {table_name}
     SET
         ended_at = CASE {format_cases(field_cases["ended_at"])} ELSE ended_at END,
         output_dump = CASE {format_cases(field_cases["output_dump"])} ELSE output_dump END,
@@ -2142,6 +2144,7 @@ def _build_calls_complete_update_query(
     wb_user_id: str,
     updated_at: datetime.datetime,
     pb: ParamBuilder,
+    table_name: str = "calls_complete",
 ) -> str | None:
     """Build a parameterized UPDATE query for calls_complete table.
 
@@ -2152,6 +2155,7 @@ def _build_calls_complete_update_query(
         wb_user_id: User ID performing the update
         updated_at: Timestamp of the update
         pb: ParamBuilder for parameterized queries
+        table_name: Name of the table to update (defaults to "calls_complete")
 
     Returns:
         Formatted SQL query string or None if no call_ids provided
@@ -2178,7 +2182,7 @@ def _build_calls_complete_update_query(
     set_sql = ", ".join(set_clauses)
 
     raw_sql = f"""
-        UPDATE calls_complete
+        UPDATE {table_name}
         SET
             {set_sql}
         WHERE project_id = {param_slot(project_id_param, "String")}
@@ -2194,6 +2198,7 @@ def build_calls_complete_update_display_name_query(
     wb_user_id: str,
     updated_at: datetime.datetime,
     pb: ParamBuilder,
+    table_name: str = "calls_complete",
 ) -> str | None:
     """Build a parameterized UPDATE query for calls_complete table to update the display_name field."""
     update_fields = {"display_name": (display_name, "String")}
@@ -2204,6 +2209,7 @@ def build_calls_complete_update_display_name_query(
         wb_user_id=wb_user_id,
         updated_at=updated_at,
         pb=pb,
+        table_name=table_name,
     )
 
 
@@ -2214,6 +2220,7 @@ def build_calls_complete_batch_delete_query(
     wb_user_id: str,
     updated_at: datetime.datetime,
     pb: ParamBuilder,
+    table_name: str = "calls_complete",
 ) -> str | None:
     """Build a parameterized DELETE query for calls_complete table.
     This uses ClickHouse's lightweight DELETE with parameterized IN clause.
@@ -2226,4 +2233,5 @@ def build_calls_complete_batch_delete_query(
         wb_user_id=wb_user_id,
         updated_at=updated_at,
         pb=pb,
+        table_name=table_name,
     )

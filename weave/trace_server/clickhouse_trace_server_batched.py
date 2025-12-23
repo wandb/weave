@@ -213,6 +213,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self._kafka_producer: KafkaProducer | None = None
         self._evaluate_model_dispatcher = evaluate_model_dispatcher
         self._table_routing_resolver: TableRoutingResolver | None = None
+        self._use_distributed_mode: bool | None = None
 
     @property
     def _flush_immediately(self) -> bool:
@@ -278,6 +279,50 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             return self._table_routing_resolver
         self._table_routing_resolver = TableRoutingResolver()
         return self._table_routing_resolver
+
+    @property
+    def use_distributed_mode(self) -> bool:
+        """Check if ClickHouse is configured to use distributed tables.
+
+        Detects distributed mode by checking for the existence of the
+        call_parts_local table, which is the local table underlying the
+        distributed call_parts table.
+
+        Returns:
+            bool: True if using distributed tables, False otherwise.
+        """
+        if self._use_distributed_mode is not None:
+            return self._use_distributed_mode
+
+        try:
+            # Check if the local table exists
+            query = """
+                SELECT 1
+                FROM system.tables
+                WHERE database = {db:String}
+                  AND name = 'call_parts_local'
+                LIMIT 1
+            """
+            result = self._query(query, {"db": self._database})
+            self._use_distributed_mode = len(result.result_rows) > 0
+        except Exception:
+            # If query fails, assume we're not in distributed mode
+            self._use_distributed_mode = False
+
+        return self._use_distributed_mode
+
+    def _get_calls_complete_table_name(self) -> str:
+        """Get the appropriate table name for calls_complete updates.
+
+        In distributed mode, UPDATE statements must target the local table
+        (_local suffix) instead of the distributed table.
+
+        Returns:
+            str: Table name to use for UPDATE statements.
+        """
+        if self.use_distributed_mode:
+            return "calls_complete_local"
+        return "calls_complete"
 
     def _get_existing_ops_from_spans(
         self, seen_ids: set[str], project_id: str, limit: int | None = None
@@ -773,7 +818,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             return
 
         pb = ParamBuilder()
-        command = build_calls_complete_batch_update_query(end_calls, pb)
+        table_name = self._get_calls_complete_table_name()
+        command = build_calls_complete_batch_update_query(end_calls, pb, table_name)
         self._command(command, pb.get_params())
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.calls_end_batch_v2")
@@ -1138,6 +1184,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         pb = ParamBuilder()
         deleted_at = datetime.datetime.now()
+        table_name = self._get_calls_complete_table_name()
         update_sql = build_calls_complete_batch_delete_query(
             project_id=project_id,
             wb_user_id=wb_user_id,
@@ -1145,6 +1192,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             deleted_at=deleted_at,
             updated_at=deleted_at,
             pb=pb,
+            table_name=table_name,
         )
         if update_sql is None:
             return tsi.CallsDeleteRes(num_deleted=0)
@@ -1177,6 +1225,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if write_target in (WriteTarget.CALLS_COMPLETE, WriteTarget.BOTH):
             pb = ParamBuilder()
             assert req.wb_user_id is not None
+            table_name = self._get_calls_complete_table_name()
             update_query = build_calls_complete_update_display_name_query(
                 project_id=req.project_id,
                 call_id=req.call_id,
@@ -1184,6 +1233,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 wb_user_id=req.wb_user_id,
                 updated_at=datetime.datetime.now(),
                 pb=pb,
+                table_name=table_name,
             )
             self._command(update_query, pb.get_params())
             # Early return only if CALLS_COMPLETE is the ONLY target
