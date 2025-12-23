@@ -28,6 +28,7 @@ Outstanding Optimizations/Work:
 import datetime
 import json
 import logging
+import re
 from collections import defaultdict
 from collections.abc import Callable, KeysView
 from typing import Any, Literal, cast
@@ -2031,10 +2032,41 @@ def _build_array_value_clause(
         return f"CAST([], 'Array({array_element_type})')"
 
 
+def _add_on_cluster_to_update(sql_query: str, cluster_name: str | None) -> str:
+    """Add ON CLUSTER clause to UPDATE statement if cluster_name is provided.
+
+    Args:
+        sql_query: The UPDATE SQL query
+        cluster_name: The cluster name to use (if None, returns query unchanged)
+
+    Returns:
+        SQL query with ON CLUSTER added if applicable
+    """
+    if not cluster_name:
+        return sql_query
+
+    # Check if this is an UPDATE statement and doesn't already have ON CLUSTER
+    if not re.search(r"\bUPDATE\b", sql_query, flags=re.IGNORECASE):
+        return sql_query
+
+    if re.search(r"\bON\s+CLUSTER\b", sql_query, flags=re.IGNORECASE):
+        return sql_query
+
+    # Match "UPDATE table_name" and add ON CLUSTER after table name
+    # Pattern matches: UPDATE [optional whitespace] table_name [whitespace or newline]
+    pattern = r"(\bUPDATE\s+)([a-zA-Z0-9_]+)(\s)"
+
+    def add_cluster(match: re.Match[str]) -> str:
+        return f"{match.group(1)}{match.group(2)} ON CLUSTER {cluster_name}{match.group(3)}"
+
+    return re.sub(pattern, add_cluster, sql_query, flags=re.IGNORECASE)
+
+
 def build_calls_complete_batch_update_query(
     end_calls: list["tsi.EndedCallSchemaForInsert"],
     pb: ParamBuilder,
     table_name: str = "calls_complete",
+    cluster_name: str | None = None,
 ) -> str:
     """Build a parameterized batch UPDATE query for calls_complete table.
 
@@ -2047,6 +2079,7 @@ def build_calls_complete_batch_update_query(
         end_calls: List of ended call schemas to update
         pb: Parameter builder for query parameterization
         table_name: Name of the table to update (defaults to "calls_complete")
+        cluster_name: Optional cluster name for ON CLUSTER clause
 
     Returns:
         Formatted SQL UPDATE command string
@@ -2134,7 +2167,8 @@ def build_calls_complete_batch_update_query(
       AND id IN ({", ".join(where_params)})
     """
 
-    return safely_format_sql(raw_sql, logger)
+    formatted_sql = safely_format_sql(raw_sql, logger)
+    return _add_on_cluster_to_update(formatted_sql, cluster_name)
 
 
 def _build_calls_complete_update_query(
@@ -2145,6 +2179,7 @@ def _build_calls_complete_update_query(
     updated_at: datetime.datetime,
     pb: ParamBuilder,
     table_name: str = "calls_complete",
+    cluster_name: str | None = None,
 ) -> str | None:
     """Build a parameterized UPDATE query for calls_complete table.
 
@@ -2156,6 +2191,7 @@ def _build_calls_complete_update_query(
         updated_at: Timestamp of the update
         pb: ParamBuilder for parameterized queries
         table_name: Name of the table to update (defaults to "calls_complete")
+        cluster_name: Optional cluster name for ON CLUSTER clause
 
     Returns:
         Formatted SQL query string or None if no call_ids provided
@@ -2188,7 +2224,8 @@ def _build_calls_complete_update_query(
         WHERE project_id = {param_slot(project_id_param, "String")}
             AND id IN {param_slot(call_ids_param, "Array(String)")}
     """
-    return safely_format_sql(raw_sql, logger)
+    formatted_sql = safely_format_sql(raw_sql, logger)
+    return _add_on_cluster_to_update(formatted_sql, cluster_name)
 
 
 def build_calls_complete_update_display_name_query(
@@ -2199,6 +2236,7 @@ def build_calls_complete_update_display_name_query(
     updated_at: datetime.datetime,
     pb: ParamBuilder,
     table_name: str = "calls_complete",
+    cluster_name: str | None = None,
 ) -> str | None:
     """Build a parameterized UPDATE query for calls_complete table to update the display_name field."""
     update_fields = {"display_name": (display_name, "String")}
@@ -2210,6 +2248,7 @@ def build_calls_complete_update_display_name_query(
         updated_at=updated_at,
         pb=pb,
         table_name=table_name,
+        cluster_name=cluster_name,
     )
 
 
@@ -2221,6 +2260,7 @@ def build_calls_complete_batch_delete_query(
     updated_at: datetime.datetime,
     pb: ParamBuilder,
     table_name: str = "calls_complete",
+    cluster_name: str | None = None,
 ) -> str | None:
     """Build a parameterized DELETE query for calls_complete table.
     This uses ClickHouse's lightweight DELETE with parameterized IN clause.
@@ -2234,4 +2274,5 @@ def build_calls_complete_batch_delete_query(
         updated_at=updated_at,
         pb=pb,
         table_name=table_name,
+        cluster_name=cluster_name,
     )

@@ -214,6 +214,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self._evaluate_model_dispatcher = evaluate_model_dispatcher
         self._table_routing_resolver: TableRoutingResolver | None = None
         self._use_distributed_mode: bool | None = None
+        self._clickhouse_cluster_name: str | None = None
 
     @property
     def _flush_immediately(self) -> bool:
@@ -311,6 +312,19 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         return self._use_distributed_mode
 
+    @property
+    def clickhouse_cluster_name(self) -> str | None:
+        """Get the ClickHouse cluster name from environment.
+
+        Returns:
+            str | None: The cluster name if configured, None otherwise.
+        """
+        if self._clickhouse_cluster_name is not None:
+            return self._clickhouse_cluster_name
+
+        self._clickhouse_cluster_name = wf_env.wf_clickhouse_replicated_cluster()
+        return self._clickhouse_cluster_name
+
     def _get_calls_complete_table_name(self) -> str:
         """Get the appropriate table name for calls_complete updates.
 
@@ -323,6 +337,81 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if self.use_distributed_mode:
             return "calls_complete_local"
         return "calls_complete"
+
+    def _verify_calls_complete_update(
+        self,
+        project_id: str,
+        call_ids: list[str],
+        expected_fields: dict[str, Any] | None = None,
+    ) -> None:
+        """Verify that UPDATE operations on calls_complete were successful.
+
+        Queries both the distributed table (calls_complete) and local table
+        (calls_complete_local) to verify updates were applied correctly.
+
+        Args:
+            project_id: The project ID to filter by
+            call_ids: List of call IDs that were updated
+            expected_fields: Optional dict of field names to expected values for verification
+        """
+        if not call_ids:
+            return
+
+        logger.info(
+            f"Verifying calls_complete update for {len(call_ids)} call(s) in project {project_id}"
+        )
+
+        # Check both tables to see the results
+        for table_name in ["calls_complete", "calls_complete_local"]:
+            try:
+                # Build query to select the updated calls
+                pb = ParamBuilder()
+                project_id_param = pb.add_param(project_id)
+                call_ids_param = pb.add_param(call_ids)
+
+                query = f"""
+                    SELECT id, ended_at, display_name, deleted_at, updated_at
+                    FROM {table_name}
+                    WHERE project_id = {{project_id_param:String}}
+                      AND id IN {{call_ids_param:Array(String)}}
+                    LIMIT 100
+                """
+
+                result = self._query(
+                    query,
+                    {
+                        "project_id_param": project_id,
+                        "call_ids_param": call_ids,
+                    },
+                )
+
+                found_count = len(result.result_rows)
+                logger.info(
+                    f"Query {table_name}: found {found_count}/{len(call_ids)} call(s)"
+                )
+
+                # Log details of first few results
+                for i, row in enumerate(result.result_rows[:3]):
+                    call_id, ended_at, display_name, deleted_at, updated_at = row
+                    logger.info(
+                        f"  [{table_name}] Call {i}: id={call_id}, "
+                        f"ended_at={ended_at}, display_name={display_name}, "
+                        f"deleted_at={deleted_at}, updated_at={updated_at}"
+                    )
+
+                if found_count < len(call_ids):
+                    logger.warning(
+                        f"Only found {found_count}/{len(call_ids)} calls in {table_name}"
+                    )
+
+            except Exception as e:
+                # If the table doesn't exist (non-distributed mode), that's expected
+                if "call_parts_local" in str(e) or "calls_complete_local" in str(e):
+                    logger.info(
+                        f"Table {table_name} does not exist (expected in non-distributed mode)"
+                    )
+                else:
+                    logger.exception(f"Error verifying update in {table_name}")
 
     def _get_existing_ops_from_spans(
         self, seen_ids: set[str], project_id: str, limit: int | None = None
@@ -819,8 +908,28 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         pb = ParamBuilder()
         table_name = self._get_calls_complete_table_name()
-        command = build_calls_complete_batch_update_query(end_calls, pb, table_name)
+        call_ids = [call.id for call in end_calls]
+        project_id = end_calls[0].project_id if end_calls else None
+        cluster_name = (
+            self.clickhouse_cluster_name if self.use_distributed_mode else None
+        )
+
+        logger.info(
+            f"Executing UPDATE on {table_name} for {len(call_ids)} call(s) "
+            f"in project {project_id} (distributed_mode={self.use_distributed_mode}, "
+            f"cluster={cluster_name})"
+        )
+
+        command = build_calls_complete_batch_update_query(
+            end_calls, pb, table_name, cluster_name
+        )
         self._command(command, pb.get_params())
+
+        logger.info(f"UPDATE command completed on {table_name}")
+
+        # Verify the update was successful
+        if project_id:
+            self._verify_calls_complete_update(project_id, call_ids)
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.calls_end_batch_v2")
     def calls_end_batch(self, req: tsi.CallsEndBatchReq) -> tsi.CallsEndBatchRes:
@@ -1185,6 +1294,16 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         pb = ParamBuilder()
         deleted_at = datetime.datetime.now()
         table_name = self._get_calls_complete_table_name()
+        cluster_name = (
+            self.clickhouse_cluster_name if self.use_distributed_mode else None
+        )
+
+        logger.info(
+            f"Executing UPDATE (soft delete) on {table_name} for {len(call_ids)} call(s) "
+            f"in project {project_id} (distributed_mode={self.use_distributed_mode}, "
+            f"cluster={cluster_name})"
+        )
+
         update_sql = build_calls_complete_batch_delete_query(
             project_id=project_id,
             wb_user_id=wb_user_id,
@@ -1193,11 +1312,18 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             updated_at=deleted_at,
             pb=pb,
             table_name=table_name,
+            cluster_name=cluster_name,
         )
         if update_sql is None:
             return tsi.CallsDeleteRes(num_deleted=0)
 
         self._command(update_sql, pb.get_params())
+
+        logger.info(f"UPDATE command completed on {table_name}")
+
+        # Verify the update was successful
+        self._verify_calls_complete_update(project_id, call_ids)
+
         return tsi.CallsDeleteRes(num_deleted=len(call_ids))
 
     def _ensure_valid_update_field(self, req: tsi.CallUpdateReq) -> None:
@@ -1226,6 +1352,16 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             pb = ParamBuilder()
             assert req.wb_user_id is not None
             table_name = self._get_calls_complete_table_name()
+            cluster_name = (
+                self.clickhouse_cluster_name if self.use_distributed_mode else None
+            )
+
+            logger.info(
+                f"Executing UPDATE (display_name) on {table_name} for call_id={req.call_id} "
+                f"in project {req.project_id} (distributed_mode={self.use_distributed_mode}, "
+                f"cluster={cluster_name})"
+            )
+
             update_query = build_calls_complete_update_display_name_query(
                 project_id=req.project_id,
                 call_id=req.call_id,
@@ -1234,8 +1370,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 updated_at=datetime.datetime.now(),
                 pb=pb,
                 table_name=table_name,
+                cluster_name=cluster_name,
             )
             self._command(update_query, pb.get_params())
+
+            logger.info(f"UPDATE command completed on {table_name}")
+
+            # Verify the update was successful
+            self._verify_calls_complete_update(req.project_id, [req.call_id])
+
             # Early return only if CALLS_COMPLETE is the ONLY target
             if write_target == WriteTarget.CALLS_COMPLETE:
                 return tsi.CallUpdateRes()
