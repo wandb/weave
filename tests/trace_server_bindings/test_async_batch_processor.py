@@ -303,29 +303,26 @@ def test_poison_pill_detection_and_immediate_drop():
             assert log_content.count("Unprocessable item detected") == 2
 
         # Test 4: Queue full - items get written to disk instead of being enqueued
-        # Stop the processor to avoid race conditions where the processing thread
-        # consumes items while we're enqueuing (which can happen on Windows)
-        processor.stop_accepting_new_work_and_flush_queue()
-        processor.accept_new_work()
-        # Wait for processing thread to enter its sleep phase (min_batch_interval=0.1)
-        # This ensures the thread won't consume items during our enqueue
-        time.sleep(0.15)
+        # Keep the processor stopped to prevent any race conditions where items
+        # could be consumed during enqueue
+        # The queue is already empty from the previous stop_and_flush
 
-        # Now enqueue items - with the queue empty and processing thread sleeping,
-        # fill1-fill5 will fill the queue, and fill6-fill7 will overflow
+        # Now enqueue items while processor is stopped - with maxsize=5,
+        # fill1-fill5 will fill the queue, and fill6-fill7 will overflow to disk
         processor.enqueue(
             ["fill1", "fill2", "fill3", "fill4", "fill5", "fill6", "fill7"]
         )  # Fill the small queue (maxsize=5)
+
         # Confirm extras got written to disk
         with open(log_path) as f:
             log_content = f.read().splitlines()
-            # Should have at least 4 log entries (2 poison pills + 2 queue full items)
-            assert len(log_content) >= 4
+            # Should have 4 log entries: 2 poison pills + 2 queue full items (fill6, fill7)
+            assert len(log_content) == 4
             # Check that queue full items were logged
             queue_full_entries = [
                 line for line in log_content if "Queue is full" in line
             ]
-            assert len(queue_full_entries) >= 2
+            assert len(queue_full_entries) == 2
 
         # Test 5: Disk fallback disabled - no files should be written
         processor_no_disk = AsyncBatchProcessor(
