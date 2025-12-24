@@ -4,6 +4,7 @@ from weave.trace_server.orm import ParamBuilder
 def make_project_stats_query(
     project_id: str,
     pb: ParamBuilder,
+    calls_table_alias: str,
     include_trace_storage_size: bool,
     include_objects_storage_size: bool,
     include_tables_storage_size: bool,
@@ -32,7 +33,7 @@ def make_project_stats_query(
                 COALESCE(output_size_bytes, 0) +
                 COALESCE(summary_size_bytes, 0)
                 )
-                FROM calls_merged_stats
+                FROM {calls_table_alias}_stats
                 WHERE project_id = {{{project_id}: String}}
             ) AS {columns[-1]}
             """
