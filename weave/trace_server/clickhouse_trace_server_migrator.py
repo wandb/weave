@@ -52,10 +52,10 @@
   - Ensures complete cleanup of both local and distributed tables
 
 **DROP VIEW:**
-  - Automatically adds `IF EXISTS` if not present
-  - Tries dropping both `view_name_local` (for materialized views) AND `view_name` (for regular views)
-  - Since we can't distinguish regular views from materialized views in DROP statements,
-    we attempt both with IF EXISTS to handle either case gracefully
+  - Only adds `ON CLUSTER` clause (views are metadata-only, no local/distributed split)
+  - Works identically to replicated mode
+  - Note: For materialized views that were modified via ALTER TABLE MODIFY QUERY,
+    you must drop the `_local` version explicitly (e.g., `DROP VIEW view_name_local`)
 
 **MATERIALIZE commands:**
   - Skipped entirely (not supported by distributed tables)
@@ -621,6 +621,16 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
             self.ch_client.database = curr_db
             return
 
+        # Handle CREATE/DROP VIEW (no local/distributed split, just add ON CLUSTER)
+        if SQLPatterns.CREATE_VIEW_STMT.search(
+            command
+        ) or SQLPatterns.DROP_VIEW_STMT.search(command):
+            formatted_command = self._format_replicated_sql(command)
+            formatted_command = self._add_on_cluster_clause(formatted_command)
+            self.ch_client.command(formatted_command)
+            self.ch_client.database = curr_db
+            return
+
         # Format for replicated tables with distributed-specific paths
         formatted_command = self._format_replicated_sql_distributed(command, target_db)
 
@@ -748,19 +758,11 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
                     local_command=local_command, distributed_command=distributed_command
                 )
             else:  # VIEW
-                # Add IF EXISTS if not present
-                if not SQLPatterns.IF_EXISTS.search(sql_query):
-                    sql_query = re.sub(
-                        r"(\bDROP\s+VIEW\s+)",
-                        r"\1IF EXISTS ",
-                        sql_query,
-                        flags=re.IGNORECASE,
-                    )
-                local_name = self._add_local_suffix(object_name)
-                local_command = sql_query.replace(object_name, local_name, 1)
-                distributed_command = sql_query
+                # For regular views, there's no local/distributed split
+                # Views are metadata-only, so we just return a single command
+                # (This applies to both regular VIEWs and materialized VIEWs created via CREATE)
                 return DistributedTransformResult(
-                    local_command=local_command, distributed_command=distributed_command
+                    local_command=sql_query, distributed_command=None
                 )
 
         # Check if this is a CREATE TABLE statement
