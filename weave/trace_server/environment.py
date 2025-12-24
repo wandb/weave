@@ -43,7 +43,7 @@ def kafka_partition_by_project_id() -> bool:
 
     When enabled, messages are partitioned by project_id to ensure all messages
     for a given project go to the same partition. When disabled, messages are
-    distributed round-robin across partitions. Can be safely toggled withoug
+    distributed round-robin across partitions. Can be safely toggled without
     having to rebalanc/re-partition the topic.
     """
     return os.environ.get("KAFKA_PARTITION_BY_PROJECT_ID", "false").lower() == "true"
@@ -93,6 +93,29 @@ def wf_clickhouse_pass() -> str:
 def wf_clickhouse_database() -> str:
     """The name of the clickhouse database."""
     return os.environ.get("WF_CLICKHOUSE_DATABASE", "default")
+
+
+def wf_clickhouse_replicated() -> bool:
+    """Whether to use replicated clickhouse tables."""
+    return os.environ.get("WF_CLICKHOUSE_REPLICATED", "false").lower() == "true"
+
+
+def wf_clickhouse_replicated_path() -> str | None:
+    """The path of the replicated clickhouse tables."""
+    return os.environ.get("WF_CLICKHOUSE_REPLICATED_PATH")
+
+
+def wf_clickhouse_replicated_cluster() -> str | None:
+    """The cluster of the replicated clickhouse tables."""
+    return os.environ.get("WF_CLICKHOUSE_REPLICATED_CLUSTER")
+
+
+def wf_clickhouse_use_distributed_tables() -> bool:
+    """Whether to use distributed tables on top of replicated tables."""
+    return (
+        os.environ.get("WF_CLICKHOUSE_USE_DISTRIBUTED_TABLES", "false").lower()
+        == "true"
+    )
 
 
 def wf_clickhouse_max_memory_usage() -> int | None:
