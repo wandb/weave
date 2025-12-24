@@ -7,6 +7,7 @@ from datetime import datetime
 
 from clickhouse_connect.driver.client import Client as CHClient
 
+from weave.trace_server import clickhouse_trace_server_settings as ch_settings
 from weave.trace_server.costs.insert_costs import insert_costs, should_insert_costs
 
 logger = logging.getLogger(__name__)
@@ -17,7 +18,6 @@ DEFAULT_REPLICATED_PATH = "/clickhouse/tables/{db}"
 DEFAULT_REPLICATED_CLUSTER = "weave_cluster"
 
 # Constants for table naming conventions
-LOCAL_TABLE_SUFFIX = "_local"
 VIEW_SUFFIX = "_view"
 
 
@@ -477,9 +477,11 @@ class ClickHouseTraceServerMigrator:
         # Determine local view and target table names
         view_name_local = _add_local_suffix(view_name)
         if view_name.endswith(VIEW_SUFFIX):
-            target_table = view_name[: -len(VIEW_SUFFIX)] + LOCAL_TABLE_SUFFIX
+            target_table = (
+                view_name[: -len(VIEW_SUFFIX)] + ch_settings.LOCAL_TABLE_SUFFIX
+            )
         else:
-            target_table = view_name + LOCAL_TABLE_SUFFIX
+            target_table = view_name + ch_settings.LOCAL_TABLE_SUFFIX
 
         # DROP and CREATE the materialized view
         drop_statement = f"DROP TABLE IF EXISTS {view_name_local} ON CLUSTER {self.replicated_cluster}"
@@ -523,7 +525,11 @@ class ClickHouseTraceServerMigrator:
 
 def _add_local_suffix(name: str) -> str:
     """Add _local suffix to a name if it doesn't already have it."""
-    return name if name.endswith(LOCAL_TABLE_SUFFIX) else name + LOCAL_TABLE_SUFFIX
+    return (
+        name
+        if name.endswith(ch_settings.LOCAL_TABLE_SUFFIX)
+        else name + ch_settings.LOCAL_TABLE_SUFFIX
+    )
 
 
 def _is_safe_identifier(value: str) -> bool:
@@ -563,7 +569,10 @@ def _rename_table_to_local(sql_query: str, table_name: str) -> str:
     """Rename table in CREATE TABLE statement to table_name_local."""
     pattern = rf"(CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?){table_name}\b"
     return re.sub(
-        pattern, rf"\1{table_name}{LOCAL_TABLE_SUFFIX}", sql_query, flags=re.IGNORECASE
+        pattern,
+        rf"\1{table_name}{ch_settings.LOCAL_TABLE_SUFFIX}",
+        sql_query,
+        flags=re.IGNORECASE,
     )
 
 
@@ -635,7 +644,7 @@ def _rename_from_tables_to_local(sql_query: str) -> str:
         # Handle database.table format - extract just the table name
         if "." in table_name:
             table_name = table_name.split(".")[-1]
-        if not table_name.endswith(LOCAL_TABLE_SUFFIX):
+        if not table_name.endswith(ch_settings.LOCAL_TABLE_SUFFIX):
             table_names.add(table_name)
 
     # Now rename FROM clauses
@@ -650,7 +659,7 @@ def _rename_from_tables_to_local(sql_query: str) -> str:
     for table_name in table_names:
         # Match table_name.column_name
         qualified_pattern = rf"\b{re.escape(table_name)}\.([a-zA-Z0-9_]+)\b"
-        replacement = rf"{table_name}{LOCAL_TABLE_SUFFIX}.\1"
+        replacement = rf"{table_name}{ch_settings.LOCAL_TABLE_SUFFIX}.\1"
         sql_to_process = re.sub(
             qualified_pattern, replacement, sql_to_process, flags=re.IGNORECASE
         )
@@ -720,7 +729,7 @@ def _format_replicated_sql(
                     table_name = table_name.split(".")[-1]
 
                 # When using distributed tables, append _local suffix to the table name in the path
-                local_table_name = table_name + LOCAL_TABLE_SUFFIX
+                local_table_name = table_name + ch_settings.LOCAL_TABLE_SUFFIX
                 return f"ENGINE = Replicated{engine_prefix}MergeTree('/clickhouse/tables/{{shard}}/{target_db}/{local_table_name}', '{{replica}}')"
 
         return f"ENGINE = Replicated{engine_prefix}MergeTree"
@@ -882,8 +891,8 @@ def _create_distributed_table_sql(
     """
     distributed_sql = f"""
         CREATE TABLE IF NOT EXISTS {table_name} ON CLUSTER {cluster_name}
-        AS {local_table_name}{LOCAL_TABLE_SUFFIX}
-        ENGINE = Distributed({cluster_name}, currentDatabase(), {local_table_name}{LOCAL_TABLE_SUFFIX}, rand())
+        AS {local_table_name}{ch_settings.LOCAL_TABLE_SUFFIX}
+        ENGINE = Distributed({cluster_name}, currentDatabase(), {local_table_name}{ch_settings.LOCAL_TABLE_SUFFIX}, rand())
     """
     return distributed_sql
 

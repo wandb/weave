@@ -24,6 +24,11 @@ ENTITY_TOO_LARGE_PAYLOAD = '{"_weave": {"error":"<EXCEEDS_LIMITS>"}}'
 # Clickhouse calls complete sane max settings
 MAX_BATCH_UPDATE_CALLS = 100
 
+# Table naming conventions for distributed mode
+# In distributed mode, local tables use this suffix (e.g., "calls_complete_local")
+# while distributed tables use the base name (e.g., "calls_complete")
+LOCAL_TABLE_SUFFIX = "_local"
+
 
 # ClickHouse query db settings
 
