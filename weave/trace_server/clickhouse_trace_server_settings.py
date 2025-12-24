@@ -13,12 +13,16 @@ FILE_CHUNK_SIZE = 100000
 MAX_DELETE_CALLS_COUNT = 1000
 INITIAL_CALLS_STREAM_BATCH_SIZE = 50
 MAX_CALLS_STREAM_BATCH_SIZE = 500
+BATCH_UPDATE_CHUNK_SIZE = 100  # Split large UPDATE queries to avoid SQL limits
 
 
 # ClickHouse size limits and error handling
 CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT = 3.5 * 1024 * 1024  # 3.5 MiB
 CLICKHOUSE_MAX_FEEDBACK_PAYLOAD_SIZE = 1 * 1024 * 1024  # 1 MiB
 ENTITY_TOO_LARGE_PAYLOAD = '{"_weave": {"error":"<EXCEEDS_LIMITS>"}}'
+
+# Clickhouse calls complete sane max settings
+MAX_BATCH_UPDATE_CALLS = 100
 
 
 # ClickHouse query db settings
