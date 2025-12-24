@@ -27,7 +27,7 @@ def mock_costs():
 @pytest.fixture
 def migrator():
     ch_client = Mock()
-    migrator = trace_server_migrator.ClickHouseTraceServerMigrator(ch_client)
+    migrator = trace_server_migrator.clickhouse_trace_server_migrator(ch_client)
     migrator._get_migration_status = Mock()
     migrator._get_migrations = Mock()
     migrator._determine_migrations_to_apply = Mock()
@@ -41,7 +41,7 @@ def replicated_migrator():
     """Migrator configured for replicated mode with standard test settings."""
     ch_client = Mock()
     ch_client.database = "original_db"
-    migrator = trace_server_migrator.ClickHouseTraceServerMigrator(
+    migrator = trace_server_migrator.clickhouse_trace_server_migrator(
         ch_client,
         replicated=True,
         replicated_cluster="test_cluster",
@@ -60,7 +60,7 @@ def distributed_migrator():
     """Migrator configured for distributed mode with standard test settings."""
     ch_client = Mock()
     ch_client.database = "original_db"
-    migrator = trace_server_migrator.ClickHouseTraceServerMigrator(
+    migrator = trace_server_migrator.clickhouse_trace_server_migrator(
         ch_client,
         replicated=True,
         use_distributed=True,
@@ -146,7 +146,7 @@ def test_migration_non_replicated(migrator):
 def test_update_migration_status(migrator):
     # Don't mock _update_migration_status for this test
     migrator._update_migration_status = types.MethodType(
-        trace_server_migrator.ClickHouseTraceServerMigrator._update_migration_status,
+        trace_server_migrator.BaseClickHouseTraceServerMigrator._update_migration_status,
         migrator,
     )
 
@@ -451,7 +451,7 @@ def test_distributed_requires_replicated():
         MigrationError,
         match="Distributed tables can only be used with replicated tables",
     ):
-        trace_server_migrator.ClickHouseTraceServerMigrator(
+        trace_server_migrator.clickhouse_trace_server_migrator(
             ch_client, replicated=False, use_distributed=True
         )
 
@@ -566,6 +566,7 @@ def test_execute_views_in_replicated_and_distributed_modes(
     )
 
     # Test in distributed mode (should be identical)
+    distributed_migrator.ch_client.command.reset_mock()
     distributed_migrator._execute_migration_command(
         "test_db", "DROP VIEW IF EXISTS my_view"
     )

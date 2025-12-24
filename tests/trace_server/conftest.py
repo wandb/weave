@@ -165,7 +165,7 @@ def get_ch_trace_server(
             def patched_run_migrations():
                 import weave.trace_server.clickhouse_trace_server_migrator as wf_migrator
 
-                migrator = wf_migrator.ClickHouseTraceServerMigrator(
+                migrator = wf_migrator.clickhouse_trace_server_migrator(
                     ch_server._mint_client(), management_db=management_db
                 )
                 migrator.apply_migrations(ch_server._database)

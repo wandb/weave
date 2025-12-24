@@ -893,7 +893,7 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
         return "\n".join(result_lines)
 
 
-def ClickHouseTraceServerMigrator(
+def clickhouse_trace_server_migrator(
     ch_client: CHClient,
     replicated: bool | None = None,
     replicated_path: str | None = None,

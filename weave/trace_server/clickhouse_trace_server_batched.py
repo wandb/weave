@@ -4608,7 +4608,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     def _run_migrations(self) -> None:
         logger.info("Running migrations")
-        migrator = wf_migrator.ClickHouseTraceServerMigrator(
+        migrator = wf_migrator.clickhouse_trace_server_migrator(
             self._mint_client(),
             replicated=wf_env.wf_clickhouse_replicated(),
             replicated_path=wf_env.wf_clickhouse_replicated_path(),
