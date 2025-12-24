@@ -7,6 +7,7 @@ from datetime import datetime
 
 from clickhouse_connect.driver.client import Client as CHClient
 
+from weave.trace_server import clickhouse_trace_server_settings as ch_settings
 from weave.trace_server.costs.insert_costs import insert_costs, should_insert_costs
 
 logger = logging.getLogger(__name__)
@@ -17,7 +18,6 @@ DEFAULT_REPLICATED_PATH = "/clickhouse/tables/{db}"
 DEFAULT_REPLICATED_CLUSTER = "weave_cluster"
 
 # Constants for table naming conventions
-LOCAL_TABLE_SUFFIX = "_local"
 VIEW_SUFFIX = "_view"
 
 
@@ -54,16 +54,30 @@ Differences between cloud, replicated, and distributed modes:
   - Only alters `table_name_local` (distributed tables don't support indexes)
   - Skips altering the distributed table
 
+**ALTER TABLE DELETE/UPDATE (mutations):**
+  - Only alters `table_name_local` (distributed tables don't support mutations)
+  - Skips altering the distributed table
+
 **ALTER TABLE ... MODIFY QUERY (materialized views):**
   - Uses DROP/CREATE pattern instead of ALTER
   - Drops `view_name_local` ON CLUSTER
   - Creates `view_name_local` ON CLUSTER with `TO target_table_local`
   - All `FROM` clauses and qualified column references renamed to `_local` suffix
 
-**CREATE/DROP VIEW and CREATE MATERIALIZED VIEW:**
+**CREATE VIEW and CREATE MATERIALIZED VIEW:**
   - Only adds `ON CLUSTER` clause (views are metadata-only, no local/distributed split)
   - Note: In distributed mode, materialized views from initial CREATE statements should reference
     base tables (not _local), as the migrator doesn't transform initial CREATE statements
+
+**DROP TABLE:**
+  - Drops both `table_name_local` AND `table_name`
+  - Ensures complete cleanup of both local and distributed tables
+
+**DROP VIEW:**
+  - Automatically adds `IF EXISTS` if not present
+  - Tries dropping both `view_name_local` (for materialized views) AND `view_name` (for regular views)
+  - Since we can't distinguish regular views from materialized views in DROP statements,
+    we attempt both with IF EXISTS to handle either case gracefully
 
 **MATERIALIZE commands:**
   - Skipped entirely (not supported by distributed tables)
@@ -194,6 +208,7 @@ class ClickHouseTraceServerMigrator:
             if self.use_distributed:
                 # In distributed mode, use a fixed path without {shard} so all nodes
                 # replicate the same data (not sharded per-shard)
+                # Use {shard}-{replica} to ensure unique replica names across all shards
                 create_table_sql = f"""
                     CREATE TABLE IF NOT EXISTS {self.management_db}.migrations ON CLUSTER {self.replicated_cluster}
                     (
@@ -201,7 +216,7 @@ class ClickHouseTraceServerMigrator:
                         curr_version UInt64,
                         partially_applied_version UInt64 NULL,
                     )
-                    ENGINE = ReplicatedMergeTree('/clickhouse/tables/{self.management_db}/migrations', '{{replica}}')
+                    ENGINE = ReplicatedMergeTree('/clickhouse/tables/{self.management_db}/migrations', '{{shard}}-{{replica}}')
                     ORDER BY (db_name)
                 """
             else:
@@ -356,13 +371,11 @@ class ClickHouseTraceServerMigrator:
     ) -> None:
         """Update the migration status in management database migrations table."""
         if is_start:
-            self.ch_client.command(
-                f"ALTER TABLE {self.management_db}.migrations UPDATE partially_applied_version = {target_version} WHERE db_name = '{target_db}'"
-            )
+            command = f"ALTER TABLE {self.management_db}.migrations UPDATE partially_applied_version = {target_version} WHERE db_name = '{target_db}'"
+            self.ch_client.command(command)
         else:
-            self.ch_client.command(
-                f"ALTER TABLE {self.management_db}.migrations UPDATE curr_version = {target_version}, partially_applied_version = NULL WHERE db_name = '{target_db}'"
-            )
+            command = f"ALTER TABLE {self.management_db}.migrations UPDATE curr_version = {target_version}, partially_applied_version = NULL WHERE db_name = '{target_db}'"
+            self.ch_client.command(command)
 
     def _execute_migration_command(self, target_db: str, command: str) -> None:
         """Execute a single migration command in the context of the target database."""
@@ -423,10 +436,10 @@ class ClickHouseTraceServerMigrator:
             self._execute_materialized_view_alter(command)
             return
 
-        # Index operations (ADD/DROP INDEX)
-        is_index_op = re.search(r"\b(ADD|DROP)\s+INDEX\b", command, flags=re.IGNORECASE)
-        if is_index_op:
-            self._execute_index_operation(command)
+        # Operations that only apply to local tables (indexes and mutations)
+        # Distributed tables don't support these operations
+        if _is_local_only_operation(command):
+            self._execute_local_table_operation(command)
             return
 
         # Regular ALTER: apply to both local and distributed tables
@@ -464,9 +477,11 @@ class ClickHouseTraceServerMigrator:
         # Determine local view and target table names
         view_name_local = _add_local_suffix(view_name)
         if view_name.endswith(VIEW_SUFFIX):
-            target_table = view_name[: -len(VIEW_SUFFIX)] + LOCAL_TABLE_SUFFIX
+            target_table = (
+                view_name[: -len(VIEW_SUFFIX)] + ch_settings.LOCAL_TABLE_SUFFIX
+            )
         else:
-            target_table = view_name + LOCAL_TABLE_SUFFIX
+            target_table = view_name + ch_settings.LOCAL_TABLE_SUFFIX
 
         # DROP and CREATE the materialized view
         drop_statement = f"DROP TABLE IF EXISTS {view_name_local} ON CLUSTER {self.replicated_cluster}"
@@ -481,8 +496,15 @@ class ClickHouseTraceServerMigrator:
         )
         self.ch_client.command(create_statement)
 
-    def _execute_index_operation(self, command: str) -> None:
-        """Execute ADD/DROP INDEX (only on local tables)."""
+    def _execute_local_table_operation(self, command: str) -> None:
+        """Execute operations that only apply to local tables in distributed mode.
+
+        This includes:
+        - ADD/DROP INDEX (distributed tables don't support indexes)
+        - DELETE/UPDATE mutations (distributed tables don't support mutations)
+
+        The operation is executed only on the local table with _local suffix.
+        """
         local_command = _rename_alter_table_to_local(command)
         local_command = _format_with_on_cluster_sql(
             local_command, self.replicated_cluster
@@ -503,12 +525,33 @@ class ClickHouseTraceServerMigrator:
 
 def _add_local_suffix(name: str) -> str:
     """Add _local suffix to a name if it doesn't already have it."""
-    return name if name.endswith(LOCAL_TABLE_SUFFIX) else name + LOCAL_TABLE_SUFFIX
+    return (
+        name
+        if name.endswith(ch_settings.LOCAL_TABLE_SUFFIX)
+        else name + ch_settings.LOCAL_TABLE_SUFFIX
+    )
 
 
 def _is_safe_identifier(value: str) -> bool:
     """Check if a string is safe to use as an identifier in SQL."""
     return bool(re.match(r"^[a-zA-Z0-9_\.]+$", value))
+
+
+def _is_local_only_operation(command: str) -> bool:
+    """Check if the command is an operation that only applies to local tables.
+
+    In distributed mode, certain operations are not supported on distributed tables
+    and must only be executed on local tables:
+    - ADD/DROP INDEX: Distributed tables don't support indexes
+    - DELETE/UPDATE: Distributed tables don't support mutations
+    """
+    return bool(
+        re.search(
+            r"\b(ADD|DROP)\s+INDEX\b|\b(DELETE|UPDATE)\b",
+            command,
+            flags=re.IGNORECASE,
+        )
+    )
 
 
 def _extract_table_name(sql_query: str) -> str | None:
@@ -526,7 +569,10 @@ def _rename_table_to_local(sql_query: str, table_name: str) -> str:
     """Rename table in CREATE TABLE statement to table_name_local."""
     pattern = rf"(CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?){table_name}\b"
     return re.sub(
-        pattern, rf"\1{table_name}{LOCAL_TABLE_SUFFIX}", sql_query, flags=re.IGNORECASE
+        pattern,
+        rf"\1{table_name}{ch_settings.LOCAL_TABLE_SUFFIX}",
+        sql_query,
+        flags=re.IGNORECASE,
     )
 
 
@@ -598,7 +644,7 @@ def _rename_from_tables_to_local(sql_query: str) -> str:
         # Handle database.table format - extract just the table name
         if "." in table_name:
             table_name = table_name.split(".")[-1]
-        if not table_name.endswith(LOCAL_TABLE_SUFFIX):
+        if not table_name.endswith(ch_settings.LOCAL_TABLE_SUFFIX):
             table_names.add(table_name)
 
     # Now rename FROM clauses
@@ -613,7 +659,7 @@ def _rename_from_tables_to_local(sql_query: str) -> str:
     for table_name in table_names:
         # Match table_name.column_name
         qualified_pattern = rf"\b{re.escape(table_name)}\.([a-zA-Z0-9_]+)\b"
-        replacement = rf"{table_name}{LOCAL_TABLE_SUFFIX}.\1"
+        replacement = rf"{table_name}{ch_settings.LOCAL_TABLE_SUFFIX}.\1"
         sql_to_process = re.sub(
             qualified_pattern, replacement, sql_to_process, flags=re.IGNORECASE
         )
@@ -683,7 +729,7 @@ def _format_replicated_sql(
                     table_name = table_name.split(".")[-1]
 
                 # When using distributed tables, append _local suffix to the table name in the path
-                local_table_name = table_name + LOCAL_TABLE_SUFFIX
+                local_table_name = table_name + ch_settings.LOCAL_TABLE_SUFFIX
                 return f"ENGINE = Replicated{engine_prefix}MergeTree('/clickhouse/tables/{{shard}}/{target_db}/{local_table_name}', '{{replica}}')"
 
         return f"ENGINE = Replicated{engine_prefix}MergeTree"
@@ -845,8 +891,8 @@ def _create_distributed_table_sql(
     """
     distributed_sql = f"""
         CREATE TABLE IF NOT EXISTS {table_name} ON CLUSTER {cluster_name}
-        AS {local_table_name}{LOCAL_TABLE_SUFFIX}
-        ENGINE = Distributed({cluster_name}, currentDatabase(), {local_table_name}{LOCAL_TABLE_SUFFIX}, rand())
+        AS {local_table_name}{ch_settings.LOCAL_TABLE_SUFFIX}
+        ENGINE = Distributed({cluster_name}, currentDatabase(), {local_table_name}{ch_settings.LOCAL_TABLE_SUFFIX}, rand())
     """
     return distributed_sql
 
@@ -854,7 +900,7 @@ def _create_distributed_table_sql(
 def _format_distributed_sql(
     sql_query: str, cluster_name: str
 ) -> DistributedTransformResult:
-    """Format SQL to create distributed tables.
+    """Format SQL for distributed mode (CREATE TABLE, DROP TABLE/VIEW).
 
     Args:
         sql_query: The SQL query to transform
@@ -862,8 +908,55 @@ def _format_distributed_sql(
 
     Returns:
         DistributedTransformResult with local_command and optional distributed_command.
-        If sql_query is not a CREATE TABLE statement, distributed_command will be None.
+        - For CREATE TABLE: returns commands to create both local and distributed tables
+        - For DROP TABLE/VIEW: returns commands to drop both local and distributed versions
+        - For other statements: returns the statement as-is with distributed_command=None
     """
+    # Check if this is a DROP TABLE or DROP VIEW statement
+    drop_match = re.search(
+        r"\bDROP\s+(TABLE|VIEW)\s+(?:IF\s+EXISTS\s+)?([a-zA-Z0-9_.]+)",
+        sql_query,
+        flags=re.IGNORECASE,
+    )
+    if drop_match:
+        object_type = drop_match.group(1).upper()
+        object_name = drop_match.group(2)
+
+        if object_type == "TABLE":
+            # Tables always have local/distributed split
+            local_name = _add_local_suffix(object_name)
+            local_command = sql_query.replace(object_name, local_name, 1)
+            distributed_command = sql_query
+
+            return DistributedTransformResult(
+                local_command=local_command, distributed_command=distributed_command
+            )
+        else:  # VIEW
+            # Regular views don't have _local suffix, but materialized views do
+            # We can't tell from the DROP statement which type it is, so we try both
+            # First ensure the statement has IF EXISTS to avoid errors
+            has_if_exists = bool(
+                re.search(r"\bIF\s+EXISTS\b", sql_query, flags=re.IGNORECASE)
+            )
+            if not has_if_exists:
+                # Add IF EXISTS after DROP VIEW
+                sql_query = re.sub(
+                    r"(\bDROP\s+VIEW\s+)",
+                    r"\1IF EXISTS ",
+                    sql_query,
+                    flags=re.IGNORECASE,
+                )
+
+            # Try dropping the _local version (for materialized views)
+            local_name = _add_local_suffix(object_name)
+            local_command = sql_query.replace(object_name, local_name, 1)
+            # Try dropping the non-_local version (for regular views and distributed views)
+            distributed_command = sql_query
+
+            return DistributedTransformResult(
+                local_command=local_command, distributed_command=distributed_command
+            )
+
     # Check if this is a CREATE TABLE statement
     table_name = _extract_table_name(sql_query)
     if not table_name:
