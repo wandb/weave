@@ -807,14 +807,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         pb = ParamBuilder()
         table_name = self._get_calls_complete_table_name()
-        call_ids = [call.id for call in end_calls]
-        project_id = end_calls[0].project_id if end_calls else None
-        cluster_name = (
-            self.clickhouse_cluster_name if self.use_distributed_mode else None
-        )
-
         command = build_calls_complete_batch_update_query(
-            end_calls, pb, table_name, cluster_name
+            end_calls, pb, table_name, self.clickhouse_cluster_name
         )
         self._command(command, pb.get_params())
 
@@ -1181,9 +1175,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         pb = ParamBuilder()
         deleted_at = datetime.datetime.now()
         table_name = self._get_calls_complete_table_name()
-        cluster_name = (
-            self.clickhouse_cluster_name if self.use_distributed_mode else None
-        )
 
         update_sql = build_calls_complete_batch_delete_query(
             project_id=project_id,
@@ -1193,7 +1184,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             updated_at=deleted_at,
             pb=pb,
             table_name=table_name,
-            cluster_name=cluster_name,
+            cluster_name=self.clickhouse_cluster_name,
         )
         if update_sql is None:
             return tsi.CallsDeleteRes(num_deleted=0)
@@ -1228,9 +1219,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             pb = ParamBuilder()
             assert req.wb_user_id is not None
             table_name = self._get_calls_complete_table_name()
-            cluster_name = (
-                self.clickhouse_cluster_name if self.use_distributed_mode else None
-            )
 
             update_query = build_calls_complete_update_display_name_query(
                 project_id=req.project_id,
@@ -1240,7 +1228,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 updated_at=datetime.datetime.now(),
                 pb=pb,
                 table_name=table_name,
-                cluster_name=cluster_name,
+                cluster_name=self.clickhouse_cluster_name,
             )
             self._command(update_query, pb.get_params())
 
