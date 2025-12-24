@@ -13,6 +13,7 @@ class LLMAsAJudgeScorer(Scorer):
     model: LLMStructuredCompletionModel
     scoring_prompt: str
     include_audio_output: bool = False
+    audio_output_json_paths: list[str] | None = None
 
     @op
     def score(self, *, output: str, **kwargs: Any) -> Any:
