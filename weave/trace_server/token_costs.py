@@ -143,10 +143,10 @@ def get_llm_usage(param_builder: ParamBuilder, table_alias: str) -> PreparedSele
             ) AS kv"""
     llm_id = "kv.1 AS llm_id"
     requests = "JSONExtractInt(kv.2, 'requests') AS requests"
-    # Some libraries return prompt_tokens and completion_tokens, others prompt_tokens and completion_tokens
-    # prompt_tokens is not present, we use input_tokens
-    prompt_tokens = """if(JSONHas(kv.2, 'prompt_tokens'), JSONExtractInt(kv.2, 'prompt_tokens'), JSONExtractInt(kv.2, 'input_tokens')) AS prompt_tokens"""
-    completion_tokens = """if(JSONHas(kv.2, 'completion_tokens'), JSONExtractInt(kv.2, 'completion_tokens'), JSONExtractInt(kv.2, 'output_tokens')) AS completion_tokens"""
+    # Some libraries return prompt_tokens and completion_tokens, others input_tokens and output_tokens
+    # If both are present, add them together; if only one is present, use that one
+    prompt_tokens = """(if(JSONHas(kv.2, 'prompt_tokens'), JSONExtractInt(kv.2, 'prompt_tokens'), 0) + if(JSONHas(kv.2, 'input_tokens'), JSONExtractInt(kv.2, 'input_tokens'), 0)) AS prompt_tokens"""
+    completion_tokens = """(if(JSONHas(kv.2, 'completion_tokens'), JSONExtractInt(kv.2, 'completion_tokens'), 0) + if(JSONHas(kv.2, 'output_tokens'), JSONExtractInt(kv.2, 'output_tokens'), 0)) AS completion_tokens"""
     total_tokens = "JSONExtractInt(kv.2, 'total_tokens') AS total_tokens"
 
     select_query = (
