@@ -27,7 +27,7 @@ def mock_costs():
 @pytest.fixture
 def migrator():
     ch_client = Mock()
-    migrator = trace_server_migrator.clickhouse_trace_server_migrator(ch_client)
+    migrator = trace_server_migrator.get_clickhouse_trace_server_migrator(ch_client)
     migrator._get_migration_status = Mock()
     migrator._get_migrations = Mock()
     migrator._determine_migrations_to_apply = Mock()
@@ -41,7 +41,7 @@ def replicated_migrator():
     """Migrator configured for replicated mode with standard test settings."""
     ch_client = Mock()
     ch_client.database = "original_db"
-    migrator = trace_server_migrator.clickhouse_trace_server_migrator(
+    migrator = trace_server_migrator.get_clickhouse_trace_server_migrator(
         ch_client,
         replicated=True,
         replicated_cluster="test_cluster",
@@ -60,7 +60,7 @@ def distributed_migrator():
     """Migrator configured for distributed mode with standard test settings."""
     ch_client = Mock()
     ch_client.database = "original_db"
-    migrator = trace_server_migrator.clickhouse_trace_server_migrator(
+    migrator = trace_server_migrator.get_clickhouse_trace_server_migrator(
         ch_client,
         replicated=True,
         use_distributed=True,
@@ -451,7 +451,7 @@ def test_distributed_requires_replicated():
         MigrationError,
         match="Distributed tables can only be used with replicated tables",
     ):
-        trace_server_migrator.clickhouse_trace_server_migrator(
+        trace_server_migrator.get_clickhouse_trace_server_migrator(
             ch_client, replicated=False, use_distributed=True
         )
 

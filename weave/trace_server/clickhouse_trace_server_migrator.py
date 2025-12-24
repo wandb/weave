@@ -85,81 +85,6 @@ DEFAULT_REPLICATED_CLUSTER = "weave_cluster"
 VIEW_SUFFIX = "_view"
 
 
-class SQLPatterns:
-    """Consolidated SQL regex patterns for parsing and transforming SQL statements."""
-
-    # Table and identifier patterns
-    CREATE_TABLE: Pattern = re.compile(
-        r"CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([a-zA-Z0-9_.]+)",
-        re.IGNORECASE,
-    )
-    ALTER_TABLE: Pattern = re.compile(
-        r"ALTER\s+TABLE\s+([a-zA-Z0-9_.]+)", re.IGNORECASE
-    )
-    SAFE_IDENTIFIER: Pattern = re.compile(r"^[a-zA-Z0-9_\.]+$")
-
-    # Engine patterns
-    MERGETREE_ENGINE: Pattern = re.compile(
-        r"ENGINE\s*=\s*(\w+)?MergeTree\b(\(\))?", re.IGNORECASE
-    )
-
-    # DDL statement patterns
-    ALTER_TABLE_STMT: Pattern = re.compile(r"\bALTER\s+TABLE\b", re.IGNORECASE)
-    CREATE_TABLE_STMT: Pattern = re.compile(r"\bCREATE\s+TABLE\b", re.IGNORECASE)
-    DROP_VIEW_STMT: Pattern = re.compile(r"\bDROP\s+VIEW\b", re.IGNORECASE)
-    CREATE_VIEW_STMT: Pattern = re.compile(
-        r"\bCREATE\s+(?:MATERIALIZED\s+)?VIEW\b", re.IGNORECASE
-    )
-    DROP_TABLE_OR_VIEW: Pattern = re.compile(
-        r"\bDROP\s+(TABLE|VIEW)\s+(?:IF\s+EXISTS\s+)?([a-zA-Z0-9_.]+)", re.IGNORECASE
-    )
-
-    # ON CLUSTER pattern
-    ON_CLUSTER: Pattern = re.compile(r"\bON\s+CLUSTER\b", re.IGNORECASE)
-    IF_EXISTS: Pattern = re.compile(r"\bIF\s+EXISTS\b", re.IGNORECASE)
-
-    # Distributed mode patterns
-    MODIFY_QUERY: Pattern = re.compile(r"\bMODIFY\s+QUERY\b", re.IGNORECASE)
-    MATERIALIZE: Pattern = re.compile(r"\bMATERIALIZE\b", re.IGNORECASE)
-    LOCAL_ONLY_OPS: Pattern = re.compile(
-        r"\b(ADD|DROP)\s+INDEX\b|\b(DELETE|UPDATE)\b", re.IGNORECASE
-    )
-
-    # Table name extraction patterns
-    ALTER_TABLE_NAME_PATTERN: Pattern = re.compile(
-        r"(ALTER\s+TABLE\s+)([a-zA-Z0-9_.]+)(\s+)", re.IGNORECASE
-    )
-    CREATE_TABLE_NAME_PATTERN: Pattern = re.compile(
-        r"(\bCREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?)([a-zA-Z0-9_.]+)(\s*\()",
-        re.IGNORECASE,
-    )
-    DROP_VIEW_NAME_PATTERN: Pattern = re.compile(
-        r"(\bDROP\s+VIEW\s+(?:IF\s+EXISTS\s+)?)([a-zA-Z0-9_.]+)(\s|$)", re.IGNORECASE
-    )
-    CREATE_VIEW_NAME_PATTERN: Pattern = re.compile(
-        r"(\bCREATE\s+(?:MATERIALIZED\s+)?VIEW\s+(?:IF\s+NOT\s+EXISTS\s+)?)([a-zA-Z0-9_.]+)(\s+)",
-        re.IGNORECASE,
-    )
-
-    # FROM clause patterns
-    FROM_TABLE: Pattern = re.compile(
-        r"(?<=\s)FROM\s+([a-zA-Z0-9_.]+)\b|^FROM\s+([a-zA-Z0-9_.]+)\b",
-        re.IGNORECASE | re.MULTILINE,
-    )
-
-
-@dataclass
-class DistributedTransformResult:
-    """Result of transforming SQL for distributed tables."""
-
-    local_command: str
-    distributed_command: str | None
-
-
-class MigrationError(RuntimeError):
-    """Raised when a migration error occurs."""
-
-
 class BaseClickHouseTraceServerMigrator(ABC):
     """Base class for ClickHouse trace server migration strategies.
 
@@ -397,8 +322,7 @@ class BaseClickHouseTraceServerMigrator(ABC):
 class CloudClickHouseTraceServerMigrator(BaseClickHouseTraceServerMigrator):
     """Migrator for single-node ClickHouse Cloud deployments.
 
-    In cloud mode, SQL commands are executed as-is without transformation.
-    This is the simplest deployment mode.
+    SQL commands are executed as-is without transformation.
     """
 
     def _create_db_sql(self, db_name: str) -> str:
@@ -556,6 +480,14 @@ class ReplicatedClickHouseTraceServerMigrator(BaseClickHouseTraceServerMigrator)
             )
 
         return sql_query
+
+
+@dataclass
+class DistributedTransformResult:
+    """Result of transforming SQL for distributed tables."""
+
+    local_command: str
+    distributed_command: str | None
 
 
 class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMigrator):
@@ -893,7 +825,7 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
         return "\n".join(result_lines)
 
 
-def clickhouse_trace_server_migrator(
+def get_clickhouse_trace_server_migrator(
     ch_client: CHClient,
     replicated: bool | None = None,
     replicated_path: str | None = None,
@@ -937,3 +869,70 @@ def clickhouse_trace_server_migrator(
         )
     else:
         return CloudClickHouseTraceServerMigrator(ch_client, management_db)
+
+
+class MigrationError(RuntimeError):
+    """Raised when a migration error occurs."""
+
+
+class SQLPatterns:
+    """Consolidated SQL regex patterns for parsing and transforming SQL statements."""
+
+    # Table and identifier patterns
+    CREATE_TABLE: Pattern = re.compile(
+        r"CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([a-zA-Z0-9_.]+)",
+        re.IGNORECASE,
+    )
+    ALTER_TABLE: Pattern = re.compile(
+        r"ALTER\s+TABLE\s+([a-zA-Z0-9_.]+)", re.IGNORECASE
+    )
+    SAFE_IDENTIFIER: Pattern = re.compile(r"^[a-zA-Z0-9_\.]+$")
+
+    # Engine patterns
+    MERGETREE_ENGINE: Pattern = re.compile(
+        r"ENGINE\s*=\s*(\w+)?MergeTree\b(\(\))?", re.IGNORECASE
+    )
+
+    # DDL statement patterns
+    ALTER_TABLE_STMT: Pattern = re.compile(r"\bALTER\s+TABLE\b", re.IGNORECASE)
+    CREATE_TABLE_STMT: Pattern = re.compile(r"\bCREATE\s+TABLE\b", re.IGNORECASE)
+    DROP_VIEW_STMT: Pattern = re.compile(r"\bDROP\s+VIEW\b", re.IGNORECASE)
+    CREATE_VIEW_STMT: Pattern = re.compile(
+        r"\bCREATE\s+(?:MATERIALIZED\s+)?VIEW\b", re.IGNORECASE
+    )
+    DROP_TABLE_OR_VIEW: Pattern = re.compile(
+        r"\bDROP\s+(TABLE|VIEW)\s+(?:IF\s+EXISTS\s+)?([a-zA-Z0-9_.]+)", re.IGNORECASE
+    )
+
+    # ON CLUSTER pattern
+    ON_CLUSTER: Pattern = re.compile(r"\bON\s+CLUSTER\b", re.IGNORECASE)
+    IF_EXISTS: Pattern = re.compile(r"\bIF\s+EXISTS\b", re.IGNORECASE)
+
+    # Distributed mode patterns
+    MODIFY_QUERY: Pattern = re.compile(r"\bMODIFY\s+QUERY\b", re.IGNORECASE)
+    MATERIALIZE: Pattern = re.compile(r"\bMATERIALIZE\b", re.IGNORECASE)
+    LOCAL_ONLY_OPS: Pattern = re.compile(
+        r"\b(ADD|DROP)\s+INDEX\b|\b(DELETE|UPDATE)\b", re.IGNORECASE
+    )
+
+    # Table name extraction patterns
+    ALTER_TABLE_NAME_PATTERN: Pattern = re.compile(
+        r"(ALTER\s+TABLE\s+)([a-zA-Z0-9_.]+)(\s+)", re.IGNORECASE
+    )
+    CREATE_TABLE_NAME_PATTERN: Pattern = re.compile(
+        r"(\bCREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?)([a-zA-Z0-9_.]+)(\s*\()",
+        re.IGNORECASE,
+    )
+    DROP_VIEW_NAME_PATTERN: Pattern = re.compile(
+        r"(\bDROP\s+VIEW\s+(?:IF\s+EXISTS\s+)?)([a-zA-Z0-9_.]+)(\s|$)", re.IGNORECASE
+    )
+    CREATE_VIEW_NAME_PATTERN: Pattern = re.compile(
+        r"(\bCREATE\s+(?:MATERIALIZED\s+)?VIEW\s+(?:IF\s+NOT\s+EXISTS\s+)?)([a-zA-Z0-9_.]+)(\s+)",
+        re.IGNORECASE,
+    )
+
+    # FROM clause patterns
+    FROM_TABLE: Pattern = re.compile(
+        r"(?<=\s)FROM\s+([a-zA-Z0-9_.]+)\b|^FROM\s+([a-zA-Z0-9_.]+)\b",
+        re.IGNORECASE | re.MULTILINE,
+    )
