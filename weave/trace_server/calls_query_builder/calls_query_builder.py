@@ -248,6 +248,7 @@ class OrderField(BaseModel):
         table_alias: str,
         expand_columns: list[str] | None = None,
         field_to_object_join_alias_map: dict[str, str] | None = None,
+        use_agg_fn: bool = True,
     ) -> str:
         options: list[tuple[tsi_query.CastTo | None, str]]
         if isinstance(
@@ -296,7 +297,14 @@ class OrderField(BaseModel):
         for index, (cast_to, direction) in enumerate(options):
             if index > 0:
                 res += ", "
-            res += f"{self.field.as_sql(pb, table_alias, cast_to)} {direction}"
+            # Pass use_agg_fn to field's as_sql if the field supports it
+            if isinstance(self.field, (FeedbackField, DynamicField)):
+                field_sql = self.field.as_sql(
+                    pb, table_alias, cast_to, use_agg_fn=use_agg_fn
+                )
+            else:
+                field_sql = self.field.as_sql(pb, table_alias, cast_to)
+            res += f"{field_sql} {direction}"
         return res
 
     @property
@@ -356,6 +364,7 @@ class Condition(BaseModel):
             tsi_query.Query.model_validate({"$expr": {"$and": [self.operand]}}),
             pb,
             table_alias,
+            use_agg_fn=(read_table != ReadTable.CALLS_COMPLETE),
             read_table=read_table,
         )
         if self._consumed_fields is None:
@@ -1005,6 +1014,7 @@ class CallsQuery(BaseModel):
         table_alias: str,
         expand_columns: list[str] | None,
         field_to_object_join_alias_map: dict[str, str] | None,
+        use_agg_fn: bool = True,
     ) -> tuple[str, str, str, bool]:
         """Build ORDER BY, LIMIT, and OFFSET clauses.
 
@@ -1013,6 +1023,7 @@ class CallsQuery(BaseModel):
             table_alias: The table alias to use in SQL
             expand_columns: List of columns that should be expanded for object refs
             field_to_object_join_alias_map: Mapping of field paths to CTE aliases
+            use_agg_fn: Whether to use aggregate functions (False for calls_complete)
 
         Returns:
             Tuple of (order_by_sql, limit_sql, offset_sql, needs_feedback_flag)
@@ -1023,7 +1034,11 @@ class CallsQuery(BaseModel):
         if len(self.order_fields) > 0:
             order_by_sqls = [
                 order_field.as_sql(
-                    pb, table_alias, expand_columns, field_to_object_join_alias_map
+                    pb,
+                    table_alias,
+                    expand_columns,
+                    field_to_object_join_alias_map,
+                    use_agg_fn,
                 )
                 for order_field in self.order_fields
             ]
@@ -1187,7 +1202,11 @@ class CallsQuery(BaseModel):
             where_conditions_sql += "AND " + combine_conditions(where_conditions, "AND")
         order_by_sql, limit_sql, offset_sql, needs_feedback_order = (
             self._build_order_limit_offset(
-                pb, table_alias, expand_columns, field_to_object_join_alias_map
+                pb,
+                table_alias,
+                expand_columns,
+                field_to_object_join_alias_map,
+                use_agg_fn=False,
             )
         )
         project_param = pb.add_param(self.project_id)
@@ -1403,7 +1422,7 @@ def process_query_to_conditions(
 
             structured_field = get_field_by_name(operand.get_field_, read_table)
             if (
-                isinstance(structured_field, DynamicField)
+                isinstance(structured_field, (DynamicField, FeedbackField))
                 and structured_field.supports_aggregation()
             ):
                 field = structured_field.as_sql(

@@ -2458,3 +2458,140 @@ def test_calls_complete_parent_ids_filter_no_aggregate() -> None:
     pb = ParamBuilder()
     query_sql, _ = build_calls_stats_query(req, pb, ReadTable.CALLS_COMPLETE)
     assert "calls_complete.parent_id IN" in query_sql
+
+
+def test_calls_complete_order_by_feedback_no_aggregate() -> None:
+    """Test that sorting by feedback on calls_complete doesn't use aggregate functions."""
+    cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_COMPLETE)
+    cq.add_field("id")
+    cq.add_order("feedback.[wandb.annotation.test1].payload.value", "DESC")
+
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_complete.id AS id
+        FROM calls_complete
+        LEFT JOIN (
+            SELECT * FROM feedback WHERE feedback.project_id = {pb_3:String}
+        ) AS feedback ON (
+            feedback.weave_ref = concat('weave-trace-internal:///',
+            {pb_3:String},
+            '/call/',
+            calls_complete.id))
+        WHERE calls_complete.project_id = {pb_3:String}
+            AND (calls_complete.deleted_at IS NULL)
+        ORDER BY
+            (NOT (JSONType(if(feedback.feedback_type = {pb_0:String}, feedback.payload_dump, NULL),
+            {pb_1:String}) = 'Null'
+                OR JSONType(if(feedback.feedback_type = {pb_0:String}, feedback.payload_dump, NULL),
+                {pb_1:String}) IS NULL)) desc,
+            toFloat64OrNull(coalesce(nullIf(JSON_VALUE(if(feedback.feedback_type = {pb_0:String}, feedback.payload_dump, NULL),
+            {pb_2:String}), 'null'), '')) DESC,
+            toString(coalesce(nullIf(JSON_VALUE(if(feedback.feedback_type = {pb_0:String}, feedback.payload_dump, NULL),
+            {pb_2:String}), 'null'), '')) DESC
+        """,
+        {
+            "pb_0": "wandb.annotation.test1",
+            "pb_1": "value",
+            "pb_2": '$."value"',
+            "pb_3": "project",
+        },
+    )
+
+
+def test_calls_complete_filter_by_feedback_no_aggregate() -> None:
+    """Test that filtering by feedback on calls_complete doesn't use aggregate functions."""
+    cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_COMPLETE)
+    cq.add_field("id")
+    cq.add_condition(
+        tsi_query.GtOperation.model_validate(
+            {
+                "$gt": [
+                    {"$getField": "feedback.[wandb.annotation.test1].payload.value"},
+                    {"$literal": 5},
+                ]
+            }
+        )
+    )
+
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_complete.id AS id
+        FROM calls_complete
+        LEFT JOIN (
+            SELECT * FROM feedback WHERE feedback.project_id = {pb_3:String}
+        ) AS feedback ON (
+            feedback.weave_ref = concat('weave-trace-internal:///',
+            {pb_3:String},
+            '/call/',
+            calls_complete.id))
+        WHERE calls_complete.project_id = {pb_3:String}
+            AND (((coalesce(nullIf(JSON_VALUE(if(feedback.feedback_type = {pb_0:String}, feedback.payload_dump, NULL),
+            {pb_1:String}), 'null'), '') > {pb_2:UInt64}))
+            AND ((calls_complete.deleted_at IS NULL)))
+        """,
+        {
+            "pb_0": "wandb.annotation.test1",
+            "pb_1": '$."value"',
+            "pb_2": 5,
+            "pb_3": "project",
+        },
+    )
+
+
+def test_calls_complete_filter_and_order_by_feedback_no_aggregate() -> None:
+    """Test that filtering and sorting by feedback on calls_complete doesn't use aggregate functions."""
+    cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_COMPLETE)
+    cq.add_field("id")
+    cq.add_condition(
+        tsi_query.EqOperation.model_validate(
+            {
+                "$eq": [
+                    {"$getField": "feedback.[wandb.annotation.test1].payload.value"},
+                    {"$literal": "test_value"},
+                ]
+            }
+        )
+    )
+    cq.add_order("feedback.[wandb.annotation.test2].payload.score", "DESC")
+
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_complete.id AS id
+        FROM calls_complete
+        LEFT JOIN (
+            SELECT * FROM feedback WHERE feedback.project_id = {pb_6:String}
+        ) AS feedback ON (
+            feedback.weave_ref = concat('weave-trace-internal:///',
+            {pb_6:String},
+            '/call/',
+            calls_complete.id))
+        WHERE calls_complete.project_id = {pb_6:String}
+            AND (((coalesce(nullIf(JSON_VALUE(if(feedback.feedback_type = {pb_0:String}, feedback.payload_dump, NULL),
+            {pb_1:String}), 'null'), '') = {pb_2:String}))
+            AND ((calls_complete.deleted_at IS NULL)))
+        ORDER BY
+            (NOT (JSONType(if(feedback.feedback_type = {pb_3:String}, feedback.payload_dump, NULL),
+            {pb_4:String}) = 'Null'
+                OR JSONType(if(feedback.feedback_type = {pb_3:String}, feedback.payload_dump, NULL),
+                {pb_4:String}) IS NULL)) desc,
+            toFloat64OrNull(coalesce(nullIf(JSON_VALUE(if(feedback.feedback_type = {pb_3:String}, feedback.payload_dump, NULL),
+            {pb_5:String}), 'null'), '')) DESC,
+            toString(coalesce(nullIf(JSON_VALUE(if(feedback.feedback_type = {pb_3:String}, feedback.payload_dump, NULL),
+            {pb_5:String}), 'null'), '')) DESC
+        """,
+        {
+            "pb_0": "wandb.annotation.test1",
+            "pb_1": '$."value"',
+            "pb_2": "test_value",
+            "pb_3": "wandb.annotation.test2",
+            "pb_4": "score",
+            "pb_5": '$."score"',
+            "pb_6": "project",
+        },
+    )

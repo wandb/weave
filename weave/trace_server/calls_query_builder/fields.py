@@ -411,11 +411,21 @@ class FeedbackField(QueryField, BaseModel):
         use_agg_fn: bool = True,
     ) -> str:
         inner = f"feedback.{self.field}"
-        if self.feedback_type == "*":
-            res = f"any({inner})"
+
+        # Use aggregate functions only when use_agg_fn is True
+        if use_agg_fn:
+            if self.feedback_type == "*":
+                res = f"any({inner})"
+            else:
+                param_name = pb.add_param(self.feedback_type)
+                res = f"anyIf({inner}, feedback.feedback_type = {param_slot(param_name, 'String')})"
         else:
-            param_name = pb.add_param(self.feedback_type)
-            res = f"anyIf({inner}, feedback.feedback_type = {param_slot(param_name, 'String')})"
+            # Non-aggregated version for calls_complete
+            if self.feedback_type == "*":
+                res = inner
+            else:
+                param_name = pb.add_param(self.feedback_type)
+                res = f"if(feedback.feedback_type = {param_slot(param_name, 'String')}, {inner}, NULL)"
 
         if not self.extra_path:
             return res
