@@ -514,6 +514,7 @@ class CallsQuery(BaseModel):
             hardcoded_filter=self.hardcoded_filter,
             limit=self.limit,
             offset=self.offset,
+            read_table=self.read_table,
         )
 
     def set_include_costs(self, include_costs: bool) -> "CallsQuery":

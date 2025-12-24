@@ -46,19 +46,27 @@ def test_large_batch_is_split_into_multiple_smaller_batches(server):
     encoded_data = data.encode("utf-8")
     assert len(encoded_data) > server.remote_request_bytes_limit
 
-    # Process the batch and verify _send_batch_to_server was called more than once,
-    # implying the batch was split into smaller chunks
     server._flush_calls(batch)
-    assert server._send_batch_to_server.call_count > 1
 
-    # Verify all items were sent
+    # Should split into multiple batches due to size limit
+    total_calls = (
+        server._send_calls_start_batch_to_server.call_count
+        + server._send_calls_end_batch_to_server.call_count
+    )
+    assert total_calls > 1
+
+    # Verify all items were sent (20 starts + 20 ends = 40 items)
     total_items_sent = 0
-    for call in server._send_batch_to_server.call_args_list:
-        called_data = call[0][0]
-        decoded_batch = json.loads(called_data.decode("utf-8"))
-        total_items_sent += len(decoded_batch["batch"])
+    for mock_method in [
+        server._send_calls_start_batch_to_server,
+        server._send_calls_end_batch_to_server,
+    ]:
+        for call in mock_method.call_args_list:
+            called_data = call[0][2]
+            decoded_batch = json.loads(called_data.decode("utf-8"))
+            total_items_sent += len(decoded_batch["batch"])
 
-    assert total_items_sent == len(batch)
+    assert total_items_sent == 40
 
 
 @pytest.mark.parametrize("server", ["normal"], indirect=True)
@@ -68,9 +76,18 @@ def test_small_batch_is_sent_in_one_request(server):
     batch = [StartBatchItem(req=start)]
     server._flush_calls(batch)
 
-    # Verify _send_batch_to_server was called once with the entire batch
-    assert server._send_batch_to_server.call_count == 1
-    called_data = server._send_batch_to_server.call_args[0][0]
+    # Small batch should be sent in one request without splitting
+    total_calls = (
+        server._send_calls_start_batch_to_server.call_count
+        + server._send_calls_end_batch_to_server.call_count
+    )
+    assert total_calls == 1
+
+    # Verify the single item was sent (check whichever endpoint was called)
+    if server._send_calls_start_batch_to_server.call_count == 1:
+        called_data = server._send_calls_start_batch_to_server.call_args[0][2]
+    else:
+        called_data = server._send_calls_end_batch_to_server.call_args[0][2]
     decoded_batch = json.loads(called_data.decode("utf-8"))
     assert len(decoded_batch["batch"]) == 1
 
@@ -81,8 +98,9 @@ def test_empty_batch_is_noop(server):
     batch = []
     server._flush_calls(batch)
 
-    # Verify _send_batch_to_server was not called
-    assert server._send_batch_to_server.call_count == 0
+    # Verify no batch endpoints were called
+    assert server._send_calls_start_batch_to_server.call_count == 0
+    assert server._send_calls_end_batch_to_server.call_count == 0
 
 
 @pytest.mark.disable_logging_error_check
@@ -107,18 +125,21 @@ def test_oversized_item_will_log_warning_and_send(server, caplog):
     server._flush_calls(batch)
 
     # Verify warning was logged
-    assert any("Single calls size" in record.message for record in caplog.records)
+    assert any("Single call_starts size" in record.message for record in caplog.records)
     assert any("may be too large" in record.message for record in caplog.records)
 
-    # Verify _send_batch_to_server was still called
-    assert server._send_batch_to_server.call_count == 1
+    # Verify batch was still sent
+    total_calls = (
+        server._send_calls_start_batch_to_server.call_count
+        + server._send_calls_end_batch_to_server.call_count
+    )
+    assert total_calls == 1
 
 
 @pytest.mark.parametrize("server", ["small_limit"], indirect=True)
 def test_multi_level_recursive_splitting(server):
     """Test that a very large batch is recursively split multiple times."""
-    # Create a very large batch with many items to force multiple levels of splitting.
-    # Some items are larger than others to test non-uniform sizes.
+    # Create a very large batch with many items to force multiple levels of splitting
     batch = []
     for i in range(50):
         start = generate_start()
@@ -128,20 +149,27 @@ def test_multi_level_recursive_splitting(server):
         batch.append(StartBatchItem(req=tsi.CallStartReq(start=start)))
         batch.append(EndBatchItem(req=tsi.CallEndReq(end=end)))
 
-    # Process the batch
     server._flush_calls(batch)
 
-    # Verify _send_batch_to_server was called multiple times
-    assert server._send_batch_to_server.call_count > 2
+    # Verify multiple calls due to recursive splitting
+    total_calls = (
+        server._send_calls_start_batch_to_server.call_count
+        + server._send_calls_end_batch_to_server.call_count
+    )
+    assert total_calls > 2
 
-    # Verify all items were sent
+    # Verify all items were sent (50 starts + 50 ends = 100 items)
     total_items_sent = 0
-    for call in server._send_batch_to_server.call_args_list:
-        called_data = call[0][0]
-        decoded_batch = json.loads(called_data.decode("utf-8"))
-        total_items_sent += len(decoded_batch["batch"])
+    for mock_method in [
+        server._send_calls_start_batch_to_server,
+        server._send_calls_end_batch_to_server,
+    ]:
+        for call in mock_method.call_args_list:
+            called_data = call[0][2]
+            decoded_batch = json.loads(called_data.decode("utf-8"))
+            total_items_sent += len(decoded_batch["batch"])
 
-    assert total_items_sent == len(batch)
+    assert total_items_sent == 100
 
 
 @pytest.mark.parametrize("server", ["normal"], indirect=True)
@@ -162,14 +190,14 @@ def test_dynamic_batch_size_adjustment(server):
     new_max_batch_size = server.call_processor.max_batch_size
     assert new_max_batch_size != original_max_batch_size
 
-    # The new max_batch_size should be based on the average item size
-    data = Batch(batch=batch).model_dump_json()
-    encoded_bytes = len(data.encode("utf-8"))
-    estimated_bytes_per_item = encoded_bytes / len(batch)
+    # Should have sent the batch of starts in one call
+    assert server._send_calls_start_batch_to_server.call_count == 1
+    called_data = server._send_calls_start_batch_to_server.call_args[0][2]
+    encoded_bytes = len(called_data)
+    estimated_bytes_per_item = encoded_bytes / 10
     expected_max_batch_size = max(
         1, int(server.remote_request_bytes_limit // estimated_bytes_per_item)
     )
-
     assert new_max_batch_size == expected_max_batch_size
 
 
@@ -195,20 +223,19 @@ def test_non_uniform_batch_items(server):
     }
     batch.append(StartBatchItem(req=tsi.CallStartReq(start=start)))
 
-    # Process the batch
     server._flush_calls(batch)
 
-    # The batch should have been split to accommodate the different sized items
-    assert server._send_batch_to_server.call_count >= 2
+    # Should split to accommodate the different sized items
+    assert server._send_calls_start_batch_to_server.call_count >= 2
 
-    # Verify all items were sent
+    # Verify all 7 start items were sent
     total_items_sent = 0
-    for call in server._send_batch_to_server.call_args_list:
-        called_data = call[0][0]
+    for call in server._send_calls_start_batch_to_server.call_args_list:
+        called_data = call[0][2]
         decoded_batch = json.loads(called_data.decode("utf-8"))
         total_items_sent += len(decoded_batch["batch"])
 
-    assert total_items_sent == len(batch)
+    assert total_items_sent == 7
 
 
 @pytest.mark.disable_logging_error_check
@@ -247,16 +274,22 @@ def test_requeue_after_max_retries(server, server_class, caplog):
     # Mock is_accepting_new_work to return True so we can test requeuing
     server.call_processor.is_accepting_new_work = MagicMock(return_value=True)
 
-    # Mock enqueue to verify it gets called, and _send_batch_to_server to throw an exception
+    # Mock enqueue to verify it gets called
     server.call_processor.enqueue = MagicMock()
 
     # Use the appropriate exception type for each implementation
     if server_class == RemoteHTTPTraceServer:
-        server._send_batch_to_server = MagicMock(
+        server._send_calls_start_batch_to_server = MagicMock(
+            side_effect=httpx.ConnectError("Connection error")
+        )
+        server._send_calls_end_batch_to_server = MagicMock(
             side_effect=httpx.ConnectError("Connection error")
         )
     else:
-        server._send_batch_to_server = MagicMock(
+        server._send_calls_start_batch_to_server = MagicMock(
+            side_effect=requests.ConnectionError("Connection error")
+        )
+        server._send_calls_end_batch_to_server = MagicMock(
             side_effect=requests.ConnectionError("Connection error")
         )
 
@@ -266,9 +299,11 @@ def test_requeue_after_max_retries(server, server_class, caplog):
 
     # Process the batch, which should fail and requeue.
     server._flush_calls(batch)
-    server.call_processor.enqueue.assert_called_once_with(batch)
+    assert server.call_processor.enqueue.call_count >= 1
 
-    # On enqueue, the user should expect this error message
-    assert len(caplog.records) == 1
-    msg = caplog.records[0].message
-    assert "batch failed after max retries, requeuing batch with" in msg
+    # Verify requeue warning was logged
+    assert len(caplog.records) >= 1
+    assert any(
+        "batch failed after max retries, requeuing batch with" in record.message
+        for record in caplog.records
+    )

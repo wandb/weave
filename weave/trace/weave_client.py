@@ -13,6 +13,7 @@ import time
 from collections.abc import Callable, Sequence
 from concurrent.futures import Future
 from functools import cached_property
+from threading import Event, Lock, Timer
 from typing import TYPE_CHECKING, Any, TypedDict, cast
 
 import pydantic
@@ -90,7 +91,7 @@ from weave.trace.wandb_run_context import (
     get_global_wb_run_context,
 )
 from weave.trace.weave_client_send_file_cache import WeaveClientSendFileCache
-from weave.trace_server.constants import MAX_OBJECT_NAME_LENGTH
+from weave.trace_server.constants import EVALUATION_RUN_OP_NAME, MAX_OBJECT_NAME_LENGTH
 from weave.trace_server.ids import generate_id
 from weave.trace_server.interface.feedback_types import (
     RUNNABLE_FEEDBACK_TYPE_PREFIX,
@@ -349,6 +350,11 @@ class WeaveClient:
         if hasattr(self.server, "get_feedback_processor"):
             self._server_feedback_processor = self.server.get_feedback_processor()
         self.send_file_cache = WeaveClientSendFileCache()
+        # Cache to ensure call_end never enqueues before call_start
+        # Maps call_id -> Event that is set when start is enqueued to batch
+        self._call_start_enqueued: dict[str, Event] = {}
+        self._pending_starts: dict[str, Callable[[], None]] = {}
+        self._pending_starts_lock = Lock()
 
     ################ High Level Convenience Methods ################
 
@@ -765,6 +771,10 @@ class WeaveClient:
         should_print_call_link_ = should_print_call_link()
         current_call = call_context.get_current_call()
 
+        # Create event to track when start is enqueued - BEFORE any async work
+        start_enqueued_event = Event()
+        self._call_start_enqueued[call_id] = start_enqueued_event
+
         def send_start_call() -> bool:
             maybe_redacted_inputs_with_refs = inputs_with_refs
             if should_redact_pii():
@@ -801,18 +811,51 @@ class WeaveClient:
                 )
 
             self.server.call_start(call_start_req)
+            start_enqueued_event.set()
+
             return True
 
-        def on_complete(f: Future) -> None:
+        def execute_start_call() -> None:
             try:
-                root_call_did_not_error = f.result() and not current_call
+                result = send_start_call()
+                root_call_did_not_error = result and not current_call
                 if root_call_did_not_error and should_print_call_link_:
                     print_call_link(call)
             except Exception:
-                pass
+                logger.exception(f"Failed to execute start call for {call_id}")
+                start_enqueued_event.set()
 
-        fut = self.future_executor.defer(send_start_call)
-        fut.add_done_callback(on_complete)
+        call_start_delay = settings.call_start_delay()
+        # Evaluations are always long running, don't try to wait
+        is_eval_op = op.name == EVALUATION_RUN_OP_NAME
+
+        should_delay = (call_start_delay != 0) and (not is_eval_op)
+
+        if should_delay:
+            with self._pending_starts_lock:
+                self._pending_starts[call_id] = execute_start_call
+
+            if call_start_delay > 0:
+
+                def on_timeout() -> None:
+                    with self._pending_starts_lock:
+                        if call_id in self._pending_starts:
+                            func = self._pending_starts.pop(call_id)
+                            self.future_executor.defer(func)
+
+                Timer(call_start_delay, on_timeout).start()
+        else:
+
+            def on_complete(f: Future) -> None:
+                try:
+                    root_call_did_not_error = f.result() and not current_call
+                    if root_call_did_not_error and should_print_call_link_:
+                        print_call_link(call)
+                except Exception:
+                    pass
+
+            fut = self.future_executor.defer(send_start_call)
+            fut.add_done_callback(on_complete)
 
         if use_stack:
             call_context.push_call(call)
@@ -928,6 +971,23 @@ class WeaveClient:
             op._on_finish_handler(call, original_output, exception)
 
         def send_end_call() -> None:
+            # Wait for start to be enqueued before we enqueue end
+            assert isinstance(call.id, str)
+
+            # Execute pending start if it hasn't fired yet
+            with self._pending_starts_lock:
+                if call.id in self._pending_starts:
+                    start_func = self._pending_starts.pop(call.id)
+                    start_func()
+
+            # Wait for start to be enqueued with timeout
+            start_event = self._call_start_enqueued.pop(call.id, None)
+            if start_event is not None and not start_event.wait(timeout=30.0):
+                logger.error(
+                    f"Timeout waiting for start to enqueue for call {call.id}. "
+                    "Proceeding with end anyway."
+                )
+
             maybe_redacted_output_as_refs = output_as_refs
             if should_redact_pii():
                 from weave.utils.pii_redaction import redact_pii
@@ -944,6 +1004,7 @@ class WeaveClient:
                 wb_run_context_end.step if wb_run_context_end else None
             )
 
+            # Always send end only - consolidate_batch will reconcile start/end pairs
             call_end_req = CallEndReq(
                 end=EndedCallSchemaForInsert(
                     project_id=project_id,
@@ -955,12 +1016,6 @@ class WeaveClient:
                     wb_run_step_end=current_wb_run_step_end,
                 )
             )
-            bytes_size = len(call_end_req.model_dump_json())
-            if bytes_size > MAX_TRACE_PAYLOAD_SIZE:
-                logger.warning(
-                    f"Trace output size ({bytes_size} bytes) exceeds the maximum allowed size of {MAX_TRACE_PAYLOAD_SIZE} bytes. "
-                    "Output may be dropped."
-                )
             self.server.call_end(call_end_req)
 
         self.future_executor.defer(send_end_call)
