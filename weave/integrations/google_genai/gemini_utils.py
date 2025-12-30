@@ -28,6 +28,15 @@ def google_genai_gemini_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, 
     if model_name is not None:
         inputs["model"] = model_name
 
+    # Extract system_instruction from config and surface it at the top level
+    # System instructions are provided via GenerateContentConfig and should be
+    # visible in the trace inputs
+    if "config" in inputs and inputs["config"] is not None:
+        config = inputs["config"]
+        system_instruction = getattr(config, "system_instruction", None)
+        if system_instruction is not None:
+            inputs["system_instruction"] = system_instruction
+
     # Convert the `self` parameter which is actually the state of the
     # `google.genai.models.Models` object to a dictionary of attributes that can
     # be displayed in the Weave UI
@@ -56,6 +65,12 @@ def google_genai_gemini_on_finish(
                     "total_tokens": output.usage_metadata.total_token_count,
                 }
             )
+            # Track thinking tokens for models that use thinking/reasoning
+            # See: https://ai.google.dev/gemini-api/docs/thinking
+            if hasattr(output.usage_metadata, "thoughts_token_count"):
+                thoughts_token_count = output.usage_metadata.thoughts_token_count
+                if thoughts_token_count is not None:
+                    usage[model_name]["thoughts_tokens"] = thoughts_token_count
     if call.summary is not None:
         call.summary.update(summary_update)
 
@@ -69,34 +84,54 @@ def google_genai_gemini_accumulator(
     for i, value_candidate in enumerate(value.candidates):
         if i >= len(acc.candidates):
             break
-        for j, value_part in enumerate(value_candidate.content.parts):
-            if j >= len(acc.candidates[i].content.parts):
-                break
-            if value_part.text is not None:
-                acc.candidates[i].content.parts[j].text += value_part.text
 
-    if acc.usage_metadata.prompt_token_count is None:
-        acc.usage_metadata.prompt_token_count = 0
-    elif value.usage_metadata.prompt_token_count is not None:
-        acc.usage_metadata.prompt_token_count += value.usage_metadata.prompt_token_count
+        # Accumulate text parts, handling thought vs non-thought parts separately
+        # Parts with the same index but different `thought` values should not overwrite each other
+        for value_part in value_candidate.content.parts:
+            if value_part.text is None:
+                continue
 
-    if acc.usage_metadata.candidates_token_count is None:
-        acc.usage_metadata.candidates_token_count = 0
-    elif value.usage_metadata.candidates_token_count is not None:
-        acc.usage_metadata.candidates_token_count += (
+            is_thought = getattr(value_part, "thought", False)
+
+            # Find matching part by thought status, not by index
+            matching_part = None
+            for acc_part in acc.candidates[i].content.parts:
+                acc_is_thought = getattr(acc_part, "thought", False)
+                if acc_is_thought == is_thought and acc_part.text is not None:
+                    matching_part = acc_part
+                    break
+
+            if matching_part is not None:
+                matching_part.text += value_part.text
+            else:
+                # Append new part if no matching part found
+                acc.candidates[i].content.parts.append(value_part)
+
+    # Token counts in streaming are cumulative, so replace instead of summing
+    # See: https://ai.google.dev/gemini-api/docs/text-generation?lang=python#streaming
+    if value.usage_metadata.prompt_token_count is not None:
+        acc.usage_metadata.prompt_token_count = value.usage_metadata.prompt_token_count
+
+    if value.usage_metadata.candidates_token_count is not None:
+        acc.usage_metadata.candidates_token_count = (
             value.usage_metadata.candidates_token_count
         )
 
-    if acc.usage_metadata.total_token_count is None:
-        acc.usage_metadata.total_token_count = 0
-    elif value.usage_metadata.total_token_count is not None:
-        acc.usage_metadata.total_token_count += value.usage_metadata.total_token_count
+    if value.usage_metadata.total_token_count is not None:
+        acc.usage_metadata.total_token_count = value.usage_metadata.total_token_count
 
-    if acc.usage_metadata.cached_content_token_count is None:
-        acc.usage_metadata.cached_content_token_count = 0
-    elif value.usage_metadata.cached_content_token_count is not None:
-        acc.usage_metadata.cached_content_token_count += (
+    if value.usage_metadata.cached_content_token_count is not None:
+        acc.usage_metadata.cached_content_token_count = (
             value.usage_metadata.cached_content_token_count
+        )
+
+    # Handle thinking token count for thinking models
+    if (
+        hasattr(value.usage_metadata, "thoughts_token_count")
+        and value.usage_metadata.thoughts_token_count is not None
+    ):
+        acc.usage_metadata.thoughts_token_count = (
+            value.usage_metadata.thoughts_token_count
         )
 
     return acc
