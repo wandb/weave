@@ -81,7 +81,7 @@ library_cases = [
             "dataset": "weave:///shawn/test-project/object/Dataset:N0VKaX8wr9kF9QQzM7mSQz3yKrJJjTiJi4c9Bt7RSTA",
             "scorers": [
                 "weave:///shawn/test-project/object/MyScorer:ILpCvdAsCLLLt9wU28MU9ugSScTkg7L3XX6PlUgFvlg",
-                "weave:///shawn/test-project/object/LLMAsAJudgeScorer:QeWkNYRDOwM1bZjbJAB98gajD8xMcvc4yGHLGnHYxGY",
+                "weave:///shawn/test-project/object/LLMAsAJudgeScorer:mlBiQgiNCDY2Ae9YDHwBIafGjIOShiZZGi8Yxlv6dXs",
             ],
             "preprocess_model_input": None,
             "trials": 1,
@@ -140,7 +140,7 @@ library_cases = [
             },
             {
                 "object_id": "LLMAsAJudgeScorer",
-                "digest": "QeWkNYRDOwM1bZjbJAB98gajD8xMcvc4yGHLGnHYxGY",
+                "digest": "mlBiQgiNCDY2Ae9YDHwBIafGjIOShiZZGi8Yxlv6dXs",
                 "exp_val": {
                     "_type": "LLMAsAJudgeScorer",
                     "name": None,
@@ -148,6 +148,7 @@ library_cases = [
                     "column_map": None,
                     "model": "weave:///shawn/test-project/object/LLMStructuredCompletionModel:VUqRnYmuvNhu3zgfDb9hnZhLRFM1vKKI1WEpw3bsViE",
                     "include_audio_output": False,
+                    'audio_output_json_paths': None,
                     "scoring_prompt": "Here are the inputs: {inputs}. Here is the output: {output}. Is the output correct?",
                     "score": "weave:///shawn/test-project/op/LLMAsAJudgeScorer.score:OIgGBpG1Xnwppf494LDa4mC2AEEu5tFePiWkX3N6B1s",
                     "summarize": "weave:///shawn/test-project/op/Scorer.summarize:bWwaybJxxIBLMGZp7bzeKrmjhLNCp2DYrubnU2Ry9xQ",
