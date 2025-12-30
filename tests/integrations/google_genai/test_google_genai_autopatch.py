@@ -1,13 +1,11 @@
 """Tests for Google GenAI autopatching behavior."""
 
-from __future__ import annotations
-
 from unittest.mock import MagicMock, patch
 
 from weave.integrations.patch import register_import_hook
 
 
-def test_foo():
+def test_google_genai_autopatch():
     register_import_hook()
     mock_patch_func = MagicMock()
 
