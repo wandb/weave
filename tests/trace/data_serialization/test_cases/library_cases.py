@@ -1,3 +1,5 @@
+import sys
+
 import weave
 from tests.trace.data_serialization.spec import SerializationTestCase
 from weave.scorers import LLMAsAJudgeScorer
@@ -67,6 +69,7 @@ def evaluation_equality_check(a, b):
 
     return True
 
+llm_as_a_judge_scorer_digest = "QeWkNYRDOwM1bZjbJAB98gajD8xMcvc4yGHLGnHYxGY" if sys.version_info.minor >= 13 else "mlBiQgiNCDY2Ae9YDHwBIafGjIOShiZZGi8Yxlv6dXs"
 
 library_cases = [
     SerializationTestCase(
@@ -81,7 +84,7 @@ library_cases = [
             "dataset": "weave:///shawn/test-project/object/Dataset:N0VKaX8wr9kF9QQzM7mSQz3yKrJJjTiJi4c9Bt7RSTA",
             "scorers": [
                 "weave:///shawn/test-project/object/MyScorer:ILpCvdAsCLLLt9wU28MU9ugSScTkg7L3XX6PlUgFvlg",
-                "weave:///shawn/test-project/object/LLMAsAJudgeScorer:mlBiQgiNCDY2Ae9YDHwBIafGjIOShiZZGi8Yxlv6dXs",
+                f"weave:///shawn/test-project/object/LLMAsAJudgeScorer:{llm_as_a_judge_scorer_digest}",
             ],
             "preprocess_model_input": None,
             "trials": 1,
@@ -140,7 +143,7 @@ library_cases = [
             },
             {
                 "object_id": "LLMAsAJudgeScorer",
-                "digest": "mlBiQgiNCDY2Ae9YDHwBIafGjIOShiZZGi8Yxlv6dXs",
+                "digest": llm_as_a_judge_scorer_digest,
                 "exp_val": {
                     "_type": "LLMAsAJudgeScorer",
                     "name": None,
