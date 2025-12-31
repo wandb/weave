@@ -69,7 +69,12 @@ def evaluation_equality_check(a, b):
 
     return True
 
-llm_as_a_judge_scorer_digest = "QeWkNYRDOwM1bZjbJAB98gajD8xMcvc4yGHLGnHYxGY" if sys.version_info.minor >= 13 else "mlBiQgiNCDY2Ae9YDHwBIafGjIOShiZZGi8Yxlv6dXs"
+
+llm_as_a_judge_scorer_digest = (
+    "QeWkNYRDOwM1bZjbJAB98gajD8xMcvc4yGHLGnHYxGY"
+    if sys.version_info.minor >= 13
+    else "mlBiQgiNCDY2Ae9YDHwBIafGjIOShiZZGi8Yxlv6dXs"
+)
 
 library_cases = [
     SerializationTestCase(
