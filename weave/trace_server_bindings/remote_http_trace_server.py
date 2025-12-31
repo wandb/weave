@@ -737,6 +737,16 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
             tsi.AnnotationQueueAddCallsRes,
         )
 
+    def annotation_queue_items_query(
+        self, req: tsi.AnnotationQueueItemsQueryReq
+    ) -> tsi.AnnotationQueueItemsQueryRes:
+        return self._generic_request(
+            "/annotation_queue/items/query",
+            req,
+            tsi.AnnotationQueueItemsQueryReq,
+            tsi.AnnotationQueueItemsQueryRes,
+        )
+
     def annotation_queues_stats(
         self, req: tsi.AnnotationQueuesStatsReq
     ) -> tsi.AnnotationQueuesStatsRes:
