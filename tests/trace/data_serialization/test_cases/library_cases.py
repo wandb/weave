@@ -70,10 +70,10 @@ def evaluation_equality_check(a, b):
 
 library_cases = [
     SerializationTestCase(
-        id="Library Objects - Scorer, Evaluation, Dataset, LLMAsAJudgeScorer, LLMStructuredCompletionModel",
+        id="Library Objects - Scorer, Evaluation, Dataset, LLMAsAJudgeScorer (with audio), LLMStructuredCompletionModel",
         runtime_object_factory=lambda: make_evaluation(),
         inline_call_param=False,
-        is_legacy=False,
+        is_legacy=True,
         exp_json={
             "_type": "Evaluation",
             "name": None,
@@ -81,7 +81,7 @@ library_cases = [
             "dataset": "weave:///shawn/test-project/object/Dataset:N0VKaX8wr9kF9QQzM7mSQz3yKrJJjTiJi4c9Bt7RSTA",
             "scorers": [
                 "weave:///shawn/test-project/object/MyScorer:ILpCvdAsCLLLt9wU28MU9ugSScTkg7L3XX6PlUgFvlg",
-                "weave:///shawn/test-project/object/LLMAsAJudgeScorer:QeWkNYRDOwM1bZjbJAB98gajD8xMcvc4yGHLGnHYxGY",
+                "weave:///shawn/test-project/object/LLMAsAJudgeScorer:mlBiQgiNCDY2Ae9YDHwBIafGjIOShiZZGi8Yxlv6dXs",
             ],
             "preprocess_model_input": None,
             "trials": 1,
@@ -140,7 +140,7 @@ library_cases = [
             },
             {
                 "object_id": "LLMAsAJudgeScorer",
-                "digest": "QeWkNYRDOwM1bZjbJAB98gajD8xMcvc4yGHLGnHYxGY",
+                "digest": "mlBiQgiNCDY2Ae9YDHwBIafGjIOShiZZGi8Yxlv6dXs",
                 "exp_val": {
                     "_type": "LLMAsAJudgeScorer",
                     "name": None,
