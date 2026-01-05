@@ -859,7 +859,8 @@ class WeaveClient:
                     if root_call_did_not_error and should_print_call_link_:
                         print_call_link(call)
                 except Exception:
-                    pass
+                    # Ensure the event is set even if call_start failed
+                    start_enqueued_event.set()
 
             fut = self.future_executor.defer(send_start_call)
             fut.add_done_callback(on_complete)
