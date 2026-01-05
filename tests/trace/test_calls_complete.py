@@ -496,7 +496,6 @@ def verify_call_deleted_in_table(client, ch_client, project_id, call_id, table_n
     For calls_merged: Check if call no longer exists (soft deletes remove from merged view)
     """
     rows = query_calls_raw(ch_client, project_id, table_name, call_id)
-    print(">>>> rows:", rows)
     if len(rows) == 1 and rows[0]["deleted_at"] is not None:
         return True
     return False
