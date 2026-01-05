@@ -86,7 +86,8 @@ def get_expected_item_count(server_class, num_pairs: int) -> int:
 def test_large_batch_is_split_into_multiple_smaller_batches(server, server_class):
     """Test that a batch exceeding the size limit is split into smaller batches."""
     batch = []
-    for _ in range(20):
+    batch_length = 20
+    for _ in range(batch_length):
         start, end = generate_call_start_end_pair()
         batch.append(StartBatchItem(req=start))
         batch.append(EndBatchItem(req=end))
@@ -102,7 +103,9 @@ def test_large_batch_is_split_into_multiple_smaller_batches(server, server_class
     assert get_total_mock_calls(server) > 1
 
     # Verify all items were sent
-    assert count_items_sent(server) == get_expected_item_count(server_class, 20)
+    assert count_items_sent(server) == get_expected_item_count(
+        server_class, batch_length
+    )
 
 
 @pytest.mark.parametrize("server", ["normal"], indirect=True)
@@ -115,11 +118,8 @@ def test_small_batch_is_sent_in_one_request(server):
     # Small batch should be sent in one request without splitting
     assert get_total_mock_calls(server) == 1
 
-    # Verify the single item was sent (check whichever endpoint was called)
-    if server._send_calls_start_batch_to_server.call_count == 1:
-        called_data = server._send_calls_start_batch_to_server.call_args[0][2]
-    else:
-        called_data = server._send_calls_end_batch_to_server.call_args[0][2]
+    # Verify the single item was sent
+    called_data = server._send_calls_start_batch_to_server.call_args[0][2]
     decoded_batch = json.loads(called_data.decode("utf-8"))
     assert len(decoded_batch["batch"]) == 1
 
@@ -169,7 +169,8 @@ def test_multi_level_recursive_splitting(server, server_class):
     """Test that a very large batch is recursively split multiple times."""
     # Create a very large batch with many items to force multiple levels of splitting
     batch = []
-    for i in range(50):
+    batch_length = 50
+    for i in range(batch_length):
         call_id = generate_id()
         start = generate_start(id=call_id)
         end = generate_end(id=call_id)
@@ -184,7 +185,9 @@ def test_multi_level_recursive_splitting(server, server_class):
     assert get_total_mock_calls(server) > 2
 
     # Verify all items were sent
-    assert count_items_sent(server) == get_expected_item_count(server_class, 50)
+    assert count_items_sent(server) == get_expected_item_count(
+        server_class, batch_length
+    )
 
 
 @pytest.mark.parametrize("server", ["normal"], indirect=True)
