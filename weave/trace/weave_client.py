@@ -985,9 +985,7 @@ class WeaveClient:
             op._on_finish_handler(call, original_output, exception)
 
         def send_end_call() -> None:
-            # Wait for start to be enqueued before we enqueue end
             assert isinstance(call.id, str)
-
             # Execute pending start if it hasn't fired yet
             with self._pending_starts_lock:
                 if call.id in self._pending_starts:
@@ -1017,8 +1015,6 @@ class WeaveClient:
             current_wb_run_step_end = (
                 wb_run_context_end.step if wb_run_context_end else None
             )
-
-            # Always send end only - consolidate_batch will reconcile start/end pairs
             call_end_req = CallEndReq(
                 end=EndedCallSchemaForInsert(
                     project_id=project_id,
@@ -1030,6 +1026,12 @@ class WeaveClient:
                     wb_run_step_end=current_wb_run_step_end,
                 )
             )
+            bytes_size = len(call_end_req.model_dump_json())
+            if bytes_size > MAX_TRACE_PAYLOAD_SIZE:
+                logger.warning(
+                    f"Trace output size ({bytes_size} bytes) exceeds the maximum allowed size of {MAX_TRACE_PAYLOAD_SIZE} bytes. "
+                    "Output may be dropped."
+                )
             self.server.call_end(call_end_req)
 
         self.future_executor.defer(send_end_call)
