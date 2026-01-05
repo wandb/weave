@@ -54,6 +54,9 @@ def generate_call_start_end_pair(
     project_id: str = "test_entity/test",
 ) -> tuple[tsi.CallStartReq, tsi.CallEndReq]:
     """Generate a matching pair of CallStartReq and CallEndReq for testing."""
+    # Generate an ID if not provided to ensure start and end have matching IDs
+    if id is None:
+        id = generate_id()
     start = generate_start(id, project_id)
     end = generate_end(id, project_id)
     return tsi.CallStartReq(start=start), tsi.CallEndReq(end=end)
