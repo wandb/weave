@@ -22,6 +22,7 @@ from tests.trace_server_bindings.conftest import (
     generate_start,
 )
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.ids import generate_id
 from weave.trace_server_bindings.models import (
     Batch,
     EndBatchItem,
@@ -32,8 +33,57 @@ from weave.trace_server_bindings.remote_http_trace_server import (
 )
 
 
+def get_total_mock_calls(server) -> int:
+    """Get total number of mock calls, handling shared mock objects.
+
+    The test fixture sets both _send_calls_start_batch_to_server and
+    _send_calls_end_batch_to_server to the same mock object, so we need
+    to check for that to avoid double-counting.
+    """
+    if (
+        server._send_calls_start_batch_to_server
+        is server._send_calls_end_batch_to_server
+    ):
+        return server._send_calls_start_batch_to_server.call_count
+    return (
+        server._send_calls_start_batch_to_server.call_count
+        + server._send_calls_end_batch_to_server.call_count
+    )
+
+
+def count_items_sent(server) -> int:
+    """Count total items sent across all mock calls.
+
+    Handles deduplication when both mocks point to the same object.
+    """
+    total_items_sent = 0
+    seen_calls = set()
+    for mock_method in [
+        server._send_calls_start_batch_to_server,
+        server._send_calls_end_batch_to_server,
+    ]:
+        for call in mock_method.call_args_list:
+            call_id = id(call)
+            if call_id not in seen_calls:
+                seen_calls.add(call_id)
+                called_data = call[0][2]
+                decoded_batch = json.loads(called_data.decode("utf-8"))
+                total_items_sent += len(decoded_batch["batch"])
+    return total_items_sent
+
+
+def get_expected_item_count(server_class, num_pairs: int) -> int:
+    """Get expected number of items based on server consolidation behavior.
+
+    RemoteHTTPTraceServer consolidates matching start/end pairs into complete calls,
+    so N pairs = N items. StainlessRemoteHTTPTraceServer sends starts and ends
+    separately, so N pairs = 2N items.
+    """
+    return num_pairs if server_class == RemoteHTTPTraceServer else num_pairs * 2
+
+
 @pytest.mark.parametrize("server", ["small_limit"], indirect=True)
-def test_large_batch_is_split_into_multiple_smaller_batches(server):
+def test_large_batch_is_split_into_multiple_smaller_batches(server, server_class):
     """Test that a batch exceeding the size limit is split into smaller batches."""
     batch = []
     for _ in range(20):
@@ -49,24 +99,10 @@ def test_large_batch_is_split_into_multiple_smaller_batches(server):
     server._flush_calls(batch)
 
     # Should split into multiple batches due to size limit
-    total_calls = (
-        server._send_calls_start_batch_to_server.call_count
-        + server._send_calls_end_batch_to_server.call_count
-    )
-    assert total_calls > 1
+    assert get_total_mock_calls(server) > 1
 
-    # Verify all items were sent (20 starts + 20 ends = 40 items)
-    total_items_sent = 0
-    for mock_method in [
-        server._send_calls_start_batch_to_server,
-        server._send_calls_end_batch_to_server,
-    ]:
-        for call in mock_method.call_args_list:
-            called_data = call[0][2]
-            decoded_batch = json.loads(called_data.decode("utf-8"))
-            total_items_sent += len(decoded_batch["batch"])
-
-    assert total_items_sent == 40
+    # Verify all items were sent
+    assert count_items_sent(server) == get_expected_item_count(server_class, 20)
 
 
 @pytest.mark.parametrize("server", ["normal"], indirect=True)
@@ -77,11 +113,7 @@ def test_small_batch_is_sent_in_one_request(server):
     server._flush_calls(batch)
 
     # Small batch should be sent in one request without splitting
-    total_calls = (
-        server._send_calls_start_batch_to_server.call_count
-        + server._send_calls_end_batch_to_server.call_count
-    )
-    assert total_calls == 1
+    assert get_total_mock_calls(server) == 1
 
     # Verify the single item was sent (check whichever endpoint was called)
     if server._send_calls_start_batch_to_server.call_count == 1:
@@ -129,21 +161,18 @@ def test_oversized_item_will_log_warning_and_send(server, caplog):
     assert any("may be too large" in record.message for record in caplog.records)
 
     # Verify batch was still sent
-    total_calls = (
-        server._send_calls_start_batch_to_server.call_count
-        + server._send_calls_end_batch_to_server.call_count
-    )
-    assert total_calls == 1
+    assert get_total_mock_calls(server) == 1
 
 
 @pytest.mark.parametrize("server", ["small_limit"], indirect=True)
-def test_multi_level_recursive_splitting(server):
+def test_multi_level_recursive_splitting(server, server_class):
     """Test that a very large batch is recursively split multiple times."""
     # Create a very large batch with many items to force multiple levels of splitting
     batch = []
     for i in range(50):
-        start = generate_start()
-        end = generate_end()
+        call_id = generate_id()
+        start = generate_start(id=call_id)
+        end = generate_end(id=call_id)
         if i % 5 == 0:
             start.attributes = {"data": "x" * 500}
         batch.append(StartBatchItem(req=tsi.CallStartReq(start=start)))
@@ -152,24 +181,10 @@ def test_multi_level_recursive_splitting(server):
     server._flush_calls(batch)
 
     # Verify multiple calls due to recursive splitting
-    total_calls = (
-        server._send_calls_start_batch_to_server.call_count
-        + server._send_calls_end_batch_to_server.call_count
-    )
-    assert total_calls > 2
+    assert get_total_mock_calls(server) > 2
 
-    # Verify all items were sent (50 starts + 50 ends = 100 items)
-    total_items_sent = 0
-    for mock_method in [
-        server._send_calls_start_batch_to_server,
-        server._send_calls_end_batch_to_server,
-    ]:
-        for call in mock_method.call_args_list:
-            called_data = call[0][2]
-            decoded_batch = json.loads(called_data.decode("utf-8"))
-            total_items_sent += len(decoded_batch["batch"])
-
-    assert total_items_sent == 100
+    # Verify all items were sent
+    assert count_items_sent(server) == get_expected_item_count(server_class, 50)
 
 
 @pytest.mark.parametrize("server", ["normal"], indirect=True)
