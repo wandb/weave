@@ -197,7 +197,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         user: str = "default",
         password: str = "",
         database: str = "default",
-        use_async_insert: bool = True,
+        use_async_insert: bool = False,
         evaluate_model_dispatcher: EvaluateModelDispatcher | None = None,
     ):
         super().__init__()
@@ -5171,7 +5171,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._flush_calls")
     def _flush_calls(self) -> None:
         self._analyze_call_batch_breakdown()
-
         try:
             self._insert_call_batch(self._call_batch)
         except InsertTooLarge:
