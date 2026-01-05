@@ -136,8 +136,12 @@ def lite_llm_image_generation(
             image_params["n"] = inputs.get("n", 1)
 
         # Only set quality parameter for models that support it (DALL-E 3 and gpt-image-1)
-        if model_name in ["dall-e-3", "gpt-image-1"]:
-            default_quality = "high" if model_name == "gpt-image-1" else "standard"
+        if model_name in ["dall-e-3", "gpt-image-1", "gpt-image-1.5"]:
+            default_quality = (
+                "high"
+                if model_name == "gpt-image-1" or model_name == "gpt-image-1.5"
+                else "standard"
+            )
             image_params["quality"] = default_quality
 
         # Only set style parameter for DALL-E 3
@@ -147,14 +151,14 @@ def lite_llm_image_generation(
         # Set default size for models that need it
         if model_name == "dall-e-3":
             image_params["size"] = "1024x1024"
-        elif model_name == "gpt-image-1":
+        elif model_name == "gpt-image-1" or model_name == "gpt-image-1.5":
             image_params["size"] = "1024x1024"
         else:
             image_params["size"] = "1024x1024"
 
         try:
             # gpt-image-1 doesn't support response_format parameter
-            if model_name == "gpt-image-1":
+            if model_name == "gpt-image-1" or model_name == "gpt-image-1.5":
                 res = image_generation(**image_params)
             else:
                 res = image_generation(response_format="url", **image_params)
