@@ -2317,12 +2317,12 @@ def build_calls_complete_batch_update_query(
     UPDATE {table_name}
     SET
         ended_at = CASE {format_cases(field_cases["ended_at"])} ELSE ended_at END,
+        updated_at = now64(3),
         output_dump = CASE {format_cases(field_cases["output_dump"])} ELSE output_dump END,
-        output_refs = CASE {format_cases(field_cases["output_refs"])} ELSE output_refs END,
         summary_dump = CASE {format_cases(field_cases["summary_dump"])} ELSE summary_dump END,
         exception = CASE {format_cases(field_cases["exception"])} ELSE exception END,
-        wb_run_step_end = CASE {format_cases(field_cases["wb_run_step_end"])} ELSE wb_run_step_end END,
-        updated_at = now64(3)
+        output_refs = CASE {format_cases(field_cases["output_refs"])} ELSE output_refs END,
+        wb_run_step_end = CASE {format_cases(field_cases["wb_run_step_end"])} ELSE wb_run_step_end END
     WHERE project_id = {project_id_param}
       AND id IN ({", ".join(where_params)})
     """
