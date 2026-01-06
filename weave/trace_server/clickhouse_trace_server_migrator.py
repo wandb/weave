@@ -520,11 +520,10 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
     def _create_management_table_sql(self) -> str:
         """Generate SQL to create the management table in distributed mode.
 
-        In distributed mode, the management table should be replicated but NOT sharded.
-        All shards need to see the same migration state.
+        Unlike data tables (which use {shard} in the ZK path to separate data per shard),
+        the management table uses a shared path so all nodes replicate the same state.
+        We use {shard}-{replica} for the replica ID since {replica} alone repeats across shards.
         """
-        # Use a fixed path without {shard} macro so all nodes replicate the same data
-        # Use {replica} only (not {shard}-{replica}) to ensure it's truly shared
         return f"""
             CREATE TABLE IF NOT EXISTS {self.management_db}.migrations ON CLUSTER {self.replicated_cluster}
             (
@@ -532,7 +531,7 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
                 curr_version UInt64,
                 partially_applied_version UInt64 NULL,
             )
-            ENGINE = ReplicatedMergeTree('/clickhouse/tables/shared/{self.management_db}/migrations', '{{replica}}')
+            ENGINE = ReplicatedMergeTree('/clickhouse/tables/shared/{self.management_db}/migrations', '{{shard}}-{{replica}}')
             ORDER BY (db_name)
         """
 
