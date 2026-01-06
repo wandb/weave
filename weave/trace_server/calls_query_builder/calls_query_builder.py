@@ -2005,7 +2005,7 @@ def _try_optimized_stats_query(
         )
 
     # Pattern 3: Uses direct COUNT(*) instead of subquery for better performance
-    if not req.include_total_storage_size:
+    if read_table == ReadTable.CALLS_COMPLETE and not req.include_total_storage_size:
         return _build_direct_count_query(req, param_builder, read_table)
 
     return None
