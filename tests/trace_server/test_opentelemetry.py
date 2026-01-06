@@ -23,6 +23,7 @@ from opentelemetry.proto.trace.v1.trace_pb2 import (
 )
 from opentelemetry.semconv_ai import SpanAttributes as OTSpanAttr
 
+from tests.trace.util import client_is_sqlite
 from weave.trace import weave_client
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.constants import MAX_OP_NAME_LENGTH
@@ -1127,6 +1128,96 @@ class TestSemanticConventionParsing:
         assert usage.get("output_tokens") == 20
         # Verify explicit total_tokens is used instead of calculated value
         assert usage.get("total_tokens") == 35
+
+    def test_opentelemetry_cost_calculation(self, client: weave_client.WeaveClient):
+        """Test that costs are properly calculated for OTEL spans with usage at query time."""
+        if client_is_sqlite(client):
+            # SQLite does not support costs
+            return
+
+        project_id = client._project_id()
+
+        # Create span with gpt-4 model and usage
+        span_gpt4 = create_test_span()
+        span_gpt4.name = "llm_call_gpt4"
+
+        # Add model attribute
+        kv_model = KeyValue()
+        kv_model.key = "gen_ai.request.model"
+        kv_model.value.string_value = "gpt-4"
+        span_gpt4.attributes.append(kv_model)
+
+        # Add usage attributes
+        kv_prompt = KeyValue()
+        kv_prompt.key = "gen_ai.usage.prompt_tokens"
+        kv_prompt.value.int_value = 1000000
+        span_gpt4.attributes.append(kv_prompt)
+
+        kv_completion = KeyValue()
+        kv_completion.key = "gen_ai.usage.completion_tokens"
+        kv_completion.value.int_value = 2000000
+        span_gpt4.attributes.append(kv_completion)
+
+        # Create export request
+        export_req = create_test_export_request(project_id=project_id)
+        export_req.traces.resource_spans[0].scope_spans[0].spans[0].CopyFrom(span_gpt4)
+        export_req.wb_user_id = "test_user"
+
+        # Export the trace
+        client.server.otel_export(export_req)
+
+        # Query with costs
+        res_with_cost = client.server.calls_query(
+            tsi.CallsQueryReq(
+                project_id=project_id,
+                include_costs=True,
+            )
+        )
+
+        # Query without costs
+        res_no_cost = client.server.calls_query(
+            tsi.CallsQueryReq(
+                project_id=project_id,
+                include_costs=False,
+            )
+        )
+
+        assert len(res_with_cost.calls) == 1
+        assert len(res_no_cost.calls) == 1
+
+        call_with_cost = res_with_cost.calls[0]
+        call_no_cost = res_no_cost.calls[0]
+        assert call_with_cost.summary is not None
+
+        # Verify model cost information is present when requested
+        assert "gpt-4" in call_with_cost.summary["weave"]["costs"]  # type: ignore
+
+        gpt4_cost = call_with_cost.summary["weave"]["costs"]["gpt-4"]  # type: ignore
+        del gpt4_cost["effective_date"]  # type: ignore
+        del gpt4_cost["created_at"]  # type: ignore
+        # Verify cost calculation matches expected values
+        assert (
+            gpt4_cost
+            == {
+                "prompt_tokens": 1000000,
+                "completion_tokens": 2000000,
+                "requests": 0,  # OTEL doesn't track requests separately
+                "total_tokens": 3000000,  # Now properly calculated from prompt + completion tokens
+                "prompt_tokens_total_cost": pytest.approx(30),
+                "completion_tokens_total_cost": pytest.approx(120),
+                "prompt_token_cost": 3e-05,
+                "completion_token_cost": 6e-05,
+                "prompt_token_cost_unit": "USD",
+                "completion_token_cost_unit": "USD",
+                "provider_id": "openai",
+                "pricing_level": "default",
+                "pricing_level_id": "default",
+                "created_by": "system",
+            }
+        )
+
+        # Verify no cost information when not requested
+        assert "costs" not in call_no_cost.summary.get("weave", {})  # type: ignore
 
 
 class TestHelpers:

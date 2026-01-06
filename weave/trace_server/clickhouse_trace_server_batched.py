@@ -485,7 +485,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.kafka_producer.flush")
     def _flush_kafka_producer(self) -> None:
-        self.kafka_producer.flush()
+        if wf_env.wf_enable_online_eval():
+            self.kafka_producer.flush()
 
     @contextmanager
     def call_batch(self) -> Iterator[None]:
@@ -5034,7 +5035,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     def _run_migrations(self) -> None:
         logger.info("Running migrations")
-        migrator = wf_migrator.ClickHouseTraceServerMigrator(
+        migrator = wf_migrator.get_clickhouse_trace_server_migrator(
             self._mint_client(),
             replicated=wf_env.wf_clickhouse_replicated(),
             replicated_path=wf_env.wf_clickhouse_replicated_path(),

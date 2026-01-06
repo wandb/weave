@@ -30,6 +30,12 @@ MAX_BATCH_UPDATE_CALLS = 100
 LOCAL_TABLE_SUFFIX = "_local"
 
 
+# Table naming conventions for distributed mode
+# In distributed mode, local tables use this suffix (e.g., "calls_complete_local")
+# while distributed tables use the base name (e.g., "calls_complete")
+LOCAL_TABLE_SUFFIX = "_local"
+
+
 # ClickHouse query db settings
 
 # https://clickhouse.com/docs/operations/settings/settings#max_memory_usage
@@ -47,7 +53,7 @@ CLICKHOUSE_DEFAULT_QUERY_SETTINGS = {
     "max_execution_time": wf_env.wf_clickhouse_max_execution_time()
     or DEFAULT_MAX_EXECUTION_TIME,
     "function_json_value_return_type_allow_complex": RETURN_TYPE_ALLOW_COMPLEX,
-    # Enable cross-replica queries with subqueries
+    # Valid values here are 'allow' or 'global', with 'global' slightly outperforming in testing
     "distributed_product_mode": "global",
 }
 

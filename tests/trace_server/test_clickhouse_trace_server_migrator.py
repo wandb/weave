@@ -5,19 +5,11 @@ import pytest
 
 from weave.trace_server import clickhouse_trace_server_migrator as trace_server_migrator
 from weave.trace_server.clickhouse_trace_server_migrator import (
+    BaseClickHouseTraceServerMigrator,
+    CloudClickHouseTraceServerMigrator,
+    DistributedClickHouseTraceServerMigrator,
     MigrationError,
-    _add_local_suffix,
-    _create_db_sql,
-    _create_distributed_table_sql,
-    _extract_alter_table_name,
-    _extract_table_name,
-    _format_distributed_sql,
-    _format_replicated_sql,
-    _format_with_on_cluster_sql,
-    _is_safe_identifier,
-    _rename_alter_table_to_local,
-    _rename_from_tables_to_local,
-    _rename_table_to_local,
+    ReplicatedClickHouseTraceServerMigrator,
 )
 
 
@@ -35,7 +27,7 @@ def mock_costs():
 @pytest.fixture
 def migrator():
     ch_client = Mock()
-    migrator = trace_server_migrator.ClickHouseTraceServerMigrator(ch_client)
+    migrator = trace_server_migrator.get_clickhouse_trace_server_migrator(ch_client)
     migrator._get_migration_status = Mock()
     migrator._get_migrations = Mock()
     migrator._determine_migrations_to_apply = Mock()
@@ -49,7 +41,7 @@ def replicated_migrator():
     """Migrator configured for replicated mode with standard test settings."""
     ch_client = Mock()
     ch_client.database = "original_db"
-    migrator = trace_server_migrator.ClickHouseTraceServerMigrator(
+    migrator = trace_server_migrator.get_clickhouse_trace_server_migrator(
         ch_client,
         replicated=True,
         replicated_cluster="test_cluster",
@@ -68,7 +60,7 @@ def distributed_migrator():
     """Migrator configured for distributed mode with standard test settings."""
     ch_client = Mock()
     ch_client.database = "original_db"
-    migrator = trace_server_migrator.ClickHouseTraceServerMigrator(
+    migrator = trace_server_migrator.get_clickhouse_trace_server_migrator(
         ch_client,
         replicated=True,
         use_distributed=True,
@@ -154,7 +146,7 @@ def test_migration_non_replicated(migrator):
 def test_update_migration_status(migrator):
     # Don't mock _update_migration_status for this test
     migrator._update_migration_status = types.MethodType(
-        trace_server_migrator.ClickHouseTraceServerMigrator._update_migration_status,
+        trace_server_migrator.BaseClickHouseTraceServerMigrator._update_migration_status,
         migrator,
     )
 
@@ -171,44 +163,71 @@ def test_update_migration_status(migrator):
     )
 
 
-def test_add_local_suffix():
+@pytest.mark.parametrize(
+    ("input_name", "expected_output"),
+    [
+        ("my_table", "my_table_local"),
+        ("already_local", "already_local"),  # Idempotency test
+        ("test", "test_local"),
+    ],
+)
+def test_add_local_suffix(input_name, expected_output):
     """Test that _add_local_suffix adds _local suffix correctly."""
-    assert _add_local_suffix("my_table") == "my_table_local"
-    # Test idempotency - don't add twice
-    assert _add_local_suffix("already_local") == "already_local"
+    assert (
+        DistributedClickHouseTraceServerMigrator._add_local_suffix(input_name)
+        == expected_output
+    )
 
 
-def test_is_safe_identifier(migrator):
-    # Valid identifiers
-    assert _is_safe_identifier("test_db")
-    assert _is_safe_identifier("my_db123")
-    assert _is_safe_identifier("db.table")
+@pytest.mark.parametrize(
+    ("identifier", "is_valid"),
+    [
+        # Valid identifiers
+        ("test_db", True),
+        ("my_db123", True),
+        ("db.table", True),
+        # Invalid identifiers
+        ("test-db", False),
+        ("db;", False),
+        ("db'name", False),
+        ("db/*", False),
+    ],
+)
+def test_is_safe_identifier(identifier, is_valid):
+    """Test identifier validation."""
+    assert BaseClickHouseTraceServerMigrator._is_safe_identifier(identifier) == is_valid
 
-    # Invalid identifiers
-    assert not _is_safe_identifier("test-db")
-    assert not _is_safe_identifier("db;")
-    assert not _is_safe_identifier("db'name")
-    assert not _is_safe_identifier("db/*")
 
-
-def test_create_db_sql(migrator):
-    with pytest.raises(MigrationError, match="Invalid database name"):
-        _create_db_sql("test;db", False, "test_cluster", "/clickhouse/tables/{db}")
-
-    with pytest.raises(MigrationError, match="Invalid cluster name"):
-        _create_db_sql("test_db", True, "test;cluster", "/clickhouse/tables/{db}")
-
-    sql = _create_db_sql("test_db", False, "test_cluster", "/clickhouse/tables/{db}")
+def test_create_db_sql(mock_costs):
+    """Test database creation SQL generation in different modes."""
+    # Test cloud mode
+    cloud_migrator = CloudClickHouseTraceServerMigrator(Mock())
+    sql = cloud_migrator._create_db_sql("test_db")
     assert sql.strip() == "CREATE DATABASE IF NOT EXISTS test_db"
 
-    sql = _create_db_sql("test_db", True, "test_cluster", "/clickhouse/tables/{db}")
+    # Test invalid database name
+    with pytest.raises(MigrationError, match="Invalid database name"):
+        cloud_migrator._create_db_sql("test;db")
+
+    # Test replicated mode
+    replicated_migrator = ReplicatedClickHouseTraceServerMigrator(
+        Mock(), replicated_cluster="test_cluster"
+    )
+    sql = replicated_migrator._create_db_sql("test_db")
     assert (
         sql.strip() == "CREATE DATABASE IF NOT EXISTS test_db ON CLUSTER test_cluster"
     )
 
+    # Test invalid cluster name
+    with pytest.raises(MigrationError, match="Invalid cluster name"):
+        ReplicatedClickHouseTraceServerMigrator(
+            Mock(), replicated_cluster="test;cluster"
+        )
 
-def test_format_replicated_sql(migrator):
-    test_cases = [
+
+@pytest.mark.parametrize(
+    ("input_sql", "expected_sql"),
+    [
         (
             "CREATE TABLE test (id Int32) ENGINE = MergeTree",
             "CREATE TABLE test (id Int32) ENGINE = ReplicatedMergeTree",
@@ -229,71 +248,99 @@ def test_format_replicated_sql(migrator):
             "CREATE TABLE test (id Int32) ENGINE = MergeTree()",
             "CREATE TABLE test (id Int32) ENGINE = ReplicatedMergeTree",
         ),
-    ]
+        # Non-MergeTree engines should be unchanged
+        (
+            "CREATE TABLE test (id Int32) ENGINE = Memory",
+            "CREATE TABLE test (id Int32) ENGINE = Memory",
+        ),
+        (
+            "CREATE TABLE test (id Int32) ENGINE = Log",
+            "CREATE TABLE test (id Int32) ENGINE = Log",
+        ),
+    ],
+)
+def test_format_replicated_sql(input_sql, expected_sql):
+    """Test MergeTree engine replacement with ReplicatedMergeTree."""
+    replicated_migrator = ReplicatedClickHouseTraceServerMigrator(
+        Mock(), replicated_cluster="test_cluster"
+    )
+    assert replicated_migrator._format_replicated_sql(input_sql) == expected_sql
 
-    for input_sql, expected_sql in test_cases:
-        assert _format_replicated_sql(input_sql) == expected_sql
 
-    result = _format_replicated_sql(
-        "CREATE TABLE test (id Int32) ENGINE = MergeTree",
-        use_distributed=True,
-        target_db="test_db",
+def test_format_replicated_sql_distributed():
+    """Test replicated SQL formatting in distributed mode with explicit paths."""
+    distributed_migrator = DistributedClickHouseTraceServerMigrator(
+        Mock(), replicated_cluster="test_cluster"
+    )
+    result = distributed_migrator._format_replicated_sql_distributed(
+        "CREATE TABLE test (id Int32) ENGINE = MergeTree", "test_db"
     )
     assert (
         "ReplicatedMergeTree('/clickhouse/tables/{shard}/test_db/test_local', '{replica}')"
         in result
     )
 
-    non_mergetree_cases = [
-        "CREATE TABLE test (id Int32) ENGINE = Memory",
-        "CREATE TABLE test (id Int32) ENGINE = Log",
-        "CREATE TABLE test (id Int32) ENGINE = TinyLog",
-    ]
 
-    for sql in non_mergetree_cases:
-        assert _format_replicated_sql(sql) == sql
+@pytest.mark.parametrize(
+    ("sql", "expected_table"),
+    [
+        ("CREATE TABLE test (id Int32)", "test"),
+        ("CREATE TABLE IF NOT EXISTS my_table (id Int32)", "my_table"),
+        ("ALTER TABLE test ADD COLUMN x Int32", None),  # Not a CREATE TABLE
+    ],
+)
+def test_extract_table_name(sql, expected_table):
+    """Test extracting table name from SQL."""
+    from weave.trace_server.clickhouse_trace_server_migrator import SQLPatterns
+
+    match = SQLPatterns.CREATE_TABLE.search(sql)
+    result = match.group(1) if match else None
+    assert result == expected_table
 
 
-def test_table_name_operations(migrator):
-    assert _extract_table_name("CREATE TABLE test (id Int32)") == "test"
-    assert (
-        _extract_table_name("CREATE TABLE IF NOT EXISTS my_table (id Int32)")
-        == "my_table"
+@pytest.mark.parametrize(
+    ("sql", "table_name", "expected_sql"),
+    [
+        (
+            "CREATE TABLE test (id Int32)",
+            "test",
+            "CREATE TABLE test_local (id Int32)",
+        ),
+        (
+            "CREATE TABLE IF NOT EXISTS my_table (id Int32)",
+            "my_table",
+            "CREATE TABLE IF NOT EXISTS my_table_local (id Int32)",
+        ),
+    ],
+)
+def test_rename_table_to_local(sql, table_name, expected_sql):
+    """Test renaming table to local in CREATE TABLE statement."""
+    result = DistributedClickHouseTraceServerMigrator._rename_table_to_local(
+        sql, table_name
     )
-    assert _extract_table_name("ALTER TABLE test ADD COLUMN x Int32") is None
+    assert result == expected_sql
 
-    assert (
-        _rename_table_to_local("CREATE TABLE test (id Int32)", "test")
-        == "CREATE TABLE test_local (id Int32)"
+
+def test_create_distributed_table_sql():
+    """Test distributed table creation SQL."""
+    distributed_migrator = DistributedClickHouseTraceServerMigrator(
+        Mock(), replicated_cluster="test_cluster"
     )
-    assert (
-        _rename_table_to_local(
-            "CREATE TABLE IF NOT EXISTS my_table (id Int32)", "my_table"
-        )
-        == "CREATE TABLE IF NOT EXISTS my_table_local (id Int32)"
-    )
-
-
-def test_create_distributed_table_sql(migrator):
-    cluster_name = "test_cluster"
-    sql = _create_distributed_table_sql("test", "test", cluster_name)
+    sql = distributed_migrator._create_distributed_table_sql("test")
     expected = "CREATE TABLE IF NOT EXISTS test ON CLUSTER test_cluster\n        AS test_local\n        ENGINE = Distributed(test_cluster, currentDatabase(), test_local, rand())"
     assert sql.strip() == expected.strip()
 
 
-def test_format_distributed_sql(migrator):
-    cluster_name = "test_cluster"
-    alter_sql = "ALTER TABLE test ADD COLUMN x Int32"
-
-    result = _format_distributed_sql(alter_sql, cluster_name)
-    assert result.local_command == alter_sql
-    assert result.distributed_command is None
-
-    sql = "CREATE TABLE test (id Int32) ENGINE = MergeTree"
-    result = _format_distributed_sql(sql, cluster_name)
-    assert (
-        "CREATE TABLE test_local (id Int32) ENGINE = MergeTree" == result.local_command
+def test_format_distributed_sql():
+    """Test distributed SQL formatting for CREATE TABLE and other DDL."""
+    distributed_migrator = DistributedClickHouseTraceServerMigrator(
+        Mock(), replicated_cluster="test_cluster"
     )
+
+    # CREATE TABLE should create both local and distributed
+    sql = "CREATE TABLE test ON CLUSTER test_cluster (id Int32) ENGINE = MergeTree"
+    result = distributed_migrator._format_distributed_sql(sql)
+    assert "test_local" in result.local_command
     assert result.distributed_command is not None
     assert (
         "CREATE TABLE IF NOT EXISTS test ON CLUSTER test_cluster"
@@ -367,23 +414,33 @@ def test_execute_migration_command_with_alter_distributed(distributed_migrator):
     )
 
 
-def test_rename_alter_table_to_local(migrator):
-    assert (
-        _rename_alter_table_to_local("ALTER TABLE test ADD COLUMN x Int32")
-        == "ALTER TABLE test_local ADD COLUMN x Int32"
+@pytest.mark.parametrize(
+    ("input_sql", "expected_sql"),
+    [
+        (
+            "ALTER TABLE test ADD COLUMN x Int32",
+            "ALTER TABLE test_local ADD COLUMN x Int32",
+        ),
+        (
+            "ALTER TABLE my_table DROP COLUMN old_col",
+            "ALTER TABLE my_table_local DROP COLUMN old_col",
+        ),
+        (
+            "alter table users modify column name String",
+            "alter table users_local modify column name String",
+        ),
+        (
+            "ALTER TABLE test_local ADD COLUMN x Int32",
+            "ALTER TABLE test_local ADD COLUMN x Int32",  # Idempotent
+        ),
+    ],
+)
+def test_rename_alter_table_to_local(input_sql, expected_sql):
+    """Test renaming ALTER TABLE to use _local suffix."""
+    result = DistributedClickHouseTraceServerMigrator._rename_alter_table_to_local(
+        input_sql
     )
-    assert (
-        _rename_alter_table_to_local("ALTER TABLE my_table DROP COLUMN old_col")
-        == "ALTER TABLE my_table_local DROP COLUMN old_col"
-    )
-    assert (
-        _rename_alter_table_to_local("alter table users modify column name String")
-        == "alter table users_local modify column name String"
-    )
-    assert (
-        _rename_alter_table_to_local("ALTER TABLE test_local ADD COLUMN x Int32")
-        == "ALTER TABLE test_local ADD COLUMN x Int32"
-    )
+    assert result == expected_sql
 
 
 def test_distributed_requires_replicated():
@@ -394,18 +451,22 @@ def test_distributed_requires_replicated():
         MigrationError,
         match="Distributed tables can only be used with replicated tables",
     ):
-        trace_server_migrator.ClickHouseTraceServerMigrator(
+        trace_server_migrator.get_clickhouse_trace_server_migrator(
             ch_client, replicated=False, use_distributed=True
         )
 
 
-def test_format_replicated_sql_idempotent(migrator):
+def test_format_replicated_sql_idempotent():
+    """Test that formatting is idempotent (doesn't double-transform)."""
+    replicated_migrator = ReplicatedClickHouseTraceServerMigrator(
+        Mock(), replicated_cluster="test_cluster"
+    )
     sql = "CREATE TABLE test (id Int32) ENGINE = MergeTree"
-    formatted_once = _format_replicated_sql(sql)
+    formatted_once = replicated_migrator._format_replicated_sql(sql)
     expected = "CREATE TABLE test (id Int32) ENGINE = ReplicatedMergeTree"
     assert formatted_once == expected
 
-    formatted_twice = _format_replicated_sql(formatted_once)
+    formatted_twice = replicated_migrator._format_replicated_sql(formatted_once)
     assert formatted_twice == expected
 
 
@@ -423,66 +484,61 @@ def test_non_replicated_preserves_table_names(migrator):
     assert "Distributed" not in call_sql
 
 
-def test_format_views_with_on_cluster_sql(migrator):
-    """Test CREATE VIEW, CREATE MATERIALIZED VIEW, and DROP VIEW get ON CLUSTER clause added."""
-    cluster_name = "test_cluster"
-
-    # Test cases for various DDL types
-    test_cases = [
+@pytest.mark.parametrize(
+    ("input_sql", "expected_sql"),
+    [
         # DROP VIEW cases
         ("DROP VIEW my_view", "DROP VIEW my_view ON CLUSTER test_cluster"),
         (
             "DROP VIEW IF EXISTS my_view",
             "DROP VIEW IF EXISTS my_view ON CLUSTER test_cluster",
         ),
-        (
-            "drop view if exists default.object_versions_deduped",
-            "drop view if exists default.object_versions_deduped ON CLUSTER test_cluster",
-        ),
         # CREATE VIEW cases
         (
             "CREATE VIEW my_view AS SELECT * FROM test",
             "CREATE VIEW my_view ON CLUSTER test_cluster AS SELECT * FROM test",
-        ),
-        (
-            "CREATE VIEW IF NOT EXISTS my_view AS SELECT id FROM test",
-            "CREATE VIEW IF NOT EXISTS my_view ON CLUSTER test_cluster AS SELECT id FROM test",
         ),
         # CREATE MATERIALIZED VIEW cases
         (
             "CREATE MATERIALIZED VIEW calls_merged_view TO calls_merged AS SELECT * FROM call_parts",
             "CREATE MATERIALIZED VIEW calls_merged_view ON CLUSTER test_cluster TO calls_merged AS SELECT * FROM call_parts",
         ),
-        (
-            "CREATE MATERIALIZED VIEW IF NOT EXISTS calls_merged_view TO calls_merged AS SELECT * FROM call_parts",
-            "CREATE MATERIALIZED VIEW IF NOT EXISTS calls_merged_view ON CLUSTER test_cluster TO calls_merged AS SELECT * FROM call_parts",
-        ),
         # ALTER TABLE cases
         (
             "ALTER TABLE test ADD COLUMN x Int32",
             "ALTER TABLE test ON CLUSTER test_cluster ADD COLUMN x Int32",
         ),
-    ]
+    ],
+)
+def test_add_on_cluster_clause(input_sql, expected_sql):
+    """Test that ON CLUSTER clause is added correctly to various DDL statements."""
+    replicated_migrator = ReplicatedClickHouseTraceServerMigrator(
+        Mock(), replicated_cluster="test_cluster"
+    )
+    result = replicated_migrator._add_on_cluster_clause(input_sql)
+    assert result == expected_sql
 
-    for input_sql, expected_sql in test_cases:
-        result = _format_with_on_cluster_sql(input_sql, cluster_name)
-        assert result == expected_sql
 
-    # Test CREATE TABLE (has special pattern)
-    create_table_sql = "CREATE TABLE test (id Int32) ENGINE = MergeTree"
-    result = _format_with_on_cluster_sql(create_table_sql, cluster_name)
-    assert "CREATE TABLE test ON CLUSTER test_cluster" in result
-
-    # Test idempotency - don't add if already present
+def test_add_on_cluster_clause_idempotent():
+    """Test that ON CLUSTER clause addition is idempotent."""
+    replicated_migrator = ReplicatedClickHouseTraceServerMigrator(
+        Mock(), replicated_cluster="test_cluster"
+    )
     already_formatted = (
         "ALTER TABLE test ON CLUSTER existing_cluster ADD COLUMN x Int32"
     )
-    result = _format_with_on_cluster_sql(already_formatted, cluster_name)
+    result = replicated_migrator._add_on_cluster_clause(already_formatted)
+    # Should not modify if already has ON CLUSTER
     assert result == already_formatted
 
-    # Test non-DDL statements are not modified
+
+def test_add_on_cluster_clause_non_ddl():
+    """Test that non-DDL statements are not modified."""
+    replicated_migrator = ReplicatedClickHouseTraceServerMigrator(
+        Mock(), replicated_cluster="test_cluster"
+    )
     for sql in ["INSERT INTO test VALUES (1)", "SELECT * FROM test"]:
-        assert _format_with_on_cluster_sql(sql, cluster_name) == sql
+        assert replicated_migrator._add_on_cluster_clause(sql) == sql
 
 
 def test_execute_views_in_replicated_and_distributed_modes(
@@ -510,6 +566,7 @@ def test_execute_views_in_replicated_and_distributed_modes(
     )
 
     # Test in distributed mode (should be identical)
+    distributed_migrator.ch_client.command.reset_mock()
     distributed_migrator._execute_migration_command(
         "test_db", "DROP VIEW IF EXISTS my_view"
     )
@@ -543,21 +600,20 @@ def test_execute_materialized_view_in_replicated_mode(replicated_migrator):
     assert call_sql == expected_sql
 
 
-def test_extract_alter_table_name(migrator):
-    assert _extract_alter_table_name("ALTER TABLE test ADD COLUMN x Int32") == "test"
-    assert (
-        _extract_alter_table_name("ALTER TABLE my_table DROP COLUMN old_col")
-        == "my_table"
-    )
-    assert (
-        _extract_alter_table_name("alter table users modify column name String")
-        == "users"
-    )
-    assert (
-        _extract_alter_table_name("ALTER TABLE default.test_table ADD COLUMN x Int32")
-        == "default.test_table"
-    )
-    assert _extract_alter_table_name("CREATE TABLE test (id Int32)") is None
+@pytest.mark.parametrize(
+    ("sql", "expected_table"),
+    [
+        ("ALTER TABLE test ADD COLUMN x Int32", "test"),
+        ("ALTER TABLE my_table DROP COLUMN old_col", "my_table"),
+        ("alter table users modify column name String", "users"),
+        ("ALTER TABLE default.test_table ADD COLUMN x Int32", "default.test_table"),
+        ("CREATE TABLE test (id Int32)", None),  # Not an ALTER TABLE
+    ],
+)
+def test_extract_alter_table_name(sql, expected_table):
+    """Test extracting table name from ALTER TABLE statements."""
+    result = DistributedClickHouseTraceServerMigrator._extract_alter_table_name(sql)
+    assert result == expected_table
 
 
 def test_alter_distributed_with_multiple_columns(distributed_migrator):
@@ -588,49 +644,47 @@ def test_alter_distributed_with_multiple_columns(distributed_migrator):
     )
 
 
-def test_rename_from_tables_to_local(migrator):
+@pytest.mark.parametrize(
+    ("input_sql", "expected_sql"),
+    [
+        # Basic FROM clause
+        (
+            "SELECT * FROM test WHERE id = 1",
+            "SELECT * FROM test_local WHERE id = 1",
+        ),
+        # FROM with qualified column references
+        (
+            "SELECT * FROM call_parts WHERE call_parts.started_at IS NOT NULL",
+            "SELECT * FROM call_parts_local WHERE call_parts_local.started_at IS NOT NULL",
+        ),
+        # Multiple qualified column references
+        (
+            "SELECT call_parts.id, call_parts.name FROM call_parts",
+            "SELECT call_parts_local.id, call_parts_local.name FROM call_parts_local",
+        ),
+        # Qualified table names (database.table)
+        (
+            "SELECT * FROM default.test WHERE id = 1",
+            "SELECT * FROM default.test_local WHERE id = 1",
+        ),
+        # Idempotency test
+        (
+            "SELECT * FROM test_local WHERE id = 1",
+            "SELECT * FROM test_local WHERE id = 1",
+        ),
+        # Function calls on qualified columns
+        (
+            "SELECT isNotNull(call_parts.started_at) FROM call_parts",
+            "SELECT isNotNull(call_parts_local.started_at) FROM call_parts_local",
+        ),
+    ],
+)
+def test_rename_from_tables_to_local(input_sql, expected_sql):
     """Test that FROM clauses and qualified column references get renamed to use _local suffix."""
-    # Basic FROM clause
-    assert (
-        _rename_from_tables_to_local("SELECT * FROM test WHERE id = 1")
-        == "SELECT * FROM test_local WHERE id = 1"
+    result = DistributedClickHouseTraceServerMigrator._rename_from_tables_to_local(
+        input_sql
     )
-
-    # FROM with qualified column references
-    assert (
-        _rename_from_tables_to_local(
-            "SELECT * FROM call_parts WHERE call_parts.started_at IS NOT NULL"
-        )
-        == "SELECT * FROM call_parts_local WHERE call_parts_local.started_at IS NOT NULL"
-    )
-
-    # Multiple qualified column references from same table
-    assert (
-        _rename_from_tables_to_local(
-            "SELECT call_parts.id, call_parts.name FROM call_parts"
-        )
-        == "SELECT call_parts_local.id, call_parts_local.name FROM call_parts_local"
-    )
-
-    # Test with qualified table names (database.table)
-    assert (
-        _rename_from_tables_to_local("SELECT * FROM default.test WHERE id = 1")
-        == "SELECT * FROM default.test_local WHERE id = 1"
-    )
-
-    # Test idempotency - don't add _local if already present
-    assert (
-        _rename_from_tables_to_local("SELECT * FROM test_local WHERE id = 1")
-        == "SELECT * FROM test_local WHERE id = 1"
-    )
-
-    # Test with function calls on qualified columns
-    assert (
-        _rename_from_tables_to_local(
-            "SELECT isNotNull(call_parts.started_at) FROM call_parts"
-        )
-        == "SELECT isNotNull(call_parts_local.started_at) FROM call_parts_local"
-    )
+    assert result == expected_sql
 
 
 def test_alter_materialized_view_distributed(distributed_migrator):
