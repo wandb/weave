@@ -128,6 +128,10 @@ def get_ch_trace_server(
         host, port = next(ensure_clickhouse_db())
         db_suffix = _get_worker_db_suffix(request)
 
+        # Always add a test-specific suffix to prevent collision with other databases
+        if not db_suffix:
+            db_suffix = "_test"
+
         # Store original environment variable
         original_db = os.environ.get("WF_CLICKHOUSE_DATABASE")
         base_db = original_db or "default"

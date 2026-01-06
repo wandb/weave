@@ -16854,5 +16854,61 @@
       "output": 0.0,
       "created_at": "2025-12-16 12:20:58"
     }
+  ],
+  "azure_ai/deepseek-v3.2": [
+    {
+      "provider": "azure_ai",
+      "input": 5.8e-07,
+      "output": 1.68e-06,
+      "created_at": "2025-12-17 15:14:09"
+    }
+  ],
+  "azure_ai/deepseek-v3.2-speciale": [
+    {
+      "provider": "azure_ai",
+      "input": 5.8e-07,
+      "output": 1.68e-06,
+      "created_at": "2025-12-17 15:14:09"
+    }
+  ],
+  "gpt-4o-transcribe-diarize": [
+    {
+      "provider": "openai",
+      "input": 2.5e-06,
+      "output": 1e-05,
+      "created_at": "2025-12-17 15:14:09"
+    }
+  ],
+  "gemini/gemini-3-flash-preview": [
+    {
+      "provider": "gemini",
+      "input": 5e-07,
+      "output": 3e-06,
+      "created_at": "2025-12-17 15:14:09"
+    }
+  ],
+  "gemini-3-flash-preview": [
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 5e-07,
+      "output": 3e-06,
+      "created_at": "2025-12-17 15:14:09"
+    }
+  ],
+  "gpt-image-1.5": [
+    {
+      "provider": "openai",
+      "input": 5e-06,
+      "output": 1e-05,
+      "created_at": "2025-12-17 15:14:09"
+    }
+  ],
+  "gpt-image-1.5-2025-12-16": [
+    {
+      "provider": "openai",
+      "input": 5e-06,
+      "output": 1e-05,
+      "created_at": "2025-12-17 15:14:09"
+    }
   ]
 }
