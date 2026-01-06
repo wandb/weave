@@ -104,25 +104,6 @@ class BaseClickHouseTraceServerMigrator(ABC):
         super().__init__()
         self.ch_client = ch_client
         self.management_db = management_db
-
-        # Validate configuration
-        if self.use_distributed and not self.replicated:
-            raise MigrationError(
-                "Distributed tables can only be used with replicated tables. "
-                "Set replicated=True or use_distributed=False."
-            )
-
-        # Log configuration
-        logger.info(
-            f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} "
-            f"ClickHouseTraceServerMigrator initialized with: "
-            f"replicated={self.replicated}, "
-            f"use_distributed={self.use_distributed}, "
-            f"replicated_cluster={self.replicated_cluster}, "
-            f"replicated_path={self.replicated_path}, "
-            f"management_db={self.management_db}"
-        )
-
         self._initialize_migration_db()
 
     @abstractmethod
@@ -870,6 +851,15 @@ def get_clickhouse_trace_server_migrator(
     """
     replicated = False if replicated is None else replicated
     use_distributed = False if use_distributed is None else use_distributed
+
+    logger.info(
+        f"ClickHouseTraceServerMigrator initialized with: "
+        f"replicated={replicated}, "
+        f"use_distributed={use_distributed}, "
+        f"replicated_cluster={replicated_cluster}, "
+        f"replicated_path={replicated_path}, "
+        f"management_db={management_db}"
+    )
 
     # Validate configuration
     if use_distributed and not replicated:
