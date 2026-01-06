@@ -21,8 +21,6 @@ CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT = 3.5 * 1024 * 1024  # 3.5 MiB
 CLICKHOUSE_MAX_FEEDBACK_PAYLOAD_SIZE = 1 * 1024 * 1024  # 1 MiB
 ENTITY_TOO_LARGE_PAYLOAD = '{"_weave": {"error":"<EXCEEDS_LIMITS>"}}'
 
-# Clickhouse calls complete sane max settings
-MAX_BATCH_UPDATE_CALLS = 100
 
 # Table naming conventions for distributed mode
 # In distributed mode, local tables use this suffix (e.g., "calls_complete_local")
@@ -47,7 +45,8 @@ CLICKHOUSE_DEFAULT_QUERY_SETTINGS = {
     "max_execution_time": wf_env.wf_clickhouse_max_execution_time()
     or DEFAULT_MAX_EXECUTION_TIME,
     "function_json_value_return_type_allow_complex": RETURN_TYPE_ALLOW_COMPLEX,
-    "distributed_product_mode": "allow",
+    # Valid values here are 'allow' or 'global', with 'global' slightly outperforming in testing
+    "distributed_product_mode": "global",
 }
 
 # ClickHouse async insert settings
