@@ -423,6 +423,9 @@ class CachingMiddlewareTraceServer(TraceServerClientInterface):
     ) -> tsi.EnsureProjectExistsRes:
         return self._next_trace_server.ensure_project_exists(entity, project)
 
+    def get_project_id(self, req: tsi.GetProjectIdReq) -> tsi.GetProjectIdRes:
+        return self._next_trace_server.get_project_id(req)
+
     # Call API
     def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
         return self._next_trace_server.call_start(req)

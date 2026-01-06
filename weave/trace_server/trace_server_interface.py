@@ -1003,6 +1003,18 @@ class EnsureProjectExistsRes(BaseModel):
     project_name: str
 
 
+class GetProjectIdReq(BaseModelStrict):
+    """Request to get the internal project ID for a project."""
+
+    project_id: str  # External format: entity/project
+
+
+class GetProjectIdRes(BaseModel):
+    """Response containing the internal project ID."""
+
+    internal_project_id: str | None = None  # None if server doesn't support this
+
+
 class CostCreateInput(BaseModelStrict):
     prompt_token_cost: float
     completion_token_cost: float
@@ -1963,6 +1975,13 @@ class TraceServerInterface(Protocol):
         self, entity: str, project: str
     ) -> EnsureProjectExistsRes:
         return EnsureProjectExistsRes(project_name=project)
+
+    def get_project_id(self, req: GetProjectIdReq) -> GetProjectIdRes:
+        """Get the internal project ID for a project.
+
+        Returns None for internal_project_id if not supported (older servers).
+        """
+        return GetProjectIdRes(internal_project_id=None)
 
     # OTEL API
     def otel_export(self, req: OtelExportReq) -> OtelExportRes: ...

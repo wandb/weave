@@ -84,6 +84,19 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
             project_creator.ensure_project_exists(entity, project)
         )
 
+    def get_project_id(self, req: tsi.GetProjectIdReq) -> tsi.GetProjectIdRes:
+        """Get the internal project ID for a project.
+
+        Falls back to returning None if the server doesn't support this endpoint.
+        """
+        try:
+            return self._generic_request(
+                "/project/get_id", req, tsi.GetProjectIdReq, tsi.GetProjectIdRes
+            )
+        except Exception:
+            # Older server doesn't support this endpoint - fall back gracefully
+            return tsi.GetProjectIdRes(internal_project_id=None)
+
     @classmethod
     def from_env(cls, should_batch: bool = False) -> Self:
         return cls(weave_trace_server_url(), should_batch)

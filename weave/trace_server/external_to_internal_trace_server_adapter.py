@@ -65,9 +65,24 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
     def __getattr__(self, name: str) -> typing.Any:
         return getattr(self._internal_trace_server, name)
 
+    def _validate_internal_project_access(self, internal_project_id: str) -> bool:
+        """Check if authenticated user has read access to project.
+
+        Used to validate internal refs sent directly by the client for
+        client-side digest calculation.
+        """
+        try:
+            # int_to_ext_project_id returns None if user doesn't have access
+            ext_id = self._idc.int_to_ext_project_id(internal_project_id)
+            return ext_id is not None
+        except Exception:
+            return False
+
     def _ref_apply(self, method: Callable[[A], B], req: A) -> B:
         req_conv = universal_ext_to_int_ref_converter(
-            req, self._idc.ext_to_int_project_id
+            req,
+            self._idc.ext_to_int_project_id,
+            self._validate_internal_project_access,
         )
         res = method(req_conv)
         res_conv = universal_int_to_ext_ref_converter(
@@ -79,7 +94,9 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         self, method: Callable[[A], Iterator[B]], req: A
     ) -> Iterator[B]:
         req_conv = universal_ext_to_int_ref_converter(
-            req, self._idc.ext_to_int_project_id
+            req,
+            self._idc.ext_to_int_project_id,
+            self._validate_internal_project_access,
         )
         res = method(req_conv)
 
@@ -100,6 +117,15 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         self, entity: str, project: str
     ) -> tsi.EnsureProjectExistsRes:
         return self._internal_trace_server.ensure_project_exists(entity, project)
+
+    def get_project_id(self, req: tsi.GetProjectIdReq) -> tsi.GetProjectIdRes:
+        """Get internal project ID for a project.
+
+        This enables clients to compute digests locally by constructing
+        internal refs with the correct project ID.
+        """
+        internal_project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return tsi.GetProjectIdRes(internal_project_id=internal_project_id)
 
     def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
@@ -408,7 +434,11 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
     ) -> typing.Iterator[dict[str, typing.Any]]:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         # Convert any refs in the request (e.g., prompt) to internal format
-        req = universal_ext_to_int_ref_converter(req, self._idc.ext_to_int_project_id)
+        req = universal_ext_to_int_ref_converter(
+            req,
+            self._idc.ext_to_int_project_id,
+            self._validate_internal_project_access,
+        )
         # The streamed chunks contain no project-scoped references, so we can
         # forward directly without additional ref conversion.
         return self._internal_trace_server.completions_create_stream(req)
