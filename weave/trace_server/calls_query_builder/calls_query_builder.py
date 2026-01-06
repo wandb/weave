@@ -91,6 +91,26 @@ ROLLED_UP_CALL_MERGED_STATS_TABLE_NAME = "rolled_up_cms"
 DISALLOWED_FILTERING_FIELDS = {"storage_size_bytes", "total_storage_size_bytes"}
 
 
+def build_where_clause(*conditions: str) -> str:
+    """Build a WHERE clause from multiple conditions.
+
+    Takes any number of condition strings
+    filters out empty ones, joins them with AND, and prepends WHERE.
+
+    Args:
+        *conditions: Variable number of condition strings (no AND/WHERE prefix)
+
+    Returns:
+        Complete WHERE clause, or empty string if no conditions
+    """
+    non_empty = [c for c in conditions if c]
+    if not non_empty:
+        return ""
+    if len(non_empty) == 1:
+        return f"WHERE {non_empty[0]}"
+    return "WHERE " + "\n        AND ".join(non_empty)
+
+
 def get_field_name(field: QueryFieldType) -> str:
     """Extract the field name from a QueryField.
 
@@ -194,9 +214,10 @@ class WhereFilters(BaseModel):
     object_refs: str = ""
 
     def to_sql(self) -> str:
-        """Convert all filters to SQL clauses suitable for WHERE clause.
+        """Convert all filters to a single combined condition string.
 
-        Returns a string with all non-empty filters, each starting with 'AND'.
+        Returns all non-empty filters joined with AND (no WHERE keyword).
+        Returns empty string if no filters.
         """
         filters = [
             self.id_mask,
@@ -213,7 +234,8 @@ class WhereFilters(BaseModel):
             self.ref_filter,
             self.object_refs,
         ]
-        return "\n        ".join(f for f in filters if f)
+        non_empty = [f for f in filters if f]
+        return "\n        AND ".join(non_empty) if non_empty else ""
 
 
 class QueryJoins(BaseModel):
@@ -856,7 +878,7 @@ class CallsQuery(BaseModel):
         # special optimization for call_ids filter
         id_mask = ""
         if self.hardcoded_filter and self.hardcoded_filter.filter.call_ids:
-            id_mask = f"AND ({table_alias}.id IN {param_slot(pb.add_param(self.hardcoded_filter.filter.call_ids), 'Array(String)')})"
+            id_mask = f"({table_alias}.id IN {param_slot(pb.add_param(self.hardcoded_filter.filter.call_ids), 'Array(String)')})"
 
         return WhereFilters(
             id_mask=id_mask,
@@ -1127,12 +1149,13 @@ class CallsQuery(BaseModel):
         )
 
         # Assemble the actual SQL query with GROUP BY for calls_merged
+        joins_sql = joins.to_sql()
+        joins_sql = f"\n        {joins_sql}" if joins_sql else ""
         raw_sql = f"""
         SELECT {select_fields_sql}
-        FROM calls_merged
-        {joins.to_sql()}
-        WHERE calls_merged.project_id = {param_slot(project_param, "String")}
-        {where_filters.to_sql()}
+        FROM calls_merged{joins_sql}
+        PREWHERE calls_merged.project_id = {param_slot(project_param, "String")}
+        {build_where_clause(where_filters.to_sql())}
         GROUP BY (calls_merged.project_id, calls_merged.id)
         {having_filter_sql}
         {order_by_sql}
@@ -1199,7 +1222,7 @@ class CallsQuery(BaseModel):
 
         where_conditions_sql = ""
         if where_conditions:
-            where_conditions_sql += "AND " + combine_conditions(where_conditions, "AND")
+            where_conditions_sql = combine_conditions(where_conditions, "AND")
         order_by_sql, limit_sql, offset_sql, needs_feedback_order = (
             self._build_order_limit_offset(
                 pb,
@@ -1219,17 +1242,23 @@ class CallsQuery(BaseModel):
             field_to_object_join_alias_map=field_to_object_join_alias_map,
         )
 
+        # Combine all WHERE clause filters
+        where_clause = build_where_clause(
+            id_subquery_sql,
+            trace_id_sql,
+            trace_roots_sql,
+            op_name_sql,
+            where_conditions_sql,
+        )
+
         # Assemble the actual SQL query WITHOUT GROUP BY for calls_complete
+        joins_sql = joins.to_sql()
+        joins_sql = f"\n        {joins_sql}" if joins_sql else ""
         raw_sql = f"""
         SELECT {select_fields_sql}
-        FROM calls_complete
-        {joins.to_sql()}
-        WHERE calls_complete.project_id = {param_slot(project_param, "String")}
-        {id_subquery_sql}
-        {trace_id_sql}
-        {trace_roots_sql}
-        {op_name_sql}
-        {where_conditions_sql}
+        FROM calls_complete{joins_sql}
+        PREWHERE calls_complete.project_id = {param_slot(project_param, "String")}
+        {where_clause}
         {order_by_sql}
         {limit_sql}
         {offset_sql}
@@ -1505,7 +1534,7 @@ def process_op_name_filter_to_sql(
     # Account for unmerged call parts by including null op_name (call ends)
     or_conditions += [f"{op_field_sql} IS NULL"]
 
-    return " AND " + combine_conditions(or_conditions, "OR")
+    return combine_conditions(or_conditions, "OR")
 
 
 def process_trace_id_filter_to_sql(
@@ -1531,7 +1560,7 @@ def process_trace_id_filter_to_sql(
     else:
         return ""
 
-    return f" AND ({trace_cond} OR {trace_id_field_sql} IS NULL)"
+    return f"({trace_cond} OR {trace_id_field_sql} IS NULL)"
 
 
 def process_thread_id_filter_to_sql(
@@ -1561,7 +1590,7 @@ def process_thread_id_filter_to_sql(
     else:
         return ""
 
-    return f" AND ({thread_cond} OR {thread_id_field_sql} IS NULL)"
+    return f"({thread_cond} OR {thread_id_field_sql} IS NULL)"
 
 
 def process_turn_id_filter_to_sql(
@@ -1591,7 +1620,7 @@ def process_turn_id_filter_to_sql(
     else:
         return ""
 
-    return f" AND ({turn_cond} OR {turn_id_field_sql} IS NULL)"
+    return f"({turn_cond} OR {turn_id_field_sql} IS NULL)"
 
 
 def process_trace_roots_only_filter_to_sql(
@@ -1605,7 +1634,7 @@ def process_trace_roots_only_filter_to_sql(
 
     parent_id_field_sql = get_field_sql_for_filter("parent_id", strategy, param_builder)
 
-    return f"AND ({parent_id_field_sql} IS NULL)"
+    return f"({parent_id_field_sql} IS NULL)"
 
 
 def process_parent_ids_filter_to_sql(
@@ -1621,7 +1650,7 @@ def process_parent_ids_filter_to_sql(
 
     parent_ids_sql = f"{parent_id_field_sql} IN {param_slot(param_builder.add_param(hardcoded_filter.filter.parent_ids), 'Array(String)')}"
 
-    return f"AND ({parent_ids_sql} OR {parent_id_field_sql} IS NULL)"
+    return f"({parent_ids_sql} OR {parent_id_field_sql} IS NULL)"
 
 
 def process_ref_filters_to_sql(
@@ -1661,7 +1690,7 @@ def process_ref_filters_to_sql(
     if not ref_filters:
         return ""
 
-    return " AND (" + combine_conditions(ref_filters, "AND") + ")"
+    return "(" + combine_conditions(ref_filters, "AND") + ")"
 
 
 def process_object_refs_filter_to_opt_sql(
@@ -1675,15 +1704,19 @@ def process_object_refs_filter_to_opt_sql(
 
     # Optimization for filtering with refs, only include calls that have non-zero
     # input refs when we are conditioning on refs in inputs, or is a naked call end.
-    refs_filter_opt_sql = ""
+    conditions = []
     if "inputs_dump" in object_ref_fields_consumed:
-        refs_filter_opt_sql += f"AND (length({table_alias}.input_refs) > 0 OR {table_alias}.started_at IS NULL)"
+        conditions.append(
+            f"(length({table_alias}.input_refs) > 0 OR {table_alias}.started_at IS NULL)"
+        )
     # If we are conditioning on output refs, filter down calls to those with non-zero
     # output refs, or they are a naked call start.
     if "output_dump" in object_ref_fields_consumed:
-        refs_filter_opt_sql += f"AND (length({table_alias}.output_refs) > 0 OR {table_alias}.ended_at IS NULL)"
+        conditions.append(
+            f"(length({table_alias}.output_refs) > 0 OR {table_alias}.ended_at IS NULL)"
+        )
 
-    return refs_filter_opt_sql
+    return " AND ".join(conditions) if conditions else ""
 
 
 def process_wb_run_ids_filter_to_sql(
@@ -1700,7 +1733,7 @@ def process_wb_run_ids_filter_to_sql(
     wb_run_id_field_sql = get_field_sql_for_filter("wb_run_id", strategy, param_builder)
     wb_run_id_filter_sql = f"{wb_run_id_field_sql} IN {param_slot(param_builder.add_param(wb_run_ids), 'Array(String)')}"
 
-    return f"AND ({wb_run_id_filter_sql} OR {wb_run_id_field_sql} IS NULL)"
+    return f"({wb_run_id_filter_sql} OR {wb_run_id_field_sql} IS NULL)"
 
 
 def process_calls_filter_to_conditions(
@@ -1773,7 +1806,7 @@ def make_id_subquery(
 ) -> str:
     if id_subquery_name is None:
         return ""
-    return f"AND ({table_alias}.id IN {id_subquery_name})"
+    return f"({table_alias}.id IN {id_subquery_name})"
 
 
 ######### STATS QUERY HANDLING ##########
@@ -1834,6 +1867,110 @@ def build_calls_stats_query(
     return (calls_query_sql, aggregated_columns.keys())
 
 
+def _build_direct_count_query(
+    req: tsi.CallsQueryStatsReq,
+    param_builder: ParamBuilder,
+    read_table: ReadTable,
+) -> str:
+    """Build a direct COUNT query without subqueries.
+
+    This generates: SELECT count() FROM table WHERE conditions
+    instead of: SELECT count() FROM (SELECT id FROM table WHERE conditions)
+
+    Only used for simple count queries on calls_complete without storage size.
+
+    Args:
+        req: The stats query request
+        param_builder: Parameter builder for query parameterization
+        read_table: Read table to query
+
+    Returns:
+        SQL query string
+    """
+    table_alias = read_table.value
+    strategy = get_table_strategy(read_table)
+    where_conditions: list[str] = []
+
+    # Project ID will be in PREWHERE clause
+    project_param = param_builder.add_param(req.project_id)
+
+    # Add hardcoded filter conditions
+    if req.filter is not None:
+        hardcoded_filter = HardCodedFilter(filter=req.filter, read_table=read_table)
+
+        # Handle special filters that need custom processing
+        if req.filter.trace_roots_only:
+            where_conditions.append(f"{table_alias}.parent_id IS NULL")
+
+        if req.filter.op_names:
+            op_name_sql = process_op_name_filter_to_sql(
+                hardcoded_filter, param_builder, strategy
+            )
+            if op_name_sql:
+                where_conditions.append(op_name_sql)
+
+        if req.filter.trace_ids:
+            trace_id_sql = process_trace_id_filter_to_sql(
+                hardcoded_filter, param_builder, strategy
+            )
+            if trace_id_sql:
+                where_conditions.append(trace_id_sql)
+
+        if req.filter.thread_ids:
+            thread_id_sql = process_thread_id_filter_to_sql(
+                hardcoded_filter, param_builder, strategy
+            )
+            if thread_id_sql:
+                where_conditions.append(thread_id_sql)
+
+        if req.filter.turn_ids:
+            turn_id_sql = process_turn_id_filter_to_sql(
+                hardcoded_filter, param_builder, strategy
+            )
+            if turn_id_sql:
+                where_conditions.append(turn_id_sql)
+
+        # Process remaining standard filter conditions
+        filter_conditions = process_calls_filter_to_conditions(
+            req.filter, param_builder, table_alias, read_table
+        )
+        where_conditions.extend(filter_conditions)
+
+    where_conditions.append(
+        f"{get_field_by_name('deleted_at', read_table).as_sql(param_builder, table_alias)} IS NULL"
+    )
+
+    if req.query is not None:
+        # Process the query expression
+        query_filter = process_query_to_conditions(
+            req.query,
+            param_builder,
+            table_alias,
+            use_agg_fn=False,
+            read_table=read_table,
+        )
+        where_conditions.extend(query_filter.conditions)
+
+    # Build WHERE clause
+    where_clause = ""
+    if where_conditions:
+        where_clause = "WHERE " + " AND ".join(where_conditions)
+
+    # Add LIMIT if specified
+    limit_clause = f"LIMIT {req.limit}" if req.limit is not None else ""
+
+    # Generate the query with PREWHERE for project_id optimization
+    raw_sql = f"""
+    SELECT count()
+    FROM {table_alias}
+    PREWHERE {table_alias}.project_id = {param_slot(project_param, "String")}
+    {where_clause}
+    {limit_clause}
+    """
+
+    return safely_format_sql(raw_sql, logger)
+
+
 def _try_optimized_stats_query(
     req: tsi.CallsQueryStatsReq,
     param_builder: ParamBuilder,
@@ -1866,6 +2003,10 @@ def _try_optimized_stats_query(
         return _optimized_wb_run_id_not_null_query(
             req.project_id, param_builder, read_table
         )
+
+    # Pattern 3: Uses direct COUNT(*) instead of subquery for better performance
+    if not req.include_total_storage_size:
+        return _build_direct_count_query(req, param_builder, read_table)
 
     return None
 
