@@ -5,6 +5,7 @@ results to server-side calculation, enabling fire-and-forget publishing.
 """
 
 import json
+import re
 from unittest.mock import Mock
 
 import pytest
@@ -12,7 +13,12 @@ import pytest
 from weave.trace.refs import ObjectRef, TableRef
 from weave.trace.serialization.serialize import _ref_to_internal_uri, to_json_internal
 from weave.trace_server import refs_internal
-from weave.trace_server.client_server_common.digest import bytes_digest, str_digest
+from weave.trace_server.client_server_common.digest import (
+    bytes_digest,
+    json_digest,
+    str_digest,
+    table_digest_from_row_digests,
+)
 from weave.trace_server.trace_server_converter import (
     _extract_project_from_internal_ref,
     universal_ext_to_int_ref_converter,
@@ -278,3 +284,58 @@ class TestServerInternalRefValidation:
             result["ref"]
             == "weave-trace-internal:///CONVERTED_PROJECT/object/myobj:digest"
         )
+
+
+class TestJsonDigest:
+    """Tests for json_digest with stable key ordering."""
+
+    def test_json_digest_is_deterministic(self) -> None:
+        """Verify json_digest produces consistent results."""
+        data = {"key": "value", "num": 42}
+        digest1 = json_digest(data)
+        digest2 = json_digest(data)
+        assert digest1 == digest2
+
+    def test_json_digest_stable_to_dict_order(self) -> None:
+        """Verify dict insertion order doesn't affect digest."""
+        v1 = {"a": 1, "b": 2, "c": 3}
+        v2 = {"c": 3, "b": 2, "a": 1}
+        assert json_digest(v1) == json_digest(v2)
+
+    def test_json_digest_stable_nested_dicts(self) -> None:
+        """Verify nested dicts are also order-stable."""
+        v1 = {"outer": {"a": 1, "b": 2}, "x": {"y": 1, "z": 2}}
+        v2 = {"x": {"z": 2, "y": 1}, "outer": {"b": 2, "a": 1}}
+        assert json_digest(v1) == json_digest(v2)
+
+    def test_json_digest_different_values_different_digest(self) -> None:
+        """Verify different values produce different digests."""
+        v1 = {"a": 1}
+        v2 = {"a": 2}
+        assert json_digest(v1) != json_digest(v2)
+
+
+class TestTableDigestFromRowDigests:
+    """Tests for table_digest_from_row_digests."""
+
+    def test_table_digest_is_hex(self) -> None:
+        """Verify table digest is hex-encoded."""
+        digest = table_digest_from_row_digests(["row1", "row2"])
+        assert re.fullmatch(r"[0-9a-f]{64}", digest) is not None
+
+    def test_table_digest_is_order_dependent(self) -> None:
+        """Verify row order affects the digest."""
+        d1 = table_digest_from_row_digests(["row1", "row2"])
+        d2 = table_digest_from_row_digests(["row2", "row1"])
+        assert d1 != d2
+
+    def test_table_digest_is_deterministic(self) -> None:
+        """Verify same rows produce same digest."""
+        d1 = table_digest_from_row_digests(["row1", "row2", "row3"])
+        d2 = table_digest_from_row_digests(["row1", "row2", "row3"])
+        assert d1 == d2
+
+    def test_table_digest_empty_table(self) -> None:
+        """Verify empty table produces valid digest."""
+        digest = table_digest_from_row_digests([])
+        assert re.fullmatch(r"[0-9a-f]{64}", digest) is not None

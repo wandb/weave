@@ -1,10 +1,15 @@
 from typing import Any
 
 from weave.trace_server import refs_internal
-from weave.trace_server.client_server_common.digest import bytes_digest, str_digest
+from weave.trace_server.client_server_common.digest import (
+    bytes_digest,
+    json_digest,
+    str_digest,
+    table_digest_from_row_digests,
+)
 
 # Re-export for backward compatibility
-__all__ = ["bytes_digest", "str_digest"]
+__all__ = ["bytes_digest", "str_digest", "json_digest", "table_digest_from_row_digests"]
 
 TRACE_REF_SCHEME = "weave"
 ARTIFACT_REF_SCHEME = "wandb-artifact"

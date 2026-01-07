@@ -163,6 +163,7 @@ from weave.trace_server.trace_server_interface_util import (
     bytes_digest,
     extract_refs_from_values,
     str_digest,
+    table_digest_from_row_digests,
 )
 from weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker import (
     EvaluateModelArgs,
@@ -1125,11 +1126,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
 
         row_digests = [r[1] for r in insert_rows]
-
-        table_hasher = hashlib.sha256()
-        for row_digest in row_digests:
-            table_hasher.update(row_digest.encode())
-        digest = table_hasher.hexdigest()
+        digest = table_digest_from_row_digests(row_digests)
 
         self._insert(
             "tables",
@@ -1213,10 +1210,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 column_names=["project_id", "digest", "refs", "val_dump"],
             )
 
-        table_hasher = hashlib.sha256()
-        for row_digest in final_row_digests:
-            table_hasher.update(row_digest.encode())
-        digest = table_hasher.hexdigest()
+        digest = table_digest_from_row_digests(final_row_digests)
 
         self._insert(
             "tables",
@@ -1229,11 +1223,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self, req: tsi.TableCreateFromDigestsReq
     ) -> tsi.TableCreateFromDigestsRes:
         """Create a table by specifying row digests, instead actual rows."""
-        # Calculate table digest from row digests
-        table_hasher = hashlib.sha256()
-        for row_digest in req.row_digests:
-            table_hasher.update(row_digest.encode())
-        digest = table_hasher.hexdigest()
+        digest = table_digest_from_row_digests(req.row_digests)
 
         # Insert into tables table
         self._insert(
