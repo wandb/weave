@@ -34,16 +34,7 @@ from weave.trace_server_bindings.remote_http_trace_server import (
 
 
 def get_total_mock_calls(server) -> int:
-    """Get total number of mock calls, handling shared mock objects."""
-    if (
-        server._send_calls_start_batch_to_server
-        is server._send_calls_end_batch_to_server
-    ):
-        # Both methods point to the same mock (fixture uses shared_mock),
-        # so just return one count to avoid double-counting
-        return server._send_calls_start_batch_to_server.call_count
-
-    # Different mocks for start and end, sum both counts
+    """Get total number of batch send calls made."""
     return (
         server._send_calls_start_batch_to_server.call_count
         + server._send_calls_end_batch_to_server.call_count
@@ -51,23 +42,16 @@ def get_total_mock_calls(server) -> int:
 
 
 def count_items_sent(server) -> int:
-    """Count total items sent across all mock calls.
-
-    Handles deduplication when both mocks point to the same object.
-    """
+    """Count total items sent across all mock calls."""
     total_items_sent = 0
-    seen_calls = set()
     for mock_method in [
         server._send_calls_start_batch_to_server,
         server._send_calls_end_batch_to_server,
     ]:
         for call in mock_method.call_args_list:
-            if call not in seen_calls:
-                seen_calls.add(call)
-                # Destructure: _send_calls_*_batch_to_server(entity, project, encoded_data)
-                (_, _, encoded_data) = call[0]
-                decoded_batch = json.loads(encoded_data.decode("utf-8"))
-                total_items_sent += len(decoded_batch["batch"])
+            (_, _, encoded_data) = call[0]
+            decoded_batch = json.loads(encoded_data.decode("utf-8"))
+            total_items_sent += len(decoded_batch["batch"])
     return total_items_sent
 
 
@@ -118,7 +102,6 @@ def test_small_batch_is_sent_in_one_request(server):
     assert get_total_mock_calls(server) == 1
 
     # Verify the single item was sent
-    # Destructure: _send_calls_start_batch_to_server(entity, project, encoded_data)
     (_, _, encoded_data) = server._send_calls_start_batch_to_server.call_args[0]
     decoded_batch = json.loads(encoded_data.decode("utf-8"))
     assert len(decoded_batch["batch"]) == 1
@@ -210,7 +193,6 @@ def test_dynamic_batch_size_adjustment(server):
 
     # Should have sent the batch of starts in one call
     assert server._send_calls_start_batch_to_server.call_count == 1
-    # Destructure: _send_calls_start_batch_to_server(entity, project, encoded_data)
     (_, _, encoded_data) = server._send_calls_start_batch_to_server.call_args[0]
     encoded_bytes = len(encoded_data)
     estimated_bytes_per_item = encoded_bytes / 10
@@ -250,7 +232,6 @@ def test_non_uniform_batch_items(server):
     # Verify all 7 start items were sent
     total_items_sent = 0
     for call in server._send_calls_start_batch_to_server.call_args_list:
-        # Destructure: _send_calls_start_batch_to_server(entity, project, encoded_data)
         (_, _, encoded_data) = call[0]
         decoded_batch = json.loads(encoded_data.decode("utf-8"))
         total_items_sent += len(decoded_batch["batch"])

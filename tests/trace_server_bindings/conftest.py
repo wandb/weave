@@ -94,16 +94,14 @@ def server(request, server_class):
     """Common server fixture that uses server_class based on the CLI flag."""
     server_ = server_class("http://example.com", should_batch=True)
 
-    shared_mock = MagicMock()
-
     if request.param == "normal":
-        server_._send_calls_start_batch_to_server = shared_mock
-        server_._send_calls_end_batch_to_server = shared_mock
+        server_._send_calls_start_batch_to_server = MagicMock()
+        server_._send_calls_end_batch_to_server = MagicMock()
     elif request.param == "small_limit":
         server_.remote_request_bytes_limit = 1024  # 1kb
-        server_._send_calls_start_batch_to_server = shared_mock
-        server_._send_calls_end_batch_to_server = shared_mock
-        server_._send_batch_to_server = shared_mock
+        server_._send_calls_start_batch_to_server = MagicMock()
+        server_._send_calls_end_batch_to_server = MagicMock()
+        server_._send_batch_to_server = MagicMock()
     elif request.param == "fast_retrying":
         fast_retry = tenacity.retry(
             wait=tenacity.wait_fixed(0.1),
