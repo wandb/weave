@@ -213,6 +213,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self._kafka_producer: KafkaProducer | None = None
         self._evaluate_model_dispatcher = evaluate_model_dispatcher
         self._table_routing_resolver: TableRoutingResolver | None = None
+        self._shard_hosts: list[tuple[str, int]] | None = None
 
     @property
     def _flush_immediately(self) -> bool:
@@ -801,16 +802,22 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def _update_calls_complete_batch(
         self, end_calls: list[tsi.EndedCallSchemaForInsert]
     ) -> None:
-        """Update calls_complete table with end call data."""
+        """Update calls_complete table with end call data.
+
+        HACK: In distributed mode, runs the UPDATE on each shard individually to avoid
+        ClickHouse lightweight-update edge cases that can cause 'Block structure
+        mismatch in patch parts stream' errors when using ON CLUSTER.
+        """
         if not end_calls:
             return
 
         pb = ParamBuilder()
         table_name = self._get_calls_complete_table_name()
+        # HACK: Build the UPDATE without ON CLUSTER - we handle per-shard execution ourselves
         command = build_calls_complete_batch_update_query(
-            end_calls, pb, table_name, self.clickhouse_cluster_name
+            end_calls, pb, table_name, cluster_name=None
         )
-        self._command(command, pb.get_params())
+        self._command_on_all_shards(command, pb.get_params())
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.calls_end_batch_v2")
     def calls_end_batch(self, req: tsi.CallsEndBatchReq) -> tsi.CallsEndBatchRes:
@@ -1165,6 +1172,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     ) -> tsi.CallsDeleteRes:
         """Update the deleted_at field for a batch of calls in the calls_complete table.
 
+        In distributed mode, runs the UPDATE on each shard individually to avoid
+        ClickHouse lightweight-update edge cases that can cause 'Block structure
+        mismatch in patch parts stream' errors when using ON CLUSTER.
+
         Args:
             project_id: The project ID
             call_ids: The list of call IDs to delete
@@ -1184,12 +1195,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             updated_at=deleted_at,
             pb=pb,
             table_name=table_name,
-            cluster_name=self.clickhouse_cluster_name,
+            cluster_name=None,  # We handle per-shard execution ourselves
         )
         if update_sql is None:
             return tsi.CallsDeleteRes(num_deleted=0)
 
-        self._command(update_sql, pb.get_params())
+        self._command_on_all_shards(update_sql, pb.get_params())
 
         return tsi.CallsDeleteRes(num_deleted=len(call_ids))
 
@@ -1215,6 +1226,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
 
         # Update calls_complete if needed
+        # In distributed mode, runs the UPDATE on each shard individually to avoid
+        # ClickHouse lightweight-update edge cases with ON CLUSTER.
         if write_target in (WriteTarget.CALLS_COMPLETE, WriteTarget.BOTH):
             pb = ParamBuilder()
             assert req.wb_user_id is not None
@@ -1228,9 +1241,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 updated_at=datetime.datetime.now(),
                 pb=pb,
                 table_name=table_name,
-                cluster_name=self.clickhouse_cluster_name,
+                cluster_name=None,  # We handle per-shard execution ourselves
             )
-            self._command(update_query, pb.get_params())
+            self._command_on_all_shards(update_query, pb.get_params())
 
             # Early return only if CALLS_COMPLETE is the ONLY target
             if write_target == WriteTarget.CALLS_COMPLETE:
@@ -5154,6 +5167,122 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 },
             )
             raise
+
+    @property
+    def shard_hosts(self) -> list[tuple[str, int]]:
+        """Get one host per shard for per-shard mutation execution (cached).
+
+        For distributed ClickHouse with ReplicatedMergeTree, mutations (UPDATE/DELETE)
+        should be run once per shard to avoid concurrent patch part creation issues
+        when using ON CLUSTER (causes 'Block structure mismatch in patch parts stream').
+
+        Configured via WF_CLICKHOUSE_SHARD_HOSTS environment variable.
+        Format: comma-separated host:port pairs, one per shard.
+        Example: "shard1.example.com:8123,shard2.example.com:8123"
+
+        Returns:
+            List of (host, port) tuples, one per shard. Empty list if not in
+            distributed mode or WF_CLICKHOUSE_SHARD_HOSTS is not set.
+        """
+        if self._shard_hosts is not None:
+            return self._shard_hosts
+
+        # Not in distributed mode - no shards to iterate
+        if not self.use_distributed_mode:
+            self._shard_hosts = []
+            return self._shard_hosts
+
+        # Use explicitly configured shard hosts
+        configured_hosts = wf_env.wf_clickhouse_shard_hosts()
+        if configured_hosts:
+            self._shard_hosts = configured_hosts
+            logger.info(
+                "Using configured shard hosts from WF_CLICKHOUSE_SHARD_HOSTS",
+                extra={"shard_count": len(configured_hosts), "hosts": configured_hosts},
+            )
+            return self._shard_hosts
+
+        # No shard hosts configured
+        self._shard_hosts = []
+        return self._shard_hosts
+
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._command_on_all_shards")
+    def _command_on_all_shards(
+        self,
+        command: str,
+        parameters: dict[str, Any],
+        settings: dict[str, Any] | None = None,
+    ) -> None:
+        """Run a command on all shards in the cluster.
+
+        For UPDATE/DELETE mutations, ClickHouse's ON CLUSTER can cause 'Block structure
+        mismatch in patch parts stream' errors due to concurrent lightweight-update
+        execution across replicas. This method runs the mutation on one replica per
+        shard sequentially, letting ReplicatedMergeTree handle replication within each
+        shard.
+
+        Shard hosts must be configured via WF_CLICKHOUSE_SHARD_HOSTS environment variable.
+
+        In non-distributed mode or if shard hosts are not configured, falls back to
+        running the command on the current connection only.
+
+        Args:
+            command: The SQL command to execute
+            parameters: Query parameters
+            settings: Optional ClickHouse settings
+        """
+        shard_hosts = self.shard_hosts
+
+        print(">>>> doing command on all shards", shard_hosts)
+
+        # If not in distributed mode or can't get shard info, use current connection
+        if not shard_hosts:
+            if self.use_distributed_mode:
+                logger.warning(
+                    "No shard hosts available for per-shard mutation. "
+                    "Set WF_CLICKHOUSE_SHARD_HOSTS to externally-reachable shard addresses "
+                    "to enable proper per-shard mutation execution. "
+                    "Falling back to current connection only.",
+                )
+            self._command(command, parameters, settings)
+            return
+
+        # Run the command on each shard individually
+        for host, port in shard_hosts:
+            try:
+                if host == self._host and port == self._port:
+                    # Use existing client for current host
+                    self._command(command, parameters, settings)
+                else:
+                    # Create a temporary client for this shard
+                    client = clickhouse_connect.get_client(
+                        host=host,
+                        port=port,
+                        user=self._user,
+                        password=self._password,
+                        secure=port == 8443,
+                        database=self._database,
+                    )
+                    try:
+                        import time
+                        start = time.time()
+                        client.command(
+                            command, parameters=parameters, settings=settings
+                        )
+                        print(">>>> Fired command on shard host with custom client", host, port, time.time() - start, "seconds")
+                    finally:
+                        client.close()
+            except Exception as e:
+                logger.exception(
+                    "clickhouse_command_on_shard_error",
+                    extra={
+                        "error_str": str(e),
+                        "host": host,
+                        "port": port,
+                        "command": command,
+                    },
+                )
+                raise
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert")
     def _insert(

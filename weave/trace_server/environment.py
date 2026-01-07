@@ -118,6 +118,47 @@ def wf_clickhouse_use_distributed_tables() -> bool:
     )
 
 
+def wf_clickhouse_shard_hosts() -> list[tuple[str, int]] | None:
+    """Get externally-reachable shard hosts for per-shard mutation execution.
+
+    For distributed ClickHouse with ReplicatedMergeTree, mutations (UPDATE/DELETE)
+    should be run once per shard to avoid concurrent patch part creation issues
+    when using ON CLUSTER. This environment variable allows operators to specify
+    externally-reachable addresses for each shard.
+
+    Format: comma-separated list of host:port pairs, one per shard.
+    Example: "shard1.example.com:8123,shard2.example.com:8123"
+
+    Returns:
+        List of (host, port) tuples, one per shard. Returns None if not configured.
+    """
+    hosts_str = os.environ.get("WF_CLICKHOUSE_SHARD_HOSTS")
+    hosts_str = "127.0.0.1:8123,127.0.0.1:8124"
+    if not hosts_str:
+        return None
+
+    hosts: list[tuple[str, int]] = []
+    for host_port in hosts_str.split(","):
+        host_port = host_port.strip()
+        if not host_port:
+            continue
+        try:
+            if ":" in host_port:
+                host, port_str = host_port.rsplit(":", 1)
+                port = int(port_str)
+            else:
+                host = host_port
+                port = 8123  # Default ClickHouse HTTP port
+            hosts.append((host, port))
+        except ValueError:
+            logger.exception(
+                f"Invalid host:port in WF_CLICKHOUSE_SHARD_HOSTS: {host_port}"
+            )
+            continue
+
+    return hosts if hosts else None
+
+
 def wf_clickhouse_max_memory_usage() -> int | None:
     """The maximum memory usage for the clickhouse server."""
     mem = os.environ.get("WF_CLICKHOUSE_MAX_MEMORY_USAGE")

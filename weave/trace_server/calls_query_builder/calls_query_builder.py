@@ -2068,6 +2068,10 @@ def _build_array_value_clause(
 def _add_on_cluster_to_update(sql_query: str, cluster_name: str | None) -> str:
     """Add ON CLUSTER clause to UPDATE statement if cluster_name is provided.
 
+    Note: For distributed setups, prefer running updates per-shard without ON CLUSTER
+    (pass cluster_name=None) to avoid ClickHouse lightweight-update concurrency issues.
+    See ClickHouseTraceServer._command_on_all_shards for the recommended approach.
+
     Args:
         sql_query: The UPDATE SQL query
         cluster_name: The cluster name to use (if None, returns query unchanged)
