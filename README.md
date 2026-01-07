@@ -1,4 +1,6 @@
-# **Weave by Weights & Biases**
+# 🎉 **Weave by Weights & Biases** 🎊
+
+### ✨ Happy New Year 2026! ✨
 
 [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](http://wandb.me/weave_colab)
 [![Stable Version](https://img.shields.io/pypi/v/weave?color=green)](https://pypi.org/project/weave)
@@ -7,15 +9,15 @@
 )](https://github.com/wandb/weave)
 [![codecov](https://codecov.io/gh/wandb/weave/graph/badge.svg?token=YOUR_TOKEN)](https://codecov.io/gh/wandb/weave)
 
-Weave is a toolkit for developing Generative AI applications, built by [Weights & Biases](https://wandb.ai/).
+🥳 Weave is a toolkit for developing Generative AI applications, built by [Weights & Biases](https://wandb.ai/). Ring in the new year with better AI observability! 🎆
 
 ---
 
 You can use Weave to:
 
-- **Log and debug** language model inputs, outputs, and traces
-- **Build rigorous, apples-to-apples evaluations** for language model use cases
-- **Organize all the information** generated across the LLM workflow, from experimentation to evaluations to production
+- 🔍 **Log and debug** language model inputs, outputs, and traces
+- 📊 **Build rigorous, apples-to-apples evaluations** for language model use cases
+- 📁 **Organize all the information** generated across the LLM workflow, from experimentation to evaluations to production
 
 Our goal is to bring rigor, best-practices, and composability to the inherently experimental process of developing Generative AI software, without introducing cognitive overhead.
 
@@ -33,7 +35,7 @@ Our documentation site can be found [here](https://wandb.me/weave).
 - A [Weights & Biases account](https://wandb.ai/signup) (free tier available)
 
 
-## Quick Start
+## 🚀 Quick Start
 
 1. **Install Weave**:
    ```bash
@@ -118,11 +120,21 @@ sentence = "There are many fruits that were found on the recently discovered pla
 extract_fruit(sentence)
 ```
 
-## Contributing
+## 🤝 Contributing
 
 Interested in pulling back the hood or contributing? Awesome, before you dive in, here's what you need to know.
 
 We're in the process of 🧹 cleaning up 🧹. This codebase contains a large amount code for the "Weave engine" and "Weave boards", which we've put on pause as we focus on Tracing and Evaluations.
+
+---
+
+<div align="center">
+
+🎇 **Here's to a year of better AI development!** 🎇
+
+*May your traces be clear and your evaluations be rigorous in 2026!*
+
+</div>
 
 The Weave Tracing code is mostly in: `weave/trace` and `weave/trace_server`.
 
