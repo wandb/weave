@@ -13,7 +13,7 @@ import time
 from collections.abc import Callable, Sequence
 from concurrent.futures import Future
 from functools import cached_property
-from threading import Event, Lock, Timer
+from threading import Event, Lock
 from typing import TYPE_CHECKING, Any, TypedDict, cast
 
 import pydantic
@@ -36,6 +36,7 @@ from weave.trace.casting import CallsFilterLike, QueryLike, SortByLike
 from weave.trace.concurrent.futures import FutureExecutor
 from weave.trace.constants import TRACE_CALL_EMOJI
 from weave.trace.context import call_context
+from weave.trace.delayed_scheduler import DelayedScheduler
 from weave.trace.feedback import FeedbackQuery
 from weave.trace.interface_query_builder import (
     exists_expr,
@@ -357,6 +358,7 @@ class WeaveClient:
         self._call_start_enqueued: dict[str, Event] = {}
         self._pending_starts: dict[str, Callable[[], None]] = {}
         self._pending_starts_lock = Lock()
+        self._delayed_scheduler = DelayedScheduler()
 
     ################ High Level Convenience Methods ################
 
@@ -856,7 +858,7 @@ class WeaveClient:
                             func = self._pending_starts.pop(call_id)
                             self.future_executor.defer(func)
 
-                Timer(delay_seconds, on_timeout).start()
+                self._delayed_scheduler.schedule(delay_seconds, on_timeout)
         else:
 
             def on_complete(f: Future) -> None:
