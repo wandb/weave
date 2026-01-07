@@ -73,12 +73,15 @@ def wf_scoring_worker_check_cancellation() -> bool:
     When enabled, the worker checks for cancellation on every poll, allowing
     faster graceful shutdown. Useful for tests. Defaults to False.
     """
-    return os.environ.get("WF_SCORING_WORKER_CHECK_CANCELLATION", "false").lower() == "true"
+    return (
+        os.environ.get("WF_SCORING_WORKER_CHECK_CANCELLATION", "false").lower()
+        == "true"
+    )
 
 
 def wf_scoring_worker_kafka_consumer_group_id_override() -> str | None:
     """The Kafka consumer group ID override for the scoring worker.
-    
+
     Returns the override value if set via WF_SCORING_WORKER_KAFKA_CONSUMER_GROUP_ID,
     otherwise returns None. The scoring worker will use its own default if None.
     Useful for tests to set a unique value per test run to avoid offset issues.
