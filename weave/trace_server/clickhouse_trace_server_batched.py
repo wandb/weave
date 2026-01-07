@@ -270,6 +270,39 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self._table_routing_resolver = TableRoutingResolver()
         return self._table_routing_resolver
 
+    @property
+    def use_distributed_mode(self) -> bool:
+        """Check if ClickHouse is configured to use distributed tables.
+
+        Returns the value from WF_CLICKHOUSE_USE_DISTRIBUTED_TABLES environment variable.
+
+        Returns:
+            bool: True if using distributed tables, False otherwise.
+        """
+        return wf_env.wf_clickhouse_use_distributed_tables()
+
+    @property
+    def clickhouse_cluster_name(self) -> str | None:
+        """Get the ClickHouse cluster name from environment.
+
+        Returns:
+            str | None: The cluster name from WF_CLICKHOUSE_REPLICATED_CLUSTER, or None if not set.
+        """
+        return wf_env.wf_clickhouse_replicated_cluster()
+
+    def _get_calls_complete_table_name(self) -> str:
+        """Get the appropriate table name for calls_complete updates.
+
+        In distributed mode, UPDATE statements must target the local table
+        (with LOCAL_TABLE_SUFFIX) instead of the distributed table.
+
+        Returns:
+            str: Table name to use for UPDATE statements.
+        """
+        if self.use_distributed_mode:
+            return f"calls_complete{ch_settings.LOCAL_TABLE_SUFFIX}"
+        return "calls_complete"
+
     def _noop_project_version_latency_test(self, project_id: str) -> None:
         # NOOP for testing latency impact of project switcher
         try:
@@ -445,7 +478,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.kafka_producer.flush")
     def _flush_kafka_producer(self) -> None:
-        self.kafka_producer.flush()
+        if wf_env.wf_enable_online_eval():
+            self.kafka_producer.flush()
 
     @contextmanager
     def call_batch(self) -> Iterator[None]:
@@ -4575,7 +4609,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     def _run_migrations(self) -> None:
         logger.info("Running migrations")
-        migrator = wf_migrator.ClickHouseTraceServerMigrator(self._mint_client())
+        migrator = wf_migrator.get_clickhouse_trace_server_migrator(
+            self._mint_client(),
+            replicated=wf_env.wf_clickhouse_replicated(),
+            replicated_path=wf_env.wf_clickhouse_replicated_path(),
+            replicated_cluster=wf_env.wf_clickhouse_replicated_cluster(),
+            use_distributed=wf_env.wf_clickhouse_use_distributed_tables(),
+        )
         migrator.apply_migrations(self._database)
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._query_stream")
