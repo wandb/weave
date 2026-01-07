@@ -96,6 +96,47 @@ def assert_min_weave_version(
         raise ValueError(message)
 
 
+def assert_min_trace_server_version(
+    trace_server_version: str | None,
+    min_required_version: str | None,
+    trace_server_host: str = "https://trace.wandb.ai",
+) -> None:
+    """Check that the trace server version meets the client's minimum requirement.
+
+    Args:
+        trace_server_version: The version reported by the server, or None if not available.
+        min_required_version: The minimum version required by this client, or None if no requirement.
+        trace_server_host: The trace server URL (for error messages).
+
+    Raises:
+        ValueError: If the server version is below the minimum required version,
+            or if the client requires a version but the server doesn't report one.
+    """
+    # No requirement from client - skip check
+    if min_required_version is None:
+        return
+
+    # Client requires a version but server didn't report one (old server)
+    if trace_server_version is None:
+        message = (
+            f"This client requires trace server version >= {min_required_version}, "
+            f"but the server at {trace_server_host} does not report its version.\n"
+            "Please contact your administrator to upgrade the trace server, or "
+            "downgrade your `weave` package to a compatible version."
+        )
+        raise ValueError(message)
+
+    # Both versions available - compare them
+    if _parse_version(min_required_version) > _parse_version(trace_server_version):
+        message = (
+            f"The trace server at {trace_server_host} is running version {trace_server_version}, "
+            f"but this client requires version >= {min_required_version}.\n"
+            "Please contact your administrator to upgrade the trace server, or "
+            "downgrade your `weave` package to a compatible version."
+        )
+        raise ValueError(message)
+
+
 def print_init_message(
     username: str | None, entity_name: str, project_name: str, read_only: bool
 ) -> None:
