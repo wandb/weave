@@ -184,11 +184,13 @@ def init_weave(
         # In the future, we may want to throw here.
         min_required_version = "0.0.0"
         trace_server_version = None
-    init_message.assert_min_weave_version(min_required_version)
-    init_message.assert_min_trace_server_version(
+    if not init_message.check_min_weave_version(min_required_version):
+        return init_weave_disabled()
+    if not init_message.check_min_trace_server_version(
         trace_server_version,
         MIN_TRACE_SERVER_VERSION,
-    )
+    ):
+        return init_weave_disabled()
     init_message.print_init_message(
         username, entity_name, project_name, read_only=not ensure_project_exists
     )
