@@ -2041,14 +2041,30 @@ def _build_value_clause(
     is_array: bool,
     pb: ParamBuilder,
 ) -> str:
-    """Build the value clause for a CASE WHEN statement."""
-    if is_nullable and value is None:
-        return "NULL"
+    """Build the value clause for a CASE WHEN statement.
 
+    For nullable fields, we explicitly cast ALL values (both NULL and non-NULL)
+    to Nullable(type) to ensure consistent block structure during ClickHouse
+    lightweight update patch-part merging. Without explicit casting, different
+    CASE branches may have mismatched types (String vs Nullable(String)), causing
+    block structure mismatches in distributed/replicated environments during
+    concurrent patch-part merges.
+    """
     if is_array:
         if array_element_type is None:
             raise ValueError("array_element_type must be provided for array fields")
         return _build_array_value_clause(value, array_element_type, pb)
+
+    if is_nullable:
+        if value is None:
+            # Explicitly cast NULL to ensure consistent type inference across
+            # all patch parts during distributed lightweight updates
+            return f"CAST(NULL AS Nullable({clickhouse_type}))"
+        else:
+            # Cast non-NULL values to Nullable(type) as well to ensure all
+            # CASE branches have identical return types
+            value_param = pb.add_param(value)
+            return f"CAST({param_slot(value_param, clickhouse_type)} AS Nullable({clickhouse_type}))"
 
     value_param = pb.add_param(value)
     return param_slot(value_param, clickhouse_type)
