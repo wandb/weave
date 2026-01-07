@@ -184,7 +184,7 @@ def init_weave(
         # In the future, we may want to throw here.
         min_required_version = "0.0.0"
         trace_server_version = None
-    trace_server_url = remote_server.trace_server_url
+    trace_server_url = env.weave_trace_server_url()
     if not init_message.check_min_weave_version(min_required_version, trace_server_url):
         return init_weave_disabled()
     if not init_message.check_min_trace_server_version(
