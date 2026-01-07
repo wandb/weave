@@ -126,6 +126,50 @@ def test_clickhouse_storage_size_null_handling():
     assert ch_schema["total_storage_size_bytes"] is None
 
 
+def test_clickhouse_distributed_mode_properties():
+    """Test that ClickHouse distributed mode properties are correctly initialized."""
+    # Test with distributed mode enabled
+    with (
+        patch(
+            "weave.trace_server.environment.wf_clickhouse_use_distributed_tables"
+        ) as mock_distributed,
+        patch(
+            "weave.trace_server.environment.wf_clickhouse_replicated_cluster"
+        ) as mock_cluster,
+    ):
+        mock_distributed.return_value = True
+        mock_cluster.return_value = "test_cluster"
+
+        server = chts.ClickHouseTraceServer(host="test_host")
+
+        # Test distributed mode property
+        assert server.use_distributed_mode is True
+        assert server.clickhouse_cluster_name == "test_cluster"
+        from weave.trace_server import clickhouse_trace_server_settings as ch_settings
+
+        expected_table = f"calls_complete{ch_settings.LOCAL_TABLE_SUFFIX}"
+        assert server._get_calls_complete_table_name() == expected_table
+
+    # Test with distributed mode disabled
+    with (
+        patch(
+            "weave.trace_server.environment.wf_clickhouse_use_distributed_tables"
+        ) as mock_distributed,
+        patch(
+            "weave.trace_server.environment.wf_clickhouse_replicated_cluster"
+        ) as mock_cluster,
+    ):
+        mock_distributed.return_value = False
+        mock_cluster.return_value = None
+
+        server = chts.ClickHouseTraceServer(host="test_host")
+
+        # Test distributed mode property
+        assert server.use_distributed_mode is False
+        assert server.clickhouse_cluster_name is None
+        assert server._get_calls_complete_table_name() == "calls_complete"
+
+
 def test_completions_create_stream_custom_provider():
     """Test completions_create_stream for a custom provider (no call tracking)."""
     # Mock chunks to be returned by the stream
