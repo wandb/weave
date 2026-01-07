@@ -40,6 +40,8 @@ def test_batch_update_single_call():
     query = build_calls_complete_batch_update_query(end_calls, pb)
     params = pb.get_params()
 
+    # Note: Nullable fields use explicit CAST to ensure consistent block structure
+    # during ClickHouse lightweight update patch-part merging
     expected_query = """
         UPDATE calls_complete
         SET
@@ -60,11 +62,11 @@ def test_batch_update_single_call():
                 ELSE summary_dump
             END,
             exception = CASE
-                WHEN id = {pb_0:String} THEN NULL
+                WHEN id = {pb_0:String} THEN CAST(NULL AS Nullable(String))
                 ELSE exception
             END,
             wb_run_step_end = CASE
-                WHEN id = {pb_0:String} THEN NULL
+                WHEN id = {pb_0:String} THEN CAST(NULL AS Nullable(UInt64))
                 ELSE wb_run_step_end
             END,
             updated_at = now64(3)
