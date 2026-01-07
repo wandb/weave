@@ -7,6 +7,32 @@
 - Always follow the established coding patterns and conventions in the codebase.
 - Document any significant architectural decisions or changes.
 
+## Python Import Rules
+
+**IMPORTANT: Always place imports at the top of Python files.**
+
+- All imports must be at the module level (top of the file), not inside functions or methods.
+- The only exceptions are:
+  - Circular import avoidance (must be documented with a comment explaining why)
+  - Optional dependencies that may not be installed (must be wrapped in try/except)
+  - TYPE_CHECKING imports for type hints only
+- This rule is enforced by the `E402` ruff lint rule.
+
+❌ **Never do this:**
+```python
+def my_function():
+    import re  # BAD: import inside function
+    return re.match(...)
+```
+
+✅ **Always do this:**
+```python
+import re  # GOOD: import at top of file
+
+def my_function():
+    return re.match(...)
+```
+
 ## Development Setup
 
 - Your machine should be setup for you automatically via `bin/codex_setup.sh`

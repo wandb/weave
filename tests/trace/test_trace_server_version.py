@@ -2,6 +2,8 @@
 
 from weave.trace.init_message import check_min_trace_server_version
 
+TEST_SERVER_URL = "https://test.trace.server"
+
 
 class TestCheckMinTraceServerVersion:
     """Test check_min_trace_server_version with various client/server version combinations."""
@@ -13,6 +15,7 @@ class TestCheckMinTraceServerVersion:
         result = check_min_trace_server_version(
             trace_server_version=None,
             min_required_version=None,
+            trace_server_url=TEST_SERVER_URL,
         )
         assert result is True
 
@@ -21,6 +24,7 @@ class TestCheckMinTraceServerVersion:
         result = check_min_trace_server_version(
             trace_server_version="1.0.0",
             min_required_version=None,
+            trace_server_url=TEST_SERVER_URL,
         )
         assert result is True
 
@@ -31,6 +35,7 @@ class TestCheckMinTraceServerVersion:
         result = check_min_trace_server_version(
             trace_server_version=None,
             min_required_version="0.5.0",
+            trace_server_url=TEST_SERVER_URL,
         )
         assert result is False
 
@@ -39,6 +44,7 @@ class TestCheckMinTraceServerVersion:
         result = check_min_trace_server_version(
             trace_server_version="0.3.0",
             min_required_version="0.5.0",
+            trace_server_url=TEST_SERVER_URL,
         )
         assert result is False
 
@@ -47,6 +53,7 @@ class TestCheckMinTraceServerVersion:
         result = check_min_trace_server_version(
             trace_server_version="0.5.0",
             min_required_version="0.5.0",
+            trace_server_url=TEST_SERVER_URL,
         )
         assert result is True
 
@@ -55,6 +62,7 @@ class TestCheckMinTraceServerVersion:
         result = check_min_trace_server_version(
             trace_server_version="1.0.0",
             min_required_version="0.5.0",
+            trace_server_url=TEST_SERVER_URL,
         )
         assert result is True
 
@@ -66,6 +74,7 @@ class TestCheckMinTraceServerVersion:
         result = check_min_trace_server_version(
             trace_server_version="0.5.0-dev0",
             min_required_version="0.5.0",
+            trace_server_url=TEST_SERVER_URL,
         )
         assert result is False
 
@@ -75,5 +84,6 @@ class TestCheckMinTraceServerVersion:
         result = check_min_trace_server_version(
             trace_server_version="0.5.0",
             min_required_version="0.5.0-dev0",
+            trace_server_url=TEST_SERVER_URL,
         )
         assert result is True
