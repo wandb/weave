@@ -16,7 +16,7 @@
   - Circular import avoidance (must be documented with a comment explaining why)
   - Optional dependencies that may not be installed (must be wrapped in try/except)
   - TYPE_CHECKING imports for type hints only
-- This rule is enforced by the `E402` ruff lint rule.
+- Note: The `E402` ruff lint rule enforces module-level imports are at the top, but imports inside functions are not caught by linting. **Agents must self-enforce this rule.**
 
 ❌ **Never do this:**
 ```python
