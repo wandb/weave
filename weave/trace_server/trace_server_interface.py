@@ -1976,13 +1976,6 @@ class TraceServerInterface(Protocol):
     ) -> EnsureProjectExistsRes:
         return EnsureProjectExistsRes(project_name=project)
 
-    def get_project_id(self, req: GetProjectIdReq) -> GetProjectIdRes:
-        """Get the internal project ID for a project.
-
-        Returns None for internal_project_id if not supported (older servers).
-        """
-        return GetProjectIdRes(internal_project_id=None)
-
     # OTEL API
     def otel_export(self, req: OtelExportReq) -> OtelExportRes: ...
 

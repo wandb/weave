@@ -118,15 +118,6 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
     ) -> tsi.EnsureProjectExistsRes:
         return self._internal_trace_server.ensure_project_exists(entity, project)
 
-    def get_project_id(self, req: tsi.GetProjectIdReq) -> tsi.GetProjectIdRes:
-        """Get internal project ID for a project.
-
-        This enables clients to compute digests locally by constructing
-        internal refs with the correct project ID.
-        """
-        internal_project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return tsi.GetProjectIdRes(internal_project_id=internal_project_id)
-
     def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         if req.wb_run_id is not None:
