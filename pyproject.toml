@@ -227,7 +227,6 @@ select = [
   "F541",    # https://docs.astral.sh/ruff/rules/f-string-missing-placeholders/
   "I",       # https://docs.astral.sh/ruff/rules/#isort-i
   "W",       # https://docs.astral.sh/ruff/rules/#warning-w
-  "E402",    # https://docs.astral.sh/ruff/rules/module-import-not-at-top-of-file/
   "F401",    # https://docs.astral.sh/ruff/rules/unused-import/
   "F402",    # https://docs.astral.sh/ruff/rules/import-shadowed-by-loop-var/
   "F6",      # https://docs.astral.sh/ruff/rules/multi-value-repeated-key-literal/
