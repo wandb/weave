@@ -214,6 +214,9 @@ class UserSettings(BaseModel):
     If set to 0, call starts are sent immediately.
     If set to -1, call starts are only sent when the call ends.
 
+    Note: The maximum effective delay is capped by MAX_CALL_START_DELAY in
+    weave.trace.weave_client (currently 10 minutes).
+
     Can be overridden with the environment variable `WEAVE_CALL_START_DELAY`
     """
 

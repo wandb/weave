@@ -26,6 +26,7 @@ from weave.trace_server_bindings.http_utils import (
 from weave.trace_server_bindings.models import (
     CompleteBatchItem,
     EndBatchItem,
+    EntityProjectInfo,
     ServerInfoRes,
     StartBatchItem,
 )
@@ -213,7 +214,7 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
 
     def _extract_entity_project(
         self, batch: list[StartBatchItem | EndBatchItem | CompleteBatchItem]
-    ) -> tuple[str, str, str]:
+    ) -> EntityProjectInfo:
         """Extract entity, project, and project_id from first batch item."""
         if not batch:
             raise ValueError("Cannot extract entity/project from empty batch")
@@ -237,7 +238,7 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         if not entity or not project:
             raise ValueError(f"Invalid project_id: {project_id}")
 
-        return entity, project, project_id
+        return EntityProjectInfo(entity=entity, project=project, project_id=project_id)
 
     def _get_batch_item_id(
         self, item: StartBatchItem | EndBatchItem | CompleteBatchItem
@@ -289,14 +290,14 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         ends = [item for item in batch if isinstance(item, EndBatchItem)]
 
         first_items = starts_and_completes or ends
-        entity, project, project_id = self._extract_entity_project(first_items)
+        ep_info = self._extract_entity_project(first_items)
 
         if starts_and_completes:
             self._send_batch_group(
                 batch=starts_and_completes,
-                project_id=project_id,
-                entity=entity,
-                project=project,
+                project_id=ep_info.project_id,
+                entity=ep_info.entity,
+                project=ep_info.project,
                 batch_name="call_starts",
                 encode_fn=self._encode_start_batch,
                 send_fn=self._send_calls_start_batch_to_server,
@@ -306,9 +307,9 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         if ends:
             self._send_batch_group(
                 batch=ends,
-                project_id=project_id,
-                entity=entity,
-                project=project,
+                project_id=ep_info.project_id,
+                entity=ep_info.entity,
+                project=ep_info.project,
                 batch_name="call_ends",
                 encode_fn=self._encode_end_batch,
                 send_fn=self._send_calls_end_batch_to_server,
