@@ -279,6 +279,39 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self._table_routing_resolver = TableRoutingResolver()
         return self._table_routing_resolver
 
+    @property
+    def use_distributed_mode(self) -> bool:
+        """Check if ClickHouse is configured to use distributed tables.
+
+        Returns the value from WF_CLICKHOUSE_USE_DISTRIBUTED_TABLES environment variable.
+
+        Returns:
+            bool: True if using distributed tables, False otherwise.
+        """
+        return wf_env.wf_clickhouse_use_distributed_tables()
+
+    @property
+    def clickhouse_cluster_name(self) -> str | None:
+        """Get the ClickHouse cluster name from environment.
+
+        Returns:
+            str | None: The cluster name from WF_CLICKHOUSE_REPLICATED_CLUSTER, or None if not set.
+        """
+        return wf_env.wf_clickhouse_replicated_cluster()
+
+    def _get_calls_complete_table_name(self) -> str:
+        """Get the appropriate table name for calls_complete updates.
+
+        In distributed mode, UPDATE statements must target the local table
+        (with LOCAL_TABLE_SUFFIX) instead of the distributed table.
+
+        Returns:
+            str: Table name to use for UPDATE statements.
+        """
+        if self.use_distributed_mode:
+            return f"calls_complete{ch_settings.LOCAL_TABLE_SUFFIX}"
+        return "calls_complete"
+
     def _get_existing_ops_from_spans(
         self, seen_ids: set[str], project_id: str, limit: int | None = None
     ) -> list[tsi.ObjSchema]:
@@ -773,7 +806,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             return
 
         pb = ParamBuilder()
-        command = build_calls_complete_batch_update_query(end_calls, pb)
+        table_name = self._get_calls_complete_table_name()
+        command = build_calls_complete_batch_update_query(
+            end_calls, pb, table_name, self.clickhouse_cluster_name
+        )
         self._command(command, pb.get_params())
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.calls_end_batch_v2")
@@ -1138,6 +1174,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         pb = ParamBuilder()
         deleted_at = datetime.datetime.now()
+        table_name = self._get_calls_complete_table_name()
+
         update_sql = build_calls_complete_batch_delete_query(
             project_id=project_id,
             wb_user_id=wb_user_id,
@@ -1145,11 +1183,14 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             deleted_at=deleted_at,
             updated_at=deleted_at,
             pb=pb,
+            table_name=table_name,
+            cluster_name=self.clickhouse_cluster_name,
         )
         if update_sql is None:
             return tsi.CallsDeleteRes(num_deleted=0)
 
         self._command(update_sql, pb.get_params())
+
         return tsi.CallsDeleteRes(num_deleted=len(call_ids))
 
     def _ensure_valid_update_field(self, req: tsi.CallUpdateReq) -> None:
@@ -1177,6 +1218,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if write_target in (WriteTarget.CALLS_COMPLETE, WriteTarget.BOTH):
             pb = ParamBuilder()
             assert req.wb_user_id is not None
+            table_name = self._get_calls_complete_table_name()
+
             update_query = build_calls_complete_update_display_name_query(
                 project_id=req.project_id,
                 call_id=req.call_id,
@@ -1184,8 +1227,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 wb_user_id=req.wb_user_id,
                 updated_at=datetime.datetime.now(),
                 pb=pb,
+                table_name=table_name,
+                cluster_name=self.clickhouse_cluster_name,
             )
             self._command(update_query, pb.get_params())
+
             # Early return only if CALLS_COMPLETE is the ONLY target
             if write_target == WriteTarget.CALLS_COMPLETE:
                 return tsi.CallUpdateRes()
