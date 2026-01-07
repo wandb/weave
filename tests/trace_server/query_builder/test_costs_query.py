@@ -25,9 +25,8 @@ def test_query_light_column_with_costs() -> None:
         WITH
             filtered_calls AS (
                 SELECT calls_merged.id AS id
-                FROM calls_merged
-                WHERE calls_merged.project_id = {pb_1:String}
-                    AND ((calls_merged.op_name IN {pb_0:Array(String)})
+                FROM calls_merged PREWHERE calls_merged.project_id = {pb_1:String}
+                    WHERE ((calls_merged.op_name IN {pb_0:Array(String)})
                         OR (calls_merged.op_name IS NULL))
                 GROUP BY (calls_merged.project_id, calls_merged.id)
                 HAVING (((any(calls_merged.deleted_at) IS NULL))
@@ -38,9 +37,8 @@ def test_query_light_column_with_costs() -> None:
                 SELECT
                     calls_merged.id AS id,
                     any(calls_merged.started_at) AS started_at
-                FROM calls_merged
-                WHERE calls_merged.project_id = {pb_1:String}
-                    AND (calls_merged.id IN filtered_calls)
+                FROM calls_merged PREWHERE calls_merged.project_id = {pb_1:String}
+                    WHERE (calls_merged.id IN filtered_calls)
                 GROUP BY (calls_merged.project_id, calls_merged.id)),
             llm_usage AS (
                 -- From the all_calls we get the usage data for LLMs
@@ -171,8 +169,7 @@ def test_query_with_costs_and_attributes_order() -> None:
         """
         WITH filtered_calls AS
             (SELECT calls_merged.id AS id
-             FROM calls_merged
-             WHERE calls_merged.project_id = {pb_0:String}
+             FROM calls_merged PREWHERE calls_merged.project_id = {pb_0:String}
              GROUP BY (calls_merged.project_id,
                        calls_merged.id)
              HAVING (((any(calls_merged.deleted_at) IS NULL))
@@ -183,9 +180,8 @@ def test_query_with_costs_and_attributes_order() -> None:
             (SELECT calls_merged.id AS id,
                     any(calls_merged.started_at) AS started_at,
                     any(calls_merged.attributes_dump) AS attributes_dump
-             FROM calls_merged
-             WHERE calls_merged.project_id = {pb_0:String}
-               AND (calls_merged.id IN filtered_calls)
+             FROM calls_merged PREWHERE calls_merged.project_id = {pb_0:String}
+                    WHERE (calls_merged.id IN filtered_calls)
              GROUP BY (calls_merged.project_id,
                        calls_merged.id)
              ORDER BY (NOT (JSONType(any(calls_merged.attributes_dump)) = 'Null'
@@ -279,8 +275,7 @@ def test_query_with_costs_and_feedback_order() -> None:
         WITH filtered_calls AS
             (SELECT calls_merged.id AS id
              FROM calls_merged
-             LEFT JOIN (SELECT * FROM feedback WHERE feedback.project_id = {pb_4:String} ) AS feedback ON (feedback.weave_ref = concat('weave-trace-internal:///', {pb_4:String}, '/call/', calls_merged.id))
-             WHERE calls_merged.project_id = {pb_4:String}
+             LEFT JOIN (SELECT * FROM feedback WHERE feedback.project_id = {pb_4:String} ) AS feedback ON (feedback.weave_ref = concat('weave-trace-internal:///', {pb_4:String}, '/call/', calls_merged.id)) PREWHERE calls_merged.project_id = {pb_4:String}
              GROUP BY (calls_merged.project_id,
                        calls_merged.id)
              HAVING (((any(calls_merged.deleted_at) IS NULL))
@@ -291,9 +286,8 @@ def test_query_with_costs_and_feedback_order() -> None:
             (SELECT calls_merged.id AS id,
                     any(calls_merged.started_at) AS started_at
              FROM calls_merged
-             LEFT JOIN (SELECT * FROM feedback WHERE feedback.project_id = {pb_4:String} ) AS feedback ON (feedback.weave_ref = concat('weave-trace-internal:///', {pb_4:String}, '/call/', calls_merged.id))
-             WHERE calls_merged.project_id = {pb_4:String}
-               AND (calls_merged.id IN filtered_calls)
+             LEFT JOIN (SELECT * FROM feedback WHERE feedback.project_id = {pb_4:String} ) AS feedback ON (feedback.weave_ref = concat('weave-trace-internal:///', {pb_4:String}, '/call/', calls_merged.id)) PREWHERE calls_merged.project_id = {pb_4:String}
+             WHERE (calls_merged.id IN filtered_calls)
              GROUP BY (calls_merged.project_id,
                        calls_merged.id)
              ORDER BY (NOT (JSONType(anyIf(feedback.payload_dump, feedback.feedback_type = {pb_0:String}), {pb_1:String}, {pb_2:String}) = 'Null'
@@ -391,8 +385,7 @@ def test_query_with_costs_and_nested_attributes_order() -> None:
         """
             WITH filtered_calls AS
                 (SELECT calls_merged.id AS id
-                 FROM calls_merged
-                 WHERE calls_merged.project_id = {pb_2:String}
+                 FROM calls_merged PREWHERE calls_merged.project_id = {pb_2:String}
                  GROUP BY (calls_merged.project_id,
                            calls_merged.id)
                  HAVING (((any(calls_merged.deleted_at) IS NULL))
@@ -403,9 +396,8 @@ def test_query_with_costs_and_nested_attributes_order() -> None:
                 (SELECT calls_merged.id AS id,
                         any(calls_merged.started_at) AS started_at,
                         any(calls_merged.attributes_dump) AS attributes_dump
-                 FROM calls_merged
-                 WHERE calls_merged.project_id = {pb_2:String}
-                   AND (calls_merged.id IN filtered_calls)
+                 FROM calls_merged PREWHERE calls_merged.project_id = {pb_2:String}
+                    WHERE (calls_merged.id IN filtered_calls)
                  GROUP BY (calls_merged.project_id,
                            calls_merged.id)
                  ORDER BY (NOT (JSONType(any(calls_merged.attributes_dump), {pb_0:String}) = 'Null'
