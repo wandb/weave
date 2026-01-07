@@ -74,8 +74,7 @@ def wf_scoring_worker_check_cancellation() -> bool:
     faster graceful shutdown. Useful for tests. Defaults to False.
     """
     return (
-        os.environ.get("SCORING_WORKER_CHECK_CANCELLATION", "false").lower()
-        == "true"
+        os.environ.get("SCORING_WORKER_CHECK_CANCELLATION", "false").lower() == "true"
     )
 
 
