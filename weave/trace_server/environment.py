@@ -67,6 +67,15 @@ def wf_scoring_worker_batch_timeout() -> int:
     return int(os.environ.get("WF_SCORING_WORKER_BATCH_TIMEOUT", 5))
 
 
+def wf_scoring_worker_check_cancellation() -> bool:
+    """Whether to check for cancellation on every poll for faster shutdown.
+
+    When enabled, the worker checks for cancellation on every poll, allowing
+    faster graceful shutdown. Useful for tests. Defaults to False.
+    """
+    return os.environ.get("WF_SCORING_WORKER_CHECK_CANCELLATION", "false").lower() == "true"
+
+
 # Clickhouse Settings
 
 
