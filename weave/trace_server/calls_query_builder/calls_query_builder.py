@@ -2111,6 +2111,109 @@ def _add_on_cluster_to_update(sql_query: str, cluster_name: str | None) -> str:
     return re.sub(pattern, add_cluster, sql_query, flags=re.IGNORECASE)
 
 
+def build_calls_complete_single_update_query(
+    end_call: "tsi.EndedCallSchemaForInsert",
+    pb: ParamBuilder,
+    table_name: str = "calls_complete",
+    cluster_name: str | None = None,
+) -> str:
+    """Build a parameterized UPDATE query for a single call in calls_complete table.
+
+    This creates a lightweight UPDATE that only includes columns with non-default values,
+    avoiding CASE/WHEN/ELSE constructs. Columns that would be set to their default values
+    are omitted entirely:
+    - exception: omitted if None (NULL is the default from INSERT)
+    - output_refs: omitted if empty ([] is the default from INSERT)
+    - wb_run_step_end: omitted if None (NULL is the default from INSERT)
+
+    This approach ensures consistent patch part column structure within each "type"
+    of update, preventing block structure mismatch errors during ClickHouse merge
+    operations in distributed/sharded environments.
+
+    ClickHouse patch parts are partitioned by a hash of the column names being updated,
+    so updates with different column sets go to different partitions and can be merged
+    independently without conflicts.
+
+    The columns are ordered to match the table schema exactly.
+
+    Args:
+        end_call: Single ended call schema to update
+        pb: Parameter builder for query parameterization
+        table_name: Name of the table to update (defaults to "calls_complete")
+        cluster_name: Optional cluster name for ON CLUSTER clause
+
+    Returns:
+        Formatted SQL UPDATE command string
+
+    Examples:
+        >>> pb = ParamBuilder()
+        >>> query = build_calls_complete_single_update_query(end_call, pb)
+    """
+    project_id = end_call.project_id
+    call_id = end_call.id
+
+    # Build SET clauses only for fields that are actually being updated.
+    # Order matches table schema to ensure consistent column structure.
+    set_clauses: list[str] = []
+
+    # ended_at is always present (required field)
+    ended_at_param = pb.add_param(end_call.ended_at)
+    set_clauses.append(f"ended_at = {param_slot(ended_at_param, 'DateTime64(6)')}")
+
+    # updated_at is always set
+    set_clauses.append("updated_at = now64(3)")
+
+    # output_dump - serialize output (can be None, which becomes "null" JSON)
+    output_dump = json.dumps(end_call.output)
+    output_dump_param = pb.add_param(output_dump)
+    set_clauses.append(f"output_dump = {param_slot(output_dump_param, 'String')}")
+
+    # summary_dump is always present (required field)
+    summary_dump = json.dumps(dict(end_call.summary))
+    summary_dump_param = pb.add_param(summary_dump)
+    set_clauses.append(f"summary_dump = {param_slot(summary_dump_param, 'String')}")
+
+    # exception - only include if there's an actual exception string
+    # NULL is the default value from INSERT, no need to update if None
+    if end_call.exception is not None:
+        exception_param = pb.add_param(end_call.exception)
+        set_clauses.append(
+            f"exception = {param_slot(exception_param, 'Nullable(String)')}"
+        )
+
+    # output_refs - only include if there are actual refs
+    # Empty array is the default value from INSERT, no need to update if empty
+    output_refs = extract_refs_from_values(end_call.output)
+    if output_refs:
+        ref_params = [param_slot(pb.add_param(ref), "String") for ref in output_refs]
+        set_clauses.append(f"output_refs = [{', '.join(ref_params)}]")
+
+    # wb_run_step_end - only include if actually provided (not None)
+    # NULL is the default value from INSERT, no need to update if None
+    if end_call.wb_run_step_end is not None:
+        wb_run_step_end_param = pb.add_param(end_call.wb_run_step_end)
+        set_clauses.append(
+            f"wb_run_step_end = {param_slot(wb_run_step_end_param, 'Nullable(UInt64)')}"
+        )
+
+    # Build WHERE clause
+    project_id_param = param_slot(pb.add_param(project_id), "String")
+    call_id_param = param_slot(pb.add_param(call_id), "String")
+
+    # Construct the final UPDATE command
+    set_sql = ",\n        ".join(set_clauses)
+    raw_sql = f"""
+    UPDATE {table_name}
+    SET
+        {set_sql}
+    WHERE project_id = {project_id_param}
+      AND id = {call_id_param}
+    """
+
+    formatted_sql = safely_format_sql(raw_sql, logger)
+    return _add_on_cluster_to_update(formatted_sql, cluster_name)
+
+
 def build_calls_complete_batch_update_query(
     end_calls: list["tsi.EndedCallSchemaForInsert"],
     pb: ParamBuilder,

@@ -55,6 +55,7 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     OrderField,
     build_calls_complete_batch_delete_query,
     build_calls_complete_batch_update_query,
+    build_calls_complete_single_update_query,
     build_calls_complete_update_display_name_query,
     build_calls_stats_query,
     combine_conditions,
@@ -810,16 +811,23 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def _update_calls_complete_batch(
         self, end_calls: list[tsi.EndedCallSchemaForInsert]
     ) -> None:
-        """Update calls_complete table with end call data."""
+        """Update calls_complete table with end call data.
+
+        Executes one UPDATE per call to ensure consistent patch part column structure
+        in ClickHouse lightweight updates. This prevents block structure mismatch errors
+        during merge operations in distributed/sharded environments.
+        """
         if not end_calls:
             return
 
-        pb = ParamBuilder()
         table_name = self._get_calls_complete_table_name()
-        command = build_calls_complete_batch_update_query(
-            end_calls, pb, table_name, self.clickhouse_cluster_name
-        )
-        self._command(command, pb.get_params())
+
+        for end_call in end_calls:
+            pb = ParamBuilder()
+            command = build_calls_complete_single_update_query(
+                end_call, pb, table_name, self.clickhouse_cluster_name
+            )
+            self._command(command, pb.get_params())
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.calls_end_batch_v2")
     def calls_end_batch(self, req: tsi.CallsEndBatchReq) -> tsi.CallsEndBatchRes:
