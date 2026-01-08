@@ -13,6 +13,7 @@ import weave.integrations.patch as patch_module
 from weave.integrations.patch import (
     _PATCHED_INTEGRATIONS,
     _patch_if_needed,
+    _patch_integration,
     implicit_patch,
     patch_openai,
     register_import_hook,
@@ -249,19 +250,23 @@ def test_explicit_patch_still_works(setup_env, monkeypatch):
     """Test that explicit patching still works alongside implicit patching."""
     _inject_fake_module(monkeypatch, "openai")
 
-    with patch(
-        "weave.integrations.openai.openai_sdk.get_openai_patcher"
-    ) as mock_get_patcher:
-        mock_patcher = MagicMock()
-        mock_patcher.attempt_patch.return_value = True
-        mock_get_patcher.return_value = mock_patcher
+    mock_patcher = MagicMock()
+    mock_patcher.attempt_patch.return_value = True
+    mock_get_patcher = MagicMock(return_value=mock_patcher)
 
+    fake_module = types.ModuleType("weave.integrations.openai.openai_sdk")
+    fake_module.get_openai_patcher = mock_get_patcher
+
+    with patch(
+        "weave.integrations.patch.importlib.import_module",
+        return_value=fake_module,
+    ):
         patch_openai()
 
         mock_get_patcher.assert_called_once()
         mock_patcher.attempt_patch.assert_called_once()
 
-        assert "openai" in _PATCHED_INTEGRATIONS
+        assert "openai" in patch_module._PATCHED_INTEGRATIONS
 
 
 def test_reset_patched_integrations(setup_env, monkeypatch):
@@ -282,3 +287,127 @@ def test_unregister_import_hook(setup_env):
 
     unregister_import_hook()
     assert patch_module._IMPORT_HOOK is None
+
+
+class TestPatchIntegration:
+    """Tests for the _patch_integration helper function."""
+
+    def test_patch_integration_success(self, setup_env):
+        """Test that _patch_integration correctly patches and tracks integration."""
+        mock_patcher = MagicMock()
+        mock_patcher.attempt_patch.return_value = True
+        mock_getter = MagicMock(return_value=mock_patcher)
+
+        fake_module = types.ModuleType("fake_integration_module")
+        fake_module.get_fake_patcher = mock_getter
+
+        with patch(
+            "weave.integrations.patch.importlib.import_module",
+            return_value=fake_module,
+        ):
+            _patch_integration(
+                module_path="fake.integration.module",
+                get_patcher_func_name="get_fake_patcher",
+                integration_names=["fake_integration"],
+            )
+
+        mock_getter.assert_called_once()
+        mock_patcher.attempt_patch.assert_called_once()
+        assert "fake_integration" in patch_module._PATCHED_INTEGRATIONS
+
+    def test_patch_integration_with_settings(self, setup_env):
+        """Test that _patch_integration passes settings to the patcher getter."""
+        from weave.trace.autopatch import IntegrationSettings
+
+        mock_patcher = MagicMock()
+        mock_patcher.attempt_patch.return_value = True
+        mock_getter = MagicMock(return_value=mock_patcher)
+
+        fake_module = types.ModuleType("fake_integration_module")
+        fake_module.get_fake_patcher = mock_getter
+
+        custom_settings = IntegrationSettings()
+
+        with patch(
+            "weave.integrations.patch.importlib.import_module",
+            return_value=fake_module,
+        ):
+            _patch_integration(
+                module_path="fake.integration.module",
+                get_patcher_func_name="get_fake_patcher",
+                integration_names=["fake_integration"],
+                settings=custom_settings,
+            )
+
+        mock_getter.assert_called_once_with(custom_settings)
+
+    def test_patch_integration_multiple_names(self, setup_env):
+        """Test that _patch_integration adds multiple integration names."""
+        mock_patcher = MagicMock()
+        mock_patcher.attempt_patch.return_value = True
+        mock_getter = MagicMock(return_value=mock_patcher)
+
+        fake_module = types.ModuleType("fake_integration_module")
+        fake_module.get_fake_patcher = mock_getter
+
+        with patch(
+            "weave.integrations.patch.importlib.import_module",
+            return_value=fake_module,
+        ):
+            _patch_integration(
+                module_path="fake.integration.module",
+                get_patcher_func_name="get_fake_patcher",
+                integration_names=["integration_a", "integration_b", "integration_c"],
+            )
+
+        assert "integration_a" in patch_module._PATCHED_INTEGRATIONS
+        assert "integration_b" in patch_module._PATCHED_INTEGRATIONS
+        assert "integration_c" in patch_module._PATCHED_INTEGRATIONS
+
+    def test_patch_integration_failure_no_tracking(self, setup_env):
+        """Test that failed patches don't add to _PATCHED_INTEGRATIONS."""
+        mock_patcher = MagicMock()
+        mock_patcher.attempt_patch.return_value = False
+        mock_getter = MagicMock(return_value=mock_patcher)
+
+        fake_module = types.ModuleType("fake_integration_module")
+        fake_module.get_fake_patcher = mock_getter
+
+        with patch(
+            "weave.integrations.patch.importlib.import_module",
+            return_value=fake_module,
+        ):
+            _patch_integration(
+                module_path="fake.integration.module",
+                get_patcher_func_name="get_fake_patcher",
+                integration_names=["failed_integration"],
+            )
+
+        mock_patcher.attempt_patch.assert_called_once()
+        assert "failed_integration" not in patch_module._PATCHED_INTEGRATIONS
+
+    def test_patch_integration_default_settings(self, setup_env):
+        """Test that _patch_integration creates default settings when None."""
+        from weave.trace.autopatch import IntegrationSettings
+
+        mock_patcher = MagicMock()
+        mock_patcher.attempt_patch.return_value = True
+        mock_getter = MagicMock(return_value=mock_patcher)
+
+        fake_module = types.ModuleType("fake_integration_module")
+        fake_module.get_fake_patcher = mock_getter
+
+        with patch(
+            "weave.integrations.patch.importlib.import_module",
+            return_value=fake_module,
+        ):
+            _patch_integration(
+                module_path="fake.integration.module",
+                get_patcher_func_name="get_fake_patcher",
+                integration_names=["default_settings_integration"],
+            )
+
+        # Verify getter was called with an IntegrationSettings instance
+        call_args = mock_getter.call_args
+        assert len(call_args.args) == 1
+        assert isinstance(call_args.args[0], IntegrationSettings)
