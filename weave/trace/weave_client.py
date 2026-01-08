@@ -1018,6 +1018,7 @@ class WeaveClient:
             current_wb_run_step_end = (
                 wb_run_context_end.step if wb_run_context_end else None
             )
+
             call_end_req = CallEndReq(
                 end=EndedCallSchemaForInsert(
                     project_id=project_id,
