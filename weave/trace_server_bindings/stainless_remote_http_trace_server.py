@@ -16,6 +16,7 @@ from weave.trace.settings import max_calls_queue_size, should_enable_disk_fallba
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ids import generate_id
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
+from weave.trace_server_bindings.call_batch_processor import CallBatchProcessor
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface
 from weave.trace_server_bindings.http_utils import (
     REMOTE_REQUEST_BYTES_LIMIT,
@@ -25,6 +26,7 @@ from weave.trace_server_bindings.http_utils import (
 )
 from weave.trace_server_bindings.models import (
     Batch,
+    CompleteBatchItem,
     EndBatchItem,
     ServerInfoRes,
     StartBatchItem,
@@ -60,8 +62,8 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
     ):
         self.trace_server_url = trace_server_url.rstrip("/")
         self.should_batch = should_batch
-        self.call_processor = None
-        self.feedback_processor = None
+        self.call_processor: CallBatchProcessor | None = None
+        self.feedback_processor: AsyncBatchProcessor | None = None
         self.remote_request_bytes_limit = remote_request_bytes_limit
         self._extra_headers: dict[str, str] = extra_headers or {}
         self._username: str = username
@@ -81,11 +83,16 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
         if self.should_batch:
-            self.call_processor = AsyncBatchProcessor(
+            # Use CallBatchProcessor for calls - it pairs starts with ends at
+            # enqueue time, maximizing complete calls sent to the server
+            self.call_processor = CallBatchProcessor(
                 self._flush_calls,
                 max_queue_size=max_calls_queue_size(),
                 enable_disk_fallback=should_enable_disk_fallback(),
+                # Hold starts for 10s waiting for their ends
+                start_hold_timeout=10.0,
             )
+            # Feedback uses the standard async batch processor
             self.feedback_processor = AsyncBatchProcessor(
                 self._flush_feedback,
                 max_queue_size=max_calls_queue_size(),
@@ -289,15 +296,25 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
                         "req": item.req.model_dump(by_alias=True),
                     }
                 )
+            elif isinstance(item, CompleteBatchItem):
+                stainless_batch.append(
+                    {
+                        "mode": "complete",
+                        "req": item.req.model_dump(by_alias=True),
+                    }
+                )
         self._stainless_client.calls.upsert_batch(batch=stainless_batch)
 
     def _flush_calls(
         self,
-        batch: list[StartBatchItem | EndBatchItem],
+        batch: list[StartBatchItem | EndBatchItem | CompleteBatchItem],
         *,
         _should_update_batch_size: bool = True,
     ) -> None:
         """Process a batch of calls, splitting if necessary and sending to the server.
+
+        Note: With CallBatchProcessor, most items arrive already paired as
+        CompleteBatchItems. This reduces server-side merging overhead.
 
         Args:
             batch: List of batch items to process.
@@ -307,14 +324,20 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         if len(batch) == 0:
             return
 
-        def get_item_id(item: StartBatchItem | EndBatchItem) -> str:
+        def get_item_id(
+            item: StartBatchItem | EndBatchItem | CompleteBatchItem,
+        ) -> str:
             if isinstance(item, StartBatchItem):
                 return f"{item.req.start.id}-start"
             elif isinstance(item, EndBatchItem):
                 return f"{item.req.end.id}-end"
+            elif isinstance(item, CompleteBatchItem):
+                return f"{item.req.complete.id}-complete"
             return "unknown"
 
-        def encode_batch(batch: list[StartBatchItem | EndBatchItem]) -> bytes:
+        def encode_batch(
+            batch: list[StartBatchItem | EndBatchItem | CompleteBatchItem],
+        ) -> bytes:
             data = Batch(batch=batch).model_dump_json()
             return data.encode("utf-8")
 
@@ -330,11 +353,11 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             encode_batch_fn=encode_batch,
         )
 
-    def get_call_processor(self) -> AsyncBatchProcessor | None:
+    def get_call_processor(self) -> CallBatchProcessor | None:
         """Get the call processor for batching.
 
         Returns:
-            AsyncBatchProcessor instance or None if batching is disabled.
+            CallBatchProcessor instance or None if batching is disabled.
         """
         return self.call_processor
 

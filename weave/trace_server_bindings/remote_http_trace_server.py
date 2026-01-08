@@ -15,6 +15,7 @@ from weave.trace.settings import max_calls_queue_size, should_enable_disk_fallba
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ids import generate_id
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
+from weave.trace_server_bindings.call_batch_processor import CallBatchProcessor
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface
 from weave.trace_server_bindings.http_utils import (
     REMOTE_REQUEST_BYTES_LIMIT,
@@ -59,14 +60,20 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         super().__init__()
         self.trace_server_url = trace_server_url
         self.should_batch = should_batch
-        self.call_processor = None
-        self.feedback_processor = None
+        self.call_processor: CallBatchProcessor | None = None
+        self.feedback_processor: AsyncBatchProcessor | None = None
         if self.should_batch:
-            self.call_processor = AsyncBatchProcessor(
+            # Use CallBatchProcessor for calls - it pairs starts with ends at
+            # enqueue time, maximizing complete calls sent to the server
+            self.call_processor = CallBatchProcessor(
                 self._flush_calls,
                 max_queue_size=max_calls_queue_size(),
                 enable_disk_fallback=should_enable_disk_fallback(),
+                # Hold starts for 10s waiting for their ends
+                # This should be >= call_start_delay in weave_client settings
+                start_hold_timeout=10.0,
             )
+            # Feedback uses the standard async batch processor
             self.feedback_processor = AsyncBatchProcessor(
                 self._flush_feedback,
                 max_queue_size=max_calls_queue_size(),
@@ -132,86 +139,6 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
             **kwargs,
         )
 
-    def _consolidate_batch(
-        self, batch: list[StartBatchItem | EndBatchItem | CompleteBatchItem]
-    ) -> list[StartBatchItem | EndBatchItem | CompleteBatchItem]:
-        """Consolidate start/end pairs in a batch into complete items.
-
-        Looks for pairs of start and end items with matching IDs and combines them
-        into CompleteBatchItems. Unpaired starts and ends are left as-is.
-        """
-        # Build maps of call IDs to their items
-        starts: dict[str, StartBatchItem] = {}
-        ends: dict[str, EndBatchItem] = {}
-        completes: list[CompleteBatchItem] = []
-
-        # First pass: collect all items by type and ID
-        for item in batch:
-            if isinstance(item, StartBatchItem):
-                if item.req.start.id is not None:
-                    starts[item.req.start.id] = item
-            elif isinstance(item, EndBatchItem):
-                if item.req.end.id is not None:
-                    ends[item.req.end.id] = item
-            elif isinstance(item, CompleteBatchItem):
-                completes.append(item)
-
-        # Second pass: match starts with ends and create completes
-        consolidated: list[StartBatchItem | EndBatchItem | CompleteBatchItem] = []
-        paired_ids: set[str] = set()
-
-        for call_id, start_item in starts.items():
-            if call_id in ends:
-                # Found a pair - create a complete item
-                end_item = ends[call_id]
-                # Ensure id and trace_id are not None
-                if (
-                    start_item.req.start.id is None
-                    or start_item.req.start.trace_id is None
-                ):
-                    # Skip pairing if essential fields are missing
-                    continue
-                complete_call = tsi.CompletedCallSchemaForInsert(
-                    project_id=start_item.req.start.project_id,
-                    id=start_item.req.start.id,
-                    trace_id=start_item.req.start.trace_id,
-                    op_name=start_item.req.start.op_name,
-                    display_name=start_item.req.start.display_name,
-                    parent_id=start_item.req.start.parent_id,
-                    thread_id=start_item.req.start.thread_id,
-                    turn_id=start_item.req.start.turn_id,
-                    started_at=start_item.req.start.started_at,
-                    attributes=start_item.req.start.attributes,
-                    inputs=start_item.req.start.inputs,
-                    ended_at=end_item.req.end.ended_at,
-                    exception=end_item.req.end.exception,
-                    output=end_item.req.end.output,
-                    summary=end_item.req.end.summary,
-                    wb_user_id=start_item.req.start.wb_user_id,
-                    wb_run_id=start_item.req.start.wb_run_id,
-                    wb_run_step=start_item.req.start.wb_run_step,
-                    wb_run_step_end=end_item.req.end.wb_run_step_end,
-                )
-                consolidated.append(
-                    CompleteBatchItem(req=tsi.CallCompleteReq(complete=complete_call))
-                )
-                paired_ids.add(call_id)
-
-        # Add unpaired starts
-        for call_id, start_item in starts.items():
-            if call_id not in paired_ids:
-                consolidated.append(start_item)
-
-        # Add unpaired ends
-        for call_id, end_item in ends.items():
-            if call_id not in paired_ids:
-                consolidated.append(end_item)
-
-        # Add pre-existing completes
-        consolidated.extend(completes)
-
-        return consolidated
-
     def _extract_entity_project(
         self, batch: list[StartBatchItem | EndBatchItem | CompleteBatchItem]
     ) -> EntityProjectInfo:
@@ -276,12 +203,17 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         *,
         _should_update_batch_size: bool = True,
     ) -> None:
-        """Process a batch: consolidate pairs, split by type, send to server."""
+        """Process a batch: split by type and send to server.
+
+        With CallBatchProcessor, pairing of starts with ends happens at enqueue time,
+        so batches arriving here already contain CompleteBatchItems for fast calls.
+        This method simply splits by type and sends to the appropriate endpoints.
+        """
         assert self.call_processor is not None
         if not batch:
             return
 
-        batch = self._consolidate_batch(batch)
+        # Split batch by type - starts and completes go to start endpoint, ends to end endpoint
         starts_and_completes = [
             item
             for item in batch
@@ -359,7 +291,7 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
             encode_batch_fn=lambda b: encode_fn(b, project_id),
         )
 
-    def get_call_processor(self) -> AsyncBatchProcessor | None:
+    def get_call_processor(self) -> CallBatchProcessor | None:
         """Custom method not defined on the formal TraceServerInterface to expose
         the underlying call processor. Should be formalized in a client-side interface.
         """

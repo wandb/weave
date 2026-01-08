@@ -1,8 +1,18 @@
 """Tests for RemoteHTTPTraceServer and StainlessRemoteHTTPTraceServer bindings.
 
-These tests verify the batching, splitting, and retry behavior of both server
+These tests verify the splitting, retry, and HTTP sending behavior of both server
 implementations. The --remote-http-trace-server flag controls which implementation
 is tested (default: "remote", or "stainless").
+
+NOTE: Most tests call _flush_calls() directly with constructed batches. This tests
+the splitting and sending layer, NOT the CallBatchProcessor pairing behavior. For
+pairing tests, see test_call_batch_processor.py.
+
+With the new CallBatchProcessor:
+- Pairing of start/end into CompleteBatchItems happens at enqueue time
+- _flush_calls() receives already-paired items and just splits/sends them
+- Tests passing raw starts+ends to _flush_calls() test the "worst case" where
+  items arrive without pairing (e.g., from requeue after network failure)
 """
 
 from __future__ import annotations
@@ -55,18 +65,8 @@ def count_items_sent(server) -> int:
     return total_items_sent
 
 
-def get_expected_item_count(server_class, num_pairs: int) -> int:
-    """Get expected number of items based on server consolidation behavior.
-
-    RemoteHTTPTraceServer consolidates matching start/end pairs into complete calls,
-    so N pairs = N items. StainlessRemoteHTTPTraceServer sends starts and ends
-    separately, so N pairs = 2N items.
-    """
-    return num_pairs if server_class == RemoteHTTPTraceServer else num_pairs * 2
-
-
 @pytest.mark.parametrize("server", ["small_limit"], indirect=True)
-def test_large_batch_is_split_into_multiple_smaller_batches(server, server_class):
+def test_large_batch_is_split_into_multiple_smaller_batches(server):
     """Test that a batch exceeding the size limit is split into smaller batches."""
     batch = []
     batch_length = 20
@@ -85,10 +85,8 @@ def test_large_batch_is_split_into_multiple_smaller_batches(server, server_class
     # Should split into multiple batches due to size limit
     assert get_total_mock_calls(server) > 1
 
-    # Verify all items were sent
-    assert count_items_sent(server) == get_expected_item_count(
-        server_class, batch_length
-    )
+    # Verify all items were sent (N starts + N ends = 2N items)
+    assert count_items_sent(server) == batch_length * 2
 
 
 @pytest.mark.parametrize("server", ["normal"], indirect=True)
@@ -148,7 +146,7 @@ def test_oversized_item_will_log_warning_and_send(server, caplog):
 
 
 @pytest.mark.parametrize("server", ["small_limit"], indirect=True)
-def test_multi_level_recursive_splitting(server, server_class):
+def test_multi_level_recursive_splitting(server):
     """Test that a very large batch is recursively split multiple times."""
     # Create a very large batch with many items to force multiple levels of splitting
     batch = []
@@ -167,10 +165,8 @@ def test_multi_level_recursive_splitting(server, server_class):
     # Verify multiple calls due to recursive splitting
     assert get_total_mock_calls(server) > 2
 
-    # Verify all items were sent
-    assert count_items_sent(server) == get_expected_item_count(
-        server_class, batch_length
-    )
+    # Verify all items were sent (N starts + N ends = 2N items)
+    assert count_items_sent(server) == batch_length * 2
 
 
 @pytest.mark.parametrize("server", ["normal"], indirect=True)
@@ -242,28 +238,35 @@ def test_non_uniform_batch_items(server):
 @pytest.mark.disable_logging_error_check
 @pytest.mark.parametrize("server", ["normal"], indirect=True)
 @pytest.mark.parametrize("log_collector", ["warning"], indirect=True)
-def test_drop_data_when_queue_is_full(server, server_class, log_collector):
-    """Test that items are dropped when the queue is full."""
-    # For StainlessRemoteHTTPTraceServer, set _dropped_item_count to 0
-    # so the next drop (1st) will log (logging happens at 1, 1001, 2001, etc.)
-    if server_class.__name__ == "StainlessRemoteHTTPTraceServer":
-        server.call_processor._dropped_item_count = 0
+def test_drop_data_when_queue_is_full(server, log_collector):
+    """Test that items are dropped when the queue is full.
 
-    # Replace the real queue with a mock that raises Full when put_nowait is called
+    With CallBatchProcessor, starts are buffered in _pending_starts until their ends arrive.
+    When an end arrives and pairs with a start, or when an orphan end arrives, items go to
+    the ready_queue. This test verifies that overflow is handled correctly.
+    """
+    # Reset counter so the next drop (1st) will log (logging happens at 1, 1001, 2001, etc.)
+    server.call_processor._dropped_item_count = 0
+
+    # Replace the ready queue with a mock that raises Full when put_nowait is called
     mock_queue = MagicMock()
     mock_queue.put_nowait.side_effect = Full
-    server.call_processor.queue = mock_queue
+    server.call_processor.ready_queue = mock_queue
 
-    server.call_start(tsi.CallStartReq(start=generate_start()))
+    # Start a call - this buffers the start in _pending_starts
+    start, end = generate_call_start_end_pair()
+    server.call_start(start)
 
-    # Verify that the put_nowait method was called (meaning we tried to enqueue the item)
+    # End the call - this pairs with the start and tries to put a CompleteBatchItem in ready_queue
+    server.call_end(end)
+
+    # Verify that put_nowait was called (meaning we tried to queue the complete item)
     mock_queue.put_nowait.assert_called_once()
 
-    # We can still check logs as a secondary verification
+    # Verify warning was logged
     logs = log_collector.get_warning_logs()
     assert len(logs) == 1
-    assert "Queue is full" in logs[0].msg
-    assert "Dropping item" in logs[0].msg
+    assert "Ready queue full" in logs[0].msg
 
 
 @pytest.mark.disable_logging_error_check
