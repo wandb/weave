@@ -3,6 +3,7 @@ from enum import Enum
 from pydantic import BaseModel
 
 from weave.trace_server.interface.builtin_object_classes import base_object_def
+from weave.trace_server import trace_server_interface as tsi
 from typing import Literal
 
 
@@ -34,7 +35,7 @@ class DynamicLeaderboardColumnConfig(BaseModel):
 
 
 class DynamicLeaderboard(base_object_def.BaseObject):
-    calls_query: str
+    calls_query: tsi.Query
     model_configuration: ObjectConfig
     dataset_configuration: ObjectConfig
     scorer_configuration: ObjectConfig

@@ -812,8 +812,7 @@
           "title": "Description"
         },
         "calls_query": {
-          "title": "Calls Query",
-          "type": "string"
+          "$ref": "#/$defs/Query"
         },
         "model_configuration": {
           "$ref": "#/$defs/ObjectConfig"
