@@ -254,6 +254,7 @@ def patch_langchain() -> None:
 
     if langchain_patcher.attempt_patch():
         _PATCHED_INTEGRATIONS.add("langchain")
+        _PATCHED_INTEGRATIONS.add("langchain_core")
 
 
 def patch_llamaindex() -> None:
@@ -300,6 +301,7 @@ INTEGRATION_MODULE_MAPPING: dict[str, Callable[[], None]] = {
     "verifiers": patch_verifiers,
     "autogen": patch_autogen,
     "langchain": patch_langchain,
+    "langchain_core": patch_langchain,
     "llama_index": patch_llamaindex,
     "openai_realtime": patch_openai_realtime,
 }
