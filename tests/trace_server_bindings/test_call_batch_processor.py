@@ -21,7 +21,9 @@ from weave.trace_server_bindings.models import (
 )
 
 
-def make_start(call_id: str, project_id: str = "entity/project") -> StartBatchItem:
+def make_start(
+    call_id: str, project_id: str = "entity/project", op_name: str = "test_op"
+) -> StartBatchItem:
     """Helper to create a StartBatchItem for testing."""
     return StartBatchItem(
         req=tsi.CallStartReq(
@@ -29,7 +31,7 @@ def make_start(call_id: str, project_id: str = "entity/project") -> StartBatchIt
                 project_id=project_id,
                 id=call_id,
                 trace_id=f"trace_{call_id}",
-                op_name="test_op",
+                op_name=op_name,
                 started_at="2024-01-01T00:00:00Z",
                 inputs={},
                 attributes={},
@@ -189,6 +191,64 @@ def test_pairing_behavior_comprehensive():
 
     assert len(starts) == 1
     assert starts[0].req.start.id is None
+
+
+# =============================================================================
+# MAX_CALL_START_DELAY Tests
+# =============================================================================
+
+
+def test_start_hold_timeout_capped_at_max():
+    """Test that start_hold_timeout is capped at MAX_CALL_START_DELAY (600s)."""
+    processor = CallBatchProcessor(
+        lambda batch: None,
+        start_hold_timeout=1000.0,  # Exceeds MAX_CALL_START_DELAY
+    )
+    assert processor.start_hold_timeout == 600.0  # Capped to MAX_CALL_START_DELAY
+    processor.stop_accepting_new_work_and_flush_queue()
+
+
+def test_start_hold_timeout_negative_not_capped():
+    """Test that negative timeout (-1 = infinite) is not capped."""
+    processor = CallBatchProcessor(
+        lambda batch: None,
+        start_hold_timeout=-1,
+    )
+    assert processor.start_hold_timeout == -1  # Stays as infinite
+    processor.stop_accepting_new_work_and_flush_queue()
+
+
+# =============================================================================
+# Evaluation Op Name Special Handling Tests
+# =============================================================================
+
+
+def test_evaluation_ops_never_buffered():
+    """Test that evaluation ops are sent immediately, not buffered."""
+    processed_batches = []
+
+    def processor_fn(batch):
+        processed_batches.append(batch)
+
+    processor = CallBatchProcessor(
+        processor_fn,
+        max_batch_size=100,
+        min_batch_interval=0.01,
+        start_hold_timeout=60.0,  # Long timeout - would normally buffer
+    )
+
+    # Enqueue an evaluation start (should NOT be buffered)
+    processor.enqueue([make_start("eval_call", op_name="Evaluation.evaluate")])
+
+    # Verify it was NOT buffered (pending_starts should be empty)
+    assert "eval_call" not in processor._pending_starts
+
+    processor.stop_accepting_new_work_and_flush_queue()
+
+    # Should have processed the start immediately
+    all_items = [item for batch in processed_batches for item in batch]
+    assert len(all_items) == 1
+    assert isinstance(all_items[0], StartBatchItem)
 
 
 # =============================================================================

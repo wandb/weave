@@ -275,34 +275,58 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
     def _send_batch_to_server(self, encoded_data: bytes) -> None:
         """Send an encoded batch of calls to the server using the stainless client.
 
-        Args:
-            encoded_data: Encoded batch data to send.
+        Note: The old upsert_batch endpoint doesn't support 'complete' mode, so we
+        split CompleteBatchItems back into start+end pairs before sending.
         """
         self._update_client_headers()
-        # Parse the batch and convert to stainless format
         batch_data = Batch.model_validate_json(encoded_data.decode("utf-8"))
         stainless_batch = []
         for item in batch_data.batch:
             if isinstance(item, StartBatchItem):
                 stainless_batch.append(
-                    {
-                        "mode": "start",
-                        "req": item.req.model_dump(by_alias=True),
-                    }
+                    {"mode": "start", "req": item.req.model_dump(by_alias=True)}
                 )
             elif isinstance(item, EndBatchItem):
                 stainless_batch.append(
-                    {
-                        "mode": "end",
-                        "req": item.req.model_dump(by_alias=True),
-                    }
+                    {"mode": "end", "req": item.req.model_dump(by_alias=True)}
                 )
             elif isinstance(item, CompleteBatchItem):
+                # Split complete back into start+end (upsert_batch doesn't support complete)
+                complete = item.req.complete
+                start_req = tsi.CallStartReq(
+                    start=tsi.StartedCallSchemaForInsert(
+                        project_id=complete.project_id,
+                        id=complete.id,
+                        trace_id=complete.trace_id,
+                        op_name=complete.op_name,
+                        display_name=complete.display_name,
+                        parent_id=complete.parent_id,
+                        thread_id=complete.thread_id,
+                        turn_id=complete.turn_id,
+                        started_at=complete.started_at,
+                        attributes=complete.attributes,
+                        inputs=complete.inputs,
+                        wb_user_id=complete.wb_user_id,
+                        wb_run_id=complete.wb_run_id,
+                        wb_run_step=complete.wb_run_step,
+                    )
+                )
+                end_req = tsi.CallEndReq(
+                    end=tsi.EndedCallSchemaForInsert(
+                        project_id=complete.project_id,
+                        id=complete.id,
+                        ended_at=complete.ended_at,
+                        exception=complete.exception,
+                        output=complete.output,
+                        summary=complete.summary,
+                        wb_run_step_end=complete.wb_run_step_end,
+                    )
+                )
                 stainless_batch.append(
-                    {
-                        "mode": "complete",
-                        "req": item.req.model_dump(by_alias=True),
-                    }
+                    {"mode": "start", "req": start_req.model_dump(by_alias=True)}
+                )
+                stainless_batch.append(
+                    {"mode": "end", "req": end_req.model_dump(by_alias=True)}
                 )
         self._stainless_client.calls.upsert_batch(batch=stainless_batch)
 

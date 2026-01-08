@@ -17,6 +17,7 @@ from threading import Event, Lock, Thread
 from weave.telemetry.trace_sentry import SENTRY_AVAILABLE, sentry_sdk
 from weave.trace.context.tests_context import get_raise_on_captured_errors
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.constants import EVALUATION_RUN_OP_NAME
 from weave.trace_server_bindings.models import (
     CompleteBatchItem,
     EndBatchItem,
@@ -26,6 +27,7 @@ from weave.trace_server_bindings.models import (
 logger = logging.getLogger(__name__)
 
 HEALTH_CHECK_INTERVAL = 5.0  # seconds
+MAX_CALL_START_DELAY = 600.0  # 10 minutes - cap for start_hold_timeout
 MAX_LOGFILES = 3
 MAX_LOG_FILE_SIZE_BYTES = 1024 * 1024 * 512  # 512MB
 
@@ -92,7 +94,11 @@ class CallBatchProcessor:
         self.processor_fn = processor_fn
         self.max_batch_size = max_batch_size
         self.min_batch_interval = min_batch_interval
-        self.start_hold_timeout = start_hold_timeout
+        # Cap timeout: -1 means infinite, otherwise cap at MAX_CALL_START_DELAY
+        if start_hold_timeout < 0:
+            self.start_hold_timeout = start_hold_timeout  # -1 = infinite
+        else:
+            self.start_hold_timeout = min(start_hold_timeout, MAX_CALL_START_DELAY)
         self.enable_disk_fallback = enable_disk_fallback
         self.disk_fallback_path = Path(disk_fallback_path)
 
@@ -189,7 +195,9 @@ class CallBatchProcessor:
     def _handle_start(self, item: StartBatchItem, timestamp: float) -> None:
         """Buffer a start item waiting for its end."""
         call_id = item.req.start.id
-        if call_id is None or self.start_hold_timeout == 0:  # 0 means no buffering
+        op_name = item.req.start.op_name or ""
+        is_eval = EVALUATION_RUN_OP_NAME in op_name  # Never buffer evals
+        if call_id is None or self.start_hold_timeout == 0 or is_eval:
             self._queue_item(item)
             return
         self._pending_starts[call_id] = (item, timestamp)
