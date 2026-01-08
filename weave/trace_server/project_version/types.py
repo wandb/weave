@@ -6,7 +6,7 @@ from enum import Enum
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_SERVER_MODE = "auto"
+DEFAULT_SERVER_MODE = "dual_write_read_merged"
 
 # Project Version Routing Matrix
 # ==============================
