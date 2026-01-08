@@ -9,6 +9,7 @@ import pytest
 import weave
 from tests.trace.util import client_is_sqlite
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.ids import generate_id
 
 
 def test_annotation_queue_create_and_read(client):
@@ -377,3 +378,227 @@ def test_annotation_queue_add_calls_partial_duplicates(client):
     add_res2 = client.server.annotation_queue_add_calls(add_req2)
     assert add_res2.added_count == 2  # Only 2 new calls added
     assert add_res2.duplicates == 3  # 3 were duplicates
+
+
+def test_annotation_queues_stats(client):
+    """Test getting stats for multiple annotation queues with partial completion."""
+    if client_is_sqlite(client):
+        pytest.skip("Annotation queues not supported in SQLite")
+
+    # Create test calls
+    @weave.op
+    def stats_test_op(x: int) -> int:
+        return x * 10
+
+    for i in range(10):
+        stats_test_op(i)
+
+    calls = list(client.get_calls())
+    assert len(calls) == 10
+    call_ids = [call.id for call in calls]
+
+    # Create three queues
+    queue_ids = []
+    for i in range(3):
+        req = tsi.AnnotationQueueCreateReq(
+            project_id=client._project_id(),
+            name=f"Stats Test Queue {i}",
+            scorer_refs=[f"weave:///entity/project/scorer/test{i}:abc"],
+            wb_user_id="test_user",
+        )
+        res = client.server.annotation_queue_create(req)
+        queue_ids.append(res.id)
+
+    # Add different numbers of calls to each queue
+    # Queue 0: 3 calls
+    add_req1 = tsi.AnnotationQueueAddCallsReq(
+        project_id=client._project_id(),
+        queue_id=queue_ids[0],
+        call_ids=call_ids[:3],
+        display_fields=["input.x", "output"],
+        wb_user_id="test_user",
+    )
+    add_res1 = client.server.annotation_queue_add_calls(add_req1)
+    assert add_res1.added_count == 3
+
+    # Queue 1: 5 calls
+    add_req2 = tsi.AnnotationQueueAddCallsReq(
+        project_id=client._project_id(),
+        queue_id=queue_ids[1],
+        call_ids=call_ids[:5],
+        display_fields=["input.x", "output"],
+        wb_user_id="test_user",
+    )
+    add_res2 = client.server.annotation_queue_add_calls(add_req2)
+    assert add_res2.added_count == 5
+
+    # Queue 2: 7 calls
+    add_req3 = tsi.AnnotationQueueAddCallsReq(
+        project_id=client._project_id(),
+        queue_id=queue_ids[2],
+        call_ids=call_ids[:7],
+        display_fields=["input.x", "output"],
+        wb_user_id="test_user",
+    )
+    add_res3 = client.server.annotation_queue_add_calls(add_req3)
+    assert add_res3.added_count == 7
+
+    # Now mark some items as completed/skipped by inserting progress records
+    # This simulates the annotation workflow where annotators work on items
+    # Progress records are only created when an annotator interacts with an item
+
+    # For Queue 0 (3 items): Mark 2 as completed, 1 stays pending (no progress record)
+    # For Queue 1 (5 items): Mark 3 as completed, 1 as skipped, 1 stays pending (no progress record)
+    # For Queue 2 (7 items): Mark 4 as skipped, 3 stay pending (no progress record)
+
+    # We need to insert into the annotator_queue_items_progress table
+    # Access the ClickHouse client through the server wrapper chain
+    # The pattern is: client.server (caching middleware) -> _next_trace_server (actual CH server)
+    try:
+        ch_client = client.server._next_trace_server.ch_client
+    except AttributeError:
+        # For non-ClickHouse backends (e.g., SQLite), skip the direct DB manipulation
+        pytest.skip("Direct DB manipulation only works with ClickHouse server")
+
+    # Ensure writes are flushed
+    import time
+
+    time.sleep(0.5)
+
+    # Use internal project_id (base64 encoded format)
+    # TODO: Use proper ID converter once available
+    internal_project_id = "c2hhd24vdGVzdC1wcm9qZWN0"  # base64 of "shawn/test-project"
+
+    # Get queue_item_ids for Queue 0
+    result = ch_client.query(
+        f"SELECT id FROM annotation_queue_items WHERE project_id = '{internal_project_id}' AND queue_id = '{queue_ids[0]}' AND deleted_at IS NULL ORDER BY created_at LIMIT 3"
+    )
+    queue0_items = [row[0] for row in result.result_rows]
+    assert len(queue0_items) == 3
+
+    # Mark first 2 items of Queue 0 as completed by inserting progress records
+    for item_id in queue0_items[:2]:
+        progress_id = generate_id()
+        ch_client.command(
+            f"""
+            INSERT INTO annotator_queue_items_progress (id, project_id, queue_item_id, queue_id, annotator_id, annotation_state)
+            VALUES ('{progress_id}', '{internal_project_id}', '{item_id}', '{queue_ids[0]}', 'test_annotator', 'completed')
+            """
+        )
+
+    # Get queue_item_ids for Queue 1
+    result = ch_client.query(
+        f"SELECT id FROM annotation_queue_items WHERE project_id = '{internal_project_id}' AND queue_id = '{queue_ids[1]}' AND deleted_at IS NULL ORDER BY created_at LIMIT 5"
+    )
+    queue1_items = [row[0] for row in result.result_rows]
+    assert len(queue1_items) == 5
+
+    # Mark first 3 items of Queue 1 as completed by inserting progress records
+    for item_id in queue1_items[:3]:
+        progress_id = generate_id()
+        ch_client.command(
+            f"""
+            INSERT INTO annotator_queue_items_progress (id, project_id, queue_item_id, queue_id, annotator_id, annotation_state)
+            VALUES ('{progress_id}', '{internal_project_id}', '{item_id}', '{queue_ids[1]}', 'test_annotator', 'completed')
+            """
+        )
+
+    # Mark 4th item of Queue 1 as skipped by inserting a progress record
+    item_id = queue1_items[3]
+    progress_id = generate_id()
+    ch_client.command(
+        f"""
+        INSERT INTO annotator_queue_items_progress (id, project_id, queue_item_id, queue_id, annotator_id, annotation_state)
+        VALUES ('{progress_id}', '{internal_project_id}', '{item_id}', '{queue_ids[1]}', 'test_annotator', 'skipped')
+        """
+    )
+
+    # Get queue_item_ids for Queue 2
+    result = ch_client.query(
+        f"SELECT id FROM annotation_queue_items WHERE project_id = '{internal_project_id}' AND queue_id = '{queue_ids[2]}' AND deleted_at IS NULL ORDER BY created_at LIMIT 7"
+    )
+    queue2_items = [row[0] for row in result.result_rows]
+    assert len(queue2_items) == 7
+
+    # Mark first 4 items of Queue 2 as skipped by inserting progress records
+    for item_id in queue2_items[:4]:
+        progress_id = generate_id()
+        ch_client.command(
+            f"""
+            INSERT INTO annotator_queue_items_progress (id, project_id, queue_item_id, queue_id, annotator_id, annotation_state)
+            VALUES ('{progress_id}', '{internal_project_id}', '{item_id}', '{queue_ids[2]}', 'test_annotator', 'skipped')
+            """
+        )
+
+    # Get stats for all queues
+    stats_req = tsi.AnnotationQueuesStatsReq(
+        project_id=client._project_id(),
+        queue_ids=queue_ids,
+    )
+    stats_res = client.server.annotation_queues_stats(stats_req)
+
+    # Verify we got stats for all 3 queues
+    assert len(stats_res.stats) == 3
+
+    # Create a map of queue_id to stats for easier verification
+    stats_map = {stat.queue_id: stat for stat in stats_res.stats}
+
+    # Verify stats for each queue
+    # Queue 0: 3 total, 2 completed
+    assert stats_map[queue_ids[0]].total_items == 3
+    assert stats_map[queue_ids[0]].completed_items == 2
+
+    # Queue 1: 5 total, 4 completed (3 completed + 1 skipped)
+    assert stats_map[queue_ids[1]].total_items == 5
+    assert stats_map[queue_ids[1]].completed_items == 4
+
+    # Queue 2: 7 total, 4 skipped
+    assert stats_map[queue_ids[2]].total_items == 7
+    assert stats_map[queue_ids[2]].completed_items == 4
+
+
+def test_annotation_queues_stats_empty_queues(client):
+    """Test getting stats for queues with no items."""
+    if client_is_sqlite(client):
+        pytest.skip("Annotation queues not supported in SQLite")
+
+    # Create two empty queues
+    queue_ids = []
+    for i in range(2):
+        req = tsi.AnnotationQueueCreateReq(
+            project_id=client._project_id(),
+            name=f"Empty Stats Queue {i}",
+            scorer_refs=[f"weave:///entity/project/scorer/empty{i}:abc"],
+            wb_user_id="test_user",
+        )
+        res = client.server.annotation_queue_create(req)
+        queue_ids.append(res.id)
+
+    # Get stats for empty queues
+    stats_req = tsi.AnnotationQueuesStatsReq(
+        project_id=client._project_id(),
+        queue_ids=queue_ids,
+    )
+    stats_res = client.server.annotation_queues_stats(stats_req)
+
+    # Verify we got stats for both queues with zero items
+    assert len(stats_res.stats) == 2
+    for stat in stats_res.stats:
+        assert stat.total_items == 0
+        assert stat.completed_items == 0
+
+
+def test_annotation_queues_stats_no_queue_ids(client):
+    """Test getting stats with empty queue_ids list."""
+    if client_is_sqlite(client):
+        pytest.skip("Annotation queues not supported in SQLite")
+
+    # Request stats with no queue IDs
+    stats_req = tsi.AnnotationQueuesStatsReq(
+        project_id=client._project_id(),
+        queue_ids=[],
+    )
+    stats_res = client.server.annotation_queues_stats(stats_req)
+
+    # Should return empty stats list
+    assert len(stats_res.stats) == 0

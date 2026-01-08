@@ -273,3 +273,67 @@ def make_queue_add_calls_fetch_calls_query(
     """
 
     return query
+
+
+def make_queues_stats_query(
+    project_id: str,
+    queue_ids: list[str],
+    pb: ParamBuilder,
+) -> str:
+    """Generate a query to fetch stats for multiple annotation queues.
+
+    This query returns:
+    - total_items: Count of items in annotation_queue_items per queue
+    - completed_items: Count of items where annotation_state is 'completed' or 'skipped'
+
+    Note: An item is considered "completed" when any annotator has finished working on it
+    (annotation_state = 'completed' or 'skipped'). Items with state 'in_progress' or
+    'unstarted' are not counted as completed.
+
+    Args:
+        project_id: The project ID
+        queue_ids: List of queue IDs to get stats for
+        pb: Parameter builder for safe SQL parameter injection
+
+    Returns:
+        SQL query string for fetching queue stats
+    """
+    project_id_param = pb.add_param(project_id)
+    queue_ids_param = pb.add_param(queue_ids)
+
+    # Using LEFT JOIN to get stats for queues even if they have no items or progress
+    # Only count items where annotation_state is 'completed' or 'skipped', not 'in_progress' or 'unstarted'
+    query = f"""
+    WITH total_items_per_queue AS (
+        SELECT
+            queue_id,
+            count(*) as total_items
+        FROM annotation_queue_items
+        WHERE project_id = {{{project_id_param}: String}}
+            AND queue_id IN {{{queue_ids_param}: Array(String)}}
+            AND deleted_at IS NULL
+        GROUP BY queue_id
+    ),
+    completed_items_per_queue AS (
+        SELECT
+            queue_id,
+            count(DISTINCT queue_item_id) as completed_items
+        FROM annotator_queue_items_progress
+        WHERE project_id = {{{project_id_param}: String}}
+            AND queue_id IN {{{queue_ids_param}: Array(String)}}
+            AND annotation_state IN ('completed', 'skipped')
+            AND deleted_at IS NULL
+        GROUP BY queue_id
+    )
+    SELECT
+        q.queue_id,
+        coalesce(t.total_items, 0) as total_items,
+        coalesce(c.completed_items, 0) as completed_items
+    FROM (
+        SELECT arrayJoin({{{queue_ids_param}: Array(String)}}) as queue_id
+    ) q
+    LEFT JOIN total_items_per_queue t ON q.queue_id = t.queue_id
+    LEFT JOIN completed_items_per_queue c ON q.queue_id = c.queue_id
+    """
+
+    return query
