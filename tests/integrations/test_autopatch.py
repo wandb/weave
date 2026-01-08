@@ -21,6 +21,7 @@ from weave.integrations.patch import (
     unregister_import_hook,
 )
 from weave.trace import weave_init
+from weave.trace.autopatch import IntegrationSettings
 
 
 def _reset_import(monkeypatch, module: str):
@@ -317,8 +318,6 @@ class TestPatchIntegration:
 
     def test_patch_integration_with_settings(self, setup_env):
         """Test that _patch_integration passes settings to the patcher getter."""
-        from weave.trace.autopatch import IntegrationSettings
-
         mock_patcher = MagicMock()
         mock_patcher.attempt_patch.return_value = True
         mock_getter = MagicMock(return_value=mock_patcher)
@@ -388,8 +387,6 @@ class TestPatchIntegration:
 
     def test_patch_integration_default_settings(self, setup_env):
         """Test that _patch_integration creates default settings when None."""
-        from weave.trace.autopatch import IntegrationSettings
-
         mock_patcher = MagicMock()
         mock_patcher.attempt_patch.return_value = True
         mock_getter = MagicMock(return_value=mock_patcher)
@@ -411,3 +408,46 @@ class TestPatchIntegration:
         call_args = mock_getter.call_args
         assert len(call_args.args) == 1
         assert isinstance(call_args.args[0], IntegrationSettings)
+
+    def test_patch_integration_no_double_patch_multiple_names(self, setup_env):
+        """Test that patching with multiple names prevents re-patching via either name.
+
+        This tests the scenario like crewai which registers both "crewai" and "crewai_tools".
+        Once patched, importing either module should not trigger patching again.
+        """
+        mock_patcher = MagicMock()
+        mock_patcher.attempt_patch.return_value = True
+        mock_getter = MagicMock(return_value=mock_patcher)
+
+        fake_module = types.ModuleType("fake_multi_integration")
+        fake_module.get_multi_patcher = mock_getter
+
+        # First patch with two integration names
+        with patch(
+            "weave.integrations.patch.importlib.import_module",
+            return_value=fake_module,
+        ):
+            _patch_integration(
+                module_path="fake.multi.module",
+                get_patcher_func_name="get_multi_patcher",
+                integration_names=["multi_a", "multi_b"],
+            )
+
+        # Verify initial patch happened once
+        assert mock_getter.call_count == 1
+        assert mock_patcher.attempt_patch.call_count == 1
+        assert "multi_a" in patch_module._PATCHED_INTEGRATIONS
+        assert "multi_b" in patch_module._PATCHED_INTEGRATIONS
+
+        # Now simulate importing "multi_a" - should not trigger patch again
+        mock_patch_func = MagicMock()
+        with patch.dict(
+            "weave.integrations.patch.INTEGRATION_MODULE_MAPPING",
+            {"multi_a": mock_patch_func, "multi_b": mock_patch_func},
+        ):
+            _patch_if_needed("multi_a")
+            mock_patch_func.assert_not_called()
+
+            # Also test "multi_b" - should not trigger patch again
+            _patch_if_needed("multi_b")
+            mock_patch_func.assert_not_called()
