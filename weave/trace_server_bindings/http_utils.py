@@ -161,6 +161,46 @@ def process_batch_with_retry(
     except Exception as e:
         from weave.utils.retry import _is_retryable_exception
 
+        # Handle 413 Content Too Large specially - split and retry if possible
+        is_413 = (
+            isinstance(e, httpx.HTTPStatusError)
+            and e.response is not None
+            and e.response.status_code == 413
+        )
+        if is_413 and len(batch) > 1:
+            logger.warning(
+                f"Server returned 413 for {batch_name} batch of {len(batch)} items, splitting and retrying"
+            )
+            # Aggressively reduce max_batch_size to prevent future 413s
+            if processor_obj:
+                new_max = max(1, len(batch) // 4)
+                processor_obj.max_batch_size = new_max
+                logger.info(f"Reduced {batch_name} max_batch_size to {new_max}")
+            split_idx = len(batch) // 2
+            process_batch_with_retry(
+                batch[:split_idx],
+                batch_name=batch_name,
+                remote_request_bytes_limit=remote_request_bytes_limit,
+                send_batch_fn=send_batch_fn,
+                processor_obj=processor_obj,
+                should_update_batch_size=False,
+                get_item_id_fn=get_item_id_fn,
+                log_dropped_fn=log_dropped_fn,
+                encode_batch_fn=encode_batch_fn,
+            )
+            process_batch_with_retry(
+                batch[split_idx:],
+                batch_name=batch_name,
+                remote_request_bytes_limit=remote_request_bytes_limit,
+                send_batch_fn=send_batch_fn,
+                processor_obj=processor_obj,
+                should_update_batch_size=False,
+                get_item_id_fn=get_item_id_fn,
+                log_dropped_fn=log_dropped_fn,
+                encode_batch_fn=encode_batch_fn,
+            )
+            return
+
         if not _is_retryable_exception(e):
             if log_dropped_fn:
                 log_dropped_fn(batch, e)
@@ -170,12 +210,11 @@ def process_batch_with_retry(
                     exc_info=True,
                 )
         else:
-            # Add items back to the queue for later processing, but only if the processor is still accepting work
+            # Add items back to the queue for later processing
             logger.warning(
                 f"{batch_name.capitalize()} batch failed after max retries, requeuing batch with {len(batch)=} for later processing",
             )
 
-            # only if debug mode
             if logger.isEnabledFor(logging.DEBUG) and get_item_id_fn:
                 ids = []
                 for item in batch:
