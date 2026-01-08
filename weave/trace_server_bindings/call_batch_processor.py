@@ -45,7 +45,7 @@ class CallBatchProcessor:
 
     Unlike the generic AsyncBatchProcessor which uses pure FIFO batching, this processor:
 
-    1. **Buffers starts**: Incoming StartBatchItems are held in an indexed dict
+    1. **Buffers starts**: Incoming StartBatchItems are held in a dict
     2. **Pairs on end arrival**: When an EndBatchItem arrives, it's immediately paired
        with its matching start (if buffered) to create a CompleteBatchItem
     3. **Timeout-based flush**: Starts that don't receive ends within `start_hold_timeout`
@@ -53,8 +53,7 @@ class CallBatchProcessor:
     4. **Ready queue**: Only contains items ready to send - completes, flushed starts,
        and orphaned ends
 
-    This ensures batches contain maximum complete calls, reducing server-side merging
-    and enabling efficient writes to the calls_complete table.
+    Batches contain maximum complete calls, reducing server-side merging and updates.
 
     Example flow:
         1. start_a arrives → buffered in pending_starts
@@ -175,6 +174,10 @@ class CallBatchProcessor:
         self._flush_thread.join(timeout=5.0)
         self._health_check_thread.join(timeout=5.0)
 
+    def accept_new_work(self) -> None:
+        """Start accepting new work again after stopping."""
+        self._stop_event.clear()
+
     def is_accepting_new_work(self) -> bool:
         """Returns True if the processor is accepting new work."""
         return not self._stop_event.is_set()
@@ -184,41 +187,23 @@ class CallBatchProcessor:
     # =========================================================================
 
     def _handle_start(self, item: StartBatchItem, timestamp: float) -> None:
-        """Buffer a start item waiting for its end.
-
-        If the start has no ID, it's queued immediately since it can't be paired.
-        """
+        """Buffer a start item waiting for its end."""
         call_id = item.req.start.id
-        if call_id is None:
-            # No ID means we can't pair - queue immediately
+        if call_id is None or self.start_hold_timeout == 0:  # 0 means no buffering
             self._queue_item(item)
             return
-
-        # Buffer the start, waiting for its end
         self._pending_starts[call_id] = (item, timestamp)
 
     def _handle_end(self, item: EndBatchItem) -> None:
-        """Handle an end item - pair with buffered start if possible.
-
-        If no matching start is found, the end is queued as an orphan.
-        This can happen when:
-        - The start was already flushed due to timeout
-        - The start was never received (bug or network issue)
-        - The start had no ID
-        """
+        """Handle an end item - pair with buffered start if possible."""
         call_id = item.req.end.id
         if call_id is None:
-            # No ID means we can't pair - queue as orphan
             self._queue_item(item)
             return
-
-        # Try to pair with a buffered start
         if call_id in self._pending_starts:
             start_item, _ = self._pending_starts.pop(call_id)
-            complete = self._create_complete(start_item, item)
-            self._queue_item(complete)
+            self._queue_item(self._create_complete(start_item, item))
         else:
-            # Orphaned end - queue as-is
             self._queue_item(item)
 
     def _create_complete(
@@ -326,12 +311,10 @@ class CallBatchProcessor:
             self._flush_stale_starts()
 
     def _flush_stale_starts(self) -> None:
-        """Move starts that have exceeded hold timeout to the ready queue.
+        """Move starts older than start_hold_timeout to the ready queue."""
+        if self.start_hold_timeout < 0:  # -1 means never flush, always wait for end
+            return
 
-        These are starts whose ends never arrived within the timeout window.
-        They're flushed as unpaired starts so the server has visibility that
-        the call was started (important for long-running calls).
-        """
         now = time.time()
         stale_items: list[StartBatchItem] = []
 
@@ -345,7 +328,6 @@ class CallBatchProcessor:
                 item, _ = self._pending_starts.pop(call_id)
                 stale_items.append(item)
 
-        # Queue stale starts (outside lock to avoid holding it during queue ops)
         for item in stale_items:
             try:
                 self.ready_queue.put_nowait(item)

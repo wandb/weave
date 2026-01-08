@@ -836,10 +836,16 @@ class WeaveClient:
                 start_enqueued_event.set()
 
         call_start_delay = settings.call_start_delay()
-        # Evaluations are always long running, don't try to wait
         is_eval_op = op.name == EVALUATION_RUN_OP_NAME
-
-        should_delay = (call_start_delay != 0) and (not is_eval_op)
+        server_handles_buffering = (  # CallBatchProcessor buffers starts
+            hasattr(self.server, "get_call_processor")
+            and self.server.get_call_processor() is not None
+        )
+        should_delay = (
+            (call_start_delay != 0)
+            and (not is_eval_op)
+            and (not server_handles_buffering)
+        )
 
         if should_delay:
             with self._pending_starts_lock:

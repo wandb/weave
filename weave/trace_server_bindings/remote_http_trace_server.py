@@ -11,7 +11,11 @@ from pydantic.json_schema import SkipJsonSchema
 from typing_extensions import Self
 
 from weave.trace.env import weave_trace_server_url
-from weave.trace.settings import max_calls_queue_size, should_enable_disk_fallback
+from weave.trace.settings import (
+    call_start_delay,
+    max_calls_queue_size,
+    should_enable_disk_fallback,
+)
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ids import generate_id
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
@@ -63,15 +67,11 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         self.call_processor: CallBatchProcessor | None = None
         self.feedback_processor: AsyncBatchProcessor | None = None
         if self.should_batch:
-            # Use CallBatchProcessor for calls - it pairs starts with ends at
-            # enqueue time, maximizing complete calls sent to the server
             self.call_processor = CallBatchProcessor(
                 self._flush_calls,
                 max_queue_size=max_calls_queue_size(),
                 enable_disk_fallback=should_enable_disk_fallback(),
-                # Hold starts for 10s waiting for their ends
-                # This should be >= call_start_delay in weave_client settings
-                start_hold_timeout=10.0,
+                start_hold_timeout=call_start_delay(),  # Buffer starts waiting for ends
             )
             # Feedback uses the standard async batch processor
             self.feedback_processor = AsyncBatchProcessor(
