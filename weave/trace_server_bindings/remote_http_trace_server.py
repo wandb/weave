@@ -73,7 +73,6 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
                 enable_disk_fallback=should_enable_disk_fallback(),
                 start_hold_timeout=call_start_delay(),  # Buffer starts waiting for ends
             )
-            # Feedback uses the standard async batch processor
             self.feedback_processor = AsyncBatchProcessor(
                 self._flush_feedback,
                 max_queue_size=max_calls_queue_size(),

@@ -49,7 +49,6 @@ def log_dropped_call_batch(
             # For end items, access the end request
             dropped_end_ids.append(item.req.end.id)
         elif hasattr(item, "req") and hasattr(item.req, "complete"):
-            # For complete items, access the complete request
             dropped_complete_ids.append(item.req.complete.id)
     if dropped_start_ids:
         logger.error(f"dropped call start ids: {dropped_start_ids}")
