@@ -1,13 +1,10 @@
+from enum import Enum
 from typing import Literal
 
 from pydantic import BaseModel, Field
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.interface.builtin_object_classes import base_object_def
-from weave.trace_server.interface.builtin_object_classes.dynamic_leaderboard import (
-    ObjectConfig,
-    DynamicLeaderboardColumnConfig,
-)
 
 PathElement = str | int
 
@@ -37,10 +34,41 @@ class ChartConfig(BaseModel):
     custom_name: str | None = Field(default=None)
 
 
+class AggregationMethod(str, Enum):
+    LATEST = "latest"
+    AVERAGE = "average"
+
+
+class ObjectVersionGroup(BaseModel):
+    label: str  # label for the combination of the groups
+    base_ref: str
+    versions: list[str] | Literal["*"]
+    show_version_indicator: bool
+    method: AggregationMethod
+
+
+class ObjectConfig(BaseModel):
+    version_groups: list[ObjectVersionGroup]
+    display_name_map: dict[str, str]  # obj -> display name (keys can use "*" wildcards)
+    deselected: list[
+        str
+    ]  # List of dataset refs or patterns to exclude (can use "*" for wildcard matching)
+
+
+class DynamicLeaderboardColumnConfig(BaseModel):
+    evaluation_object_ref: base_object_def.RefStr
+    scorer_name: str
+    summary_metric_path: str
+    should_minimize: bool
+    deselected: bool  # If True, this metric is excluded from the leaderboard
+
+
 class DynamicLeaderboardConfig(BaseModel):
+    # These are initialized to empty lists and dicts by default (show everything)
     model_configuration: ObjectConfig
     dataset_configuration: ObjectConfig
     scorer_configuration: ObjectConfig
+    # Only has entries when a column is marked as deselected or minimized
     columns_configuration: list[DynamicLeaderboardColumnConfig]
 
 
@@ -68,6 +96,7 @@ class SavedViewDefinition(BaseModel):
     dataset_selector: str | None = Field(default=None)
     evaluation_selector: str | None = Field(default=None)
 
+    # Dynamic leaderboards are populated by the evals in a saved view
     dynamic_leaderboard_config: DynamicLeaderboardConfig | None = Field(default=None)
 
 
