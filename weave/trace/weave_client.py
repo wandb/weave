@@ -845,9 +845,10 @@ class WeaveClient:
             with self._pending_starts_lock:
                 self._pending_starts[call_id] = execute_start_call
 
-            delay_seconds = min(
-                MAX_CALL_START_DELAY if call_start_delay == -1 else call_start_delay,
-                MAX_CALL_START_DELAY,
+            delay_seconds = (
+                MAX_CALL_START_DELAY
+                if call_start_delay == -1
+                else min(call_start_delay, MAX_CALL_START_DELAY)
             )
 
             if delay_seconds > 0:
