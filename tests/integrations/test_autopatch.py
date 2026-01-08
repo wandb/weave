@@ -319,6 +319,8 @@ def test_patch_integration(setup_env, success):
 
         mock_getter.assert_called_once()
         mock_patcher.attempt_patch.assert_called_once()
+
+        # True if patched, False if not
         assert ("single_symbol" in patch_module._PATCHED_INTEGRATIONS) is success
 
         # Second call behavior depends on whether first patch succeeded
@@ -373,6 +375,8 @@ def test_patch_integration_multi(setup_env, success):
 
         mock_getter.assert_called_once()
         mock_patcher.attempt_patch.assert_called_once()
+
+        # All True if patched, all False if not
         assert ("symbol1" in patch_module._PATCHED_INTEGRATIONS) is success
         assert ("symbol2" in patch_module._PATCHED_INTEGRATIONS) is success
         assert ("symbol3" in patch_module._PATCHED_INTEGRATIONS) is success
