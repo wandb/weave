@@ -1,26 +1,16 @@
-"""Single-thread scheduler for delayed execution using a min-heap."""
+"""Single-thread scheduler for delayed execution using sched."""
 
-import heapq
+import sched
 import threading
 import time
 from collections.abc import Callable
-from dataclasses import dataclass, field
-
-
-@dataclass(order=True)
-class ScheduledTask:
-    deadline: float
-    callback: Callable[[], None] = field(compare=False)
-    cancelled: bool = field(default=False, compare=False)
 
 
 class DelayedScheduler:
     """Schedules callbacks to run after a delay using a single background thread."""
 
     def __init__(self) -> None:
-        self._heap: list[ScheduledTask] = []
-        self._lock = threading.Lock()
-        self._condition = threading.Condition(self._lock)
+        self._scheduler = sched.scheduler(time.monotonic, time.sleep)
         self._shutdown = False
         self._thread = threading.Thread(
             target=self._run, daemon=True, name="weave-delayed-scheduler"
@@ -29,48 +19,22 @@ class DelayedScheduler:
 
     def schedule(
         self, delay_seconds: float, callback: Callable[[], None]
-    ) -> ScheduledTask:
-        """Schedule callback to run after delay_seconds. Returns task for cancellation."""
-        task = ScheduledTask(
-            deadline=time.monotonic() + delay_seconds,
-            callback=callback,
-        )
-        with self._condition:
-            heapq.heappush(self._heap, task)
-            self._condition.notify()
-        return task
+    ) -> sched.Event:
+        """Schedule callback to run after delay_seconds. Returns event for cancellation."""
+        return self._scheduler.enter(delay_seconds, 1, callback)
 
-    def cancel(self, task: ScheduledTask) -> None:
-        """Mark task as cancelled. It will be skipped when its deadline arrives."""
-        task.cancelled = True
+    def cancel(self, event: sched.Event) -> None:
+        """Cancel a scheduled event."""
+        try:
+            self._scheduler.cancel(event)
+        except ValueError:
+            pass  # Already executed or cancelled
 
     def _run(self) -> None:
-        while True:
-            with self._condition:
-                # Wait for tasks or shutdown
-                while not self._heap and not self._shutdown:
-                    self._condition.wait()
-
-                if self._shutdown:
-                    return
-
-                # Wait until next deadline
-                wait_time = self._heap[0].deadline - time.monotonic()
-                if wait_time > 0:
-                    self._condition.wait(timeout=wait_time)
-                    continue
-
-                task = heapq.heappop(self._heap)
-
-            # Execute outside lock
-            if not task.cancelled:
-                try:
-                    task.callback()
-                except Exception:
-                    pass
+        while not self._shutdown:
+            self._scheduler.run(blocking=False)
+            time.sleep(0.01)  # Poll interval
 
     def shutdown(self) -> None:
-        with self._condition:
-            self._shutdown = True
-            self._condition.notify()
+        self._shutdown = True
         self._thread.join(timeout=5.0)
