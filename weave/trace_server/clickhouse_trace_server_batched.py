@@ -41,6 +41,7 @@ from weave.trace_server.annotation_queues_query_builder import (
     make_queue_add_calls_check_duplicates_query,
     make_queue_add_calls_fetch_calls_query,
     make_queue_create_query,
+    make_queue_items_query,
     make_queue_read_query,
     make_queues_query,
     make_queues_stats_query,
@@ -1731,6 +1732,50 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         return tsi.AnnotationQueueAddCallsRes(
             added_count=len(calls_data), duplicates=len(existing_call_ids)
         )
+
+    def annotation_queue_items_query(
+        self, req: tsi.AnnotationQueueItemsQueryReq
+    ) -> tsi.AnnotationQueueItemsQueryRes:
+        """Query items in an annotation queue with pagination, sorting, and filtering."""
+        pb = ParamBuilder()
+
+        query = make_queue_items_query(
+            project_id=req.project_id,
+            queue_id=req.queue_id,
+            pb=pb,
+            filter=req.filter,
+            sort_by=req.sort_by,
+            limit=req.limit,
+            offset=req.offset,
+            include_position=req.include_position,
+        )
+
+        result = self.ch_client.query(query, parameters=pb.get_params())
+
+        items = []
+        for row in result.named_results():
+            items.append(
+                tsi.AnnotationQueueItemSchema(
+                    id=row["id"],
+                    project_id=row["project_id"],
+                    queue_id=row["queue_id"],
+                    call_id=row["call_id"],
+                    call_started_at=row["call_started_at"],
+                    call_ended_at=row["call_ended_at"],
+                    call_op_name=row["call_op_name"],
+                    call_trace_id=row["call_trace_id"],
+                    display_fields=row["display_fields"],
+                    added_by=row["added_by"],
+                    annotation_state=row["annotation_state"],
+                    created_at=row["created_at"],
+                    created_by=row["created_by"],
+                    updated_at=row["updated_at"],
+                    deleted_at=row["deleted_at"],
+                    position_in_queue=row.get("position_in_queue"),
+                )
+            )
+
+        return tsi.AnnotationQueueItemsQueryRes(items=items)
 
     def annotation_queues_stats(
         self, req: tsi.AnnotationQueuesStatsReq

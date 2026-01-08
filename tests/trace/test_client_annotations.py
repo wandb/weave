@@ -4,12 +4,136 @@ These tests cover the queue-based call annotation system introduced in
 commit 7fd5bfd24bccce8f97449bee1676ac55e74fd993.
 """
 
+from typing import NamedTuple
+
 import pytest
 
 import weave
 from tests.trace.util import client_is_sqlite
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ids import generate_id
+
+
+class CallsFixture(NamedTuple):
+    """Container for test calls data."""
+
+    call_ids: list[str]
+    calls: list
+
+
+class QueueWithCallsFixture(NamedTuple):
+    """Container for queue with calls data."""
+
+    queue_id: str
+    call_ids: list[str]
+    calls: list
+
+
+# Utility functions for test setup
+
+
+def create_test_calls(
+    client, count: int, op_name_prefix: str = "test_op"
+) -> CallsFixture:
+    """Create test calls and return their IDs.
+
+    Args:
+        client: Weave client instance
+        count: Number of calls to create
+        op_name_prefix: Prefix for the operation name
+
+    Returns:
+        CallsFixture with call_ids and calls list
+    """
+
+    @weave.op(name=f"{op_name_prefix}_{count}")
+    def test_op(x: int) -> int:
+        return x * 2
+
+    for i in range(count):
+        test_op(i)
+
+    calls = list(client.get_calls())
+    # Get only the calls we just created (last 'count' calls)
+    new_calls = calls[-count:] if len(calls) >= count else calls
+    call_ids = [call.id for call in new_calls]
+
+    return CallsFixture(call_ids=call_ids, calls=new_calls)
+
+
+def create_annotation_queue(
+    client,
+    name: str = "Test Queue",
+    description: str | None = "A test annotation queue",
+    scorer_refs: list[str] | None = None,
+) -> str:
+    """Create an annotation queue and return its ID.
+
+    Args:
+        client: Weave client instance
+        name: Queue name
+        description: Queue description
+        scorer_refs: List of scorer references
+
+    Returns:
+        Queue ID
+    """
+    if scorer_refs is None:
+        scorer_refs = ["weave:///entity/project/scorer/test:abc123"]
+
+    create_req = tsi.AnnotationQueueCreateReq(
+        project_id=client._project_id(),
+        name=name,
+        description=description,
+        scorer_refs=scorer_refs,
+        wb_user_id="test_user",
+    )
+
+    create_res = client.server.annotation_queue_create(create_req)
+    return create_res.id
+
+
+def create_queue_with_calls(
+    client,
+    num_calls: int = 5,
+    queue_name: str = "Test Queue",
+    display_fields: list[str] | None = None,
+) -> QueueWithCallsFixture:
+    """Create a queue and add calls to it.
+
+    Args:
+        client: Weave client instance
+        num_calls: Number of calls to create and add
+        queue_name: Name for the queue
+        display_fields: Fields to display (defaults to ["input.x", "output"])
+
+    Returns:
+        QueueWithCallsFixture containing queue_id, call_ids, and calls
+    """
+    if display_fields is None:
+        display_fields = ["input.x", "output"]
+
+    # Create calls
+    calls_fixture = create_test_calls(client, num_calls, op_name_prefix=queue_name)
+
+    # Create queue
+    queue_id = create_annotation_queue(client, name=queue_name)
+
+    # Add calls to queue
+    add_req = tsi.AnnotationQueueAddCallsReq(
+        project_id=client._project_id(),
+        queue_id=queue_id,
+        call_ids=calls_fixture.call_ids,
+        display_fields=display_fields,
+        wb_user_id="test_user",
+    )
+    client.server.annotation_queue_add_calls(add_req)
+
+    return QueueWithCallsFixture(
+        queue_id=queue_id,
+        call_ids=calls_fixture.call_ids,
+        calls=calls_fixture.calls,
+    )
 
 
 def test_annotation_queue_create_and_read(client):
@@ -602,3 +726,595 @@ def test_annotation_queues_stats_no_queue_ids(client):
 
     # Should return empty stats list
     assert len(stats_res.stats) == 0
+
+
+def test_annotation_queue_items_query_basic(client):
+    """Test basic querying of annotation queue items."""
+    if client_is_sqlite(client):
+        pytest.skip("Annotation queues not supported in SQLite")
+
+    # Create queue with 5 calls
+    fixture = create_queue_with_calls(
+        client, num_calls=5, queue_name="Items Query Test Queue"
+    )
+
+    # Query items
+    query_req = tsi.AnnotationQueueItemsQueryReq(
+        project_id=client._project_id(),
+        queue_id=fixture.queue_id,
+    )
+    query_res = client.server.annotation_queue_items_query(query_req)
+
+    # Verify we got all 5 items
+    assert len(query_res.items) == 5
+
+    # Verify item structure
+    for item in query_res.items:
+        assert item.id is not None
+        assert item.queue_id == fixture.queue_id
+        assert item.call_id in fixture.call_ids
+        assert item.display_fields == ["input.x", "output"]
+        assert item.added_by == "test_user"
+        assert item.deleted_at is None
+
+
+def test_annotation_queue_items_query_with_pagination(client):
+    """Test querying queue items with limit and offset."""
+    if client_is_sqlite(client):
+        pytest.skip("Annotation queues not supported in SQLite")
+
+    # Create queue with 10 calls
+    fixture = create_queue_with_calls(
+        client, num_calls=10, queue_name="Items Pagination Queue"
+    )
+
+    # Query first page (limit 3)
+    query_req = tsi.AnnotationQueueItemsQueryReq(
+        project_id=client._project_id(),
+        queue_id=fixture.queue_id,
+        limit=3,
+        offset=0,
+    )
+    page1_res = client.server.annotation_queue_items_query(query_req)
+    assert len(page1_res.items) == 3
+
+    # Query second page (offset 3)
+    query_req = tsi.AnnotationQueueItemsQueryReq(
+        project_id=client._project_id(),
+        queue_id=fixture.queue_id,
+        limit=3,
+        offset=3,
+    )
+    page2_res = client.server.annotation_queue_items_query(query_req)
+    assert len(page2_res.items) == 3
+
+    # Pages should have different items
+    page1_ids = {item.id for item in page1_res.items}
+    page2_ids = {item.id for item in page2_res.items}
+    assert page1_ids.isdisjoint(page2_ids)
+
+
+def test_annotation_queue_items_query_with_sorting(client):
+    """Test querying queue items with different sort orders."""
+    if client_is_sqlite(client):
+        pytest.skip("Annotation queues not supported in SQLite")
+
+    # Create queue with 3 calls
+    fixture = create_queue_with_calls(
+        client,
+        num_calls=3,
+        queue_name="Items Sorting Queue",
+        display_fields=["input.x"],
+    )
+
+    # Query with default sort (created_at ASC)
+    query_req = tsi.AnnotationQueueItemsQueryReq(
+        project_id=client._project_id(),
+        queue_id=fixture.queue_id,
+    )
+    query_res = client.server.annotation_queue_items_query(query_req)
+
+    # Items should be sorted by created_at ascending
+    for i in range(len(query_res.items) - 1):
+        assert query_res.items[i].created_at <= query_res.items[i + 1].created_at
+
+    # Query with call_started_at DESC sort
+    query_req = tsi.AnnotationQueueItemsQueryReq(
+        project_id=client._project_id(),
+        queue_id=fixture.queue_id,
+        sort_by=[tsi.SortBy(field="call_started_at", direction="desc")],
+    )
+    query_res = client.server.annotation_queue_items_query(query_req)
+
+    # Items should be sorted by call_started_at descending
+    for i in range(len(query_res.items) - 1):
+        assert (
+            query_res.items[i].call_started_at >= query_res.items[i + 1].call_started_at
+        )
+
+
+def test_annotation_queue_items_query_empty_queue(client):
+    """Test querying items from an empty queue."""
+    if client_is_sqlite(client):
+        pytest.skip("Annotation queues not supported in SQLite")
+
+    # Create an empty queue
+    queue_id = create_annotation_queue(client, name="Empty Items Queue")
+
+    # Query items from empty queue
+    query_req = tsi.AnnotationQueueItemsQueryReq(
+        project_id=client._project_id(),
+        queue_id=queue_id,
+    )
+    query_res = client.server.annotation_queue_items_query(query_req)
+
+    # Should return empty list
+    assert len(query_res.items) == 0
+
+
+def test_annotation_queue_items_query_with_multiple_sort_fields(client):
+    """Test querying with multiple sort fields."""
+    if client_is_sqlite(client):
+        pytest.skip("Annotation queues not supported in SQLite")
+
+    # Create queue with 5 calls
+    fixture = create_queue_with_calls(
+        client, num_calls=5, queue_name="Multi Sort Queue"
+    )
+
+    # Query with multiple sort fields
+    query_req = tsi.AnnotationQueueItemsQueryReq(
+        project_id=client._project_id(),
+        queue_id=fixture.queue_id,
+        sort_by=[
+            tsi.SortBy(field="call_op_name", direction="asc"),
+            tsi.SortBy(field="created_at", direction="desc"),
+        ],
+    )
+    query_res = client.server.annotation_queue_items_query(query_req)
+
+    # Should return all items
+    assert len(query_res.items) == 5
+
+
+def test_annotation_queue_items_query_filter_by_call_id(client):
+    """Test filtering queue items by call_id."""
+    if client_is_sqlite(client):
+        pytest.skip("Annotation queues not supported in SQLite")
+
+    # Create queue with 5 calls
+    fixture = create_queue_with_calls(
+        client, num_calls=5, queue_name="Filter By Call ID Queue"
+    )
+
+    # Pick one call_id to filter by
+    target_call_id = fixture.call_ids[2]
+
+    # Query with call_id filter
+    query_req = tsi.AnnotationQueueItemsQueryReq(
+        project_id=client._project_id(),
+        queue_id=fixture.queue_id,
+        filter=tsi.AnnotationQueueItemsFilter(call_id=target_call_id),
+    )
+    query_res = client.server.annotation_queue_items_query(query_req)
+
+    # Should return only 1 item
+    assert len(query_res.items) == 1
+    assert query_res.items[0].call_id == target_call_id
+
+
+def test_annotation_queue_items_query_filter_by_call_op_name(client):
+    """Test filtering queue items by call_op_name."""
+    if client_is_sqlite(client):
+        pytest.skip("Annotation queues not supported in SQLite")
+
+    # Create two different sets of calls with different op names
+    fixture1 = create_queue_with_calls(
+        client, num_calls=3, queue_name="Filter Op Name Queue A"
+    )
+    fixture2 = create_queue_with_calls(
+        client, num_calls=2, queue_name="Filter Op Name Queue B"
+    )
+
+    # Get the op_name from first fixture
+    calls = list(client.get_calls())
+    target_op_name = None
+    for call in calls:
+        if call.id in fixture1.call_ids:
+            target_op_name = call.op_name
+            break
+
+    assert target_op_name is not None
+
+    # Query fixture1's queue filtered by op_name
+    query_req = tsi.AnnotationQueueItemsQueryReq(
+        project_id=client._project_id(),
+        queue_id=fixture1.queue_id,
+        filter=tsi.AnnotationQueueItemsFilter(call_op_name=target_op_name),
+    )
+    query_res = client.server.annotation_queue_items_query(query_req)
+
+    # Should return all items from fixture1 (they all have same op_name)
+    assert len(query_res.items) == 3
+    for item in query_res.items:
+        assert item.call_op_name == target_op_name
+
+
+def test_annotation_queue_items_query_filter_by_call_trace_id(client):
+    """Test filtering queue items by call_trace_id."""
+    if client_is_sqlite(client):
+        pytest.skip("Annotation queues not supported in SQLite")
+
+    # Create queue with 5 calls
+    fixture = create_queue_with_calls(
+        client, num_calls=5, queue_name="Filter By Trace ID Queue"
+    )
+
+    # Get trace_id from one of the calls
+    calls = list(client.get_calls())
+    target_trace_id = None
+    for call in calls:
+        if call.id in fixture.call_ids:
+            target_trace_id = call.trace_id
+            break
+
+    assert target_trace_id is not None
+
+    # Query with trace_id filter
+    query_req = tsi.AnnotationQueueItemsQueryReq(
+        project_id=client._project_id(),
+        queue_id=fixture.queue_id,
+        filter=tsi.AnnotationQueueItemsFilter(call_trace_id=target_trace_id),
+    )
+    query_res = client.server.annotation_queue_items_query(query_req)
+
+    # Should return at least 1 item (might be more if multiple calls share trace)
+    assert len(query_res.items) >= 1
+    for item in query_res.items:
+        assert item.call_trace_id == target_trace_id
+
+
+def test_annotation_queue_items_query_filter_by_added_by(client):
+    """Test filtering queue items by added_by."""
+    if client_is_sqlite(client):
+        pytest.skip("Annotation queues not supported in SQLite")
+
+    # Create queue with 5 calls added by test_user
+    fixture = create_queue_with_calls(
+        client, num_calls=5, queue_name="Filter By Added By Queue"
+    )
+
+    # Query with added_by filter
+    query_req = tsi.AnnotationQueueItemsQueryReq(
+        project_id=client._project_id(),
+        queue_id=fixture.queue_id,
+        filter=tsi.AnnotationQueueItemsFilter(added_by="test_user"),
+    )
+    query_res = client.server.annotation_queue_items_query(query_req)
+
+    # Should return all 5 items
+    assert len(query_res.items) == 5
+    for item in query_res.items:
+        assert item.added_by == "test_user"
+
+    # Query with non-existent added_by
+    query_req = tsi.AnnotationQueueItemsQueryReq(
+        project_id=client._project_id(),
+        queue_id=fixture.queue_id,
+        filter=tsi.AnnotationQueueItemsFilter(added_by="nonexistent_user"),
+    )
+    query_res = client.server.annotation_queue_items_query(query_req)
+
+    # Should return no items
+    assert len(query_res.items) == 0
+
+
+def test_annotation_queue_items_query_filter_by_annotation_states(client):
+    """Test filtering queue items by annotation_states.
+
+    Note: This test only validates filtering for 'unstarted' state.
+    Tests for other states (in_progress, completed, skipped) will be added
+    once the queue item progress update API is available.
+    """
+    if client_is_sqlite(client):
+        pytest.skip("Annotation queues not supported in SQLite")
+
+    # Create queue with 5 calls
+    fixture = create_queue_with_calls(
+        client, num_calls=5, queue_name="Filter By States Queue"
+    )
+
+    # Query for unstarted items (all items should be unstarted initially)
+    query_req = tsi.AnnotationQueueItemsQueryReq(
+        project_id=client._project_id(),
+        queue_id=fixture.queue_id,
+        filter=tsi.AnnotationQueueItemsFilter(annotation_states=["unstarted"]),
+    )
+    query_res = client.server.annotation_queue_items_query(query_req)
+
+    # Should return all 5 items
+    assert len(query_res.items) == 5
+    for item in query_res.items:
+        assert item.annotation_state == "unstarted"
+
+    # Query for completed items (should be none)
+    query_req = tsi.AnnotationQueueItemsQueryReq(
+        project_id=client._project_id(),
+        queue_id=fixture.queue_id,
+        filter=tsi.AnnotationQueueItemsFilter(annotation_states=["completed"]),
+    )
+    query_res = client.server.annotation_queue_items_query(query_req)
+
+    # Should return no items
+    assert len(query_res.items) == 0
+
+
+def test_annotation_queue_items_query_filter_combined(client):
+    """Test filtering queue items with multiple filters combined."""
+    if client_is_sqlite(client):
+        pytest.skip("Annotation queues not supported in SQLite")
+
+    # Create queue with 5 calls
+    fixture = create_queue_with_calls(
+        client, num_calls=5, queue_name="Filter Combined Queue"
+    )
+
+    # Get call info
+    calls = list(client.get_calls())
+    target_call = None
+    for call in calls:
+        if call.id in fixture.call_ids:
+            target_call = call
+            break
+
+    assert target_call is not None
+
+    # Query with multiple filters: call_id + added_by + annotation_states
+    query_req = tsi.AnnotationQueueItemsQueryReq(
+        project_id=client._project_id(),
+        queue_id=fixture.queue_id,
+        filter=tsi.AnnotationQueueItemsFilter(
+            call_id=target_call.id,
+            added_by="test_user",
+            annotation_states=["unstarted"],
+        ),
+    )
+    query_res = client.server.annotation_queue_items_query(query_req)
+
+    # Should return exactly 1 item matching all criteria
+    assert len(query_res.items) == 1
+    assert query_res.items[0].call_id == target_call.id
+    assert query_res.items[0].added_by == "test_user"
+    assert query_res.items[0].annotation_state == "unstarted"
+
+    # Query with conflicting filters (specific call_id + wrong annotation state)
+    query_req = tsi.AnnotationQueueItemsQueryReq(
+        project_id=client._project_id(),
+        queue_id=fixture.queue_id,
+        filter=tsi.AnnotationQueueItemsFilter(
+            call_id=target_call.id,
+            annotation_states=["completed"],  # Item is unstarted, not completed
+        ),
+    )
+    query_res = client.server.annotation_queue_items_query(query_req)
+
+    # Should return no items
+    assert len(query_res.items) == 0
+
+
+def test_annotation_queue_items_query_filter_empty_results(client):
+    """Test filtering queue items that returns no results."""
+    if client_is_sqlite(client):
+        pytest.skip("Annotation queues not supported in SQLite")
+
+    # Create queue with 5 calls
+    fixture = create_queue_with_calls(
+        client, num_calls=5, queue_name="Filter Empty Results Queue"
+    )
+
+    # Query with non-existent call_id
+    query_req = tsi.AnnotationQueueItemsQueryReq(
+        project_id=client._project_id(),
+        queue_id=fixture.queue_id,
+        filter=tsi.AnnotationQueueItemsFilter(call_id="nonexistent_call_id"),
+    )
+    query_res = client.server.annotation_queue_items_query(query_req)
+
+    # Should return no items
+    assert len(query_res.items) == 0
+
+    # Query with non-existent op_name
+    query_req = tsi.AnnotationQueueItemsQueryReq(
+        project_id=client._project_id(),
+        queue_id=fixture.queue_id,
+        filter=tsi.AnnotationQueueItemsFilter(call_op_name="NonexistentOp"),
+    )
+    query_res = client.server.annotation_queue_items_query(query_req)
+
+    # Should return no items
+    assert len(query_res.items) == 0
+
+
+def test_annotation_queue_items_query_filter_with_pagination(client):
+    """Test filtering with pagination."""
+    if client_is_sqlite(client):
+        pytest.skip("Annotation queues not supported in SQLite")
+
+    # Create queue with 10 calls
+    fixture = create_queue_with_calls(
+        client, num_calls=10, queue_name="Filter With Pagination Queue"
+    )
+
+    # Query for unstarted items with limit
+    query_req = tsi.AnnotationQueueItemsQueryReq(
+        project_id=client._project_id(),
+        queue_id=fixture.queue_id,
+        filter=tsi.AnnotationQueueItemsFilter(annotation_states=["unstarted"]),
+        limit=3,
+        offset=0,
+    )
+    page1_res = client.server.annotation_queue_items_query(query_req)
+
+    # Should return 3 items
+    assert len(page1_res.items) == 3
+
+    # Query second page
+    query_req = tsi.AnnotationQueueItemsQueryReq(
+        project_id=client._project_id(),
+        queue_id=fixture.queue_id,
+        filter=tsi.AnnotationQueueItemsFilter(annotation_states=["unstarted"]),
+        limit=3,
+        offset=3,
+    )
+    page2_res = client.server.annotation_queue_items_query(query_req)
+
+    # Should return 3 different items
+    assert len(page2_res.items) == 3
+    page1_ids = {item.id for item in page1_res.items}
+    page2_ids = {item.id for item in page2_res.items}
+    assert page1_ids.isdisjoint(page2_ids)
+
+
+def test_annotation_queue_items_query_filter_with_sorting(client):
+    """Test filtering with sorting."""
+    if client_is_sqlite(client):
+        pytest.skip("Annotation queues not supported in SQLite")
+
+    # Create queue with 5 calls
+    fixture = create_queue_with_calls(
+        client, num_calls=5, queue_name="Filter With Sorting Queue"
+    )
+
+    # Query with filter and sort
+    query_req = tsi.AnnotationQueueItemsQueryReq(
+        project_id=client._project_id(),
+        queue_id=fixture.queue_id,
+        filter=tsi.AnnotationQueueItemsFilter(
+            added_by="test_user", annotation_states=["unstarted"]
+        ),
+        sort_by=[tsi.SortBy(field="call_started_at", direction="desc")],
+    )
+    query_res = client.server.annotation_queue_items_query(query_req)
+
+    # Should return all 5 items sorted by call_started_at descending
+    assert len(query_res.items) == 5
+    for i in range(len(query_res.items) - 1):
+        assert (
+            query_res.items[i].call_started_at >= query_res.items[i + 1].call_started_at
+        )
+
+
+def test_annotation_queue_items_query_with_position_basic(client):
+    """Test querying queue items with position tracking enabled."""
+    if client_is_sqlite(client):
+        pytest.skip("Annotation queues not supported in SQLite")
+
+    # Create queue with 5 calls
+    fixture = create_queue_with_calls(
+        client, num_calls=5, queue_name="Position Basic Queue"
+    )
+
+    # Query items with include_position=True
+    query_req = tsi.AnnotationQueueItemsQueryReq(
+        project_id=client._project_id(),
+        queue_id=fixture.queue_id,
+        include_position=True,
+    )
+    query_res = client.server.annotation_queue_items_query(query_req)
+
+    # Verify we got all 5 items
+    assert len(query_res.items) == 5
+
+    # Verify position_in_queue is present and sequential (1-based)
+    for i, item in enumerate(query_res.items):
+        assert item.position_in_queue is not None
+        assert item.position_in_queue == i + 1  # 1-based indexing
+
+    # Verify positions are 1 through 5
+    positions = {item.position_in_queue for item in query_res.items}
+    assert positions == {1, 2, 3, 4, 5}
+
+
+def test_annotation_queue_items_query_without_position(client):
+    """Test that position_in_queue is None when include_position=False."""
+    if client_is_sqlite(client):
+        pytest.skip("Annotation queues not supported in SQLite")
+
+    # Create queue with 3 calls
+    fixture = create_queue_with_calls(
+        client, num_calls=3, queue_name="No Position Queue"
+    )
+
+    # Query items without include_position (defaults to False)
+    query_req = tsi.AnnotationQueueItemsQueryReq(
+        project_id=client._project_id(),
+        queue_id=fixture.queue_id,
+    )
+    query_res = client.server.annotation_queue_items_query(query_req)
+
+    # Verify position_in_queue is None for all items
+    assert len(query_res.items) == 3
+    for item in query_res.items:
+        assert item.position_in_queue is None
+
+
+def test_annotation_queue_items_query_position_with_sorting(client):
+    """Test that position respects custom sort order."""
+    if client_is_sqlite(client):
+        pytest.skip("Annotation queues not supported in SQLite")
+
+    # Create queue with 5 calls
+    fixture = create_queue_with_calls(
+        client, num_calls=5, queue_name="Position With Sort Queue"
+    )
+
+    # Query with DESC sort and position
+    query_req = tsi.AnnotationQueueItemsQueryReq(
+        project_id=client._project_id(),
+        queue_id=fixture.queue_id,
+        sort_by=[tsi.SortBy(field="call_started_at", direction="desc")],
+        include_position=True,
+    )
+    query_res = client.server.annotation_queue_items_query(query_req)
+
+    # Verify positions are still sequential 1-5 in the DESC order
+    assert len(query_res.items) == 5
+    for i, item in enumerate(query_res.items):
+        assert item.position_in_queue == i + 1
+
+    # Verify items are sorted by call_started_at DESC
+    for i in range(len(query_res.items) - 1):
+        assert (
+            query_res.items[i].call_started_at >= query_res.items[i + 1].call_started_at
+        )
+
+
+def test_annotation_queue_items_query_position_with_filter_unstarted(client):
+    """Test position calculation with annotation_states filter.
+
+    Position should be calculated on the full unfiltered result set,
+    then the filter is applied. This allows users to see the true
+    position of items in the queue even when viewing a filtered subset.
+    """
+    if client_is_sqlite(client):
+        pytest.skip("Annotation queues not supported in SQLite")
+
+    # Create queue with 5 calls
+    fixture = create_queue_with_calls(
+        client, num_calls=5, queue_name="Position With Filter Queue"
+    )
+
+    # All items are initially unstarted
+    # Query with filter for unstarted and position
+    query_req = tsi.AnnotationQueueItemsQueryReq(
+        project_id=client._project_id(),
+        queue_id=fixture.queue_id,
+        filter=tsi.AnnotationQueueItemsFilter(annotation_states=["unstarted"]),
+        include_position=True,
+    )
+    query_res = client.server.annotation_queue_items_query(query_req)
+
+    # Should return all 5 items with positions 1-5
+    assert len(query_res.items) == 5
+    positions = sorted([item.position_in_queue for item in query_res.items])
+    assert positions == [1, 2, 3, 4, 5]

@@ -1674,6 +1674,12 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         """Annotation queues not supported in SQLite."""
         raise NotImplementedError("Annotation queues are not supported in SQLite")
 
+    def annotation_queue_items_query(
+        self, req: tsi.AnnotationQueueItemsQueryReq
+    ) -> tsi.AnnotationQueueItemsQueryRes:
+        """Annotation queues not supported in SQLite."""
+        raise NotImplementedError("Annotation queues are not supported in SQLite")
+
     def annotation_queues_stats(
         self, req: tsi.AnnotationQueuesStatsReq
     ) -> tsi.AnnotationQueuesStatsRes:

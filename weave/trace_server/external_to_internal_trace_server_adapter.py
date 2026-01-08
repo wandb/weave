@@ -461,6 +461,14 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
             self._internal_trace_server.annotation_queue_add_calls, req
         )
 
+    def annotation_queue_items_query(
+        self, req: tsi.AnnotationQueueItemsQueryReq
+    ) -> tsi.AnnotationQueueItemsQueryRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(
+            self._internal_trace_server.annotation_queue_items_query, req
+        )
+
     def annotation_queues_stats(
         self, req: tsi.AnnotationQueuesStatsReq
     ) -> tsi.AnnotationQueuesStatsRes:
