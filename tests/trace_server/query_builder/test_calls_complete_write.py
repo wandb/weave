@@ -49,13 +49,10 @@ def test_batch_update_single_call():
                 WHEN id = {pb_0:String} THEN {pb_1:DateTime64(6)}
                 ELSE ended_at
             END,
+            updated_at = now64(3),
             output_dump = CASE
                 WHEN id = {pb_0:String} THEN {pb_2:String}
                 ELSE output_dump
-            END,
-            output_refs = CASE
-                WHEN id = {pb_0:String} THEN CAST([], 'Array(String)')
-                ELSE output_refs
             END,
             summary_dump = CASE
                 WHEN id = {pb_0:String} THEN {pb_3:String}
@@ -65,11 +62,14 @@ def test_batch_update_single_call():
                 WHEN id = {pb_0:String} THEN CAST(NULL AS Nullable(String))
                 ELSE exception
             END,
+            output_refs = CASE
+                WHEN id = {pb_0:String} THEN CAST([], 'Array(String)')
+                ELSE output_refs
+            END,
             wb_run_step_end = CASE
                 WHEN id = {pb_0:String} THEN CAST(NULL AS Nullable(UInt64))
                 ELSE wb_run_step_end
-            END,
-            updated_at = now64(3)
+            END
         WHERE project_id = {pb_4:String}
           AND id IN ({pb_0:String})
     """
@@ -142,15 +142,12 @@ def test_batch_update_multiple_calls():
                 WHEN id = {pb_4:String} THEN {pb_5:DateTime64(6)}
                 ELSE ended_at
             END,
+            updated_at = now64(3),
             output_dump = CASE
                 WHEN id = {pb_0:String} THEN {pb_6:String}
                 WHEN id = {pb_2:String} THEN {pb_7:String}
                 WHEN id = {pb_4:String} THEN {pb_8:String}
                 ELSE output_dump
-            END,
-            output_refs = CASE
-                WHEN id IN ({pb_0:String}, {pb_2:String}, {pb_4:String}) THEN CAST([], 'Array(String)')
-                ELSE output_refs
             END,
             summary_dump = CASE
                 WHEN id = {pb_0:String} THEN {pb_9:String}
@@ -159,17 +156,20 @@ def test_batch_update_multiple_calls():
                 ELSE summary_dump
             END,
             exception = CASE
-                WHEN id IN ({pb_0:String}, {pb_4:String}) THEN NULL
-                WHEN id = {pb_2:String} THEN {pb_12:String}
+                WHEN id IN ({pb_0:String}, {pb_4:String}) THEN CAST(NULL AS Nullable(String))
+                WHEN id = {pb_2:String} THEN CAST({pb_12:String} AS Nullable(String))
                 ELSE exception
             END,
-            wb_run_step_end = CASE
-                WHEN id = {pb_0:String} THEN {pb_13:UInt64}
-                WHEN id = {pb_2:String} THEN NULL
-                WHEN id = {pb_4:String} THEN {pb_14:UInt64}
-                ELSE wb_run_step_end
+            output_refs = CASE
+                WHEN id IN ({pb_0:String}, {pb_2:String}, {pb_4:String}) THEN CAST([], 'Array(String)')
+                ELSE output_refs
             END,
-            updated_at = now64(3)
+            wb_run_step_end = CASE
+                WHEN id = {pb_0:String} THEN CAST({pb_13:UInt64} AS Nullable(UInt64))
+                WHEN id = {pb_2:String} THEN CAST(NULL AS Nullable(UInt64))
+                WHEN id = {pb_4:String} THEN CAST({pb_14:UInt64} AS Nullable(UInt64))
+                ELSE wb_run_step_end
+            END
         WHERE project_id = {pb_15:String}
           AND id IN ({pb_0:String}, {pb_2:String}, {pb_4:String})
     """
@@ -237,28 +237,28 @@ def test_batch_update_mixed_refs():
                 WHEN id IN ({pb_0:String}, {pb_1:String}) THEN {pb_2:DateTime64(6)}
                 ELSE ended_at
             END,
+            updated_at = now64(3),
             output_dump = CASE
                 WHEN id = {pb_0:String} THEN {pb_3:String}
                 WHEN id = {pb_1:String} THEN {pb_4:String}
                 ELSE output_dump
-            END,
-            output_refs = CASE
-                WHEN id IN ({pb_0:String}, {pb_1:String}) THEN CAST([], 'Array(String)')
-                ELSE output_refs
             END,
             summary_dump = CASE
                 WHEN id IN ({pb_0:String}, {pb_1:String}) THEN {pb_5:String}
                 ELSE summary_dump
             END,
             exception = CASE
-                WHEN id IN ({pb_0:String}, {pb_1:String}) THEN NULL
+                WHEN id IN ({pb_0:String}, {pb_1:String}) THEN CAST(NULL AS Nullable(String))
                 ELSE exception
             END,
-            wb_run_step_end = CASE
-                WHEN id IN ({pb_0:String}, {pb_1:String}) THEN NULL
-                ELSE wb_run_step_end
+            output_refs = CASE
+                WHEN id IN ({pb_0:String}, {pb_1:String}) THEN CAST([], 'Array(String)')
+                ELSE output_refs
             END,
-            updated_at = now64(3)
+            wb_run_step_end = CASE
+                WHEN id IN ({pb_0:String}, {pb_1:String}) THEN CAST(NULL AS Nullable(UInt64))
+                ELSE wb_run_step_end
+            END
         WHERE project_id = {pb_6:String}
           AND id IN ({pb_0:String}, {pb_1:String})
     """
@@ -319,6 +319,7 @@ def test_batch_update_grouping_optimization():
                 WHEN id IN ({pb_0:String}, {pb_1:String}, {pb_2:String}, {pb_3:String}, {pb_4:String}) THEN {pb_5:DateTime64(6)}
                 ELSE ended_at
             END,
+            updated_at = now64(3),
             output_dump = CASE
                 WHEN id = {pb_0:String} THEN {pb_6:String}
                 WHEN id = {pb_1:String} THEN {pb_7:String}
@@ -327,24 +328,23 @@ def test_batch_update_grouping_optimization():
                 WHEN id = {pb_4:String} THEN {pb_10:String}
                 ELSE output_dump
             END,
-            output_refs = CASE
-                WHEN id IN ({pb_0:String}, {pb_1:String}, {pb_2:String}, {pb_3:String}, {pb_4:String}) THEN CAST([], 'Array(String)')
-                ELSE output_refs
-            END,
             summary_dump = CASE
                 WHEN id IN ({pb_0:String}, {pb_1:String}, {pb_2:String}, {pb_3:String}, {pb_4:String}) THEN {pb_11:String}
                 ELSE summary_dump
             END,
             exception = CASE
-                WHEN id IN ({pb_0:String}, {pb_1:String}, {pb_2:String}, {pb_3:String}) THEN {pb_12:String}
-                WHEN id = {pb_4:String} THEN {pb_13:String}
+                WHEN id IN ({pb_0:String}, {pb_1:String}, {pb_2:String}, {pb_3:String}) THEN CAST({pb_12:String} AS Nullable(String))
+                WHEN id = {pb_4:String} THEN CAST({pb_13:String} AS Nullable(String))
                 ELSE exception
             END,
-            wb_run_step_end = CASE
-                WHEN id IN ({pb_0:String}, {pb_1:String}, {pb_2:String}, {pb_3:String}, {pb_4:String}) THEN NULL
-                ELSE wb_run_step_end
+            output_refs = CASE
+                WHEN id IN ({pb_0:String}, {pb_1:String}, {pb_2:String}, {pb_3:String}, {pb_4:String}) THEN CAST([], 'Array(String)')
+                ELSE output_refs
             END,
-            updated_at = now64(3)
+            wb_run_step_end = CASE
+                WHEN id IN ({pb_0:String}, {pb_1:String}, {pb_2:String}, {pb_3:String}, {pb_4:String}) THEN CAST(NULL AS Nullable(UInt64))
+                ELSE wb_run_step_end
+            END
         WHERE project_id = {pb_14:String}
           AND id IN ({pb_0:String}, {pb_1:String}, {pb_2:String}, {pb_3:String}, {pb_4:String})
     """

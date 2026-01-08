@@ -54,7 +54,6 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     HardCodedFilter,
     OrderField,
     build_calls_complete_batch_delete_query,
-    build_calls_complete_batch_update_query,
     build_calls_complete_single_update_query,
     build_calls_complete_update_display_name_query,
     build_calls_stats_query,
