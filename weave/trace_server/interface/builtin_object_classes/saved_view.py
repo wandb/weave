@@ -4,6 +4,10 @@ from pydantic import BaseModel, Field
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.interface.builtin_object_classes import base_object_def
+from weave.trace_server.interface.builtin_object_classes.dynamic_leaderboard import (
+    ObjectConfig,
+    DynamicLeaderboardColumnConfig,
+)
 
 PathElement = str | int
 
@@ -33,6 +37,13 @@ class ChartConfig(BaseModel):
     custom_name: str | None = Field(default=None)
 
 
+class LeaderboardConfig(BaseModel):
+    model_configuration: ObjectConfig
+    dataset_configuration: ObjectConfig
+    scorer_configuration: ObjectConfig
+    columns_configuration: list[DynamicLeaderboardColumnConfig]
+
+
 class SavedViewDefinition(BaseModel):
     filter: tsi.CallsFilter | None = Field(default=None)
 
@@ -54,12 +65,10 @@ class SavedViewDefinition(BaseModel):
     page_size: int | None = Field(default=None)
     charts: list[ChartConfig] | None = Field(default=None)
 
-    # Evaluations calls table has dataset and evaluation object
-    # selectors that can be used to filter down evals to those using these objects.
-    # The selector is an object ref where the version can either be a digest or `*`
-    # to match all versions.
     dataset_selector: str | None = Field(default=None)
     evaluation_selector: str | None = Field(default=None)
+
+    leaderboard_config: LeaderboardConfig | None = Field(default=None)
 
 
 class SavedView(base_object_def.BaseObject):

@@ -1548,6 +1548,34 @@
       "title": "LeaderboardColumn",
       "type": "object"
     },
+    "LeaderboardConfig": {
+      "properties": {
+        "model_configuration": {
+          "$ref": "#/$defs/ObjectConfig"
+        },
+        "dataset_configuration": {
+          "$ref": "#/$defs/ObjectConfig"
+        },
+        "scorer_configuration": {
+          "$ref": "#/$defs/ObjectConfig"
+        },
+        "columns_configuration": {
+          "items": {
+            "$ref": "#/$defs/DynamicLeaderboardColumnConfig"
+          },
+          "title": "Columns Configuration",
+          "type": "array"
+        }
+      },
+      "required": [
+        "model_configuration",
+        "dataset_configuration",
+        "scorer_configuration",
+        "columns_configuration"
+      ],
+      "title": "LeaderboardConfig",
+      "type": "object"
+    },
     "LiteralOperation": {
       "description": "Represents a constant value in the query language.\n\nThis can be any standard JSON-serializable value.\n\nExample:\n    ```\n    {\"$literal\": \"predict\"}\n    ```",
       "properties": {
@@ -2276,6 +2304,17 @@
           ],
           "default": null,
           "title": "Evaluation Selector"
+        },
+        "leaderboard_config": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LeaderboardConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         }
       },
       "title": "SavedViewDefinition",
