@@ -36,6 +36,10 @@ class DynamicLeaderboardColumnConfig(BaseModel):
 
 class DynamicLeaderboard(base_object_def.BaseObject):
     calls_query: tsi.Query
+    # List of nested field paths to expand when querying calls (e.g., ['inputs.prompt', 'outputs.text', 'summary.usage']).
+    # Required because calls_query may reference nested fields, and the backend needs to know which reference columns
+    # to denormalize when executing the query. Without this, filters on nested fields would fail.
+    expand_cols: list[str]
     model_configuration: ObjectConfig
     dataset_configuration: ObjectConfig
     scorer_configuration: ObjectConfig

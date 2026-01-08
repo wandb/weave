@@ -814,6 +814,13 @@
         "calls_query": {
           "$ref": "#/$defs/Query"
         },
+        "expand_cols": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Expand Cols",
+          "type": "array"
+        },
         "model_configuration": {
           "$ref": "#/$defs/ObjectConfig"
         },
@@ -833,6 +840,7 @@
       },
       "required": [
         "calls_query",
+        "expand_cols",
         "model_configuration",
         "dataset_configuration",
         "scorer_configuration",
