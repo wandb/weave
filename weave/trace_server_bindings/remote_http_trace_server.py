@@ -696,6 +696,67 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
             "/threads/stream_query", req, tsi.ThreadsQueryReq, tsi.ThreadSchema
         )
 
+    # Annotation Queue API
+    def annotation_queue_create(
+        self, req: tsi.AnnotationQueueCreateReq
+    ) -> tsi.AnnotationQueueCreateRes:
+        return self._generic_request(
+            "/annotation_queue/create",
+            req,
+            tsi.AnnotationQueueCreateReq,
+            tsi.AnnotationQueueCreateRes,
+        )
+
+    def annotation_queues_query_stream(
+        self, req: tsi.AnnotationQueuesQueryReq
+    ) -> Iterator[tsi.AnnotationQueueSchema]:
+        return self._generic_stream_request(
+            "/annotation_queues/stream_query",
+            req,
+            tsi.AnnotationQueuesQueryReq,
+            tsi.AnnotationQueueSchema,
+        )
+
+    def annotation_queue_read(
+        self, req: tsi.AnnotationQueueReadReq
+    ) -> tsi.AnnotationQueueReadRes:
+        return self._generic_request(
+            "/annotation_queue/read",
+            req,
+            tsi.AnnotationQueueReadReq,
+            tsi.AnnotationQueueReadRes,
+        )
+
+    def annotation_queue_add_calls(
+        self, req: tsi.AnnotationQueueAddCallsReq
+    ) -> tsi.AnnotationQueueAddCallsRes:
+        return self._generic_request(
+            "/annotation_queue/add_calls",
+            req,
+            tsi.AnnotationQueueAddCallsReq,
+            tsi.AnnotationQueueAddCallsRes,
+        )
+
+    def annotation_queue_items_query(
+        self, req: tsi.AnnotationQueueItemsQueryReq
+    ) -> tsi.AnnotationQueueItemsQueryRes:
+        return self._generic_request(
+            "/annotation_queue/items/query",
+            req,
+            tsi.AnnotationQueueItemsQueryReq,
+            tsi.AnnotationQueueItemsQueryRes,
+        )
+
+    def annotation_queues_stats(
+        self, req: tsi.AnnotationQueuesStatsReq
+    ) -> tsi.AnnotationQueuesStatsRes:
+        return self._generic_request(
+            "/annotation_queues/stats",
+            req,
+            tsi.AnnotationQueuesStatsReq,
+            tsi.AnnotationQueuesStatsRes,
+        )
+
     def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
         raise NotImplementedError("evaluate_model is not implemented")
 

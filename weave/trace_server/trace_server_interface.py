@@ -1111,6 +1111,217 @@ class ProjectStatsRes(BaseModel):
     files_storage_size_bytes: int
 
 
+# Annotation Queue API
+# =====================
+# These schemas support the queue-based call annotation system.
+# See: services/weave-trace/Queue-Based Call Annotation System.md
+
+
+class AnnotationQueueSchema(BaseModel):
+    """Schema for annotation queue responses."""
+
+    id: str  # UUID
+    project_id: str
+    name: str
+    description: str
+    scorer_refs: list[str]  # Array of weave:// refs to scorers
+    created_at: datetime.datetime
+    created_by: str  # wb_user_id
+    updated_at: datetime.datetime
+    deleted_at: datetime.datetime | None = None
+
+
+class AnnotationQueueCreateReq(BaseModelStrict):
+    """Request to create a new annotation queue."""
+
+    project_id: str = Field(examples=["entity/project"])
+    name: str = Field(examples=["Error Review Queue"])
+    description: str = Field(default="", examples=["Review calls with exceptions"])
+    scorer_refs: list[str] = Field(
+        examples=[
+            [
+                "weave:///entity/project/scorer/error_severity:abc123",
+                "weave:///entity/project/scorer/resolution_quality:def456",
+            ]
+        ]
+    )
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class AnnotationQueueCreateRes(BaseModel):
+    """Response from creating an annotation queue."""
+
+    id: str  # UUID of the created queue
+
+
+class AnnotationQueuesQueryReq(BaseModelStrict):
+    """Request to query annotation queues for a project."""
+
+    project_id: str = Field(examples=["entity/project"])
+    name: str | None = Field(
+        default=None,
+        examples=["Error"],
+        description="Filter by queue name (case-insensitive partial match)",
+    )
+    sort_by: list[SortBy] | None = Field(
+        default=None,
+        description="Sort by multiple fields (e.g., created_at, updated_at, name)",
+    )
+    limit: int | None = Field(default=None, examples=[10])
+    offset: int | None = Field(default=None, examples=[0])
+
+
+class AnnotationQueuesQueryRes(BaseModel):
+    """Response from querying annotation queues."""
+
+    queues: list[AnnotationQueueSchema]
+
+
+class AnnotationQueueReadReq(BaseModelStrict):
+    """Request to read a specific annotation queue."""
+
+    project_id: str = Field(examples=["entity/project"])
+    queue_id: str = Field(examples=["550e8400-e29b-41d4-a716-446655440000"])
+
+
+class AnnotationQueueReadRes(BaseModel):
+    """Response from reading an annotation queue."""
+
+    queue: AnnotationQueueSchema
+
+
+AnnotationState = Literal["unstarted", "in_progress", "completed", "skipped"]
+
+
+class AnnotationQueueItemSchema(BaseModel):
+    """Schema for annotation queue item responses."""
+
+    id: str  # UUID
+    project_id: str
+    queue_id: str  # UUID
+    call_id: str
+    call_started_at: datetime.datetime
+    call_ended_at: datetime.datetime | None = None
+    call_op_name: str
+    call_trace_id: str
+    display_fields: list[str]  # JSON paths like ['input.prompt', 'output.text']
+    added_by: str | None = None  # wb_user_id (nullable)
+    annotation_state: AnnotationState
+    created_at: datetime.datetime
+    created_by: str  # wb_user_id
+    updated_at: datetime.datetime
+    deleted_at: datetime.datetime | None = None
+    position_in_queue: int | None = (
+        None  # 1-based position in queue (if include_position was requested)
+    )
+
+
+class AnnotationQueueAddCallsReq(BaseModelStrict):
+    """Request to add calls to an annotation queue in batch."""
+
+    project_id: str = Field(examples=["entity/project"])
+    queue_id: str = Field(examples=["550e8400-e29b-41d4-a716-446655440000"])
+    call_ids: list[str] = Field(examples=[["call-1", "call-2", "call-3"]])
+    display_fields: list[str] = Field(
+        examples=[["input.prompt", "output.text"]],
+        description="JSON paths to display to annotators",
+    )
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class AnnotationQueueAddCallsRes(BaseModel):
+    """Response from adding calls to a queue."""
+
+    added_count: int  # Number of calls successfully added
+    duplicates: int  # Number of calls already in queue (skipped)
+
+
+class AnnotationQueueItemsFilter(BaseModel):
+    """Simple filter for annotation queue items.
+
+    Supports equality filtering on call metadata fields and IN filtering on annotation state.
+    """
+
+    call_id: str | None = Field(default=None, description="Filter by exact call ID")
+    call_op_name: str | None = Field(
+        default=None, description="Filter by exact operation name"
+    )
+    call_trace_id: str | None = Field(
+        default=None, description="Filter by exact trace ID"
+    )
+    added_by: str | None = Field(
+        default=None, description="Filter by W&B user ID who added the call"
+    )
+    annotation_states: list[AnnotationState] | None = Field(
+        default=None,
+        description="Filter by annotation states (unstarted, in_progress, completed, skipped)",
+        examples=[["unstarted", "in_progress"]],
+    )
+
+
+class AnnotationQueueItemsQueryReq(BaseModelStrict):
+    """Request to query items in an annotation queue."""
+
+    project_id: str = Field(examples=["entity/project"])
+    queue_id: str = Field(examples=["550e8400-e29b-41d4-a716-446655440000"])
+    filter: AnnotationQueueItemsFilter | None = Field(
+        default=None,
+        description="Filter queue items by call metadata and annotation state",
+    )
+    sort_by: list[SortBy] | None = Field(
+        default=None,
+        description="Sort by multiple fields (e.g., created_at, updated_at)",
+    )
+    limit: int | None = Field(default=None, examples=[50])
+    offset: int | None = Field(default=None, examples=[0])
+    include_position: bool = Field(
+        default=False,
+        description="Include position_in_queue field (1-based index in full queue)",
+    )
+
+
+class AnnotationQueueItemsQueryRes(BaseModel):
+    """Response from querying annotation queue items."""
+
+    items: list[AnnotationQueueItemSchema]
+
+
+class AnnotationQueueStatsSchema(BaseModel):
+    """Statistics for a single annotation queue."""
+
+    queue_id: str = Field(
+        examples=["550e8400-e29b-41d4-a716-446655440000"],
+        description="The queue ID",
+    )
+    total_items: int = Field(
+        description="Total number of items in the queue",
+    )
+    completed_items: int = Field(
+        description="Number of items completed or skipped by at least one annotator",
+    )
+
+
+class AnnotationQueuesStatsReq(BaseModelStrict):
+    """Request to get stats for multiple annotation queues."""
+
+    project_id: str = Field(examples=["entity/project"])
+    queue_ids: list[str] = Field(
+        examples=[
+            [
+                "550e8400-e29b-41d4-a716-446655440000",
+                "550e8400-e29b-41d4-a716-446655440001",
+            ]
+        ],
+        description="List of queue IDs to get stats for",
+    )
+
+
+class AnnotationQueuesStatsRes(BaseModel):
+    """Response with stats for multiple annotation queues."""
+
+    stats: list[AnnotationQueueStatsSchema]
+
+
 # Thread API
 
 
@@ -2047,6 +2258,31 @@ class TraceServerInterface(Protocol):
 
     # Thread API
     def threads_query_stream(self, req: ThreadsQueryReq) -> Iterator[ThreadSchema]: ...
+
+    # Annotation Queue API
+    def annotation_queue_create(
+        self, req: AnnotationQueueCreateReq
+    ) -> AnnotationQueueCreateRes: ...
+
+    def annotation_queues_query_stream(
+        self, req: AnnotationQueuesQueryReq
+    ) -> Iterator[AnnotationQueueSchema]: ...
+
+    def annotation_queue_read(
+        self, req: AnnotationQueueReadReq
+    ) -> AnnotationQueueReadRes: ...
+
+    def annotation_queue_add_calls(
+        self, req: AnnotationQueueAddCallsReq
+    ) -> AnnotationQueueAddCallsRes: ...
+
+    def annotation_queues_stats(
+        self, req: AnnotationQueuesStatsReq
+    ) -> AnnotationQueuesStatsRes: ...
+
+    def annotation_queue_items_query(
+        self, req: AnnotationQueueItemsQueryReq
+    ) -> AnnotationQueueItemsQueryRes: ...
 
     # Evaluation API
     def evaluate_model(self, req: EvaluateModelReq) -> EvaluateModelRes: ...
