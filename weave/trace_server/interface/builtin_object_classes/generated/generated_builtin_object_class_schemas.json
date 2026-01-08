@@ -882,6 +882,34 @@
       "title": "DynamicLeaderboardColumnConfig",
       "type": "object"
     },
+    "DynamicLeaderboardConfig": {
+      "properties": {
+        "model_configuration": {
+          "$ref": "#/$defs/ObjectConfig"
+        },
+        "dataset_configuration": {
+          "$ref": "#/$defs/ObjectConfig"
+        },
+        "scorer_configuration": {
+          "$ref": "#/$defs/ObjectConfig"
+        },
+        "columns_configuration": {
+          "items": {
+            "$ref": "#/$defs/DynamicLeaderboardColumnConfig"
+          },
+          "title": "Columns Configuration",
+          "type": "array"
+        }
+      },
+      "required": [
+        "model_configuration",
+        "dataset_configuration",
+        "scorer_configuration",
+        "columns_configuration"
+      ],
+      "title": "DynamicLeaderboardConfig",
+      "type": "object"
+    },
     "EqOperation": {
       "description": "Equality check between two operands.\n\nExample:\n    ```\n    {\n        \"$eq\": [{\"$getField\": \"op_name\"}, {\"$literal\": \"predict\"}]\n    }\n    ```",
       "properties": {
@@ -1546,34 +1574,6 @@
         "summary_metric_path"
       ],
       "title": "LeaderboardColumn",
-      "type": "object"
-    },
-    "LeaderboardConfig": {
-      "properties": {
-        "model_configuration": {
-          "$ref": "#/$defs/ObjectConfig"
-        },
-        "dataset_configuration": {
-          "$ref": "#/$defs/ObjectConfig"
-        },
-        "scorer_configuration": {
-          "$ref": "#/$defs/ObjectConfig"
-        },
-        "columns_configuration": {
-          "items": {
-            "$ref": "#/$defs/DynamicLeaderboardColumnConfig"
-          },
-          "title": "Columns Configuration",
-          "type": "array"
-        }
-      },
-      "required": [
-        "model_configuration",
-        "dataset_configuration",
-        "scorer_configuration",
-        "columns_configuration"
-      ],
-      "title": "LeaderboardConfig",
       "type": "object"
     },
     "LiteralOperation": {
@@ -2305,10 +2305,10 @@
           "default": null,
           "title": "Evaluation Selector"
         },
-        "leaderboard_config": {
+        "dynamic_leaderboard_config": {
           "anyOf": [
             {
-              "$ref": "#/$defs/LeaderboardConfig"
+              "$ref": "#/$defs/DynamicLeaderboardConfig"
             },
             {
               "type": "null"

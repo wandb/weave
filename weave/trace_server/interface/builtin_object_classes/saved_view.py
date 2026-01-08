@@ -37,7 +37,7 @@ class ChartConfig(BaseModel):
     custom_name: str | None = Field(default=None)
 
 
-class LeaderboardConfig(BaseModel):
+class DynamicLeaderboardConfig(BaseModel):
     model_configuration: ObjectConfig
     dataset_configuration: ObjectConfig
     scorer_configuration: ObjectConfig
@@ -68,7 +68,7 @@ class SavedViewDefinition(BaseModel):
     dataset_selector: str | None = Field(default=None)
     evaluation_selector: str | None = Field(default=None)
 
-    leaderboard_config: LeaderboardConfig | None = Field(default=None)
+    dynamic_leaderboard_config: DynamicLeaderboardConfig | None = Field(default=None)
 
 
 class SavedView(base_object_def.BaseObject):
