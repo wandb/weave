@@ -26,8 +26,8 @@ _IMPORT_HOOK: WeaveImportHook | None = None
 def _patch_integration(
     *,
     module_path: str,
-    get_patcher_func_name: str,
-    integration_names: list[str],
+    patcher_func_getter_name: str,
+    triggering_symbols: list[str],
     settings: IntegrationSettings | None = None,
 ) -> None:
     """Helper to reduce boilerplate in patch functions.
@@ -35,17 +35,17 @@ def _patch_integration(
     Args:
         module_path: The full module path to import from (e.g., "weave.integrations.openai.openai_sdk")
         get_patcher_func_name: The name of the patcher getter function (e.g., "get_openai_patcher")
-        integration_names: Names to add to _PATCHED_INTEGRATIONS on success
+        triggering_symbols: Symbols to add to _PATCHED_INTEGRATIONS on success (e.g. ["openai"])
         settings: Optional integration settings
     """
     if settings is None:
         settings = IntegrationSettings()
 
     module = importlib.import_module(module_path)
-    getter = getattr(module, get_patcher_func_name)
+    patcher_func = getattr(module, patcher_func_getter_name)
 
-    if getter(settings).attempt_patch():
-        for name in integration_names:
+    if patcher_func(settings).attempt_patch():
+        for name in triggering_symbols:
             _PATCHED_INTEGRATIONS.add(name)
 
 
@@ -61,8 +61,8 @@ def patch_openai(settings: IntegrationSettings | None = None) -> None:
     """
     _patch_integration(
         module_path="weave.integrations.openai.openai_sdk",
-        get_patcher_func_name="get_openai_patcher",
-        integration_names=["openai"],
+        patcher_func_getter_name="get_openai_patcher",
+        triggering_symbols=["openai"],
         settings=settings,
     )
 
@@ -71,8 +71,8 @@ def patch_anthropic(settings: IntegrationSettings | None = None) -> None:
     """Enable Weave tracing for Anthropic."""
     _patch_integration(
         module_path="weave.integrations.anthropic.anthropic_sdk",
-        get_patcher_func_name="get_anthropic_patcher",
-        integration_names=["anthropic"],
+        patcher_func_getter_name="get_anthropic_patcher",
+        triggering_symbols=["anthropic"],
         settings=settings,
     )
 
@@ -81,8 +81,8 @@ def patch_mistral(settings: IntegrationSettings | None = None) -> None:
     """Enable Weave tracing for Mistral."""
     _patch_integration(
         module_path="weave.integrations.mistral.mistral_sdk",
-        get_patcher_func_name="get_mistral_patcher",
-        integration_names=["mistralai"],
+        patcher_func_getter_name="get_mistral_patcher",
+        triggering_symbols=["mistralai"],
         settings=settings,
     )
 
@@ -91,8 +91,8 @@ def patch_groq(settings: IntegrationSettings | None = None) -> None:
     """Enable Weave tracing for Groq."""
     _patch_integration(
         module_path="weave.integrations.groq.groq_sdk",
-        get_patcher_func_name="get_groq_patcher",
-        integration_names=["groq"],
+        patcher_func_getter_name="get_groq_patcher",
+        triggering_symbols=["groq"],
         settings=settings,
     )
 
@@ -101,8 +101,8 @@ def patch_litellm(settings: IntegrationSettings | None = None) -> None:
     """Enable Weave tracing for LiteLLM."""
     _patch_integration(
         module_path="weave.integrations.litellm.litellm",
-        get_patcher_func_name="get_litellm_patcher",
-        integration_names=["litellm"],
+        patcher_func_getter_name="get_litellm_patcher",
+        triggering_symbols=["litellm"],
         settings=settings,
     )
 
@@ -111,8 +111,8 @@ def patch_cerebras(settings: IntegrationSettings | None = None) -> None:
     """Enable Weave tracing for Cerebras."""
     _patch_integration(
         module_path="weave.integrations.cerebras.cerebras_sdk",
-        get_patcher_func_name="get_cerebras_patcher",
-        integration_names=["cerebras"],
+        patcher_func_getter_name="get_cerebras_patcher",
+        triggering_symbols=["cerebras"],
         settings=settings,
     )
 
@@ -121,8 +121,8 @@ def patch_cohere(settings: IntegrationSettings | None = None) -> None:
     """Enable Weave tracing for Cohere."""
     _patch_integration(
         module_path="weave.integrations.cohere.cohere_sdk",
-        get_patcher_func_name="get_cohere_patcher",
-        integration_names=["cohere"],
+        patcher_func_getter_name="get_cohere_patcher",
+        triggering_symbols=["cohere"],
         settings=settings,
     )
 
@@ -131,8 +131,8 @@ def patch_google_genai(settings: IntegrationSettings | None = None) -> None:
     """Enable Weave tracing for Google Generative AI."""
     _patch_integration(
         module_path="weave.integrations.google_genai.google_genai_sdk",
-        get_patcher_func_name="get_google_genai_patcher",
-        integration_names=["google.genai"],
+        patcher_func_getter_name="get_google_genai_patcher",
+        triggering_symbols=["google.genai"],
         settings=settings,
     )
 
@@ -141,8 +141,8 @@ def patch_vertexai(settings: IntegrationSettings | None = None) -> None:
     """Enable Weave tracing for Google Vertex AI."""
     _patch_integration(
         module_path="weave.integrations.vertexai.vertexai_sdk",
-        get_patcher_func_name="get_vertexai_patcher",
-        integration_names=["vertexai"],
+        patcher_func_getter_name="get_vertexai_patcher",
+        triggering_symbols=["vertexai"],
         settings=settings,
     )
 
@@ -151,8 +151,8 @@ def patch_huggingface(settings: IntegrationSettings | None = None) -> None:
     """Enable Weave tracing for Hugging Face."""
     _patch_integration(
         module_path="weave.integrations.huggingface.huggingface_inference_client_sdk",
-        get_patcher_func_name="get_huggingface_patcher",
-        integration_names=["huggingface_hub"],
+        patcher_func_getter_name="get_huggingface_patcher",
+        triggering_symbols=["huggingface_hub"],
         settings=settings,
     )
 
@@ -161,8 +161,8 @@ def patch_instructor(settings: IntegrationSettings | None = None) -> None:
     """Enable Weave tracing for Instructor."""
     _patch_integration(
         module_path="weave.integrations.instructor.instructor_sdk",
-        get_patcher_func_name="get_instructor_patcher",
-        integration_names=["instructor"],
+        patcher_func_getter_name="get_instructor_patcher",
+        triggering_symbols=["instructor"],
         settings=settings,
     )
 
@@ -171,8 +171,8 @@ def patch_dspy(settings: IntegrationSettings | None = None) -> None:
     """Enable Weave tracing for DSPy."""
     _patch_integration(
         module_path="weave.integrations.dspy.dspy_sdk",
-        get_patcher_func_name="get_dspy_patcher",
-        integration_names=["dspy"],
+        patcher_func_getter_name="get_dspy_patcher",
+        triggering_symbols=["dspy"],
         settings=settings,
     )
 
@@ -181,8 +181,8 @@ def patch_crewai(settings: IntegrationSettings | None = None) -> None:
     """Enable Weave tracing for CrewAI."""
     _patch_integration(
         module_path="weave.integrations.crewai",
-        get_patcher_func_name="get_crewai_patcher",
-        integration_names=["crewai", "crewai_tools"],
+        patcher_func_getter_name="get_crewai_patcher",
+        triggering_symbols=["crewai", "crewai_tools"],
         settings=settings,
     )
 
@@ -191,8 +191,8 @@ def patch_notdiamond(settings: IntegrationSettings | None = None) -> None:
     """Enable Weave tracing for NotDiamond."""
     _patch_integration(
         module_path="weave.integrations.notdiamond.tracing",
-        get_patcher_func_name="get_notdiamond_patcher",
-        integration_names=["notdiamond"],
+        patcher_func_getter_name="get_notdiamond_patcher",
+        triggering_symbols=["notdiamond"],
         settings=settings,
     )
 
@@ -213,8 +213,8 @@ def patch_nvidia(settings: IntegrationSettings | None = None) -> None:
     """Enable Weave tracing for NVIDIA AI endpoints."""
     _patch_integration(
         module_path="weave.integrations.langchain_nvidia_ai_endpoints.langchain_nv_ai_endpoints",
-        get_patcher_func_name="get_nvidia_ai_patcher",
-        integration_names=["langchain_nvidia_ai_endpoints"],
+        patcher_func_getter_name="get_nvidia_ai_patcher",
+        triggering_symbols=["langchain_nvidia_ai_endpoints"],
         settings=settings,
     )
 
@@ -223,8 +223,8 @@ def patch_smolagents(settings: IntegrationSettings | None = None) -> None:
     """Enable Weave tracing for SmolAgents."""
     _patch_integration(
         module_path="weave.integrations.smolagents.smolagents_sdk",
-        get_patcher_func_name="get_smolagents_patcher",
-        integration_names=["smolagents"],
+        patcher_func_getter_name="get_smolagents_patcher",
+        triggering_symbols=["smolagents"],
         settings=settings,
     )
 
@@ -233,8 +233,8 @@ def patch_openai_agents(settings: IntegrationSettings | None = None) -> None:
     """Enable Weave tracing for OpenAI Agents."""
     _patch_integration(
         module_path="weave.integrations.openai_agents.openai_agents",
-        get_patcher_func_name="get_openai_agents_patcher",
-        integration_names=["openai_agents"],
+        patcher_func_getter_name="get_openai_agents_patcher",
+        triggering_symbols=["openai_agents"],
         settings=settings,
     )
 
@@ -243,8 +243,8 @@ def patch_verdict(settings: IntegrationSettings | None = None) -> None:
     """Enable Weave tracing for Verdict."""
     _patch_integration(
         module_path="weave.integrations.verdict.verdict_sdk",
-        get_patcher_func_name="get_verdict_patcher",
-        integration_names=["verdict"],
+        patcher_func_getter_name="get_verdict_patcher",
+        triggering_symbols=["verdict"],
         settings=settings,
     )
 
@@ -253,8 +253,8 @@ def patch_verifiers(settings: IntegrationSettings | None = None) -> None:
     """Enable Weave tracing for Verifiers."""
     _patch_integration(
         module_path="weave.integrations.verifiers.verifiers",
-        get_patcher_func_name="get_verifiers_patcher",
-        integration_names=["verifiers"],
+        patcher_func_getter_name="get_verifiers_patcher",
+        triggering_symbols=["verifiers"],
         settings=settings,
     )
 
@@ -263,8 +263,8 @@ def patch_autogen(settings: IntegrationSettings | None = None) -> None:
     """Enable Weave tracing for AutoGen."""
     _patch_integration(
         module_path="weave.integrations.autogen",
-        get_patcher_func_name="get_autogen_patcher",
-        integration_names=["autogen"],
+        patcher_func_getter_name="get_autogen_patcher",
+        triggering_symbols=["autogen"],
         settings=settings,
     )
 
@@ -289,8 +289,8 @@ def patch_openai_realtime(settings: IntegrationSettings | None = None) -> None:
     """Enable Weave tracing for OpenAI Realtime."""
     _patch_integration(
         module_path="weave.integrations.openai_realtime",
-        get_patcher_func_name="get_openai_realtime_websocket_patcher",
-        integration_names=["openai_realtime"],
+        patcher_func_getter_name="get_openai_realtime_websocket_patcher",
+        triggering_symbols=["openai_realtime"],
         settings=settings,
     )
 
@@ -306,6 +306,7 @@ INTEGRATION_MODULE_MAPPING: dict[str, Callable[[], None]] = {
     "litellm": patch_litellm,
     "cerebras": patch_cerebras,
     "cohere": patch_cohere,
+    "google.generativeai": patch_google_genai,
     "google.genai": patch_google_genai,
     "vertexai": patch_vertexai,
     "huggingface_hub": patch_huggingface,
@@ -322,6 +323,7 @@ INTEGRATION_MODULE_MAPPING: dict[str, Callable[[], None]] = {
     "verifiers": patch_verifiers,
     "autogen": patch_autogen,
     "langchain": patch_langchain,
+    "langchain_core": patch_langchain,
     "llama_index": patch_llamaindex,
     "openai_realtime": patch_openai_realtime,
 }

@@ -293,8 +293,15 @@ def test_unregister_import_hook(setup_env):
 class TestPatchIntegration:
     """Tests for the _patch_integration helper function."""
 
-    def test_patch_integration_success(self, setup_env):
-        """Test that _patch_integration correctly patches and tracks integration."""
+    def test_successful_patch(self, setup_env):
+        """The basic case where a single integration is patched and it has a
+        single triggering symbol.
+
+        SUCCESS:
+            1. Patcher is called once;
+            2. Symbol is tracked in patched_integrations.
+            3. Subsequent calls to _patch_integration for the same integration do not trigger a new patch.
+        """
         mock_patcher = MagicMock()
         mock_patcher.attempt_patch.return_value = True
         mock_getter = MagicMock(return_value=mock_patcher)
@@ -308,16 +315,35 @@ class TestPatchIntegration:
         ):
             _patch_integration(
                 module_path="fake.integration.module",
-                get_patcher_func_name="get_fake_patcher",
-                integration_names=["fake_integration"],
+                patcher_func_getter_name="get_fake_patcher",
+                triggering_symbols=["fake_integration_module"],
             )
 
-        mock_getter.assert_called_once()
-        mock_patcher.attempt_patch.assert_called_once()
-        assert "fake_integration" in patch_module._PATCHED_INTEGRATIONS
+            mock_patcher.attempt_patch.assert_called_once()
+            mock_getter.assert_called_once()
+            assert "fake_integration_module" in patch_module._PATCHED_INTEGRATIONS
 
-    def test_patch_integration_with_settings(self, setup_env):
-        """Test that _patch_integration passes settings to the patcher getter."""
+            _patch_integration(
+                module_path="fake.integration.module",
+                patcher_func_getter_name="get_fake_patcher",
+                triggering_symbols=["fake_integration_module"],
+            )
+
+            mock_patcher.attempt_patch.assert_called_once()
+            mock_getter.assert_called_once()
+            assert "fake_integration_module" in patch_module._PATCHED_INTEGRATIONS
+
+    def test_successful_patch_multiple_triggering_symbols(self, setup_env):
+        """A secondary case where a single integration is patched and it has
+        multiple triggering symbols.  This is common for libraries like langchain
+        or crewai where users may not necessarily just import the root module, but
+        rather some combination of submodules.
+
+        SUCCESS:
+            1. Patcher is called once;
+            2. All symbols for this integration are tracked in patched_integrations.
+            3. Subsequent calls to _patch_integration for the same integration do not trigger a new patch.
+        """
         mock_patcher = MagicMock()
         mock_patcher.attempt_patch.return_value = True
         mock_getter = MagicMock(return_value=mock_patcher)
@@ -333,35 +359,15 @@ class TestPatchIntegration:
         ):
             _patch_integration(
                 module_path="fake.integration.module",
-                get_patcher_func_name="get_fake_patcher",
-                integration_names=["fake_integration"],
-                settings=custom_settings,
+                patcher_func_getter_name="get_fake_patcher",
+                triggering_symbols=["symbol1", "symbol2", "symbol3"],
             )
 
-        mock_getter.assert_called_once_with(custom_settings)
-
-    def test_patch_integration_multiple_names(self, setup_env):
-        """Test that _patch_integration adds multiple integration names."""
-        mock_patcher = MagicMock()
-        mock_patcher.attempt_patch.return_value = True
-        mock_getter = MagicMock(return_value=mock_patcher)
-
-        fake_module = types.ModuleType("fake_integration_module")
-        fake_module.get_fake_patcher = mock_getter
-
-        with patch(
-            "weave.integrations.patch.importlib.import_module",
-            return_value=fake_module,
-        ):
-            _patch_integration(
-                module_path="fake.integration.module",
-                get_patcher_func_name="get_fake_patcher",
-                integration_names=["integration_a", "integration_b", "integration_c"],
-            )
-
-        assert "integration_a" in patch_module._PATCHED_INTEGRATIONS
-        assert "integration_b" in patch_module._PATCHED_INTEGRATIONS
-        assert "integration_c" in patch_module._PATCHED_INTEGRATIONS
+        mock_getter.assert_called_once()
+        mock_patcher.attempt_patch.assert_called_once_with(custom_settings)
+        assert "symbol1" in patch_module._PATCHED_INTEGRATIONS
+        assert "symbol2" in patch_module._PATCHED_INTEGRATIONS
+        assert "symbol3" in patch_module._PATCHED_INTEGRATIONS
 
     def test_patch_integration_failure_no_tracking(self, setup_env):
         """Test that failed patches don't add to _PATCHED_INTEGRATIONS."""
@@ -378,8 +384,8 @@ class TestPatchIntegration:
         ):
             _patch_integration(
                 module_path="fake.integration.module",
-                get_patcher_func_name="get_fake_patcher",
-                integration_names=["failed_integration"],
+                patcher_func_getter_name="get_fake_patcher",
+                triggering_symbols=["failed_integration"],
             )
 
         mock_patcher.attempt_patch.assert_called_once()
@@ -400,8 +406,8 @@ class TestPatchIntegration:
         ):
             _patch_integration(
                 module_path="fake.integration.module",
-                get_patcher_func_name="get_fake_patcher",
-                integration_names=["default_settings_integration"],
+                patcher_func_getter_name="get_fake_patcher",
+                triggering_symbols=["default_settings_integration"],
             )
 
         # Verify getter was called with an IntegrationSettings instance
@@ -429,8 +435,8 @@ class TestPatchIntegration:
         ):
             _patch_integration(
                 module_path="fake.multi.module",
-                get_patcher_func_name="get_multi_patcher",
-                integration_names=["multi_a", "multi_b"],
+                patcher_func_getter_name="get_multi_patcher",
+                triggering_symbols=["multi_a", "multi_b"],
             )
 
         # Verify initial patch happened once
