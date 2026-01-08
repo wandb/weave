@@ -8,9 +8,6 @@ from weave.trace_server.interface.builtin_object_classes.base_object_def import 
 from weave.trace_server.interface.builtin_object_classes.comparison_view import (
     ComparisonView,
 )
-from weave.trace_server.interface.builtin_object_classes.dynamic_leaderboard import (
-    DynamicLeaderboard,
-)
 from weave.trace_server.interface.builtin_object_classes.leaderboard import Leaderboard
 from weave.trace_server.interface.builtin_object_classes.llm_structured_model import (
     LLMStructuredCompletionModel,
@@ -45,7 +42,6 @@ register_base_object(TestOnlyExample)
 register_base_object(TestOnlyNestedBaseObject)
 register_base_object(TestOnlyInheritedBaseObject)
 register_base_object(Leaderboard)
-register_base_object(DynamicLeaderboard)
 register_base_object(ActionSpec)
 register_base_object(AnnotationSpec)
 register_base_object(Provider)
