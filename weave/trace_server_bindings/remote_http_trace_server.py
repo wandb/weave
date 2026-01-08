@@ -1557,16 +1557,7 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         if not req.batch:
             return tsi.CallsStartBatchRes(res=[])
 
-        # Get project_id from the first batch item
-        first_item = req.batch[0]
-        if first_item.mode == "start":
-            project_id = first_item.req.start.project_id
-        elif first_item.mode == "complete":
-            project_id = first_item.req.complete.project_id
-        else:
-            raise ValueError(f"Unknown batch item mode: {first_item.mode}")
-
-        entity, project = project_id.split("/", 1)
+        entity, project = req.project_id.split("/", 1)
         url = f"/v2/{entity}/{project}/calls/start/batch"
         return self._generic_request(
             url,
@@ -1580,11 +1571,7 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         if not req.batch:
             return tsi.CallsEndBatchRes(res=[])
 
-        # Get project_id from the first batch item
-        first_item = req.batch[0]
-        project_id = first_item.req.end.project_id
-
-        entity, project = project_id.split("/", 1)
+        entity, project = req.project_id.split("/", 1)
         url = f"/v2/{entity}/{project}/calls/end/batch"
         return self._generic_request(
             url,
