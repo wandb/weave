@@ -93,6 +93,10 @@ class SavedViewDefinition(BaseModel):
     page_size: int | None = Field(default=None)
     charts: list[ChartConfig] | None = Field(default=None)
 
+    # Evaluations calls table has dataset and evaluation object
+    # selectors that can be used to filter down evals to those using these objects.
+    # The selector is an object ref where the version can either be a digest or `*`
+    # to match all versions.
     dataset_selector: str | None = Field(default=None)
     evaluation_selector: str | None = Field(default=None)
 
