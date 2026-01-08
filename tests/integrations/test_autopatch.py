@@ -310,15 +310,35 @@ def test_patch_integration(setup_env, success):
         "weave.integrations.patch.importlib.import_module",
         return_value=fake_module,
     ):
+        # First call - should patch
         _patch_integration(
             module_path="fake.integration.module",
             patcher_func_getter_name="get_fake_patcher",
             triggering_symbols=["single_symbol"],
         )
 
-    mock_getter.assert_called_once()
-    mock_patcher.attempt_patch.assert_called_once()
-    assert ("single_symbol" in patch_module._PATCHED_INTEGRATIONS) is success
+        mock_getter.assert_called_once()
+        mock_patcher.attempt_patch.assert_called_once()
+        assert ("single_symbol" in patch_module._PATCHED_INTEGRATIONS) is success
+
+        # Second call behavior depends on whether first patch succeeded
+        mock_getter.reset_mock()
+        mock_patcher.reset_mock()
+        _patch_integration(
+            module_path="fake.integration.module",
+            patcher_func_getter_name="get_fake_patcher",
+            triggering_symbols=["single_symbol"],
+        )
+
+        if success:
+            # If first patch succeeded, should NOT patch again
+            mock_getter.assert_not_called()
+            mock_patcher.attempt_patch.assert_not_called()
+        else:
+            # If first patch failed, should try again (symbol wasn't added to _PATCHED_INTEGRATIONS)
+            mock_getter.assert_called_once()
+            mock_patcher.attempt_patch.assert_called_once()
+        assert ("single_symbol" in patch_module._PATCHED_INTEGRATIONS) is success
 
 
 @pytest.mark.parametrize("success", [True, False])
@@ -344,14 +364,36 @@ def test_patch_integration_multi(setup_env, success):
         "weave.integrations.patch.importlib.import_module",
         return_value=fake_module,
     ):
+        # First call - should patch
         _patch_integration(
             module_path="fake.integration.module",
             patcher_func_getter_name="get_fake_patcher",
             triggering_symbols=["symbol1", "symbol2", "symbol3"],
         )
 
-    mock_getter.assert_called_once()
-    mock_patcher.attempt_patch.assert_called_once()
-    assert ("symbol1" in patch_module._PATCHED_INTEGRATIONS) is success
-    assert ("symbol2" in patch_module._PATCHED_INTEGRATIONS) is success
-    assert ("symbol3" in patch_module._PATCHED_INTEGRATIONS) is success
+        mock_getter.assert_called_once()
+        mock_patcher.attempt_patch.assert_called_once()
+        assert ("symbol1" in patch_module._PATCHED_INTEGRATIONS) is success
+        assert ("symbol2" in patch_module._PATCHED_INTEGRATIONS) is success
+        assert ("symbol3" in patch_module._PATCHED_INTEGRATIONS) is success
+
+        # Second call behavior depends on whether first patch succeeded
+        mock_getter.reset_mock()
+        mock_patcher.reset_mock()
+        _patch_integration(
+            module_path="fake.integration.module",
+            patcher_func_getter_name="get_fake_patcher",
+            triggering_symbols=["symbol1", "symbol2", "symbol3"],
+        )
+
+        if success:
+            # If first patch succeeded, should NOT patch again (checking by any of the symbols)
+            mock_getter.assert_not_called()
+            mock_patcher.attempt_patch.assert_not_called()
+        else:
+            # If first patch failed, should try again (symbols weren't added to _PATCHED_INTEGRATIONS)
+            mock_getter.assert_called_once()
+            mock_patcher.attempt_patch.assert_called_once()
+        assert ("symbol1" in patch_module._PATCHED_INTEGRATIONS) is success
+        assert ("symbol2" in patch_module._PATCHED_INTEGRATIONS) is success
+        assert ("symbol3" in patch_module._PATCHED_INTEGRATIONS) is success

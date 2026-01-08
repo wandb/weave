@@ -38,6 +38,10 @@ def _patch_integration(
         triggering_symbols: Symbols to add to _PATCHED_INTEGRATIONS on success (e.g. ["openai"])
         settings: Optional integration settings
     """
+    # If symbols are already patched, don't patch again
+    if any(name in _PATCHED_INTEGRATIONS for name in triggering_symbols):
+        return
+
     if settings is None:
         settings = IntegrationSettings()
 
