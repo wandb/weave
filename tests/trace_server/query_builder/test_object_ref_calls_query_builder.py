@@ -45,9 +45,8 @@ def test_object_ref_filter_simple() -> None:
                     digest),
              filtered_calls AS
           (SELECT calls_merged.id AS id
-           FROM calls_merged
-           WHERE calls_merged.project_id = {pb_0:String}
-             AND (length(calls_merged.output_refs) > 0
+           FROM calls_merged PREWHERE calls_merged.project_id = {pb_0:String}
+             WHERE (length(calls_merged.output_refs) > 0
                   OR calls_merged.ended_at IS NULL)
            GROUP BY (calls_merged.project_id,
                      calls_merged.id)
@@ -61,9 +60,8 @@ def test_object_ref_filter_simple() -> None:
                    AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
            ORDER BY any(calls_merged.started_at) DESC)
         SELECT calls_merged.id AS id
-        FROM calls_merged
-        WHERE calls_merged.project_id = {pb_0:String}
-          AND (calls_merged.id IN filtered_calls)
+        FROM calls_merged PREWHERE calls_merged.project_id = {pb_0:String}
+          WHERE (calls_merged.id IN filtered_calls)
         GROUP BY (calls_merged.project_id,
                   calls_merged.id)
         ORDER BY any(calls_merged.started_at) DESC
@@ -141,9 +139,8 @@ def test_object_ref_filter_nested() -> None:
                     ov.digest),
              filtered_calls AS
           (SELECT calls_merged.id AS id
-           FROM calls_merged
-           WHERE calls_merged.project_id = {pb_0:String}
-             AND (calls_merged.parent_id IS NULL)
+           FROM calls_merged PREWHERE calls_merged.project_id = {pb_0:String}
+             WHERE (calls_merged.parent_id IS NULL)
              AND (length(calls_merged.input_refs) > 0
                   OR calls_merged.started_at IS NULL)
            GROUP BY (calls_merged.project_id,
@@ -160,9 +157,8 @@ def test_object_ref_filter_nested() -> None:
            LIMIT 50
            OFFSET 0)
         SELECT calls_merged.id AS id
-        FROM calls_merged
-        WHERE calls_merged.project_id = {pb_0:String}
-          AND (calls_merged.id IN filtered_calls)
+        FROM calls_merged PREWHERE calls_merged.project_id = {pb_0:String}
+          WHERE (calls_merged.id IN filtered_calls)
         GROUP BY (calls_merged.project_id,
                   calls_merged.id)
         ORDER BY any(calls_merged.started_at) DESC
@@ -258,9 +254,8 @@ def test_multiple_object_ref_filters() -> None:
                     digest),
              filtered_calls AS
           (SELECT calls_merged.id AS id
-           FROM calls_merged
-           WHERE calls_merged.project_id = {pb_0:String}
-             AND (calls_merged.parent_id IS NULL)
+           FROM calls_merged PREWHERE calls_merged.project_id = {pb_0:String}
+             WHERE (calls_merged.parent_id IS NULL)
              AND (length(calls_merged.input_refs) > 0
                   OR calls_merged.started_at IS NULL)
            GROUP BY (calls_merged.project_id,
@@ -281,9 +276,8 @@ def test_multiple_object_ref_filters() -> None:
                    AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
            ORDER BY any(calls_merged.started_at) DESC)
         SELECT calls_merged.id AS id
-        FROM calls_merged
-        WHERE calls_merged.project_id = {pb_0:String}
-          AND (calls_merged.id IN filtered_calls)
+        FROM calls_merged PREWHERE calls_merged.project_id = {pb_0:String}
+          WHERE (calls_merged.id IN filtered_calls)
         GROUP BY (calls_merged.project_id,
                   calls_merged.id)
         ORDER BY any(calls_merged.started_at) DESC
@@ -436,9 +430,8 @@ def test_object_ref_filter_duplicates_and_similar() -> None:
                     digest),
              filtered_calls AS
           (SELECT calls_merged.id AS id
-           FROM calls_merged
-           WHERE calls_merged.project_id = {pb_0:String}
-             AND (calls_merged.parent_id IS NULL)
+           FROM calls_merged PREWHERE calls_merged.project_id = {pb_0:String}
+             WHERE (calls_merged.parent_id IS NULL)
              AND ((lower(calls_merged.inputs_dump) LIKE {pb_10:String}
                   OR calls_merged.inputs_dump IS NULL))
              AND (length(calls_merged.input_refs) > 0
@@ -479,9 +472,8 @@ def test_object_ref_filter_duplicates_and_similar() -> None:
            AND ((any(calls_merged.deleted_at) IS NULL))
            AND ((NOT ((any(calls_merged.started_at) IS NULL))))))
         SELECT calls_merged.id AS id
-        FROM calls_merged
-        WHERE calls_merged.project_id = {pb_0:String}
-          AND (calls_merged.id IN filtered_calls)
+        FROM calls_merged PREWHERE calls_merged.project_id = {pb_0:String}
+          WHERE (calls_merged.id IN filtered_calls)
         GROUP BY (calls_merged.project_id,
                   calls_merged.id)
         """,
@@ -616,9 +608,8 @@ def test_object_ref_filter_complex_mixed_conditions() -> None:
                     digest),
              filtered_calls AS (
         SELECT calls_merged.id AS id
-        FROM calls_merged
-        WHERE calls_merged.project_id = {pb_0:String}
-          AND ((calls_merged.op_name IN {pb_10:Array(String)})
+        FROM calls_merged PREWHERE calls_merged.project_id = {pb_0:String}
+          WHERE ((calls_merged.op_name IN {pb_10:Array(String)})
                OR (calls_merged.op_name IS NULL))
           AND (length(calls_merged.input_refs) > 0
                OR calls_merged.started_at IS NULL)
@@ -649,9 +640,8 @@ def test_object_ref_filter_complex_mixed_conditions() -> None:
                 LIMIT 10)
         SELECT calls_merged.id AS id,
                any(calls_merged.inputs_dump) AS inputs_dump
-        FROM calls_merged
-        WHERE calls_merged.project_id = {pb_0:String}
-          AND (calls_merged.id IN filtered_calls)
+        FROM calls_merged PREWHERE calls_merged.project_id = {pb_0:String}
+          WHERE (calls_merged.id IN filtered_calls)
         GROUP BY (calls_merged.project_id,
                   calls_merged.id)
         ORDER BY any(calls_merged.started_at) DESC
@@ -703,8 +693,7 @@ def test_object_ref_order_by_simple() -> None:
           (SELECT calls_merged.id AS id
            FROM calls_merged
            LEFT JOIN obj_filter_0 ON (coalesce(nullIf(JSON_VALUE(calls_merged.inputs_dump, {pb_2:String}), 'null'), '') = obj_filter_0.ref
-                                      OR regexpExtract(coalesce(nullIf(JSON_VALUE(calls_merged.inputs_dump, {pb_2:String}), 'null'), ''), '/([^/]+)$', 1) = obj_filter_0.ref)
-           WHERE calls_merged.project_id = {pb_0:String}
+                                      OR regexpExtract(coalesce(nullIf(JSON_VALUE(calls_merged.inputs_dump, {pb_2:String}), 'null'), ''), '/([^/]+)$', 1) = obj_filter_0.ref) PREWHERE calls_merged.project_id = {pb_0:String}
            GROUP BY (calls_merged.project_id,
                      calls_merged.id)
            HAVING (((any(calls_merged.deleted_at) IS NULL))
@@ -714,9 +703,8 @@ def test_object_ref_order_by_simple() -> None:
         SELECT calls_merged.id AS id
         FROM calls_merged
         LEFT JOIN obj_filter_0 ON (coalesce(nullIf(JSON_VALUE(calls_merged.inputs_dump, {pb_2:String}), 'null'), '') = obj_filter_0.ref
-                                   OR regexpExtract(coalesce(nullIf(JSON_VALUE(calls_merged.inputs_dump, {pb_2:String}), 'null'), ''), '/([^/]+)$', 1) = obj_filter_0.ref)
-        WHERE calls_merged.project_id = {pb_0:String}
-          AND (calls_merged.id IN filtered_calls)
+                                   OR regexpExtract(coalesce(nullIf(JSON_VALUE(calls_merged.inputs_dump, {pb_2:String}), 'null'), ''), '/([^/]+)$', 1) = obj_filter_0.ref) PREWHERE calls_merged.project_id = {pb_0:String}
+        WHERE (calls_merged.id IN filtered_calls)
         GROUP BY (calls_merged.project_id,
                   calls_merged.id)
         ORDER BY (NOT (JSONType(any(obj_filter_0.object_val_dump)) = 'Null'
@@ -779,9 +767,8 @@ def test_object_ref_filter_heavily_nested_keys() -> None:
                     ov.digest),
              filtered_calls AS
           (SELECT calls_merged.id AS id
-           FROM calls_merged
-           WHERE calls_merged.project_id = {pb_0:String}
-             AND (length(calls_merged.input_refs) > 0
+           FROM calls_merged PREWHERE calls_merged.project_id = {pb_0:String}
+             WHERE (length(calls_merged.input_refs) > 0
                   OR calls_merged.started_at IS NULL)
            GROUP BY (calls_merged.project_id,
                      calls_merged.id)
@@ -795,9 +782,8 @@ def test_object_ref_filter_heavily_nested_keys() -> None:
                    AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
         )
         SELECT calls_merged.id AS id
-        FROM calls_merged
-        WHERE calls_merged.project_id = {pb_0:String}
-          AND (calls_merged.id IN filtered_calls)
+        FROM calls_merged PREWHERE calls_merged.project_id = {pb_0:String}
+          WHERE (calls_merged.id IN filtered_calls)
         GROUP BY (calls_merged.project_id,
                   calls_merged.id)
         """,
@@ -863,9 +849,8 @@ def test_object_ref_filter_complex_nested_path() -> None:
                     ov.digest),
              filtered_calls AS
           (SELECT calls_merged.id AS id
-           FROM calls_merged
-           WHERE calls_merged.project_id = {pb_0:String}
-             AND (calls_merged.parent_id IS NULL)
+           FROM calls_merged PREWHERE calls_merged.project_id = {pb_0:String}
+             WHERE (calls_merged.parent_id IS NULL)
              AND (length(calls_merged.input_refs) > 0
                   OR calls_merged.started_at IS NULL)
            GROUP BY (calls_merged.project_id,
@@ -880,9 +865,8 @@ def test_object_ref_filter_complex_nested_path() -> None:
                    AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
            ORDER BY any(calls_merged.started_at) DESC)
         SELECT calls_merged.id AS id
-        FROM calls_merged
-        WHERE calls_merged.project_id = {pb_0:String}
-          AND (calls_merged.id IN filtered_calls)
+        FROM calls_merged PREWHERE calls_merged.project_id = {pb_0:String}
+          WHERE (calls_merged.id IN filtered_calls)
         GROUP BY (calls_merged.project_id,
                   calls_merged.id)
         ORDER BY any(calls_merged.started_at) DESC

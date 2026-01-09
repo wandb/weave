@@ -28,6 +28,7 @@ Outstanding Optimizations/Work:
 import datetime
 import json
 import logging
+import re
 from collections import defaultdict
 from collections.abc import Callable, KeysView
 from typing import Any, Literal, cast
@@ -88,6 +89,26 @@ CTE_ALL_CALLS = "all_calls"
 STORAGE_SIZE_TABLE_NAME = "storage_size_tbl"
 ROLLED_UP_CALL_MERGED_STATS_TABLE_NAME = "rolled_up_cms"
 DISALLOWED_FILTERING_FIELDS = {"storage_size_bytes", "total_storage_size_bytes"}
+
+
+def build_where_clause(*conditions: str) -> str:
+    """Build a WHERE clause from multiple conditions.
+
+    Takes any number of condition strings
+    filters out empty ones, joins them with AND, and prepends WHERE.
+
+    Args:
+        *conditions: Variable number of condition strings (no AND/WHERE prefix)
+
+    Returns:
+        Complete WHERE clause, or empty string if no conditions
+    """
+    non_empty = [c for c in conditions if c]
+    if not non_empty:
+        return ""
+    if len(non_empty) == 1:
+        return f"WHERE {non_empty[0]}"
+    return "WHERE " + "\n        AND ".join(non_empty)
 
 
 def get_field_name(field: QueryFieldType) -> str:
@@ -193,9 +214,10 @@ class WhereFilters(BaseModel):
     object_refs: str = ""
 
     def to_sql(self) -> str:
-        """Convert all filters to SQL clauses suitable for WHERE clause.
+        """Convert all filters to a single combined condition string.
 
-        Returns a string with all non-empty filters, each starting with 'AND'.
+        Returns all non-empty filters joined with AND (no WHERE keyword).
+        Returns empty string if no filters.
         """
         filters = [
             self.id_mask,
@@ -212,7 +234,8 @@ class WhereFilters(BaseModel):
             self.ref_filter,
             self.object_refs,
         ]
-        return "\n        ".join(f for f in filters if f)
+        non_empty = [f for f in filters if f]
+        return "\n        AND ".join(non_empty) if non_empty else ""
 
 
 class QueryJoins(BaseModel):
@@ -846,7 +869,7 @@ class CallsQuery(BaseModel):
         # special optimization for call_ids filter
         id_mask = ""
         if self.hardcoded_filter and self.hardcoded_filter.filter.call_ids:
-            id_mask = f"AND ({table_alias}.id IN {param_slot(pb.add_param(self.hardcoded_filter.filter.call_ids), 'Array(String)')})"
+            id_mask = f"({table_alias}.id IN {param_slot(pb.add_param(self.hardcoded_filter.filter.call_ids), 'Array(String)')})"
 
         return WhereFilters(
             id_mask=id_mask,
@@ -1111,12 +1134,13 @@ class CallsQuery(BaseModel):
         )
 
         # Assemble the actual SQL query with GROUP BY for calls_merged
+        joins_sql = joins.to_sql()
+        joins_sql = f"\n        {joins_sql}" if joins_sql else ""
         raw_sql = f"""
         SELECT {select_fields_sql}
-        FROM calls_merged
-        {joins.to_sql()}
-        WHERE calls_merged.project_id = {param_slot(project_param, "String")}
-        {where_filters.to_sql()}
+        FROM calls_merged{joins_sql}
+        PREWHERE calls_merged.project_id = {param_slot(project_param, "String")}
+        {build_where_clause(where_filters.to_sql())}
         GROUP BY (calls_merged.project_id, calls_merged.id)
         {having_filter_sql}
         {order_by_sql}
@@ -1183,7 +1207,7 @@ class CallsQuery(BaseModel):
 
         where_conditions_sql = ""
         if where_conditions:
-            where_conditions_sql += "AND " + combine_conditions(where_conditions, "AND")
+            where_conditions_sql = combine_conditions(where_conditions, "AND")
         order_by_sql, limit_sql, offset_sql, needs_feedback_order = (
             self._build_order_limit_offset(
                 pb, table_alias, expand_columns, field_to_object_join_alias_map
@@ -1199,17 +1223,23 @@ class CallsQuery(BaseModel):
             field_to_object_join_alias_map=field_to_object_join_alias_map,
         )
 
+        # Combine all WHERE clause filters
+        where_clause = build_where_clause(
+            id_subquery_sql,
+            trace_id_sql,
+            trace_roots_sql,
+            op_name_sql,
+            where_conditions_sql,
+        )
+
         # Assemble the actual SQL query WITHOUT GROUP BY for calls_complete
+        joins_sql = joins.to_sql()
+        joins_sql = f"\n        {joins_sql}" if joins_sql else ""
         raw_sql = f"""
         SELECT {select_fields_sql}
-        FROM calls_complete
-        {joins.to_sql()}
-        WHERE calls_complete.project_id = {param_slot(project_param, "String")}
-        {id_subquery_sql}
-        {trace_id_sql}
-        {trace_roots_sql}
-        {op_name_sql}
-        {where_conditions_sql}
+        FROM calls_complete{joins_sql}
+        PREWHERE calls_complete.project_id = {param_slot(project_param, "String")}
+        {where_clause}
         {order_by_sql}
         {limit_sql}
         {offset_sql}
@@ -1485,7 +1515,7 @@ def process_op_name_filter_to_sql(
     # Account for unmerged call parts by including null op_name (call ends)
     or_conditions += [f"{op_field_sql} IS NULL"]
 
-    return " AND " + combine_conditions(or_conditions, "OR")
+    return combine_conditions(or_conditions, "OR")
 
 
 def process_trace_id_filter_to_sql(
@@ -1511,7 +1541,7 @@ def process_trace_id_filter_to_sql(
     else:
         return ""
 
-    return f" AND ({trace_cond} OR {trace_id_field_sql} IS NULL)"
+    return f"({trace_cond} OR {trace_id_field_sql} IS NULL)"
 
 
 def process_thread_id_filter_to_sql(
@@ -1541,7 +1571,7 @@ def process_thread_id_filter_to_sql(
     else:
         return ""
 
-    return f" AND ({thread_cond} OR {thread_id_field_sql} IS NULL)"
+    return f"({thread_cond} OR {thread_id_field_sql} IS NULL)"
 
 
 def process_turn_id_filter_to_sql(
@@ -1571,7 +1601,7 @@ def process_turn_id_filter_to_sql(
     else:
         return ""
 
-    return f" AND ({turn_cond} OR {turn_id_field_sql} IS NULL)"
+    return f"({turn_cond} OR {turn_id_field_sql} IS NULL)"
 
 
 def process_trace_roots_only_filter_to_sql(
@@ -1585,7 +1615,7 @@ def process_trace_roots_only_filter_to_sql(
 
     parent_id_field_sql = get_field_sql_for_filter("parent_id", strategy, param_builder)
 
-    return f"AND ({parent_id_field_sql} IS NULL)"
+    return f"({parent_id_field_sql} IS NULL)"
 
 
 def process_parent_ids_filter_to_sql(
@@ -1601,7 +1631,7 @@ def process_parent_ids_filter_to_sql(
 
     parent_ids_sql = f"{parent_id_field_sql} IN {param_slot(param_builder.add_param(hardcoded_filter.filter.parent_ids), 'Array(String)')}"
 
-    return f"AND ({parent_ids_sql} OR {parent_id_field_sql} IS NULL)"
+    return f"({parent_ids_sql} OR {parent_id_field_sql} IS NULL)"
 
 
 def process_ref_filters_to_sql(
@@ -1641,7 +1671,7 @@ def process_ref_filters_to_sql(
     if not ref_filters:
         return ""
 
-    return " AND (" + combine_conditions(ref_filters, "AND") + ")"
+    return "(" + combine_conditions(ref_filters, "AND") + ")"
 
 
 def process_object_refs_filter_to_opt_sql(
@@ -1655,15 +1685,19 @@ def process_object_refs_filter_to_opt_sql(
 
     # Optimization for filtering with refs, only include calls that have non-zero
     # input refs when we are conditioning on refs in inputs, or is a naked call end.
-    refs_filter_opt_sql = ""
+    conditions = []
     if "inputs_dump" in object_ref_fields_consumed:
-        refs_filter_opt_sql += f"AND (length({table_alias}.input_refs) > 0 OR {table_alias}.started_at IS NULL)"
+        conditions.append(
+            f"(length({table_alias}.input_refs) > 0 OR {table_alias}.started_at IS NULL)"
+        )
     # If we are conditioning on output refs, filter down calls to those with non-zero
     # output refs, or they are a naked call start.
     if "output_dump" in object_ref_fields_consumed:
-        refs_filter_opt_sql += f"AND (length({table_alias}.output_refs) > 0 OR {table_alias}.ended_at IS NULL)"
+        conditions.append(
+            f"(length({table_alias}.output_refs) > 0 OR {table_alias}.ended_at IS NULL)"
+        )
 
-    return refs_filter_opt_sql
+    return " AND ".join(conditions) if conditions else ""
 
 
 def process_wb_run_ids_filter_to_sql(
@@ -1680,7 +1714,7 @@ def process_wb_run_ids_filter_to_sql(
     wb_run_id_field_sql = get_field_sql_for_filter("wb_run_id", strategy, param_builder)
     wb_run_id_filter_sql = f"{wb_run_id_field_sql} IN {param_slot(param_builder.add_param(wb_run_ids), 'Array(String)')}"
 
-    return f"AND ({wb_run_id_filter_sql} OR {wb_run_id_field_sql} IS NULL)"
+    return f"({wb_run_id_filter_sql} OR {wb_run_id_field_sql} IS NULL)"
 
 
 def process_calls_filter_to_conditions(
@@ -1753,7 +1787,7 @@ def make_id_subquery(
 ) -> str:
     if id_subquery_name is None:
         return ""
-    return f"AND ({table_alias}.id IN {id_subquery_name})"
+    return f"({table_alias}.id IN {id_subquery_name})"
 
 
 ######### STATS QUERY HANDLING ##########
@@ -2007,14 +2041,30 @@ def _build_value_clause(
     is_array: bool,
     pb: ParamBuilder,
 ) -> str:
-    """Build the value clause for a CASE WHEN statement."""
-    if is_nullable and value is None:
-        return "NULL"
+    """Build the value clause for a CASE WHEN statement.
 
+    For nullable fields, we explicitly cast ALL values (both NULL and non-NULL)
+    to Nullable(type) to ensure consistent block structure during ClickHouse
+    lightweight update patch-part merging. Without explicit casting, different
+    CASE branches may have mismatched types (String vs Nullable(String)), causing
+    block structure mismatches in distributed/replicated environments during
+    concurrent patch-part merges.
+    """
     if is_array:
         if array_element_type is None:
             raise ValueError("array_element_type must be provided for array fields")
         return _build_array_value_clause(value, array_element_type, pb)
+
+    if is_nullable:
+        if value is None:
+            # Explicitly cast NULL to ensure consistent type inference across
+            # all patch parts during distributed lightweight updates
+            return f"CAST(NULL AS Nullable({clickhouse_type}))"
+        else:
+            # Cast non-NULL values to Nullable(type) as well to ensure all
+            # CASE branches have identical return types
+            value_param = pb.add_param(value)
+            return f"CAST({param_slot(value_param, clickhouse_type)} AS Nullable({clickhouse_type}))"
 
     value_param = pb.add_param(value)
     return param_slot(value_param, clickhouse_type)
@@ -2031,9 +2081,105 @@ def _build_array_value_clause(
         return f"CAST([], 'Array({array_element_type})')"
 
 
+def _add_on_cluster_to_update(sql_query: str, cluster_name: str | None) -> str:
+    """Add ON CLUSTER clause to UPDATE statement if cluster_name is provided.
+
+    Args:
+        sql_query: The UPDATE SQL query
+        cluster_name: The cluster name to use (if None, returns query unchanged)
+
+    Returns:
+        SQL query with ON CLUSTER added if applicable
+    """
+    if not cluster_name:
+        return sql_query
+
+    # Check if this is an UPDATE statement and doesn't already have ON CLUSTER
+    if not re.search(r"\bUPDATE\b", sql_query, flags=re.IGNORECASE):
+        return sql_query
+
+    if re.search(r"\bON\s+CLUSTER\b", sql_query, flags=re.IGNORECASE):
+        return sql_query
+
+    # Match "UPDATE table_name" and add ON CLUSTER after table name
+    # Pattern matches: UPDATE [optional whitespace] table_name [whitespace or newline]
+    pattern = r"(\bUPDATE\s+)([a-zA-Z0-9_]+)(\s)"
+
+    def add_cluster(match: re.Match[str]) -> str:
+        return f"{match.group(1)}{match.group(2)} ON CLUSTER {cluster_name}{match.group(3)}"
+
+    return re.sub(pattern, add_cluster, sql_query, flags=re.IGNORECASE)
+
+
+def build_calls_complete_single_update_query(
+    end_call: "tsi.EndedCallSchemaForInsert",
+    pb: ParamBuilder,
+    table_name: str = "calls_complete",
+    cluster_name: str | None = None,
+) -> str:
+    """Build a parameterized UPDATE query for a single call in calls_complete table.
+
+    This creates a lightweight UPDATE that always includes ALL update columns with
+    explicit ClickHouse type casts. Every field is included regardless of whether
+    its value is NULL or empty, ensuring consistent column structure across all
+    updates and preventing block structure mismatch errors during ClickHouse merge
+    operations in distributed/sharded environments.
+
+    The columns are ordered to match the table schema exactly.
+
+    Args:
+        end_call: Single ended call schema to update
+        pb: Parameter builder for query parameterization
+        table_name: Name of the table to update (defaults to "calls_complete")
+        cluster_name: Optional cluster name for ON CLUSTER clause
+
+    Returns:
+        Formatted SQL UPDATE command string
+
+    Examples:
+        >>> pb = ParamBuilder()
+        >>> query = build_calls_complete_single_update_query(end_call, pb)
+    """
+    # Build output_refs expression - Array(String) - always include, even if empty
+    output_refs = extract_refs_from_values(end_call.output)
+    if output_refs:
+        ref_params = [param_slot(pb.add_param(ref), "String") for ref in output_refs]
+        output_refs_expr = f"CAST([{', '.join(ref_params)}], 'Array(String)')"
+    else:
+        output_refs_expr = "CAST([], 'Array(String)')"
+
+    # Build WHERE clause - use full primary key if started_at is available
+    where_clause = f"""WHERE project_id = {param_slot(pb.add_param(end_call.project_id), "String")}
+      AND id = {param_slot(pb.add_param(end_call.id), "String")}"""
+    if end_call.started_at is not None:
+        # Include started_at for full primary key utilization (project_id, started_at, id)
+        where_clause = f"""WHERE project_id = {param_slot(pb.add_param(end_call.project_id), "String")}
+      AND started_at = {param_slot(pb.add_param(end_call.started_at), "DateTime64(6)")}
+      AND id = {param_slot(pb.add_param(end_call.id), "String")}"""
+
+    # Construct the UPDATE command with all fields inline
+    raw_sql = f"""
+    UPDATE {table_name}
+    SET
+        ended_at = {param_slot(pb.add_param(end_call.ended_at), "DateTime64(6)")},
+        updated_at = toDateTime64(now64(3), 3),
+        output_dump = {param_slot(pb.add_param(json.dumps(end_call.output)), "String")},
+        summary_dump = {param_slot(pb.add_param(json.dumps(dict(end_call.summary))), "String")},
+        exception = {param_slot(pb.add_param(end_call.exception), "Nullable(String)")},
+        output_refs = {output_refs_expr},
+        wb_run_step_end = {param_slot(pb.add_param(end_call.wb_run_step_end), "Nullable(UInt64)")}
+    {where_clause}
+    """
+
+    formatted_sql = safely_format_sql(raw_sql, logger)
+    return _add_on_cluster_to_update(formatted_sql, cluster_name)
+
+
 def build_calls_complete_batch_update_query(
     end_calls: list["tsi.EndedCallSchemaForInsert"],
     pb: ParamBuilder,
+    table_name: str = "calls_complete",
+    cluster_name: str | None = None,
 ) -> str:
     """Build a parameterized batch UPDATE query for calls_complete table.
 
@@ -2045,6 +2191,8 @@ def build_calls_complete_batch_update_query(
     Args:
         end_calls: List of ended call schemas to update
         pb: Parameter builder for query parameterization
+        table_name: Name of the table to update (defaults to "calls_complete")
+        cluster_name: Optional cluster name for ON CLUSTER clause
 
     Returns:
         Formatted SQL UPDATE command string
@@ -2060,6 +2208,8 @@ def build_calls_complete_batch_update_query(
     # All calls should be from the same project
     project_id = end_calls[0].project_id
     call_ids = []
+    # Track (id, started_at) pairs for primary key optimization
+    call_id_started_at_pairs: list[tuple[str, Any]] = []
 
     # Collect values for each field across all calls
     field_values: dict[str, list[Any]] = {
@@ -2073,6 +2223,7 @@ def build_calls_complete_batch_update_query(
 
     for call in end_calls:
         call_ids.append(call.id)
+        call_id_started_at_pairs.append((call.id, call.started_at))
         field_values["ended_at"].append((call.id, call.ended_at))
         field_values["output_dump"].append((call.id, json.dumps(call.output)))
         field_values["output_refs"].append(
@@ -2113,26 +2264,42 @@ def build_calls_complete_batch_update_query(
         """Format a list of CASE conditions into a multi-line string."""
         return "\n".join(cases)
 
-    # Build WHERE clause with parameterized IN clause
-    where_params = [param_slot(pb.add_param(cid), "String") for cid in call_ids]
+    # Build WHERE clause - use full primary key if all calls have started_at
     project_id_param = param_slot(pb.add_param(project_id), "String")
+    all_have_started_at = all(
+        started_at is not None for _, started_at in call_id_started_at_pairs
+    )
+
+    if all_have_started_at:
+        # Use tuple matching for full primary key utilization (project_id, started_at, id)
+        tuple_params = [
+            f"({param_slot(pb.add_param(cid), 'String')}, {param_slot(pb.add_param(started_at), 'DateTime64(6)')})"
+            for cid, started_at in call_id_started_at_pairs
+        ]
+        where_clause = f"""WHERE project_id = {project_id_param}
+      AND (id, started_at) IN ({", ".join(tuple_params)})"""
+    else:
+        # Fall back to id-only matching
+        where_params = [param_slot(pb.add_param(cid), "String") for cid in call_ids]
+        where_clause = f"""WHERE project_id = {project_id_param}
+      AND id IN ({", ".join(where_params)})"""
 
     # Construct the final UPDATE command
     raw_sql = f"""
-    UPDATE calls_complete
+    UPDATE {table_name}
     SET
         ended_at = CASE {format_cases(field_cases["ended_at"])} ELSE ended_at END,
+        updated_at = now64(3),
         output_dump = CASE {format_cases(field_cases["output_dump"])} ELSE output_dump END,
-        output_refs = CASE {format_cases(field_cases["output_refs"])} ELSE output_refs END,
         summary_dump = CASE {format_cases(field_cases["summary_dump"])} ELSE summary_dump END,
         exception = CASE {format_cases(field_cases["exception"])} ELSE exception END,
-        wb_run_step_end = CASE {format_cases(field_cases["wb_run_step_end"])} ELSE wb_run_step_end END,
-        updated_at = now64(3)
-    WHERE project_id = {project_id_param}
-      AND id IN ({", ".join(where_params)})
+        output_refs = CASE {format_cases(field_cases["output_refs"])} ELSE output_refs END,
+        wb_run_step_end = CASE {format_cases(field_cases["wb_run_step_end"])} ELSE wb_run_step_end END
+    {where_clause}
     """
 
-    return safely_format_sql(raw_sql, logger)
+    formatted_sql = safely_format_sql(raw_sql, logger)
+    return _add_on_cluster_to_update(formatted_sql, cluster_name)
 
 
 def _build_calls_complete_update_query(
@@ -2142,6 +2309,8 @@ def _build_calls_complete_update_query(
     wb_user_id: str,
     updated_at: datetime.datetime,
     pb: ParamBuilder,
+    table_name: str = "calls_complete",
+    cluster_name: str | None = None,
 ) -> str | None:
     """Build a parameterized UPDATE query for calls_complete table.
 
@@ -2152,6 +2321,8 @@ def _build_calls_complete_update_query(
         wb_user_id: User ID performing the update
         updated_at: Timestamp of the update
         pb: ParamBuilder for parameterized queries
+        table_name: Name of the table to update (defaults to "calls_complete")
+        cluster_name: Optional cluster name for ON CLUSTER clause
 
     Returns:
         Formatted SQL query string or None if no call_ids provided
@@ -2178,13 +2349,14 @@ def _build_calls_complete_update_query(
     set_sql = ", ".join(set_clauses)
 
     raw_sql = f"""
-        UPDATE calls_complete
+        UPDATE {table_name}
         SET
             {set_sql}
         WHERE project_id = {param_slot(project_id_param, "String")}
             AND id IN {param_slot(call_ids_param, "Array(String)")}
     """
-    return safely_format_sql(raw_sql, logger)
+    formatted_sql = safely_format_sql(raw_sql, logger)
+    return _add_on_cluster_to_update(formatted_sql, cluster_name)
 
 
 def build_calls_complete_update_display_name_query(
@@ -2194,6 +2366,8 @@ def build_calls_complete_update_display_name_query(
     wb_user_id: str,
     updated_at: datetime.datetime,
     pb: ParamBuilder,
+    table_name: str = "calls_complete",
+    cluster_name: str | None = None,
 ) -> str | None:
     """Build a parameterized UPDATE query for calls_complete table to update the display_name field."""
     update_fields = {"display_name": (display_name, "String")}
@@ -2204,6 +2378,8 @@ def build_calls_complete_update_display_name_query(
         wb_user_id=wb_user_id,
         updated_at=updated_at,
         pb=pb,
+        table_name=table_name,
+        cluster_name=cluster_name,
     )
 
 
@@ -2214,6 +2390,8 @@ def build_calls_complete_batch_delete_query(
     wb_user_id: str,
     updated_at: datetime.datetime,
     pb: ParamBuilder,
+    table_name: str = "calls_complete",
+    cluster_name: str | None = None,
 ) -> str | None:
     """Build a parameterized DELETE query for calls_complete table.
     This uses ClickHouse's lightweight DELETE with parameterized IN clause.
@@ -2226,4 +2404,6 @@ def build_calls_complete_batch_delete_query(
         wb_user_id=wb_user_id,
         updated_at=updated_at,
         pb=pb,
+        table_name=table_name,
+        cluster_name=cluster_name,
     )

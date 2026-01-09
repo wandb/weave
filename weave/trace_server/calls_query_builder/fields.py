@@ -411,11 +411,21 @@ class FeedbackField(QueryField, BaseModel):
         use_agg_fn: bool = True,
     ) -> str:
         inner = f"feedback.{self.field}"
-        if self.feedback_type == "*":
-            res = f"any({inner})"
+
+        # Only use aggregate functions if strategy requires grouping and use_agg_fn is True
+        if self.strategy.requires_grouping() and use_agg_fn:
+            if self.feedback_type == "*":
+                res = f"any({inner})"
+            else:
+                param_name = pb.add_param(self.feedback_type)
+                res = f"anyIf({inner}, feedback.feedback_type = {param_slot(param_name, 'String')})"
         else:
-            param_name = pb.add_param(self.feedback_type)
-            res = f"anyIf({inner}, feedback.feedback_type = {param_slot(param_name, 'String')})"
+            # Non-aggregated version for calls_complete or when use_agg_fn is False
+            if self.feedback_type == "*":
+                res = inner
+            else:
+                param_name = pb.add_param(self.feedback_type)
+                res = f"if(feedback.feedback_type = {param_slot(param_name, 'String')}, {inner}, NULL)"
 
         if not self.extra_path:
             return res
@@ -430,7 +440,7 @@ class FeedbackField(QueryField, BaseModel):
         return True
 
     def supports_aggregation(self) -> bool:
-        return True
+        return self.strategy.requires_grouping()
 
     def as_sql_without_aggregation(
         self,

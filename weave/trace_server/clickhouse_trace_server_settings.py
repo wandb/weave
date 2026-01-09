@@ -66,7 +66,8 @@ CLICKHOUSE_ASYNC_INSERT_SETTINGS = {
     # Max number of queries to batch together, this is the default
     "async_insert_max_query_number": 450,
     # Max time between buffer flushes
-    "async_insert_busy_timeout_ms": 1000,
+    "async_insert_busy_timeout_ms": wf_env.wf_clickhouse_async_insert_flush_interval()
+    or 1000,
 }
 
 
