@@ -494,7 +494,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.kafka_producer.flush")
     def _flush_kafka_producer(self) -> None:
-        self.kafka_producer.flush()
+        if wf_env.wf_enable_online_eval():
+            self.kafka_producer.flush()
 
     @contextmanager
     def call_batch(self) -> Iterator[None]:
