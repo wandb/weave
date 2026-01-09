@@ -4,8 +4,11 @@ This module provides CallBatchProcessor, which extends AsyncBatchProcessor
 to maximize complete calls by pairing starts with ends at enqueue time.
 """
 
+import logging
 import time
 from collections.abc import Callable
+
+logger = logging.getLogger(__name__)
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.constants import EVALUATION_RUN_OP_NAME
@@ -197,8 +200,18 @@ class CallBatchProcessor(AsyncBatchProcessor[BatchItem]):
         try:
             self.queue.put_nowait(item)
         except Exception:
-            # Use parent's error handling
-            self._write_item_to_disk(item, "Queue full")
+            self._dropped_item_count += 1
+            error_message = (
+                f"Ready queue full. Dropping item. Max queue size: {self.queue.maxsize}"
+            )
+
+            # Only log the first dropped item and every 1000th thereafter
+            if self._dropped_item_count % 1000 == 1:
+                logger.warning(
+                    f"{error_message}. Total dropped items: {self._dropped_item_count}"
+                )
+
+            self._write_item_to_disk(item, error_message)
 
     # =========================================================================
     # Stale Start Flushing

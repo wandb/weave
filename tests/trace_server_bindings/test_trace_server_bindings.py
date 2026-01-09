@@ -243,21 +243,21 @@ def test_drop_data_when_queue_is_full(server, log_collector):
 
     With CallBatchProcessor, starts are buffered in _pending_starts until their ends arrive.
     When an end arrives and pairs with a start, or when an orphan end arrives, items go to
-    the ready_queue. This test verifies that overflow is handled correctly.
+    the queue. This test verifies that overflow is handled correctly.
     """
     # Reset counter so the next drop (1st) will log (logging happens at 1, 1001, 2001, etc.)
     server.call_processor._dropped_item_count = 0
 
-    # Replace the ready queue with a mock that raises Full when put_nowait is called
+    # Replace the queue with a mock that raises Full when put_nowait is called
     mock_queue = MagicMock()
     mock_queue.put_nowait.side_effect = Full
-    server.call_processor.ready_queue = mock_queue
+    server.call_processor.queue = mock_queue
 
     # Start a call - this buffers the start in _pending_starts
     start, end = generate_call_start_end_pair()
     server.call_start(start)
 
-    # End the call - this pairs with the start and tries to put a CompleteBatchItem in ready_queue
+    # End the call - this pairs with the start and tries to put a CompleteBatchItem in queue
     server.call_end(end)
 
     # Verify that put_nowait was called (meaning we tried to queue the complete item)
