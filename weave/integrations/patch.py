@@ -317,8 +317,11 @@ class WeaveImportHook(MetaPathFinder):
         integration is being imported and schedule it for patching after import.
         """
         # Check if this is a root module we support (not a submodule)
-        root_module = fullname.split(".")[0]
-
+        # Google GenAI is a special case because it's a namespace package
+        if fullname.startswith("google.genai"):
+            root_module = "google.genai"
+        else:
+            root_module = fullname.split(".")[0]
         # If this is one of our supported integrations and not yet patched,
         # we'll patch it after it's imported
         if (
