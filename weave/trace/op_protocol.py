@@ -20,10 +20,10 @@ if TYPE_CHECKING:
 P = ParamSpec("P")
 R = TypeVar("R")
 
-# Valid op kinds for categorizing operations in the UI
+# Each Op kind has an associated icon in the UI.
 OpKind = Literal["agent", "llm", "tool", "search", "fun"]
 
-# Valid op colors for customizing the kind icon color in the UI
+# Basic colors for additional organization.
 OpColor = Literal["red", "orange", "yellow", "green", "blue", "purple"]
 
 

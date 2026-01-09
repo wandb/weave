@@ -1296,10 +1296,7 @@ def op(
             wrapper._is_generator = is_sync_generator  # type: ignore
             wrapper._is_async_generator = is_async_generator  # type: ignore
 
-            # Store the op kind (e.g., "tool") if provided
             wrapper.kind = kind  # type: ignore
-
-            # Store the op color (e.g., "blue") if provided
             wrapper.color = color  # type: ignore
 
             return cast(Op[P, R], wrapper)
