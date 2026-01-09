@@ -13,10 +13,23 @@ class EndBatchItem(BaseModel):
     req: tsi.CallEndReq
 
 
+class CompleteBatchItem(BaseModel):
+    mode: str = "complete"
+    req: tsi.CallCompleteReq
+
+
 class Batch(BaseModel):
-    batch: list[StartBatchItem | EndBatchItem]
+    batch: list[StartBatchItem | EndBatchItem | CompleteBatchItem]
 
 
 class ServerInfoRes(BaseModel):
     min_required_weave_python_version: str
     trace_server_version: str | None = None
+
+
+class EntityProjectInfo(BaseModel):
+    """Extracted entity and project information from a project_id."""
+
+    entity: str
+    project: str
+    project_id: str

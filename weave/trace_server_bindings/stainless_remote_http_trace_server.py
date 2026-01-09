@@ -12,10 +12,15 @@ from typing_extensions import Self
 from weave_server_sdk import Client as StainlessClient
 
 from weave.trace.env import weave_trace_server_url
-from weave.trace.settings import max_calls_queue_size, should_enable_disk_fallback
+from weave.trace.settings import (
+    call_start_delay,
+    max_calls_queue_size,
+    should_enable_disk_fallback,
+)
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ids import generate_id
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
+from weave.trace_server_bindings.call_batch_processor import CallBatchProcessor
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface
 from weave.trace_server_bindings.http_utils import (
     REMOTE_REQUEST_BYTES_LIMIT,
@@ -25,6 +30,7 @@ from weave.trace_server_bindings.http_utils import (
 )
 from weave.trace_server_bindings.models import (
     Batch,
+    CompleteBatchItem,
     EndBatchItem,
     ServerInfoRes,
     StartBatchItem,
@@ -60,8 +66,8 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
     ):
         self.trace_server_url = trace_server_url.rstrip("/")
         self.should_batch = should_batch
-        self.call_processor = None
-        self.feedback_processor = None
+        self.call_processor: CallBatchProcessor | None = None
+        self.feedback_processor: AsyncBatchProcessor | None = None
         self.remote_request_bytes_limit = remote_request_bytes_limit
         self._extra_headers: dict[str, str] = extra_headers or {}
         self._username: str = username
@@ -81,10 +87,11 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
         if self.should_batch:
-            self.call_processor = AsyncBatchProcessor(
+            self.call_processor = CallBatchProcessor(
                 self._flush_calls,
                 max_queue_size=max_calls_queue_size(),
                 enable_disk_fallback=should_enable_disk_fallback(),
+                start_hold_timeout=call_start_delay(),  # Buffer starts waiting for ends
             )
             self.feedback_processor = AsyncBatchProcessor(
                 self._flush_feedback,
@@ -267,37 +274,71 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
     def _send_batch_to_server(self, encoded_data: bytes) -> None:
         """Send an encoded batch of calls to the server using the stainless client.
 
-        Args:
-            encoded_data: Encoded batch data to send.
+        Note: The old upsert_batch endpoint doesn't support 'complete' mode, so we
+        split CompleteBatchItems back into start+end pairs before sending.
         """
         self._update_client_headers()
-        # Parse the batch and convert to stainless format
         batch_data = Batch.model_validate_json(encoded_data.decode("utf-8"))
         stainless_batch = []
         for item in batch_data.batch:
             if isinstance(item, StartBatchItem):
                 stainless_batch.append(
-                    {
-                        "mode": "start",
-                        "req": item.req.model_dump(by_alias=True),
-                    }
+                    {"mode": "start", "req": item.req.model_dump(by_alias=True)}
                 )
             elif isinstance(item, EndBatchItem):
                 stainless_batch.append(
-                    {
-                        "mode": "end",
-                        "req": item.req.model_dump(by_alias=True),
-                    }
+                    {"mode": "end", "req": item.req.model_dump(by_alias=True)}
+                )
+            elif isinstance(item, CompleteBatchItem):
+                # Split complete back into start+end (upsert_batch doesn't support complete)
+                complete = item.req.complete
+                start_req = tsi.CallStartReq(
+                    start=tsi.StartedCallSchemaForInsert(
+                        project_id=complete.project_id,
+                        id=complete.id,
+                        trace_id=complete.trace_id,
+                        op_name=complete.op_name,
+                        display_name=complete.display_name,
+                        parent_id=complete.parent_id,
+                        thread_id=complete.thread_id,
+                        turn_id=complete.turn_id,
+                        started_at=complete.started_at,
+                        attributes=complete.attributes,
+                        inputs=complete.inputs,
+                        wb_user_id=complete.wb_user_id,
+                        wb_run_id=complete.wb_run_id,
+                        wb_run_step=complete.wb_run_step,
+                    )
+                )
+                end_req = tsi.CallEndReq(
+                    end=tsi.EndedCallSchemaForInsert(
+                        project_id=complete.project_id,
+                        id=complete.id,
+                        ended_at=complete.ended_at,
+                        exception=complete.exception,
+                        output=complete.output,
+                        summary=complete.summary,
+                        wb_run_step_end=complete.wb_run_step_end,
+                    )
+                )
+                stainless_batch.append(
+                    {"mode": "start", "req": start_req.model_dump(by_alias=True)}
+                )
+                stainless_batch.append(
+                    {"mode": "end", "req": end_req.model_dump(by_alias=True)}
                 )
         self._stainless_client.calls.upsert_batch(batch=stainless_batch)
 
     def _flush_calls(
         self,
-        batch: list[StartBatchItem | EndBatchItem],
+        batch: list[StartBatchItem | EndBatchItem | CompleteBatchItem],
         *,
         _should_update_batch_size: bool = True,
     ) -> None:
         """Process a batch of calls, splitting if necessary and sending to the server.
+
+        Note: With CallBatchProcessor, most items arrive already paired as
+        CompleteBatchItems. This reduces server-side merging overhead.
 
         Args:
             batch: List of batch items to process.
@@ -307,14 +348,20 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         if len(batch) == 0:
             return
 
-        def get_item_id(item: StartBatchItem | EndBatchItem) -> str:
+        def get_item_id(
+            item: StartBatchItem | EndBatchItem | CompleteBatchItem,
+        ) -> str:
             if isinstance(item, StartBatchItem):
                 return f"{item.req.start.id}-start"
             elif isinstance(item, EndBatchItem):
                 return f"{item.req.end.id}-end"
+            elif isinstance(item, CompleteBatchItem):
+                return f"{item.req.complete.id}-complete"
             return "unknown"
 
-        def encode_batch(batch: list[StartBatchItem | EndBatchItem]) -> bytes:
+        def encode_batch(
+            batch: list[StartBatchItem | EndBatchItem | CompleteBatchItem],
+        ) -> bytes:
             data = Batch(batch=batch).model_dump_json()
             return data.encode("utf-8")
 
@@ -330,11 +377,11 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             encode_batch_fn=encode_batch,
         )
 
-    def get_call_processor(self) -> AsyncBatchProcessor | None:
+    def get_call_processor(self) -> CallBatchProcessor | None:
         """Get the call processor for batching.
 
         Returns:
-            AsyncBatchProcessor instance or None if batching is disabled.
+            CallBatchProcessor instance or None if batching is disabled.
         """
         return self.call_processor
 

@@ -766,6 +766,7 @@ class WeaveClient:
             current_wb_run_step = None
 
         started_at = datetime.datetime.now(tz=datetime.timezone.utc)
+        call.started_at = started_at
         project_id = self._project_id()
 
         should_print_call_link_ = should_print_call_link()
@@ -954,6 +955,7 @@ class WeaveClient:
                 end=EndedCallSchemaForInsert(
                     project_id=project_id,
                     id=call.id,
+                    started_at=call.started_at,
                     ended_at=ended_at,
                     output=output_json,
                     summary=merged_summary,
