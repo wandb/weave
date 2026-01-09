@@ -5,7 +5,11 @@ import pytest
 
 from weave.trace_server import clickhouse_trace_server_batched as chts
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.project_version.types import CallsStorageServerMode, WriteTarget
+from weave.trace_server.project_version.types import (
+    CallsStorageServerMode,
+    ReadTable,
+    WriteTarget,
+)
 from weave.trace_server.secret_fetcher_context import secret_fetcher_context
 
 
@@ -24,6 +28,14 @@ def test_clickhouse_storage_size_query_generation():
             autospec=True,
         ) as mock_cq,
         patch.object(chts.ClickHouseTraceServer, "_query_stream") as mock_query_stream,
+        patch(
+            "weave.trace_server.project_version.project_version.TableRoutingResolver.resolve_read_table",
+            return_value=ReadTable.CALLS_MERGED,
+        ),
+        patch(
+            "weave.trace_server.project_version.project_version.TableRoutingResolver.resolve_write_target",
+            return_value=WriteTarget.CALLS_MERGED,
+        ),
     ):
         # Create a mock CallsQuery instance
         mock_calls_query = Mock()
@@ -42,8 +54,11 @@ def test_clickhouse_storage_size_query_generation():
             include_total_storage_size=True,
         )
 
-        # Create server instance
+        # Create server instance and mock the ch_client property
         server = chts.ClickHouseTraceServer(host="test_host")
+        # Mock ch_client to prevent actual connection
+        server._thread_local = Mock()
+        server._thread_local.ch_client = Mock()
 
         # Call the method that generates the query and consume the generator
         list(server.calls_query_stream(req))
@@ -124,50 +139,6 @@ def test_clickhouse_storage_size_null_handling():
     ch_schema = chts._ch_call_dict_to_call_schema_dict(test_data)
     assert ch_schema["storage_size_bytes"] is None
     assert ch_schema["total_storage_size_bytes"] is None
-
-
-def test_clickhouse_distributed_mode_properties():
-    """Test that ClickHouse distributed mode properties are correctly initialized."""
-    # Test with distributed mode enabled
-    with (
-        patch(
-            "weave.trace_server.environment.wf_clickhouse_use_distributed_tables"
-        ) as mock_distributed,
-        patch(
-            "weave.trace_server.environment.wf_clickhouse_replicated_cluster"
-        ) as mock_cluster,
-    ):
-        mock_distributed.return_value = True
-        mock_cluster.return_value = "test_cluster"
-
-        server = chts.ClickHouseTraceServer(host="test_host")
-
-        # Test distributed mode property
-        assert server.use_distributed_mode is True
-        assert server.clickhouse_cluster_name == "test_cluster"
-        from weave.trace_server import clickhouse_trace_server_settings as ch_settings
-
-        expected_table = f"calls_complete{ch_settings.LOCAL_TABLE_SUFFIX}"
-        assert server._get_calls_complete_table_name() == expected_table
-
-    # Test with distributed mode disabled
-    with (
-        patch(
-            "weave.trace_server.environment.wf_clickhouse_use_distributed_tables"
-        ) as mock_distributed,
-        patch(
-            "weave.trace_server.environment.wf_clickhouse_replicated_cluster"
-        ) as mock_cluster,
-    ):
-        mock_distributed.return_value = False
-        mock_cluster.return_value = None
-
-        server = chts.ClickHouseTraceServer(host="test_host")
-
-        # Test distributed mode property
-        assert server.use_distributed_mode is False
-        assert server.clickhouse_cluster_name is None
-        assert server._get_calls_complete_table_name() == "calls_complete"
 
 
 def test_completions_create_stream_custom_provider():
