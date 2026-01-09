@@ -165,6 +165,20 @@ def wf_clickhouse_max_execution_time() -> int | None:
         return None
 
 
+def wf_clickhouse_async_insert_flush_interval() -> int | None:
+    """The interval for flushing async inserts to the clickhouse server."""
+    interval = os.environ.get("WF_CLICKHOUSE_ASYNC_INSERT_FLUSH_INTERVAL")
+    if interval is None:
+        return None
+    try:
+        return int(interval)
+    except ValueError:
+        logger.exception(
+            f"WF_CLICKHOUSE_ASYNC_INSERT_FLUSH_INTERVAL value '{interval}' is not valid"
+        )
+        return None
+
+
 # BYOB Settings
 
 
