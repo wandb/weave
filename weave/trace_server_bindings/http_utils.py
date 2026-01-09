@@ -173,12 +173,7 @@ def process_batch_with_retry(
         send_batch_fn(encoded_data)
     except Exception as e:
         # Handle 413 specially: server rejected as too large, split and retry
-        is_413 = (
-            isinstance(e, httpx.HTTPStatusError)
-            and e.response is not None
-            and e.response.status_code == 413
-        )
-        if is_413 and len(batch) > 1:
+        if _is_413_error(e) and len(batch) > 1:
             logger.warning(
                 f"Server returned 413 for {batch_name} batch of {len(batch)} items, splitting and retrying"
             )
@@ -316,3 +311,12 @@ def check_endpoint_exists(
     if endpoint_exists:
         _ENDPOINT_CACHE.add(cache_key)
     return endpoint_exists
+
+
+def _is_413_error(e: Exception) -> bool:
+    """Check if an exception is an HTTP 413 (Payload Too Large) error."""
+    return (
+        isinstance(e, httpx.HTTPStatusError)
+        and e.response is not None
+        and e.response.status_code == 413
+    )
