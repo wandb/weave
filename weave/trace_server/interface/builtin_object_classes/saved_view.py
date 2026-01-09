@@ -37,6 +37,7 @@ class ChartConfig(BaseModel):
 class AggregationMethod(str, Enum):
     LATEST = "latest"
     AVERAGE = "average"
+    BEST = "best"
 
 
 class ObjectVersionGroup(BaseModel):

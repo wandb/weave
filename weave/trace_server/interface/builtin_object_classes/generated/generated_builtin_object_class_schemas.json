@@ -54,7 +54,8 @@
     "AggregationMethod": {
       "enum": [
         "latest",
-        "average"
+        "average",
+        "best"
       ],
       "title": "AggregationMethod",
       "type": "string"
