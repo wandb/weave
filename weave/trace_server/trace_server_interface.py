@@ -185,6 +185,10 @@ class EndedCallSchemaForInsert(BaseModel):
     project_id: str
     id: str
 
+    # Start time is optional but improves query performance when provided
+    # (allows using full primary key in UPDATE)
+    started_at: datetime.datetime | None = None
+
     # End time is required
     ended_at: datetime.datetime
 
