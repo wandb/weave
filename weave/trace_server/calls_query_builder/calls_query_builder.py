@@ -2148,6 +2148,15 @@ def build_calls_complete_single_update_query(
     else:
         output_refs_expr = "CAST([], 'Array(String)')"
 
+    # Build WHERE clause - use full primary key if started_at is available
+    where_clause = f"""WHERE project_id = {param_slot(pb.add_param(end_call.project_id), "String")}
+      AND id = {param_slot(pb.add_param(end_call.id), "String")}"""
+    if end_call.started_at is not None:
+        # Include started_at for full primary key utilization (project_id, started_at, id)
+        where_clause = f"""WHERE project_id = {param_slot(pb.add_param(end_call.project_id), "String")}
+      AND started_at = {param_slot(pb.add_param(end_call.started_at), "DateTime64(6)")}
+      AND id = {param_slot(pb.add_param(end_call.id), "String")}"""
+
     # Construct the UPDATE command with all fields inline
     raw_sql = f"""
     UPDATE {table_name}
@@ -2159,8 +2168,7 @@ def build_calls_complete_single_update_query(
         exception = {param_slot(pb.add_param(end_call.exception), "Nullable(String)")},
         output_refs = {output_refs_expr},
         wb_run_step_end = {param_slot(pb.add_param(end_call.wb_run_step_end), "Nullable(UInt64)")}
-    WHERE project_id = {param_slot(pb.add_param(end_call.project_id), "String")}
-      AND id = {param_slot(pb.add_param(end_call.id), "String")}
+    {where_clause}
     """
 
     formatted_sql = safely_format_sql(raw_sql, logger)
@@ -2200,6 +2208,8 @@ def build_calls_complete_batch_update_query(
     # All calls should be from the same project
     project_id = end_calls[0].project_id
     call_ids = []
+    # Track (id, started_at) pairs for primary key optimization
+    call_id_started_at_pairs: list[tuple[str, Any]] = []
 
     # Collect values for each field across all calls
     field_values: dict[str, list[Any]] = {
@@ -2213,6 +2223,7 @@ def build_calls_complete_batch_update_query(
 
     for call in end_calls:
         call_ids.append(call.id)
+        call_id_started_at_pairs.append((call.id, call.started_at))
         field_values["ended_at"].append((call.id, call.ended_at))
         field_values["output_dump"].append((call.id, json.dumps(call.output)))
         field_values["output_refs"].append(
@@ -2253,9 +2264,25 @@ def build_calls_complete_batch_update_query(
         """Format a list of CASE conditions into a multi-line string."""
         return "\n".join(cases)
 
-    # Build WHERE clause with parameterized IN clause
-    where_params = [param_slot(pb.add_param(cid), "String") for cid in call_ids]
+    # Build WHERE clause - use full primary key if all calls have started_at
     project_id_param = param_slot(pb.add_param(project_id), "String")
+    all_have_started_at = all(
+        started_at is not None for _, started_at in call_id_started_at_pairs
+    )
+
+    if all_have_started_at:
+        # Use tuple matching for full primary key utilization (project_id, started_at, id)
+        tuple_params = [
+            f"({param_slot(pb.add_param(cid), 'String')}, {param_slot(pb.add_param(started_at), 'DateTime64(6)')})"
+            for cid, started_at in call_id_started_at_pairs
+        ]
+        where_clause = f"""WHERE project_id = {project_id_param}
+      AND (id, started_at) IN ({", ".join(tuple_params)})"""
+    else:
+        # Fall back to id-only matching
+        where_params = [param_slot(pb.add_param(cid), "String") for cid in call_ids]
+        where_clause = f"""WHERE project_id = {project_id_param}
+      AND id IN ({", ".join(where_params)})"""
 
     # Construct the final UPDATE command
     raw_sql = f"""
@@ -2268,8 +2295,7 @@ def build_calls_complete_batch_update_query(
         exception = CASE {format_cases(field_cases["exception"])} ELSE exception END,
         output_refs = CASE {format_cases(field_cases["output_refs"])} ELSE output_refs END,
         wb_run_step_end = CASE {format_cases(field_cases["wb_run_step_end"])} ELSE wb_run_step_end END
-    WHERE project_id = {project_id_param}
-      AND id IN ({", ".join(where_params)})
+    {where_clause}
     """
 
     formatted_sql = safely_format_sql(raw_sql, logger)
