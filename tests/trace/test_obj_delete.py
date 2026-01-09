@@ -3,6 +3,7 @@ import pytest
 import weave
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.common_interface import SortBy
 
 
 def _objs_query(client: WeaveClient, object_id: str) -> list[tsi.ObjSchema]:
@@ -10,7 +11,7 @@ def _objs_query(client: WeaveClient, object_id: str) -> list[tsi.ObjSchema]:
         tsi.ObjQueryReq(
             project_id=client._project_id(),
             filter=tsi.ObjectVersionFilter(object_ids=[object_id]),
-            sort_by=[tsi.SortBy(field="created_at", direction="asc")],
+            sort_by=[SortBy(field="created_at", direction="asc")],
         )
     )
     return objs.objs

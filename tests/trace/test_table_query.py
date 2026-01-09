@@ -8,6 +8,7 @@ from tests.trace.util import (
 )
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.common_interface import SortBy
 
 
 def generate_table_data(client: WeaveClient, n_rows: int, n_cols: int):
@@ -174,7 +175,7 @@ def test_table_query_sort_by_column(client: WeaveClient):
         tsi.TableQueryReq(
             project_id=client._project_id(),
             digest=digest,
-            sort_by=[tsi.SortBy(field="id", direction="desc")],
+            sort_by=[SortBy(field="id", direction="desc")],
         )
     )
 
@@ -200,7 +201,7 @@ def test_table_query_sort_by_nested_column(client: WeaveClient):
         tsi.TableQueryReq(
             project_id=client._project_id(),
             digest=digest,
-            sort_by=[tsi.SortBy(field="nested_col.prop_a", direction="asc")],
+            sort_by=[SortBy(field="nested_col.prop_a", direction="asc")],
         )
     )
 
@@ -226,7 +227,7 @@ def test_table_query_combined(client: WeaveClient):
             digest=digest,
             limit=limit,
             offset=offset,
-            sort_by=[tsi.SortBy(field="id", direction="desc")],
+            sort_by=[SortBy(field="id", direction="desc")],
         )
     )
 
@@ -251,8 +252,8 @@ def test_table_query_multiple_sort_criteria(client: WeaveClient):
             project_id=client._project_id(),
             digest=digest,
             sort_by=[
-                tsi.SortBy(field="col_0", direction="asc"),
-                tsi.SortBy(field="id", direction="desc"),
+                SortBy(field="col_0", direction="asc"),
+                SortBy(field="id", direction="desc"),
             ],
         )
     )
@@ -444,7 +445,7 @@ def test_duplicate_table_with_identical_rows(client: WeaveClient):
         tsi.TableQueryReq(
             project_id=client._project_id(),
             digest=res1.digest,
-            sort_by=[tsi.SortBy(field="val", direction="asc")],
+            sort_by=[SortBy(field="val", direction="asc")],
         )
     )
 

@@ -8,6 +8,7 @@ from tests.trace.util import client_is_sqlite
 from weave import AnnotationSpec
 from weave.trace.weave_client import WeaveClient, get_ref
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.common_interface import SortBy
 from weave.trace_server.errors import InvalidRequest
 from weave.trace_server.interface.query import Query
 from weave.trace_server.trace_server_interface import (
@@ -410,7 +411,7 @@ async def test_sort_by_feedback(client: WeaveClient) -> None:
                 project_id=client._project_id(),
                 filter=tsi.CallsFilter(op_names=[get_ref(my_model).uri()]),
                 sort_by=[
-                    tsi.SortBy(
+                    SortBy(
                         field=field,
                         direction="asc",
                     )
@@ -429,7 +430,7 @@ async def test_sort_by_feedback(client: WeaveClient) -> None:
                 project_id=client._project_id(),
                 filter=tsi.CallsFilter(op_names=[get_ref(my_model).uri()]),
                 sort_by=[
-                    tsi.SortBy(
+                    SortBy(
                         field=field,
                         direction="desc",
                     )

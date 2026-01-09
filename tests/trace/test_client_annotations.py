@@ -11,6 +11,7 @@ import pytest
 import weave
 from tests.trace.util import client_is_sqlite
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.common_interface import AnnotationQueueItemsFilter, SortBy
 from weave.trace_server.ids import generate_id
 
 
@@ -822,7 +823,7 @@ def test_annotation_queue_items_query_with_sorting(client):
     query_req = tsi.AnnotationQueueItemsQueryReq(
         project_id=client._project_id(),
         queue_id=fixture.queue_id,
-        sort_by=[tsi.SortBy(field="call_started_at", direction="desc")],
+        sort_by=[SortBy(field="call_started_at", direction="desc")],
     )
     query_res = client.server.annotation_queue_items_query(query_req)
 
@@ -867,8 +868,8 @@ def test_annotation_queue_items_query_with_multiple_sort_fields(client):
         project_id=client._project_id(),
         queue_id=fixture.queue_id,
         sort_by=[
-            tsi.SortBy(field="call_op_name", direction="asc"),
-            tsi.SortBy(field="created_at", direction="desc"),
+            SortBy(field="call_op_name", direction="asc"),
+            SortBy(field="created_at", direction="desc"),
         ],
     )
     query_res = client.server.annotation_queue_items_query(query_req)
@@ -894,7 +895,7 @@ def test_annotation_queue_items_query_filter_by_call_id(client):
     query_req = tsi.AnnotationQueueItemsQueryReq(
         project_id=client._project_id(),
         queue_id=fixture.queue_id,
-        filter=tsi.AnnotationQueueItemsFilter(call_id=target_call_id),
+        filter=AnnotationQueueItemsFilter(call_id=target_call_id),
     )
     query_res = client.server.annotation_queue_items_query(query_req)
 
@@ -930,7 +931,7 @@ def test_annotation_queue_items_query_filter_by_call_op_name(client):
     query_req = tsi.AnnotationQueueItemsQueryReq(
         project_id=client._project_id(),
         queue_id=fixture1.queue_id,
-        filter=tsi.AnnotationQueueItemsFilter(call_op_name=target_op_name),
+        filter=AnnotationQueueItemsFilter(call_op_name=target_op_name),
     )
     query_res = client.server.annotation_queue_items_query(query_req)
 
@@ -964,7 +965,7 @@ def test_annotation_queue_items_query_filter_by_call_trace_id(client):
     query_req = tsi.AnnotationQueueItemsQueryReq(
         project_id=client._project_id(),
         queue_id=fixture.queue_id,
-        filter=tsi.AnnotationQueueItemsFilter(call_trace_id=target_trace_id),
+        filter=AnnotationQueueItemsFilter(call_trace_id=target_trace_id),
     )
     query_res = client.server.annotation_queue_items_query(query_req)
 
@@ -988,7 +989,7 @@ def test_annotation_queue_items_query_filter_by_added_by(client):
     query_req = tsi.AnnotationQueueItemsQueryReq(
         project_id=client._project_id(),
         queue_id=fixture.queue_id,
-        filter=tsi.AnnotationQueueItemsFilter(added_by="test_user"),
+        filter=AnnotationQueueItemsFilter(added_by="test_user"),
     )
     query_res = client.server.annotation_queue_items_query(query_req)
 
@@ -1001,7 +1002,7 @@ def test_annotation_queue_items_query_filter_by_added_by(client):
     query_req = tsi.AnnotationQueueItemsQueryReq(
         project_id=client._project_id(),
         queue_id=fixture.queue_id,
-        filter=tsi.AnnotationQueueItemsFilter(added_by="nonexistent_user"),
+        filter=AnnotationQueueItemsFilter(added_by="nonexistent_user"),
     )
     query_res = client.server.annotation_queue_items_query(query_req)
 
@@ -1028,7 +1029,7 @@ def test_annotation_queue_items_query_filter_by_annotation_states(client):
     query_req = tsi.AnnotationQueueItemsQueryReq(
         project_id=client._project_id(),
         queue_id=fixture.queue_id,
-        filter=tsi.AnnotationQueueItemsFilter(annotation_states=["unstarted"]),
+        filter=AnnotationQueueItemsFilter(annotation_states=["unstarted"]),
     )
     query_res = client.server.annotation_queue_items_query(query_req)
 
@@ -1041,7 +1042,7 @@ def test_annotation_queue_items_query_filter_by_annotation_states(client):
     query_req = tsi.AnnotationQueueItemsQueryReq(
         project_id=client._project_id(),
         queue_id=fixture.queue_id,
-        filter=tsi.AnnotationQueueItemsFilter(annotation_states=["completed"]),
+        filter=AnnotationQueueItemsFilter(annotation_states=["completed"]),
     )
     query_res = client.server.annotation_queue_items_query(query_req)
 
@@ -1073,7 +1074,7 @@ def test_annotation_queue_items_query_filter_combined(client):
     query_req = tsi.AnnotationQueueItemsQueryReq(
         project_id=client._project_id(),
         queue_id=fixture.queue_id,
-        filter=tsi.AnnotationQueueItemsFilter(
+        filter=AnnotationQueueItemsFilter(
             call_id=target_call.id,
             added_by="test_user",
             annotation_states=["unstarted"],
@@ -1091,7 +1092,7 @@ def test_annotation_queue_items_query_filter_combined(client):
     query_req = tsi.AnnotationQueueItemsQueryReq(
         project_id=client._project_id(),
         queue_id=fixture.queue_id,
-        filter=tsi.AnnotationQueueItemsFilter(
+        filter=AnnotationQueueItemsFilter(
             call_id=target_call.id,
             annotation_states=["completed"],  # Item is unstarted, not completed
         ),
@@ -1116,7 +1117,7 @@ def test_annotation_queue_items_query_filter_empty_results(client):
     query_req = tsi.AnnotationQueueItemsQueryReq(
         project_id=client._project_id(),
         queue_id=fixture.queue_id,
-        filter=tsi.AnnotationQueueItemsFilter(call_id="nonexistent_call_id"),
+        filter=AnnotationQueueItemsFilter(call_id="nonexistent_call_id"),
     )
     query_res = client.server.annotation_queue_items_query(query_req)
 
@@ -1127,7 +1128,7 @@ def test_annotation_queue_items_query_filter_empty_results(client):
     query_req = tsi.AnnotationQueueItemsQueryReq(
         project_id=client._project_id(),
         queue_id=fixture.queue_id,
-        filter=tsi.AnnotationQueueItemsFilter(call_op_name="NonexistentOp"),
+        filter=AnnotationQueueItemsFilter(call_op_name="NonexistentOp"),
     )
     query_res = client.server.annotation_queue_items_query(query_req)
 
@@ -1149,7 +1150,7 @@ def test_annotation_queue_items_query_filter_with_pagination(client):
     query_req = tsi.AnnotationQueueItemsQueryReq(
         project_id=client._project_id(),
         queue_id=fixture.queue_id,
-        filter=tsi.AnnotationQueueItemsFilter(annotation_states=["unstarted"]),
+        filter=AnnotationQueueItemsFilter(annotation_states=["unstarted"]),
         limit=3,
         offset=0,
     )
@@ -1162,7 +1163,7 @@ def test_annotation_queue_items_query_filter_with_pagination(client):
     query_req = tsi.AnnotationQueueItemsQueryReq(
         project_id=client._project_id(),
         queue_id=fixture.queue_id,
-        filter=tsi.AnnotationQueueItemsFilter(annotation_states=["unstarted"]),
+        filter=AnnotationQueueItemsFilter(annotation_states=["unstarted"]),
         limit=3,
         offset=3,
     )
@@ -1189,10 +1190,10 @@ def test_annotation_queue_items_query_filter_with_sorting(client):
     query_req = tsi.AnnotationQueueItemsQueryReq(
         project_id=client._project_id(),
         queue_id=fixture.queue_id,
-        filter=tsi.AnnotationQueueItemsFilter(
+        filter=AnnotationQueueItemsFilter(
             added_by="test_user", annotation_states=["unstarted"]
         ),
-        sort_by=[tsi.SortBy(field="call_started_at", direction="desc")],
+        sort_by=[SortBy(field="call_started_at", direction="desc")],
     )
     query_res = client.server.annotation_queue_items_query(query_req)
 
@@ -1272,7 +1273,7 @@ def test_annotation_queue_items_query_position_with_sorting(client):
     query_req = tsi.AnnotationQueueItemsQueryReq(
         project_id=client._project_id(),
         queue_id=fixture.queue_id,
-        sort_by=[tsi.SortBy(field="call_started_at", direction="desc")],
+        sort_by=[SortBy(field="call_started_at", direction="desc")],
         include_position=True,
     )
     query_res = client.server.annotation_queue_items_query(query_req)
@@ -1309,7 +1310,7 @@ def test_annotation_queue_items_query_position_with_filter_unstarted(client):
     query_req = tsi.AnnotationQueueItemsQueryReq(
         project_id=client._project_id(),
         queue_id=fixture.queue_id,
-        filter=tsi.AnnotationQueueItemsFilter(annotation_states=["unstarted"]),
+        filter=AnnotationQueueItemsFilter(annotation_states=["unstarted"]),
         include_position=True,
     )
     query_res = client.server.annotation_queue_items_query(query_req)

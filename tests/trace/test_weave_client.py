@@ -45,6 +45,7 @@ from weave.trace.serialization.serializer import (
     register_serializer,
 )
 from weave.trace_server.clickhouse_trace_server_batched import NotFoundError
+from weave.trace_server.common_interface import SortBy
 from weave.trace_server.constants import MAX_DISPLAY_NAME_LENGTH
 from weave.trace_server.ids import generate_id
 from weave.trace_server.interface.builtin_object_classes.llm_structured_model import (
@@ -305,7 +306,7 @@ def test_filter_sort_by_query_validation(client):
         client.get_calls(sort_by=["not a sort_by"])
 
     # test valid
-    client.get_calls(sort_by=[tsi.SortBy(field="started_at", direction="desc")])
+    client.get_calls(sort_by=[SortBy(field="started_at", direction="desc")])
 
     # now query like filter
     with pytest.raises(TypeError):
@@ -463,7 +464,7 @@ def test_get_calls_complete(client):
             limit=1,
             offset=0,
             query=query,
-            sort_by=[tsi.SortBy(field="started_at", direction="desc")],
+            sort_by=[SortBy(field="started_at", direction="desc")],
             include_feedback=True,
             columns=["inputs.dataset.rows"],
         )
@@ -481,7 +482,7 @@ def test_get_calls_complete(client):
                 limit=1,
                 offset=0,
                 query=query,
-                sort_by=[tsi.SortBy(field="started_at", direction="desc")],
+                sort_by=[SortBy(field="started_at", direction="desc")],
                 include_feedback=True,
                 columns=["inputs.dataset"],
                 expand_columns=["inputs.dataset"],
@@ -504,7 +505,7 @@ def test_get_calls_complete(client):
     # add a simple query
     client_result = list(
         client.get_calls(
-            sort_by=[tsi.SortBy(field="started_at", direction="desc")],
+            sort_by=[SortBy(field="started_at", direction="desc")],
             query=query,
             include_costs=True,
             include_feedback=True,
@@ -514,7 +515,7 @@ def test_get_calls_complete(client):
         client.server.calls_query(
             tsi.CallsQueryReq(
                 project_id="shawn/test-project",
-                sort_by=[tsi.SortBy(field="started_at", direction="desc")],
+                sort_by=[SortBy(field="started_at", direction="desc")],
                 query=query,
                 include_costs=True,
                 include_feedback=True,
@@ -2071,7 +2072,7 @@ def test_object_deletion(client):
         req=tsi.ObjQueryReq(
             project_id=client._project_id(),
             filter=tsi.ObjectVersionFilter(object_ids=["my-obj"]),
-            sort_by=[tsi.SortBy(field="created_at", direction="desc")],
+            sort_by=[SortBy(field="created_at", direction="desc")],
         )
     )
     assert len(versions.objs) == 2
@@ -2580,7 +2581,7 @@ def test_calls_query_sort_by_status(client):
     calls_asc = list(
         client.get_calls(
             query=query,
-            sort_by=[tsi.SortBy(field="summary.weave.status", direction="asc")],
+            sort_by=[SortBy(field="summary.weave.status", direction="asc")],
         )
     )
 
@@ -2597,7 +2598,7 @@ def test_calls_query_sort_by_status(client):
     calls_desc = list(
         client.get_calls(
             query=query,
-            sort_by=[tsi.SortBy(field="summary.weave.status", direction="desc")],
+            sort_by=[SortBy(field="summary.weave.status", direction="desc")],
         )
     )
 
@@ -2645,7 +2646,7 @@ def test_calls_query_sort_by_latency(client):
     calls_asc = list(
         client.get_calls(
             query=query,
-            sort_by=[tsi.SortBy(field="summary.weave.latency_ms", direction="asc")],
+            sort_by=[SortBy(field="summary.weave.latency_ms", direction="asc")],
         )
     )
 
@@ -2659,7 +2660,7 @@ def test_calls_query_sort_by_latency(client):
     calls_desc = list(
         client.get_calls(
             query=query,
-            sort_by=[tsi.SortBy(field="summary.weave.latency_ms", direction="desc")],
+            sort_by=[SortBy(field="summary.weave.latency_ms", direction="desc")],
         )
     )
 
@@ -2771,7 +2772,7 @@ def test_calls_filter_by_latency(client):
     # Verify asc order
     sorted_calls = client.get_calls(
         query=tsi.Query(**base_query),
-        sort_by=[tsi.SortBy(field="summary.weave.latency_ms", direction="asc")],
+        sort_by=[SortBy(field="summary.weave.latency_ms", direction="asc")],
     )
     assert sorted_calls[0].id == fast_call.id  # Fast call
     assert sorted_calls[1].id == medium_call.id  # Medium call
@@ -2780,7 +2781,7 @@ def test_calls_filter_by_latency(client):
     # Verify desc order
     sorted_calls = client.get_calls(
         query=tsi.Query(**base_query),
-        sort_by=[tsi.SortBy(field="summary.weave.latency_ms", direction="desc")],
+        sort_by=[SortBy(field="summary.weave.latency_ms", direction="desc")],
     )
     assert sorted_calls[0].id == slow_call.id  # Slow call
     assert sorted_calls[1].id == medium_call.id  # Medium call
@@ -2933,7 +2934,7 @@ def test_calls_query_sort_by_display_name_prioritized(client):
     )
     calls = client.get_calls(
         query=query,
-        sort_by=[tsi.SortBy(field="summary.weave.trace_name", direction="asc")],
+        sort_by=[SortBy(field="summary.weave.trace_name", direction="asc")],
     )
     call_list = list(calls)
 
@@ -2951,7 +2952,7 @@ def test_calls_query_sort_by_display_name_prioritized(client):
     # Sort by trace_name (descending)
     calls = client.get_calls(
         query=query,
-        sort_by=[tsi.SortBy(field="summary.weave.trace_name", direction="desc")],
+        sort_by=[SortBy(field="summary.weave.trace_name", direction="desc")],
     )
     call_list = list(calls)
 
