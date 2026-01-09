@@ -212,14 +212,13 @@ def setup_dunder_weave_dict(op: Op, d: WeaveKwargs | None = None) -> WeaveKwargs
     res: dict[str, Any] = {}
     if d is not None:
         res = cast(dict[str, Any], d)
-    res.setdefault("attributes", defaultdict(dict))
+    weave_dict = res.setdefault("attributes", defaultdict(dict)).setdefault("weave", {})
     res.setdefault("display_name", None)
 
-    # Set kind and color from op
     if op.kind:
-        _set_kind_on_weave_dict(cast(WeaveKwargs, res), op.kind)
+        weave_dict["kind"] = op.kind
     if op.color:
-        _set_color_on_weave_dict(cast(WeaveKwargs, res), op.color)
+        weave_dict["color"] = op.color
 
     return cast(WeaveKwargs, res)
 
@@ -401,18 +400,6 @@ def _set_python_function_type_on_weave_dict(
         .setdefault("python", {})
     )
     weave_dict["type"] = type_str
-
-
-def _set_kind_on_weave_dict(__weave: WeaveKwargs, kind: str) -> None:
-    """Sets the op kind (e.g., 'tool') on the __weave dict attributes."""
-    weave_dict = __weave.setdefault("attributes", {}).setdefault("weave", {})
-    weave_dict["kind"] = kind
-
-
-def _set_color_on_weave_dict(__weave: WeaveKwargs, color: str) -> None:
-    """Sets the op color (e.g., 'blue') on the __weave dict attributes."""
-    weave_dict = __weave.setdefault("attributes", {}).setdefault("weave", {})
-    weave_dict["color"] = color
 
 
 def _call_sync_func(
