@@ -48,10 +48,10 @@ from weave.trace.op_protocol import (
     FinishCallbackType,
     OnFinishHandlerType,
     OnInputHandlerType,
+    OnOutputHandlerType,
     Op,
     OpColor,
     OpKind,
-    OnOutputHandlerType,
     PostprocessInputsFunc,
     PostprocessOutputFunc,
     ProcessedInputs,
@@ -199,13 +199,28 @@ class OpKwargs(TypedDict, total=False):
     color: OpColor | None
 
 
-def setup_dunder_weave_dict(d: WeaveKwargs | None = None) -> WeaveKwargs:
-    """Sets up a __weave dict used to pass WeaveKwargs to ops."""
+def setup_dunder_weave_dict(op: Op, d: WeaveKwargs | None = None) -> WeaveKwargs:
+    """Sets up a __weave dict used to pass WeaveKwargs to ops.
+
+    Args:
+        d: Optional existing WeaveKwargs dict to update.
+        op: Op to extract kind and color from.
+
+    Returns:
+        WeaveKwargs dict with attributes, display_name, and optionally kind/color set.
+    """
     res: dict[str, Any] = {}
     if d is not None:
         res = cast(dict[str, Any], d)
     res.setdefault("attributes", defaultdict(dict))
     res.setdefault("display_name", None)
+
+    # Set kind and color from op
+    if op.kind:
+        _set_kind_on_weave_dict(cast(WeaveKwargs, res), op.kind)
+    if op.color:
+        _set_color_on_weave_dict(cast(WeaveKwargs, res), op.color)
+
     return cast(WeaveKwargs, res)
 
 
@@ -426,12 +441,8 @@ def _call_sync_func(
             call.output = res
             return res, call
 
-    __weave = setup_dunder_weave_dict(__weave)
+    __weave = setup_dunder_weave_dict(op, __weave)
     _set_python_function_type_on_weave_dict(__weave, "function")
-    if op.kind:
-        _set_kind_on_weave_dict(__weave, op.kind)
-    if op.color:
-        _set_color_on_weave_dict(__weave, op.color)
 
     # Proceed with tracing. Note that we don't check the sample rate here.
     # Only root calls get sampling applied.
@@ -575,12 +586,8 @@ async def _call_async_func(
             call.output = res
             return res, call
 
-    __weave = setup_dunder_weave_dict(__weave)
+    __weave = setup_dunder_weave_dict(op, __weave)
     _set_python_function_type_on_weave_dict(__weave, "async_function")
-    if op.kind:
-        _set_kind_on_weave_dict(__weave, op.kind)
-    if op.color:
-        _set_color_on_weave_dict(__weave, op.color)
 
     # Proceed with tracing
     try:
@@ -710,12 +717,8 @@ def _call_sync_gen(
             call.output = gen
             return gen, call
 
-    __weave = setup_dunder_weave_dict(__weave)
+    __weave = setup_dunder_weave_dict(op, __weave)
     _set_python_function_type_on_weave_dict(__weave, "generator")
-    if op.kind:
-        _set_kind_on_weave_dict(__weave, op.kind)
-    if op.color:
-        _set_color_on_weave_dict(__weave, op.color)
 
     # Proceed with tracing
     try:
@@ -924,12 +927,8 @@ async def _call_async_gen(
             call.output = gen
             return gen, call
 
-    __weave = setup_dunder_weave_dict(__weave)
+    __weave = setup_dunder_weave_dict(op, __weave)
     _set_python_function_type_on_weave_dict(__weave, "async_generator")
-    if op.kind:
-        _set_kind_on_weave_dict(__weave, op.kind)
-    if op.color:
-        _set_color_on_weave_dict(__weave, op.color)
 
     # Proceed with tracing
     try:
