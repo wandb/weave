@@ -354,7 +354,9 @@ def call_start_delay() -> float:
     """Returns the delay in seconds before sending a call start."""
     delay = _optional_float("call_start_delay")
     if delay is None:
-        return 5.0
+        # HACK: really make sure we delay sending longrunning call starts while
+        # update performance remains sub-par
+        return 15.0
     return delay
 
 
