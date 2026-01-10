@@ -206,6 +206,20 @@ class UserSettings(BaseModel):
     Can be overridden with the environment variable `WEAVE_USE_STAINLESS_SERVER`
     """
 
+    call_start_delay: float = 5.0
+    """
+    Sets the delay in seconds before sending a call start. Defaults to 5 seconds.
+    This allows the client to group call starts and ends together.
+
+    If set to 0, call starts are sent immediately.
+    If set to -1, call starts are only sent when the call ends.
+
+    Note: The maximum effective delay is capped by MAX_CALL_START_DELAY in
+    weave.trace.weave_client (currently 10 minutes).
+
+    Can be overridden with the environment variable `WEAVE_CALL_START_DELAY`
+    """
+
     model_config = ConfigDict(extra="forbid")
     _is_first_apply: bool = PrivateAttr(True)
 
@@ -334,6 +348,16 @@ def http_timeout() -> float:
 def should_use_stainless_server() -> bool:
     """Returns whether the stainless-generated HTTP client should be used."""
     return _should("use_stainless_server")
+
+
+def call_start_delay() -> float:
+    """Returns the delay in seconds before sending a call start."""
+    delay = _optional_float("call_start_delay")
+    if delay is None:
+        # HACK: really make sure we delay sending longrunning call starts while
+        # update performance remains sub-par
+        return 15.0
+    return delay
 
 
 def parse_and_apply_settings(

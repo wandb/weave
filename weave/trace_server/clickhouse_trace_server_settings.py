@@ -21,6 +21,9 @@ CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT = 3.5 * 1024 * 1024  # 3.5 MiB
 CLICKHOUSE_MAX_FEEDBACK_PAYLOAD_SIZE = 1 * 1024 * 1024  # 1 MiB
 ENTITY_TOO_LARGE_PAYLOAD = '{"_weave": {"error":"<EXCEEDS_LIMITS>"}}'
 
+# Clickhouse calls complete sane max settings
+MAX_BATCH_UPDATE_CALLS = 100
+
 
 # Table naming conventions for distributed mode
 # In distributed mode, local tables use this suffix (e.g., "calls_complete_local")
@@ -63,7 +66,8 @@ CLICKHOUSE_ASYNC_INSERT_SETTINGS = {
     # Max number of queries to batch together, this is the default
     "async_insert_max_query_number": 450,
     # Max time between buffer flushes
-    "async_insert_busy_timeout_ms": 1000,
+    "async_insert_busy_timeout_ms": wf_env.wf_clickhouse_async_insert_flush_interval()
+    or 1000,
 }
 
 

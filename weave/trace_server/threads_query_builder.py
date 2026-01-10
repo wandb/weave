@@ -2,11 +2,13 @@ import datetime
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.orm import ParamBuilder
+from weave.trace_server.project_version.types import ReadTable
 
 
 def make_threads_query(
     project_id: str,
     pb: ParamBuilder,
+    read_table: ReadTable,
     *,
     limit: int | None = None,
     offset: int | None = None,
@@ -85,7 +87,8 @@ def make_threads_query(
     #   - WHERE: No additional filtering needed
     #   - HAVING: Filter out NULL/empty thread_ids
     where_thread_filter_clause = ""
-    having_thread_filter_clause = ""
+    having_thread_filter_clause_merged = ""
+    having_thread_filter_clause_complete = ""
 
     if thread_ids is not None and len(thread_ids) > 0:
         # Create parameterized IN clause for multiple thread IDs
@@ -101,14 +104,18 @@ def make_threads_query(
             f"AND (thread_id IS NULL OR thread_id IN {thread_ids_in_clause})"
         )
 
-        # HAVING: Filter final aggregated thread_id to specified thread_ids only
-        having_thread_filter_clause = (
-            f"AND aggregated_thread_id IN {thread_ids_in_clause}"
+        # HAVING: Filter final thread_id to specified thread_ids only
+        having_thread_filter_clause_merged = (
+            f"aggregated_thread_id IN {thread_ids_in_clause}"
         )
+        having_thread_filter_clause_complete = f"thread_id IN {thread_ids_in_clause}"
     else:
         # Filter out NULL and empty thread_ids when no specific thread_ids are requested
-        having_thread_filter_clause = (
-            "AND aggregated_thread_id IS NOT NULL AND aggregated_thread_id != ''"
+        having_thread_filter_clause_merged = (
+            "aggregated_thread_id IS NOT NULL AND aggregated_thread_id != ''"
+        )
+        having_thread_filter_clause_complete = (
+            "thread_id IS NOT NULL AND thread_id != ''"
         )
 
     # Two-level aggregation to handle ClickHouse materialized view partial merges
@@ -133,36 +140,61 @@ def make_threads_query(
     # - call_duration: Calculate call duration in milliseconds
     # - Group by call id to merge partial rows
     # - Filter to turn calls only
-    query = f"""
-    SELECT
-        aggregated_thread_id AS thread_id,
-        COUNT(*) AS turn_count,
-        min(call_start_time) AS start_time,
-        max(call_end_time) AS last_updated,
-        argMin(id, call_start_time) AS first_turn_id,
-        argMax(id, call_end_time) AS last_turn_id,
-        quantile(0.5)(call_duration) AS p50_turn_duration_ms,
-        quantile(0.99)(call_duration) AS p99_turn_duration_ms
-    FROM (
+    if read_table == ReadTable.CALLS_MERGED:
+        query = f"""
         SELECT
-            id,
-            any(thread_id) AS aggregated_thread_id,
-            min(started_at) AS call_start_time,
-            max(ended_at) AS call_end_time,
-            CASE
-                WHEN call_end_time IS NOT NULL AND call_start_time IS NOT NULL
-                THEN dateDiff('millisecond', call_start_time, call_end_time)
-                ELSE NULL
-            END AS call_duration
-        FROM calls_merged
+            aggregated_thread_id AS thread_id,
+            COUNT(*) AS turn_count,
+            min(call_start_time) AS start_time,
+            max(call_end_time) AS last_updated,
+            argMin(id, call_start_time) AS first_turn_id,
+            argMax(id, call_end_time) AS last_turn_id,
+            quantile(0.5)(call_duration) AS p50_turn_duration_ms,
+            quantile(0.99)(call_duration) AS p99_turn_duration_ms
+        FROM (
+            SELECT
+                id,
+                any(thread_id) AS aggregated_thread_id,
+                min(started_at) AS call_start_time,
+                max(ended_at) AS call_end_time,
+                CASE
+                    WHEN call_end_time IS NOT NULL AND call_start_time IS NOT NULL
+                    THEN dateDiff('millisecond', call_start_time, call_end_time)
+                    ELSE NULL
+                END AS call_duration
+            FROM calls_merged
+            WHERE project_id = {{{project_id_param}: String}}
+                {sortable_datetime_filter_clause}
+                {where_thread_filter_clause}
+            GROUP BY (project_id, id)
+            HAVING id = any(turn_id) AND {having_thread_filter_clause_merged}
+        ) AS properly_merged_calls
+        GROUP BY aggregated_thread_id
+        """
+    else:
+        # CALLS_COMPLETE doesn't need two-level aggregation since it doesn't have partial merges
+        # Use actual column names from the table
+        # Note: For calls_complete, we filter turn calls in WHERE (id = turn_id) not HAVING,
+        # since id is not in GROUP BY or an aggregate function
+        query = f"""
+        SELECT
+            thread_id AS thread_id,
+            COUNT(*) AS turn_count,
+            min(started_at) AS start_time,
+            max(ended_at) AS last_updated,
+            argMin(id, started_at) AS first_turn_id,
+            argMax(id, ended_at) AS last_turn_id,
+            quantile(0.5)(dateDiff('millisecond', started_at, ended_at)) AS p50_turn_duration_ms,
+            quantile(0.99)(dateDiff('millisecond', started_at, ended_at)) AS p99_turn_duration_ms
+        FROM
+            calls_complete
         WHERE project_id = {{{project_id_param}: String}}
+            AND id = turn_id
             {sortable_datetime_filter_clause}
             {where_thread_filter_clause}
-        GROUP BY (project_id, id)
-        HAVING id = any(turn_id) {having_thread_filter_clause}
-    ) AS properly_merged_calls
-    GROUP BY aggregated_thread_id
-    """
+        GROUP BY thread_id
+        HAVING {having_thread_filter_clause_complete}
+        """
 
     # Add sorting
     if sort_by:

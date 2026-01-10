@@ -111,9 +111,11 @@ def test_version_resolution_by_table_duel_write(client, trace_server):
         resolver.resolve_read_table(merged_proj, ch_server.ch_client)
         == ReadTable.CALLS_MERGED
     )
+    # Edge case: COMPLETE_ONLY shouldn't happen in dual-write mode, but if it does
+    # read from where the data actually is (calls_complete)
     assert (
         resolver.resolve_read_table(complete_proj, ch_server.ch_client)
-        == ReadTable.CALLS_MERGED
+        == ReadTable.CALLS_COMPLETE
     )
     assert (
         resolver.resolve_read_table(both_proj, ch_server.ch_client)
@@ -253,8 +255,13 @@ def test_project_version_mode_from_env():
         test_cases = [
             ("off", CallsStorageServerMode.OFF),
             ("force_legacy", CallsStorageServerMode.FORCE_LEGACY),
+            ("dual_write_read_merged", CallsStorageServerMode.DUAL_WRITE_READ_MERGED),
+            (
+                "dual_write_read_complete",
+                CallsStorageServerMode.DUAL_WRITE_READ_COMPLETE,
+            ),
             ("auto", CallsStorageServerMode.AUTO),
-            ("invalid_mode", CallsStorageServerMode.FORCE_LEGACY),
+            ("invalid_mode", CallsStorageServerMode.DUAL_WRITE_READ_MERGED),
         ]
 
         for env_val, expected_mode in test_cases:
@@ -264,8 +271,10 @@ def test_project_version_mode_from_env():
 
         if "PROJECT_VERSION_MODE" in os.environ:
             del os.environ["PROJECT_VERSION_MODE"]
+
+        # default
         mode = CallsStorageServerMode.from_env()
-        assert mode == CallsStorageServerMode.FORCE_LEGACY
+        assert mode == CallsStorageServerMode.DUAL_WRITE_READ_MERGED
 
     finally:
         if original_value is not None:

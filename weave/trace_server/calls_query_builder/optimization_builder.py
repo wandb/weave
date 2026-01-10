@@ -188,11 +188,9 @@ class QueryOptimizationProcessor(ABC):
             result: The SQL condition to finalize
 
         Returns:
-            The finalized SQL condition or None if no condition
+            The finalized SQL condition without AND prefix (will be added by caller)
         """
-        if result:
-            return f"AND {result}"
-        return None
+        return result
 
 
 class HeavyFieldOptimizationProcessor(QueryOptimizationProcessor):

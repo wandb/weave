@@ -63,6 +63,19 @@ def pytest_addoption(parser):
             default="remote",
             help="Specify the remote HTTP trace server implementation: remote or stainless",
         )
+        parser.addoption(
+            "--calls-storage-mode",
+            action="store",
+            default="force_legacy",
+            choices=[
+                "auto",
+                "force_legacy",
+                "dual_write_read_merged",
+                "dual_write_read_complete",
+                "off",
+            ],
+            help="Storage mode for calls: matches CallsStorageServerMode enum values",
+        )
     except ValueError:
         pass
 
@@ -106,6 +119,16 @@ def get_remote_http_trace_server_flag(request):
         str: Either 'remote' for RemoteHTTPTraceServer or 'stainless' for StainlessRemoteHTTPTraceServer
     """
     return request.config.getoption("--remote-http-trace-server")
+
+
+def get_calls_storage_mode(request):
+    """Get the calls storage mode to use.
+
+    Returns:
+        str: One of the CallsStorageServerMode enum values:
+            'auto', 'force_legacy', 'dual_write_read_merged', 'dual_write_read_complete', 'off'
+    """
+    return request.config.getoption("--calls-storage-mode")
 
 
 def _get_worker_db_suffix(request) -> str:

@@ -10,7 +10,11 @@ from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcesso
 from weave.utils.retry import _is_retryable_exception
 
 if TYPE_CHECKING:
-    from weave.trace_server_bindings.models import EndBatchItem, StartBatchItem
+    from weave.trace_server_bindings.models import (
+        CompleteBatchItem,
+        EndBatchItem,
+        StartBatchItem,
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -29,12 +33,14 @@ BatchProcessor = AsyncBatchProcessor
 
 
 def log_dropped_call_batch(
-    batch: list[Union["StartBatchItem", "EndBatchItem"]], e: Exception
+    batch: list[Union["StartBatchItem", "EndBatchItem", "CompleteBatchItem"]],
+    e: Exception,
 ) -> None:
     """Log details about a dropped call batch for debugging purposes."""
     logger.error(f"Error sending batch of {len(batch)} call events to server")
     dropped_start_ids = []
     dropped_end_ids = []
+    dropped_complete_ids = []
     for item in batch:
         # Use string comparison to avoid circular imports
         if hasattr(item, "req") and hasattr(item.req, "start"):
@@ -43,10 +49,14 @@ def log_dropped_call_batch(
         elif hasattr(item, "req") and hasattr(item.req, "end"):
             # For end items, access the end request
             dropped_end_ids.append(item.req.end.id)
+        elif hasattr(item, "req") and hasattr(item.req, "complete"):
+            dropped_complete_ids.append(item.req.complete.id)
     if dropped_start_ids:
         logger.error(f"dropped call start ids: {dropped_start_ids}")
     if dropped_end_ids:
         logger.error(f"dropped call end ids: {dropped_end_ids}")
+    if dropped_complete_ids:
+        logger.error(f"dropped call complete ids: {dropped_complete_ids}")
     response = getattr(e, "response", None)
     if isinstance(e, (httpx.HTTPError, httpx.HTTPStatusError)) and response:
         logger.error(f"status code: {response.status_code}")

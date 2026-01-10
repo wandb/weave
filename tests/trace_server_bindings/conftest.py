@@ -18,7 +18,7 @@ from weave.trace_server_bindings.remote_http_trace_server import (
 
 def generate_start(
     id: str | None = None,
-    project_id: str = "test",
+    project_id: str = "test_entity/test",
 ) -> tsi.StartedCallSchemaForInsert:
     """Generate a test StartedCallSchemaForInsert."""
     return tsi.StartedCallSchemaForInsert(
@@ -35,7 +35,7 @@ def generate_start(
 
 def generate_end(
     id: str | None = None,
-    project_id: str = "test",
+    project_id: str = "test_entity/test",
 ) -> tsi.EndedCallSchemaForInsert:
     """Generate a test EndedCallSchemaForInsert."""
     return tsi.EndedCallSchemaForInsert(
@@ -51,9 +51,12 @@ def generate_end(
 
 def generate_call_start_end_pair(
     id: str | None = None,
-    project_id: str = "test",
+    project_id: str = "test_entity/test",
 ) -> tuple[tsi.CallStartReq, tsi.CallEndReq]:
     """Generate a matching pair of CallStartReq and CallEndReq for testing."""
+    # Generate an ID if not provided to ensure start and end have matching IDs
+    if id is None:
+        id = generate_id()
     start = generate_start(id, project_id)
     end = generate_end(id, project_id)
     return tsi.CallStartReq(start=start), tsi.CallEndReq(end=end)
@@ -92,9 +95,12 @@ def server(request, server_class):
     server_ = server_class("http://example.com", should_batch=True)
 
     if request.param == "normal":
-        server_._send_batch_to_server = MagicMock()
+        server_._send_calls_start_batch_to_server = MagicMock()
+        server_._send_calls_end_batch_to_server = MagicMock()
     elif request.param == "small_limit":
         server_.remote_request_bytes_limit = 1024  # 1kb
+        server_._send_calls_start_batch_to_server = MagicMock()
+        server_._send_calls_end_batch_to_server = MagicMock()
         server_._send_batch_to_server = MagicMock()
     elif request.param == "fast_retrying":
         fast_retry = tenacity.retry(
@@ -102,11 +108,16 @@ def server(request, server_class):
             stop=tenacity.stop_after_attempt(2),
             reraise=True,
         )
-        unwrapped_send_batch_to_server = MethodType(
-            server_._send_batch_to_server.__wrapped__,  # type: ignore[attr-defined]
+        unwrapped_start = MethodType(
+            server_._send_calls_start_batch_to_server.__wrapped__,  # type: ignore[attr-defined]
             server_,
         )
-        server_._send_batch_to_server = fast_retry(unwrapped_send_batch_to_server)
+        unwrapped_end = MethodType(
+            server_._send_calls_end_batch_to_server.__wrapped__,  # type: ignore[attr-defined]
+            server_,
+        )
+        server_._send_calls_start_batch_to_server = fast_retry(unwrapped_start)
+        server_._send_calls_end_batch_to_server = fast_retry(unwrapped_end)
 
     yield server_
 

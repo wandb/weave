@@ -46,6 +46,9 @@ def test_clickhouse_batching():
     # Mock the insert method to track calls
     mock_ch_client.insert.return_value = MagicMock()
 
+    # Mock the query method to return empty result (project has no data yet - EMPTY residence)
+    mock_ch_client.query.return_value.result_rows = []
+
     # Create a ClickHouseTraceServer instance and patch _mint_client
     with patch.object(
         ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
