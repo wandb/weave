@@ -7,6 +7,7 @@ import httpx
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
+from weave.utils.retry import _is_retryable_exception
 
 if TYPE_CHECKING:
     from weave.trace_server_bindings.models import EndBatchItem, StartBatchItem
@@ -76,6 +77,33 @@ def log_dropped_feedback_batch(
         logger.error(f"error: {e}")
 
 
+def _split_and_process_halves(
+    batch: list[T],
+    *,
+    batch_name: str,
+    remote_request_bytes_limit: int,
+    send_batch_fn: Callable[[bytes], None],
+    processor_obj: BatchProcessor[T] | None,
+    get_item_id_fn: Callable[[T], str] | None,
+    log_dropped_fn: Callable[[list[T], Exception], None] | None,
+    encode_batch_fn: Callable[[list[T]], bytes],
+) -> None:
+    """Split a batch in half and recursively process each half."""
+    split_idx = len(batch) // 2
+    for half in (batch[:split_idx], batch[split_idx:]):
+        process_batch_with_retry(
+            half,
+            batch_name=batch_name,
+            remote_request_bytes_limit=remote_request_bytes_limit,
+            send_batch_fn=send_batch_fn,
+            processor_obj=processor_obj,
+            should_update_batch_size=False,
+            get_item_id_fn=get_item_id_fn,
+            log_dropped_fn=log_dropped_fn,
+            encode_batch_fn=encode_batch_fn,
+        )
+
+
 def process_batch_with_retry(
     batch: list[T],
     *,
@@ -113,43 +141,28 @@ def process_batch_with_retry(
     encoded_data = encode_batch_fn(batch)
     encoded_bytes = len(encoded_data)
 
-    # Update target batch size (this allows us to have a dynamic batch size based on the size of the data being sent)
+    # Update target batch size dynamically based on actual data size
     estimated_bytes_per_item = encoded_bytes / len(batch)
     if should_update_batch_size and estimated_bytes_per_item > 0:
         target_batch_size = int(remote_request_bytes_limit // estimated_bytes_per_item)
         if processor_obj:
             processor_obj.max_batch_size = max(1, target_batch_size)
 
-    # If the batch is too big, split it in half and process each half
+    # Pre-send split: if batch exceeds limit, split and process halves
     if encoded_bytes > remote_request_bytes_limit and len(batch) > 1:
-        split_idx = int(len(batch) // 2)
-        # Recursively process each half with batch size updates disabled
-        process_batch_with_retry(
-            batch[:split_idx],
+        _split_and_process_halves(
+            batch,
             batch_name=batch_name,
             remote_request_bytes_limit=remote_request_bytes_limit,
             send_batch_fn=send_batch_fn,
             processor_obj=processor_obj,
-            should_update_batch_size=False,
-            get_item_id_fn=get_item_id_fn,
-            log_dropped_fn=log_dropped_fn,
-            encode_batch_fn=encode_batch_fn,
-        )
-        process_batch_with_retry(
-            batch[split_idx:],
-            batch_name=batch_name,
-            remote_request_bytes_limit=remote_request_bytes_limit,
-            send_batch_fn=send_batch_fn,
-            processor_obj=processor_obj,
-            should_update_batch_size=False,
             get_item_id_fn=get_item_id_fn,
             log_dropped_fn=log_dropped_fn,
             encode_batch_fn=encode_batch_fn,
         )
         return
 
-    # If a single item is over the configured limit we should log a warning
-    # Bytes limit can change based on env so we don't want to actually error here
+    # Warn if single item exceeds limit (can't split further)
     if encoded_bytes > remote_request_bytes_limit and len(batch) == 1:
         logger.warning(
             f"Single {batch_name} size ({encoded_bytes} bytes) may be too large to send."
@@ -159,7 +172,22 @@ def process_batch_with_retry(
     try:
         send_batch_fn(encoded_data)
     except Exception as e:
-        from weave.utils.retry import _is_retryable_exception
+        # Handle 413 specially: server rejected as too large, split and retry
+        if _is_413_error(e) and len(batch) > 1:
+            logger.warning(
+                f"Server returned 413 for {batch_name} batch of {len(batch)} items, splitting and retrying"
+            )
+            _split_and_process_halves(
+                batch,
+                batch_name=batch_name,
+                remote_request_bytes_limit=remote_request_bytes_limit,
+                send_batch_fn=send_batch_fn,
+                processor_obj=processor_obj,
+                get_item_id_fn=get_item_id_fn,
+                log_dropped_fn=log_dropped_fn,
+                encode_batch_fn=encode_batch_fn,
+            )
+            return
 
         if not _is_retryable_exception(e):
             if log_dropped_fn:
@@ -170,16 +198,13 @@ def process_batch_with_retry(
                     exc_info=True,
                 )
         else:
-            # Add items back to the queue for later processing, but only if the processor is still accepting work
+            # Add items back to the queue for later processing
             logger.warning(
                 f"{batch_name.capitalize()} batch failed after max retries, requeuing batch with {len(batch)=} for later processing",
             )
 
-            # only if debug mode
             if logger.isEnabledFor(logging.DEBUG) and get_item_id_fn:
-                ids = []
-                for item in batch:
-                    ids.append(get_item_id_fn(item))
+                ids = [get_item_id_fn(item) for item in batch]
                 logger.debug(f"Requeuing {batch_name} batch with {ids=}")
 
             # Only requeue if the processor is still accepting work
@@ -286,3 +311,12 @@ def check_endpoint_exists(
     if endpoint_exists:
         _ENDPOINT_CACHE.add(cache_key)
     return endpoint_exists
+
+
+def _is_413_error(e: Exception) -> bool:
+    """Check if an exception is an HTTP 413 (Payload Too Large) error."""
+    return (
+        isinstance(e, httpx.HTTPStatusError)
+        and e.response is not None
+        and e.response.status_code == 413
+    )
