@@ -78,25 +78,25 @@ library_cases = [
             "_type": "Evaluation",
             "name": None,
             "description": None,
-            "dataset": "weave:///shawn/test-project/object/Dataset:N0VKaX8wr9kF9QQzM7mSQz3yKrJJjTiJi4c9Bt7RSTA",
+            "dataset": "weave:///shawn/test-project/object/Dataset:acPomFUR8YXQnrXywT8Y9xrZZQeBk07GzOGCFzB7KO0",
             "scorers": [
-                "weave:///shawn/test-project/object/MyScorer:ILpCvdAsCLLLt9wU28MU9ugSScTkg7L3XX6PlUgFvlg",
-                "weave:///shawn/test-project/object/LLMAsAJudgeScorer:RRyrCyMJoOYgXzeNP6l4Xq3ZkKTRv9TGM57YyuaizOw",
+                "weave:///shawn/test-project/object/MyScorer:YZQwofwInVNL3M3cR6IuymuMYH6riXSg30fKWqbxEfo",
+                "weave:///shawn/test-project/object/LLMAsAJudgeScorer:DT52wFsZQ4XSuOjZ5nYQmjLounrTB5twFg08EGpgVTM",
             ],
             "preprocess_model_input": None,
             "trials": 1,
             "metadata": None,
             "evaluation_name": None,
-            "evaluate": "weave:///shawn/test-project/op/Evaluation.evaluate:XbyuZNBxQ90Ur9tjMI6Cj8CNXnisWemlzU8etRYeFsI",
-            "predict_and_score": "weave:///shawn/test-project/op/Evaluation.predict_and_score:NrwneWUrXaCdi9BUqmufH4dg1U1tvHFGPK5dZh2CcPQ",
-            "summarize": "weave:///shawn/test-project/op/Evaluation.summarize:eq6QbaZJYKZlbaCR95PvaoLDomTryBhb5uajqpIX8u0",
+            "evaluate": "weave:///shawn/test-project/op/Evaluation.evaluate:JepEfgIjiFYe0sDJx6SE3hCwjMS48ziBMNwJXuZPQbk",
+            "predict_and_score": "weave:///shawn/test-project/op/Evaluation.predict_and_score:jd4m1EJuNnrGmHeiGY1T2CUngsk9x7knOgRJ2sYpU2g",
+            "summarize": "weave:///shawn/test-project/op/Evaluation.summarize:Y0s05NYTuqlmXieehHPogfq2JXKl4Y1Xgy8CKumdmjI",
             "_class_name": "Evaluation",
             "_bases": ["Object", "BaseModel"],
         },
         exp_objects=[
             {
                 "object_id": "Dataset",
-                "digest": "N0VKaX8wr9kF9QQzM7mSQz3yKrJJjTiJi4c9Bt7RSTA",
+                "digest": "acPomFUR8YXQnrXywT8Y9xrZZQeBk07GzOGCFzB7KO0",
                 "exp_val": {
                     "_type": "Dataset",
                     "name": None,
@@ -108,7 +108,7 @@ library_cases = [
             },
             {
                 "object_id": "Evaluation.evaluate",
-                "digest": "XbyuZNBxQ90Ur9tjMI6Cj8CNXnisWemlzU8etRYeFsI",
+                "digest": "JepEfgIjiFYe0sDJx6SE3hCwjMS48ziBMNwJXuZPQbk",
                 "exp_val": {
                     "_type": "CustomWeaveType",
                     "weave_type": {"type": "Op"},
@@ -117,7 +117,7 @@ library_cases = [
             },
             {
                 "object_id": "Evaluation.predict_and_score",
-                "digest": "NrwneWUrXaCdi9BUqmufH4dg1U1tvHFGPK5dZh2CcPQ",
+                "digest": "jd4m1EJuNnrGmHeiGY1T2CUngsk9x7knOgRJ2sYpU2g",
                 "exp_val": {
                     "_type": "CustomWeaveType",
                     "weave_type": {"type": "Op"},
@@ -126,37 +126,37 @@ library_cases = [
             },
             {
                 "object_id": "MyScorer",
-                "digest": "ILpCvdAsCLLLt9wU28MU9ugSScTkg7L3XX6PlUgFvlg",
+                "digest": "YZQwofwInVNL3M3cR6IuymuMYH6riXSg30fKWqbxEfo",
                 "exp_val": {
                     "_type": "MyScorer",
                     "name": None,
                     "description": None,
                     "column_map": None,
-                    "score": "weave:///shawn/test-project/op/MyScorer.score:BE7Pf2XsllJGfbeffAcYiZa2zRAD24oytT9U9iqIn4o",
-                    "summarize": "weave:///shawn/test-project/op/Scorer.summarize:bWwaybJxxIBLMGZp7bzeKrmjhLNCp2DYrubnU2Ry9xQ",
+                    "score": "weave:///shawn/test-project/op/MyScorer.score:lwLZn8tYQ025uYUv8SPwa1TlVfWSbzVSyw4aDynz1yQ",
+                    "summarize": "weave:///shawn/test-project/op/Scorer.summarize:LYcmOkxmx4hRYtJ65hnd4uy7jhdYJCnhYXys5aakzfo",
                     "_class_name": "MyScorer",
                     "_bases": ["Scorer", "Object", "BaseModel"],
                 },
             },
             {
                 "object_id": "LLMAsAJudgeScorer",
-                "digest": "RRyrCyMJoOYgXzeNP6l4Xq3ZkKTRv9TGM57YyuaizOw",
+                "digest": "DT52wFsZQ4XSuOjZ5nYQmjLounrTB5twFg08EGpgVTM",
                 "exp_val": {
                     "_type": "LLMAsAJudgeScorer",
                     "name": None,
                     "description": None,
                     "column_map": None,
-                    "model": "weave:///shawn/test-project/object/LLMStructuredCompletionModel:VUqRnYmuvNhu3zgfDb9hnZhLRFM1vKKI1WEpw3bsViE",
+                    "model": "weave:///shawn/test-project/object/LLMStructuredCompletionModel:LujnCgt2nd7N7BrENYXEI8dHjlzmoQ2C5XdESuszGSY",
                     "scoring_prompt": "Here are the inputs: {inputs}. Here is the output: {output}. Is the output correct?",
-                    "score": "weave:///shawn/test-project/op/LLMAsAJudgeScorer.score:OIgGBpG1Xnwppf494LDa4mC2AEEu5tFePiWkX3N6B1s",
-                    "summarize": "weave:///shawn/test-project/op/Scorer.summarize:bWwaybJxxIBLMGZp7bzeKrmjhLNCp2DYrubnU2Ry9xQ",
+                    "score": "weave:///shawn/test-project/op/LLMAsAJudgeScorer.score:2qBMCi2NKvPsWtfe10WxusvHuQSCeX3khGq7KUMbNpc",
+                    "summarize": "weave:///shawn/test-project/op/Scorer.summarize:LYcmOkxmx4hRYtJ65hnd4uy7jhdYJCnhYXys5aakzfo",
                     "_class_name": "LLMAsAJudgeScorer",
                     "_bases": ["Scorer", "Object", "BaseModel"],
                 },
             },
             {
                 "object_id": "LLMAsAJudgeScorer.score",
-                "digest": "OIgGBpG1Xnwppf494LDa4mC2AEEu5tFePiWkX3N6B1s",
+                "digest": "2qBMCi2NKvPsWtfe10WxusvHuQSCeX3khGq7KUMbNpc",
                 "exp_val": {
                     "_type": "CustomWeaveType",
                     "weave_type": {"type": "Op"},
@@ -165,7 +165,7 @@ library_cases = [
             },
             {
                 "object_id": "LLMStructuredCompletionModel",
-                "digest": "VUqRnYmuvNhu3zgfDb9hnZhLRFM1vKKI1WEpw3bsViE",
+                "digest": "LujnCgt2nd7N7BrENYXEI8dHjlzmoQ2C5XdESuszGSY",
                 "exp_val": {
                     "_type": "LLMStructuredCompletionModel",
                     "name": None,
@@ -198,14 +198,14 @@ library_cases = [
                         "_class_name": "LLMStructuredCompletionModelDefaultParams",
                         "_bases": ["BaseModel"],
                     },
-                    "predict": "weave:///shawn/test-project/op/LLMStructuredCompletionModel.predict:ili08oGwFsNX4Bn0fhZPvKpT9CfjSgNJVLegSJ2iGUk",
+                    "predict": "weave:///shawn/test-project/op/LLMStructuredCompletionModel.predict:D8Tc450nEd4JKoyD3w5cPnCujWCaXJqWVzlL57rZ6Yw",
                     "_class_name": "LLMStructuredCompletionModel",
                     "_bases": ["Model", "Object", "BaseModel"],
                 },
             },
             {
                 "object_id": "LLMStructuredCompletionModel.predict",
-                "digest": "ili08oGwFsNX4Bn0fhZPvKpT9CfjSgNJVLegSJ2iGUk",
+                "digest": "D8Tc450nEd4JKoyD3w5cPnCujWCaXJqWVzlL57rZ6Yw",
                 "exp_val": {
                     "_type": "CustomWeaveType",
                     "weave_type": {"type": "Op"},
@@ -214,7 +214,7 @@ library_cases = [
             },
             {
                 "object_id": "Evaluation.summarize",
-                "digest": "eq6QbaZJYKZlbaCR95PvaoLDomTryBhb5uajqpIX8u0",
+                "digest": "Y0s05NYTuqlmXieehHPogfq2JXKl4Y1Xgy8CKumdmjI",
                 "exp_val": {
                     "_type": "CustomWeaveType",
                     "weave_type": {"type": "Op"},
@@ -223,7 +223,7 @@ library_cases = [
             },
             {
                 "object_id": "MyScorer.score",
-                "digest": "BE7Pf2XsllJGfbeffAcYiZa2zRAD24oytT9U9iqIn4o",
+                "digest": "lwLZn8tYQ025uYUv8SPwa1TlVfWSbzVSyw4aDynz1yQ",
                 "exp_val": {
                     "_type": "CustomWeaveType",
                     "weave_type": {"type": "Op"},
@@ -232,7 +232,7 @@ library_cases = [
             },
             {
                 "object_id": "Scorer.summarize",
-                "digest": "bWwaybJxxIBLMGZp7bzeKrmjhLNCp2DYrubnU2Ry9xQ",
+                "digest": "LYcmOkxmx4hRYtJ65hnd4uy7jhdYJCnhYXys5aakzfo",
                 "exp_val": {
                     "_type": "CustomWeaveType",
                     "weave_type": {"type": "Op"},
@@ -284,25 +284,25 @@ library_cases = [
             "_type": "Evaluation",
             "name": None,
             "description": None,
-            "dataset": "weave:///shawn/test-project/object/Dataset:N0VKaX8wr9kF9QQzM7mSQz3yKrJJjTiJi4c9Bt7RSTA",
+            "dataset": "weave:///shawn/test-project/object/Dataset:acPomFUR8YXQnrXywT8Y9xrZZQeBk07GzOGCFzB7KO0",
             "scorers": [
-                "weave:///shawn/test-project/object/MyScorer:ILpCvdAsCLLLt9wU28MU9ugSScTkg7L3XX6PlUgFvlg",
-                "weave:///shawn/test-project/object/LLMAsAJudgeScorer:U3vlpg3CT6cuu0jcm3eFm5MyDxXvH0OCvrFax0VRY3w",
+                "weave:///shawn/test-project/object/MyScorer:YZQwofwInVNL3M3cR6IuymuMYH6riXSg30fKWqbxEfo",
+                "weave:///shawn/test-project/object/LLMAsAJudgeScorer:erL8bTkANuYOPLwm6Rj2QWMES8iYsvcZm7pAHswfLf8",
             ],
             "preprocess_model_input": None,
             "trials": 1,
             "metadata": None,
             "evaluation_name": None,
-            "evaluate": "weave:///shawn/test-project/op/Evaluation.evaluate:XbyuZNBxQ90Ur9tjMI6Cj8CNXnisWemlzU8etRYeFsI",
-            "predict_and_score": "weave:///shawn/test-project/op/Evaluation.predict_and_score:NrwneWUrXaCdi9BUqmufH4dg1U1tvHFGPK5dZh2CcPQ",
-            "summarize": "weave:///shawn/test-project/op/Evaluation.summarize:eq6QbaZJYKZlbaCR95PvaoLDomTryBhb5uajqpIX8u0",
+            "evaluate": "weave:///shawn/test-project/op/Evaluation.evaluate:JepEfgIjiFYe0sDJx6SE3hCwjMS48ziBMNwJXuZPQbk",
+            "predict_and_score": "weave:///shawn/test-project/op/Evaluation.predict_and_score:jd4m1EJuNnrGmHeiGY1T2CUngsk9x7knOgRJ2sYpU2g",
+            "summarize": "weave:///shawn/test-project/op/Evaluation.summarize:Y0s05NYTuqlmXieehHPogfq2JXKl4Y1Xgy8CKumdmjI",
             "_class_name": "Evaluation",
             "_bases": ["Object", "BaseModel"],
         },
         exp_objects=[
             {
                 "object_id": "Dataset",
-                "digest": "N0VKaX8wr9kF9QQzM7mSQz3yKrJJjTiJi4c9Bt7RSTA",
+                "digest": "acPomFUR8YXQnrXywT8Y9xrZZQeBk07GzOGCFzB7KO0",
                 "exp_val": {
                     "_type": "Dataset",
                     "name": None,
@@ -314,7 +314,7 @@ library_cases = [
             },
             {
                 "object_id": "Evaluation.evaluate",
-                "digest": "XbyuZNBxQ90Ur9tjMI6Cj8CNXnisWemlzU8etRYeFsI",
+                "digest": "JepEfgIjiFYe0sDJx6SE3hCwjMS48ziBMNwJXuZPQbk",
                 "exp_val": {
                     "_type": "CustomWeaveType",
                     "weave_type": {"type": "Op"},
@@ -323,7 +323,7 @@ library_cases = [
             },
             {
                 "object_id": "Evaluation.predict_and_score",
-                "digest": "NrwneWUrXaCdi9BUqmufH4dg1U1tvHFGPK5dZh2CcPQ",
+                "digest": "jd4m1EJuNnrGmHeiGY1T2CUngsk9x7knOgRJ2sYpU2g",
                 "exp_val": {
                     "_type": "CustomWeaveType",
                     "weave_type": {"type": "Op"},
@@ -332,37 +332,37 @@ library_cases = [
             },
             {
                 "object_id": "MyScorer",
-                "digest": "ILpCvdAsCLLLt9wU28MU9ugSScTkg7L3XX6PlUgFvlg",
+                "digest": "YZQwofwInVNL3M3cR6IuymuMYH6riXSg30fKWqbxEfo",
                 "exp_val": {
                     "_type": "MyScorer",
                     "name": None,
                     "description": None,
                     "column_map": None,
-                    "score": "weave:///shawn/test-project/op/MyScorer.score:BE7Pf2XsllJGfbeffAcYiZa2zRAD24oytT9U9iqIn4o",
-                    "summarize": "weave:///shawn/test-project/op/Scorer.summarize:bWwaybJxxIBLMGZp7bzeKrmjhLNCp2DYrubnU2Ry9xQ",
+                    "score": "weave:///shawn/test-project/op/MyScorer.score:lwLZn8tYQ025uYUv8SPwa1TlVfWSbzVSyw4aDynz1yQ",
+                    "summarize": "weave:///shawn/test-project/op/Scorer.summarize:LYcmOkxmx4hRYtJ65hnd4uy7jhdYJCnhYXys5aakzfo",
                     "_class_name": "MyScorer",
                     "_bases": ["Scorer", "Object", "BaseModel"],
                 },
             },
             {
                 "object_id": "LLMAsAJudgeScorer",
-                "digest": "U3vlpg3CT6cuu0jcm3eFm5MyDxXvH0OCvrFax0VRY3w",
+                "digest": "erL8bTkANuYOPLwm6Rj2QWMES8iYsvcZm7pAHswfLf8",
                 "exp_val": {
                     "_type": "LLMAsAJudgeScorer",
                     "name": None,
                     "description": None,
                     "column_map": None,
-                    "model": "weave:///shawn/test-project/object/LLMStructuredCompletionModel:kgMVTEoEXBudZExbXhfAS7InEQSOAzfsQ2qmvnCGd0M",
+                    "model": "weave:///shawn/test-project/object/LLMStructuredCompletionModel:ZRj0O2UQTStbLrYHXxim8HKdtatyS9lLbmR3DDPwNIY",
                     "scoring_prompt": "Here are the inputs: {inputs}. Here is the output: {output}. Is the output correct?",
-                    "score": "weave:///shawn/test-project/op/LLMAsAJudgeScorer.score:OIgGBpG1Xnwppf494LDa4mC2AEEu5tFePiWkX3N6B1s",
-                    "summarize": "weave:///shawn/test-project/op/Scorer.summarize:bWwaybJxxIBLMGZp7bzeKrmjhLNCp2DYrubnU2Ry9xQ",
+                    "score": "weave:///shawn/test-project/op/LLMAsAJudgeScorer.score:2qBMCi2NKvPsWtfe10WxusvHuQSCeX3khGq7KUMbNpc",
+                    "summarize": "weave:///shawn/test-project/op/Scorer.summarize:LYcmOkxmx4hRYtJ65hnd4uy7jhdYJCnhYXys5aakzfo",
                     "_class_name": "LLMAsAJudgeScorer",
                     "_bases": ["Scorer", "Object", "BaseModel"],
                 },
             },
             {
                 "object_id": "LLMAsAJudgeScorer.score",
-                "digest": "OIgGBpG1Xnwppf494LDa4mC2AEEu5tFePiWkX3N6B1s",
+                "digest": "2qBMCi2NKvPsWtfe10WxusvHuQSCeX3khGq7KUMbNpc",
                 "exp_val": {
                     "_type": "CustomWeaveType",
                     "weave_type": {"type": "Op"},
@@ -371,7 +371,7 @@ library_cases = [
             },
             {
                 "object_id": "LLMStructuredCompletionModel",
-                "digest": "kgMVTEoEXBudZExbXhfAS7InEQSOAzfsQ2qmvnCGd0M",
+                "digest": "ZRj0O2UQTStbLrYHXxim8HKdtatyS9lLbmR3DDPwNIY",
                 "exp_val": {
                     "_type": "LLMStructuredCompletionModel",
                     "name": None,
@@ -403,14 +403,14 @@ library_cases = [
                         "_class_name": "LLMStructuredCompletionModelDefaultParams",
                         "_bases": ["BaseModel"],
                     },
-                    "predict": "weave:///shawn/test-project/op/LLMStructuredCompletionModel.predict:SjfGulYMo1eX8BDv4HxKOfswszec6CVI43rbFrnxB9M",
+                    "predict": "weave:///shawn/test-project/op/LLMStructuredCompletionModel.predict:QQbJYkUdfFRTYWovY1S3O7tOaPvicXZEjjcPX4Rxitc",
                     "_class_name": "LLMStructuredCompletionModel",
                     "_bases": ["Model", "Object", "BaseModel"],
                 },
             },
             {
                 "object_id": "LLMStructuredCompletionModel.predict",
-                "digest": "SjfGulYMo1eX8BDv4HxKOfswszec6CVI43rbFrnxB9M",
+                "digest": "QQbJYkUdfFRTYWovY1S3O7tOaPvicXZEjjcPX4Rxitc",
                 "exp_val": {
                     "_type": "CustomWeaveType",
                     "weave_type": {"type": "Op"},
@@ -419,7 +419,7 @@ library_cases = [
             },
             {
                 "object_id": "Evaluation.summarize",
-                "digest": "eq6QbaZJYKZlbaCR95PvaoLDomTryBhb5uajqpIX8u0",
+                "digest": "Y0s05NYTuqlmXieehHPogfq2JXKl4Y1Xgy8CKumdmjI",
                 "exp_val": {
                     "_type": "CustomWeaveType",
                     "weave_type": {"type": "Op"},
@@ -428,7 +428,7 @@ library_cases = [
             },
             {
                 "object_id": "MyScorer.score",
-                "digest": "BE7Pf2XsllJGfbeffAcYiZa2zRAD24oytT9U9iqIn4o",
+                "digest": "lwLZn8tYQ025uYUv8SPwa1TlVfWSbzVSyw4aDynz1yQ",
                 "exp_val": {
                     "_type": "CustomWeaveType",
                     "weave_type": {"type": "Op"},
@@ -437,7 +437,7 @@ library_cases = [
             },
             {
                 "object_id": "Scorer.summarize",
-                "digest": "bWwaybJxxIBLMGZp7bzeKrmjhLNCp2DYrubnU2Ry9xQ",
+                "digest": "LYcmOkxmx4hRYtJ65hnd4uy7jhdYJCnhYXys5aakzfo",
                 "exp_val": {
                     "_type": "CustomWeaveType",
                     "weave_type": {"type": "Op"},
@@ -489,15 +489,15 @@ library_cases = [
             "_type": "MyModel",
             "name": None,
             "description": None,
-            "prompt": "weave:///shawn/test-project/object/StringPrompt:E5XB0iGux1m8LJXEiwZlOLdJLmHSAbCBsgXHYeP0UB4",
-            "predict": "weave:///shawn/test-project/op/MyModel.predict:mCmPlFC0ylrSIXNsfYCuKOvb8WxQG4XUbGqMqbM4ZJE",
+            "prompt": "weave:///shawn/test-project/object/StringPrompt:mDgNgtMQPw8sUgyhUPt2GlufG3zaXUBRSNj68TbaC2c",
+            "predict": "weave:///shawn/test-project/op/MyModel.predict:a0vtxxzoJroPZ53EFK0MXT16heCnwQ7XvlgrM5QjhXE",
             "_class_name": "MyModel",
             "_bases": ["Model", "Object", "BaseModel"],
         },
         exp_objects=[
             {
                 "object_id": "StringPrompt",
-                "digest": "E5XB0iGux1m8LJXEiwZlOLdJLmHSAbCBsgXHYeP0UB4",
+                "digest": "mDgNgtMQPw8sUgyhUPt2GlufG3zaXUBRSNj68TbaC2c",
                 "exp_val": {
                     "_type": "StringPrompt",
                     "name": None,
@@ -509,7 +509,7 @@ library_cases = [
             },
             {
                 "object_id": "MyModel.predict",
-                "digest": "mCmPlFC0ylrSIXNsfYCuKOvb8WxQG4XUbGqMqbM4ZJE",
+                "digest": "a0vtxxzoJroPZ53EFK0MXT16heCnwQ7XvlgrM5QjhXE",
                 "exp_val": {
                     "_type": "CustomWeaveType",
                     "weave_type": {"type": "Op"},
