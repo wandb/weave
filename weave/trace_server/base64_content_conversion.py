@@ -23,9 +23,25 @@ logger = logging.getLogger(__name__)
 # Format: data:[content-type];base64,[base64_data]
 DATA_URI_PATTERN = re.compile(r"^data:([^;]+);base64,([A-Za-z0-9+/=]+)$", re.IGNORECASE)
 
+# Pattern to match standalone base64 strings
+BASE64_PATTERN = re.compile(r"^[A-Za-z0-9+/]+={0,2}$")
+
 # Minimum size to create a file (to avoid making more data than what the original is)
 AUTO_CONVERSION_MIN_SIZE = 1024  # 1 KiB
 
+def is_maybe_base64(value: str) -> bool:
+    """Huerestic to quickly check if a string is likely base64.
+    We do not decode here because Content already does decode based 'true' validation
+    Args:
+        value: String to check
+    Returns:
+        True if the string is valid base64
+    """
+    # Check if it matches base64 pattern
+    if not BASE64_PATTERN.match(value):
+        return False
+
+    return True
 
 def is_data_uri(data_uri: str) -> bool:
     """Extract content type and decoded bytes from a data URI.
@@ -126,6 +142,23 @@ def replace_base64_with_content_objects(
                 except Exception as e:
                     logger.warning(
                         f"Failed to create and store content from data URI with error {e}"
+                    )
+
+            if is_maybe_base64(val):
+                try:
+                    content = Content.from_base64(val)
+                    # 'aaaa' is valid base64 but will come out as plaintext
+                    # more complicated text values may end up being 'application/octet-stream'
+                    # We don't handle either mimetype in a special way so false negatives in our detection aren't an issue
+                    if content.mimetype not in ('text/plain', 'application/octet-stream'):
+                        return store_content_object(
+                            content,
+                            project_id,
+                            trace_server,
+                        )
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to create content from standalone base64: {e}"
                     )
 
             return val
