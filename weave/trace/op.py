@@ -1261,6 +1261,8 @@ def op(
             wrapper._accumulator = accumulator  # type: ignore
 
             wrapper.get_captured_code = partial(get_captured_code, wrapper)  # type: ignore
+            wrapper.get_input_json_schema = partial(get_input_json_schema, wrapper)  # type: ignore
+            wrapper.get_output_json_schema = partial(get_output_json_schema, wrapper)  # type: ignore
             wrapper._code_capture_enabled = enable_code_capture  # type: ignore
 
             if callable(call_display_name):
@@ -1301,6 +1303,143 @@ def get_captured_code(op: Op) -> str:
         raise RuntimeError(
             "Failed to get captured code for op (this only works when you get an op back from a ref)."
         ) from None
+
+
+def _serialize_default(value: Any) -> Any:
+    """Serialize a default value for JSON schema.
+
+    Args:
+        value: The default value to serialize.
+
+    Returns:
+        A JSON-serializable representation of the default value.
+    """
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, (list, tuple)):
+        return [_serialize_default(v) for v in value]
+    if isinstance(value, dict):
+        return {k: _serialize_default(v) for k, v in value.items()}
+
+    # Unknown type, return None
+    return None
+
+
+def _type_to_json_schema(annotation: Any) -> dict[str, Any]:
+    """Convert a type annotation to a JSON schema.
+
+    Uses Pydantic's TypeAdapter for robust type-to-JSON-schema conversion.
+    Falls back to an empty schema (any type) if conversion fails.
+
+    Args:
+        annotation: The type annotation to convert.
+
+    Returns:
+        A JSON schema dict representing the type.
+    """
+    if annotation is None or annotation is inspect.Parameter.empty:
+        return {}
+
+    try:
+        from pydantic import TypeAdapter
+
+        adapter = TypeAdapter(annotation)
+        return adapter.json_schema()
+    except Exception:
+        # If Pydantic can't handle it, return empty schema (any type)
+        return {}
+
+
+def get_input_json_schema(op: Op) -> dict[str, Any]:
+    """Get the JSON schema for an Op's input parameters.
+
+    Args:
+        op: The op to get the input schema for.
+
+    Returns:
+        A JSON schema object with properties for each input parameter.
+
+    Examples:
+        >>> @weave.op
+        ... def add(a: int, b: int = 0) -> int:
+        ...     return a + b
+        >>> schema = add.get_input_json_schema()
+        >>> schema["properties"]["a"]["type"]
+        'integer'
+    """
+    func = op.resolve_fn
+
+    sig = inspect.signature(func)
+    type_hints: dict[str, Any] = {}
+    try:
+        type_hints = inspect.get_annotations(func)
+    except Exception:
+        pass
+
+    properties: dict[str, Any] = {}
+    required: list[str] = []
+    defs: dict[str, Any] = {}
+
+    for param_name, param in sig.parameters.items():
+        if param_name in ("self", "cls"):
+            continue
+
+        annotation = type_hints.get(param_name)
+        param_schema = _type_to_json_schema(annotation)
+
+        # Extract $defs if present and merge into our definitions
+        if "$defs" in param_schema:
+            defs.update(param_schema.pop("$defs"))
+
+        # Add default value if present
+        if param.default is not inspect.Parameter.empty:
+            param_schema["default"] = _serialize_default(param.default)
+        else:
+            required.append(param_name)
+
+        properties[param_name] = param_schema
+
+    schema: dict[str, Any] = {
+        "type": "object",
+        "properties": properties,
+    }
+
+    if required:
+        schema["required"] = required
+
+    if defs:
+        schema["$defs"] = defs
+
+    return schema
+
+
+def get_output_json_schema(op: Op) -> dict[str, Any]:
+    """Get the JSON schema for an Op's return type.
+
+    Args:
+        op: The op to get the output schema for.
+
+    Returns:
+        A JSON schema representing the return type, or empty dict if not typed.
+
+    Examples:
+        >>> @weave.op
+        ... def add(a: int, b: int) -> int:
+        ...     return a + b
+        >>> schema = add.get_output_json_schema()
+        >>> schema["type"]
+        'integer'
+    """
+    func = op.resolve_fn
+
+    type_hints: dict[str, Any] = {}
+    try:
+        type_hints = inspect.get_annotations(func)
+    except Exception:
+        pass
+
+    return_annotation = type_hints.get("return")
+    return _type_to_json_schema(return_annotation)
 
 
 def maybe_bind_method(func: Callable, self: Any = None) -> Callable | MethodType:
