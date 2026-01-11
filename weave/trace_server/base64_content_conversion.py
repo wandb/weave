@@ -147,9 +147,9 @@ def replace_base64_with_content_objects(
             if is_maybe_base64(val):
                 try:
                     content = Content.from_base64(val)
-                    # 'aaaa' is valid base64 but will come out as plaintext
-                    # more complicated text values may end up being 'application/octet-stream'
-                    # We don't handle either mimetype in a special way so false negatives in our detection aren't an issue
+                    # 'aaaa' is valid base64 and will come out as text/plain
+                    # More complicated false positives or failed detections will show 'application/octet-stream'
+                    # We don't handle either in a special way so false negatives in our detection aren't an issue
                     if content.mimetype not in ('text/plain', 'application/octet-stream'):
                         return store_content_object(
                             content,
