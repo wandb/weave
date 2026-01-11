@@ -29,6 +29,7 @@ BASE64_PATTERN = re.compile(r"^[A-Za-z0-9+/]+={0,2}$")
 # Minimum size to create a file (to avoid making more data than what the original is)
 AUTO_CONVERSION_MIN_SIZE = 1024  # 1 KiB
 
+
 def is_maybe_base64(value: str) -> bool:
     """Huerestic to quickly check if a string is likely base64.
     We do not decode here because Content already does decode based 'true' validation
@@ -42,6 +43,7 @@ def is_maybe_base64(value: str) -> bool:
         return False
 
     return True
+
 
 def is_data_uri(data_uri: str) -> bool:
     """Extract content type and decoded bytes from a data URI.
@@ -150,7 +152,10 @@ def replace_base64_with_content_objects(
                     # 'aaaa' is valid base64 and will come out as text/plain
                     # More complicated false positives or failed detections will show 'application/octet-stream'
                     # We don't handle either in a special way so false negatives in our detection aren't an issue
-                    if content.mimetype not in ('text/plain', 'application/octet-stream'):
+                    if content.mimetype not in (
+                        "text/plain",
+                        "application/octet-stream",
+                    ):
                         return store_content_object(
                             content,
                             project_id,
