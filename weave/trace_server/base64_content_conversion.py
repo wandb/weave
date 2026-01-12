@@ -36,13 +36,9 @@ def is_maybe_base64(value: str) -> bool:
     Args:
         value: String to check
     Returns:
-        True if the string is valid base64
+        True if the string is possibly valid base64
     """
-    # Check if it matches base64 pattern
-    if not BASE64_PATTERN.match(value):
-        return False
-
-    return True
+    return bool(BASE64_PATTERN.match(value))
 
 
 def is_data_uri(data_uri: str) -> bool:
@@ -54,8 +50,7 @@ def is_data_uri(data_uri: str) -> bool:
     Returns:
         bool: True is match, else false
     """
-    match = DATA_URI_PATTERN.match(data_uri)
-    return bool(match)
+    return bool(DATA_URI_PATTERN.match(data_uri))
 
 
 def store_content_object(
