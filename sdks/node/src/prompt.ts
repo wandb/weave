@@ -1,4 +1,5 @@
-import {WeaveObject, WeaveObjectParameters} from './weaveObject';
+import {WeaveClient} from './weaveClient';
+import {ObjectRef, WeaveObject, WeaveObjectParameters} from './weaveObject';
 
 export class Prompt extends WeaveObject {
   constructor(parameters: WeaveObjectParameters) {
@@ -20,6 +21,12 @@ export class StringPrompt extends Prompt {
 
   format(values: Record<string, any> = {}): string {
     return formatString(this.content, values);
+  }
+
+  static async get(client: WeaveClient, uri: string): Promise<StringPrompt> {
+    const ref = ObjectRef.fromUri(uri);
+    const data = await client.get(ref);
+    return data as StringPrompt;
   }
 }
 
@@ -61,6 +68,12 @@ export class MessagesPrompt extends Prompt {
     return this.messages.map(message => {
       return this.formatMessage(message, values);
     });
+  }
+
+  static async get(client: WeaveClient, uri: string): Promise<MessagesPrompt> {
+    const ref = ObjectRef.fromUri(uri);
+    const data = await client.get(ref);
+    return data as MessagesPrompt;
   }
 }
 
