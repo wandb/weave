@@ -320,7 +320,7 @@ reportCallIssue = false
 [tool.mypy]
 warn_unused_configs = true
 # Note: You have to update .pre-commit-config.yaml too!
-exclude = [".*pyi$", "tests", "examples"]
+exclude = [".*pyi$", "tests", "examples", "build"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
