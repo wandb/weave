@@ -30,7 +30,7 @@ BASE64_PATTERN = re.compile(r"^[A-Za-z0-9+/]+={0,2}$")
 AUTO_CONVERSION_MIN_SIZE = 1024  # 1 KiB
 
 
-def is_maybe_base64(value: str) -> bool:
+def is_base64(value: str) -> bool:
     """Huerestic to quickly check if a string is likely base64.
     We do not decode here because Content already does decode based 'true' validation
     Args:
@@ -38,7 +38,7 @@ def is_maybe_base64(value: str) -> bool:
     Returns:
         True if the string is possibly valid base64
     """
-    return bool(BASE64_PATTERN.match(value))
+    return (BASE64_PATTERN.match(value) is not None)
 
 
 def is_data_uri(data_uri: str) -> bool:
@@ -50,7 +50,7 @@ def is_data_uri(data_uri: str) -> bool:
     Returns:
         bool: True is match, else false
     """
-    return bool(DATA_URI_PATTERN.match(data_uri))
+    return (DATA_URI_PATTERN.match(data_uri) is not None)
 
 
 def store_content_object(
@@ -98,6 +98,17 @@ def store_content_object(
 
 T = TypeVar("T")
 
+def convert_base64(
+    val: str | bytes,
+    project_id: str,
+    trace_server: TraceServerInterface
+):
+
+def convert_data_url(
+    val: str | bytes,
+    project_id: str,
+    trace_server: TraceServerInterface
+):
 
 def replace_base64_with_content_objects(
     vals: T,
@@ -141,12 +152,14 @@ def replace_base64_with_content_objects(
                         f"Failed to create and store content from data URI with error {e}"
                     )
 
-            if is_maybe_base64(val):
+            if is_base64(val):
                 try:
-                    content = Content.from_base64(val)
+                    # All we care about here is if this is an object that we can handle in some way.
                     # 'aaaa' is valid base64 and will come out as text/plain
                     # More complicated false positives or failed detections will show 'application/octet-stream'
-                    # We don't handle either in a special way so false negatives in our detection aren't an issue
+                    # The uncovered scenario is if a user has encoded a plaintext document as Base64
+                    # We don't handle text content objects in a special way on the clients, so this is acceptable.
+                    content = Content.from_base64(val)
                     if content.mimetype not in (
                         "text/plain",
                         "application/octet-stream",

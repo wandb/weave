@@ -9,7 +9,6 @@ import pytest
 from weave.trace_server.base64_content_conversion import (
     AUTO_CONVERSION_MIN_SIZE,
     is_data_uri,
-    is_maybe_base64,
     process_call_req_to_content,
     replace_base64_with_content_objects,
     store_content_object,
@@ -228,11 +227,12 @@ class TestStandaloneBase64Detection:
 
     def test_non_media_base64_strings_not_converted(self):
         """Test that various base64 strings of different lengths (mod 4) that decode to
-        text/plain or application/octet-stream are NOT converted."""
+        text/plain or application/octet-stream are NOT converted.
+        """
         # Mock trace server
         trace_server = MagicMock()
 
-        # Test strings of various lengths mod 4 (0, 1, 2, 3)
+        # Test strings of various lengths mod 4
         # These should all decode to text/plain or application/octet-stream
         test_cases = [
             # Length % 4 == 0: "aaaa" decodes to binary data
@@ -253,7 +253,7 @@ class TestStandaloneBase64Detection:
 
         for test_str in test_cases:
             # First verify these match the base64 pattern
-            assert is_maybe_base64(test_str), f"Expected {test_str} to match base64 pattern"
+            assert is__base64(test_str), f"Expected {test_str} to match base64 pattern"
 
             input_data = {"field": test_str}
             result = replace_base64_with_content_objects(
@@ -261,14 +261,17 @@ class TestStandaloneBase64Detection:
             )
 
             # These should NOT be converted because they decode to text/plain or application/octet-stream
-            assert result["field"] == test_str, f"Expected {test_str} to NOT be converted"
+            assert result["field"] == test_str, (
+                f"Expected {test_str} to NOT be converted"
+            )
 
         # Verify trace server was never called since nothing should be converted
         assert trace_server.file_create.call_count == 0
 
     def test_wav_file_base64_converted(self):
         """Test that a dict with a field containing raw base64 representing a WAV file
-        is detected and converted to Content."""
+        is detected and converted to Content.
+        """
         # Mock trace server
         trace_server = MagicMock()
         trace_server.file_create = MagicMock(
@@ -292,11 +295,11 @@ class TestStandaloneBase64Detection:
         # fmt chunk
         wav_data.extend(b"fmt ")
         wav_data.extend((16).to_bytes(4, "little"))  # chunk size
-        wav_data.extend((1).to_bytes(2, "little"))   # audio format (PCM)
-        wav_data.extend((1).to_bytes(2, "little"))   # num channels
+        wav_data.extend((1).to_bytes(2, "little"))  # audio format (PCM)
+        wav_data.extend((1).to_bytes(2, "little"))  # num channels
         wav_data.extend((44100).to_bytes(4, "little"))  # sample rate
         wav_data.extend((88200).to_bytes(4, "little"))  # byte rate
-        wav_data.extend((2).to_bytes(2, "little"))   # block align
+        wav_data.extend((2).to_bytes(2, "little"))  # block align
         wav_data.extend((16).to_bytes(2, "little"))  # bits per sample
 
         # data chunk - make it large enough to exceed AUTO_CONVERSION_MIN_SIZE
@@ -308,13 +311,13 @@ class TestStandaloneBase64Detection:
 
         # Update file size in RIFF header (total size - 8 bytes for RIFF header)
         file_size = len(wav_data) - 8
-        wav_data[file_size_pos:file_size_pos + 4] = file_size.to_bytes(4, "little")
+        wav_data[file_size_pos : file_size_pos + 4] = file_size.to_bytes(4, "little")
 
         # Encode as base64
         wav_base64 = base64.b64encode(bytes(wav_data)).decode("ascii")
 
         # Verify it matches base64 pattern
-        assert is_maybe_base64(wav_base64)
+        assert is__base64(wav_base64)
 
         # Test that it gets converted
         input_data = {
@@ -329,7 +332,10 @@ class TestStandaloneBase64Detection:
         # The WAV file should be converted to Content object
         assert isinstance(result["audio_field"], dict)
         assert result["audio_field"]["_type"] == "CustomWeaveType"
-        assert result["audio_field"]["weave_type"]["type"] == "weave.type_wrappers.Content.content.Content"
+        assert (
+            result["audio_field"]["weave_type"]["type"]
+            == "weave.type_wrappers.Content.content.Content"
+        )
         assert "files" in result["audio_field"]
         assert "content" in result["audio_field"]["files"]
         assert "metadata.json" in result["audio_field"]["files"]
