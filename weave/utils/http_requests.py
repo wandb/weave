@@ -164,8 +164,15 @@ def _get_http_timeout() -> float:
     return http_timeout()
 
 
+proxy_url = (
+    os.environ.get("HTTPS_PROXY")
+    or os.environ.get("https_proxy")
+    or os.environ.get("HTTP_PROXY")
+    or os.environ.get("http_proxy")
+)
+
 client = httpx.Client(
-    transport=LoggingHTTPTransport(),
+    transport=LoggingHTTPTransport(proxy=proxy_url),
     timeout=_get_http_timeout(),
     limits=httpx.Limits(max_connections=None, max_keepalive_connections=None),
 )
