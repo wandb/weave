@@ -38,7 +38,7 @@ def is_base64(value: str) -> bool:
     Returns:
         True if the string is possibly valid base64
     """
-    return (BASE64_PATTERN.match(value) is not None)
+    return BASE64_PATTERN.match(value) is not None
 
 
 def is_data_uri(data_uri: str) -> bool:
@@ -50,7 +50,7 @@ def is_data_uri(data_uri: str) -> bool:
     Returns:
         bool: True is match, else false
     """
-    return (DATA_URI_PATTERN.match(data_uri) is not None)
+    return DATA_URI_PATTERN.match(data_uri) is not None
 
 
 def store_content_object(
@@ -97,6 +97,7 @@ def store_content_object(
 
 
 T = TypeVar("T")
+
 
 def replace_base64_with_content_objects(
     vals: T,

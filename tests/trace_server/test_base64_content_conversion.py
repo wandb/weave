@@ -8,8 +8,8 @@ import pytest
 
 from weave.trace_server.base64_content_conversion import (
     AUTO_CONVERSION_MIN_SIZE,
-    is_data_uri,
     is_base64,
+    is_data_uri,
     process_call_req_to_content,
     replace_base64_with_content_objects,
     store_content_object,
