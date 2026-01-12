@@ -98,18 +98,6 @@ def store_content_object(
 
 T = TypeVar("T")
 
-def convert_base64(
-    val: str | bytes,
-    project_id: str,
-    trace_server: TraceServerInterface
-):
-
-def convert_data_url(
-    val: str | bytes,
-    project_id: str,
-    trace_server: TraceServerInterface
-):
-
 def replace_base64_with_content_objects(
     vals: T,
     project_id: str,
