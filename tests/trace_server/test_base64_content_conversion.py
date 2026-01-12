@@ -253,7 +253,7 @@ class TestStandaloneBase64Detection:
 
         for test_str in test_cases:
             # First verify these match the base64 pattern
-            assert is__base64(test_str), f"Expected {test_str} to match base64 pattern"
+            assert is_base64(test_str), f"Expected {test_str} to match base64 pattern"
 
             input_data = {"field": test_str}
             result = replace_base64_with_content_objects(
@@ -317,7 +317,7 @@ class TestStandaloneBase64Detection:
         wav_base64 = base64.b64encode(bytes(wav_data)).decode("ascii")
 
         # Verify it matches base64 pattern
-        assert is__base64(wav_base64)
+        assert is_base64(wav_base64)
 
         # Test that it gets converted
         input_data = {
