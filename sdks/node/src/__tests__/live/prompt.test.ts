@@ -164,20 +164,24 @@ describe('Prompt.get static methods', () => {
   });
 
   test('should get a string prompt by URI', async () => {
+    const content = 'Hello, {name}!';
+    const name = 'test-prompt';
+    const description = 'A test prompt';
+
     // Mock TraceServerApi
     (TraceServerApi as jest.Mock).mockImplementation(() => ({
       obj: {
         objReadObjReadPost: jest.fn().mockResolvedValue({
           data: {
             obj: {
-              object_id: 'test-prompt',
+              object_id: name,
               val: {
                 _type: 'StringPrompt',
                 _class_name: 'StringPrompt',
                 _bases: ['Prompt', 'Object', 'BaseModel'],
-                content: 'Hello, {name}!',
-                name: 'test-prompt',
-                description: 'A test prompt',
+                content,
+                name,
+                description,
               },
             },
           },
@@ -188,32 +192,36 @@ describe('Prompt.get static methods', () => {
     const client = await init('test-project');
     const prompt = await StringPrompt.get(
       client,
-      'weave:///test-entity/test-project/object/test-prompt:abc123'
+      `weave:///test-entity/test-project/object/${name}:abc123`
     );
 
     // Verify type
     expect(prompt).toBeInstanceOf(StringPrompt);
     // Verify properties
-    expect(prompt.content).toBe('Hello, {name}!');
-    expect(prompt.name).toBe('test-prompt');
-    expect(prompt.description).toBe('A test prompt');
+    expect(prompt.content).toBe(content);
+    expect(prompt.name).toBe(name);
+    expect(prompt.description).toBe(description);
   });
 
   test('should get a messages prompt by URI', async () => {
+    const messages = [{role: 'user', content: 'Hello, {name}!'}];
+    const name = 'test-messages-prompt';
+    const description = 'A test messages prompt';
+
     // Mock TraceServerApi
     (TraceServerApi as jest.Mock).mockImplementation(() => ({
       obj: {
         objReadObjReadPost: jest.fn().mockResolvedValue({
           data: {
             obj: {
-              object_id: 'test-messages-prompt',
+              object_id: name,
               val: {
                 _type: 'MessagesPrompt',
                 _class_name: 'MessagesPrompt',
                 _bases: ['Prompt', 'Object', 'BaseModel'],
-                messages: [{role: 'user', content: 'Hello, {name}!'}],
-                name: 'test-messages-prompt',
-                description: 'A test messages prompt',
+                messages,
+                name,
+                description,
               },
             },
           },
@@ -224,16 +232,14 @@ describe('Prompt.get static methods', () => {
     const client = await init('test-project');
     const prompt = await MessagesPrompt.get(
       client,
-      'weave:///test-entity/test-project/object/test-messages-prompt:def456'
+      `weave:///test-entity/test-project/object/${name}:def456`
     );
 
     // Verify type
     expect(prompt).toBeInstanceOf(MessagesPrompt);
     // Verify properties
-    expect(prompt.messages).toEqual([
-      {role: 'user', content: 'Hello, {name}!'},
-    ]);
-    expect(prompt.name).toBe('test-messages-prompt');
-    expect(prompt.description).toBe('A test messages prompt');
+    expect(prompt.messages).toEqual(messages);
+    expect(prompt.name).toBe(name);
+    expect(prompt.description).toBe(description);
   });
 });
