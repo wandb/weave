@@ -898,7 +898,8 @@ def get_clickhouse_trace_server_migrator(
     use_distributed: bool | None = None,
     management_db: str = "db_management",
     migration_dir: str | None = None,
-    post_migration_hook: PostMigrationHook | None = _default_trace_server_costs_post_migration_hook,
+    post_migration_hook: PostMigrationHook
+    | None = _default_trace_server_costs_post_migration_hook,
 ) -> BaseClickHouseTraceServerMigrator:
     """Factory function to create the appropriate migrator based on configuration.
 
