@@ -45,23 +45,16 @@ from weave.trace_server_bindings.remote_http_trace_server import (
 
 def get_total_mock_calls(server) -> int:
     """Get total number of batch send calls made."""
-    return (
-        server._send_calls_start_batch_to_server.call_count
-        + server._send_calls_end_batch_to_server.call_count
-    )
+    return server._send_calls_upsert_complete_to_server.call_count
 
 
 def count_items_sent(server) -> int:
     """Count total items sent across all mock calls."""
     total_items_sent = 0
-    for mock_method in [
-        server._send_calls_start_batch_to_server,
-        server._send_calls_end_batch_to_server,
-    ]:
-        for call in mock_method.call_args_list:
-            (_, _, encoded_data) = call[0]
-            decoded_batch = json.loads(encoded_data.decode("utf-8"))
-            total_items_sent += len(decoded_batch["batch"])
+    for call in server._send_calls_upsert_complete_to_server.call_args_list:
+        (_, _, encoded_data) = call[0]
+        decoded_batch = json.loads(encoded_data.decode("utf-8"))
+        total_items_sent += len(decoded_batch["batch"])
     return total_items_sent
 
 

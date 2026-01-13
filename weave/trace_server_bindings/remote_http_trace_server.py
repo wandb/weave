@@ -12,23 +12,27 @@ from typing_extensions import Self
 
 from weave.trace.env import weave_trace_server_url
 from weave.trace.settings import (
-    call_start_delay,
     max_calls_queue_size,
     should_enable_disk_fallback,
+    should_use_calls_complete,
 )
-from weave.trace_server.ids import generate_id
 from weave.trace_server import http_service_interface as his
+from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.ids import generate_id
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
 from weave.trace_server_bindings.call_batch_processor import CallBatchProcessor
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface
 from weave.trace_server_bindings.http_utils import (
     REMOTE_REQUEST_BYTES_LIMIT,
+    CallsCompleteModeRequired,
     handle_response_error,
+    is_calls_complete_mode_error,
     log_dropped_call_batch,
     log_dropped_feedback_batch,
     process_batch_with_retry,
 )
 from weave.trace_server_bindings.models import (
+    Batch,
     CompleteBatchItem,
     EndBatchItem,
     EntityProjectInfo,
@@ -64,15 +68,25 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         super().__init__()
         self.trace_server_url = trace_server_url
         self.should_batch = should_batch
-        self.call_processor: CallBatchProcessor | None = None
+        # Opt-in to new calls_complete write path via env var
+        self.use_calls_complete = should_use_calls_complete() and should_batch
+        self.call_processor: AsyncBatchProcessor | CallBatchProcessor | None = None
         self.feedback_processor: AsyncBatchProcessor | None = None
         if self.should_batch:
-            self.call_processor = CallBatchProcessor(
-                self._flush_calls,
-                max_queue_size=max_calls_queue_size(),
-                enable_disk_fallback=should_enable_disk_fallback(),
-                start_hold_timeout=call_start_delay(),  # Buffer starts waiting for ends
-            )
+            if self.use_calls_complete:
+                # New path: use CallBatchProcessor which pairs starts/ends → calls_complete
+                self.call_processor = CallBatchProcessor(
+                    self._flush_calls_complete,
+                    max_queue_size=max_calls_queue_size(),
+                    enable_disk_fallback=should_enable_disk_fallback(),
+                )
+            else:
+                # Default/legacy path: use AsyncBatchProcessor → calls_merged
+                self.call_processor = AsyncBatchProcessor(
+                    self._flush_calls_legacy,
+                    max_queue_size=max_calls_queue_size(),
+                    enable_disk_fallback=should_enable_disk_fallback(),
+                )
             self.feedback_processor = AsyncBatchProcessor(
                 self._flush_feedback,
                 max_queue_size=max_calls_queue_size(),
@@ -151,7 +165,7 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         elif isinstance(first_item, EndBatchItem):
             project_id = first_item.req.end.project_id
         elif isinstance(first_item, CompleteBatchItem):
-            project_id = first_item.req.complete.project_id
+            project_id = first_item.req.project_id
         else:
             raise TypeError(f"Unknown batch item type: {type(first_item)}")
 
@@ -175,95 +189,148 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         elif isinstance(item, EndBatchItem):
             return f"{item.req.end.id}-end"
         elif isinstance(item, CompleteBatchItem):
-            return f"{item.req.complete.id}-complete"
+            return f"{item.req.id}-complete"
         return "unknown"
 
     @with_retry
-    def _send_calls_start_batch_to_server(
-        self, entity: str, project: str, encoded_data: bytes
+    def _send_batch_to_server(self, encoded_data: bytes) -> None:
+        """Send a batch of data to the server with retry logic (legacy path).
+
+        This method is separated from _flush_calls_legacy to avoid recursive retries.
+        Raises CallsCompleteModeRequired if the project requires calls_complete mode.
+        """
+        r = self.post(
+            "/call/upsert_batch",
+            data=encoded_data,  # type: ignore
+        )
+        try:
+            handle_response_error(r, "/call/upsert_batch")
+        except Exception as e:
+            if is_calls_complete_mode_error(e):
+                raise CallsCompleteModeRequired(str(e)) from e
+            raise
+
+    def _flush_calls_legacy(
+        self,
+        batch: list[StartBatchItem | EndBatchItem],
+        *,
+        _should_update_batch_size: bool = True,
     ) -> None:
-        """Send a batch of call starts/completes to the server with retry logic."""
-        url = f"/v2/{entity}/{project}/calls/start/batch"
-        r = self.post(url, data=encoded_data)
-        handle_response_error(r, url)
+        """Process a batch of calls, splitting if necessary and sending to the server.
+
+        This is the legacy/default path that sends starts/ends to /call/upsert_batch.
+        If the project requires calls_complete mode, automatically switches to that mode.
+        """
+        assert self.call_processor is not None
+        if len(batch) == 0:
+            return
+
+        def get_item_id(item: StartBatchItem | EndBatchItem) -> str:
+            if isinstance(item, StartBatchItem):
+                return f"{item.req.start.id}-start"
+            elif isinstance(item, EndBatchItem):
+                return f"{item.req.end.id}-end"
+            return "unknown"
+
+        def encode_batch(batch: list[StartBatchItem | EndBatchItem]) -> bytes:
+            data = Batch(batch=batch).model_dump_json()
+            return data.encode("utf-8")
+
+        try:
+            process_batch_with_retry(
+                batch_name="calls",
+                batch=batch,
+                remote_request_bytes_limit=self.remote_request_bytes_limit,
+                send_batch_fn=self._send_batch_to_server,
+                processor_obj=self.call_processor,
+                should_update_batch_size=_should_update_batch_size,
+                get_item_id_fn=get_item_id,
+                log_dropped_fn=log_dropped_call_batch,
+                encode_batch_fn=encode_batch,
+            )
+        except CallsCompleteModeRequired:
+            self._switch_to_calls_complete_mode(batch)
+
+    def _switch_to_calls_complete_mode(
+        self, batch: list[StartBatchItem | EndBatchItem]
+    ) -> None:
+        """Switch from legacy mode to calls_complete mode and re-enqueue the batch.
+
+        This is called when the server indicates the project requires calls_complete mode.
+        """
+        logger.warning(
+            "Project requires calls_complete mode. Automatically switching to "
+            "calls_complete mode for this session. To avoid this warning, set "
+            "WEAVE_USE_CALLS_COMPLETE=true or init weave with the setting use_calls_complete=True."
+        )
+
+        # Stop the old processor (don't wait for flush, we're re-routing)
+        old_processor = self.call_processor
+        if old_processor is not None:
+            old_processor.stop_accepting_new_work()
+
+        # Switch to calls_complete mode
+        self.use_calls_complete = True
+
+        # Create new CallBatchProcessor with calls_complete flush function
+        self.call_processor = CallBatchProcessor(
+            self._flush_calls_complete,
+            max_queue_size=max_calls_queue_size(),
+            enable_disk_fallback=should_enable_disk_fallback(),
+        )
+        self.call_processor.enqueue(batch)
 
     @with_retry
-    def _send_calls_end_batch_to_server(
+    def _send_calls_upsert_complete_to_server(
         self, entity: str, project: str, encoded_data: bytes
     ) -> None:
-        """Send a batch of call ends to the server with retry logic."""
-        url = f"/v2/{entity}/{project}/calls/end/batch"
+        """Send a batch of completed calls to the server with retry logic (new path)."""
+        url = f"/v2/{entity}/{project}/calls/upsert"
         r = self.post(url, data=encoded_data)
         handle_response_error(r, url)
 
-    def _flush_calls(
+    def _flush_calls_complete(
         self,
         batch: list[StartBatchItem | EndBatchItem | CompleteBatchItem],
         *,
         _should_update_batch_size: bool = True,
     ) -> None:
-        """Process a batch: split by type and send to server.
+        """Process a batch: filter to completed calls and send to server.
 
-        With CallBatchProcessor, pairing of starts with ends happens at enqueue time,
-        so batches arriving here already contain CompleteBatchItems for fast calls.
-        This method simply splits by type and sends to the appropriate endpoints.
+        This is the new calls_complete path. With CallBatchProcessor, pairing of
+        starts with ends happens at enqueue time, so batches arriving here already
+        contain CompleteBatchItems for fast calls. This method filters to only
+        completed calls and sends them to the /v2/.../calls/upsert endpoint.
         """
         assert self.call_processor is not None
         if not batch:
             return
 
-        # Split batch by type - starts and completes go to start endpoint, ends to end endpoint
-        starts_and_completes = [
-            item
-            for item in batch
-            if isinstance(item, (StartBatchItem, CompleteBatchItem))
-        ]
-        ends = [item for item in batch if isinstance(item, EndBatchItem)]
+        # Filter to only completed calls
+        completes = [item for item in batch if isinstance(item, CompleteBatchItem)]
 
-        first_items = starts_and_completes or ends
-        ep_info = self._extract_entity_project(first_items)
+        if not completes:
+            return
 
-        if starts_and_completes:
-            self._send_batch_group(
-                batch=starts_and_completes,
-                project_id=ep_info.project_id,
-                entity=ep_info.entity,
-                project=ep_info.project,
-                batch_name="call_starts",
-                encode_fn=self._encode_start_batch,
-                send_fn=self._send_calls_start_batch_to_server,
-                should_update_batch_size=_should_update_batch_size,
-            )
+        ep_info = self._extract_entity_project(completes)
 
-        if ends:
-            self._send_batch_group(
-                batch=ends,
-                project_id=ep_info.project_id,
-                entity=ep_info.entity,
-                project=ep_info.project,
-                batch_name="call_ends",
-                encode_fn=self._encode_end_batch,
-                send_fn=self._send_calls_end_batch_to_server,
-                should_update_batch_size=_should_update_batch_size,
-            )
+        self._send_batch_group(
+            batch=completes,
+            project_id=ep_info.project_id,
+            entity=ep_info.entity,
+            project=ep_info.project,
+            batch_name="calls_complete",
+            encode_fn=self._encode_complete_batch,
+            send_fn=self._send_calls_upsert_complete_to_server,
+            should_update_batch_size=_should_update_batch_size,
+        )
 
-    def _encode_start_batch(
-        self, batch: list[StartBatchItem | CompleteBatchItem], project_id: str
+    def _encode_complete_batch(
+        self, batch: list[CompleteBatchItem], project_id: str
     ) -> bytes:
-        """Encode starts/completes batch into API format."""
-        api_batch: list[tsi.CallBatchStartMode | tsi.CallBatchCompleteMode] = []
-        for item in batch:
-            if isinstance(item, StartBatchItem):
-                api_batch.append(tsi.CallBatchStartMode(req=item.req))
-            elif isinstance(item, CompleteBatchItem):
-                api_batch.append(tsi.CallBatchCompleteMode(req=item.req))
-        req = tsi.CallsStartBatchReq(project_id=project_id, batch=api_batch)
-        return req.model_dump_json().encode("utf-8")
-
-    def _encode_end_batch(self, batch: list[EndBatchItem], project_id: str) -> bytes:
-        """Encode ends batch into API format."""
-        api_batch = [tsi.CallBatchEndMode(req=item.req) for item in batch]
-        req = tsi.CallsEndBatchReq(project_id=project_id, batch=api_batch)
+        """Encode completed calls batch into API format."""
+        api_batch = [item.req for item in batch]
+        req = tsi.CallsUpsertCompleteReq(project_id=project_id, batch=api_batch)
         return req.model_dump_json().encode("utf-8")
 
     def _send_batch_group(
@@ -290,7 +357,7 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
             encode_batch_fn=lambda b: encode_fn(b, project_id),
         )
 
-    def get_call_processor(self) -> CallBatchProcessor | None:
+    def get_call_processor(self) -> AsyncBatchProcessor | CallBatchProcessor | None:
         """Custom method not defined on the formal TraceServerInterface to expose
         the underlying call processor. Should be formalized in a client-side interface.
         """
@@ -513,36 +580,34 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         return self._generic_request("/call/end", req, tsi.CallEndReq, tsi.CallEndRes)
 
     def _call_complete(
-        self, req: tsi.CallCompleteReq | dict[str, Any]
+        self, req: tsi.CompletedCallSchemaForInsert | dict[str, Any]
     ) -> tsi.CallUpsertRes:
         """Internal method to handle complete calls for batching.
 
         This accumulates complete calls into the batch processor when batching is enabled.
-        When batching is disabled, it sends as a single-item batch to calls_start_batch.
+        When batching is disabled, it sends as a single-item batch to calls_upsert_complete.
         """
-        req_as_obj: tsi.CallCompleteReq
+        req_as_obj: tsi.CompletedCallSchemaForInsert
         if isinstance(req, dict):
-            req_as_obj = tsi.CallCompleteReq.model_validate(req)
+            req_as_obj = tsi.CompletedCallSchemaForInsert.model_validate(req)
         else:
             req_as_obj = req
 
-        if req_as_obj.complete.id is None or req_as_obj.complete.trace_id is None:
-            raise ValueError("CallCompleteReq must have id and trace_id.")
+        if req_as_obj.id is None or req_as_obj.trace_id is None:
+            raise ValueError("CompletedCallSchemaForInsert must have id and trace_id.")
 
         if self.should_batch:
             assert self.call_processor is not None
 
             self.call_processor.enqueue([CompleteBatchItem(req=req_as_obj)])
-            return tsi.CallUpsertRes(
-                id=req_as_obj.complete.id, trace_id=req_as_obj.complete.trace_id
-            )
+            return tsi.CallUpsertRes(id=req_as_obj.id, trace_id=req_as_obj.trace_id)
         else:
             # When batching is disabled, send as a single-item batch directly
-            batch_req = tsi.CallsStartBatchReq(
-                project_id=req_as_obj.complete.project_id,
-                batch=[tsi.CallBatchCompleteMode(req=req_as_obj)],
+            batch_req = tsi.CallsUpsertCompleteReq(
+                project_id=req_as_obj.project_id,
+                batch=[req_as_obj],
             )
-            batch_res = self.calls_start_batch(batch_req)
+            batch_res = self.calls_upsert_complete(batch_req)
             # Extract the result for the single item
             if batch_res.res and len(batch_res.res) > 0:
                 return tsi.CallUpsertRes(
@@ -550,9 +615,7 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
                 )
             else:
                 # Fallback to returning from the original request
-                return tsi.CallUpsertRes(
-                    id=req_as_obj.complete.id, trace_id=req_as_obj.complete.trace_id
-                )
+                return tsi.CallUpsertRes(id=req_as_obj.id, trace_id=req_as_obj.trace_id)
 
     @validate_call
     def call_read(self, req: tsi.CallReadReq) -> tsi.CallReadRes:
@@ -1501,30 +1564,18 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
             params=params,
         )
 
-    def calls_start_batch(self, req: tsi.CallsStartBatchReq) -> tsi.CallsStartBatchRes:
-        """V2 batch call start endpoint - handles starts and completes only."""
+    def calls_upsert_complete(
+        self, req: tsi.CallsUpsertCompleteReq
+    ) -> tsi.CallsUpsertCompleteRes:
+        """V2 batch upsert complete calls endpoint."""
         if not req.batch:
-            return tsi.CallsStartBatchRes(res=[])
+            return tsi.CallsUpsertCompleteRes(res=[])
 
         entity, project = req.project_id.split("/", 1)
-        url = f"/v2/{entity}/{project}/calls/start/batch"
+        url = f"/v2/{entity}/{project}/calls/upsert"
         return self._generic_request(
             url,
             req,
-            tsi.CallsStartBatchReq,
-            tsi.CallsStartBatchRes,
-        )
-
-    def calls_end_batch(self, req: tsi.CallsEndBatchReq) -> tsi.CallsEndBatchRes:
-        """V2 batch call end endpoint - handles ends only."""
-        if not req.batch:
-            return tsi.CallsEndBatchRes(res=[])
-
-        entity, project = req.project_id.split("/", 1)
-        url = f"/v2/{entity}/{project}/calls/end/batch"
-        return self._generic_request(
-            url,
-            req,
-            tsi.CallsEndBatchReq,
-            tsi.CallsEndBatchRes,
+            tsi.CallsUpsertCompleteReq,
+            tsi.CallsUpsertCompleteRes,
         )

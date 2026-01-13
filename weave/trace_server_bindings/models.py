@@ -15,7 +15,7 @@ class EndBatchItem(BaseModel):
 
 class CompleteBatchItem(BaseModel):
     mode: str = "complete"
-    req: tsi.CallCompleteReq
+    req: tsi.CompletedCallSchemaForInsert
 
 
 class Batch(BaseModel):

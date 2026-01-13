@@ -42,15 +42,13 @@ def log_dropped_call_batch(
     dropped_end_ids = []
     dropped_complete_ids = []
     for item in batch:
-        # Use string comparison to avoid circular imports
         if hasattr(item, "req") and hasattr(item.req, "start"):
-            # For start items, access the start request
             dropped_start_ids.append(item.req.start.id)
         elif hasattr(item, "req") and hasattr(item.req, "end"):
-            # For end items, access the end request
             dropped_end_ids.append(item.req.end.id)
-        elif hasattr(item, "req") and hasattr(item.req, "complete"):
-            dropped_complete_ids.append(item.req.complete.id)
+        elif hasattr(item, "mode") and item.mode == "complete":
+            # CompleteBatchItem has mode="complete" and req is CompletedCallSchemaForInsert
+            dropped_complete_ids.append(item.req.id)
     if dropped_start_ids:
         logger.error(f"dropped call start ids: {dropped_start_ids}")
     if dropped_end_ids:
@@ -181,6 +179,9 @@ def process_batch_with_retry(
 
     try:
         send_batch_fn(encoded_data)
+    except CallsCompleteModeRequired:
+        # Re-raise to allow caller to switch modes
+        raise
     except Exception as e:
         # Handle 413 specially: server rejected as too large, split and retry
         if _is_413_error(e) and len(batch) > 1:
@@ -330,3 +331,40 @@ def _is_413_error(e: Exception) -> bool:
         and e.response is not None
         and e.response.status_code == 413
     )
+
+
+# Error code from server when project requires calls_complete mode
+# This matches the ErrorCode.CALLS_COMPLETE_MODE_REQUIRED from weave.trace_server.errors
+ERROR_CODE_CALLS_COMPLETE_MODE_REQUIRED = "CALLS_COMPLETE_MODE_REQUIRED"
+
+
+class CallsCompleteModeRequired(Exception):
+    """Raised when a project requires calls_complete mode but SDK is using legacy mode.
+
+    This exception triggers automatic mode switching in the SDK.
+    """
+
+    pass
+
+
+def is_calls_complete_mode_error(error: Exception) -> bool:
+    """Check if an error indicates the project requires calls_complete mode.
+
+    Args:
+        error: The exception to check
+
+    Returns:
+        True if the error indicates calls_complete mode is required
+    """
+    response = getattr(error, "response", None)
+    if response is not None:
+        try:
+            error_data = response.json()
+            if isinstance(error_data, dict):
+                return (
+                    error_data.get("error_code")
+                    == ERROR_CODE_CALLS_COMPLETE_MODE_REQUIRED
+                )
+        except (json.JSONDecodeError, ValueError, AttributeError):
+            pass
+    return False

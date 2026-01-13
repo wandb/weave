@@ -95,12 +95,10 @@ def server(request, server_class):
     server_ = server_class("http://example.com", should_batch=True)
 
     if request.param == "normal":
-        server_._send_calls_start_batch_to_server = MagicMock()
-        server_._send_calls_end_batch_to_server = MagicMock()
+        server_._send_calls_upsert_complete_to_server = MagicMock()
     elif request.param == "small_limit":
         server_.remote_request_bytes_limit = 1024  # 1kb
-        server_._send_calls_start_batch_to_server = MagicMock()
-        server_._send_calls_end_batch_to_server = MagicMock()
+        server_._send_calls_upsert_complete_to_server = MagicMock()
         server_._send_batch_to_server = MagicMock()
     elif request.param == "fast_retrying":
         fast_retry = tenacity.retry(
@@ -108,16 +106,11 @@ def server(request, server_class):
             stop=tenacity.stop_after_attempt(2),
             reraise=True,
         )
-        unwrapped_start = MethodType(
-            server_._send_calls_start_batch_to_server.__wrapped__,  # type: ignore[attr-defined]
+        unwrapped = MethodType(
+            server_._send_calls_upsert_complete_to_server.__wrapped__,  # type: ignore[attr-defined]
             server_,
         )
-        unwrapped_end = MethodType(
-            server_._send_calls_end_batch_to_server.__wrapped__,  # type: ignore[attr-defined]
-            server_,
-        )
-        server_._send_calls_start_batch_to_server = fast_retry(unwrapped_start)
-        server_._send_calls_end_batch_to_server = fast_retry(unwrapped_end)
+        server_._send_calls_upsert_complete_to_server = fast_retry(unwrapped)
 
     yield server_
 

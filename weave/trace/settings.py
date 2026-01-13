@@ -206,18 +206,14 @@ class UserSettings(BaseModel):
     Can be overridden with the environment variable `WEAVE_USE_STAINLESS_SERVER`
     """
 
-    call_start_delay: float = 5.0
+    use_calls_complete: bool = False
     """
-    Sets the delay in seconds before sending a call start. Defaults to 5 seconds.
-    This allows the client to group call starts and ends together.
+    Toggles use of the calls_complete write path for new calls.
 
-    If set to 0, call starts are sent immediately.
-    If set to -1, call starts are only sent when the call ends.
-
-    Note: The maximum effective delay is capped by MAX_CALL_START_DELAY in
-    weave.trace.weave_client (currently 10 minutes).
-
-    Can be overridden with the environment variable `WEAVE_CALL_START_DELAY`
+    If True, uses the new calls_upsert_complete endpoint which writes to
+    calls_complete table. If False (default), uses the legacy call_start/call_end
+    endpoints which write to calls_merged table.
+    Can be overridden with the environment variable `WEAVE_USE_CALLS_COMPLETE`
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -350,14 +346,9 @@ def should_use_stainless_server() -> bool:
     return _should("use_stainless_server")
 
 
-def call_start_delay() -> float:
-    """Returns the delay in seconds before sending a call start."""
-    delay = _optional_float("call_start_delay")
-    if delay is None:
-        # HACK: really make sure we delay sending longrunning call starts while
-        # update performance remains sub-par
-        return 15.0
-    return delay
+def should_use_calls_complete() -> bool:
+    """Returns whether the calls_complete write path should be used."""
+    return _should("use_calls_complete")
 
 
 def parse_and_apply_settings(

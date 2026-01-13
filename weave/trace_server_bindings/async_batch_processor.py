@@ -101,12 +101,20 @@ class AsyncBatchProcessor(Generic[T]):
 
                     self._write_item_to_disk(item, error_message)
 
+    def stop_accepting_new_work(self) -> None:
+        """Stops accepting new work without waiting for flush.
+
+        Use this when re-routing items to a different processor.
+        Any new items enqueued after this call will not be processed!
+        """
+        self.stop_accepting_work_event.set()
+
     def stop_accepting_new_work_and_flush_queue(self) -> None:
         """Stops accepting new work and begins gracefully shutting down.
 
         Any new items enqueued after this call will not be processed!
         """
-        self.stop_accepting_work_event.set()
+        self.stop_accepting_new_work()
         self.processing_thread.join()
         self.health_check_thread.join()
 

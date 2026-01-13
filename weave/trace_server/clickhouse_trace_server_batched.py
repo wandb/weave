@@ -54,7 +54,6 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     HardCodedFilter,
     OrderField,
     build_calls_complete_batch_delete_query,
-    build_calls_complete_single_update_query,
     build_calls_complete_update_display_name_query,
     build_calls_stats_query,
     combine_conditions,
@@ -88,6 +87,7 @@ from weave.trace_server.datadog import (
     set_root_span_dd_tags,
 )
 from weave.trace_server.errors import (
+    CallsCompleteModeRequired,
     InsertTooLarge,
     InvalidRequest,
     MissingLLMApiKeyError,
@@ -363,8 +363,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             raise TypeError(
                 "Expected traces as ExportTraceServiceRequest, got {type(req.traces)}"
             )
-        starts: list[tsi.StartedCallSchemaForInsert] = []
-        ends: list[tsi.EndedCallSchemaForInsert] = []
         completes: list[tsi.CompletedCallSchemaForInsert] = []
         rejected_spans = 0
         error_messages: list[str] = []
@@ -393,13 +391,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                         error_messages.append(f"Rejected span ({span_ident}): {e!s}")
                         continue
 
-                    start_call, end_call = span.to_call(
-                        req.project_id,
-                        wb_user_id=req.wb_user_id,
-                        wb_run_id=req.wb_run_id,
-                    )
-                    starts.append(start_call)
-                    ends.append(end_call)
                     completes.append(
                         span.to_complete(
                             req.project_id,
@@ -409,14 +400,14 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     )
 
         obj_id_idx_map = defaultdict(list)
-        for idx, start_call in enumerate(starts):
-            op_name = object_creation_utils.make_safe_name(start_call.op_name)
+        for idx, complete in enumerate(completes):
+            op_name = object_creation_utils.make_safe_name(complete.op_name)
             obj_id_idx_map[op_name].append(idx)
 
         existing_objects = self._get_existing_ops_from_spans(
             seen_ids=set(obj_id_idx_map.keys()),
             project_id=req.project_id,
-            limit=len(starts),
+            limit=len(completes),
         )
         # We know that OTel will always use the placeholder source.
         # We can instead just reuse the existing file if we know it is present
@@ -438,7 +429,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             ).uri()
 
             for idx in obj_id_idx_map[obj.object_id]:
-                starts[idx].op_name = op_ref_uri
                 completes[idx].op_name = op_ref_uri
             obj_id_idx_map.pop(obj.object_id)
 
@@ -465,14 +455,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 version=result.digest,
             ).uri()
             for idx in obj_id_idx_map[result.object_id]:
-                starts[idx].op_name = op_ref_uri
                 completes[idx].op_name = op_ref_uri
 
         self._dual_write_calls_batch(
             req.project_id,
             source=CallSource.SERVER,
-            starts=starts,
-            ends=ends,
             completes=completes,
             # Don't do async inserts for OTEL, in case the insert fails we don't want
             # to reject the other inserts in the batch
@@ -536,10 +523,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             source=CallSource.SDK_CALLS_MERGED,
         )
         if write_target in (WriteTarget.CALLS_COMPLETE, WriteTarget.BOTH):
-            raise InvalidRequest(
-                f"The project '{req.start.project_id}' has been created with a newer version of the SDK. "
-                "Please upgrade your SDK to write to this project."
-            )
+            raise CallsCompleteModeRequired(req.start.project_id)
 
         req = process_call_req_to_content(req, self)
         ch_call = _start_call_for_insert_to_ch_insertable_start_call(req.start, self)
@@ -570,10 +554,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             source=CallSource.SDK_CALLS_MERGED,
         )
         if write_target in (WriteTarget.CALLS_COMPLETE, WriteTarget.BOTH):
-            raise InvalidRequest(
-                f"The project '{req.end.project_id}' has been created with a newer version of the SDK. "
-                "Please upgrade your SDK to write to this project."
-            )
+            raise CallsCompleteModeRequired(req.end.project_id)
 
         req = process_call_req_to_content(req, self)
         ch_call = _end_call_for_insert_to_ch_insertable_end_call(req.end, self)
@@ -594,37 +575,27 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # Returns the id of the newly created call
         return tsi.CallEndRes()
 
-    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.calls_start_batch_v2")
-    def calls_start_batch(self, req: tsi.CallsStartBatchReq) -> tsi.CallsStartBatchRes:
-        """Batch insert call starts and completes directly into calls_complete table.
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.calls_upsert_complete")
+    def calls_upsert_complete(
+        self, req: tsi.CallsUpsertCompleteReq
+    ) -> tsi.CallsUpsertCompleteRes:
+        """Insert completed calls directly into calls_complete table.
 
-        Accepts start or complete call types and writes them directly to the
-        calls_complete table without needing to split the batch.
+        Accepts only completed call records and writes them directly to the
+        calls_complete table.
         """
         if not req.batch:
-            return tsi.CallsStartBatchRes()
-
-        # Extract starts and completes from batch
-        starts = []
-        completes = []
-        for item in req.batch:
-            if item.mode == "start":
-                starts.append(item.req.start)
-            elif item.mode == "complete":
-                completes.append(item.req.complete)
+            return tsi.CallsUpsertCompleteRes(res=[])
 
         self._dual_write_calls_batch(
             req.project_id,
             source=CallSource.SDK_CALLS_COMPLETE,
-            starts=starts,
-            completes=completes,
+            completes=req.batch,
         )
 
-        res = [
-            tsi.CallUpsertRes(id=c.id, trace_id=c.trace_id) for c in starts + completes
-        ]
+        res = [tsi.CallUpsertRes(id=c.id, trace_id=c.trace_id) for c in req.batch]
 
-        return tsi.CallsStartBatchRes(res=res)
+        return tsi.CallsUpsertCompleteRes(res=res)
 
     def _split_completes_into_parts(
         self, completes: list[tsi.CompletedCallSchemaForInsert]
@@ -677,7 +648,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def _write_batch_to_merged_table(
         self,
         starts: list[tsi.StartedCallSchemaForInsert],
-        ends: list[tsi.EndedCallSchemaForInsert],
         completes: list[tsi.CompletedCallSchemaForInsert],
         do_sync_insert: bool = False,
     ) -> None:
@@ -686,14 +656,14 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
 
         all_starts = starts + starts_from_completes
-        all_ends = ends + ends_from_completes
 
         ch_insertable_starts = [
             _start_call_for_insert_to_ch_insertable_start_call(start)
             for start in all_starts
         ]
         ch_insertable_ends = [
-            _end_call_for_insert_to_ch_insertable_end_call(end) for end in all_ends
+            _end_call_for_insert_to_ch_insertable_end_call(end)
+            for end in ends_from_completes
         ]
 
         batch_data = self._convert_to_batch_rows(
@@ -704,7 +674,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def _write_batch_to_complete_table(
         self,
         starts: list[tsi.StartedCallSchemaForInsert],
-        ends: list[tsi.EndedCallSchemaForInsert],
         completes: list[tsi.CompletedCallSchemaForInsert],
         do_sync_insert: bool = False,
     ) -> None:
@@ -722,15 +691,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 do_sync_insert=do_sync_insert,
             )
 
-        if ends:
-            self._update_calls_complete_batch(ends)
-
     def _dual_write_calls_batch(
         self,
         project_id: str,
         source: CallSource,
         starts: list[tsi.StartedCallSchemaForInsert] | None = None,
-        ends: list[tsi.EndedCallSchemaForInsert] | None = None,
         completes: list[tsi.CompletedCallSchemaForInsert] | None = None,
         do_sync_insert: bool = False,
     ) -> None:
@@ -746,7 +711,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 - CallSource.SDK_CALLS_MERGED: Old SDK with single-table writes only
                 - CallSource.SERVER: Server-side sources (OTEL, completions)
             starts: List of call starts to insert
-            ends: List of call ends to insert (updates existing calls)
             completes: List of complete calls to insert (start + end in one)
             do_sync_insert: If True, bypass async_insert for immediate consistency
 
@@ -754,10 +718,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             RuntimeError: If write_target is BOTH and writes to both tables fail
         """
         starts = starts or []
-        ends = ends or []
         completes = completes or []
 
-        if not starts and not ends and not completes:
+        if not starts and not completes:
             return
 
         write_target = self.table_routing_resolver.resolve_write_target(
@@ -776,16 +739,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             complete_error = None
 
             try:
-                self._write_batch_to_merged_table(
-                    starts, ends, completes, do_sync_insert
-                )
+                self._write_batch_to_merged_table(starts, completes, do_sync_insert)
             except Exception as e:
                 merged_error = e
 
             try:
-                self._write_batch_to_complete_table(
-                    starts, ends, completes, do_sync_insert
-                )
+                self._write_batch_to_complete_table(starts, completes, do_sync_insert)
             except Exception as e:
                 complete_error = e
 
@@ -804,52 +763,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     f"Errors: {'; '.join(error_details)}"
                 )
         elif write_target == WriteTarget.CALLS_MERGED:
-            self._write_batch_to_merged_table(starts, ends, completes, do_sync_insert)
+            self._write_batch_to_merged_table(starts, completes, do_sync_insert)
         elif write_target == WriteTarget.CALLS_COMPLETE:
-            self._write_batch_to_complete_table(starts, ends, completes, do_sync_insert)
-
-    def _update_calls_complete_batch(
-        self, end_calls: list[tsi.EndedCallSchemaForInsert]
-    ) -> None:
-        """Update calls_complete table with end call data.
-
-        Executes one UPDATE per call to ensure consistent patch part column structure
-        in ClickHouse lightweight updates. This prevents block structure mismatch errors
-        during merge operations in distributed/sharded environments.
-        """
-        if not end_calls:
-            return
-
-        table_name = self._get_calls_complete_table_name()
-
-        for end_call in end_calls:
-            pb = ParamBuilder()
-            command = build_calls_complete_single_update_query(
-                end_call, pb, table_name, self.clickhouse_cluster_name
-            )
-            self._command(command, pb.get_params())
-
-    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.calls_end_batch_v2")
-    def calls_end_batch(self, req: tsi.CallsEndBatchReq) -> tsi.CallsEndBatchRes:
-        """Batch update call ends in calls_complete table.
-
-        Accepts only end call types and updates existing records in the
-        calls_complete table without needing to split the batch.
-        """
-        batch_length = len(req.batch)
-        if batch_length > ch_settings.MAX_BATCH_UPDATE_CALLS:
-            raise RequestTooLarge(
-                f"Cannot update more than {ch_settings.MAX_BATCH_UPDATE_CALLS} calls at once, got: {batch_length}"
-            )
-
-        # Extract ends from batch
-        end_calls = [item.req.end for item in req.batch]
-
-        self._dual_write_calls_batch(
-            req.project_id, source=CallSource.SDK_CALLS_COMPLETE, ends=end_calls
-        )
-
-        return tsi.CallsEndBatchRes()
+            self._write_batch_to_complete_table(starts, completes, do_sync_insert)
 
     def call_read(self, req: tsi.CallReadReq) -> tsi.CallReadRes:
         res = self.calls_query_stream(
@@ -4967,8 +4883,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
             return _single_error_iter(e)
 
-        # Track start call if requested
-        start: tsi.StartedCallSchemaForInsert | None = None
+        # Build tracked inputs if tracking is requested
+        tracked_inputs: dict[str, Any] | None = None
+        call_id: str | None = None
+        started_at: datetime.datetime | None = None
         if req.track_llm_call:
             tracked_inputs = req.inputs.model_dump(exclude_none=True)
             tracked_inputs["model"] = model_name
@@ -4977,21 +4895,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 tracked_inputs["prompt"] = prompt
             if template_vars:
                 tracked_inputs["template_vars"] = template_vars
-
-            start = tsi.StartedCallSchemaForInsert(
-                id=generate_id(),
-                project_id=req.project_id,
-                wb_user_id=req.wb_user_id,
-                op_name=COMPLETIONS_CREATE_OP_NAME,
-                started_at=datetime.datetime.now(),
-                inputs=tracked_inputs,
-                attributes={},
-            )
-
-            # Use dual write for start call with server source
-            self._dual_write_calls_batch(
-                req.project_id, source=CallSource.SERVER, starts=[start]
-            )
+            call_id = generate_id()
+            started_at = datetime.datetime.now()
 
         # Set the combined messages (with template vars replaced) for LiteLLM
         req.inputs.messages = combined_messages
@@ -5014,24 +4919,31 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
 
         # If tracking not requested just return chunks directly
-        if not req.track_llm_call or start is None:
+        if (
+            not req.track_llm_call
+            or tracked_inputs is None
+            or call_id is None
+            or started_at is None
+        ):
             return chunk_iter
 
-        start_call_id = start.id
-        assert start_call_id is not None
-
-        # Otherwise, wrap the iterator with tracking
-        def finish_call_handler(end_call: tsi.EndedCallSchemaForInsert) -> None:
+        # Otherwise, wrap the iterator with tracking - insert complete call when done
+        def finish_call_handler(
+            complete_call: tsi.CompletedCallSchemaForInsert,
+        ) -> None:
             self._dual_write_calls_batch(
-                req.project_id, source=CallSource.SERVER, ends=[end_call]
+                req.project_id, source=CallSource.SERVER, completes=[complete_call]
             )
 
         return _create_tracked_stream_wrapper(
             finish_call_handler,
             chunk_iter,
-            start_call_id,
+            call_id,
+            started_at,
+            tracked_inputs,
             model_name,
             req.project_id,
+            req.wb_user_id,
         )
 
     def image_create(
@@ -6063,17 +5975,20 @@ def _process_tool_call_delta(
 
 
 def _create_tracked_stream_wrapper(
-    finish_call_handler: Callable[[tsi.EndedCallSchemaForInsert], None],
+    finish_call_handler: Callable[[tsi.CompletedCallSchemaForInsert], None],
     chunk_iter: Iterator[dict[str, Any]],
-    start_call_id: str,
+    call_id: str,
+    started_at: datetime.datetime,
+    tracked_inputs: dict[str, Any],
     model_name: str,
     project_id: str,
+    wb_user_id: str | None,
 ) -> Iterator[dict[str, Any]]:
     """Create a wrapper that tracks streaming completion and emits call records."""
 
     def _stream_wrapper() -> Iterator[dict[str, Any]]:
         # (1) send meta chunk first so clients can associate stream
-        yield {"_meta": {"weave_call_id": start_call_id}}
+        yield {"_meta": {"weave_call_id": call_id}}
 
         # Initialize accumulation variables for all choices
         aggregated_output: dict[str, Any] | None = None
@@ -6153,7 +6068,7 @@ def _create_tracked_stream_wrapper(
                     choices_array,
                 )
 
-            # Prepare summary and end call
+            # Prepare summary and complete call
             summary: dict[str, Any] = {}
             if aggregated_output is not None and model_name is not None:
                 aggregated_output["model"] = model_name
@@ -6161,14 +6076,20 @@ def _create_tracked_stream_wrapper(
                 if "usage" in aggregated_output:
                     summary["usage"] = {model_name: aggregated_output["usage"]}
 
-            end = tsi.EndedCallSchemaForInsert(
+            complete = tsi.CompletedCallSchemaForInsert(
                 project_id=project_id,
-                id=start_call_id,
+                id=call_id,
+                trace_id=call_id,  # Use call_id as trace_id for standalone calls
+                op_name=COMPLETIONS_CREATE_OP_NAME,
+                started_at=started_at,
                 ended_at=datetime.datetime.now(),
+                inputs=tracked_inputs,
                 output=aggregated_output,
                 summary=summary,
+                attributes={},
+                wb_user_id=wb_user_id,
             )
-            finish_call_handler(end)
+            finish_call_handler(complete)
 
     return _stream_wrapper()
 

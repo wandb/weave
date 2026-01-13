@@ -363,10 +363,6 @@ class CallEndRes(BaseModel):
     pass
 
 
-class CallCompleteReq(BaseModelStrict):
-    complete: CompletedCallSchemaForInsert
-
-
 class CallUpsertRes(BaseModel):
     id: str
     trace_id: str
@@ -380,11 +376,6 @@ class CallBatchStartMode(BaseModel):
 class CallBatchEndMode(BaseModel):
     mode: str = "end"
     req: CallEndReq
-
-
-class CallBatchCompleteMode(BaseModel):
-    mode: str = "complete"
-    req: CallCompleteReq
 
 
 class CallCreateBatchReq(BaseModelStrict):
@@ -2210,34 +2201,19 @@ class ScoreDeleteRes(BaseModel):
     num_deleted: int = Field(..., description="Number of scores deleted")
 
 
-class CallsStartBatchReq(BaseModel):
-    """Request for batch starting/completing calls. Accepts start or complete call types."""
+class CallsUpsertCompleteReq(BaseModel):
+    """Request for upserting completed calls directly into calls_complete table."""
 
     project_id: str = Field(
         ..., description="The `entity/project` where these calls are saved"
     )
-    batch: list[CallBatchStartMode | CallBatchCompleteMode]
+    batch: list[CompletedCallSchemaForInsert]
 
 
-class CallsStartBatchRes(BaseModel):
-    """Response for batch starting/completing calls."""
+class CallsUpsertCompleteRes(BaseModel):
+    """Response for upserting completed calls."""
 
     res: list[CallUpsertRes]
-
-
-class CallsEndBatchReq(BaseModel):
-    """Request for batch ending calls. Accepts only end call types."""
-
-    project_id: str = Field(
-        ..., description="The `entity/project` where these calls are saved"
-    )
-    batch: list[CallBatchEndMode]
-
-
-class CallsEndBatchRes(BaseModel):
-    """Response for batch ending calls. Returns empty list since ends don't return IDs."""
-
-    res: list[CallUpsertRes] = []
 
 
 class TraceServerInterface(Protocol):
@@ -2434,9 +2410,9 @@ class ObjectInterface(Protocol):
 
     # Calls V2 - Batch Endpoints
     # TODO: break out v2 endpoints from the "ObjectInterface" these are not object related
-    # TODO: this is start AND complete endpoint, we should name it something better
-    def calls_start_batch(self, req: CallsStartBatchReq) -> CallsStartBatchRes: ...
-    def calls_end_batch(self, req: CallsEndBatchReq) -> CallsEndBatchRes: ...
+    def calls_upsert_complete(
+        self, req: CallsUpsertCompleteReq
+    ) -> CallsUpsertCompleteRes: ...
 
 
 class FullTraceServerInterface(TraceServerInterface, ObjectInterface, Protocol):

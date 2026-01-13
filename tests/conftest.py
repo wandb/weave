@@ -20,7 +20,7 @@ from tests.trace_server.conftest import (
     get_calls_storage_mode,
     get_trace_server_flag,
 )
-from weave.trace import settings, weave_client, weave_init
+from weave.trace import weave_client, weave_init
 from weave.trace.context import weave_client_context
 from weave.trace.context.call_context import set_call_stack
 from weave.trace_server import trace_server_interface as tsi
@@ -31,21 +31,6 @@ from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTrace
 
 # Force testing to never report wandb sentry events
 os.environ["WANDB_ERROR_REPORTING"] = "false"
-
-
-@pytest.fixture(autouse=True)
-def set_call_start_delay_to_zero():
-    """Set call_start_delay to 0 for all tests unless explicitly overridden.
-
-    This fixture patches the call_start_delay setting to return 0.0 by default,
-    which causes call starts to be sent immediately. This prevents timing issues
-    in tests where calls might complete before their delayed starts are processed.
-
-    Tests that need to test specific delay values can override this by using their
-    own patch.object on settings.call_start_delay.
-    """
-    with patch.object(settings, "call_start_delay", return_value=0.0):
-        yield
 
 
 @pytest.fixture(autouse=True)
