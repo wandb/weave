@@ -148,7 +148,7 @@ def replace_base64_with_content_objects(
                     # More complicated false positives or failed detections will show 'application/octet-stream'
                     # The uncovered scenario is if a user has encoded a plaintext document as Base64
                     # We don't handle text content objects in a special way on the clients, so this is acceptable.
-                    content = Content.from_base64(val)
+                    content: Content[Any] = Content.from_base64(val)
                     if content.mimetype not in (
                         "text/plain",
                         "application/octet-stream",
