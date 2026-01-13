@@ -121,7 +121,8 @@ class BaseClickHouseTraceServerMigrator(ABC):
         self,
         ch_client: CHClient,
         management_db: str = "db_management",
-        migration_dir: str | None = None,
+        *,
+        migration_dir: str,
         post_migration_hook: PostMigrationHook | None = None,
     ):
         super().__init__()
@@ -132,9 +133,7 @@ class BaseClickHouseTraceServerMigrator(ABC):
         self._initialize_migration_db()
 
     @staticmethod
-    def _resolve_migration_dir(migration_dir: str | None) -> str:
-        if migration_dir is None:
-            return os.path.join(os.path.dirname(__file__), "migrations")
+    def _resolve_migration_dir(migration_dir: str) -> str:
         if not os.path.isabs(migration_dir):
             raise MigrationError(
                 f"migration_dir must be an absolute path, got: {migration_dir}"
@@ -422,7 +421,8 @@ class ReplicatedClickHouseTraceServerMigrator(BaseClickHouseTraceServerMigrator)
         replicated_path: str | None = None,
         replicated_cluster: str | None = None,
         management_db: str = "db_management",
-        migration_dir: str | None = None,
+        *,
+        migration_dir: str,
         post_migration_hook: PostMigrationHook | None = None,
     ):
         self.replicated_path = (
@@ -566,7 +566,8 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
         replicated_path: str | None = None,
         replicated_cluster: str | None = None,
         management_db: str = "db_management",
-        migration_dir: str | None = None,
+        *,
+        migration_dir: str,
         post_migration_hook: PostMigrationHook | None = None,
     ):
         logger.info(
@@ -936,6 +937,11 @@ def get_clickhouse_trace_server_migrator(
         raise MigrationError(
             "Distributed tables can only be used with replicated tables. "
             "Set replicated=True or use_distributed=False."
+        )
+
+    if migration_dir is None:
+        migration_dir = os.path.abspath(
+            os.path.join(os.path.dirname(__file__), "migrations")
         )
 
     if post_migration_hook is None:

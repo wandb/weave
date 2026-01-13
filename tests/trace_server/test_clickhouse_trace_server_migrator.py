@@ -1,4 +1,5 @@
 import types
+import os
 from unittest.mock import Mock, call, patch
 
 import pytest
@@ -10,6 +11,10 @@ from weave.trace_server.clickhouse_trace_server_migrator import (
     DistributedClickHouseTraceServerMigrator,
     MigrationError,
     ReplicatedClickHouseTraceServerMigrator,
+)
+
+DEFAULT_MIGRATION_DIR = os.path.abspath(
+    os.path.join(os.path.dirname(trace_server_migrator.__file__), "migrations")
 )
 
 
@@ -252,7 +257,9 @@ def test_is_safe_identifier(identifier, is_valid):
 def test_create_db_sql(mock_costs):
     """Test database creation SQL generation in different modes."""
     # Test cloud mode
-    cloud_migrator = CloudClickHouseTraceServerMigrator(Mock())
+    cloud_migrator = CloudClickHouseTraceServerMigrator(
+        Mock(), migration_dir=DEFAULT_MIGRATION_DIR
+    )
     sql = cloud_migrator._create_db_sql("test_db")
     assert sql.strip() == "CREATE DATABASE IF NOT EXISTS test_db"
 
@@ -262,7 +269,7 @@ def test_create_db_sql(mock_costs):
 
     # Test replicated mode
     replicated_migrator = ReplicatedClickHouseTraceServerMigrator(
-        Mock(), replicated_cluster="test_cluster"
+        Mock(), replicated_cluster="test_cluster", migration_dir=DEFAULT_MIGRATION_DIR
     )
     sql = replicated_migrator._create_db_sql("test_db")
     assert (
@@ -272,7 +279,7 @@ def test_create_db_sql(mock_costs):
     # Test invalid cluster name
     with pytest.raises(MigrationError, match="Invalid cluster name"):
         ReplicatedClickHouseTraceServerMigrator(
-            Mock(), replicated_cluster="test;cluster"
+            Mock(), replicated_cluster="test;cluster", migration_dir=DEFAULT_MIGRATION_DIR
         )
 
 
@@ -313,7 +320,7 @@ def test_create_db_sql(mock_costs):
 def test_format_replicated_sql(input_sql, expected_sql):
     """Test MergeTree engine replacement with ReplicatedMergeTree."""
     replicated_migrator = ReplicatedClickHouseTraceServerMigrator(
-        Mock(), replicated_cluster="test_cluster"
+        Mock(), replicated_cluster="test_cluster", migration_dir=DEFAULT_MIGRATION_DIR
     )
     assert replicated_migrator._format_replicated_sql(input_sql) == expected_sql
 
@@ -321,7 +328,7 @@ def test_format_replicated_sql(input_sql, expected_sql):
 def test_format_replicated_sql_distributed():
     """Test replicated SQL formatting in distributed mode with explicit paths."""
     distributed_migrator = DistributedClickHouseTraceServerMigrator(
-        Mock(), replicated_cluster="test_cluster"
+        Mock(), replicated_cluster="test_cluster", migration_dir=DEFAULT_MIGRATION_DIR
     )
     result = distributed_migrator._format_replicated_sql_distributed(
         "CREATE TABLE test (id Int32) ENGINE = MergeTree", "test_db"
@@ -375,7 +382,7 @@ def test_rename_table_to_local(sql, table_name, expected_sql):
 def test_create_distributed_table_sql():
     """Test distributed table creation SQL."""
     distributed_migrator = DistributedClickHouseTraceServerMigrator(
-        Mock(), replicated_cluster="test_cluster"
+        Mock(), replicated_cluster="test_cluster", migration_dir=DEFAULT_MIGRATION_DIR
     )
     sql = distributed_migrator._create_distributed_table_sql("test")
     expected = "CREATE TABLE IF NOT EXISTS test ON CLUSTER test_cluster\n        AS test_local\n        ENGINE = Distributed(test_cluster, currentDatabase(), test_local, rand())"
@@ -385,7 +392,7 @@ def test_create_distributed_table_sql():
 def test_format_distributed_sql():
     """Test distributed SQL formatting for CREATE TABLE and other DDL."""
     distributed_migrator = DistributedClickHouseTraceServerMigrator(
-        Mock(), replicated_cluster="test_cluster"
+        Mock(), replicated_cluster="test_cluster", migration_dir=DEFAULT_MIGRATION_DIR
     )
 
     # CREATE TABLE should create both local and distributed
@@ -510,7 +517,7 @@ def test_distributed_requires_replicated():
 def test_format_replicated_sql_idempotent():
     """Test that formatting is idempotent (doesn't double-transform)."""
     replicated_migrator = ReplicatedClickHouseTraceServerMigrator(
-        Mock(), replicated_cluster="test_cluster"
+        Mock(), replicated_cluster="test_cluster", migration_dir=DEFAULT_MIGRATION_DIR
     )
     sql = "CREATE TABLE test (id Int32) ENGINE = MergeTree"
     formatted_once = replicated_migrator._format_replicated_sql(sql)
@@ -564,7 +571,7 @@ def test_non_replicated_preserves_table_names(migrator):
 def test_add_on_cluster_clause(input_sql, expected_sql):
     """Test that ON CLUSTER clause is added correctly to various DDL statements."""
     replicated_migrator = ReplicatedClickHouseTraceServerMigrator(
-        Mock(), replicated_cluster="test_cluster"
+        Mock(), replicated_cluster="test_cluster", migration_dir=DEFAULT_MIGRATION_DIR
     )
     result = replicated_migrator._add_on_cluster_clause(input_sql)
     assert result == expected_sql
@@ -573,7 +580,7 @@ def test_add_on_cluster_clause(input_sql, expected_sql):
 def test_add_on_cluster_clause_idempotent():
     """Test that ON CLUSTER clause addition is idempotent."""
     replicated_migrator = ReplicatedClickHouseTraceServerMigrator(
-        Mock(), replicated_cluster="test_cluster"
+        Mock(), replicated_cluster="test_cluster", migration_dir=DEFAULT_MIGRATION_DIR
     )
     already_formatted = (
         "ALTER TABLE test ON CLUSTER existing_cluster ADD COLUMN x Int32"
@@ -586,7 +593,7 @@ def test_add_on_cluster_clause_idempotent():
 def test_add_on_cluster_clause_non_ddl():
     """Test that non-DDL statements are not modified."""
     replicated_migrator = ReplicatedClickHouseTraceServerMigrator(
-        Mock(), replicated_cluster="test_cluster"
+        Mock(), replicated_cluster="test_cluster", migration_dir=DEFAULT_MIGRATION_DIR
     )
     for sql in ["INSERT INTO test VALUES (1)", "SELECT * FROM test"]:
         assert replicated_migrator._add_on_cluster_clause(sql) == sql
