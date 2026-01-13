@@ -65,6 +65,7 @@ import logging
 import os
 import re
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from re import Pattern
@@ -84,6 +85,21 @@ DEFAULT_REPLICATED_CLUSTER = "weave_cluster"
 # Constants for table naming conventions
 VIEW_SUFFIX = "_view"
 
+@dataclass(frozen=True)
+class PostMigrationHookContext:
+    ch_client: CHClient
+    target_db: str
+    current_version: int
+    target_version: int | None
+
+
+PostMigrationHook = Callable[[PostMigrationHookContext], None]
+
+
+def _default_post_migration_hook(ctx: PostMigrationHookContext) -> None:
+    if should_insert_costs(ctx.current_version, ctx.target_version):
+        insert_costs(ctx.ch_client, ctx.target_db)
+
 
 class BaseClickHouseTraceServerMigrator(ABC):
     """Base class for ClickHouse trace server migration strategies.
@@ -96,20 +112,20 @@ class BaseClickHouseTraceServerMigrator(ABC):
     ch_client: CHClient
     management_db: str
     migration_dir: str
-    enable_costs: bool
+    post_migration_hook: PostMigrationHook | None
 
     def __init__(
         self,
         ch_client: CHClient,
         management_db: str = "db_management",
         migration_dir: str | None = None,
-        enable_costs: bool = True,
+        post_migration_hook: PostMigrationHook | None = _default_post_migration_hook,
     ):
         super().__init__()
         self.ch_client = ch_client
         self.management_db = management_db
         self.migration_dir = self._resolve_migration_dir(migration_dir)
-        self.enable_costs = enable_costs
+        self.post_migration_hook = post_migration_hook
         self._initialize_migration_db()
 
     @staticmethod
@@ -161,10 +177,9 @@ class BaseClickHouseTraceServerMigrator(ABC):
         )
         if len(migrations_to_apply) == 0:
             logger.info(f"No migrations to apply to `{target_db}`")
-            if self.enable_costs and should_insert_costs(
-                status["curr_version"], target_version
-            ):
-                insert_costs(self.ch_client, target_db)
+            self._run_post_migration_hook(
+                target_db, status["curr_version"], target_version
+            )
             return
         logger.info(f"Migrations to apply: {migrations_to_apply}")
         if status["curr_version"] == 0:
@@ -172,10 +187,21 @@ class BaseClickHouseTraceServerMigrator(ABC):
             self.ch_client.command(db_sql)
         for target_version, migration_file in migrations_to_apply:
             self._apply_migration(target_db, target_version, migration_file)
-        if self.enable_costs and should_insert_costs(
-            status["curr_version"], target_version
-        ):
-            insert_costs(self.ch_client, target_db)
+        self._run_post_migration_hook(target_db, status["curr_version"], target_version)
+
+    def _run_post_migration_hook(
+        self, target_db: str, current_version: int, target_version: int | None
+    ) -> None:
+        if self.post_migration_hook is None:
+            return
+        self.post_migration_hook(
+            PostMigrationHookContext(
+                ch_client=self.ch_client,
+                target_db=target_db,
+                current_version=current_version,
+                target_version=target_version,
+            )
+        )
 
     def _initialize_migration_db(self) -> None:
         """Initialize the management database and migrations table."""
@@ -394,7 +420,7 @@ class ReplicatedClickHouseTraceServerMigrator(BaseClickHouseTraceServerMigrator)
         replicated_cluster: str | None = None,
         management_db: str = "db_management",
         migration_dir: str | None = None,
-        enable_costs: bool = True,
+        post_migration_hook: PostMigrationHook | None = _default_post_migration_hook,
     ):
         self.replicated_path = (
             DEFAULT_REPLICATED_PATH if replicated_path is None else replicated_path
@@ -421,7 +447,7 @@ class ReplicatedClickHouseTraceServerMigrator(BaseClickHouseTraceServerMigrator)
             ch_client,
             management_db,
             migration_dir=migration_dir,
-            enable_costs=enable_costs,
+            post_migration_hook=post_migration_hook,
         )
 
     def _create_db_sql(self, db_name: str) -> str:
@@ -538,7 +564,7 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
         replicated_cluster: str | None = None,
         management_db: str = "db_management",
         migration_dir: str | None = None,
-        enable_costs: bool = True,
+        post_migration_hook: PostMigrationHook | None = _default_post_migration_hook,
     ):
         logger.info(
             f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} "
@@ -550,8 +576,9 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
             replicated_cluster,
             management_db,
             migration_dir=migration_dir,
-            enable_costs=enable_costs,
+            post_migration_hook=post_migration_hook,
         )
+
 
     def _create_management_table_sql(self) -> str:
         """Generate SQL to create the management table in distributed mode.
@@ -869,6 +896,7 @@ def get_clickhouse_trace_server_migrator(
     management_db: str = "db_management",
     migration_dir: str | None = None,
     enable_costs: bool = True,
+    post_migration_hook: PostMigrationHook | None = _default_post_migration_hook,
 ) -> BaseClickHouseTraceServerMigrator:
     """Factory function to create the appropriate migrator based on configuration.
 
@@ -881,6 +909,7 @@ def get_clickhouse_trace_server_migrator(
         management_db: Database name for migration management
         migration_dir: Absolute path to a directory containing `*.up.sql` / `*.down.sql`
         enable_costs: Whether to run Weave-specific costs backfill logic
+        post_migration_hook: Optional callable run after migrations (pass None to disable); defaults to the Weave costs backfill hook
 
     Returns:
         An instance of the appropriate migrator class
@@ -899,7 +928,8 @@ def get_clickhouse_trace_server_migrator(
         f"replicated_path={replicated_path}, "
         f"management_db={management_db}, "
         f"migration_dir={migration_dir}, "
-        f"enable_costs={enable_costs}"
+        f"enable_costs={enable_costs}, "
+        f"post_migration_hook={'none' if post_migration_hook is None else ('default' if post_migration_hook is _default_post_migration_hook else 'callable')}"
     )
 
     # Validate configuration
@@ -909,6 +939,9 @@ def get_clickhouse_trace_server_migrator(
             "Set replicated=True or use_distributed=False."
         )
 
+    if not enable_costs and post_migration_hook is _default_post_migration_hook:
+        post_migration_hook = None
+
     if use_distributed:
         return DistributedClickHouseTraceServerMigrator(
             ch_client,
@@ -916,24 +949,24 @@ def get_clickhouse_trace_server_migrator(
             replicated_cluster,
             management_db,
             migration_dir=migration_dir,
-            enable_costs=enable_costs,
+            post_migration_hook=post_migration_hook,
         )
-    elif replicated:
+    if replicated:
         return ReplicatedClickHouseTraceServerMigrator(
             ch_client,
             replicated_path,
             replicated_cluster,
             management_db,
             migration_dir=migration_dir,
-            enable_costs=enable_costs,
+            post_migration_hook=post_migration_hook,
         )
-    else:
-        return CloudClickHouseTraceServerMigrator(
-            ch_client,
-            management_db,
-            migration_dir=migration_dir,
-            enable_costs=enable_costs,
-        )
+
+    return CloudClickHouseTraceServerMigrator(
+        ch_client,
+        management_db,
+        migration_dir=migration_dir,
+        post_migration_hook=post_migration_hook,
+    )
 
 
 class MigrationError(RuntimeError):
