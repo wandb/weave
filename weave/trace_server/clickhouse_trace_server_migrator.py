@@ -85,6 +85,7 @@ DEFAULT_REPLICATED_CLUSTER = "weave_cluster"
 # Constants for table naming conventions
 VIEW_SUFFIX = "_view"
 
+
 @dataclass(frozen=True)
 class PostMigrationHookContext:
     ch_client: CHClient
@@ -96,7 +97,9 @@ class PostMigrationHookContext:
 PostMigrationHook = Callable[[PostMigrationHookContext], None]
 
 
-def _default_post_migration_hook(ctx: PostMigrationHookContext) -> None:
+def _default_trace_server_costs_post_migration_hook(
+    ctx: PostMigrationHookContext,
+) -> None:
     if should_insert_costs(ctx.current_version, ctx.target_version):
         insert_costs(ctx.ch_client, ctx.target_db)
 
@@ -119,7 +122,7 @@ class BaseClickHouseTraceServerMigrator(ABC):
         ch_client: CHClient,
         management_db: str = "db_management",
         migration_dir: str | None = None,
-        post_migration_hook: PostMigrationHook | None = _default_post_migration_hook,
+        post_migration_hook: PostMigrationHook | None = None,
     ):
         super().__init__()
         self.ch_client = ch_client
@@ -420,7 +423,7 @@ class ReplicatedClickHouseTraceServerMigrator(BaseClickHouseTraceServerMigrator)
         replicated_cluster: str | None = None,
         management_db: str = "db_management",
         migration_dir: str | None = None,
-        post_migration_hook: PostMigrationHook | None = _default_post_migration_hook,
+        post_migration_hook: PostMigrationHook | None = None,
     ):
         self.replicated_path = (
             DEFAULT_REPLICATED_PATH if replicated_path is None else replicated_path
@@ -564,7 +567,7 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
         replicated_cluster: str | None = None,
         management_db: str = "db_management",
         migration_dir: str | None = None,
-        post_migration_hook: PostMigrationHook | None = _default_post_migration_hook,
+        post_migration_hook: PostMigrationHook | None = None,
     ):
         logger.info(
             f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} "
@@ -578,7 +581,6 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
             migration_dir=migration_dir,
             post_migration_hook=post_migration_hook,
         )
-
 
     def _create_management_table_sql(self) -> str:
         """Generate SQL to create the management table in distributed mode.
@@ -895,8 +897,7 @@ def get_clickhouse_trace_server_migrator(
     use_distributed: bool | None = None,
     management_db: str = "db_management",
     migration_dir: str | None = None,
-    enable_costs: bool = True,
-    post_migration_hook: PostMigrationHook | None = _default_post_migration_hook,
+    post_migration_hook: PostMigrationHook | None = None,
 ) -> BaseClickHouseTraceServerMigrator:
     """Factory function to create the appropriate migrator based on configuration.
 
@@ -908,8 +909,7 @@ def get_clickhouse_trace_server_migrator(
         use_distributed: Whether to use distributed tables (requires replicated=True)
         management_db: Database name for migration management
         migration_dir: Absolute path to a directory containing `*.up.sql` / `*.down.sql`
-        enable_costs: Whether to run Weave-specific costs backfill logic
-        post_migration_hook: Optional callable run after migrations (pass None to disable); defaults to the Weave costs backfill hook
+        post_migration_hook: Optional callable run after migrations; if not provided, defaults to the Weave costs backfill hook (pass a no-op callable to disable)
 
     Returns:
         An instance of the appropriate migrator class
@@ -928,8 +928,7 @@ def get_clickhouse_trace_server_migrator(
         f"replicated_path={replicated_path}, "
         f"management_db={management_db}, "
         f"migration_dir={migration_dir}, "
-        f"enable_costs={enable_costs}, "
-        f"post_migration_hook={'none' if post_migration_hook is None else ('default' if post_migration_hook is _default_post_migration_hook else 'callable')}"
+        f"post_migration_hook={'none' if post_migration_hook is None else 'callable'}"
     )
 
     # Validate configuration
@@ -939,8 +938,8 @@ def get_clickhouse_trace_server_migrator(
             "Set replicated=True or use_distributed=False."
         )
 
-    if not enable_costs and post_migration_hook is _default_post_migration_hook:
-        post_migration_hook = None
+    if post_migration_hook is None:
+        post_migration_hook = _default_trace_server_costs_post_migration_hook
 
     if use_distributed:
         return DistributedClickHouseTraceServerMigrator(

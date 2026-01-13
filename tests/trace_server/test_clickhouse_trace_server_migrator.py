@@ -15,10 +15,13 @@ from weave.trace_server.clickhouse_trace_server_migrator import (
 
 @pytest.fixture
 def mock_costs():
-    with patch(
-        "weave.trace_server.clickhouse_trace_server_migrator.should_insert_costs",
-        return_value=False,
-    ), patch("weave.trace_server.clickhouse_trace_server_migrator.insert_costs"):
+    with (
+        patch(
+            "weave.trace_server.clickhouse_trace_server_migrator.should_insert_costs",
+            return_value=False,
+        ),
+        patch("weave.trace_server.clickhouse_trace_server_migrator.insert_costs"),
+    ):
         yield
 
 
@@ -136,8 +139,12 @@ def test_migration_dir_must_be_absolute():
 
 def test_apply_migrations_costs_disabled_does_not_call_costs():
     ch_client = Mock()
+
+    def no_post_migration_hook(ctx):
+        return
+
     migrator = trace_server_migrator.get_clickhouse_trace_server_migrator(
-        ch_client, enable_costs=False
+        ch_client, post_migration_hook=no_post_migration_hook
     )
     migrator._get_migration_status = Mock()
     migrator._get_migrations = Mock()
@@ -152,11 +159,14 @@ def test_apply_migrations_costs_disabled_does_not_call_costs():
     }
     migrator._determine_migrations_to_apply.return_value = []
 
-    with patch(
-        "weave.trace_server.clickhouse_trace_server_migrator.should_insert_costs"
-    ) as mock_should_insert_costs, patch(
-        "weave.trace_server.clickhouse_trace_server_migrator.insert_costs"
-    ) as mock_insert_costs:
+    with (
+        patch(
+            "weave.trace_server.clickhouse_trace_server_migrator.should_insert_costs"
+        ) as mock_should_insert_costs,
+        patch(
+            "weave.trace_server.clickhouse_trace_server_migrator.insert_costs"
+        ) as mock_insert_costs,
+    ):
         migrator.apply_migrations("test_db")
 
     mock_should_insert_costs.assert_not_called()
