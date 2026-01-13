@@ -144,12 +144,8 @@ def test_migration_dir_must_be_absolute():
 
 def test_apply_migrations_costs_disabled_does_not_call_costs():
     ch_client = Mock()
-
-    def no_post_migration_hook(ctx):
-        return
-
     migrator = trace_server_migrator.get_clickhouse_trace_server_migrator(
-        ch_client, post_migration_hook=no_post_migration_hook
+        ch_client, post_migration_hook=None
     )
     migrator._get_migration_status = Mock()
     migrator._get_migrations = Mock()

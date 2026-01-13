@@ -898,7 +898,7 @@ def get_clickhouse_trace_server_migrator(
     use_distributed: bool | None = None,
     management_db: str = "db_management",
     migration_dir: str | None = None,
-    post_migration_hook: PostMigrationHook | None = None,
+    post_migration_hook: PostMigrationHook | None = _default_trace_server_costs_post_migration_hook,
 ) -> BaseClickHouseTraceServerMigrator:
     """Factory function to create the appropriate migrator based on configuration.
 
@@ -910,7 +910,7 @@ def get_clickhouse_trace_server_migrator(
         use_distributed: Whether to use distributed tables (requires replicated=True)
         management_db: Database name for migration management
         migration_dir: Absolute path to a directory containing `*.up.sql` / `*.down.sql`
-        post_migration_hook: Optional callable run after migrations; if not provided, defaults to the Weave costs backfill hook (pass a no-op callable to disable)
+        post_migration_hook: Optional callable run after migrations; defaults to the Weave costs backfill hook (pass None to disable)
 
     Returns:
         An instance of the appropriate migrator class
@@ -943,9 +943,6 @@ def get_clickhouse_trace_server_migrator(
         migration_dir = os.path.abspath(
             os.path.join(os.path.dirname(__file__), "migrations")
         )
-
-    if post_migration_hook is None:
-        post_migration_hook = _default_trace_server_costs_post_migration_hook
 
     if use_distributed:
         return DistributedClickHouseTraceServerMigrator(
