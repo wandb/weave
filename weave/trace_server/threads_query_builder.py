@@ -1,6 +1,6 @@
 import datetime
 
-from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.common_interface import SortBy
 from weave.trace_server.orm import ParamBuilder
 
 
@@ -10,7 +10,7 @@ def make_threads_query(
     *,
     limit: int | None = None,
     offset: int | None = None,
-    sort_by: list[tsi.SortBy] | None = None,
+    sort_by: list[SortBy] | None = None,
     sortable_datetime_after: datetime.datetime | None = None,
     sortable_datetime_before: datetime.datetime | None = None,
     thread_ids: list[str] | None = None,
@@ -193,7 +193,7 @@ def make_threads_query_sqlite(
     *,
     limit: int | None = None,
     offset: int | None = None,
-    sort_by: list[tsi.SortBy] | None = None,
+    sort_by: list[SortBy] | None = None,
     sortable_datetime_after: datetime.datetime | None = None,
     sortable_datetime_before: datetime.datetime | None = None,
     thread_ids: list[str] | None = None,

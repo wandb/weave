@@ -17,6 +17,7 @@ from weave.trace.refs import CallRef, ObjectRef, OpRef
 from weave.trace.serialization.serialize import from_json
 from weave.trace.util import log_once
 from weave.trace.vals import WeaveObject
+from weave.trace_server.common_interface import SortBy
 from weave.trace_server.constants import MAX_DISPLAY_NAME_LENGTH
 from weave.trace_server.interface.query import Query
 from weave.trace_server.trace_server_interface import (
@@ -24,7 +25,6 @@ from weave.trace_server.trace_server_interface import (
     CallsFilter,
     CallsQueryReq,
     CallsQueryStatsReq,
-    SortBy,
     TraceServerInterface,
 )
 from weave.utils.attributes_dict import AttributesDict

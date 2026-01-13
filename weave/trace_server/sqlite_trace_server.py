@@ -16,6 +16,7 @@ from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
 from weave.trace_server import constants, object_creation_utils
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.common_interface import SortBy
 from weave.trace_server.errors import (
     InvalidRequest,
     NotFoundError,
@@ -3521,7 +3522,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         limit: int | None = None,
         include_deleted: bool = False,
         offset: int | None = None,
-        sort_by: list[tsi.SortBy] | None = None,
+        sort_by: list[SortBy] | None = None,
     ) -> list[tsi.ObjSchema]:
         conn, cursor = get_conn_cursor(self.db_path)
         conditions = conditions or []
