@@ -18,6 +18,7 @@ from weave.trace.refs import ObjectRef, OpRef
 from weave.trace.traverse import ObjectPath, get_paths
 from weave.trace.vals import WeaveObject
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.common_interface import SortBy
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.interface.builtin_object_classes.saved_view import Column, Pin
 from weave.trace_server.interface.builtin_object_classes.saved_view import (
@@ -49,7 +50,7 @@ COLUMN_ALIASES = {
     "Status": "summary.weave.status",
 }
 
-# This needs to be kept in sync with the type of the direction field of tsi.SortBy
+# This needs to be kept in sync with the type of the direction field of SortBy
 SortDirection = Literal["asc", "desc"]
 
 
@@ -597,7 +598,7 @@ class SavedView:
     def add_sort(self, field: str, direction: SortDirection) -> SavedView:
         if self.base.definition.sort_by is None:
             self.base.definition.sort_by = []
-        clause = tsi.SortBy(field=field, direction=direction)
+        clause = SortBy(field=field, direction=direction)
         self.base.definition.sort_by.append(clause)
         return self
 

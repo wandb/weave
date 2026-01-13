@@ -37,6 +37,15 @@ from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_common as tsc
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.actions_worker.dispatcher import execute_batch
+from weave.trace_server.annotation_queues_query_builder import (
+    make_queue_add_calls_check_duplicates_query,
+    make_queue_add_calls_fetch_calls_query,
+    make_queue_create_query,
+    make_queue_items_query,
+    make_queue_read_query,
+    make_queues_query,
+    make_queues_stats_query,
+)
 from weave.trace_server.base64_content_conversion import (
     process_call_req_to_content,
 )
@@ -640,6 +649,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         # We put summary_dump last so that when we compute the costs and summary its in the right place
         if req.include_costs:
+            set_current_span_dd_tags({"include_costs": "true"})
             summary_columns = ["summary", "summary_dump"]
             columns = [
                 *[col for col in columns if col not in summary_columns],
@@ -677,6 +687,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         select_columns = [c.field for c in cq.select_fields]
         expand_columns = req.expand_columns or []
         include_feedback = req.include_feedback or False
+
+        if include_feedback:
+            set_current_span_dd_tags({"include_feedback": "true"})
+        if expand_columns:
+            set_current_span_dd_tags({"expand_columns": "true"})
 
         def row_to_call_schema_dict(row: tuple[Any, ...]) -> dict[str, Any]:
             return _ch_call_dict_to_call_schema_dict(
@@ -1520,6 +1535,285 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 p50_turn_duration_ms=p50_turn_duration_ms,
                 p99_turn_duration_ms=p99_turn_duration_ms,
             )
+
+    # Annotation Queue API
+    def annotation_queue_create(
+        self, req: tsi.AnnotationQueueCreateReq
+    ) -> tsi.AnnotationQueueCreateRes:
+        """Create a new annotation queue."""
+        assert_non_null_wb_user_id(req)
+        pb = ParamBuilder()
+
+        # Generate UUIDv7 for the queue
+        queue_id = generate_id()
+
+        # Get wb_user_id from request (should be set by auth layer)
+        created_by = req.wb_user_id
+        assert created_by is not None  # Ensured by assert_non_null_wb_user_id
+
+        # Build and execute INSERT query
+        query = make_queue_create_query(
+            project_id=req.project_id,
+            queue_id=queue_id,
+            name=req.name,
+            description=req.description,
+            scorer_refs=req.scorer_refs,
+            created_by=created_by,
+            pb=pb,
+        )
+
+        self.ch_client.command(query, parameters=pb.get_params())
+
+        return tsi.AnnotationQueueCreateRes(id=queue_id)
+
+    def annotation_queues_query_stream(
+        self, req: tsi.AnnotationQueuesQueryReq
+    ) -> Iterator[tsi.AnnotationQueueSchema]:
+        """Stream annotation queues for a project."""
+        pb = ParamBuilder()
+
+        query = make_queues_query(
+            project_id=req.project_id,
+            pb=pb,
+            name=req.name,
+            sort_by=req.sort_by,
+            limit=req.limit,
+            offset=req.offset,
+        )
+
+        # Stream the results using _query_stream
+        raw_res = self._query_stream(query, pb.get_params())
+
+        for row in raw_res:
+            (
+                queue_id,
+                project_id,
+                name,
+                description,
+                scorer_refs,
+                created_at,
+                created_by,
+                updated_at,
+                deleted_at,
+            ) = row
+
+            # Ensure datetimes have timezone info
+            created_at_with_tz = _ensure_datetimes_have_tz(created_at)
+            updated_at_with_tz = _ensure_datetimes_have_tz(updated_at)
+            deleted_at_with_tz = _ensure_datetimes_have_tz(deleted_at)
+
+            if created_at_with_tz is None or updated_at_with_tz is None:
+                # Skip queues without valid timestamps
+                continue
+
+            yield tsi.AnnotationQueueSchema(
+                id=str(queue_id),  # Convert UUID to string
+                project_id=project_id,
+                name=name,
+                description=description,
+                scorer_refs=scorer_refs,
+                created_at=created_at_with_tz,
+                created_by=created_by,
+                updated_at=updated_at_with_tz,
+                deleted_at=deleted_at_with_tz,
+            )
+
+    def annotation_queue_read(
+        self, req: tsi.AnnotationQueueReadReq
+    ) -> tsi.AnnotationQueueReadRes:
+        """Read a specific annotation queue."""
+        pb = ParamBuilder()
+
+        query = make_queue_read_query(
+            project_id=req.project_id,
+            queue_id=req.queue_id,
+            pb=pb,
+        )
+
+        result = self.ch_client.query(query, parameters=pb.get_params())
+        rows = result.named_results()
+
+        if not rows:
+            raise NotFoundError(f"Queue {req.queue_id} not found")
+
+        row = next(rows)
+        queue = tsi.AnnotationQueueSchema(
+            id=str(row["id"]),
+            project_id=row["project_id"],
+            name=row["name"],
+            description=row["description"],
+            scorer_refs=row["scorer_refs"],
+            created_at=_ensure_datetimes_have_tz(row["created_at"]),
+            created_by=row["created_by"],
+            updated_at=_ensure_datetimes_have_tz(row["updated_at"]),
+            deleted_at=_ensure_datetimes_have_tz(row["deleted_at"]),
+        )
+
+        return tsi.AnnotationQueueReadRes(queue=queue)
+
+    def annotation_queue_add_calls(
+        self, req: tsi.AnnotationQueueAddCallsReq
+    ) -> tsi.AnnotationQueueAddCallsRes:
+        """Add calls to an annotation queue in batch with duplicate prevention."""
+        assert_non_null_wb_user_id(req)
+        pb = ParamBuilder()
+
+        # Step 1: Check for existing calls (duplicate prevention)
+        dup_query = make_queue_add_calls_check_duplicates_query(
+            project_id=req.project_id,
+            queue_id=req.queue_id,
+            call_ids=req.call_ids,
+            pb=pb,
+        )
+
+        dup_result = self.ch_client.query(dup_query, parameters=pb.get_params())
+        existing_call_ids = {row[0] for row in dup_result.result_rows}
+        new_call_ids = [cid for cid in req.call_ids if cid not in existing_call_ids]
+
+        if not new_call_ids:
+            return tsi.AnnotationQueueAddCallsRes(
+                added_count=0, duplicates=len(req.call_ids)
+            )
+
+        # Step 2: Fetch call details for caching
+        pb2 = ParamBuilder()
+        calls_query = make_queue_add_calls_fetch_calls_query(
+            project_id=req.project_id,
+            call_ids=new_call_ids,
+            pb=pb2,
+        )
+
+        calls_result = self.ch_client.query(calls_query, parameters=pb2.get_params())
+        calls_data = list(calls_result.named_results())
+
+        if not calls_data:
+            # No calls found in database
+            return tsi.AnnotationQueueAddCallsRes(
+                added_count=0, duplicates=len(existing_call_ids)
+            )
+
+        # Step 3: Create queue items
+        queue_items_rows = []
+        added_by = req.wb_user_id
+
+        for call in calls_data:
+            queue_item_id = generate_id()
+
+            # Queue item row (must be tuple in column order)
+            queue_items_rows.append(
+                (
+                    queue_item_id,
+                    req.project_id,
+                    req.queue_id,
+                    call["id"],
+                    call["started_at"],
+                    call["ended_at"],
+                    call["op_name"] or "",
+                    call["trace_id"] or "",
+                    req.display_fields,
+                    added_by,
+                    added_by,
+                )
+            )
+
+        # Step 4: Batch insert queue items
+        self.ch_client.insert(
+            "annotation_queue_items",
+            queue_items_rows,
+            column_names=[
+                "id",
+                "project_id",
+                "queue_id",
+                "call_id",
+                "call_started_at",
+                "call_ended_at",
+                "call_op_name",
+                "call_trace_id",
+                "display_fields",
+                "added_by",
+                "created_by",
+            ],
+        )
+
+        return tsi.AnnotationQueueAddCallsRes(
+            added_count=len(calls_data), duplicates=len(existing_call_ids)
+        )
+
+    def annotation_queue_items_query(
+        self, req: tsi.AnnotationQueueItemsQueryReq
+    ) -> tsi.AnnotationQueueItemsQueryRes:
+        """Query items in an annotation queue with pagination, sorting, and filtering."""
+        pb = ParamBuilder()
+
+        query = make_queue_items_query(
+            project_id=req.project_id,
+            queue_id=req.queue_id,
+            pb=pb,
+            filter=req.filter,
+            sort_by=req.sort_by,
+            limit=req.limit,
+            offset=req.offset,
+            include_position=req.include_position,
+        )
+
+        result = self.ch_client.query(query, parameters=pb.get_params())
+
+        items = []
+        for row in result.named_results():
+            items.append(
+                tsi.AnnotationQueueItemSchema(
+                    id=row["id"],
+                    project_id=row["project_id"],
+                    queue_id=row["queue_id"],
+                    call_id=row["call_id"],
+                    call_started_at=row["call_started_at"],
+                    call_ended_at=row["call_ended_at"],
+                    call_op_name=row["call_op_name"],
+                    call_trace_id=row["call_trace_id"],
+                    display_fields=row["display_fields"],
+                    added_by=row["added_by"],
+                    annotation_state=row["annotation_state"],
+                    created_at=row["created_at"],
+                    created_by=row["created_by"],
+                    updated_at=row["updated_at"],
+                    deleted_at=row["deleted_at"],
+                    position_in_queue=row.get("position_in_queue"),
+                )
+            )
+
+        return tsi.AnnotationQueueItemsQueryRes(items=items)
+
+    def annotation_queues_stats(
+        self, req: tsi.AnnotationQueuesStatsReq
+    ) -> tsi.AnnotationQueuesStatsRes:
+        """Get stats for multiple annotation queues."""
+        if not req.queue_ids:
+            # Return empty stats if no queue IDs provided
+            return tsi.AnnotationQueuesStatsRes(stats=[])
+
+        pb = ParamBuilder()
+
+        query = make_queues_stats_query(
+            project_id=req.project_id,
+            queue_ids=req.queue_ids,
+            pb=pb,
+        )
+
+        result = self.ch_client.query(query, parameters=pb.get_params())
+
+        stats = []
+        for row in result.result_rows:
+            # Row order: queue_id, total_items, completed_items
+            queue_id, total_items, completed_items = row
+            stats.append(
+                tsi.AnnotationQueueStatsSchema(
+                    queue_id=str(queue_id),
+                    total_items=int(total_items),
+                    completed_items=int(completed_items),
+                )
+            )
+
+        return tsi.AnnotationQueuesStatsRes(stats=stats)
 
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
         """Create an op object by delegating to obj_create.

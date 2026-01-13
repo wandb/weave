@@ -1,7 +1,7 @@
 import pytest
 import sqlparse
 
-from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.common_interface import SortBy
 from weave.trace_server.objects_query_builder import (
     ObjectMetadataQueryBuilder,
     _make_conditions_part,
@@ -29,17 +29,17 @@ def test_make_sort_part():
     assert _make_sort_part(None) == ""
     assert _make_sort_part([]) == ""
 
-    sort_by = [tsi.SortBy(field="created_at", direction="asc")]
+    sort_by = [SortBy(field="created_at", direction="asc")]
     assert _make_sort_part(sort_by) == "ORDER BY created_at ASC"
 
     sort_by = [
-        tsi.SortBy(field="created_at", direction="desc"),
-        tsi.SortBy(field="object_id", direction="asc"),
+        SortBy(field="created_at", direction="desc"),
+        SortBy(field="object_id", direction="asc"),
     ]
     assert _make_sort_part(sort_by) == "ORDER BY created_at DESC, object_id ASC"
 
     # Invalid sort fields should be ignored
-    sort_by = [tsi.SortBy(field="invalid_field", direction="asc")]
+    sort_by = [SortBy(field="invalid_field", direction="asc")]
     assert _make_sort_part(sort_by) == ""
 
 
