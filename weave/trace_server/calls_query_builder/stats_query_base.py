@@ -185,3 +185,58 @@ def build_calls_filter_sql(
         return ""
 
     return " AND " + combine_conditions(where_clauses, "AND")
+
+
+def build_grouped_calls_subquery(
+    project_param: str,
+    start_param: str,
+    end_param: str,
+    tz_param: str,
+    where_filter_sql: str,
+    select_columns: list[str],
+) -> str:
+    """Build SQL for a grouped calls subquery that collapses unmerged call parts.
+
+    Args:
+        project_param: Parameter name for the project ID.
+        start_param: Parameter name for the start timestamp (epoch seconds).
+        end_param: Parameter name for the end timestamp (epoch seconds).
+        tz_param: Parameter name for the timezone string.
+        where_filter_sql: Additional WHERE filters (should include leading AND).
+        select_columns: Column names to aggregate using anyIf for non-null selection.
+
+    Returns:
+        SQL string for the grouped calls subquery.
+
+    Examples:
+        >>> sql = build_grouped_calls_subquery(
+        ...     "pb_0",
+        ...     "pb_1",
+        ...     "pb_2",
+        ...     "pb_3",
+        ...     "",
+        ...     ["summary_dump"],
+        ... )
+        >>> "GROUP BY project_id, id" in sql
+        True
+    """
+    if not select_columns:
+        raise ValueError("select_columns must include at least one column")
+
+    table_alias = "cm"
+    select_sql = ",\n              ".join(
+        f"anyIf({table_alias}.{column}, {table_alias}.{column} IS NOT NULL) AS {column}"
+        for column in select_columns
+    )
+
+    return f"""
+        SELECT
+              {select_sql}
+        FROM calls_merged AS {table_alias}
+        WHERE
+              {table_alias}.project_id = {param_slot(project_param, "String")}
+              AND {table_alias}.sortable_datetime >= toDateTime({param_slot(start_param, "Float64")}, {param_slot(tz_param, "String")})
+              AND {table_alias}.sortable_datetime < toDateTime({param_slot(end_param, "Float64")}, {param_slot(tz_param, "String")})
+              AND {table_alias}.deleted_at IS NULL{where_filter_sql}
+        GROUP BY project_id, id
+        """

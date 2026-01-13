@@ -3,7 +3,7 @@ from collections.abc import Iterator
 from enum import Enum
 from typing import Any, Literal, Protocol
 
-from pydantic import BaseModel, ConfigDict, Field, field_serializer
+from pydantic import BaseModel, ConfigDict, Field, field_serializer, model_validator
 from typing_extensions import TypedDict
 
 from weave.trace_server import http_service_interface as his
@@ -2350,3 +2350,142 @@ class FullTraceServerInterface(TraceServerInterface, ObjectInterface, Protocol):
     """
 
     pass
+
+
+class AggregationType(str, Enum):
+    """Basic aggregation functions for metrics."""
+
+    SUM = "sum"
+    AVG = "avg"
+    MIN = "min"
+    MAX = "max"
+    COUNT = "count"
+
+
+UsageMetric = Literal[
+    "input_tokens",
+    "output_tokens",
+    "total_tokens",
+    "input_cost",
+    "output_cost",
+    "total_cost",
+]
+"""Supported usage metrics grouped by model.
+
+Token metrics are extracted from summary.usage[model]:
+- input_tokens: Sum of prompt_tokens (OpenAI) and input_tokens (Anthropic/others)
+- output_tokens: Sum of completion_tokens (OpenAI) and output_tokens (Anthropic/others)
+- total_tokens: Total tokens (input + output)
+
+Cost metrics are computed post-query by multiplying token counts by prices from llm_token_prices:
+- input_cost: input_tokens * prompt_token_cost
+- output_cost: output_tokens * completion_token_cost
+- total_cost: input_cost + output_cost
+"""
+
+
+class UsageMetricSpec(BaseModelStrict):
+    """Specification for a usage metric to aggregate (grouped by model)."""
+
+    metric: UsageMetric = Field(
+        description="Metric to aggregate. Token metrics are normalized across providers."
+    )
+    aggregations: list[AggregationType] = Field(
+        default=[AggregationType.SUM],
+        description="Basic aggregation functions to apply",
+    )
+    percentiles: list[float] = Field(
+        default=[],
+        description="Percentile values to compute (0-100). E.g., [50, 95, 99] for p50, p95, p99",
+    )
+
+
+CallMetric = Literal[
+    "latency_ms",
+    "call_count",
+    "error_count",
+]
+"""Call-level metrics computed from call data directly.
+
+- latency_ms: Call duration in milliseconds (ended_at - started_at)
+- call_count: Number of calls
+- error_count: Number of calls with errors (exception is not null)
+"""
+
+
+class CallMetricSpec(BaseModelStrict):
+    """Specification for a call-level metric to aggregate (not grouped by model)."""
+
+    metric: CallMetric = Field(description="Metric to aggregate.")
+    aggregations: list[AggregationType] = Field(
+        default=[AggregationType.SUM],
+        description="Basic aggregation functions to apply",
+    )
+    percentiles: list[float] = Field(
+        default=[],
+        description="Percentile values to compute (0-100). E.g., [50, 95, 99] for p50, p95, p99",
+    )
+
+
+MAX_CALL_STATS_RANGE_DAYS = 31
+MAX_CALL_STATS_RANGE = datetime.timedelta(days=MAX_CALL_STATS_RANGE_DAYS)
+
+
+class CallStatsReq(BaseModelStrict):
+    """Request for aggregated call statistics over a time range."""
+
+    project_id: str
+
+    start: datetime.datetime = Field(
+        description="Inclusive start time (UTC, ISO 8601).",
+    )
+    end: datetime.datetime | None = Field(
+        default=None,
+        description="Exclusive end time (UTC, ISO 8601). Defaults to now if omitted.",
+    )
+    granularity: int | None = Field(
+        default=None,
+        description="Bucket size in seconds (e.g., 3600 for 1 hour). If omitted, auto-selected based on time range. Will be adjusted if it would produce more than 10,000 buckets.",
+    )
+    usage_metrics: list[UsageMetricSpec] | None = Field(
+        default=None,
+        description="Usage metrics (tokens, cost) to compute. Grouped by timestamp and model.",
+    )
+    call_metrics: list[CallMetricSpec] | None = Field(
+        default=None,
+        description="Call-level metrics (latency, counts) to compute. Grouped by timestamp only.",
+    )
+    filter: CallsFilter | None = None
+    timezone: str = Field(
+        default="UTC",
+        description="IANA timezone for bucket alignment (e.g., 'America/New_York')",
+    )
+
+    @model_validator(mode="after")
+    def validate_date_range(self) -> "CallStatsReq":
+        """Ensure call stats requests are bounded to a safe date range."""
+        end = self.end or datetime.datetime.now(datetime.timezone.utc)
+        if end < self.start:
+            raise ValueError("CallStatsReq end must be after start")
+        if end - self.start > MAX_CALL_STATS_RANGE:
+            raise ValueError(
+                f"CallStatsReq date range cannot exceed {MAX_CALL_STATS_RANGE_DAYS} days"
+            )
+        return self
+
+
+class CallStatsRes(BaseModel):
+    """Response containing time-series call statistics."""
+
+    start: datetime.datetime = Field(description="Resolved start time (UTC)")
+    end: datetime.datetime = Field(description="Resolved end time (UTC)")
+    granularity: int = Field(description="Bucket size used (in seconds)")
+    timezone: str = Field(description="Timezone used for bucket alignment")
+    usage_buckets: list[dict[str, Any]] = Field(
+        default=[],
+        description="Usage metrics by model. Each bucket contains 'timestamp', 'model', and aggregated metric values.",
+    )
+    call_buckets: list[dict[str, Any]] = Field(
+        default=[],
+        description="Call-level metrics. Each bucket contains 'timestamp' and aggregated metric values.",
+    )

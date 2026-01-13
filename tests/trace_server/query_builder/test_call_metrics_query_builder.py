@@ -36,27 +36,35 @@ def test_latency_basic():
         metrics,
         """
         WITH all_buckets AS
-            (SELECT toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 3600 SECOND, {pb_3:String}) + toIntervalSecond(number * {pb_4:Int64}) AS bucket
-            FROM numbers(toUInt64(ceil((toUnixTimestamp(toDateTime({pb_2:Float64}, {pb_3:String})) - toUnixTimestamp(toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 3600 SECOND, {pb_3:String}))) / {pb_4:Float64})))
-            WHERE bucket < toDateTime({pb_2:Float64}, {pb_3:String}) ),
-            aggregated_data AS
-            (SELECT bucket,
-                    avgOrNull(m_latency_ms) AS avg_latency_ms,
-                    maxOrNull(m_latency_ms) AS max_latency_ms,
-                    count() AS count
-            FROM
-                (SELECT toStartOfInterval(sortable_datetime, INTERVAL 3600 SECOND, {pb_3:String}) AS bucket,
-                        dateDiff('millisecond', started_at, ended_at) AS m_latency_ms
-                FROM calls_merged
-                WHERE project_id = {pb_0:String}
-                    AND sortable_datetime >= toDateTime({pb_1:Float64}, {pb_3:String})
-                    AND sortable_datetime < toDateTime({pb_2:Float64}, {pb_3:String})
-                    AND deleted_at IS NULL )
-            GROUP BY bucket )
+          (SELECT toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 3600 SECOND, {pb_3:String}) + toIntervalSecond(number * {pb_4:Int64}) AS bucket
+           FROM numbers(toUInt64(ceil((toUnixTimestamp(toDateTime({pb_2:Float64}, {pb_3:String})) - toUnixTimestamp(toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 3600 SECOND, {pb_3:String}))) / {pb_4:Float64})))
+           WHERE bucket < toDateTime({pb_2:Float64}, {pb_3:String}) ),
+             aggregated_data AS
+          (SELECT bucket,
+                  avgOrNull(m_latency_ms) AS avg_latency_ms,
+                  maxOrNull(m_latency_ms) AS max_latency_ms,
+                  count() AS count
+           FROM
+             (SELECT toStartOfInterval(sortable_datetime, INTERVAL 3600 SECOND, {pb_3:String}) AS bucket,
+                     dateDiff('millisecond', started_at, ended_at) AS m_latency_ms
+              FROM
+                (SELECT anyIf(cm.sortable_datetime, cm.sortable_datetime IS NOT NULL) AS sortable_datetime,
+                        anyIf(cm.started_at, cm.started_at IS NOT NULL) AS started_at,
+                        anyIf(cm.ended_at, cm.ended_at IS NOT NULL) AS ended_at,
+                        anyIf(cm.exception, cm.exception IS NOT NULL) AS
+                 exception
+                 FROM calls_merged AS cm
+                 WHERE cm.project_id = {pb_0:String}
+                   AND cm.sortable_datetime >= toDateTime({pb_1:Float64}, {pb_3:String})
+                   AND cm.sortable_datetime < toDateTime({pb_2:Float64}, {pb_3:String})
+                   AND cm.deleted_at IS NULL
+                 GROUP BY project_id,
+                          id))
+           GROUP BY bucket)
         SELECT all_buckets.bucket AS timestamp,
-            COALESCE(aggregated_data.avg_latency_ms, 0) AS avg_latency_ms,
-            aggregated_data.max_latency_ms AS max_latency_ms,
-            COALESCE(aggregated_data.count, 0) AS count
+               COALESCE(aggregated_data.avg_latency_ms, 0) AS avg_latency_ms,
+               aggregated_data.max_latency_ms AS max_latency_ms,
+               COALESCE(aggregated_data.count, 0) AS count
         FROM all_buckets
         LEFT JOIN aggregated_data ON all_buckets.bucket = aggregated_data.bucket
         ORDER BY all_buckets.bucket
@@ -94,28 +102,37 @@ def test_call_and_error_counts():
         metrics,
         """
         WITH all_buckets AS
-            (SELECT toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 3600 SECOND, {pb_3:String}) + toIntervalSecond(number * {pb_4:Int64}) AS bucket
-            FROM numbers(toUInt64(ceil((toUnixTimestamp(toDateTime({pb_2:Float64}, {pb_3:String})) - toUnixTimestamp(toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 3600 SECOND, {pb_3:String}))) / {pb_4:Float64})))
-            WHERE bucket < toDateTime({pb_2:Float64}, {pb_3:String}) ),
-            aggregated_data AS
-            (SELECT bucket,
-                    sumOrNull(m_call_count) AS sum_call_count,
-                    sumOrNull(m_error_count) AS sum_error_count,
-                    count() AS count
-            FROM
-                (SELECT toStartOfInterval(sortable_datetime, INTERVAL 3600 SECOND, {pb_3:String}) AS bucket,
-                        1 AS m_call_count,
-                        if(exception IS NOT NULL, 1, 0) AS m_error_count
-                FROM calls_merged
-                WHERE project_id = {pb_0:String}
-                    AND sortable_datetime >= toDateTime({pb_1:Float64}, {pb_3:String})
-                    AND sortable_datetime < toDateTime({pb_2:Float64}, {pb_3:String})
-                    AND deleted_at IS NULL )
-            GROUP BY bucket )
+          (SELECT toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 3600 SECOND, {pb_3:String}) + toIntervalSecond(number * {pb_4:Int64}) AS bucket
+           FROM numbers(toUInt64(ceil((toUnixTimestamp(toDateTime({pb_2:Float64}, {pb_3:String})) - toUnixTimestamp(toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 3600 SECOND, {pb_3:String}))) / {pb_4:Float64})))
+           WHERE bucket < toDateTime({pb_2:Float64}, {pb_3:String}) ),
+             aggregated_data AS
+          (SELECT bucket,
+                  sumOrNull(m_call_count) AS sum_call_count,
+                  sumOrNull(m_error_count) AS sum_error_count,
+                  count() AS count
+           FROM
+             (SELECT toStartOfInterval(sortable_datetime, INTERVAL 3600 SECOND, {pb_3:String}) AS bucket,
+                     1 AS m_call_count,
+                     if(
+                        exception IS NOT NULL, 1, 0) AS m_error_count
+              FROM
+                (SELECT anyIf(cm.sortable_datetime, cm.sortable_datetime IS NOT NULL) AS sortable_datetime,
+                        anyIf(cm.started_at, cm.started_at IS NOT NULL) AS started_at,
+                        anyIf(cm.ended_at, cm.ended_at IS NOT NULL) AS ended_at,
+                        anyIf(cm.exception, cm.exception IS NOT NULL) AS
+                 exception
+                 FROM calls_merged AS cm
+                 WHERE cm.project_id = {pb_0:String}
+                   AND cm.sortable_datetime >= toDateTime({pb_1:Float64}, {pb_3:String})
+                   AND cm.sortable_datetime < toDateTime({pb_2:Float64}, {pb_3:String})
+                   AND cm.deleted_at IS NULL
+                 GROUP BY project_id,
+                          id))
+           GROUP BY bucket)
         SELECT all_buckets.bucket AS timestamp,
-            COALESCE(aggregated_data.sum_call_count, 0) AS sum_call_count,
-            COALESCE(aggregated_data.sum_error_count, 0) AS sum_error_count,
-            COALESCE(aggregated_data.count, 0) AS count
+               COALESCE(aggregated_data.sum_call_count, 0) AS sum_call_count,
+               COALESCE(aggregated_data.sum_error_count, 0) AS sum_error_count,
+               COALESCE(aggregated_data.count, 0) AS count
         FROM all_buckets
         LEFT JOIN aggregated_data ON all_buckets.bucket = aggregated_data.bucket
         ORDER BY all_buckets.bucket
@@ -161,33 +178,41 @@ def test_all_aggregation_types():
         metrics,
         """
         WITH all_buckets AS
-            (SELECT toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 300 SECOND, {pb_3:String}) + toIntervalSecond(number * {pb_4:Int64}) AS bucket
-            FROM numbers(toUInt64(ceil((toUnixTimestamp(toDateTime({pb_2:Float64}, {pb_3:String})) - toUnixTimestamp(toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 300 SECOND, {pb_3:String}))) / {pb_4:Float64})))
-            WHERE bucket < toDateTime({pb_2:Float64}, {pb_3:String}) ),
-            aggregated_data AS
-            (SELECT bucket,
-                    sumOrNull(m_latency_ms) AS sum_latency_ms,
-                    avgOrNull(m_latency_ms) AS avg_latency_ms,
-                    minOrNull(m_latency_ms) AS min_latency_ms,
-                    maxOrNull(m_latency_ms) AS max_latency_ms,
-                    countOrNull(m_latency_ms) AS count_latency_ms,
-                    count() AS count
-            FROM
-                (SELECT toStartOfInterval(sortable_datetime, INTERVAL 300 SECOND, {pb_3:String}) AS bucket,
-                        dateDiff('millisecond', started_at, ended_at) AS m_latency_ms
-                FROM calls_merged
-                WHERE project_id = {pb_0:String}
-                    AND sortable_datetime >= toDateTime({pb_1:Float64}, {pb_3:String})
-                    AND sortable_datetime < toDateTime({pb_2:Float64}, {pb_3:String})
-                    AND deleted_at IS NULL )
-            GROUP BY bucket )
+          (SELECT toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 300 SECOND, {pb_3:String}) + toIntervalSecond(number * {pb_4:Int64}) AS bucket
+           FROM numbers(toUInt64(ceil((toUnixTimestamp(toDateTime({pb_2:Float64}, {pb_3:String})) - toUnixTimestamp(toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 300 SECOND, {pb_3:String}))) / {pb_4:Float64})))
+           WHERE bucket < toDateTime({pb_2:Float64}, {pb_3:String}) ),
+             aggregated_data AS
+          (SELECT bucket,
+                  sumOrNull(m_latency_ms) AS sum_latency_ms,
+                  avgOrNull(m_latency_ms) AS avg_latency_ms,
+                  minOrNull(m_latency_ms) AS min_latency_ms,
+                  maxOrNull(m_latency_ms) AS max_latency_ms,
+                  countOrNull(m_latency_ms) AS count_latency_ms,
+                  count() AS count
+           FROM
+             (SELECT toStartOfInterval(sortable_datetime, INTERVAL 300 SECOND, {pb_3:String}) AS bucket,
+                     dateDiff('millisecond', started_at, ended_at) AS m_latency_ms
+              FROM
+                (SELECT anyIf(cm.sortable_datetime, cm.sortable_datetime IS NOT NULL) AS sortable_datetime,
+                        anyIf(cm.started_at, cm.started_at IS NOT NULL) AS started_at,
+                        anyIf(cm.ended_at, cm.ended_at IS NOT NULL) AS ended_at,
+                        anyIf(cm.exception, cm.exception IS NOT NULL) AS
+                 exception
+                 FROM calls_merged AS cm
+                 WHERE cm.project_id = {pb_0:String}
+                   AND cm.sortable_datetime >= toDateTime({pb_1:Float64}, {pb_3:String})
+                   AND cm.sortable_datetime < toDateTime({pb_2:Float64}, {pb_3:String})
+                   AND cm.deleted_at IS NULL
+                 GROUP BY project_id,
+                          id))
+           GROUP BY bucket)
         SELECT all_buckets.bucket AS timestamp,
-            COALESCE(aggregated_data.sum_latency_ms, 0) AS sum_latency_ms,
-            COALESCE(aggregated_data.avg_latency_ms, 0) AS avg_latency_ms,
-            aggregated_data.min_latency_ms AS min_latency_ms,
-            aggregated_data.max_latency_ms AS max_latency_ms,
-            COALESCE(aggregated_data.count_latency_ms, 0) AS count_latency_ms,
-            COALESCE(aggregated_data.count, 0) AS count
+               COALESCE(aggregated_data.sum_latency_ms, 0) AS sum_latency_ms,
+               COALESCE(aggregated_data.avg_latency_ms, 0) AS avg_latency_ms,
+               aggregated_data.min_latency_ms AS min_latency_ms,
+               aggregated_data.max_latency_ms AS max_latency_ms,
+               COALESCE(aggregated_data.count_latency_ms, 0) AS count_latency_ms,
+               COALESCE(aggregated_data.count, 0) AS count
         FROM all_buckets
         LEFT JOIN aggregated_data ON all_buckets.bucket = aggregated_data.bucket
         ORDER BY all_buckets.bucket
@@ -236,29 +261,37 @@ def test_latency_percentiles():
         metrics,
         """
         WITH all_buckets AS
-            (SELECT toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 300 SECOND, {pb_3:String}) + toIntervalSecond(number * {pb_4:Int64}) AS bucket
-            FROM numbers(toUInt64(ceil((toUnixTimestamp(toDateTime({pb_2:Float64}, {pb_3:String})) - toUnixTimestamp(toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 300 SECOND, {pb_3:String}))) / {pb_4:Float64})))
-            WHERE bucket < toDateTime({pb_2:Float64}, {pb_3:String}) ),
-            aggregated_data AS
-            (SELECT bucket,
-                    quantileOrNull(0.5)(m_latency_ms) AS p50_latency_ms,
-                    quantileOrNull(0.95)(m_latency_ms) AS p95_latency_ms,
-                    quantileOrNull(0.99)(m_latency_ms) AS p99_latency_ms,
-                    count() AS count
-            FROM
-                (SELECT toStartOfInterval(sortable_datetime, INTERVAL 300 SECOND, {pb_3:String}) AS bucket,
-                        dateDiff('millisecond', started_at, ended_at) AS m_latency_ms
-                FROM calls_merged
-                WHERE project_id = {pb_0:String}
-                    AND sortable_datetime >= toDateTime({pb_1:Float64}, {pb_3:String})
-                    AND sortable_datetime < toDateTime({pb_2:Float64}, {pb_3:String})
-                    AND deleted_at IS NULL )
-            GROUP BY bucket )
+          (SELECT toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 300 SECOND, {pb_3:String}) + toIntervalSecond(number * {pb_4:Int64}) AS bucket
+           FROM numbers(toUInt64(ceil((toUnixTimestamp(toDateTime({pb_2:Float64}, {pb_3:String})) - toUnixTimestamp(toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 300 SECOND, {pb_3:String}))) / {pb_4:Float64})))
+           WHERE bucket < toDateTime({pb_2:Float64}, {pb_3:String}) ),
+             aggregated_data AS
+          (SELECT bucket,
+                  quantileOrNull(0.5)(m_latency_ms) AS p50_latency_ms,
+                  quantileOrNull(0.95)(m_latency_ms) AS p95_latency_ms,
+                  quantileOrNull(0.99)(m_latency_ms) AS p99_latency_ms,
+                  count() AS count
+           FROM
+             (SELECT toStartOfInterval(sortable_datetime, INTERVAL 300 SECOND, {pb_3:String}) AS bucket,
+                     dateDiff('millisecond', started_at, ended_at) AS m_latency_ms
+              FROM
+                (SELECT anyIf(cm.sortable_datetime, cm.sortable_datetime IS NOT NULL) AS sortable_datetime,
+                        anyIf(cm.started_at, cm.started_at IS NOT NULL) AS started_at,
+                        anyIf(cm.ended_at, cm.ended_at IS NOT NULL) AS ended_at,
+                        anyIf(cm.exception, cm.exception IS NOT NULL) AS
+                 exception
+                 FROM calls_merged AS cm
+                 WHERE cm.project_id = {pb_0:String}
+                   AND cm.sortable_datetime >= toDateTime({pb_1:Float64}, {pb_3:String})
+                   AND cm.sortable_datetime < toDateTime({pb_2:Float64}, {pb_3:String})
+                   AND cm.deleted_at IS NULL
+                 GROUP BY project_id,
+                          id))
+           GROUP BY bucket)
         SELECT all_buckets.bucket AS timestamp,
-            aggregated_data.p50_latency_ms AS p50_latency_ms,
-            aggregated_data.p95_latency_ms AS p95_latency_ms,
-            aggregated_data.p99_latency_ms AS p99_latency_ms,
-            COALESCE(aggregated_data.count, 0) AS count
+               aggregated_data.p50_latency_ms AS p50_latency_ms,
+               aggregated_data.p95_latency_ms AS p95_latency_ms,
+               aggregated_data.p99_latency_ms AS p99_latency_ms,
+               COALESCE(aggregated_data.count, 0) AS count
         FROM all_buckets
         LEFT JOIN aggregated_data ON all_buckets.bucket = aggregated_data.bucket
         ORDER BY all_buckets.bucket
@@ -300,26 +333,34 @@ def test_op_names_filter():
         metrics,
         """
         WITH all_buckets AS
-            (SELECT toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 3600 SECOND, {pb_3:String}) + toIntervalSecond(number * {pb_4:Int64}) AS bucket
-            FROM numbers(toUInt64(ceil((toUnixTimestamp(toDateTime({pb_2:Float64}, {pb_3:String})) - toUnixTimestamp(toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 3600 SECOND, {pb_3:String}))) / {pb_4:Float64})))
-            WHERE bucket < toDateTime({pb_2:Float64}, {pb_3:String}) ),
-            aggregated_data AS
-            (SELECT bucket,
-                    sumOrNull(m_call_count) AS sum_call_count,
-                    count() AS count
-            FROM
-                (SELECT toStartOfInterval(sortable_datetime, INTERVAL 3600 SECOND, {pb_3:String}) AS bucket,
-                        1 AS m_call_count
-                FROM calls_merged
-                WHERE project_id = {pb_0:String}
-                    AND sortable_datetime >= toDateTime({pb_1:Float64}, {pb_3:String})
-                    AND sortable_datetime < toDateTime({pb_2:Float64}, {pb_3:String})
-                    AND deleted_at IS NULL
-                    AND op_name IN {pb_5:Array(String)} )
-            GROUP BY bucket )
+          (SELECT toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 3600 SECOND, {pb_3:String}) + toIntervalSecond(number * {pb_4:Int64}) AS bucket
+           FROM numbers(toUInt64(ceil((toUnixTimestamp(toDateTime({pb_2:Float64}, {pb_3:String})) - toUnixTimestamp(toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 3600 SECOND, {pb_3:String}))) / {pb_4:Float64})))
+           WHERE bucket < toDateTime({pb_2:Float64}, {pb_3:String}) ),
+             aggregated_data AS
+          (SELECT bucket,
+                  sumOrNull(m_call_count) AS sum_call_count,
+                  count() AS count
+           FROM
+             (SELECT toStartOfInterval(sortable_datetime, INTERVAL 3600 SECOND, {pb_3:String}) AS bucket,
+                     1 AS m_call_count
+              FROM
+                (SELECT anyIf(cm.sortable_datetime, cm.sortable_datetime IS NOT NULL) AS sortable_datetime,
+                        anyIf(cm.started_at, cm.started_at IS NOT NULL) AS started_at,
+                        anyIf(cm.ended_at, cm.ended_at IS NOT NULL) AS ended_at,
+                        anyIf(cm.exception, cm.exception IS NOT NULL) AS
+                 exception
+                 FROM calls_merged AS cm
+                 WHERE cm.project_id = {pb_0:String}
+                   AND cm.sortable_datetime >= toDateTime({pb_1:Float64}, {pb_3:String})
+                   AND cm.sortable_datetime < toDateTime({pb_2:Float64}, {pb_3:String})
+                   AND cm.deleted_at IS NULL
+                   AND op_name IN {pb_5:Array(String)}
+                 GROUP BY project_id,
+                          id))
+           GROUP BY bucket)
         SELECT all_buckets.bucket AS timestamp,
-            COALESCE(aggregated_data.sum_call_count, 0) AS sum_call_count,
-            COALESCE(aggregated_data.count, 0) AS count
+               COALESCE(aggregated_data.sum_call_count, 0) AS sum_call_count,
+               COALESCE(aggregated_data.count, 0) AS count
         FROM all_buckets
         LEFT JOIN aggregated_data ON all_buckets.bucket = aggregated_data.bucket
         ORDER BY all_buckets.bucket
@@ -356,26 +397,34 @@ def test_trace_roots_only_filter():
         metrics,
         """
         WITH all_buckets AS
-            (SELECT toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 3600 SECOND, {pb_3:String}) + toIntervalSecond(number * {pb_4:Int64}) AS bucket
-            FROM numbers(toUInt64(ceil((toUnixTimestamp(toDateTime({pb_2:Float64}, {pb_3:String})) - toUnixTimestamp(toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 3600 SECOND, {pb_3:String}))) / {pb_4:Float64})))
-            WHERE bucket < toDateTime({pb_2:Float64}, {pb_3:String}) ),
-            aggregated_data AS
-            (SELECT bucket,
-                    avgOrNull(m_latency_ms) AS avg_latency_ms,
-                    count() AS count
-            FROM
-                (SELECT toStartOfInterval(sortable_datetime, INTERVAL 3600 SECOND, {pb_3:String}) AS bucket,
-                        dateDiff('millisecond', started_at, ended_at) AS m_latency_ms
-                FROM calls_merged
-                WHERE project_id = {pb_0:String}
-                    AND sortable_datetime >= toDateTime({pb_1:Float64}, {pb_3:String})
-                    AND sortable_datetime < toDateTime({pb_2:Float64}, {pb_3:String})
-                    AND deleted_at IS NULL
-                    AND parent_id IS NULL )
-            GROUP BY bucket )
+          (SELECT toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 3600 SECOND, {pb_3:String}) + toIntervalSecond(number * {pb_4:Int64}) AS bucket
+           FROM numbers(toUInt64(ceil((toUnixTimestamp(toDateTime({pb_2:Float64}, {pb_3:String})) - toUnixTimestamp(toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 3600 SECOND, {pb_3:String}))) / {pb_4:Float64})))
+           WHERE bucket < toDateTime({pb_2:Float64}, {pb_3:String}) ),
+             aggregated_data AS
+          (SELECT bucket,
+                  avgOrNull(m_latency_ms) AS avg_latency_ms,
+                  count() AS count
+           FROM
+             (SELECT toStartOfInterval(sortable_datetime, INTERVAL 3600 SECOND, {pb_3:String}) AS bucket,
+                     dateDiff('millisecond', started_at, ended_at) AS m_latency_ms
+              FROM
+                (SELECT anyIf(cm.sortable_datetime, cm.sortable_datetime IS NOT NULL) AS sortable_datetime,
+                        anyIf(cm.started_at, cm.started_at IS NOT NULL) AS started_at,
+                        anyIf(cm.ended_at, cm.ended_at IS NOT NULL) AS ended_at,
+                        anyIf(cm.exception, cm.exception IS NOT NULL) AS
+                 exception
+                 FROM calls_merged AS cm
+                 WHERE cm.project_id = {pb_0:String}
+                   AND cm.sortable_datetime >= toDateTime({pb_1:Float64}, {pb_3:String})
+                   AND cm.sortable_datetime < toDateTime({pb_2:Float64}, {pb_3:String})
+                   AND cm.deleted_at IS NULL
+                   AND parent_id IS NULL
+                 GROUP BY project_id,
+                          id))
+           GROUP BY bucket)
         SELECT all_buckets.bucket AS timestamp,
-            COALESCE(aggregated_data.avg_latency_ms, 0) AS avg_latency_ms,
-            COALESCE(aggregated_data.count, 0) AS count
+               COALESCE(aggregated_data.avg_latency_ms, 0) AS avg_latency_ms,
+               COALESCE(aggregated_data.count, 0) AS count
         FROM all_buckets
         LEFT JOIN aggregated_data ON all_buckets.bucket = aggregated_data.bucket
         ORDER BY all_buckets.bucket
@@ -411,26 +460,35 @@ def test_trace_ids_filter():
         metrics,
         """
         WITH all_buckets AS
-            (SELECT toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 3600 SECOND, {pb_3:String}) + toIntervalSecond(number * {pb_4:Int64}) AS bucket
-            FROM numbers(toUInt64(ceil((toUnixTimestamp(toDateTime({pb_2:Float64}, {pb_3:String})) - toUnixTimestamp(toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 3600 SECOND, {pb_3:String}))) / {pb_4:Float64})))
-            WHERE bucket < toDateTime({pb_2:Float64}, {pb_3:String}) ),
-            aggregated_data AS
-            (SELECT bucket,
-                    sumOrNull(m_error_count) AS sum_error_count,
-                    count() AS count
-            FROM
-                (SELECT toStartOfInterval(sortable_datetime, INTERVAL 3600 SECOND, {pb_3:String}) AS bucket,
-                        if(exception IS NOT NULL, 1, 0) AS m_error_count
-                FROM calls_merged
-                WHERE project_id = {pb_0:String}
-                    AND sortable_datetime >= toDateTime({pb_1:Float64}, {pb_3:String})
-                    AND sortable_datetime < toDateTime({pb_2:Float64}, {pb_3:String})
-                    AND deleted_at IS NULL
-                    AND trace_id IN {pb_5:Array(String)} )
-            GROUP BY bucket )
+          (SELECT toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 3600 SECOND, {pb_3:String}) + toIntervalSecond(number * {pb_4:Int64}) AS bucket
+           FROM numbers(toUInt64(ceil((toUnixTimestamp(toDateTime({pb_2:Float64}, {pb_3:String})) - toUnixTimestamp(toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 3600 SECOND, {pb_3:String}))) / {pb_4:Float64})))
+           WHERE bucket < toDateTime({pb_2:Float64}, {pb_3:String}) ),
+             aggregated_data AS
+          (SELECT bucket,
+                  sumOrNull(m_error_count) AS sum_error_count,
+                  count() AS count
+           FROM
+             (SELECT toStartOfInterval(sortable_datetime, INTERVAL 3600 SECOND, {pb_3:String}) AS bucket,
+                     if(
+                        exception IS NOT NULL, 1, 0) AS m_error_count
+              FROM
+                (SELECT anyIf(cm.sortable_datetime, cm.sortable_datetime IS NOT NULL) AS sortable_datetime,
+                        anyIf(cm.started_at, cm.started_at IS NOT NULL) AS started_at,
+                        anyIf(cm.ended_at, cm.ended_at IS NOT NULL) AS ended_at,
+                        anyIf(cm.exception, cm.exception IS NOT NULL) AS
+                 exception
+                 FROM calls_merged AS cm
+                 WHERE cm.project_id = {pb_0:String}
+                   AND cm.sortable_datetime >= toDateTime({pb_1:Float64}, {pb_3:String})
+                   AND cm.sortable_datetime < toDateTime({pb_2:Float64}, {pb_3:String})
+                   AND cm.deleted_at IS NULL
+                   AND trace_id IN {pb_5:Array(String)}
+                 GROUP BY project_id,
+                          id))
+           GROUP BY bucket)
         SELECT all_buckets.bucket AS timestamp,
-            COALESCE(aggregated_data.sum_error_count, 0) AS sum_error_count,
-            COALESCE(aggregated_data.count, 0) AS count
+               COALESCE(aggregated_data.sum_error_count, 0) AS sum_error_count,
+               COALESCE(aggregated_data.count, 0) AS count
         FROM all_buckets
         LEFT JOIN aggregated_data ON all_buckets.bucket = aggregated_data.bucket
         ORDER BY all_buckets.bucket
@@ -473,33 +531,42 @@ def test_combined_metrics():
         metrics,
         """
         WITH all_buckets AS
-            (SELECT toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 3600 SECOND, {pb_3:String}) + toIntervalSecond(number * {pb_4:Int64}) AS bucket
-            FROM numbers(toUInt64(ceil((toUnixTimestamp(toDateTime({pb_2:Float64}, {pb_3:String})) - toUnixTimestamp(toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 3600 SECOND, {pb_3:String}))) / {pb_4:Float64})))
-            WHERE bucket < toDateTime({pb_2:Float64}, {pb_3:String}) ),
-            aggregated_data AS
-            (SELECT bucket,
-                    avgOrNull(m_latency_ms) AS avg_latency_ms,
-                    maxOrNull(m_latency_ms) AS max_latency_ms,
-                    sumOrNull(m_call_count) AS sum_call_count,
-                    sumOrNull(m_error_count) AS sum_error_count,
-                    count() AS count
-            FROM
-                (SELECT toStartOfInterval(sortable_datetime, INTERVAL 3600 SECOND, {pb_3:String}) AS bucket,
-                        dateDiff('millisecond', started_at, ended_at) AS m_latency_ms,
-                        1 AS m_call_count,
-                        if(exception IS NOT NULL, 1, 0) AS m_error_count
-                FROM calls_merged
-                WHERE project_id = {pb_0:String}
-                    AND sortable_datetime >= toDateTime({pb_1:Float64}, {pb_3:String})
-                    AND sortable_datetime < toDateTime({pb_2:Float64}, {pb_3:String})
-                    AND deleted_at IS NULL )
-            GROUP BY bucket )
+          (SELECT toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 3600 SECOND, {pb_3:String}) + toIntervalSecond(number * {pb_4:Int64}) AS bucket
+           FROM numbers(toUInt64(ceil((toUnixTimestamp(toDateTime({pb_2:Float64}, {pb_3:String})) - toUnixTimestamp(toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 3600 SECOND, {pb_3:String}))) / {pb_4:Float64})))
+           WHERE bucket < toDateTime({pb_2:Float64}, {pb_3:String}) ),
+             aggregated_data AS
+          (SELECT bucket,
+                  avgOrNull(m_latency_ms) AS avg_latency_ms,
+                  maxOrNull(m_latency_ms) AS max_latency_ms,
+                  sumOrNull(m_call_count) AS sum_call_count,
+                  sumOrNull(m_error_count) AS sum_error_count,
+                  count() AS count
+           FROM
+             (SELECT toStartOfInterval(sortable_datetime, INTERVAL 3600 SECOND, {pb_3:String}) AS bucket,
+                     dateDiff('millisecond', started_at, ended_at) AS m_latency_ms,
+                     1 AS m_call_count,
+                     if(
+                        exception IS NOT NULL, 1, 0) AS m_error_count
+              FROM
+                (SELECT anyIf(cm.sortable_datetime, cm.sortable_datetime IS NOT NULL) AS sortable_datetime,
+                        anyIf(cm.started_at, cm.started_at IS NOT NULL) AS started_at,
+                        anyIf(cm.ended_at, cm.ended_at IS NOT NULL) AS ended_at,
+                        anyIf(cm.exception, cm.exception IS NOT NULL) AS
+                 exception
+                 FROM calls_merged AS cm
+                 WHERE cm.project_id = {pb_0:String}
+                   AND cm.sortable_datetime >= toDateTime({pb_1:Float64}, {pb_3:String})
+                   AND cm.sortable_datetime < toDateTime({pb_2:Float64}, {pb_3:String})
+                   AND cm.deleted_at IS NULL
+                 GROUP BY project_id,
+                          id))
+           GROUP BY bucket)
         SELECT all_buckets.bucket AS timestamp,
-            COALESCE(aggregated_data.avg_latency_ms, 0) AS avg_latency_ms,
-            aggregated_data.max_latency_ms AS max_latency_ms,
-            COALESCE(aggregated_data.sum_call_count, 0) AS sum_call_count,
-            COALESCE(aggregated_data.sum_error_count, 0) AS sum_error_count,
-            COALESCE(aggregated_data.count, 0) AS count
+               COALESCE(aggregated_data.avg_latency_ms, 0) AS avg_latency_ms,
+               aggregated_data.max_latency_ms AS max_latency_ms,
+               COALESCE(aggregated_data.sum_call_count, 0) AS sum_call_count,
+               COALESCE(aggregated_data.sum_error_count, 0) AS sum_error_count,
+               COALESCE(aggregated_data.count, 0) AS count
         FROM all_buckets
         LEFT JOIN aggregated_data ON all_buckets.bucket = aggregated_data.bucket
         ORDER BY all_buckets.bucket
@@ -541,25 +608,33 @@ def test_granularity_auto_selection():
         metrics,
         """
         WITH all_buckets AS
-            (SELECT toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 300 SECOND, {pb_3:String}) + toIntervalSecond(number * {pb_4:Int64}) AS bucket
-            FROM numbers(toUInt64(ceil((toUnixTimestamp(toDateTime({pb_2:Float64}, {pb_3:String})) - toUnixTimestamp(toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 300 SECOND, {pb_3:String}))) / {pb_4:Float64})))
-            WHERE bucket < toDateTime({pb_2:Float64}, {pb_3:String}) ),
-            aggregated_data AS
-            (SELECT bucket,
-                    sumOrNull(m_call_count) AS sum_call_count,
-                    count() AS count
-            FROM
-                (SELECT toStartOfInterval(sortable_datetime, INTERVAL 300 SECOND, {pb_3:String}) AS bucket,
-                        1 AS m_call_count
-                FROM calls_merged
-                WHERE project_id = {pb_0:String}
-                    AND sortable_datetime >= toDateTime({pb_1:Float64}, {pb_3:String})
-                    AND sortable_datetime < toDateTime({pb_2:Float64}, {pb_3:String})
-                    AND deleted_at IS NULL )
-            GROUP BY bucket )
+          (SELECT toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 300 SECOND, {pb_3:String}) + toIntervalSecond(number * {pb_4:Int64}) AS bucket
+           FROM numbers(toUInt64(ceil((toUnixTimestamp(toDateTime({pb_2:Float64}, {pb_3:String})) - toUnixTimestamp(toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 300 SECOND, {pb_3:String}))) / {pb_4:Float64})))
+           WHERE bucket < toDateTime({pb_2:Float64}, {pb_3:String}) ),
+             aggregated_data AS
+          (SELECT bucket,
+                  sumOrNull(m_call_count) AS sum_call_count,
+                  count() AS count
+           FROM
+             (SELECT toStartOfInterval(sortable_datetime, INTERVAL 300 SECOND, {pb_3:String}) AS bucket,
+                     1 AS m_call_count
+              FROM
+                (SELECT anyIf(cm.sortable_datetime, cm.sortable_datetime IS NOT NULL) AS sortable_datetime,
+                        anyIf(cm.started_at, cm.started_at IS NOT NULL) AS started_at,
+                        anyIf(cm.ended_at, cm.ended_at IS NOT NULL) AS ended_at,
+                        anyIf(cm.exception, cm.exception IS NOT NULL) AS
+                 exception
+                 FROM calls_merged AS cm
+                 WHERE cm.project_id = {pb_0:String}
+                   AND cm.sortable_datetime >= toDateTime({pb_1:Float64}, {pb_3:String})
+                   AND cm.sortable_datetime < toDateTime({pb_2:Float64}, {pb_3:String})
+                   AND cm.deleted_at IS NULL
+                 GROUP BY project_id,
+                          id))
+           GROUP BY bucket)
         SELECT all_buckets.bucket AS timestamp,
-            COALESCE(aggregated_data.sum_call_count, 0) AS sum_call_count,
-            COALESCE(aggregated_data.count, 0) AS count
+               COALESCE(aggregated_data.sum_call_count, 0) AS sum_call_count,
+               COALESCE(aggregated_data.count, 0) AS count
         FROM all_buckets
         LEFT JOIN aggregated_data ON all_buckets.bucket = aggregated_data.bucket
         ORDER BY all_buckets.bucket
@@ -586,25 +661,33 @@ def test_granularity_auto_selection():
         metrics,
         """
         WITH all_buckets AS
-            (SELECT toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 3600 SECOND, {pb_3:String}) + toIntervalSecond(number * {pb_4:Int64}) AS bucket
-            FROM numbers(toUInt64(ceil((toUnixTimestamp(toDateTime({pb_2:Float64}, {pb_3:String})) - toUnixTimestamp(toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 3600 SECOND, {pb_3:String}))) / {pb_4:Float64})))
-            WHERE bucket < toDateTime({pb_2:Float64}, {pb_3:String}) ),
-            aggregated_data AS
-            (SELECT bucket,
-                    sumOrNull(m_call_count) AS sum_call_count,
-                    count() AS count
-            FROM
-                (SELECT toStartOfInterval(sortable_datetime, INTERVAL 3600 SECOND, {pb_3:String}) AS bucket,
-                        1 AS m_call_count
-                FROM calls_merged
-                WHERE project_id = {pb_0:String}
-                    AND sortable_datetime >= toDateTime({pb_1:Float64}, {pb_3:String})
-                    AND sortable_datetime < toDateTime({pb_2:Float64}, {pb_3:String})
-                    AND deleted_at IS NULL )
-            GROUP BY bucket )
+          (SELECT toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 3600 SECOND, {pb_3:String}) + toIntervalSecond(number * {pb_4:Int64}) AS bucket
+           FROM numbers(toUInt64(ceil((toUnixTimestamp(toDateTime({pb_2:Float64}, {pb_3:String})) - toUnixTimestamp(toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 3600 SECOND, {pb_3:String}))) / {pb_4:Float64})))
+           WHERE bucket < toDateTime({pb_2:Float64}, {pb_3:String}) ),
+             aggregated_data AS
+          (SELECT bucket,
+                  sumOrNull(m_call_count) AS sum_call_count,
+                  count() AS count
+           FROM
+             (SELECT toStartOfInterval(sortable_datetime, INTERVAL 3600 SECOND, {pb_3:String}) AS bucket,
+                     1 AS m_call_count
+              FROM
+                (SELECT anyIf(cm.sortable_datetime, cm.sortable_datetime IS NOT NULL) AS sortable_datetime,
+                        anyIf(cm.started_at, cm.started_at IS NOT NULL) AS started_at,
+                        anyIf(cm.ended_at, cm.ended_at IS NOT NULL) AS ended_at,
+                        anyIf(cm.exception, cm.exception IS NOT NULL) AS
+                 exception
+                 FROM calls_merged AS cm
+                 WHERE cm.project_id = {pb_0:String}
+                   AND cm.sortable_datetime >= toDateTime({pb_1:Float64}, {pb_3:String})
+                   AND cm.sortable_datetime < toDateTime({pb_2:Float64}, {pb_3:String})
+                   AND cm.deleted_at IS NULL
+                 GROUP BY project_id,
+                          id))
+           GROUP BY bucket)
         SELECT all_buckets.bucket AS timestamp,
-            COALESCE(aggregated_data.sum_call_count, 0) AS sum_call_count,
-            COALESCE(aggregated_data.count, 0) AS count
+               COALESCE(aggregated_data.sum_call_count, 0) AS sum_call_count,
+               COALESCE(aggregated_data.count, 0) AS count
         FROM all_buckets
         LEFT JOIN aggregated_data ON all_buckets.bucket = aggregated_data.bucket
         ORDER BY all_buckets.bucket

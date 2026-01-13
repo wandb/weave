@@ -13,6 +13,7 @@ from typing import Any
 from weave.trace_server.calls_query_builder.stats_query_base import (
     aggregation_selects_for_metric,
     build_calls_filter_sql,
+    build_grouped_calls_subquery,
     determine_bounds_and_bucket,
 )
 from weave.trace_server.calls_query_builder.utils import param_slot, safely_format_sql
@@ -124,6 +125,14 @@ def build_call_metrics_query(
     outer_select_sql = ",\n  ".join(outer_selects)
 
     all_buckets_interval = f"INTERVAL {granularity_seconds} SECOND"
+    grouped_calls_sql = build_grouped_calls_subquery(
+        project_param=project_param,
+        start_param=start_param,
+        end_param=end_param,
+        tz_param=tz_param,
+        where_filter_sql=where_filter_sql,
+        select_columns=["sortable_datetime", "started_at", "ended_at", "exception"],
+    )
 
     raw_sql = f"""
     WITH
@@ -154,12 +163,9 @@ def build_call_metrics_query(
           SELECT
             {bucket_expr.format(tz=param_slot(tz_param, "String"))} AS bucket,
             {inner_metric_sql}
-          FROM calls_merged
-          WHERE
-            project_id = {param_slot(project_param, "String")}
-            AND sortable_datetime >= toDateTime({param_slot(start_param, "Float64")}, {param_slot(tz_param, "String")})
-            AND sortable_datetime < toDateTime({param_slot(end_param, "Float64")}, {param_slot(tz_param, "String")})
-            AND deleted_at IS NULL{where_filter_sql}
+          FROM (
+            {grouped_calls_sql}
+          )
         )
         GROUP BY bucket
       )

@@ -29,44 +29,49 @@ def test_explicit_start_end():
         metrics,
         """
         WITH all_buckets AS
-            (SELECT toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 3600 SECOND, {pb_3:String}) + toIntervalSecond(number * {pb_4:Int64}) AS bucket
-            FROM numbers(toUInt64(ceil((toUnixTimestamp(toDateTime({pb_2:Float64}, {pb_3:String})) - toUnixTimestamp(toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 3600 SECOND, {pb_3:String}))) / {pb_4:Float64})))
-            WHERE bucket < toDateTime({pb_2:Float64}, {pb_3:String}) ),
-            aggregated_data AS
-            (SELECT bucket,
-                    model,
-                    sumOrNull(m_total_tokens) AS sum_total_tokens,
-                    avgOrNull(m_total_tokens) AS avg_total_tokens,
-                    count() AS count
-            FROM
-                (SELECT toStartOfInterval(sortable_datetime, INTERVAL 3600 SECOND, {pb_3:String}) AS bucket,
-                        kv.1 AS model,
-                        toFloat64OrNull(JSONExtractRaw(kv.2, 'total_tokens')) AS m_total_tokens
-                FROM
-                    (SELECT sortable_datetime,
-                            JSONExtractRaw(ifNull(summary_dump, '{}'), 'usage') AS usage_raw
-                    FROM calls_merged
-                    WHERE project_id = {pb_0:String}
-                        AND sortable_datetime >= toDateTime({pb_1:Float64}, {pb_3:String})
-                        AND sortable_datetime < toDateTime({pb_2:Float64}, {pb_3:String})
-                        AND deleted_at IS NULL ) ARRAY
-                JOIN JSONExtractKeysAndValuesRaw(ifNull(usage_raw, '{}')) AS kv)
-            GROUP BY bucket,
-                    model ),
-            all_models AS
-            (SELECT DISTINCT model
-            FROM aggregated_data)
+          (SELECT toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 3600 SECOND, {pb_3:String}) + toIntervalSecond(number * {pb_4:Int64}) AS bucket
+           FROM numbers(toUInt64(ceil((toUnixTimestamp(toDateTime({pb_2:Float64}, {pb_3:String})) - toUnixTimestamp(toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 3600 SECOND, {pb_3:String}))) / {pb_4:Float64})))
+           WHERE bucket < toDateTime({pb_2:Float64}, {pb_3:String}) ),
+             aggregated_data AS
+          (SELECT bucket,
+                  model,
+                  sumOrNull(m_total_tokens) AS sum_total_tokens,
+                  avgOrNull(m_total_tokens) AS avg_total_tokens,
+                  count() AS count
+           FROM
+             (SELECT toStartOfInterval(sortable_datetime, INTERVAL 3600 SECOND, {pb_3:String}) AS bucket,
+                     kv.1 AS model,
+                     toFloat64OrNull(JSONExtractRaw(kv.2, 'total_tokens')) AS m_total_tokens
+              FROM
+                (SELECT sortable_datetime,
+                        JSONExtractRaw(ifNull(summary_dump, '{}'), 'usage') AS usage_raw
+                 FROM
+                   (SELECT anyIf(cm.sortable_datetime, cm.sortable_datetime IS NOT NULL) AS sortable_datetime,
+                           anyIf(cm.summary_dump, cm.summary_dump IS NOT NULL) AS summary_dump
+                    FROM calls_merged AS cm
+                    WHERE cm.project_id = {pb_0:String}
+                      AND cm.sortable_datetime >= toDateTime({pb_1:Float64}, {pb_3:String})
+                      AND cm.sortable_datetime < toDateTime({pb_2:Float64}, {pb_3:String})
+                      AND cm.deleted_at IS NULL
+                    GROUP BY project_id,
+                             id)) ARRAY
+              JOIN JSONExtractKeysAndValuesRaw(ifNull(usage_raw, '{}')) AS kv)
+           GROUP BY bucket,
+                    model),
+             all_models AS
+          (SELECT DISTINCT model
+           FROM aggregated_data)
         SELECT all_buckets.bucket AS timestamp,
-            all_models.model,
-            COALESCE(aggregated_data.sum_total_tokens, 0) AS sum_total_tokens,
-            COALESCE(aggregated_data.avg_total_tokens, 0) AS avg_total_tokens,
-            COALESCE(aggregated_data.count, 0) AS count
+               all_models.model,
+               COALESCE(aggregated_data.sum_total_tokens, 0) AS sum_total_tokens,
+               COALESCE(aggregated_data.avg_total_tokens, 0) AS avg_total_tokens,
+               COALESCE(aggregated_data.count, 0) AS count
         FROM all_buckets
         CROSS JOIN all_models
         LEFT JOIN aggregated_data ON all_buckets.bucket = aggregated_data.bucket
         AND all_models.model = aggregated_data.model
         ORDER BY all_buckets.bucket,
-                all_models.model
+                 all_models.model
         """,
         {
             "pb_0": "entity/project",
@@ -98,43 +103,48 @@ def test_op_names_filter():
         metrics,
         """
         WITH all_buckets AS
-            (SELECT toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 3600 SECOND, {pb_3:String}) + toIntervalSecond(number * {pb_4:Int64}) AS bucket
-            FROM numbers(toUInt64(ceil((toUnixTimestamp(toDateTime({pb_2:Float64}, {pb_3:String})) - toUnixTimestamp(toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 3600 SECOND, {pb_3:String}))) / {pb_4:Float64})))
-            WHERE bucket < toDateTime({pb_2:Float64}, {pb_3:String}) ),
-            aggregated_data AS
-            (SELECT bucket,
-                    model,
-                    sumOrNull(m_total_tokens) AS sum_total_tokens,
-                    count() AS count
-            FROM
-                (SELECT toStartOfInterval(sortable_datetime, INTERVAL 3600 SECOND, {pb_3:String}) AS bucket,
-                        kv.1 AS model,
-                        toFloat64OrNull(JSONExtractRaw(kv.2, 'total_tokens')) AS m_total_tokens
-                FROM
-                    (SELECT sortable_datetime,
-                            JSONExtractRaw(ifNull(summary_dump, '{}'), 'usage') AS usage_raw
-                    FROM calls_merged
-                    WHERE project_id = {pb_0:String}
-                        AND sortable_datetime >= toDateTime({pb_1:Float64}, {pb_3:String})
-                        AND sortable_datetime < toDateTime({pb_2:Float64}, {pb_3:String})
-                        AND deleted_at IS NULL
-                        AND op_name IN {pb_5:Array(String)} ) ARRAY
-                JOIN JSONExtractKeysAndValuesRaw(ifNull(usage_raw, '{}')) AS kv)
-            GROUP BY bucket,
-                    model ),
-            all_models AS
-            (SELECT DISTINCT model
-            FROM aggregated_data)
+          (SELECT toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 3600 SECOND, {pb_3:String}) + toIntervalSecond(number * {pb_4:Int64}) AS bucket
+           FROM numbers(toUInt64(ceil((toUnixTimestamp(toDateTime({pb_2:Float64}, {pb_3:String})) - toUnixTimestamp(toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 3600 SECOND, {pb_3:String}))) / {pb_4:Float64})))
+           WHERE bucket < toDateTime({pb_2:Float64}, {pb_3:String}) ),
+             aggregated_data AS
+          (SELECT bucket,
+                  model,
+                  sumOrNull(m_total_tokens) AS sum_total_tokens,
+                  count() AS count
+           FROM
+             (SELECT toStartOfInterval(sortable_datetime, INTERVAL 3600 SECOND, {pb_3:String}) AS bucket,
+                     kv.1 AS model,
+                     toFloat64OrNull(JSONExtractRaw(kv.2, 'total_tokens')) AS m_total_tokens
+              FROM
+                (SELECT sortable_datetime,
+                        JSONExtractRaw(ifNull(summary_dump, '{}'), 'usage') AS usage_raw
+                 FROM
+                   (SELECT anyIf(cm.sortable_datetime, cm.sortable_datetime IS NOT NULL) AS sortable_datetime,
+                           anyIf(cm.summary_dump, cm.summary_dump IS NOT NULL) AS summary_dump
+                    FROM calls_merged AS cm
+                    WHERE cm.project_id = {pb_0:String}
+                      AND cm.sortable_datetime >= toDateTime({pb_1:Float64}, {pb_3:String})
+                      AND cm.sortable_datetime < toDateTime({pb_2:Float64}, {pb_3:String})
+                      AND cm.deleted_at IS NULL
+                      AND op_name IN {pb_5:Array(String)}
+                    GROUP BY project_id,
+                             id)) ARRAY
+              JOIN JSONExtractKeysAndValuesRaw(ifNull(usage_raw, '{}')) AS kv)
+           GROUP BY bucket,
+                    model),
+             all_models AS
+          (SELECT DISTINCT model
+           FROM aggregated_data)
         SELECT all_buckets.bucket AS timestamp,
-            all_models.model,
-            COALESCE(aggregated_data.sum_total_tokens, 0) AS sum_total_tokens,
-            COALESCE(aggregated_data.count, 0) AS count
+               all_models.model,
+               COALESCE(aggregated_data.sum_total_tokens, 0) AS sum_total_tokens,
+               COALESCE(aggregated_data.count, 0) AS count
         FROM all_buckets
         CROSS JOIN all_models
         LEFT JOIN aggregated_data ON all_buckets.bucket = aggregated_data.bucket
         AND all_models.model = aggregated_data.model
         ORDER BY all_buckets.bucket,
-                all_models.model
+                 all_models.model
         """,
         {
             "pb_0": "entity/project",
@@ -177,50 +187,55 @@ def test_all_aggregation_types():
         metrics,
         """
         WITH all_buckets AS
-            (SELECT toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 300 SECOND, {pb_3:String}) + toIntervalSecond(number * {pb_4:Int64}) AS bucket
-            FROM numbers(toUInt64(ceil((toUnixTimestamp(toDateTime({pb_2:Float64}, {pb_3:String})) - toUnixTimestamp(toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 300 SECOND, {pb_3:String}))) / {pb_4:Float64})))
-            WHERE bucket < toDateTime({pb_2:Float64}, {pb_3:String}) ),
-            aggregated_data AS
-            (SELECT bucket,
-                    model,
-                    sumOrNull(m_total_tokens) AS sum_total_tokens,
-                    avgOrNull(m_total_tokens) AS avg_total_tokens,
-                    minOrNull(m_total_tokens) AS min_total_tokens,
-                    maxOrNull(m_total_tokens) AS max_total_tokens,
-                    countOrNull(m_total_tokens) AS count_total_tokens,
-                    count() AS count
-            FROM
-                (SELECT toStartOfInterval(sortable_datetime, INTERVAL 300 SECOND, {pb_3:String}) AS bucket,
-                        kv.1 AS model,
-                        toFloat64OrNull(JSONExtractRaw(kv.2, 'total_tokens')) AS m_total_tokens
-                FROM
-                    (SELECT sortable_datetime,
-                            JSONExtractRaw(ifNull(summary_dump, '{}'), 'usage') AS usage_raw
-                    FROM calls_merged
-                    WHERE project_id = {pb_0:String}
-                        AND sortable_datetime >= toDateTime({pb_1:Float64}, {pb_3:String})
-                        AND sortable_datetime < toDateTime({pb_2:Float64}, {pb_3:String})
-                        AND deleted_at IS NULL ) ARRAY
-                JOIN JSONExtractKeysAndValuesRaw(ifNull(usage_raw, '{}')) AS kv)
-            GROUP BY bucket,
-                    model ),
-            all_models AS
-            (SELECT DISTINCT model
-            FROM aggregated_data)
+          (SELECT toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 300 SECOND, {pb_3:String}) + toIntervalSecond(number * {pb_4:Int64}) AS bucket
+           FROM numbers(toUInt64(ceil((toUnixTimestamp(toDateTime({pb_2:Float64}, {pb_3:String})) - toUnixTimestamp(toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 300 SECOND, {pb_3:String}))) / {pb_4:Float64})))
+           WHERE bucket < toDateTime({pb_2:Float64}, {pb_3:String}) ),
+             aggregated_data AS
+          (SELECT bucket,
+                  model,
+                  sumOrNull(m_total_tokens) AS sum_total_tokens,
+                  avgOrNull(m_total_tokens) AS avg_total_tokens,
+                  minOrNull(m_total_tokens) AS min_total_tokens,
+                  maxOrNull(m_total_tokens) AS max_total_tokens,
+                  countOrNull(m_total_tokens) AS count_total_tokens,
+                  count() AS count
+           FROM
+             (SELECT toStartOfInterval(sortable_datetime, INTERVAL 300 SECOND, {pb_3:String}) AS bucket,
+                     kv.1 AS model,
+                     toFloat64OrNull(JSONExtractRaw(kv.2, 'total_tokens')) AS m_total_tokens
+              FROM
+                (SELECT sortable_datetime,
+                        JSONExtractRaw(ifNull(summary_dump, '{}'), 'usage') AS usage_raw
+                 FROM
+                   (SELECT anyIf(cm.sortable_datetime, cm.sortable_datetime IS NOT NULL) AS sortable_datetime,
+                           anyIf(cm.summary_dump, cm.summary_dump IS NOT NULL) AS summary_dump
+                    FROM calls_merged AS cm
+                    WHERE cm.project_id = {pb_0:String}
+                      AND cm.sortable_datetime >= toDateTime({pb_1:Float64}, {pb_3:String})
+                      AND cm.sortable_datetime < toDateTime({pb_2:Float64}, {pb_3:String})
+                      AND cm.deleted_at IS NULL
+                    GROUP BY project_id,
+                             id)) ARRAY
+              JOIN JSONExtractKeysAndValuesRaw(ifNull(usage_raw, '{}')) AS kv)
+           GROUP BY bucket,
+                    model),
+             all_models AS
+          (SELECT DISTINCT model
+           FROM aggregated_data)
         SELECT all_buckets.bucket AS timestamp,
-            all_models.model,
-            COALESCE(aggregated_data.sum_total_tokens, 0) AS sum_total_tokens,
-            COALESCE(aggregated_data.avg_total_tokens, 0) AS avg_total_tokens,
-            aggregated_data.min_total_tokens AS min_total_tokens,
-            aggregated_data.max_total_tokens AS max_total_tokens,
-            COALESCE(aggregated_data.count_total_tokens, 0) AS count_total_tokens,
-            COALESCE(aggregated_data.count, 0) AS count
+               all_models.model,
+               COALESCE(aggregated_data.sum_total_tokens, 0) AS sum_total_tokens,
+               COALESCE(aggregated_data.avg_total_tokens, 0) AS avg_total_tokens,
+               aggregated_data.min_total_tokens AS min_total_tokens,
+               aggregated_data.max_total_tokens AS max_total_tokens,
+               COALESCE(aggregated_data.count_total_tokens, 0) AS count_total_tokens,
+               COALESCE(aggregated_data.count, 0) AS count
         FROM all_buckets
         CROSS JOIN all_models
         LEFT JOIN aggregated_data ON all_buckets.bucket = aggregated_data.bucket
         AND all_models.model = aggregated_data.model
         ORDER BY all_buckets.bucket,
-                all_models.model
+                 all_models.model
         """,
         {
             "pb_0": "entity/project",
@@ -266,52 +281,57 @@ def test_custom_percentiles():
         metrics,
         """
         WITH all_buckets AS
-            (SELECT toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 300 SECOND, {pb_3:String}) + toIntervalSecond(number * {pb_4:Int64}) AS bucket
-            FROM numbers(toUInt64(ceil((toUnixTimestamp(toDateTime({pb_2:Float64}, {pb_3:String})) - toUnixTimestamp(toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 300 SECOND, {pb_3:String}))) / {pb_4:Float64})))
-            WHERE bucket < toDateTime({pb_2:Float64}, {pb_3:String}) ),
-            aggregated_data AS
-            (SELECT bucket,
-                    model,
-                    quantileOrNull(0.5)(m_output_tokens) AS p50_output_tokens,
-                    quantileOrNull(0.75)(m_output_tokens) AS p75_output_tokens,
-                    quantileOrNull(0.9)(m_output_tokens) AS p90_output_tokens,
-                    quantileOrNull(0.95)(m_output_tokens) AS p95_output_tokens,
-                    quantileOrNull(0.99)(m_output_tokens) AS p99_output_tokens,
-                    quantileOrNull(0.999)(m_output_tokens) AS p99.9_output_tokens,
-                    count() AS count
-            FROM
-                (SELECT toStartOfInterval(sortable_datetime, INTERVAL 300 SECOND, {pb_3:String}) AS bucket,
-                        kv.1 AS model,
-                        (ifNull(toFloat64OrNull(JSONExtractRaw(kv.2, 'completion_tokens')), 0) + ifNull(toFloat64OrNull(JSONExtractRaw(kv.2, 'output_tokens')), 0)) AS m_output_tokens
-                FROM
-                    (SELECT sortable_datetime,
-                            JSONExtractRaw(ifNull(summary_dump, '{}'), 'usage') AS usage_raw
-                    FROM calls_merged
-                    WHERE project_id = {pb_0:String}
-                        AND sortable_datetime >= toDateTime({pb_1:Float64}, {pb_3:String})
-                        AND sortable_datetime < toDateTime({pb_2:Float64}, {pb_3:String})
-                        AND deleted_at IS NULL ) ARRAY
-                JOIN JSONExtractKeysAndValuesRaw(ifNull(usage_raw, '{}')) AS kv)
-            GROUP BY bucket,
-                    model ),
-            all_models AS
-            (SELECT DISTINCT model
-            FROM aggregated_data)
+          (SELECT toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 300 SECOND, {pb_3:String}) + toIntervalSecond(number * {pb_4:Int64}) AS bucket
+           FROM numbers(toUInt64(ceil((toUnixTimestamp(toDateTime({pb_2:Float64}, {pb_3:String})) - toUnixTimestamp(toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 300 SECOND, {pb_3:String}))) / {pb_4:Float64})))
+           WHERE bucket < toDateTime({pb_2:Float64}, {pb_3:String}) ),
+             aggregated_data AS
+          (SELECT bucket,
+                  model,
+                  quantileOrNull(0.5)(m_output_tokens) AS p50_output_tokens,
+                  quantileOrNull(0.75)(m_output_tokens) AS p75_output_tokens,
+                  quantileOrNull(0.9)(m_output_tokens) AS p90_output_tokens,
+                  quantileOrNull(0.95)(m_output_tokens) AS p95_output_tokens,
+                  quantileOrNull(0.99)(m_output_tokens) AS p99_output_tokens,
+                  quantileOrNull(0.999)(m_output_tokens) AS p99.9_output_tokens,
+                  count() AS count
+           FROM
+             (SELECT toStartOfInterval(sortable_datetime, INTERVAL 300 SECOND, {pb_3:String}) AS bucket,
+                     kv.1 AS model,
+                     (ifNull(toFloat64OrNull(JSONExtractRaw(kv.2, 'completion_tokens')), 0) + ifNull(toFloat64OrNull(JSONExtractRaw(kv.2, 'output_tokens')), 0)) AS m_output_tokens
+              FROM
+                (SELECT sortable_datetime,
+                        JSONExtractRaw(ifNull(summary_dump, '{}'), 'usage') AS usage_raw
+                 FROM
+                   (SELECT anyIf(cm.sortable_datetime, cm.sortable_datetime IS NOT NULL) AS sortable_datetime,
+                           anyIf(cm.summary_dump, cm.summary_dump IS NOT NULL) AS summary_dump
+                    FROM calls_merged AS cm
+                    WHERE cm.project_id = {pb_0:String}
+                      AND cm.sortable_datetime >= toDateTime({pb_1:Float64}, {pb_3:String})
+                      AND cm.sortable_datetime < toDateTime({pb_2:Float64}, {pb_3:String})
+                      AND cm.deleted_at IS NULL
+                    GROUP BY project_id,
+                             id)) ARRAY
+              JOIN JSONExtractKeysAndValuesRaw(ifNull(usage_raw, '{}')) AS kv)
+           GROUP BY bucket,
+                    model),
+             all_models AS
+          (SELECT DISTINCT model
+           FROM aggregated_data)
         SELECT all_buckets.bucket AS timestamp,
-            all_models.model,
-            aggregated_data.p50_output_tokens AS p50_output_tokens,
-            aggregated_data.p75_output_tokens AS p75_output_tokens,
-            aggregated_data.p90_output_tokens AS p90_output_tokens,
-            aggregated_data.p95_output_tokens AS p95_output_tokens,
-            aggregated_data.p99_output_tokens AS p99_output_tokens,
-            aggregated_data.p99.9_output_tokens AS p99.9_output_tokens,
-            COALESCE(aggregated_data.count, 0) AS count
+               all_models.model,
+               aggregated_data.p50_output_tokens AS p50_output_tokens,
+               aggregated_data.p75_output_tokens AS p75_output_tokens,
+               aggregated_data.p90_output_tokens AS p90_output_tokens,
+               aggregated_data.p95_output_tokens AS p95_output_tokens,
+               aggregated_data.p99_output_tokens AS p99_output_tokens,
+               aggregated_data.p99.9_output_tokens AS p99.9_output_tokens,
+               COALESCE(aggregated_data.count, 0) AS count
         FROM all_buckets
         CROSS JOIN all_models
         LEFT JOIN aggregated_data ON all_buckets.bucket = aggregated_data.bucket
         AND all_models.model = aggregated_data.model
         ORDER BY all_buckets.bucket,
-                all_models.model
+                 all_models.model
         """,
         {
             "pb_0": "entity/project",
@@ -356,48 +376,53 @@ def test_multiple_metrics():
         metrics,
         """
         WITH all_buckets AS
-            (SELECT toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 3600 SECOND, {pb_3:String}) + toIntervalSecond(number * {pb_4:Int64}) AS bucket
-            FROM numbers(toUInt64(ceil((toUnixTimestamp(toDateTime({pb_2:Float64}, {pb_3:String})) - toUnixTimestamp(toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 3600 SECOND, {pb_3:String}))) / {pb_4:Float64})))
-            WHERE bucket < toDateTime({pb_2:Float64}, {pb_3:String}) ),
-            aggregated_data AS
-            (SELECT bucket,
-                    model,
-                    sumOrNull(m_input_tokens) AS sum_input_tokens,
-                    sumOrNull(m_output_tokens) AS sum_output_tokens,
-                    avgOrNull(m_total_tokens) AS avg_total_tokens,
-                    count() AS count
-            FROM
-                (SELECT toStartOfInterval(sortable_datetime, INTERVAL 3600 SECOND, {pb_3:String}) AS bucket,
-                        kv.1 AS model,
-                        (ifNull(toFloat64OrNull(JSONExtractRaw(kv.2, 'prompt_tokens')), 0) + ifNull(toFloat64OrNull(JSONExtractRaw(kv.2, 'input_tokens')), 0)) AS m_input_tokens,
-                        (ifNull(toFloat64OrNull(JSONExtractRaw(kv.2, 'completion_tokens')), 0) + ifNull(toFloat64OrNull(JSONExtractRaw(kv.2, 'output_tokens')), 0)) AS m_output_tokens,
-                        toFloat64OrNull(JSONExtractRaw(kv.2, 'total_tokens')) AS m_total_tokens
-                FROM
-                    (SELECT sortable_datetime,
-                            JSONExtractRaw(ifNull(summary_dump, '{}'), 'usage') AS usage_raw
-                    FROM calls_merged
-                    WHERE project_id = {pb_0:String}
-                        AND sortable_datetime >= toDateTime({pb_1:Float64}, {pb_3:String})
-                        AND sortable_datetime < toDateTime({pb_2:Float64}, {pb_3:String})
-                        AND deleted_at IS NULL ) ARRAY
-                JOIN JSONExtractKeysAndValuesRaw(ifNull(usage_raw, '{}')) AS kv)
-            GROUP BY bucket,
-                    model ),
-            all_models AS
-            (SELECT DISTINCT model
-            FROM aggregated_data)
+          (SELECT toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 3600 SECOND, {pb_3:String}) + toIntervalSecond(number * {pb_4:Int64}) AS bucket
+           FROM numbers(toUInt64(ceil((toUnixTimestamp(toDateTime({pb_2:Float64}, {pb_3:String})) - toUnixTimestamp(toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 3600 SECOND, {pb_3:String}))) / {pb_4:Float64})))
+           WHERE bucket < toDateTime({pb_2:Float64}, {pb_3:String}) ),
+             aggregated_data AS
+          (SELECT bucket,
+                  model,
+                  sumOrNull(m_input_tokens) AS sum_input_tokens,
+                  sumOrNull(m_output_tokens) AS sum_output_tokens,
+                  avgOrNull(m_total_tokens) AS avg_total_tokens,
+                  count() AS count
+           FROM
+             (SELECT toStartOfInterval(sortable_datetime, INTERVAL 3600 SECOND, {pb_3:String}) AS bucket,
+                     kv.1 AS model,
+                     (ifNull(toFloat64OrNull(JSONExtractRaw(kv.2, 'prompt_tokens')), 0) + ifNull(toFloat64OrNull(JSONExtractRaw(kv.2, 'input_tokens')), 0)) AS m_input_tokens,
+                     (ifNull(toFloat64OrNull(JSONExtractRaw(kv.2, 'completion_tokens')), 0) + ifNull(toFloat64OrNull(JSONExtractRaw(kv.2, 'output_tokens')), 0)) AS m_output_tokens,
+                     toFloat64OrNull(JSONExtractRaw(kv.2, 'total_tokens')) AS m_total_tokens
+              FROM
+                (SELECT sortable_datetime,
+                        JSONExtractRaw(ifNull(summary_dump, '{}'), 'usage') AS usage_raw
+                 FROM
+                   (SELECT anyIf(cm.sortable_datetime, cm.sortable_datetime IS NOT NULL) AS sortable_datetime,
+                           anyIf(cm.summary_dump, cm.summary_dump IS NOT NULL) AS summary_dump
+                    FROM calls_merged AS cm
+                    WHERE cm.project_id = {pb_0:String}
+                      AND cm.sortable_datetime >= toDateTime({pb_1:Float64}, {pb_3:String})
+                      AND cm.sortable_datetime < toDateTime({pb_2:Float64}, {pb_3:String})
+                      AND cm.deleted_at IS NULL
+                    GROUP BY project_id,
+                             id)) ARRAY
+              JOIN JSONExtractKeysAndValuesRaw(ifNull(usage_raw, '{}')) AS kv)
+           GROUP BY bucket,
+                    model),
+             all_models AS
+          (SELECT DISTINCT model
+           FROM aggregated_data)
         SELECT all_buckets.bucket AS timestamp,
-            all_models.model,
-            COALESCE(aggregated_data.sum_input_tokens, 0) AS sum_input_tokens,
-            COALESCE(aggregated_data.sum_output_tokens, 0) AS sum_output_tokens,
-            COALESCE(aggregated_data.avg_total_tokens, 0) AS avg_total_tokens,
-            COALESCE(aggregated_data.count, 0) AS count
+               all_models.model,
+               COALESCE(aggregated_data.sum_input_tokens, 0) AS sum_input_tokens,
+               COALESCE(aggregated_data.sum_output_tokens, 0) AS sum_output_tokens,
+               COALESCE(aggregated_data.avg_total_tokens, 0) AS avg_total_tokens,
+               COALESCE(aggregated_data.count, 0) AS count
         FROM all_buckets
         CROSS JOIN all_models
         LEFT JOIN aggregated_data ON all_buckets.bucket = aggregated_data.bucket
         AND all_models.model = aggregated_data.model
         ORDER BY all_buckets.bucket,
-                all_models.model
+                 all_models.model
         """,
         {
             "pb_0": "entity/project",
@@ -441,50 +466,55 @@ def test_mixed_aggregations_and_percentiles():
         metrics,
         """
         WITH all_buckets AS
-            (SELECT toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 3600 SECOND, {pb_3:String}) + toIntervalSecond(number * {pb_4:Int64}) AS bucket
-            FROM numbers(toUInt64(ceil((toUnixTimestamp(toDateTime({pb_2:Float64}, {pb_3:String})) - toUnixTimestamp(toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 3600 SECOND, {pb_3:String}))) / {pb_4:Float64})))
-            WHERE bucket < toDateTime({pb_2:Float64}, {pb_3:String}) ),
-            aggregated_data AS
-            (SELECT bucket,
-                    model,
-                    sumOrNull(m_total_tokens) AS sum_total_tokens,
-                    avgOrNull(m_total_tokens) AS avg_total_tokens,
-                    quantileOrNull(0.5)(m_total_tokens) AS p50_total_tokens,
-                    quantileOrNull(0.95)(m_total_tokens) AS p95_total_tokens,
-                    quantileOrNull(0.99)(m_total_tokens) AS p99_total_tokens,
-                    count() AS count
-            FROM
-                (SELECT toStartOfInterval(sortable_datetime, INTERVAL 3600 SECOND, {pb_3:String}) AS bucket,
-                        kv.1 AS model,
-                        toFloat64OrNull(JSONExtractRaw(kv.2, 'total_tokens')) AS m_total_tokens
-                FROM
-                    (SELECT sortable_datetime,
-                            JSONExtractRaw(ifNull(summary_dump, '{}'), 'usage') AS usage_raw
-                    FROM calls_merged
-                    WHERE project_id = {pb_0:String}
-                        AND sortable_datetime >= toDateTime({pb_1:Float64}, {pb_3:String})
-                        AND sortable_datetime < toDateTime({pb_2:Float64}, {pb_3:String})
-                        AND deleted_at IS NULL ) ARRAY
-                JOIN JSONExtractKeysAndValuesRaw(ifNull(usage_raw, '{}')) AS kv)
-            GROUP BY bucket,
-                    model ),
-            all_models AS
-            (SELECT DISTINCT model
-            FROM aggregated_data)
+          (SELECT toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 3600 SECOND, {pb_3:String}) + toIntervalSecond(number * {pb_4:Int64}) AS bucket
+           FROM numbers(toUInt64(ceil((toUnixTimestamp(toDateTime({pb_2:Float64}, {pb_3:String})) - toUnixTimestamp(toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 3600 SECOND, {pb_3:String}))) / {pb_4:Float64})))
+           WHERE bucket < toDateTime({pb_2:Float64}, {pb_3:String}) ),
+             aggregated_data AS
+          (SELECT bucket,
+                  model,
+                  sumOrNull(m_total_tokens) AS sum_total_tokens,
+                  avgOrNull(m_total_tokens) AS avg_total_tokens,
+                  quantileOrNull(0.5)(m_total_tokens) AS p50_total_tokens,
+                  quantileOrNull(0.95)(m_total_tokens) AS p95_total_tokens,
+                  quantileOrNull(0.99)(m_total_tokens) AS p99_total_tokens,
+                  count() AS count
+           FROM
+             (SELECT toStartOfInterval(sortable_datetime, INTERVAL 3600 SECOND, {pb_3:String}) AS bucket,
+                     kv.1 AS model,
+                     toFloat64OrNull(JSONExtractRaw(kv.2, 'total_tokens')) AS m_total_tokens
+              FROM
+                (SELECT sortable_datetime,
+                        JSONExtractRaw(ifNull(summary_dump, '{}'), 'usage') AS usage_raw
+                 FROM
+                   (SELECT anyIf(cm.sortable_datetime, cm.sortable_datetime IS NOT NULL) AS sortable_datetime,
+                           anyIf(cm.summary_dump, cm.summary_dump IS NOT NULL) AS summary_dump
+                    FROM calls_merged AS cm
+                    WHERE cm.project_id = {pb_0:String}
+                      AND cm.sortable_datetime >= toDateTime({pb_1:Float64}, {pb_3:String})
+                      AND cm.sortable_datetime < toDateTime({pb_2:Float64}, {pb_3:String})
+                      AND cm.deleted_at IS NULL
+                    GROUP BY project_id,
+                             id)) ARRAY
+              JOIN JSONExtractKeysAndValuesRaw(ifNull(usage_raw, '{}')) AS kv)
+           GROUP BY bucket,
+                    model),
+             all_models AS
+          (SELECT DISTINCT model
+           FROM aggregated_data)
         SELECT all_buckets.bucket AS timestamp,
-            all_models.model,
-            COALESCE(aggregated_data.sum_total_tokens, 0) AS sum_total_tokens,
-            COALESCE(aggregated_data.avg_total_tokens, 0) AS avg_total_tokens,
-            aggregated_data.p50_total_tokens AS p50_total_tokens,
-            aggregated_data.p95_total_tokens AS p95_total_tokens,
-            aggregated_data.p99_total_tokens AS p99_total_tokens,
-            COALESCE(aggregated_data.count, 0) AS count
+               all_models.model,
+               COALESCE(aggregated_data.sum_total_tokens, 0) AS sum_total_tokens,
+               COALESCE(aggregated_data.avg_total_tokens, 0) AS avg_total_tokens,
+               aggregated_data.p50_total_tokens AS p50_total_tokens,
+               aggregated_data.p95_total_tokens AS p95_total_tokens,
+               aggregated_data.p99_total_tokens AS p99_total_tokens,
+               COALESCE(aggregated_data.count, 0) AS count
         FROM all_buckets
         CROSS JOIN all_models
         LEFT JOIN aggregated_data ON all_buckets.bucket = aggregated_data.bucket
         AND all_models.model = aggregated_data.model
         ORDER BY all_buckets.bucket,
-                all_models.model
+                 all_models.model
         """,
         {
             "pb_0": "entity/project",
@@ -526,42 +556,47 @@ def test_granularity_auto_selection():
         metrics,
         """
         WITH all_buckets AS
-            (SELECT toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 300 SECOND, {pb_3:String}) + toIntervalSecond(number * {pb_4:Int64}) AS bucket
-            FROM numbers(toUInt64(ceil((toUnixTimestamp(toDateTime({pb_2:Float64}, {pb_3:String})) - toUnixTimestamp(toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 300 SECOND, {pb_3:String}))) / {pb_4:Float64})))
-            WHERE bucket < toDateTime({pb_2:Float64}, {pb_3:String}) ),
-            aggregated_data AS
-            (SELECT bucket,
-                    model,
-                    sumOrNull(m_total_tokens) AS sum_total_tokens,
-                    count() AS count
-            FROM
-                (SELECT toStartOfInterval(sortable_datetime, INTERVAL 300 SECOND, {pb_3:String}) AS bucket,
-                        kv.1 AS model,
-                        toFloat64OrNull(JSONExtractRaw(kv.2, 'total_tokens')) AS m_total_tokens
-                FROM
-                    (SELECT sortable_datetime,
-                            JSONExtractRaw(ifNull(summary_dump, '{}'), 'usage') AS usage_raw
-                    FROM calls_merged
-                    WHERE project_id = {pb_0:String}
-                        AND sortable_datetime >= toDateTime({pb_1:Float64}, {pb_3:String})
-                        AND sortable_datetime < toDateTime({pb_2:Float64}, {pb_3:String})
-                        AND deleted_at IS NULL ) ARRAY
-                JOIN JSONExtractKeysAndValuesRaw(ifNull(usage_raw, '{}')) AS kv)
-            GROUP BY bucket,
-                    model ),
-            all_models AS
-            (SELECT DISTINCT model
-            FROM aggregated_data)
+          (SELECT toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 300 SECOND, {pb_3:String}) + toIntervalSecond(number * {pb_4:Int64}) AS bucket
+           FROM numbers(toUInt64(ceil((toUnixTimestamp(toDateTime({pb_2:Float64}, {pb_3:String})) - toUnixTimestamp(toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 300 SECOND, {pb_3:String}))) / {pb_4:Float64})))
+           WHERE bucket < toDateTime({pb_2:Float64}, {pb_3:String}) ),
+             aggregated_data AS
+          (SELECT bucket,
+                  model,
+                  sumOrNull(m_total_tokens) AS sum_total_tokens,
+                  count() AS count
+           FROM
+             (SELECT toStartOfInterval(sortable_datetime, INTERVAL 300 SECOND, {pb_3:String}) AS bucket,
+                     kv.1 AS model,
+                     toFloat64OrNull(JSONExtractRaw(kv.2, 'total_tokens')) AS m_total_tokens
+              FROM
+                (SELECT sortable_datetime,
+                        JSONExtractRaw(ifNull(summary_dump, '{}'), 'usage') AS usage_raw
+                 FROM
+                   (SELECT anyIf(cm.sortable_datetime, cm.sortable_datetime IS NOT NULL) AS sortable_datetime,
+                           anyIf(cm.summary_dump, cm.summary_dump IS NOT NULL) AS summary_dump
+                    FROM calls_merged AS cm
+                    WHERE cm.project_id = {pb_0:String}
+                      AND cm.sortable_datetime >= toDateTime({pb_1:Float64}, {pb_3:String})
+                      AND cm.sortable_datetime < toDateTime({pb_2:Float64}, {pb_3:String})
+                      AND cm.deleted_at IS NULL
+                    GROUP BY project_id,
+                             id)) ARRAY
+              JOIN JSONExtractKeysAndValuesRaw(ifNull(usage_raw, '{}')) AS kv)
+           GROUP BY bucket,
+                    model),
+             all_models AS
+          (SELECT DISTINCT model
+           FROM aggregated_data)
         SELECT all_buckets.bucket AS timestamp,
-            all_models.model,
-            COALESCE(aggregated_data.sum_total_tokens, 0) AS sum_total_tokens,
-            COALESCE(aggregated_data.count, 0) AS count
+               all_models.model,
+               COALESCE(aggregated_data.sum_total_tokens, 0) AS sum_total_tokens,
+               COALESCE(aggregated_data.count, 0) AS count
         FROM all_buckets
         CROSS JOIN all_models
         LEFT JOIN aggregated_data ON all_buckets.bucket = aggregated_data.bucket
         AND all_models.model = aggregated_data.model
         ORDER BY all_buckets.bucket,
-                all_models.model
+                 all_models.model
         """,
         {
             "pb_0": "p",
@@ -585,42 +620,47 @@ def test_granularity_auto_selection():
         metrics,
         """
         WITH all_buckets AS
-            (SELECT toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 3600 SECOND, {pb_3:String}) + toIntervalSecond(number * {pb_4:Int64}) AS bucket
-            FROM numbers(toUInt64(ceil((toUnixTimestamp(toDateTime({pb_2:Float64}, {pb_3:String})) - toUnixTimestamp(toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 3600 SECOND, {pb_3:String}))) / {pb_4:Float64})))
-            WHERE bucket < toDateTime({pb_2:Float64}, {pb_3:String}) ),
-            aggregated_data AS
-            (SELECT bucket,
-                    model,
-                    sumOrNull(m_total_tokens) AS sum_total_tokens,
-                    count() AS count
-            FROM
-                (SELECT toStartOfInterval(sortable_datetime, INTERVAL 3600 SECOND, {pb_3:String}) AS bucket,
-                        kv.1 AS model,
-                        toFloat64OrNull(JSONExtractRaw(kv.2, 'total_tokens')) AS m_total_tokens
-                FROM
-                    (SELECT sortable_datetime,
-                            JSONExtractRaw(ifNull(summary_dump, '{}'), 'usage') AS usage_raw
-                    FROM calls_merged
-                    WHERE project_id = {pb_0:String}
-                        AND sortable_datetime >= toDateTime({pb_1:Float64}, {pb_3:String})
-                        AND sortable_datetime < toDateTime({pb_2:Float64}, {pb_3:String})
-                        AND deleted_at IS NULL ) ARRAY
-                JOIN JSONExtractKeysAndValuesRaw(ifNull(usage_raw, '{}')) AS kv)
-            GROUP BY bucket,
-                    model ),
-            all_models AS
-            (SELECT DISTINCT model
-            FROM aggregated_data)
+          (SELECT toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 3600 SECOND, {pb_3:String}) + toIntervalSecond(number * {pb_4:Int64}) AS bucket
+           FROM numbers(toUInt64(ceil((toUnixTimestamp(toDateTime({pb_2:Float64}, {pb_3:String})) - toUnixTimestamp(toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 3600 SECOND, {pb_3:String}))) / {pb_4:Float64})))
+           WHERE bucket < toDateTime({pb_2:Float64}, {pb_3:String}) ),
+             aggregated_data AS
+          (SELECT bucket,
+                  model,
+                  sumOrNull(m_total_tokens) AS sum_total_tokens,
+                  count() AS count
+           FROM
+             (SELECT toStartOfInterval(sortable_datetime, INTERVAL 3600 SECOND, {pb_3:String}) AS bucket,
+                     kv.1 AS model,
+                     toFloat64OrNull(JSONExtractRaw(kv.2, 'total_tokens')) AS m_total_tokens
+              FROM
+                (SELECT sortable_datetime,
+                        JSONExtractRaw(ifNull(summary_dump, '{}'), 'usage') AS usage_raw
+                 FROM
+                   (SELECT anyIf(cm.sortable_datetime, cm.sortable_datetime IS NOT NULL) AS sortable_datetime,
+                           anyIf(cm.summary_dump, cm.summary_dump IS NOT NULL) AS summary_dump
+                    FROM calls_merged AS cm
+                    WHERE cm.project_id = {pb_0:String}
+                      AND cm.sortable_datetime >= toDateTime({pb_1:Float64}, {pb_3:String})
+                      AND cm.sortable_datetime < toDateTime({pb_2:Float64}, {pb_3:String})
+                      AND cm.deleted_at IS NULL
+                    GROUP BY project_id,
+                             id)) ARRAY
+              JOIN JSONExtractKeysAndValuesRaw(ifNull(usage_raw, '{}')) AS kv)
+           GROUP BY bucket,
+                    model),
+             all_models AS
+          (SELECT DISTINCT model
+           FROM aggregated_data)
         SELECT all_buckets.bucket AS timestamp,
-            all_models.model,
-            COALESCE(aggregated_data.sum_total_tokens, 0) AS sum_total_tokens,
-            COALESCE(aggregated_data.count, 0) AS count
+               all_models.model,
+               COALESCE(aggregated_data.sum_total_tokens, 0) AS sum_total_tokens,
+               COALESCE(aggregated_data.count, 0) AS count
         FROM all_buckets
         CROSS JOIN all_models
         LEFT JOIN aggregated_data ON all_buckets.bucket = aggregated_data.bucket
         AND all_models.model = aggregated_data.model
         ORDER BY all_buckets.bucket,
-                all_models.model
+                 all_models.model
         """,
         {
             "pb_0": "p",
@@ -644,42 +684,47 @@ def test_granularity_auto_selection():
         metrics,
         """
         WITH all_buckets AS
-            (SELECT toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 21600 SECOND, {pb_3:String}) + toIntervalSecond(number * {pb_4:Int64}) AS bucket
-            FROM numbers(toUInt64(ceil((toUnixTimestamp(toDateTime({pb_2:Float64}, {pb_3:String})) - toUnixTimestamp(toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 21600 SECOND, {pb_3:String}))) / {pb_4:Float64})))
-            WHERE bucket < toDateTime({pb_2:Float64}, {pb_3:String}) ),
-            aggregated_data AS
-            (SELECT bucket,
-                    model,
-                    sumOrNull(m_total_tokens) AS sum_total_tokens,
-                    count() AS count
-            FROM
-                (SELECT toStartOfInterval(sortable_datetime, INTERVAL 21600 SECOND, {pb_3:String}) AS bucket,
-                        kv.1 AS model,
-                        toFloat64OrNull(JSONExtractRaw(kv.2, 'total_tokens')) AS m_total_tokens
-                FROM
-                    (SELECT sortable_datetime,
-                            JSONExtractRaw(ifNull(summary_dump, '{}'), 'usage') AS usage_raw
-                    FROM calls_merged
-                    WHERE project_id = {pb_0:String}
-                        AND sortable_datetime >= toDateTime({pb_1:Float64}, {pb_3:String})
-                        AND sortable_datetime < toDateTime({pb_2:Float64}, {pb_3:String})
-                        AND deleted_at IS NULL ) ARRAY
-                JOIN JSONExtractKeysAndValuesRaw(ifNull(usage_raw, '{}')) AS kv)
-            GROUP BY bucket,
-                    model ),
-            all_models AS
-            (SELECT DISTINCT model
-            FROM aggregated_data)
+          (SELECT toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 21600 SECOND, {pb_3:String}) + toIntervalSecond(number * {pb_4:Int64}) AS bucket
+           FROM numbers(toUInt64(ceil((toUnixTimestamp(toDateTime({pb_2:Float64}, {pb_3:String})) - toUnixTimestamp(toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 21600 SECOND, {pb_3:String}))) / {pb_4:Float64})))
+           WHERE bucket < toDateTime({pb_2:Float64}, {pb_3:String}) ),
+             aggregated_data AS
+          (SELECT bucket,
+                  model,
+                  sumOrNull(m_total_tokens) AS sum_total_tokens,
+                  count() AS count
+           FROM
+             (SELECT toStartOfInterval(sortable_datetime, INTERVAL 21600 SECOND, {pb_3:String}) AS bucket,
+                     kv.1 AS model,
+                     toFloat64OrNull(JSONExtractRaw(kv.2, 'total_tokens')) AS m_total_tokens
+              FROM
+                (SELECT sortable_datetime,
+                        JSONExtractRaw(ifNull(summary_dump, '{}'), 'usage') AS usage_raw
+                 FROM
+                   (SELECT anyIf(cm.sortable_datetime, cm.sortable_datetime IS NOT NULL) AS sortable_datetime,
+                           anyIf(cm.summary_dump, cm.summary_dump IS NOT NULL) AS summary_dump
+                    FROM calls_merged AS cm
+                    WHERE cm.project_id = {pb_0:String}
+                      AND cm.sortable_datetime >= toDateTime({pb_1:Float64}, {pb_3:String})
+                      AND cm.sortable_datetime < toDateTime({pb_2:Float64}, {pb_3:String})
+                      AND cm.deleted_at IS NULL
+                    GROUP BY project_id,
+                             id)) ARRAY
+              JOIN JSONExtractKeysAndValuesRaw(ifNull(usage_raw, '{}')) AS kv)
+           GROUP BY bucket,
+                    model),
+             all_models AS
+          (SELECT DISTINCT model
+           FROM aggregated_data)
         SELECT all_buckets.bucket AS timestamp,
-            all_models.model,
-            COALESCE(aggregated_data.sum_total_tokens, 0) AS sum_total_tokens,
-            COALESCE(aggregated_data.count, 0) AS count
+               all_models.model,
+               COALESCE(aggregated_data.sum_total_tokens, 0) AS sum_total_tokens,
+               COALESCE(aggregated_data.count, 0) AS count
         FROM all_buckets
         CROSS JOIN all_models
         LEFT JOIN aggregated_data ON all_buckets.bucket = aggregated_data.bucket
         AND all_models.model = aggregated_data.model
         ORDER BY all_buckets.bucket,
-                all_models.model
+                 all_models.model
         """,
         {
             "pb_0": "p",
@@ -703,42 +748,47 @@ def test_granularity_auto_selection():
         metrics,
         """
         WITH all_buckets AS
-            (SELECT toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 43200 SECOND, {pb_3:String}) + toIntervalSecond(number * {pb_4:Int64}) AS bucket
-            FROM numbers(toUInt64(ceil((toUnixTimestamp(toDateTime({pb_2:Float64}, {pb_3:String})) - toUnixTimestamp(toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 43200 SECOND, {pb_3:String}))) / {pb_4:Float64})))
-            WHERE bucket < toDateTime({pb_2:Float64}, {pb_3:String}) ),
-            aggregated_data AS
-            (SELECT bucket,
-                    model,
-                    sumOrNull(m_total_tokens) AS sum_total_tokens,
-                    count() AS count
-            FROM
-                (SELECT toStartOfInterval(sortable_datetime, INTERVAL 43200 SECOND, {pb_3:String}) AS bucket,
-                        kv.1 AS model,
-                        toFloat64OrNull(JSONExtractRaw(kv.2, 'total_tokens')) AS m_total_tokens
-                FROM
-                    (SELECT sortable_datetime,
-                            JSONExtractRaw(ifNull(summary_dump, '{}'), 'usage') AS usage_raw
-                    FROM calls_merged
-                    WHERE project_id = {pb_0:String}
-                        AND sortable_datetime >= toDateTime({pb_1:Float64}, {pb_3:String})
-                        AND sortable_datetime < toDateTime({pb_2:Float64}, {pb_3:String})
-                        AND deleted_at IS NULL ) ARRAY
-                JOIN JSONExtractKeysAndValuesRaw(ifNull(usage_raw, '{}')) AS kv)
-            GROUP BY bucket,
-                    model ),
-            all_models AS
-            (SELECT DISTINCT model
-            FROM aggregated_data)
+          (SELECT toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 43200 SECOND, {pb_3:String}) + toIntervalSecond(number * {pb_4:Int64}) AS bucket
+           FROM numbers(toUInt64(ceil((toUnixTimestamp(toDateTime({pb_2:Float64}, {pb_3:String})) - toUnixTimestamp(toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 43200 SECOND, {pb_3:String}))) / {pb_4:Float64})))
+           WHERE bucket < toDateTime({pb_2:Float64}, {pb_3:String}) ),
+             aggregated_data AS
+          (SELECT bucket,
+                  model,
+                  sumOrNull(m_total_tokens) AS sum_total_tokens,
+                  count() AS count
+           FROM
+             (SELECT toStartOfInterval(sortable_datetime, INTERVAL 43200 SECOND, {pb_3:String}) AS bucket,
+                     kv.1 AS model,
+                     toFloat64OrNull(JSONExtractRaw(kv.2, 'total_tokens')) AS m_total_tokens
+              FROM
+                (SELECT sortable_datetime,
+                        JSONExtractRaw(ifNull(summary_dump, '{}'), 'usage') AS usage_raw
+                 FROM
+                   (SELECT anyIf(cm.sortable_datetime, cm.sortable_datetime IS NOT NULL) AS sortable_datetime,
+                           anyIf(cm.summary_dump, cm.summary_dump IS NOT NULL) AS summary_dump
+                    FROM calls_merged AS cm
+                    WHERE cm.project_id = {pb_0:String}
+                      AND cm.sortable_datetime >= toDateTime({pb_1:Float64}, {pb_3:String})
+                      AND cm.sortable_datetime < toDateTime({pb_2:Float64}, {pb_3:String})
+                      AND cm.deleted_at IS NULL
+                    GROUP BY project_id,
+                             id)) ARRAY
+              JOIN JSONExtractKeysAndValuesRaw(ifNull(usage_raw, '{}')) AS kv)
+           GROUP BY bucket,
+                    model),
+             all_models AS
+          (SELECT DISTINCT model
+           FROM aggregated_data)
         SELECT all_buckets.bucket AS timestamp,
-            all_models.model,
-            COALESCE(aggregated_data.sum_total_tokens, 0) AS sum_total_tokens,
-            COALESCE(aggregated_data.count, 0) AS count
+               all_models.model,
+               COALESCE(aggregated_data.sum_total_tokens, 0) AS sum_total_tokens,
+               COALESCE(aggregated_data.count, 0) AS count
         FROM all_buckets
         CROSS JOIN all_models
         LEFT JOIN aggregated_data ON all_buckets.bucket = aggregated_data.bucket
         AND all_models.model = aggregated_data.model
         ORDER BY all_buckets.bucket,
-                all_models.model
+                 all_models.model
         """,
         {
             "pb_0": "p",
@@ -762,42 +812,47 @@ def test_granularity_auto_selection():
         metrics,
         """
         WITH all_buckets AS
-            (SELECT toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 86400 SECOND, {pb_3:String}) + toIntervalSecond(number * {pb_4:Int64}) AS bucket
-            FROM numbers(toUInt64(ceil((toUnixTimestamp(toDateTime({pb_2:Float64}, {pb_3:String})) - toUnixTimestamp(toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 86400 SECOND, {pb_3:String}))) / {pb_4:Float64})))
-            WHERE bucket < toDateTime({pb_2:Float64}, {pb_3:String}) ),
-            aggregated_data AS
-            (SELECT bucket,
-                    model,
-                    sumOrNull(m_total_tokens) AS sum_total_tokens,
-                    count() AS count
-            FROM
-                (SELECT toStartOfInterval(sortable_datetime, INTERVAL 86400 SECOND, {pb_3:String}) AS bucket,
-                        kv.1 AS model,
-                        toFloat64OrNull(JSONExtractRaw(kv.2, 'total_tokens')) AS m_total_tokens
-                FROM
-                    (SELECT sortable_datetime,
-                            JSONExtractRaw(ifNull(summary_dump, '{}'), 'usage') AS usage_raw
-                    FROM calls_merged
-                    WHERE project_id = {pb_0:String}
-                        AND sortable_datetime >= toDateTime({pb_1:Float64}, {pb_3:String})
-                        AND sortable_datetime < toDateTime({pb_2:Float64}, {pb_3:String})
-                        AND deleted_at IS NULL ) ARRAY
-                JOIN JSONExtractKeysAndValuesRaw(ifNull(usage_raw, '{}')) AS kv)
-            GROUP BY bucket,
-                    model ),
-            all_models AS
-            (SELECT DISTINCT model
-            FROM aggregated_data)
+          (SELECT toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 86400 SECOND, {pb_3:String}) + toIntervalSecond(number * {pb_4:Int64}) AS bucket
+           FROM numbers(toUInt64(ceil((toUnixTimestamp(toDateTime({pb_2:Float64}, {pb_3:String})) - toUnixTimestamp(toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 86400 SECOND, {pb_3:String}))) / {pb_4:Float64})))
+           WHERE bucket < toDateTime({pb_2:Float64}, {pb_3:String}) ),
+             aggregated_data AS
+          (SELECT bucket,
+                  model,
+                  sumOrNull(m_total_tokens) AS sum_total_tokens,
+                  count() AS count
+           FROM
+             (SELECT toStartOfInterval(sortable_datetime, INTERVAL 86400 SECOND, {pb_3:String}) AS bucket,
+                     kv.1 AS model,
+                     toFloat64OrNull(JSONExtractRaw(kv.2, 'total_tokens')) AS m_total_tokens
+              FROM
+                (SELECT sortable_datetime,
+                        JSONExtractRaw(ifNull(summary_dump, '{}'), 'usage') AS usage_raw
+                 FROM
+                   (SELECT anyIf(cm.sortable_datetime, cm.sortable_datetime IS NOT NULL) AS sortable_datetime,
+                           anyIf(cm.summary_dump, cm.summary_dump IS NOT NULL) AS summary_dump
+                    FROM calls_merged AS cm
+                    WHERE cm.project_id = {pb_0:String}
+                      AND cm.sortable_datetime >= toDateTime({pb_1:Float64}, {pb_3:String})
+                      AND cm.sortable_datetime < toDateTime({pb_2:Float64}, {pb_3:String})
+                      AND cm.deleted_at IS NULL
+                    GROUP BY project_id,
+                             id)) ARRAY
+              JOIN JSONExtractKeysAndValuesRaw(ifNull(usage_raw, '{}')) AS kv)
+           GROUP BY bucket,
+                    model),
+             all_models AS
+          (SELECT DISTINCT model
+           FROM aggregated_data)
         SELECT all_buckets.bucket AS timestamp,
-            all_models.model,
-            COALESCE(aggregated_data.sum_total_tokens, 0) AS sum_total_tokens,
-            COALESCE(aggregated_data.count, 0) AS count
+               all_models.model,
+               COALESCE(aggregated_data.sum_total_tokens, 0) AS sum_total_tokens,
+               COALESCE(aggregated_data.count, 0) AS count
         FROM all_buckets
         CROSS JOIN all_models
         LEFT JOIN aggregated_data ON all_buckets.bucket = aggregated_data.bucket
         AND all_models.model = aggregated_data.model
         ORDER BY all_buckets.bucket,
-                all_models.model
+                 all_models.model
         """,
         {
             "pb_0": "p",
@@ -826,42 +881,47 @@ def test_explicit_granularity_overrides_auto():
         metrics,
         """
         WITH all_buckets AS
-            (SELECT toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 300 SECOND, {pb_3:String}) + toIntervalSecond(number * {pb_4:Int64}) AS bucket
-            FROM numbers(toUInt64(ceil((toUnixTimestamp(toDateTime({pb_2:Float64}, {pb_3:String})) - toUnixTimestamp(toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 300 SECOND, {pb_3:String}))) / {pb_4:Float64})))
-            WHERE bucket < toDateTime({pb_2:Float64}, {pb_3:String}) ),
-            aggregated_data AS
-            (SELECT bucket,
-                    model,
-                    sumOrNull(m_total_tokens) AS sum_total_tokens,
-                    count() AS count
-            FROM
-                (SELECT toStartOfInterval(sortable_datetime, INTERVAL 300 SECOND, {pb_3:String}) AS bucket,
-                        kv.1 AS model,
-                        toFloat64OrNull(JSONExtractRaw(kv.2, 'total_tokens')) AS m_total_tokens
-                FROM
-                    (SELECT sortable_datetime,
-                            JSONExtractRaw(ifNull(summary_dump, '{}'), 'usage') AS usage_raw
-                    FROM calls_merged
-                    WHERE project_id = {pb_0:String}
-                        AND sortable_datetime >= toDateTime({pb_1:Float64}, {pb_3:String})
-                        AND sortable_datetime < toDateTime({pb_2:Float64}, {pb_3:String})
-                        AND deleted_at IS NULL ) ARRAY
-                JOIN JSONExtractKeysAndValuesRaw(ifNull(usage_raw, '{}')) AS kv)
-            GROUP BY bucket,
-                    model ),
-            all_models AS
-            (SELECT DISTINCT model
-            FROM aggregated_data)
+          (SELECT toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 300 SECOND, {pb_3:String}) + toIntervalSecond(number * {pb_4:Int64}) AS bucket
+           FROM numbers(toUInt64(ceil((toUnixTimestamp(toDateTime({pb_2:Float64}, {pb_3:String})) - toUnixTimestamp(toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 300 SECOND, {pb_3:String}))) / {pb_4:Float64})))
+           WHERE bucket < toDateTime({pb_2:Float64}, {pb_3:String}) ),
+             aggregated_data AS
+          (SELECT bucket,
+                  model,
+                  sumOrNull(m_total_tokens) AS sum_total_tokens,
+                  count() AS count
+           FROM
+             (SELECT toStartOfInterval(sortable_datetime, INTERVAL 300 SECOND, {pb_3:String}) AS bucket,
+                     kv.1 AS model,
+                     toFloat64OrNull(JSONExtractRaw(kv.2, 'total_tokens')) AS m_total_tokens
+              FROM
+                (SELECT sortable_datetime,
+                        JSONExtractRaw(ifNull(summary_dump, '{}'), 'usage') AS usage_raw
+                 FROM
+                   (SELECT anyIf(cm.sortable_datetime, cm.sortable_datetime IS NOT NULL) AS sortable_datetime,
+                           anyIf(cm.summary_dump, cm.summary_dump IS NOT NULL) AS summary_dump
+                    FROM calls_merged AS cm
+                    WHERE cm.project_id = {pb_0:String}
+                      AND cm.sortable_datetime >= toDateTime({pb_1:Float64}, {pb_3:String})
+                      AND cm.sortable_datetime < toDateTime({pb_2:Float64}, {pb_3:String})
+                      AND cm.deleted_at IS NULL
+                    GROUP BY project_id,
+                             id)) ARRAY
+              JOIN JSONExtractKeysAndValuesRaw(ifNull(usage_raw, '{}')) AS kv)
+           GROUP BY bucket,
+                    model),
+             all_models AS
+          (SELECT DISTINCT model
+           FROM aggregated_data)
         SELECT all_buckets.bucket AS timestamp,
-            all_models.model,
-            COALESCE(aggregated_data.sum_total_tokens, 0) AS sum_total_tokens,
-            COALESCE(aggregated_data.count, 0) AS count
+               all_models.model,
+               COALESCE(aggregated_data.sum_total_tokens, 0) AS sum_total_tokens,
+               COALESCE(aggregated_data.count, 0) AS count
         FROM all_buckets
         CROSS JOIN all_models
         LEFT JOIN aggregated_data ON all_buckets.bucket = aggregated_data.bucket
         AND all_models.model = aggregated_data.model
         ORDER BY all_buckets.bucket,
-                all_models.model
+                 all_models.model
         """,
         {
             "pb_0": "entity/project",
@@ -893,43 +953,48 @@ def test_trace_roots_only_filter():
         metrics,
         """
         WITH all_buckets AS
-            (SELECT toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 3600 SECOND, {pb_3:String}) + toIntervalSecond(number * {pb_4:Int64}) AS bucket
-            FROM numbers(toUInt64(ceil((toUnixTimestamp(toDateTime({pb_2:Float64}, {pb_3:String})) - toUnixTimestamp(toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 3600 SECOND, {pb_3:String}))) / {pb_4:Float64})))
-            WHERE bucket < toDateTime({pb_2:Float64}, {pb_3:String}) ),
-            aggregated_data AS
-            (SELECT bucket,
-                    model,
-                    sumOrNull(m_total_tokens) AS sum_total_tokens,
-                    count() AS count
-            FROM
-                (SELECT toStartOfInterval(sortable_datetime, INTERVAL 3600 SECOND, {pb_3:String}) AS bucket,
-                        kv.1 AS model,
-                        toFloat64OrNull(JSONExtractRaw(kv.2, 'total_tokens')) AS m_total_tokens
-                FROM
-                    (SELECT sortable_datetime,
-                            JSONExtractRaw(ifNull(summary_dump, '{}'), 'usage') AS usage_raw
-                    FROM calls_merged
-                    WHERE project_id = {pb_0:String}
-                        AND sortable_datetime >= toDateTime({pb_1:Float64}, {pb_3:String})
-                        AND sortable_datetime < toDateTime({pb_2:Float64}, {pb_3:String})
-                        AND deleted_at IS NULL
-                        AND parent_id IS NULL ) ARRAY
-                JOIN JSONExtractKeysAndValuesRaw(ifNull(usage_raw, '{}')) AS kv)
-            GROUP BY bucket,
-                    model ),
-            all_models AS
-            (SELECT DISTINCT model
-            FROM aggregated_data)
+          (SELECT toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 3600 SECOND, {pb_3:String}) + toIntervalSecond(number * {pb_4:Int64}) AS bucket
+           FROM numbers(toUInt64(ceil((toUnixTimestamp(toDateTime({pb_2:Float64}, {pb_3:String})) - toUnixTimestamp(toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 3600 SECOND, {pb_3:String}))) / {pb_4:Float64})))
+           WHERE bucket < toDateTime({pb_2:Float64}, {pb_3:String}) ),
+             aggregated_data AS
+          (SELECT bucket,
+                  model,
+                  sumOrNull(m_total_tokens) AS sum_total_tokens,
+                  count() AS count
+           FROM
+             (SELECT toStartOfInterval(sortable_datetime, INTERVAL 3600 SECOND, {pb_3:String}) AS bucket,
+                     kv.1 AS model,
+                     toFloat64OrNull(JSONExtractRaw(kv.2, 'total_tokens')) AS m_total_tokens
+              FROM
+                (SELECT sortable_datetime,
+                        JSONExtractRaw(ifNull(summary_dump, '{}'), 'usage') AS usage_raw
+                 FROM
+                   (SELECT anyIf(cm.sortable_datetime, cm.sortable_datetime IS NOT NULL) AS sortable_datetime,
+                           anyIf(cm.summary_dump, cm.summary_dump IS NOT NULL) AS summary_dump
+                    FROM calls_merged AS cm
+                    WHERE cm.project_id = {pb_0:String}
+                      AND cm.sortable_datetime >= toDateTime({pb_1:Float64}, {pb_3:String})
+                      AND cm.sortable_datetime < toDateTime({pb_2:Float64}, {pb_3:String})
+                      AND cm.deleted_at IS NULL
+                      AND parent_id IS NULL
+                    GROUP BY project_id,
+                             id)) ARRAY
+              JOIN JSONExtractKeysAndValuesRaw(ifNull(usage_raw, '{}')) AS kv)
+           GROUP BY bucket,
+                    model),
+             all_models AS
+          (SELECT DISTINCT model
+           FROM aggregated_data)
         SELECT all_buckets.bucket AS timestamp,
-            all_models.model,
-            COALESCE(aggregated_data.sum_total_tokens, 0) AS sum_total_tokens,
-            COALESCE(aggregated_data.count, 0) AS count
+               all_models.model,
+               COALESCE(aggregated_data.sum_total_tokens, 0) AS sum_total_tokens,
+               COALESCE(aggregated_data.count, 0) AS count
         FROM all_buckets
         CROSS JOIN all_models
         LEFT JOIN aggregated_data ON all_buckets.bucket = aggregated_data.bucket
         AND all_models.model = aggregated_data.model
         ORDER BY all_buckets.bucket,
-                all_models.model
+                 all_models.model
         """,
         {
             "pb_0": "entity/project",
@@ -961,43 +1026,48 @@ def test_trace_ids_filter():
         metrics,
         """
         WITH all_buckets AS
-            (SELECT toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 3600 SECOND, {pb_3:String}) + toIntervalSecond(number * {pb_4:Int64}) AS bucket
-            FROM numbers(toUInt64(ceil((toUnixTimestamp(toDateTime({pb_2:Float64}, {pb_3:String})) - toUnixTimestamp(toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 3600 SECOND, {pb_3:String}))) / {pb_4:Float64})))
-            WHERE bucket < toDateTime({pb_2:Float64}, {pb_3:String}) ),
-            aggregated_data AS
-            (SELECT bucket,
-                    model,
-                    sumOrNull(m_total_tokens) AS sum_total_tokens,
-                    count() AS count
-            FROM
-                (SELECT toStartOfInterval(sortable_datetime, INTERVAL 3600 SECOND, {pb_3:String}) AS bucket,
-                        kv.1 AS model,
-                        toFloat64OrNull(JSONExtractRaw(kv.2, 'total_tokens')) AS m_total_tokens
-                FROM
-                    (SELECT sortable_datetime,
-                            JSONExtractRaw(ifNull(summary_dump, '{}'), 'usage') AS usage_raw
-                    FROM calls_merged
-                    WHERE project_id = {pb_0:String}
-                        AND sortable_datetime >= toDateTime({pb_1:Float64}, {pb_3:String})
-                        AND sortable_datetime < toDateTime({pb_2:Float64}, {pb_3:String})
-                        AND deleted_at IS NULL
-                        AND trace_id IN {pb_5:Array(String)} ) ARRAY
-                JOIN JSONExtractKeysAndValuesRaw(ifNull(usage_raw, '{}')) AS kv)
-            GROUP BY bucket,
-                    model ),
-            all_models AS
-            (SELECT DISTINCT model
-            FROM aggregated_data)
+          (SELECT toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 3600 SECOND, {pb_3:String}) + toIntervalSecond(number * {pb_4:Int64}) AS bucket
+           FROM numbers(toUInt64(ceil((toUnixTimestamp(toDateTime({pb_2:Float64}, {pb_3:String})) - toUnixTimestamp(toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 3600 SECOND, {pb_3:String}))) / {pb_4:Float64})))
+           WHERE bucket < toDateTime({pb_2:Float64}, {pb_3:String}) ),
+             aggregated_data AS
+          (SELECT bucket,
+                  model,
+                  sumOrNull(m_total_tokens) AS sum_total_tokens,
+                  count() AS count
+           FROM
+             (SELECT toStartOfInterval(sortable_datetime, INTERVAL 3600 SECOND, {pb_3:String}) AS bucket,
+                     kv.1 AS model,
+                     toFloat64OrNull(JSONExtractRaw(kv.2, 'total_tokens')) AS m_total_tokens
+              FROM
+                (SELECT sortable_datetime,
+                        JSONExtractRaw(ifNull(summary_dump, '{}'), 'usage') AS usage_raw
+                 FROM
+                   (SELECT anyIf(cm.sortable_datetime, cm.sortable_datetime IS NOT NULL) AS sortable_datetime,
+                           anyIf(cm.summary_dump, cm.summary_dump IS NOT NULL) AS summary_dump
+                    FROM calls_merged AS cm
+                    WHERE cm.project_id = {pb_0:String}
+                      AND cm.sortable_datetime >= toDateTime({pb_1:Float64}, {pb_3:String})
+                      AND cm.sortable_datetime < toDateTime({pb_2:Float64}, {pb_3:String})
+                      AND cm.deleted_at IS NULL
+                      AND trace_id IN {pb_5:Array(String)}
+                    GROUP BY project_id,
+                             id)) ARRAY
+              JOIN JSONExtractKeysAndValuesRaw(ifNull(usage_raw, '{}')) AS kv)
+           GROUP BY bucket,
+                    model),
+             all_models AS
+          (SELECT DISTINCT model
+           FROM aggregated_data)
         SELECT all_buckets.bucket AS timestamp,
-            all_models.model,
-            COALESCE(aggregated_data.sum_total_tokens, 0) AS sum_total_tokens,
-            COALESCE(aggregated_data.count, 0) AS count
+               all_models.model,
+               COALESCE(aggregated_data.sum_total_tokens, 0) AS sum_total_tokens,
+               COALESCE(aggregated_data.count, 0) AS count
         FROM all_buckets
         CROSS JOIN all_models
         LEFT JOIN aggregated_data ON all_buckets.bucket = aggregated_data.bucket
         AND all_models.model = aggregated_data.model
         ORDER BY all_buckets.bucket,
-                all_models.model
+                 all_models.model
         """,
         {
             "pb_0": "entity/project",
@@ -1030,43 +1100,48 @@ def test_wb_user_ids_filter():
         metrics,
         """
         WITH all_buckets AS
-            (SELECT toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 3600 SECOND, {pb_3:String}) + toIntervalSecond(number * {pb_4:Int64}) AS bucket
-            FROM numbers(toUInt64(ceil((toUnixTimestamp(toDateTime({pb_2:Float64}, {pb_3:String})) - toUnixTimestamp(toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 3600 SECOND, {pb_3:String}))) / {pb_4:Float64})))
-            WHERE bucket < toDateTime({pb_2:Float64}, {pb_3:String}) ),
-            aggregated_data AS
-            (SELECT bucket,
-                    model,
-                    sumOrNull(m_total_tokens) AS sum_total_tokens,
-                    count() AS count
-            FROM
-                (SELECT toStartOfInterval(sortable_datetime, INTERVAL 3600 SECOND, {pb_3:String}) AS bucket,
-                        kv.1 AS model,
-                        toFloat64OrNull(JSONExtractRaw(kv.2, 'total_tokens')) AS m_total_tokens
-                FROM
-                    (SELECT sortable_datetime,
-                            JSONExtractRaw(ifNull(summary_dump, '{}'), 'usage') AS usage_raw
-                    FROM calls_merged
-                    WHERE project_id = {pb_0:String}
-                        AND sortable_datetime >= toDateTime({pb_1:Float64}, {pb_3:String})
-                        AND sortable_datetime < toDateTime({pb_2:Float64}, {pb_3:String})
-                        AND deleted_at IS NULL
-                        AND wb_user_id IN {pb_5:Array(String)} ) ARRAY
-                JOIN JSONExtractKeysAndValuesRaw(ifNull(usage_raw, '{}')) AS kv)
-            GROUP BY bucket,
-                    model ),
-            all_models AS
-            (SELECT DISTINCT model
-            FROM aggregated_data)
+          (SELECT toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 3600 SECOND, {pb_3:String}) + toIntervalSecond(number * {pb_4:Int64}) AS bucket
+           FROM numbers(toUInt64(ceil((toUnixTimestamp(toDateTime({pb_2:Float64}, {pb_3:String})) - toUnixTimestamp(toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 3600 SECOND, {pb_3:String}))) / {pb_4:Float64})))
+           WHERE bucket < toDateTime({pb_2:Float64}, {pb_3:String}) ),
+             aggregated_data AS
+          (SELECT bucket,
+                  model,
+                  sumOrNull(m_total_tokens) AS sum_total_tokens,
+                  count() AS count
+           FROM
+             (SELECT toStartOfInterval(sortable_datetime, INTERVAL 3600 SECOND, {pb_3:String}) AS bucket,
+                     kv.1 AS model,
+                     toFloat64OrNull(JSONExtractRaw(kv.2, 'total_tokens')) AS m_total_tokens
+              FROM
+                (SELECT sortable_datetime,
+                        JSONExtractRaw(ifNull(summary_dump, '{}'), 'usage') AS usage_raw
+                 FROM
+                   (SELECT anyIf(cm.sortable_datetime, cm.sortable_datetime IS NOT NULL) AS sortable_datetime,
+                           anyIf(cm.summary_dump, cm.summary_dump IS NOT NULL) AS summary_dump
+                    FROM calls_merged AS cm
+                    WHERE cm.project_id = {pb_0:String}
+                      AND cm.sortable_datetime >= toDateTime({pb_1:Float64}, {pb_3:String})
+                      AND cm.sortable_datetime < toDateTime({pb_2:Float64}, {pb_3:String})
+                      AND cm.deleted_at IS NULL
+                      AND wb_user_id IN {pb_5:Array(String)}
+                    GROUP BY project_id,
+                             id)) ARRAY
+              JOIN JSONExtractKeysAndValuesRaw(ifNull(usage_raw, '{}')) AS kv)
+           GROUP BY bucket,
+                    model),
+             all_models AS
+          (SELECT DISTINCT model
+           FROM aggregated_data)
         SELECT all_buckets.bucket AS timestamp,
-            all_models.model,
-            COALESCE(aggregated_data.sum_total_tokens, 0) AS sum_total_tokens,
-            COALESCE(aggregated_data.count, 0) AS count
+               all_models.model,
+               COALESCE(aggregated_data.sum_total_tokens, 0) AS sum_total_tokens,
+               COALESCE(aggregated_data.count, 0) AS count
         FROM all_buckets
         CROSS JOIN all_models
         LEFT JOIN aggregated_data ON all_buckets.bucket = aggregated_data.bucket
         AND all_models.model = aggregated_data.model
         ORDER BY all_buckets.bucket,
-                all_models.model
+                 all_models.model
         """,
         {
             "pb_0": "entity/project",
