@@ -53,6 +53,7 @@ class ObjectConfig(BaseModel):
 class DynamicLeaderboardColumnConfig(BaseModel):
     evaluation_object_ref: base_object_def.RefStr | None = Field(default=None)
     scorer_name: str | None = Field(default=None)
+    display_name: str | None = Field(default=None)
     summary_metric_path: str | None = Field(default=None)
     should_minimize: bool | None = Field(default=None)
     deselected: bool | None = Field(

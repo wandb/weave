@@ -803,6 +803,18 @@
           "default": null,
           "title": "Scorer Name"
         },
+        "display_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Display Name"
+        },
         "summary_metric_path": {
           "anyOf": [
             {
