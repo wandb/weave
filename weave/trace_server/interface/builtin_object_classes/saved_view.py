@@ -1,4 +1,3 @@
-from enum import Enum
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -34,43 +33,42 @@ class ChartConfig(BaseModel):
     custom_name: str | None = Field(default=None)
 
 
-class AggregationMethod(str, Enum):
-    LATEST = "latest"
-    AVERAGE = "average"
-    BEST = "best"
-
-
 class ObjectVersionGroup(BaseModel):
     label: str  # label for the combination of the groups
     base_ref: str
     versions: list[str] | Literal["*"]
     show_version_indicator: bool
-    method: AggregationMethod
 
 
 class ObjectConfig(BaseModel):
-    version_groups: list[ObjectVersionGroup]
-    display_name_map: dict[str, str]  # obj -> display name (keys can use "*" wildcards)
-    deselected: list[
-        str
-    ]  # List of dataset refs or patterns to exclude (can use "*" for wildcard matching)
+    version_groups: list[ObjectVersionGroup] | None = Field(default=None)
+    display_name_map: dict[str, str] | None = Field(
+        default=None
+    )  # obj -> display name (keys can use "*" wildcards)
+    deselected: list[str] | None = Field(
+        default=None
+    )  # List of dataset refs or patterns to exclude
 
 
 class DynamicLeaderboardColumnConfig(BaseModel):
-    evaluation_object_ref: base_object_def.RefStr
-    scorer_name: str
-    summary_metric_path: str
-    should_minimize: bool
-    deselected: bool  # If True, this metric is excluded from the leaderboard
+    evaluation_object_ref: base_object_def.RefStr | None = Field(default=None)
+    scorer_name: str | None = Field(default=None)
+    summary_metric_path: str | None = Field(default=None)
+    should_minimize: bool | None = Field(default=None)
+    deselected: bool | None = Field(
+        default=None
+    )  # If True, this metric is excluded from the leaderboard
 
 
 class DynamicLeaderboardConfig(BaseModel):
     # These are initialized to empty lists and dicts by default (show everything)
-    model_configuration: ObjectConfig
-    dataset_configuration: ObjectConfig
-    scorer_configuration: ObjectConfig
+    model_configuration: ObjectConfig | None = Field(default=None)
+    dataset_configuration: ObjectConfig | None = Field(default=None)
+    scorer_configuration: ObjectConfig | None = Field(default=None)
     # Only has entries when a column is marked as deselected or minimized
-    columns_configuration: list[DynamicLeaderboardColumnConfig]
+    columns_configuration: list[DynamicLeaderboardColumnConfig] | None = Field(
+        default=None
+    )
 
 
 class SavedViewDefinition(BaseModel):
