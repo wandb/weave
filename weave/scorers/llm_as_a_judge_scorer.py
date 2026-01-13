@@ -13,9 +13,9 @@ class LLMAsAJudgeScorer(Scorer):
     model: LLMStructuredCompletionModel
     scoring_prompt: str
     # Specifies whether the scorer should use audio
-    enable_audio_scoring: bool = False
+    enable_audio_input_scoring: bool = False
     # Specifies the JSON paths to use to extract audio content from the input
-    audio_scoring_json_paths: list[str] | None = None
+    audio_input_scoring_json_paths: list[str] | None = None
 
     @op
     def score(self, *, output: str, **kwargs: Any) -> Any:

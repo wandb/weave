@@ -45,8 +45,8 @@ def make_evaluation():
                     ),
                 ),
                 scoring_prompt="Here are the inputs: {inputs}. Here is the output: {output}. Is the output correct?",
-                enable_audio_scoring=True,
-                audio_scoring_json_paths=["$.messages[0].content[1].input_audio"],
+                enable_audio_input_scoring=True,
+                audio_input_scoring_json_paths=["$.messages[0].content[1].input_audio"],
             ),
         ],
     )
@@ -73,9 +73,9 @@ def evaluation_equality_check(a, b):
 
 
 llm_as_a_judge_scorer_digest = (
-    "SWyaJDzmyLX74a1OiqhMEuYYO9kueJneMPVFY0W2PBE"
+    "iDEJJEYr7lVEksbDfE1EXMHhnER72ecIG87IEENxnYk"
     if sys.version_info.minor >= 13
-    else "KKQtaYOyie5TwYqPp5U5wH7aViRunVurFdAqAY3sN1E"
+    else "MS8NDaXbkci7vD5HRzyfnxUdmXmikPGtEvlSMs8kiCs"
 )
 
 library_cases = [
@@ -157,8 +157,8 @@ library_cases = [
                     "description": None,
                     "column_map": None,
                     "model": "weave:///shawn/test-project/object/LLMStructuredCompletionModel:VUqRnYmuvNhu3zgfDb9hnZhLRFM1vKKI1WEpw3bsViE",
-                    "enable_audio_scoring": True,
-                    "audio_scoring_json_paths": [
+                    "enable_audio_input_scoring": True,
+                    "audio_input_scoring_json_paths": [
                         "$.messages[0].content[1].input_audio"
                     ],
                     "scoring_prompt": "Here are the inputs: {inputs}. Here is the output: {output}. Is the output correct?",
