@@ -12,7 +12,9 @@ from weave.trace_server.interface.builtin_object_classes.llm_structured_model im
 class LLMAsAJudgeScorer(Scorer):
     model: LLMStructuredCompletionModel
     scoring_prompt: str
+    # Specifies whether the scorer should use audio
     enable_audio_scoring: bool = False
+    # Specifies the JSON paths to use to extract audio content from the input
     audio_scoring_json_paths: list[str] | None = None
 
     @op
