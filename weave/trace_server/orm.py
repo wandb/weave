@@ -508,6 +508,8 @@ def python_value_to_ch_type(value: typing.Any) -> str:
         return "UInt64"
     elif isinstance(value, float):
         return "Float64"
+    elif isinstance(value, datetime.datetime):
+        return "DateTime64(3)"
     elif value is None:
         return "Nullable(String)"
     else:
