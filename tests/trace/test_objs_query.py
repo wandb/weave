@@ -3,6 +3,7 @@ import base64
 import weave
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.common_interface import SortBy
 
 
 def generate_objects(weave_client: WeaveClient, obj_count: int, version_count: int):
@@ -75,7 +76,7 @@ def test_objs_query_filter_limit_offset_sort_by_created_at(client: WeaveClient):
             filter=tsi.ObjectVersionFilter(latest_only=True),
             limit=3,
             offset=5,
-            sort_by=[tsi.SortBy(field="created_at", direction="desc")],
+            sort_by=[SortBy(field="created_at", direction="desc")],
         )
     )
     assert len(res.objs) == 3
@@ -93,7 +94,7 @@ def test_objs_query_filter_limit_offset_sort_by_created_at(client: WeaveClient):
             filter=tsi.ObjectVersionFilter(latest_only=True),
             limit=3,
             offset=5,
-            sort_by=[tsi.SortBy(field="created_at", direction="asc")],
+            sort_by=[SortBy(field="created_at", direction="asc")],
         )
     )
     assert len(res.objs) == 3
@@ -115,7 +116,7 @@ def test_objs_query_filter_limit_offset_sort_by_object_id(client: WeaveClient):
             filter=tsi.ObjectVersionFilter(latest_only=True),
             limit=3,
             offset=5,
-            sort_by=[tsi.SortBy(field="object_id", direction="desc")],
+            sort_by=[SortBy(field="object_id", direction="desc")],
         )
     )
     assert len(res.objs) == 3
@@ -133,7 +134,7 @@ def test_objs_query_filter_limit_offset_sort_by_object_id(client: WeaveClient):
             filter=tsi.ObjectVersionFilter(latest_only=True),
             limit=3,
             offset=5,
-            sort_by=[tsi.SortBy(field="object_id", direction="asc")],
+            sort_by=[SortBy(field="object_id", direction="asc")],
         )
     )
     assert len(res.objs) == 3
