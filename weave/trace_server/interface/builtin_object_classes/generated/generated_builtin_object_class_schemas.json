@@ -51,15 +51,6 @@
       "title": "ActionSpec",
       "type": "object"
     },
-    "AggregationMethod": {
-      "enum": [
-        "latest",
-        "average",
-        "best"
-      ],
-      "title": "AggregationMethod",
-      "type": "string"
-    },
     "AndOperation": {
       "description": "Logical AND. All conditions must evaluate to true.\n\nExample:\n    ```\n    {\n        \"$and\": [\n            {\"$eq\": [{\"$getField\": \"op_name\"}, {\"$literal\": \"predict\"}]},\n            {\"$gt\": [{\"$getField\": \"summary.usage.tokens\"}, {\"$literal\": 1000}]}\n        ]\n    }\n    ```",
       "properties": {
@@ -789,61 +780,120 @@
     "DynamicLeaderboardColumnConfig": {
       "properties": {
         "evaluation_object_ref": {
-          "title": "Evaluation Object Ref",
-          "type": "string"
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Evaluation Object Ref"
         },
         "scorer_name": {
-          "title": "Scorer Name",
-          "type": "string"
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Scorer Name"
         },
         "summary_metric_path": {
-          "title": "Summary Metric Path",
-          "type": "string"
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Summary Metric Path"
         },
         "should_minimize": {
-          "title": "Should Minimize",
-          "type": "boolean"
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Should Minimize"
         },
         "deselected": {
-          "title": "Deselected",
-          "type": "boolean"
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Deselected"
         }
       },
-      "required": [
-        "evaluation_object_ref",
-        "scorer_name",
-        "summary_metric_path",
-        "should_minimize",
-        "deselected"
-      ],
       "title": "DynamicLeaderboardColumnConfig",
       "type": "object"
     },
     "DynamicLeaderboardConfig": {
       "properties": {
         "model_configuration": {
-          "$ref": "#/$defs/ObjectConfig"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObjectConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         },
         "dataset_configuration": {
-          "$ref": "#/$defs/ObjectConfig"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObjectConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         },
         "scorer_configuration": {
-          "$ref": "#/$defs/ObjectConfig"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObjectConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         },
         "columns_configuration": {
-          "items": {
-            "$ref": "#/$defs/DynamicLeaderboardColumnConfig"
-          },
-          "title": "Columns Configuration",
-          "type": "array"
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/DynamicLeaderboardColumnConfig"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Columns Configuration"
         }
       },
-      "required": [
-        "model_configuration",
-        "dataset_configuration",
-        "scorer_configuration",
-        "columns_configuration"
-      ],
       "title": "DynamicLeaderboardConfig",
       "type": "object"
     },
@@ -1717,32 +1767,51 @@
     "ObjectConfig": {
       "properties": {
         "version_groups": {
-          "items": {
-            "$ref": "#/$defs/ObjectVersionGroup"
-          },
-          "title": "Version Groups",
-          "type": "array"
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/ObjectVersionGroup"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Version Groups"
         },
         "display_name_map": {
-          "additionalProperties": {
-            "type": "string"
-          },
-          "title": "Display Name Map",
-          "type": "object"
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Display Name Map"
         },
         "deselected": {
-          "items": {
-            "type": "string"
-          },
-          "title": "Deselected",
-          "type": "array"
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Deselected"
         }
       },
-      "required": [
-        "version_groups",
-        "display_name_map",
-        "deselected"
-      ],
       "title": "ObjectConfig",
       "type": "object"
     },
@@ -1810,17 +1879,13 @@
         "show_version_indicator": {
           "title": "Show Version Indicator",
           "type": "boolean"
-        },
-        "method": {
-          "$ref": "#/$defs/AggregationMethod"
         }
       },
       "required": [
         "label",
         "base_ref",
         "versions",
-        "show_version_indicator",
-        "method"
+        "show_version_indicator"
       ],
       "title": "ObjectVersionGroup",
       "type": "object"
