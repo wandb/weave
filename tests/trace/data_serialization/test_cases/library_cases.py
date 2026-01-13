@@ -158,7 +158,9 @@ library_cases = [
                     "column_map": None,
                     "model": "weave:///shawn/test-project/object/LLMStructuredCompletionModel:VUqRnYmuvNhu3zgfDb9hnZhLRFM1vKKI1WEpw3bsViE",
                     "enable_audio_scoring": True,
-                    "audio_scoring_json_paths": ["$.messages[0].content[1].input_audio"],
+                    "audio_scoring_json_paths": [
+                        "$.messages[0].content[1].input_audio"
+                    ],
                     "scoring_prompt": "Here are the inputs: {inputs}. Here is the output: {output}. Is the output correct?",
                     "score": "weave:///shawn/test-project/op/LLMAsAJudgeScorer.score:OIgGBpG1Xnwppf494LDa4mC2AEEu5tFePiWkX3N6B1s",
                     "summarize": "weave:///shawn/test-project/op/Scorer.summarize:bWwaybJxxIBLMGZp7bzeKrmjhLNCp2DYrubnU2Ry9xQ",
