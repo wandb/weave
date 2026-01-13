@@ -1,5 +1,5 @@
-import types
 import os
+import types
 from unittest.mock import Mock, call, patch
 
 import pytest
@@ -279,7 +279,9 @@ def test_create_db_sql(mock_costs):
     # Test invalid cluster name
     with pytest.raises(MigrationError, match="Invalid cluster name"):
         ReplicatedClickHouseTraceServerMigrator(
-            Mock(), replicated_cluster="test;cluster", migration_dir=DEFAULT_MIGRATION_DIR
+            Mock(),
+            replicated_cluster="test;cluster",
+            migration_dir=DEFAULT_MIGRATION_DIR,
         )
 
 
