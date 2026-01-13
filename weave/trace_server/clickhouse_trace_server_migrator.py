@@ -95,16 +95,34 @@ class BaseClickHouseTraceServerMigrator(ABC):
 
     ch_client: CHClient
     management_db: str
+    migration_dir: str
+    enable_costs: bool
 
     def __init__(
         self,
         ch_client: CHClient,
         management_db: str = "db_management",
+        migration_dir: str | None = None,
+        enable_costs: bool = True,
     ):
         super().__init__()
         self.ch_client = ch_client
         self.management_db = management_db
+        self.migration_dir = self._resolve_migration_dir(migration_dir)
+        self.enable_costs = enable_costs
         self._initialize_migration_db()
+
+    @staticmethod
+    def _resolve_migration_dir(migration_dir: str | None) -> str:
+        if migration_dir is None:
+            return os.path.join(os.path.dirname(__file__), "migrations")
+        if not os.path.isabs(migration_dir):
+            raise MigrationError(
+                f"migration_dir must be an absolute path, got: {migration_dir}"
+            )
+        if not os.path.isdir(migration_dir):
+            raise MigrationError(f"Migration directory not found: {migration_dir}")
+        return migration_dir
 
     @abstractmethod
     def _execute_migration_command(self, target_db: str, command: str) -> None:
@@ -143,7 +161,9 @@ class BaseClickHouseTraceServerMigrator(ABC):
         )
         if len(migrations_to_apply) == 0:
             logger.info(f"No migrations to apply to `{target_db}`")
-            if should_insert_costs(status["curr_version"], target_version):
+            if self.enable_costs and should_insert_costs(
+                status["curr_version"], target_version
+            ):
                 insert_costs(self.ch_client, target_db)
             return
         logger.info(f"Migrations to apply: {migrations_to_apply}")
@@ -152,7 +172,9 @@ class BaseClickHouseTraceServerMigrator(ABC):
             self.ch_client.command(db_sql)
         for target_version, migration_file in migrations_to_apply:
             self._apply_migration(target_db, target_version, migration_file)
-        if should_insert_costs(status["curr_version"], target_version):
+        if self.enable_costs and should_insert_costs(
+            status["curr_version"], target_version
+        ):
             insert_costs(self.ch_client, target_db)
 
     def _initialize_migration_db(self) -> None:
@@ -187,8 +209,7 @@ class BaseClickHouseTraceServerMigrator(ABC):
     def _get_migrations(
         self,
     ) -> dict[int, dict[str, str | None]]:
-        migration_dir = os.path.join(os.path.dirname(__file__), "migrations")
-        migration_files = os.listdir(migration_dir)
+        migration_files = os.listdir(self.migration_dir)
         migration_map: dict[int, dict[str, str | None]] = {}
         max_version = 0
         for file in migration_files:
@@ -283,8 +304,7 @@ class BaseClickHouseTraceServerMigrator(ABC):
         self, target_db: str, target_version: int, migration_file: str
     ) -> None:
         logger.info(f"Applying migration {migration_file} to `{target_db}`")
-        migration_dir = os.path.join(os.path.dirname(__file__), "migrations")
-        migration_file_path = os.path.join(migration_dir, migration_file)
+        migration_file_path = os.path.join(self.migration_dir, migration_file)
 
         with open(migration_file_path) as f:
             migration_sql = f.read()
@@ -373,6 +393,8 @@ class ReplicatedClickHouseTraceServerMigrator(BaseClickHouseTraceServerMigrator)
         replicated_path: str | None = None,
         replicated_cluster: str | None = None,
         management_db: str = "db_management",
+        migration_dir: str | None = None,
+        enable_costs: bool = True,
     ):
         self.replicated_path = (
             DEFAULT_REPLICATED_PATH if replicated_path is None else replicated_path
@@ -395,7 +417,12 @@ class ReplicatedClickHouseTraceServerMigrator(BaseClickHouseTraceServerMigrator)
             f"management_db={management_db}"
         )
 
-        super().__init__(ch_client, management_db)
+        super().__init__(
+            ch_client,
+            management_db,
+            migration_dir=migration_dir,
+            enable_costs=enable_costs,
+        )
 
     def _create_db_sql(self, db_name: str) -> str:
         """Generate SQL to create a database in replicated mode."""
@@ -510,12 +537,21 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
         replicated_path: str | None = None,
         replicated_cluster: str | None = None,
         management_db: str = "db_management",
+        migration_dir: str | None = None,
+        enable_costs: bool = True,
     ):
         logger.info(
             f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} "
             f"DistributedClickHouseTraceServerMigrator initialized"
         )
-        super().__init__(ch_client, replicated_path, replicated_cluster, management_db)
+        super().__init__(
+            ch_client,
+            replicated_path,
+            replicated_cluster,
+            management_db,
+            migration_dir=migration_dir,
+            enable_costs=enable_costs,
+        )
 
     def _create_management_table_sql(self) -> str:
         """Generate SQL to create the management table in distributed mode.
@@ -831,6 +867,8 @@ def get_clickhouse_trace_server_migrator(
     replicated_cluster: str | None = None,
     use_distributed: bool | None = None,
     management_db: str = "db_management",
+    migration_dir: str | None = None,
+    enable_costs: bool = True,
 ) -> BaseClickHouseTraceServerMigrator:
     """Factory function to create the appropriate migrator based on configuration.
 
@@ -841,6 +879,8 @@ def get_clickhouse_trace_server_migrator(
         replicated_cluster: Cluster name for replication
         use_distributed: Whether to use distributed tables (requires replicated=True)
         management_db: Database name for migration management
+        migration_dir: Absolute path to a directory containing `*.up.sql` / `*.down.sql`
+        enable_costs: Whether to run Weave-specific costs backfill logic
 
     Returns:
         An instance of the appropriate migrator class
@@ -857,7 +897,9 @@ def get_clickhouse_trace_server_migrator(
         f"use_distributed={use_distributed}, "
         f"replicated_cluster={replicated_cluster}, "
         f"replicated_path={replicated_path}, "
-        f"management_db={management_db}"
+        f"management_db={management_db}, "
+        f"migration_dir={migration_dir}, "
+        f"enable_costs={enable_costs}"
     )
 
     # Validate configuration
@@ -869,14 +911,29 @@ def get_clickhouse_trace_server_migrator(
 
     if use_distributed:
         return DistributedClickHouseTraceServerMigrator(
-            ch_client, replicated_path, replicated_cluster, management_db
+            ch_client,
+            replicated_path,
+            replicated_cluster,
+            management_db,
+            migration_dir=migration_dir,
+            enable_costs=enable_costs,
         )
     elif replicated:
         return ReplicatedClickHouseTraceServerMigrator(
-            ch_client, replicated_path, replicated_cluster, management_db
+            ch_client,
+            replicated_path,
+            replicated_cluster,
+            management_db,
+            migration_dir=migration_dir,
+            enable_costs=enable_costs,
         )
     else:
-        return CloudClickHouseTraceServerMigrator(ch_client, management_db)
+        return CloudClickHouseTraceServerMigrator(
+            ch_client,
+            management_db,
+            migration_dir=migration_dir,
+            enable_costs=enable_costs,
+        )
 
 
 class MigrationError(RuntimeError):

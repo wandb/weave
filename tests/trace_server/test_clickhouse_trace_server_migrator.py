@@ -16,12 +16,10 @@ from weave.trace_server.clickhouse_trace_server_migrator import (
 @pytest.fixture
 def mock_costs():
     with patch(
-        "weave.trace_server.costs.insert_costs.should_insert_costs", return_value=False
-    ) as mock_should_insert:
-        with patch(
-            "weave.trace_server.costs.insert_costs.get_current_costs", return_value=[]
-        ) as mock_get_costs:
-            yield
+        "weave.trace_server.clickhouse_trace_server_migrator.should_insert_costs",
+        return_value=False,
+    ), patch("weave.trace_server.clickhouse_trace_server_migrator.insert_costs"):
+        yield
 
 
 @pytest.fixture
@@ -75,7 +73,25 @@ def distributed_migrator():
     return migrator
 
 
-def test_apply_migrations_with_target_version(mock_costs, migrator, tmp_path):
+def test_apply_migrations_with_target_version(mock_costs, tmp_path):
+    # Create a temporary migration file
+    migration_dir = tmp_path / "migrations"
+    migration_dir.mkdir()
+    migration_file = migration_dir / "2.up.sql"
+    migration_file.write_text(
+        "CREATE TABLE test1 (id Int32);\nCREATE TABLE test2 (id Int32);"
+    )
+
+    ch_client = Mock()
+    migrator = trace_server_migrator.get_clickhouse_trace_server_migrator(
+        ch_client, migration_dir=str(migration_dir)
+    )
+    migrator._get_migration_status = Mock()
+    migrator._get_migrations = Mock()
+    migrator._determine_migrations_to_apply = Mock()
+    migrator._update_migration_status = Mock()
+    ch_client.command.reset_mock()
+
     # Setup
     migrator._get_migration_status.return_value = {
         "curr_version": 1,
@@ -87,20 +103,8 @@ def test_apply_migrations_with_target_version(mock_costs, migrator, tmp_path):
     }
     migrator._determine_migrations_to_apply.return_value = [(2, "2.up.sql")]
 
-    # Create a temporary migration file
-    migration_dir = tmp_path / "migrations"
-    migration_dir.mkdir()
-    migration_file = migration_dir / "2.up.sql"
-    migration_file.write_text(
-        "CREATE TABLE test1 (id Int32);\nCREATE TABLE test2 (id Int32);"
-    )
-
-    # Mock the migration directory path
-    with patch("os.path.dirname") as mock_dirname:
-        mock_dirname.return_value = str(tmp_path)
-
-        # Execute
-        migrator.apply_migrations("test_db", target_version=2)
+    # Execute
+    migrator.apply_migrations("test_db", target_version=2)
 
     # Verify
     migrator._get_migration_status.assert_called_once_with("test_db")
@@ -120,6 +124,43 @@ def test_apply_migrations_with_target_version(mock_costs, migrator, tmp_path):
     migrator.ch_client.command.assert_has_calls(
         [call("CREATE TABLE test1 (id Int32)"), call("CREATE TABLE test2 (id Int32)")]
     )
+
+
+def test_migration_dir_must_be_absolute():
+    ch_client = Mock()
+    with pytest.raises(MigrationError, match="absolute path"):
+        trace_server_migrator.get_clickhouse_trace_server_migrator(
+            ch_client, migration_dir="relative/path"
+        )
+
+
+def test_apply_migrations_costs_disabled_does_not_call_costs():
+    ch_client = Mock()
+    migrator = trace_server_migrator.get_clickhouse_trace_server_migrator(
+        ch_client, enable_costs=False
+    )
+    migrator._get_migration_status = Mock()
+    migrator._get_migrations = Mock()
+    migrator._determine_migrations_to_apply = Mock()
+
+    migrator._get_migration_status.return_value = {
+        "curr_version": 0,
+        "partially_applied_version": None,
+    }
+    migrator._get_migrations.return_value = {
+        "1": {"up": "1.up.sql", "down": "1.down.sql"},
+    }
+    migrator._determine_migrations_to_apply.return_value = []
+
+    with patch(
+        "weave.trace_server.clickhouse_trace_server_migrator.should_insert_costs"
+    ) as mock_should_insert_costs, patch(
+        "weave.trace_server.clickhouse_trace_server_migrator.insert_costs"
+    ) as mock_insert_costs:
+        migrator.apply_migrations("test_db")
+
+    mock_should_insert_costs.assert_not_called()
+    mock_insert_costs.assert_not_called()
 
 
 def test_execute_migration_command(migrator):
