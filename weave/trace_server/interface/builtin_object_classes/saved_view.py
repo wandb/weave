@@ -3,6 +3,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.common_interface import SortBy
 from weave.trace_server.interface.builtin_object_classes import base_object_def
 
 PathElement = str | int
@@ -49,7 +50,7 @@ class SavedViewDefinition(BaseModel):
     header_depth: int | None = Field(default=None)
 
     pin: Pin | None = Field(default=None)
-    sort_by: list[tsi.SortBy] | None = Field(default=None)
+    sort_by: list[SortBy] | None = Field(default=None)
     page: int | None = Field(default=None)
     page_size: int | None = Field(default=None)
     charts: list[ChartConfig] | None = Field(default=None)

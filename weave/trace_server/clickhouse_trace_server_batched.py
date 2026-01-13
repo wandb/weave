@@ -939,6 +939,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         # We put summary_dump last so that when we compute the costs and summary its in the right place
         if req.include_costs:
+            set_current_span_dd_tags({"include_costs": "true"})
             summary_columns = ["summary", "summary_dump"]
             columns = [
                 *[col for col in columns if col not in summary_columns],
@@ -980,6 +981,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         select_columns = [c.field for c in cq.select_fields]
         expand_columns = req.expand_columns or []
         include_feedback = req.include_feedback or False
+
+        if include_feedback:
+            set_current_span_dd_tags({"include_feedback": "true"})
+        if expand_columns:
+            set_current_span_dd_tags({"expand_columns": "true"})
 
         def row_to_call_schema_dict(row: tuple[Any, ...]) -> dict[str, Any]:
             return _ch_call_dict_to_call_schema_dict(

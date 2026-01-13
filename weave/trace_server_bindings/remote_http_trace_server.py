@@ -16,8 +16,8 @@ from weave.trace.settings import (
     max_calls_queue_size,
     should_enable_disk_fallback,
 )
-from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ids import generate_id
+from weave.trace_server import http_service_interface as his
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
 from weave.trace_server_bindings.call_batch_processor import CallBatchProcessor
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface
@@ -851,7 +851,7 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         self, req: tsi.AnnotationQueueCreateReq
     ) -> tsi.AnnotationQueueCreateRes:
         return self._generic_request(
-            "/annotation_queue/create",
+            "/annotation_queues",
             req,
             tsi.AnnotationQueueCreateReq,
             tsi.AnnotationQueueCreateRes,
@@ -861,7 +861,7 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         self, req: tsi.AnnotationQueuesQueryReq
     ) -> Iterator[tsi.AnnotationQueueSchema]:
         return self._generic_stream_request(
-            "/annotation_queues/stream_query",
+            "/annotation_queues/query",
             req,
             tsi.AnnotationQueuesQueryReq,
             tsi.AnnotationQueueSchema,
@@ -871,29 +871,47 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         self, req: tsi.AnnotationQueueReadReq
     ) -> tsi.AnnotationQueueReadRes:
         return self._generic_request(
-            "/annotation_queue/read",
+            f"/annotation_queues/{req.queue_id}",
             req,
             tsi.AnnotationQueueReadReq,
             tsi.AnnotationQueueReadRes,
+            method="GET",
+            params={"project_id": req.project_id},
         )
 
     def annotation_queue_add_calls(
         self, req: tsi.AnnotationQueueAddCallsReq
     ) -> tsi.AnnotationQueueAddCallsRes:
+        # Convert to Body type to exclude queue_id from request body (it's in the URL path)
+        body = his.AnnotationQueueAddCallsBody(
+            project_id=req.project_id,
+            call_ids=req.call_ids,
+            display_fields=req.display_fields,
+            wb_user_id=req.wb_user_id,
+        )
         return self._generic_request(
-            "/annotation_queue/add_calls",
-            req,
-            tsi.AnnotationQueueAddCallsReq,
+            f"/annotation_queues/{req.queue_id}/items",
+            body,
+            his.AnnotationQueueAddCallsBody,
             tsi.AnnotationQueueAddCallsRes,
         )
 
     def annotation_queue_items_query(
         self, req: tsi.AnnotationQueueItemsQueryReq
     ) -> tsi.AnnotationQueueItemsQueryRes:
+        # Convert to Body type to exclude queue_id from request body (it's in the URL path)
+        body = his.AnnotationQueueItemsQueryBody(
+            project_id=req.project_id,
+            filter=req.filter,
+            sort_by=req.sort_by,
+            limit=req.limit,
+            offset=req.offset,
+            include_position=req.include_position,
+        )
         return self._generic_request(
-            "/annotation_queue/items/query",
-            req,
-            tsi.AnnotationQueueItemsQueryReq,
+            f"/annotation_queues/{req.queue_id}/items/query",
+            body,
+            his.AnnotationQueueItemsQueryBody,
             tsi.AnnotationQueueItemsQueryRes,
         )
 

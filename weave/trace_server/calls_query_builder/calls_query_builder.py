@@ -66,6 +66,7 @@ from weave.trace_server.calls_query_builder.utils import (
     param_slot,
     safely_format_sql,
 )
+from weave.trace_server.common_interface import SortBy
 from weave.trace_server.errors import InvalidFieldError
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.orm import (
@@ -788,9 +789,9 @@ class CallsQuery(BaseModel):
         for cte in cost_cte_list:
             ctes.add_cte(cte.name, cte.sql)
 
-    def _convert_to_orm_sort_fields(self) -> list[tsi.SortBy]:
+    def _convert_to_orm_sort_fields(self) -> list[SortBy]:
         return [
-            tsi.SortBy(
+            SortBy(
                 field=sort_by.field.field,
                 direction=cast(Literal["asc", "desc"], sort_by.direction.lower()),
             )

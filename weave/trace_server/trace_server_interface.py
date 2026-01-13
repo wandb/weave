@@ -6,17 +6,14 @@ from typing import Any, Literal, Protocol
 from pydantic import BaseModel, ConfigDict, Field, field_serializer
 from typing_extensions import TypedDict
 
-from weave.trace_server.interface.query import Query
-
-WB_USER_ID_DESCRIPTION = (
-    "Do not set directly. Server will automatically populate this field."
+from weave.trace_server import http_service_interface as his
+from weave.trace_server.common_interface import (
+    WB_USER_ID_DESCRIPTION,
+    AnnotationState,
+    BaseModelStrict,
+    SortBy,
 )
-
-
-class BaseModelStrict(BaseModel):
-    """Base model with strict validation that forbids extra fields."""
-
-    model_config = ConfigDict(extra="forbid")
+from weave.trace_server.interface.query import Query
 
 
 class ExtraKeysTypedDict(TypedDict):
@@ -513,15 +510,6 @@ class CallsFilter(BaseModelStrict):
     trace_roots_only: bool | None = None
     wb_user_ids: list[str] | None = None
     wb_run_ids: list[str] | None = None
-
-
-class SortBy(BaseModelStrict):
-    # Field should be a key of `CallSchema`. For dictionary fields
-    # (`attributes`, `inputs`, `outputs`, `summary`), the field can be
-    # dot-separated.
-    field: str  # Consider changing this to _FieldSelect
-    # Direction should be either 'asc' or 'desc'
-    direction: Literal["asc", "desc"]
 
 
 class CallsQueryReq(BaseModelStrict):
@@ -1285,9 +1273,6 @@ class AnnotationQueueReadRes(BaseModel):
     queue: AnnotationQueueSchema
 
 
-AnnotationState = Literal["unstarted", "in_progress", "completed", "skipped"]
-
-
 class AnnotationQueueItemSchema(BaseModel):
     """Schema for annotation queue item responses."""
 
@@ -1311,17 +1296,13 @@ class AnnotationQueueItemSchema(BaseModel):
     )
 
 
-class AnnotationQueueAddCallsReq(BaseModelStrict):
-    """Request to add calls to an annotation queue in batch."""
+class AnnotationQueueAddCallsReq(his.AnnotationQueueAddCallsBody):
+    """Request to add calls to an annotation queue in batch.
 
-    project_id: str = Field(examples=["entity/project"])
+    Extends AnnotationQueueAddCallsBody by adding queue_id for internal API usage.
+    """
+
     queue_id: str = Field(examples=["550e8400-e29b-41d4-a716-446655440000"])
-    call_ids: list[str] = Field(examples=[["call-1", "call-2", "call-3"]])
-    display_fields: list[str] = Field(
-        examples=[["input.prompt", "output.text"]],
-        description="JSON paths to display to annotators",
-    )
-    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
 class AnnotationQueueAddCallsRes(BaseModel):
@@ -1331,48 +1312,13 @@ class AnnotationQueueAddCallsRes(BaseModel):
     duplicates: int  # Number of calls already in queue (skipped)
 
 
-class AnnotationQueueItemsFilter(BaseModel):
-    """Simple filter for annotation queue items.
+class AnnotationQueueItemsQueryReq(his.AnnotationQueueItemsQueryBody):
+    """Request to query items in an annotation queue.
 
-    Supports equality filtering on call metadata fields and IN filtering on annotation state.
+    Extends AnnotationQueueItemsQueryBody by adding queue_id for internal API usage.
     """
 
-    call_id: str | None = Field(default=None, description="Filter by exact call ID")
-    call_op_name: str | None = Field(
-        default=None, description="Filter by exact operation name"
-    )
-    call_trace_id: str | None = Field(
-        default=None, description="Filter by exact trace ID"
-    )
-    added_by: str | None = Field(
-        default=None, description="Filter by W&B user ID who added the call"
-    )
-    annotation_states: list[AnnotationState] | None = Field(
-        default=None,
-        description="Filter by annotation states (unstarted, in_progress, completed, skipped)",
-        examples=[["unstarted", "in_progress"]],
-    )
-
-
-class AnnotationQueueItemsQueryReq(BaseModelStrict):
-    """Request to query items in an annotation queue."""
-
-    project_id: str = Field(examples=["entity/project"])
     queue_id: str = Field(examples=["550e8400-e29b-41d4-a716-446655440000"])
-    filter: AnnotationQueueItemsFilter | None = Field(
-        default=None,
-        description="Filter queue items by call metadata and annotation state",
-    )
-    sort_by: list[SortBy] | None = Field(
-        default=None,
-        description="Sort by multiple fields (e.g., created_at, updated_at)",
-    )
-    limit: int | None = Field(default=None, examples=[50])
-    offset: int | None = Field(default=None, examples=[0])
-    include_position: bool = Field(
-        default=False,
-        description="Include position_in_queue field (1-based index in full queue)",
-    )
 
 
 class AnnotationQueueItemsQueryRes(BaseModel):

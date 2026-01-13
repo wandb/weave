@@ -4,7 +4,10 @@ This module provides query building functions for the queue-based call annotatio
 following the same patterns as threads_query_builder.py and other query builders in the codebase.
 """
 
-from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.common_interface import (
+    AnnotationQueueItemsFilter,
+    SortBy,
+)
 from weave.trace_server.orm import ParamBuilder
 
 # Valid sort fields for annotation queues
@@ -27,7 +30,7 @@ VALID_SORT_DIRECTIONS = {"asc", "desc"}
 
 
 def _make_sort_clause(
-    sort_by: list[tsi.SortBy] | None,
+    sort_by: list[SortBy] | None,
     valid_fields: set[str],
     default: str,
     table_prefix: str = "",
@@ -66,7 +69,7 @@ def make_queues_query(
     pb: ParamBuilder,
     *,
     name: str | None = None,
-    sort_by: list[tsi.SortBy] | None = None,
+    sort_by: list[SortBy] | None = None,
     limit: int | None = None,
     offset: int | None = None,
 ) -> str:
@@ -362,8 +365,8 @@ def make_queue_items_query(
     queue_id: str,
     pb: ParamBuilder,
     *,
-    filter: tsi.AnnotationQueueItemsFilter | None = None,
-    sort_by: list[tsi.SortBy] | None = None,
+    filter: AnnotationQueueItemsFilter | None = None,
+    sort_by: list[SortBy] | None = None,
     limit: int | None = None,
     offset: int | None = None,
     include_position: bool = False,

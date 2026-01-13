@@ -23,8 +23,22 @@ logger = logging.getLogger(__name__)
 # Format: data:[content-type];base64,[base64_data]
 DATA_URI_PATTERN = re.compile(r"^data:([^;]+);base64,([A-Za-z0-9+/=]+)$", re.IGNORECASE)
 
+# Pattern to match standalone base64 strings
+BASE64_PATTERN = re.compile(r"^[A-Za-z0-9+/]+={0,2}$")
+
 # Minimum size to create a file (to avoid making more data than what the original is)
 AUTO_CONVERSION_MIN_SIZE = 1024  # 1 KiB
+
+
+def is_base64(value: str) -> bool:
+    """Huerestic to quickly check if a string is likely base64.
+    We do not decode here because Content already does decode based 'true' validation
+    Args:
+        value: String to check
+    Returns:
+        True if the string is possibly valid base64
+    """
+    return BASE64_PATTERN.match(value) is not None
 
 
 def is_data_uri(data_uri: str) -> bool:
@@ -36,8 +50,7 @@ def is_data_uri(data_uri: str) -> bool:
     Returns:
         bool: True is match, else false
     """
-    match = DATA_URI_PATTERN.match(data_uri)
-    return bool(match)
+    return DATA_URI_PATTERN.match(data_uri) is not None
 
 
 def store_content_object(
@@ -126,6 +139,28 @@ def replace_base64_with_content_objects(
                 except Exception as e:
                     logger.warning(
                         f"Failed to create and store content from data URI with error {e}"
+                    )
+
+            if is_base64(val):
+                try:
+                    # All we care about here is if this is an object that we can handle in some way.
+                    # 'aaaa' is valid base64 and will come out as text/plain
+                    # More complicated false positives or failed detections will show 'application/octet-stream'
+                    # The uncovered scenario is if a user has encoded a plaintext document as Base64
+                    # We don't handle text content objects in a special way on the clients, so this is acceptable.
+                    content: Content[Any] = Content.from_base64(val)
+                    if content.mimetype not in (
+                        "text/plain",
+                        "application/octet-stream",
+                    ):
+                        return store_content_object(
+                            content,
+                            project_id,
+                            trace_server,
+                        )
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to create content from standalone base64: {e}"
                     )
 
             return val
