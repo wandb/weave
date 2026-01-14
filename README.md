@@ -19,6 +19,10 @@ You can use Weave to:
 
 Our goal is to bring rigor, best-practices, and composability to the inherently experimental process of developing Generative AI software, without introducing cognitive overhead.
 
+<div align="center">
+  <img src="https://site.wandb.ai/wp-content/themes/wandb-wp-theme/assets/svg/img--dashboard.svg" width="100%">
+</div>
+
 ## Documentation
 
 Our documentation site can be found [here](https://wandb.me/weave).
