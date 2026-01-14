@@ -67,6 +67,13 @@ def _is_retryable_exception(e: BaseException) -> bool:
     if isinstance(e, ValidationError):
         return False
 
+    # Don't retry CallsCompleteModeRequired - should trigger immediate mode switch
+    # Lazy import to avoid circular dependency (http_utils imports from this module)
+    from weave.trace_server_bindings.http_utils import CallsCompleteModeRequired
+
+    if isinstance(e, CallsCompleteModeRequired):
+        return False
+
     # Don't retry on HTTP 4xx (except 429)
     if isinstance(e, httpx.HTTPStatusError) and e.response is not None:
         code_class = e.response.status_code // 100

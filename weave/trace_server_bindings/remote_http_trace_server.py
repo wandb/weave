@@ -11,11 +11,16 @@ from pydantic.json_schema import SkipJsonSchema
 from typing_extensions import Self
 
 from weave.trace.env import weave_trace_server_url
-from weave.trace.settings import max_calls_queue_size, should_enable_disk_fallback
+from weave.trace.settings import (
+    max_calls_queue_size,
+    should_enable_disk_fallback,
+    should_use_calls_complete,
+)
 from weave.trace_server import http_service_interface as his
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ids import generate_id
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
+from weave.trace_server_bindings.call_batch_processor import CallBatchProcessor
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface
 from weave.trace_server_bindings.http_utils import (
     REMOTE_REQUEST_BYTES_LIMIT,
@@ -26,7 +31,9 @@ from weave.trace_server_bindings.http_utils import (
 )
 from weave.trace_server_bindings.models import (
     Batch,
+    CompleteBatchItem,
     EndBatchItem,
+    EntityProjectInfo,
     ServerInfoRes,
     StartBatchItem,
 )
@@ -59,14 +66,24 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         super().__init__()
         self.trace_server_url = trace_server_url
         self.should_batch = should_batch
-        self.call_processor = None
-        self.feedback_processor = None
+        # Opt-in to new calls_complete write path via env var
+        self.use_calls_complete = should_use_calls_complete() and should_batch
+        self.call_processor: AsyncBatchProcessor | CallBatchProcessor | None = None
+        self.feedback_processor: AsyncBatchProcessor | None = None
         if self.should_batch:
-            self.call_processor = AsyncBatchProcessor(
-                self._flush_calls,
-                max_queue_size=max_calls_queue_size(),
-                enable_disk_fallback=should_enable_disk_fallback(),
-            )
+            if self.use_calls_complete:
+                self.call_processor = CallBatchProcessor(
+                    complete_processor_fn=self._flush_calls_complete,
+                    eager_processor_fn=self._flush_calls_eager,
+                    max_queue_size=max_calls_queue_size(),
+                    enable_disk_fallback=should_enable_disk_fallback(),
+                )
+            else:
+                self.call_processor = AsyncBatchProcessor(
+                    self._flush_calls,
+                    max_queue_size=max_calls_queue_size(),
+                    enable_disk_fallback=should_enable_disk_fallback(),
+                )
             self.feedback_processor = AsyncBatchProcessor(
                 self._flush_feedback,
                 max_queue_size=max_calls_queue_size(),
@@ -183,7 +200,119 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
             encode_batch_fn=encode_batch,
         )
 
-    def get_call_processor(self) -> AsyncBatchProcessor | None:
+    def _flush_calls_eager(
+        self,
+        batch: list[StartBatchItem | EndBatchItem],
+        *,
+        _should_update_batch_size: bool = True,
+    ) -> None:
+        """Process eager start/end items via v2 single endpoints.
+
+        This is used for ops like Evaluation.evaluate that need their start
+        to be visible immediately in the UI. Uses single call/start and call/end
+        endpoints for easier rate limiting.
+        """
+        if not batch:
+            return
+
+        for item in batch:
+            if isinstance(item, StartBatchItem):
+                self._send_call_start_v2(item)
+            elif isinstance(item, EndBatchItem):
+                self._send_call_end_v2(item)
+
+    @with_retry
+    def _send_call_start_v2(self, item: StartBatchItem) -> None:
+        """Send a single call start to the v2 endpoint."""
+        project_id = item.req.start.project_id
+        entity, project = project_id.split("/", 1)
+        url = f"/v2/{entity}/{project}/call/start"
+        req = tsi.CallStartV2Req(start=item.req.start)
+        r = self.post(url, data=req.model_dump_json().encode("utf-8"))
+        handle_response_error(r, url)
+
+    @with_retry
+    def _send_call_end_v2(self, item: EndBatchItem) -> None:
+        """Send a single call end to the v2 endpoint."""
+        project_id = item.req.end.project_id
+        entity, project = project_id.split("/", 1)
+        url = f"/v2/{entity}/{project}/call/end"
+        # started_at is required at top level for efficient UPDATE queries
+        started_at = item.req.end.started_at or item.req.end.ended_at
+        req = tsi.CallEndV2Req(end=item.req.end, started_at=started_at)
+        r = self.post(url, data=req.model_dump_json().encode("utf-8"))
+        handle_response_error(r, url)
+
+    def _extract_entity_project(
+        self, batch: list[CompleteBatchItem]
+    ) -> EntityProjectInfo:
+        """Extract entity, project, and project_id from first batch item."""
+        if not batch:
+            raise ValueError("Cannot extract entity/project from empty batch")
+
+        first_item = batch[0]
+        project_id = first_item.req.project_id
+
+        if not project_id or "/" not in project_id:
+            raise ValueError(
+                f"Invalid project_id format: {project_id}. Expected 'entity/project'"
+            )
+
+        entity, project = project_id.split("/", 1)
+        if not entity or not project:
+            raise ValueError(f"Invalid project_id: {project_id}")
+
+        return EntityProjectInfo(entity=entity, project=project, project_id=project_id)
+
+    @with_retry
+    def _send_calls_complete_to_server(
+        self, entity: str, project: str, encoded_data: bytes
+    ) -> None:
+        """Send a batch of completed calls to the server with retry logic."""
+        url = f"/v2/{entity}/{project}/calls/complete"
+        r = self.post(url, data=encoded_data)
+        handle_response_error(r, url)
+
+    def _flush_calls_complete(
+        self,
+        batch: list[CompleteBatchItem],
+        *,
+        _should_update_batch_size: bool = True,
+    ) -> None:
+        """Process a batch of complete calls and send to the calls/upsert endpoint.
+
+        This is the new calls_complete path. Complete calls have both start and
+        end information bundled together.
+        """
+        assert self.call_processor is not None
+        if not batch:
+            return
+
+        ep_info = self._extract_entity_project(batch)
+
+        def get_item_id(item: CompleteBatchItem) -> str:
+            return f"{item.req.id}-complete"
+
+        def encode_batch(batch: list[CompleteBatchItem]) -> bytes:
+            api_batch = [item.req for item in batch]
+            req = tsi.CallsUpsertCompleteReq(batch=api_batch)
+            return req.model_dump_json().encode("utf-8")
+
+        process_batch_with_retry(
+            batch_name="calls_complete",
+            batch=batch,
+            remote_request_bytes_limit=self.remote_request_bytes_limit,
+            send_batch_fn=lambda data: self._send_calls_complete_to_server(
+                ep_info.entity, ep_info.project, data
+            ),
+            processor_obj=self.call_processor,
+            should_update_batch_size=_should_update_batch_size,
+            get_item_id_fn=get_item_id,
+            log_dropped_fn=log_dropped_call_batch,
+            encode_batch_fn=encode_batch,
+        )
+
+    def get_call_processor(self) -> AsyncBatchProcessor | CallBatchProcessor | None:
         """Custom method not defined on the formal TraceServerInterface to expose
         the underlying call processor. Should be formalized in a client-side interface.
         """
@@ -385,7 +514,7 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
                 raise ValueError(
                     "CallStartReq must have id and trace_id when batching."
                 )
-            self.call_processor.enqueue([StartBatchItem(req=req)])
+            self.call_processor.enqueue_start(StartBatchItem(req=req))
             return tsi.CallStartRes(id=req.start.id, trace_id=req.start.trace_id)
         return self._generic_request(
             "/call/start", req, tsi.CallStartReq, tsi.CallStartRes
@@ -1350,4 +1479,61 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
             tsi.ScoreDeleteRes,
             method="DELETE",
             params=params,
+        )
+
+    # === Calls V2 API ===
+
+    def calls_complete(
+        self, req: tsi.CallsUpsertCompleteReq
+    ) -> tsi.CallsUpsertCompleteRes:
+        """Batch complete calls endpoint (v2).
+
+        This endpoint is used when use_calls_complete is enabled to send
+        complete calls (with both start and end information) in batches.
+        """
+        if not req.batch:
+            return tsi.CallsUpsertCompleteRes()
+
+        # Extract entity/project from first item
+        first_item = req.batch[0]
+        entity, project = from_project_id(first_item.project_id)
+
+        url = f"/v2/{entity}/{project}/calls/complete"
+        return self._generic_request(
+            url,
+            req,
+            tsi.CallsUpsertCompleteReq,
+            tsi.CallsUpsertCompleteRes,
+        )
+
+    def call_start_v2(self, req: tsi.CallStartV2Req) -> tsi.CallStartV2Res:
+        """Single call start endpoint (v2).
+
+        This endpoint is used for eager ops that need their start visible immediately.
+        """
+        project_id = req.start.project_id
+        entity, project = from_project_id(project_id)
+
+        url = f"/v2/{entity}/{project}/call/start"
+        return self._generic_request(
+            url,
+            req,
+            tsi.CallStartV2Req,
+            tsi.CallStartV2Res,
+        )
+
+    def call_end_v2(self, req: tsi.CallEndV2Req) -> tsi.CallEndV2Res:
+        """Single call end endpoint (v2).
+
+        This endpoint is used for eager ops that need their end sent separately.
+        """
+        project_id = req.end.project_id
+        entity, project = from_project_id(project_id)
+
+        url = f"/v2/{entity}/{project}/call/end"
+        return self._generic_request(
+            url,
+            req,
+            tsi.CallEndV2Req,
+            tsi.CallEndV2Res,
         )

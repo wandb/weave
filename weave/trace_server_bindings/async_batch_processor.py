@@ -14,6 +14,29 @@ from weave.trace.context.tests_context import get_raise_on_captured_errors
 T = TypeVar("T")
 logger = logging.getLogger(__name__)
 
+
+def log_warning_with_sentry(message: str) -> None:
+    """Log a warning message and report to Sentry if available.
+
+    Args:
+        message: The warning message to log and report.
+    """
+    logger.warning(message)
+    if SENTRY_AVAILABLE:
+        sentry_sdk.capture_message(message, level="warning")
+
+
+def log_error_with_sentry(message: str) -> None:
+    """Log an error message and report to Sentry if available.
+
+    Args:
+        message: The error message to log and report.
+    """
+    logger.exception(message)
+    if SENTRY_AVAILABLE:
+        sentry_sdk.capture_message(message, level="error")
+
+
 HEALTH_CHECK_INTERVAL = 5.0  # seconds
 MAX_LOGFILES = 3
 MAX_LOG_FILE_SIZE_BYTES = 1024 * 1024 * 512  # 512MB
@@ -90,16 +113,21 @@ class AsyncBatchProcessor(Generic[T]):
 
                     # Only log the first dropped item and every 1000th thereafter
                     if self._dropped_item_count % 1000 == 1:
-                        logger.warning(
+                        log_warning_with_sentry(
                             f"{error_message}. Total dropped items: {self._dropped_item_count}"
                         )
-                        if SENTRY_AVAILABLE:
-                            sentry_sdk.capture_message(
-                                f"Queue full - dropped {self._dropped_item_count} items total",
-                                level="warning",
-                            )
 
                     self._write_item_to_disk(item, error_message)
+
+    def enqueue_start(self, item: T, *, eager_call_start: bool = False) -> None:
+        """Enqueue a start item.
+
+        Args:
+            item: The item to enqueue.
+            eager_call_start: Hint for subclasses - if True, send immediately rather than
+                batching. Ignored by this base implementation (this happens automatically)
+        """
+        self.enqueue([item])
 
     def stop_accepting_new_work_and_flush_queue(self) -> None:
         """Stops accepting new work and begins gracefully shutting down.
@@ -171,9 +199,7 @@ class AsyncBatchProcessor(Generic[T]):
             f"Unprocessable item detected, dropping item permanently. "
             f"Item ID: {item_id}, Error: {error}"
         )
-        logger.exception(error_message)
-        if SENTRY_AVAILABLE:
-            sentry_sdk.capture_message(error_message, level="error")
+        log_error_with_sentry(error_message)
         self._write_item_to_disk(item, error_message)
 
     def _process_batch_individually(self, batch: list[T]) -> None:
@@ -220,9 +246,7 @@ class AsyncBatchProcessor(Generic[T]):
             self.disk_fallback_path.rename(backup_path)
         except Exception as e:
             error_message = f"Failed to rotate log file {self.disk_fallback_path}: {e}"
-            logger.exception(error_message)
-            if SENTRY_AVAILABLE:
-                sentry_sdk.capture_message(error_message, level="error")
+            log_error_with_sentry(error_message)
 
     def _write_item_to_disk(self, item: T, error_message: str) -> None:
         """Write a dropped item to disk in JSON Lines format.
@@ -257,9 +281,7 @@ class AsyncBatchProcessor(Generic[T]):
 
         except Exception as e:
             error_message = f"Failed to write dropped item {item_id} to disk: {e}"
-            logger.exception(error_message)
-            if SENTRY_AVAILABLE:
-                sentry_sdk.capture_message(error_message, level="error")
+            log_error_with_sentry(error_message)
 
     def _ensure_health_check_alive(self) -> None:
         """Ensures the health check thread is alive, restarts if needed."""

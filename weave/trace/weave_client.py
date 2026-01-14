@@ -140,6 +140,7 @@ from weave.trace_server_bindings.http_utils import (
     ROW_COUNT_CHUNKING_THRESHOLD,
     check_endpoint_exists,
 )
+from weave.trace_server_bindings.models import StartBatchItem
 from weave.utils.attributes_dict import AttributesDict
 from weave.utils.dict_utils import sum_dict_leaves, zip_dicts
 from weave.utils.exception import exception_to_json_str
@@ -766,6 +767,7 @@ class WeaveClient:
             current_wb_run_step = None
 
         started_at = datetime.datetime.now(tz=datetime.timezone.utc)
+        call.started_at = started_at
         project_id = self._project_id()
 
         should_print_call_link_ = should_print_call_link()
@@ -806,7 +808,19 @@ class WeaveClient:
                     "Inputs may be dropped."
                 )
 
-            self.server.call_start(call_start_req)
+            # eager_call_start is a client-side hint that tells the batch processor
+            # to send this call's start immediately (for long-running ops like evals)
+            # Ugly that we have to reach down to the processor level here, but otherwise
+            # we need to change the interface itself.
+            call_processor = _get_call_processor(self.server)
+            if call_processor is not None:
+                eager = getattr(op, "eager_call_start", False)
+                call_processor.enqueue_start(
+                    StartBatchItem(req=call_start_req), eager_call_start=eager
+                )
+            else:
+                self.server.call_start(call_start_req)
+
             return True
 
         def on_complete(f: Future) -> None:
@@ -954,6 +968,7 @@ class WeaveClient:
                 end=EndedCallSchemaForInsert(
                     project_id=project_id,
                     id=call.id,
+                    started_at=call.started_at,
                     ended_at=ended_at,
                     output=output_json,
                     summary=merged_summary,
@@ -2273,3 +2288,19 @@ def sanitize_object_name(name: str) -> str:
     if len(res) > MAX_OBJECT_NAME_LENGTH:
         res = res[:MAX_OBJECT_NAME_LENGTH]
     return res
+
+
+def _get_call_processor(server: Any) -> Any:
+    """Get the call processor from a server, traversing through middleware wrappers.
+
+    Most production clients (RemoteHTTPTraceServer, StainlessRemoteHTTPTraceServer)
+    use batching and have a call_processor. This traverses through middleware like
+    CachingMiddlewareTraceServer to find it.
+
+    Returns None for direct backend servers (used in tests).
+    """
+    if hasattr(server, "call_processor"):
+        return server.call_processor
+    if hasattr(server, "_next_trace_server"):
+        return _get_call_processor(server._next_trace_server)
+    return None

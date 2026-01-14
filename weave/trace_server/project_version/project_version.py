@@ -50,7 +50,7 @@ class TableRoutingResolver:
             with _project_residence_cache_lock:
                 _project_residence_cache[project_id] = residence
 
-        # TODO: remove me, this is temporary to guage cache size impact
+        # TODO: remove me, this is temporary to gage cache size impact
         if root_span := ddtrace.tracer.current_root_span():
             root_span.set_tag("cache_size", len(_project_residence_cache))
 
@@ -66,21 +66,6 @@ class TableRoutingResolver:
 
         if self._mode == CallsStorageServerMode.FORCE_LEGACY:
             return ReadTable.CALLS_MERGED
-
-        if self._mode == CallsStorageServerMode.DUAL_WRITE_READ_MERGED:
-            return ReadTable.CALLS_MERGED
-
-        if self._mode == CallsStorageServerMode.DUAL_WRITE_READ_COMPLETE:
-            # Old projects have no data in calls_complete, we need to read from calls_merged
-            if residence == ProjectDataResidence.MERGED_ONLY:
-                return ReadTable.CALLS_MERGED
-
-            if residence in (
-                ProjectDataResidence.COMPLETE_ONLY,
-                ProjectDataResidence.BOTH,
-                ProjectDataResidence.EMPTY,
-            ):
-                return ReadTable.CALLS_COMPLETE
 
         if self._mode == CallsStorageServerMode.AUTO:
             if residence in (
@@ -104,25 +89,6 @@ class TableRoutingResolver:
 
         if self._mode == CallsStorageServerMode.FORCE_LEGACY:
             return WriteTarget.CALLS_MERGED
-
-        if self._mode in (
-            CallsStorageServerMode.DUAL_WRITE_READ_MERGED,
-            CallsStorageServerMode.DUAL_WRITE_READ_COMPLETE,
-        ):
-            if residence == ProjectDataResidence.MERGED_ONLY:
-                # If we are dual writing, but the project only has calls_merged data
-                # we DO NOT write to the calls_complete table. We ONLY dual write for
-                # new projects where we can guarantee identical data in both tables.
-                return WriteTarget.CALLS_MERGED
-
-            if residence in (
-                # Technically while dual writing COMPLETE_ONLY should never occur, but just in case
-                # we should still to write to both tables
-                ProjectDataResidence.COMPLETE_ONLY,
-                ProjectDataResidence.BOTH,
-                ProjectDataResidence.EMPTY,
-            ):
-                return WriteTarget.BOTH
 
         if self._mode == CallsStorageServerMode.AUTO:
             if residence in (
