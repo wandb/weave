@@ -131,7 +131,10 @@ def get_huggingface_patcher(
     patchers = []
 
     chat_completion_settings = base.model_copy(
-        update={"name": base.name or "huggingface_hub.InferenceClient.chat_completion"}
+        update={
+            "name": base.name or "huggingface_hub.InferenceClient.chat_completion",
+            "kind": base.kind or "llm",
+        }
     )
     patchers.append(
         SymbolPatcher(
@@ -143,7 +146,8 @@ def get_huggingface_patcher(
 
     chat_completion_async_settings = base.model_copy(
         update={
-            "name": base.name or "huggingface_hub.AsyncInferenceClient.chat_completion"
+            "name": base.name or "huggingface_hub.AsyncInferenceClient.chat_completion",
+            "kind": base.kind or "llm",
         }
     )
     patchers.append(

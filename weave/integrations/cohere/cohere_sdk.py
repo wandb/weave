@@ -209,27 +209,53 @@ def get_cohere_patcher(
 
     base = settings.op_settings
 
-    chat_settings = base.model_copy(update={"name": base.name or "cohere.Client.chat"})
+    chat_settings = base.model_copy(
+        update={
+            "name": base.name or "cohere.Client.chat",
+            "kind": base.kind or "llm",
+        }
+    )
     async_chat_settings = base.model_copy(
-        update={"name": base.name or "cohere.AsyncClient.chat"}
+        update={
+            "name": base.name or "cohere.AsyncClient.chat",
+            "kind": base.kind or "llm",
+        }
     )
     chat_stream_settings = base.model_copy(
-        update={"name": base.name or "cohere.Client.chat_stream"}
+        update={
+            "name": base.name or "cohere.Client.chat_stream",
+            "kind": base.kind or "llm",
+        }
     )
     async_chat_stream_settings = base.model_copy(
-        update={"name": base.name or "cohere.AsyncClient.chat_stream"}
+        update={
+            "name": base.name or "cohere.AsyncClient.chat_stream",
+            "kind": base.kind or "llm",
+        }
     )
     chat_v2_settings = base.model_copy(
-        update={"name": base.name or "cohere.ClientV2.chat"}
+        update={
+            "name": base.name or "cohere.ClientV2.chat",
+            "kind": base.kind or "llm",
+        }
     )
     async_chat_v2_settings = base.model_copy(
-        update={"name": base.name or "cohere.AsyncClientV2.chat"}
+        update={
+            "name": base.name or "cohere.AsyncClientV2.chat",
+            "kind": base.kind or "llm",
+        }
     )
     chat_stream_v2_settings = base.model_copy(
-        update={"name": base.name or "cohere.ClientV2.chat_stream"}
+        update={
+            "name": base.name or "cohere.ClientV2.chat_stream",
+            "kind": base.kind or "llm",
+        }
     )
     async_chat_stream_v2_settings = base.model_copy(
-        update={"name": base.name or "cohere.AsyncClientV2.chat_stream"}
+        update={
+            "name": base.name or "cohere.AsyncClientV2.chat_stream",
+            "kind": base.kind or "llm",
+        }
     )
 
     _cohere_patcher = MultiPatcher(
