@@ -1,5 +1,7 @@
 from pydantic import BaseModel
 
+from weave.trace.op_protocol import OpKind
+
 
 class BasePatchClassConfig(BaseModel):
     """Configuration for patching a specific class in the autogen library.
@@ -12,12 +14,14 @@ class BasePatchClassConfig(BaseModel):
         method_names: A list of method names in the class to patch.
         should_patch_base_class: Whether to patch the base class itself.
         should_patch_subclasses: Whether to patch subclasses of the base class.
+        kind: The operation kind for the patched methods (e.g., "agent", "llm", "tool").
     """
 
     class_name: str
     method_names: list[str]
     should_patch_base_class: bool = False
     should_patch_subclasses: bool = True
+    kind: OpKind | None = None
 
 
 class BasePatchModuleConfig(BaseModel):
@@ -53,6 +57,7 @@ def _get_module_patch_configs() -> list[BasePatchModuleConfig]:
         method_names=["run", "run_stream", "on_messages", "on_messages_stream"],
         should_patch_base_class=True,
         should_patch_subclasses=True,
+        kind="agent",
     )
 
     base_chat_agent_module_config = BasePatchModuleConfig(
@@ -62,7 +67,7 @@ def _get_module_patch_configs() -> list[BasePatchModuleConfig]:
 
     # Task Runner Tool Class
     task_runner_tool_config = BasePatchClassConfig(
-        class_name="TaskRunnerTool", method_names=["run"]
+        class_name="TaskRunnerTool", method_names=["run"], kind="tool"
     )
 
     task_runner_tool_module_config = BasePatchModuleConfig(
@@ -76,6 +81,7 @@ def _get_module_patch_configs() -> list[BasePatchModuleConfig]:
         method_names=["run", "run_stream"],
         should_patch_base_class=True,
         should_patch_subclasses=True,
+        kind="agent",
     )
 
     team_module_config = BasePatchModuleConfig(
@@ -90,6 +96,7 @@ def _get_module_patch_configs() -> list[BasePatchModuleConfig]:
         method_names=["on_message", "send_message", "publish_message"],
         should_patch_base_class=True,
         should_patch_subclasses=True,
+        kind="agent",
     )
 
     base_agent_module_config = BasePatchModuleConfig(
@@ -102,6 +109,7 @@ def _get_module_patch_configs() -> list[BasePatchModuleConfig]:
         method_names=["send_message", "publish_message"],
         should_patch_base_class=True,
         should_patch_subclasses=True,
+        kind="agent",
     )
 
     agent_runtime_module_config = BasePatchModuleConfig(
@@ -110,7 +118,7 @@ def _get_module_patch_configs() -> list[BasePatchModuleConfig]:
     )
     # Base Tool Class
     base_tool_config = BasePatchClassConfig(
-        class_name="BaseTool", method_names=["run", "run_json"]
+        class_name="BaseTool", method_names=["run", "run_json"], kind="tool"
     )
 
     base_tool_module_config = BasePatchModuleConfig(
@@ -123,6 +131,7 @@ def _get_module_patch_configs() -> list[BasePatchModuleConfig]:
         method_names=["create", "create_stream", "_check_cache"],
         should_patch_base_class=True,
         should_patch_subclasses=True,
+        kind="llm",
     )
 
     chat_completion_client_module_config = BasePatchModuleConfig(
@@ -151,6 +160,7 @@ def _get_module_patch_configs() -> list[BasePatchModuleConfig]:
         ],
         should_patch_base_class=False,
         should_patch_subclasses=True,
+        kind="tool",
     )
 
     code_executor_module_config = BasePatchModuleConfig(

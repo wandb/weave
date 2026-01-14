@@ -189,11 +189,13 @@ def get_nvidia_ai_patcher(
     generate_settings: OpSettings = base.model_copy(
         update={
             "name": base.name or "langchain_nvidia_ai_endpoints.ChatNVIDIA._generate",
+            "kind": base.kind or "llm",
         }
     )
     stream_settings: OpSettings = base.model_copy(
         update={
             "name": base.name or "langchain_nvidia_ai_endpoints.ChatNVIDIA._stream",
+            "kind": base.kind or "llm",
         }
     )
 

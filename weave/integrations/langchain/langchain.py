@@ -211,6 +211,16 @@ if not import_failed:
             fn_name = make_pythonic_function_name(run.name)
             complete_op_name = f"langchain.{run.run_type.capitalize()}.{fn_name}"
             complete_op_name = truncate_op_name(complete_op_name)
+
+            # Map LangChain run_type to Weave OpKind
+            run_type_to_kind = {
+                "llm": "llm",
+                "chat_model": "llm",
+                "tool": "tool",
+                "retriever": "search",
+            }
+            kind = run_type_to_kind.get(run.run_type)
+
             call_attrs = call_context.call_attributes.get()
             call_attrs.update(
                 {
@@ -219,6 +229,10 @@ if not import_failed:
                     "lc_name": run.name,
                 }
             )
+            # Add kind to weave attributes if applicable
+            if kind:
+                call_attrs["weave"] = {"kind": kind}
+
             call = self.wc.create_call(
                 # Make sure to add the run name once the UI issue is figured out
                 complete_op_name,
