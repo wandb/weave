@@ -279,7 +279,7 @@ class Evaluation(Object):
         table_rows = [eval_row for _, eval_row in eval_rows]
         return EvaluationResults(rows=Table(table_rows))
 
-    @op(call_display_name=default_evaluation_display_name)
+    @op(call_display_name=default_evaluation_display_name, eager_call_start=True)
     async def evaluate(self, model: Op | Model) -> dict:
         eval_results = await self.get_eval_results(model)
         summary = await self.summarize(eval_results)

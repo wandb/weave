@@ -320,3 +320,40 @@ def _is_413_error(e: Exception) -> bool:
         and e.response is not None
         and e.response.status_code == 413
     )
+
+
+# Error code from server when project requires calls_complete mode
+# This matches the ErrorCode.CALLS_COMPLETE_MODE_REQUIRED from weave.trace_server.errors
+ERROR_CODE_CALLS_COMPLETE_MODE_REQUIRED = "CALLS_COMPLETE_MODE_REQUIRED"
+
+
+class CallsCompleteModeRequired(Exception):
+    """Raised when a project requires calls_complete mode but SDK is using legacy mode.
+
+    This exception triggers automatic mode switching in the SDK.
+    """
+
+    pass
+
+
+def is_calls_complete_mode_error(error: Exception) -> bool:
+    """Check if an error indicates the project requires calls_complete mode.
+
+    Args:
+        error: The exception to check
+
+    Returns:
+        True if the error indicates calls_complete mode is required
+    """
+    response = getattr(error, "response", None)
+    if response is not None:
+        try:
+            error_data = response.json()
+            if isinstance(error_data, dict):
+                return (
+                    error_data.get("error_code")
+                    == ERROR_CODE_CALLS_COMPLETE_MODE_REQUIRED
+                )
+        except (json.JSONDecodeError, ValueError, AttributeError):
+            pass
+    return False

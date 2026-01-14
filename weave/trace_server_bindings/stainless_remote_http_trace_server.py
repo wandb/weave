@@ -60,8 +60,8 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
     ):
         self.trace_server_url = trace_server_url.rstrip("/")
         self.should_batch = should_batch
-        self.call_processor = None
-        self.feedback_processor = None
+        self.call_processor: AsyncBatchProcessor | None = None
+        self.feedback_processor: AsyncBatchProcessor | None = None
         self.remote_request_bytes_limit = remote_request_bytes_limit
         self._extra_headers: dict[str, str] = extra_headers or {}
         self._username: str = username
@@ -453,7 +453,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
                 raise ValueError(
                     "CallStartReq must have id and trace_id when batching."
                 )
-            self.call_processor.enqueue([StartBatchItem(req=req)])
+            self.call_processor.enqueue_start(StartBatchItem(req=req))
             return tsi.CallStartRes(id=req.start.id, trace_id=req.start.trace_id)
 
         return self._stainless_request(
