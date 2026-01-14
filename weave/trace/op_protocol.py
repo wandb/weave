@@ -21,7 +21,7 @@ P = ParamSpec("P")
 R = TypeVar("R")
 
 # Each Op kind has an associated icon in the UI.
-OpKind = Literal["agent", "llm", "tool", "search", "fun"]
+OpKind = Literal["agent", "llm", "tool", "search"]
 
 # Basic colors for additional organization.
 OpColor = Literal["red", "orange", "yellow", "green", "blue", "purple"]
