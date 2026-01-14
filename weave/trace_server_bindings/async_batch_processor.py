@@ -11,6 +11,17 @@ from typing import Generic, TypeVar
 from weave.telemetry.trace_sentry import SENTRY_AVAILABLE, sentry_sdk
 from weave.trace.context.tests_context import get_raise_on_captured_errors
 
+
+class NonRetryableBatchError(Exception):
+    """Raised when a batch fails with a non-retryable error (e.g., 404).
+
+    This exception signals to the batch processor that individual item
+    processing should be skipped since all items will fail the same way.
+    """
+
+    pass
+
+
 T = TypeVar("T")
 logger = logging.getLogger(__name__)
 
@@ -167,6 +178,13 @@ class AsyncBatchProcessor(Generic[T]):
             if current_batch := self._get_next_batch():
                 try:
                     self.processor_fn(current_batch)
+                except NonRetryableBatchError:
+                    # Non-retryable batch errors should NOT fall back to individual processing
+                    # The processor already handled logging/dropping items appropriately
+                    if get_raise_on_captured_errors():
+                        raise
+                    for _ in current_batch:
+                        self.queue.task_done()
                 except Exception as e:
                     if get_raise_on_captured_errors():
                         raise

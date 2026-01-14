@@ -56,6 +56,7 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     OrderField,
     QueryBuilderDynamicField,
     QueryBuilderField,
+    build_calls_complete_update_end_query,
     build_calls_stats_query,
     combine_conditions,
 )
@@ -638,10 +639,19 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         This is used for eager ops like Evaluation.evaluate that need
         their start to be visible immediately in the UI.
         """
-        # Reuse the existing call_start logic
-        start_req = tsi.CallStartReq(start=req.start)
-        result = self.call_start(start_req)
-        return tsi.CallStartV2Res(id=result.id, trace_id=result.trace_id)
+        start_req = process_call_req_to_content(tsi.CallStartReq(start=req.start), self)
+        ch_start = _start_call_for_insert_to_ch_insertable_start_call(start_req.start)
+
+        write_target = self.table_routing_resolver.resolve_write_target(
+            ch_start.project_id, self.ch_client
+        )
+        if write_target == WriteTarget.CALLS_COMPLETE:
+            ch_complete_start = _start_call_insertable_to_complete_start(ch_start)
+            self._insert_call_complete(ch_complete_start)
+        else:
+            self._insert_call(ch_start)
+
+        return tsi.CallStartV2Res(id=ch_start.id, trace_id=ch_start.trace_id)
 
     def call_end_v2(self, req: tsi.CallEndV2Req) -> tsi.CallEndV2Res:
         """End a single call (v2 API).
@@ -700,31 +710,35 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         table_name = self._get_calls_complete_table_name()
 
+        # Convert datetimes to microseconds since epoch for DateTime64(6) parameters.
+        # clickhouse-connect truncates datetime objects to seconds when passing as params,
+        # but DateTime64(6) requires microsecond precision for exact matching.
+        started_at_us = _datetime_to_microseconds(ch_end.started_at)
+        ended_at_us = _datetime_to_microseconds(ch_end.ended_at)
+
         pb = ParamBuilder()
         project_id_param = pb.add_param(ch_end.project_id)
         id_param = pb.add_param(ch_end.id)
-        started_at_param = pb.add_param(ch_end.started_at.timestamp())
-        ended_at_param = pb.add_param(ch_end.ended_at.timestamp())
+        started_at_param = pb.add_param(started_at_us)
+        ended_at_param = pb.add_param(ended_at_us)
         exception_param = pb.add_param(ch_end.exception)
         output_dump_param = pb.add_param(ch_end.output_dump)
         summary_dump_param = pb.add_param(ch_end.summary_dump)
         output_refs_param = pb.add_param(ch_end.output_refs)
         wb_run_step_end_param = pb.add_param(ch_end.wb_run_step_end)
 
-        query = f"""
-        UPDATE {table_name}
-        SET
-            ended_at = fromUnixTimestamp64Milli(toInt64({{{ended_at_param}:Float64}} * 1000)),
-            exception = {{{exception_param}:Nullable(String)}},
-            output_dump = {{{output_dump_param}:String}},
-            summary_dump = {{{summary_dump_param}:String}},
-            output_refs = {{{output_refs_param}:Array(String)}},
-            wb_run_step_end = {{{wb_run_step_end_param}:Nullable(UInt64)}},
-            updated_at = now64(3)
-        WHERE project_id = {{{project_id_param}:String}}
-            AND id = {{{id_param}:String}}
-            AND started_at = fromUnixTimestamp64Milli(toInt64({{{started_at_param}:Float64}} * 1000))
-        """
+        query = build_calls_complete_update_end_query(
+            table_name=table_name,
+            project_id_param=project_id_param,
+            started_at_param=started_at_param,
+            id_param=id_param,
+            ended_at_param=ended_at_param,
+            exception_param=exception_param,
+            output_dump_param=output_dump_param,
+            summary_dump_param=summary_dump_param,
+            output_refs_param=output_refs_param,
+            wb_run_step_end_param=wb_run_step_end_param,
+        )
 
         self.ch_client.command(query, parameters=pb.get_params())
 
@@ -758,8 +772,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         """
         self._noop_project_version_latency_test(req.project_id)
 
+        read_table = self.table_routing_resolver.resolve_read_table(
+            req.project_id, self.ch_client
+        )
         pb = ParamBuilder()
-        query, columns = build_calls_stats_query(req, pb)
+        query, columns = build_calls_stats_query(req, pb, read_table)
         raw_res = self._query(query, pb.get_params())
 
         res_dict = (
@@ -778,8 +795,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         """Returns a stream of calls that match the given query."""
         self._noop_project_version_latency_test(project_id=req.project_id)
 
+        read_table = self.table_routing_resolver.resolve_read_table(
+            req.project_id, self.ch_client
+        )
         cq = CallsQuery(
             project_id=req.project_id,
+            read_table=read_table,
             include_costs=req.include_costs or False,
             include_storage_size=req.include_storage_size or False,
             include_total_storage_size=req.include_total_storage_size or False,
@@ -825,7 +846,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         for col in columns:
             cq.add_field(col)
         if req.filter is not None:
-            cq.set_hardcoded_filter(HardCodedFilter(filter=req.filter))
+            cq.set_hardcoded_filter(
+                HardCodedFilter(filter=req.filter, read_table=read_table)
+            )
         if req.query is not None:
             cq.add_condition(req.query.expr_)
 
@@ -5488,6 +5511,33 @@ def _ensure_datetimes_have_tz_strict(
     return res
 
 
+def _datetime_to_microseconds(dt: datetime.datetime) -> int:
+    """Convert a datetime to microseconds since Unix epoch.
+
+    This is needed for DateTime64(6) parameterized queries because
+    clickhouse-connect truncates datetime objects to whole seconds
+    when passing them as parameters. By converting to microseconds
+    and using Int64 type, we preserve full precision.
+
+    Args:
+        dt: A datetime object (should be timezone-aware).
+
+    Returns:
+        int: Microseconds since Unix epoch (1970-01-01 00:00:00 UTC).
+
+    Examples:
+        >>> import datetime
+        >>> dt = datetime.datetime(2026, 1, 14, 23, 15, 38, 704246, tzinfo=datetime.timezone.utc)
+        >>> _datetime_to_microseconds(dt)
+        1768432538704246
+    """
+    # Ensure we have timezone info for accurate conversion
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=datetime.timezone.utc)
+    # Convert to microseconds: timestamp() gives seconds as float, multiply by 1M
+    return int(dt.timestamp() * 1_000_000)
+
+
 def _nullable_any_dump_to_any(
     val: str | None,
 ) -> Any | None:
@@ -5611,6 +5661,60 @@ def _start_call_for_insert_to_ch_insertable_start_call(
         wb_run_step=start_call.wb_run_step,
         wb_user_id=start_call.wb_user_id,
         display_name=start_call.display_name,
+    )
+
+
+def _start_call_insertable_to_complete_start(
+    ch_start: CallStartCHInsertable,
+) -> CallCompleteCHInsertable:
+    """Convert a start-only call into a calls_complete insertable row.
+
+    Args:
+        ch_start: The start-only ClickHouse insertable call.
+
+    Returns:
+        CallCompleteCHInsertable: A calls_complete insertable row with an empty end.
+
+    Examples:
+        >>> import datetime
+        >>> ch_start = CallStartCHInsertable(
+        ...     project_id="entity/project",
+        ...     id="call-id",
+        ...     trace_id="trace-id",
+        ...     op_name="op",
+        ...     started_at=datetime.datetime(2024, 1, 1),
+        ...     attributes_dump="{}",
+        ...     inputs_dump="{}",
+        ...     input_refs=[],
+        ...     output_refs=[],
+        ... )
+        >>> complete = _start_call_insertable_to_complete_start(ch_start)
+        >>> complete.ended_at is None
+        True
+    """
+    return CallCompleteCHInsertable(
+        project_id=ch_start.project_id,
+        id=ch_start.id,
+        trace_id=ch_start.trace_id,
+        parent_id=ch_start.parent_id,
+        thread_id=ch_start.thread_id,
+        turn_id=ch_start.turn_id,
+        op_name=ch_start.op_name,
+        display_name=ch_start.display_name,
+        started_at=ch_start.started_at,
+        ended_at=None,
+        exception=None,
+        attributes_dump=ch_start.attributes_dump,
+        inputs_dump=ch_start.inputs_dump,
+        input_refs=ch_start.input_refs,
+        output_dump=_any_value_to_dump(None),
+        summary_dump=_dict_value_to_dump({}),
+        otel_dump=ch_start.otel_dump,
+        output_refs=ch_start.output_refs,
+        wb_user_id=ch_start.wb_user_id,
+        wb_run_id=ch_start.wb_run_id,
+        wb_run_step=ch_start.wb_run_step,
+        wb_run_step_end=None,
     )
 
 

@@ -19,7 +19,10 @@ from weave.trace.settings import (
 from weave.trace_server import http_service_interface as his
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ids import generate_id
-from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
+from weave.trace_server_bindings.async_batch_processor import (
+    AsyncBatchProcessor,
+    NonRetryableBatchError,
+)
 from weave.trace_server_bindings.call_batch_processor import CallBatchProcessor
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface
 from weave.trace_server_bindings.http_utils import (
@@ -39,7 +42,7 @@ from weave.trace_server_bindings.models import (
 )
 from weave.utils import http_requests
 from weave.utils.project_id import from_project_id
-from weave.utils.retry import get_current_retry_id, with_retry
+from weave.utils.retry import _is_retryable_exception, get_current_retry_id, with_retry
 from weave.wandb_interface import project_creator
 
 logger = logging.getLogger(__name__)
@@ -211,15 +214,31 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         This is used for ops like Evaluation.evaluate that need their start
         to be visible immediately in the UI. Uses single call/start and call/end
         endpoints for easier rate limiting.
+
+        Handles errors gracefully:
+        - Non-retryable errors (4xx except 429): log and drop the item
+        - Retryable errors: raise NonRetryableBatchError to signal batch processor
+          to requeue without trying individual processing
         """
         if not batch:
             return
 
         for item in batch:
-            if isinstance(item, StartBatchItem):
-                self._send_call_start_v2(item)
-            elif isinstance(item, EndBatchItem):
-                self._send_call_end_v2(item)
+            try:
+                if isinstance(item, StartBatchItem):
+                    self._send_call_start_v2(item)
+                elif isinstance(item, EndBatchItem):
+                    self._send_call_end_v2(item)
+            except Exception as e:
+                if not _is_retryable_exception(e):
+                    # Non-retryable error (e.g., 404, 400) - log and drop this item
+                    log_dropped_call_batch([item], e)
+                else:
+                    # Retryable error - raise special exception to trigger requeue
+                    # without falling back to individual processing
+                    raise NonRetryableBatchError(
+                        f"Eager batch failed with retryable error: {e}"
+                    ) from e
 
     @with_retry
     def _send_call_start_v2(self, item: StartBatchItem) -> None:

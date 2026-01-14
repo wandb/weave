@@ -116,7 +116,7 @@ class CallCompleteCHInsertable(BaseModel):
     op_name: str
     display_name: str | None = None
     started_at: datetime.datetime
-    ended_at: datetime.datetime
+    ended_at: datetime.datetime | None = None
     exception: str | None = None
     attributes_dump: str
     inputs_dump: str
