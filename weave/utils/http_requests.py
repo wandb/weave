@@ -164,8 +164,14 @@ def _get_http_timeout() -> float:
     return http_timeout()
 
 
+def _get_proxy_from_env() -> str | None:
+    return os.getenv("HTTPS_PROXY") or os.getenv("HTTP_PROXY") or os.getenv("ALL_PROXY")
+
+
 client = httpx.Client(
-    transport=LoggingHTTPTransport(),
+    # HTTPX doesn't read proxy env vars when a custom transport is provided,
+    # so we need to read them manually and pass them here.
+    transport=LoggingHTTPTransport(proxy=_get_proxy_from_env()),
     timeout=_get_http_timeout(),
     limits=httpx.Limits(max_connections=None, max_keepalive_connections=None),
 )

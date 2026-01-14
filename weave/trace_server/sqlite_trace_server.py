@@ -1687,6 +1687,12 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         """Annotation queues not supported in SQLite."""
         raise NotImplementedError("Annotation queues are not supported in SQLite")
 
+    def annotator_queue_items_progress_update(
+        self, req: tsi.AnnotatorQueueItemsProgressUpdateReq
+    ) -> tsi.AnnotatorQueueItemsProgressUpdateRes:
+        """Annotation queues not supported in SQLite."""
+        raise NotImplementedError("Annotation queues are not supported in SQLite")
+
     def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
         if self._evaluate_model_dispatcher is None:
             raise ValueError("Evaluate model dispatcher is not set")

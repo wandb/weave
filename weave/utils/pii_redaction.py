@@ -5,7 +5,7 @@ from presidio_analyzer import AnalyzerEngine
 from presidio_anonymizer import AnonymizerEngine
 
 from weave.telemetry import trace_sentry
-from weave.trace.settings import redact_pii_fields
+from weave.trace.settings import redact_pii_exclude_fields, redact_pii_fields
 from weave.utils.sanitize import REDACTED_VALUE, redact_dataclass_fields, should_redact
 
 DEFAULT_REDACTED_FIELDS = [
@@ -30,13 +30,18 @@ DEFAULT_REDACTED_FIELDS = [
 ]
 
 
+def _get_redaction_entities() -> list[str]:
+    fields = redact_pii_fields() or DEFAULT_REDACTED_FIELDS
+    exclude = redact_pii_exclude_fields()
+    return [e for e in fields if e not in exclude]
+
+
 def redact_pii(
     data: dict[str, Any] | str,
 ) -> dict[str, Any] | str:
     analyzer = AnalyzerEngine()
     anonymizer = AnonymizerEngine()
-    fields = redact_pii_fields()
-    entities = DEFAULT_REDACTED_FIELDS if len(fields) == 0 else fields
+    entities = _get_redaction_entities()
 
     def redact_recursive(value: Any) -> Any:
         if isinstance(value, str):
@@ -68,8 +73,7 @@ def redact_pii(
 def redact_pii_string(data: str) -> str:
     analyzer = AnalyzerEngine()
     anonymizer = AnonymizerEngine()
-    fields = redact_pii_fields()
-    entities = DEFAULT_REDACTED_FIELDS if len(fields) == 0 else fields
+    entities = _get_redaction_entities()
     results = analyzer.analyze(text=data, language="en", entities=entities)
     redacted = anonymizer.anonymize(text=data, analyzer_results=results)
     return redacted.text
