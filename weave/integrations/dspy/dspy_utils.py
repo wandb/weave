@@ -10,7 +10,7 @@ from pydantic import BaseModel
 import weave
 from weave.integrations.patcher import SymbolPatcher
 from weave.trace.autopatch import OpSettings
-from weave.trace.op_protocol import Op
+from weave.trace.op_protocol import Op, OpKind
 from weave.trace.serialization.serialize import is_primitive, stringify
 from weave.utils.sanitize import REDACTED_VALUE, should_redact
 
@@ -33,7 +33,7 @@ def get_symbol_patcher(
     base_symbol: str,
     attribute_name: str,
     settings: OpSettings,
-    kind: str | None = None,
+    kind: OpKind | None = None,
 ) -> SymbolPatcher:
     display_name = base_symbol + "." + attribute_name
     display_name = (

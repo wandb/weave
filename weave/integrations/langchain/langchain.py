@@ -45,6 +45,7 @@ from weave.integrations.patcher import Patcher
 from weave.trace.call import Call
 from weave.trace.context import call_context
 from weave.trace.context import weave_client_context as weave_client_context
+from weave.trace.op_protocol import OpKind
 
 import_failed = False
 
@@ -213,7 +214,7 @@ if not import_failed:
             complete_op_name = truncate_op_name(complete_op_name)
 
             # Map LangChain run_type to Weave OpKind
-            run_type_to_kind = {
+            run_type_to_kind: dict[str, OpKind] = {
                 "llm": "llm",
                 "chat_model": "llm",
                 "tool": "tool",

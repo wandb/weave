@@ -16,7 +16,7 @@ from weave.integrations.patcher import (
 )
 from weave.trace.autopatch import IntegrationSettings, OpSettings
 from weave.trace.op import _add_accumulator
-from weave.trace.op_protocol import Op, ProcessedInputs
+from weave.trace.op_protocol import Op, OpKind, ProcessedInputs
 
 from .config import get_module_patch_configs
 
@@ -347,7 +347,7 @@ def _get_symbol_patcher(
     class_name: str,
     method_name: str,
     settings: OpSettings,
-    kind: str | None = None,
+    kind: OpKind | None = None,
 ) -> SymbolPatcher | None:
     """Creates a SymbolPatcher for a specific method.
 
