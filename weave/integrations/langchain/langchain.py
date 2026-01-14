@@ -232,7 +232,7 @@ if not import_failed:
             )
             # Add kind to weave attributes if applicable
             if kind:
-                call_attrs["weave"] = {"kind": kind}
+                call_attrs.setdefault("weave", {})["kind"] = kind
 
             call = self.wc.create_call(
                 # Make sure to add the run name once the UI issue is figured out

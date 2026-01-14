@@ -404,7 +404,7 @@ def _get_class_and_subclass_patchers(
     settings: OpSettings,
     should_patch_base_class: bool = False,
     should_patch_subclasses: bool = True,
-    kind: str | None = None,
+    kind: OpKind | None = None,
 ) -> list[SymbolPatcher | None]:
     """Creates patchers for a class and its subclasses.
 

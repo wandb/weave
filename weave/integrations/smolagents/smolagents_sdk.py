@@ -7,6 +7,7 @@ from typing import Any
 import weave
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
+from weave.trace.op_protocol import OpKind
 from weave.trace.serialization.serialize import dictify
 
 _smolagents_patcher: MultiPatcher | None = None
@@ -42,7 +43,7 @@ def get_symbol_patcher(
     base_symbol: str,
     attribute_name: str,
     settings: OpSettings,
-    kind: str | None = None,
+    kind: OpKind | None = None,
 ) -> SymbolPatcher | None:
     try:
         module = importlib.import_module(base_symbol)

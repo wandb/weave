@@ -118,6 +118,7 @@ def _get_kind_for_span(op_name: str) -> str | None:
     """Determine the OpKind for a span based on its operation name."""
     op_name_lower = op_name.lower()
     # LLM-related operations
+    # See https://docs.llamaindex.ai/en/stable/api_reference/llms/ for LLM operation names
     if any(
         llm_indicator in op_name_lower
         for llm_indicator in [
@@ -133,6 +134,7 @@ def _get_kind_for_span(op_name: str) -> str | None:
     ):
         return "llm"
     # Retrieval operations
+    # See https://docs.llamaindex.ai/en/stable/api_reference/retrievers/ for retrieval operation names
     if any(
         retrieval_indicator in op_name_lower
         for retrieval_indicator in ["retriev", "search", "query"]
@@ -268,10 +270,10 @@ if not _import_failed:
             try:
                 # Determine kind based on operation name
                 kind = _get_kind_for_span(op_name)
-                attributes = {"weave": {"kind": kind}} if kind else None
+                span_attributes = {"weave": {"kind": kind}} if kind else None
 
                 call = gc.create_call(
-                    op_name, inputs, parent_call, attributes=attributes
+                    op_name, inputs, parent_call, attributes=span_attributes
                 )
                 _weave_calls_map[id_] = call  # Store by full span ID
                 # we store the spans that are streaming in nature as a dict of id_ to call
@@ -404,7 +406,7 @@ if not _import_failed:
 
             # Determine kind based on event name
             kind = _get_kind_for_event(base_event_name)
-            attributes = {"weave": {"kind": kind}} if kind else None
+            event_attributes = {"weave": {"kind": kind}} if kind else None
 
             try:
                 if is_start_event:
@@ -415,7 +417,7 @@ if not _import_failed:
                         op_name,
                         raw_event_payload,
                         parent_call_for_event,
-                        attributes=attributes,
+                        attributes=event_attributes,
                     )
                     _weave_calls_map[event_pairing_key] = call
 
@@ -433,7 +435,7 @@ if not _import_failed:
                             progress_op_name,
                             raw_event_payload,
                             call,
-                            attributes=attributes,
+                            attributes=event_attributes,
                         )
                         _weave_calls_map[progress_event_key] = progress_call
                         # Update accumulator to point to the pre-created progress call
@@ -485,7 +487,7 @@ if not _import_failed:
                             op_name,
                             raw_event_payload,
                             parent_call_for_event,
-                            attributes=attributes,
+                            attributes=event_attributes,
                         )
                         gc.finish_call(call, raw_event_payload)
 
@@ -520,7 +522,7 @@ if not _import_failed:
                         op_name,
                         raw_event_payload,
                         parent_call_for_event,
-                        attributes=attributes,
+                        attributes=event_attributes,
                     )
                     gc.finish_call(call, raw_event_payload)
             except Exception as e:
