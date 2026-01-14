@@ -31,10 +31,9 @@ DEFAULT_REDACTED_FIELDS = [
 
 
 def _get_redaction_entities() -> list[str]:
-    fields = redact_pii_fields()
+    fields = redact_pii_fields() or DEFAULT_REDACTED_FIELDS
     exclude = redact_pii_exclude_fields()
-    entities = DEFAULT_REDACTED_FIELDS if len(fields) == 0 else fields
-    return [e for e in entities if e not in exclude]
+    return [e for e in fields if e not in exclude]
 
 
 def redact_pii(

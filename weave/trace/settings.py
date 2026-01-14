@@ -100,7 +100,7 @@ class UserSettings(BaseModel):
     redact_pii_exclude_fields: list[str] = []
     """List of PII entity types to exclude from redaction.
 
-    Only applies when redact_pii is True. Entities in this list are removed from the redaction set.
+    Only applies when `redact_pii` is True. Entities in this list are removed from the redaction set.
     Can be overridden with the environment variable `WEAVE_REDACT_PII_EXCLUDE_FIELDS`
     """
 
