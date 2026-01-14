@@ -249,7 +249,9 @@ def get_dspy_patcher(
             # Tools and Retrievers
             get_symbol_patcher("dspy", "ColBERTv2.__call__", base, kind="search"),
             get_symbol_patcher("dspy", "PythonInterpreter.__call__", base, kind="tool"),
-            get_symbol_patcher("dspy.retrievers", "Embeddings.__call__", base, kind="search"),
+            get_symbol_patcher(
+                "dspy.retrievers", "Embeddings.__call__", base, kind="search"
+            ),
             # Optimizers
             get_symbol_patcher("dspy", "BetterTogether.compile", base),
             get_symbol_patcher("dspy", "BootstrapFewShot.compile", base),

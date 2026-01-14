@@ -146,7 +146,9 @@ def get_smolagents_patcher(
             get_symbol_patcher("smolagents", "Tool.forward", base, kind="tool"),
             get_symbol_patcher("smolagents", "Tool.__call__", base, kind="tool"),
             get_symbol_patcher("smolagents", "PipelineTool.forward", base, kind="tool"),
-            get_symbol_patcher("smolagents", "PipelineTool.__call__", base, kind="tool"),
+            get_symbol_patcher(
+                "smolagents", "PipelineTool.__call__", base, kind="tool"
+            ),
             get_symbol_patcher(
                 "smolagents", "PythonInterpreterTool.forward", base, kind="tool"
             ),
@@ -159,8 +161,12 @@ def get_smolagents_patcher(
             get_symbol_patcher(
                 "smolagents", "FinalAnswerTool.__call__", base, kind="tool"
             ),
-            get_symbol_patcher("smolagents", "UserInputTool.forward", base, kind="tool"),
-            get_symbol_patcher("smolagents", "UserInputTool.__call__", base, kind="tool"),
+            get_symbol_patcher(
+                "smolagents", "UserInputTool.forward", base, kind="tool"
+            ),
+            get_symbol_patcher(
+                "smolagents", "UserInputTool.__call__", base, kind="tool"
+            ),
             # Search tools (kind="search")
             get_symbol_patcher(
                 "smolagents", "DuckDuckGoSearchTool.forward", base, kind="search"

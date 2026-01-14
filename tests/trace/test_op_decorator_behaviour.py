@@ -457,6 +457,7 @@ def test_op_preserves_type_information():
 
 def test_op_kind_attribute():
     """Test that setting kind on op decorator sets attributes.weave.kind."""
+
     @op(kind="tool")
     def tool_func(x: int) -> int:
         return x + 1
@@ -468,6 +469,7 @@ def test_op_kind_attribute():
 
 def test_op_color_attribute():
     """Test that setting color on op decorator sets attributes.weave.color."""
+
     @op(color="blue")
     def colored_func(x: int) -> int:
         return x + 1
@@ -479,6 +481,7 @@ def test_op_color_attribute():
 
 def test_op_kind_and_color_attributes():
     """Test that setting both kind and color on op decorator sets both attributes."""
+
     @op(kind="llm", color="green")
     def llm_func(x: int) -> int:
         return x + 1
