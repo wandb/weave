@@ -74,7 +74,7 @@ def evaluation_equality_check(a, b):
 
 llm_as_a_judge_scorer_digest = (
     "t7mpggmkUX0XDd9gi2K2J01r657NtnfGlnc0cb8hScs"
-    if sys.version_info.minor >= 13
+    if sys.version_info.major >= 3 and sys.version_info.minor >= 13
     else "hhCGYF6e9ybgkNGlFyXNxwAYArvjeCDXtEFUkcvgK3c"
 )
 
