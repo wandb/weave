@@ -738,7 +738,6 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
             project_id=req.project_id,
             call_ids=req.call_ids,
             display_fields=req.display_fields,
-            wb_user_id=req.wb_user_id,
         )
         return self._generic_request(
             f"/annotation_queues/{req.queue_id}/items",
@@ -774,6 +773,22 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
             req,
             tsi.AnnotationQueuesStatsReq,
             tsi.AnnotationQueuesStatsRes,
+        )
+
+    def annotator_queue_items_progress_update(
+        self, req: tsi.AnnotatorQueueItemsProgressUpdateReq
+    ) -> tsi.AnnotatorQueueItemsProgressUpdateRes:
+        # Convert to Body type to exclude queue_id, item_id, and wb_user_id from request body
+        # (queue_id and item_id are in the URL path, wb_user_id is set server-side from auth)
+        body = his.AnnotationQueueItemProgressUpdateBody(
+            project_id=req.project_id,
+            annotation_state=req.annotation_state,
+        )
+        return self._generic_request(
+            f"/annotation_queues/{req.queue_id}/items/{req.item_id}/progress",
+            body,
+            his.AnnotationQueueItemProgressUpdateBody,
+            tsi.AnnotatorQueueItemsProgressUpdateRes,
         )
 
     def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
