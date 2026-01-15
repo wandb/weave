@@ -1,6 +1,7 @@
 """Utilities for working with IPython/Jupyter notebooks."""
 
 import ast
+import sys
 from collections.abc import Callable
 
 
@@ -12,6 +13,8 @@ class ClassNotFoundError(ValueError): ...
 
 def is_running_interactively() -> bool:
     """Check if the code is running in an interactive environment."""
+    if "IPython" not in sys.modules:
+        return False
     try:
         from IPython import get_ipython
 
