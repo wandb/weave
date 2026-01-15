@@ -693,3 +693,26 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         if req.wb_user_id is not None:
             req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
         return self._ref_apply(self._internal_trace_server.score_delete, req)
+
+    # Calls V2 API
+    def calls_complete(
+        self, req: tsi.CallsUpsertCompleteReq
+    ) -> tsi.CallsUpsertCompleteRes:
+        """Batch complete calls, converting project_id."""
+        for item in req.batch:
+            item.project_id = self._idc.ext_to_int_project_id(item.project_id)
+            if item.wb_user_id is not None:
+                item.wb_user_id = self._idc.ext_to_int_user_id(item.wb_user_id)
+        return self._ref_apply(self._internal_trace_server.calls_complete, req)
+
+    def call_start_v2(self, req: tsi.CallStartV2Req) -> tsi.CallStartV2Res:
+        """Start a single call (v2), converting project_id."""
+        req.start.project_id = self._idc.ext_to_int_project_id(req.start.project_id)
+        if req.start.wb_user_id is not None:
+            req.start.wb_user_id = self._idc.ext_to_int_user_id(req.start.wb_user_id)
+        return self._ref_apply(self._internal_trace_server.call_start_v2, req)
+
+    def call_end_v2(self, req: tsi.CallEndV2Req) -> tsi.CallEndV2Res:
+        """End a single call (v2), converting project_id."""
+        req.end.project_id = self._idc.ext_to_int_project_id(req.end.project_id)
+        return self._ref_apply(self._internal_trace_server.call_end_v2, req)

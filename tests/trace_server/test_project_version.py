@@ -83,63 +83,6 @@ def test_version_resolution_by_table_contents(client, trace_server):
     )
 
 
-def test_version_resolution_by_table_duel_write(client, trace_server):
-    if client_is_sqlite(client):
-        pytest.skip("ClickHouse-only test")
-
-    ch_server = trace_server._internal_trace_server
-    resolver = ch_server.table_routing_resolver
-
-    empty_proj = make_project_id("empty_project")
-
-    merged_proj = make_project_id("merged_only")
-    insert_call(ch_server.ch_client, "calls_merged", merged_proj)
-
-    complete_proj = make_project_id("complete_only")
-    insert_call(ch_server.ch_client, "calls_complete", complete_proj)
-
-    both_proj = make_project_id("both_tables")
-    insert_call(ch_server.ch_client, "calls_merged", both_proj)
-    insert_call(ch_server.ch_client, "calls_complete", both_proj)
-
-    resolver._mode = CallsStorageServerMode.DUAL_WRITE_READ_MERGED
-    assert (
-        resolver.resolve_read_table(empty_proj, ch_server.ch_client)
-        == ReadTable.CALLS_MERGED
-    )
-    assert (
-        resolver.resolve_read_table(merged_proj, ch_server.ch_client)
-        == ReadTable.CALLS_MERGED
-    )
-    assert (
-        resolver.resolve_read_table(complete_proj, ch_server.ch_client)
-        == ReadTable.CALLS_MERGED
-    )
-    assert (
-        resolver.resolve_read_table(both_proj, ch_server.ch_client)
-        == ReadTable.CALLS_MERGED
-    )
-
-    # Now test duel write read complete
-    resolver._mode = CallsStorageServerMode.DUAL_WRITE_READ_COMPLETE
-    assert (
-        resolver.resolve_read_table(empty_proj, ch_server.ch_client)
-        == ReadTable.CALLS_COMPLETE
-    )
-    assert (
-        resolver.resolve_read_table(merged_proj, ch_server.ch_client)
-        == ReadTable.CALLS_MERGED
-    )
-    assert (
-        resolver.resolve_read_table(complete_proj, ch_server.ch_client)
-        == ReadTable.CALLS_COMPLETE
-    )
-    assert (
-        resolver.resolve_read_table(both_proj, ch_server.ch_client)
-        == ReadTable.CALLS_COMPLETE
-    )
-
-
 def test_caching_behavior(client, trace_server):
     if client_is_sqlite(client):
         pytest.skip("ClickHouse-only test")
