@@ -56,7 +56,6 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     OrderField,
     QueryBuilderDynamicField,
     QueryBuilderField,
-    build_calls_complete_update_end_query,
     build_calls_stats_query,
     combine_conditions,
 )
@@ -186,6 +185,73 @@ from weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker impo
 )
 
 logger = logging.getLogger(__name__)
+
+
+def build_calls_complete_update_end_query(
+    table_name: str,
+    project_id_param: str,
+    started_at_param: str,
+    id_param: str,
+    ended_at_param: str,
+    exception_param: str,
+    output_dump_param: str,
+    summary_dump_param: str,
+    output_refs_param: str,
+    wb_run_step_end_param: str,
+) -> str:
+    """Build the calls_complete UPDATE query for call end data.
+
+    Args:
+        table_name: The calls_complete table name.
+        project_id_param: Param slot key for project_id.
+        started_at_param: Param slot key for started_at (Int64 microseconds).
+        id_param: Param slot key for call id.
+        ended_at_param: Param slot key for ended_at (Int64 microseconds).
+        exception_param: Param slot key for exception.
+        output_dump_param: Param slot key for output_dump.
+        summary_dump_param: Param slot key for summary_dump.
+        output_refs_param: Param slot key for output_refs.
+        wb_run_step_end_param: Param slot key for wb_run_step_end.
+
+    Returns:
+        The formatted ClickHouse UPDATE statement.
+
+    Examples:
+        >>> query = build_calls_complete_update_end_query(
+        ...     table_name="calls_complete",
+        ...     project_id_param="project_id",
+        ...     started_at_param="started_at",
+        ...     id_param="id",
+        ...     ended_at_param="ended_at",
+        ...     exception_param="exception",
+        ...     output_dump_param="output_dump",
+        ...     summary_dump_param="summary_dump",
+        ...     output_refs_param="output_refs",
+        ...     wb_run_step_end_param="wb_run_step_end",
+        ... )
+        >>> "UPDATE calls_complete" in query
+        True
+    """
+    # Build ClickHouse parameter specs separately to avoid Python f-string
+    # interpreting `:Int64` as a format specifier.
+    started_at_spec = f"{started_at_param}:Int64"
+    ended_at_spec = f"{ended_at_param}:Int64"
+
+    # Use fromUnixTimestamp64Micro to convert Int64 microseconds to DateTime64(6)
+    return f"""
+        UPDATE {table_name}
+        SET
+            ended_at = fromUnixTimestamp64Micro({{{ended_at_spec}}}, 'UTC'),
+            exception = {{{exception_param}:Nullable(String)}},
+            output_dump = {{{output_dump_param}:String}},
+            summary_dump = {{{summary_dump_param}:String}},
+            output_refs = {{{output_refs_param}:Array(String)}},
+            wb_run_step_end = {{{wb_run_step_end_param}:Nullable(UInt64)}},
+            updated_at = now64(3)
+        WHERE project_id = {{{project_id_param}:String}}
+            AND started_at = fromUnixTimestamp64Micro({{{started_at_spec}}}, 'UTC')
+            AND id = {{{id_param}:String}}
+        """
 logger.setLevel(logging.INFO)
 
 
