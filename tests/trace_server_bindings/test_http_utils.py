@@ -1,10 +1,15 @@
-"""Tests for http_utils 413 handling."""
+"""Tests for http_utils error handling."""
 
 from unittest.mock import Mock
 
 import httpx
+import pytest
 
-from weave.trace_server_bindings.http_utils import process_batch_with_retry
+from weave.trace_server_bindings.http_utils import (
+    CallsCompleteModeRequired,
+    handle_response_error,
+    process_batch_with_retry,
+)
 
 
 def test_413_splits_batch_and_retries():
@@ -31,3 +36,18 @@ def test_413_splits_batch_and_retries():
     )
 
     assert len(sent_batches) == 2
+
+
+def test_calls_complete_mode_required_raises():
+    """Map calls_complete mode errors to CallsCompleteModeRequired."""
+    response = httpx.Response(
+        400,
+        json={
+            "error_code": "CALLS_COMPLETE_MODE_REQUIRED",
+            "message": "calls_complete mode required",
+        },
+        request=httpx.Request("POST", "http://example.com"),
+    )
+
+    with pytest.raises(CallsCompleteModeRequired, match="calls_complete mode required"):
+        handle_response_error(response, "/call/upsert_batch")

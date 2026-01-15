@@ -242,9 +242,11 @@ def handle_response_error(response: httpx.Response, url: str) -> None:
 
     # Try to extract custom error message from JSON response
     extracted_message = None
+    error_code = None
     try:
         error_data = response.json()
         if isinstance(error_data, dict):
+            error_code = error_data.get("error_code")
             # Common error message fields
             extracted_message = (
                 error_data.get("message")
@@ -254,6 +256,11 @@ def handle_response_error(response: httpx.Response, url: str) -> None:
             )
     except (json.JSONDecodeError, ValueError):
         pass
+
+    # Handle calls_complete mode requirement for automatic SDK upgrade
+    if error_code == ERROR_CODE_CALLS_COMPLETE_MODE_REQUIRED:
+        message = extracted_message or default_message or "Calls complete mode required"
+        raise CallsCompleteModeRequired(message)
 
     # Combine messages
     if default_message and extracted_message:
