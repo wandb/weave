@@ -5,7 +5,7 @@ import pytest
 
 import weave
 from weave.trace.call import Call
-from weave.trace.op import OpCallError, is_op, op
+from weave.trace.op import OpCallError, is_op, op, setup_dunder_weave_dict
 from weave.trace.refs import ObjectRef, Ref
 from weave.trace.vals import MissingSelfInstanceError
 
@@ -453,3 +453,39 @@ def test_op_preserves_type_information():
     }
     # Check that the function can be called with the correct types
     assert typed_func(**values) == decorated_func(**values) == values
+
+
+def test_op_kind_attribute():
+    """Test that setting kind on op decorator sets attributes.weave.kind."""
+
+    @op(kind="tool")
+    def tool_func(x: int) -> int:
+        return x + 1
+
+    result = setup_dunder_weave_dict(tool_func)
+    assert result["attributes"]["weave"]["kind"] == "tool"
+    assert "color" not in result["attributes"]["weave"]
+
+
+def test_op_color_attribute():
+    """Test that setting color on op decorator sets attributes.weave.color."""
+
+    @op(color="blue")
+    def colored_func(x: int) -> int:
+        return x + 1
+
+    result = setup_dunder_weave_dict(colored_func)
+    assert result["attributes"]["weave"]["color"] == "blue"
+    assert "kind" not in result["attributes"]["weave"]
+
+
+def test_op_kind_and_color_attributes():
+    """Test that setting both kind and color on op decorator sets both attributes."""
+
+    @op(kind="llm", color="green")
+    def llm_func(x: int) -> int:
+        return x + 1
+
+    result = setup_dunder_weave_dict(llm_func)
+    assert result["attributes"]["weave"]["kind"] == "llm"
+    assert result["attributes"]["weave"]["color"] == "green"
