@@ -14,6 +14,8 @@ from weave.trace_server.project_version.types import (
     CallsStorageServerMode,
     ProjectDataResidence,
     ReadTable,
+    WriteSourceVersion,
+    WriteTarget,
 )
 
 
@@ -44,7 +46,46 @@ def count_queries(ch_client):
         yield lambda: call_count
 
 
-def test_version_resolution_by_table_contents(client, trace_server):
+@pytest.mark.parametrize(
+    ("tables", "expected_read_table", "expected_write_targets"),
+    [
+        (
+            [],
+            ReadTable.CALLS_COMPLETE,
+            {
+                WriteSourceVersion.V1: WriteTarget.CALLS_MERGED,
+                WriteSourceVersion.V2: WriteTarget.CALLS_COMPLETE,
+            },
+        ),
+        (
+            ["calls_merged"],
+            ReadTable.CALLS_MERGED,
+            {
+                WriteSourceVersion.V1: WriteTarget.CALLS_MERGED,
+                WriteSourceVersion.V2: WriteTarget.CALLS_COMPLETE,
+            },
+        ),
+        (
+            ["calls_complete"],
+            ReadTable.CALLS_COMPLETE,
+            {
+                WriteSourceVersion.V1: WriteTarget.CALLS_MERGED,
+                WriteSourceVersion.V2: WriteTarget.CALLS_COMPLETE,
+            },
+        ),
+        (
+            ["calls_merged", "calls_complete"],
+            ReadTable.CALLS_COMPLETE,
+            {
+                WriteSourceVersion.V1: WriteTarget.CALLS_MERGED,
+                WriteSourceVersion.V2: WriteTarget.CALLS_COMPLETE,
+            },
+        ),
+    ],
+)
+def test_version_resolution_by_table_contents(
+    client, trace_server, tables, expected_read_table, expected_write_targets
+):
     if client_is_sqlite(client):
         pytest.skip("ClickHouse-only test")
 
@@ -53,34 +94,23 @@ def test_version_resolution_by_table_contents(client, trace_server):
     # manually set this to auto so we can test the switching
     resolver._mode = CallsStorageServerMode.AUTO
 
-    empty_proj = make_project_id("empty_project")
-    assert (
-        resolver.resolve_read_table(empty_proj, ch_server.ch_client)
-        == ReadTable.CALLS_COMPLETE
-    )
+    project_id = make_project_id("table_contents")
+    for table in tables:
+        insert_call(ch_server.ch_client, table, project_id)
 
-    merged_proj = make_project_id("merged_only")
-    insert_call(ch_server.ch_client, "calls_merged", merged_proj)
     assert (
-        resolver.resolve_read_table(merged_proj, ch_server.ch_client)
-        == ReadTable.CALLS_MERGED
+        resolver.resolve_read_table(project_id, ch_server.ch_client)
+        == expected_read_table
     )
-
-    complete_proj = make_project_id("complete_only")
-    insert_call(ch_server.ch_client, "calls_complete", complete_proj)
-    assert (
-        resolver.resolve_read_table(complete_proj, ch_server.ch_client)
-        == ReadTable.CALLS_COMPLETE
-    )
-
-    both_proj = make_project_id("both_tables")
-    insert_call(ch_server.ch_client, "calls_merged", both_proj)
-    insert_call(ch_server.ch_client, "calls_complete", both_proj)
-    # When both tables have data, calls_complete takes priority
-    assert (
-        resolver.resolve_read_table(both_proj, ch_server.ch_client)
-        == ReadTable.CALLS_COMPLETE
-    )
+    for source_version, expected_write_target in expected_write_targets.items():
+        assert (
+            resolver.resolve_write_target(
+                project_id,
+                ch_server.ch_client,
+                write_source=source_version,
+            )
+            == expected_write_target
+        )
 
 
 def test_caching_behavior(client, trace_server):

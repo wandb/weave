@@ -12,6 +12,7 @@ from weave.trace_server.project_version.types import (
     CallsStorageServerMode,
     ProjectDataResidence,
     ReadTable,
+    WriteSourceVersion,
     WriteTarget,
 )
 
@@ -87,7 +88,12 @@ class TableRoutingResolver:
         raise ValueError(f"Invalid mode/residence: {self._mode}/{residence}")
 
     @ddtrace.tracer.wrap(name="table_routing.resolve_write_target")
-    def resolve_write_target(self, project_id: str, ch_client: CHClient) -> WriteTarget:
+    def resolve_write_target(
+        self,
+        project_id: str,
+        ch_client: CHClient,
+        write_source: WriteSourceVersion,
+    ) -> WriteTarget:
         """Resolve which table(s) to write to for a given project."""
         if self._mode == CallsStorageServerMode.OFF:
             return WriteTarget.CALLS_MERGED
@@ -98,13 +104,9 @@ class TableRoutingResolver:
             return WriteTarget.CALLS_MERGED
 
         if self._mode == CallsStorageServerMode.AUTO:
-            if residence in (
-                ProjectDataResidence.COMPLETE_ONLY,
-                ProjectDataResidence.BOTH,
-                ProjectDataResidence.EMPTY,
-            ):
-                return WriteTarget.CALLS_COMPLETE
-            if residence == ProjectDataResidence.MERGED_ONLY:
+            if write_source == WriteSourceVersion.V1:
                 return WriteTarget.CALLS_MERGED
+            if write_source == WriteSourceVersion.V2:
+                return WriteTarget.CALLS_COMPLETE
 
         raise ValueError(f"Invalid mode/residence: {self._mode}/{residence}")
