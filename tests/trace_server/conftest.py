@@ -120,6 +120,13 @@ def get_remote_http_trace_server_flag(request):
     return request.config.getoption("--remote-http-trace-server")
 
 
+@pytest.fixture(autouse=True)
+def reset_project_version_cache():
+    project_version.reset_project_residence_cache()
+    yield
+    project_version.reset_project_residence_cache()
+
+
 @pytest.fixture(autouse=True, scope="session")
 def calls_complete_only_mode(request):
     if not request.config.getoption("--calls-complete-only"):

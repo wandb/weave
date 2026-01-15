@@ -26,6 +26,17 @@ _project_residence_cache: LRUCache[str, ProjectDataResidence] = LRUCache(
 _project_residence_cache_lock = threading.Lock()
 
 
+def reset_project_residence_cache() -> None:
+    """Clear the cached project data residence entries.
+
+    Examples:
+        >>> reset_project_residence_cache()
+
+    """
+    with _project_residence_cache_lock:
+        _project_residence_cache.clear()
+
+
 class TableRoutingResolver:
     """Resolver for determining which table to read from or write to based on project data residence.
 
