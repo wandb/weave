@@ -430,6 +430,12 @@ class CachingMiddlewareTraceServer(TraceServerClientInterface):
     def call_end(self, req: tsi.CallEndReq) -> tsi.CallEndRes:
         return self._next_trace_server.call_end(req)
 
+    def calls_start_batch(self, req: tsi.CallsStartBatchReq) -> tsi.CallsStartBatchRes:
+        return self._next_trace_server.calls_start_batch(req)
+
+    def calls_end_batch(self, req: tsi.CallsEndBatchReq) -> tsi.CallsEndBatchRes:
+        return self._next_trace_server.calls_end_batch(req)
+
     def call_read(self, req: tsi.CallReadReq) -> tsi.CallReadRes:
         return self._next_trace_server.call_read(req)
 

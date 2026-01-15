@@ -6,7 +6,7 @@ from enum import Enum
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_SERVER_MODE = "force_legacy"
+DEFAULT_SERVER_MODE = "dual_write_read_merged"
 
 # Project Version Routing Matrix
 # ==============================
@@ -17,9 +17,12 @@ DEFAULT_SERVER_MODE = "force_legacy"
 # ├─────────────────────────┼──────────────────────┼─────────────────────────────┼────────────────────────────────┼──────────────────────┼──────────────────────┤
 # │ EMPTY                   │ COMPLETE / COMPLETE  │ MERGED / BOTH               │ COMPLETE / BOTH                │ MERGED / MERGED      │ MERGED / MERGED      │
 # │ MERGED_ONLY             │ MERGED / MERGED      │ MERGED / MERGED             │ MERGED / MERGED                │ MERGED / MERGED      │ MERGED / MERGED      │
-# │ COMPLETE_ONLY           │ COMPLETE / COMPLETE  │ MERGED / BOTH               │ COMPLETE / BOTH                │ MERGED / MERGED      │ MERGED / MERGED      │
+# │ COMPLETE_ONLY           │ COMPLETE / COMPLETE  │ MERGED / COMPLETE*          │ COMPLETE / COMPLETE*           │ MERGED / MERGED      │ MERGED / MERGED      │
 # │ BOTH                    │ COMPLETE / COMPLETE  │ MERGED / BOTH               │ COMPLETE / BOTH                │ MERGED / MERGED      │ MERGED / MERGED      │
 # └─────────────────────────┴──────────────────────┴─────────────────────────────┴────────────────────────────────┴──────────────────────┴──────────────────────┘
+#
+# * COMPLETE_ONLY in dual-write modes is an edge case that should never occur in production.
+#   We never switch from AUTO to dual-write modes. Writes go to COMPLETE only to avoid inconsistent state.
 
 
 class ProjectDataResidence(Enum):
@@ -69,3 +72,16 @@ class WriteTarget(str, Enum):
     CALLS_MERGED = "calls_merged"
     CALLS_COMPLETE = "calls_complete"
     BOTH = "both"
+
+
+class CallSource(str, Enum):
+    """Source of call data being inserted.
+
+    SDK_CALLS_MERGED: Old SDK with single-table writes only (calls_merged).
+    SDK_CALLS_COMPLETE: New SDK with dual-write capability.
+    SERVER: Server-side sources (OTEL, completions).
+    """
+
+    SDK_CALLS_MERGED = "sdk_calls_merged"
+    SDK_CALLS_COMPLETE = "sdk_calls_complete"
+    SERVER = "server"
