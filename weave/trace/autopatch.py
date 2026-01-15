@@ -10,6 +10,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from weave.trace.call import Call
+from weave.trace.op_protocol import OpColor, OpKind
 
 
 class OpSettings(BaseModel):
@@ -22,6 +23,8 @@ class OpSettings(BaseModel):
     call_display_name: str | Callable[[Call], str] | None = None
     postprocess_inputs: Callable[[dict[str, Any]], dict[str, Any]] | None = None
     postprocess_output: Callable[[Any], Any] | None = None
+    kind: OpKind | None = None
+    color: OpColor | None = None
 
 
 class IntegrationSettings(BaseModel):

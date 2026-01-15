@@ -202,28 +202,52 @@ def get_anthropic_patcher(
     base = settings.op_settings
 
     messages_create_settings = base.model_copy(
-        update={"name": base.name or "anthropic.Messages.create"}
+        update={
+            "name": base.name or "anthropic.Messages.create",
+            "kind": base.kind or "llm",
+        }
     )
     async_messages_create_settings = base.model_copy(
-        update={"name": base.name or "anthropic.AsyncMessages.create"}
+        update={
+            "name": base.name or "anthropic.AsyncMessages.create",
+            "kind": base.kind or "llm",
+        }
     )
     stream_settings = base.model_copy(
-        update={"name": base.name or "anthropic.Messages.stream"}
+        update={
+            "name": base.name or "anthropic.Messages.stream",
+            "kind": base.kind or "llm",
+        }
     )
     async_stream_settings = base.model_copy(
-        update={"name": base.name or "anthropic.AsyncMessages.stream"}
+        update={
+            "name": base.name or "anthropic.AsyncMessages.stream",
+            "kind": base.kind or "llm",
+        }
     )
     beta_messages_create_settings = base.model_copy(
-        update={"name": base.name or "anthropic.beta.Messages.create"}
+        update={
+            "name": base.name or "anthropic.beta.Messages.create",
+            "kind": base.kind or "llm",
+        }
     )
     beta_async_messages_create_settings = base.model_copy(
-        update={"name": base.name or "anthropic.beta.AsyncMessages.create"}
+        update={
+            "name": base.name or "anthropic.beta.AsyncMessages.create",
+            "kind": base.kind or "llm",
+        }
     )
     beta_stream_settings = base.model_copy(
-        update={"name": base.name or "anthropic.beta.Messages.stream"}
+        update={
+            "name": base.name or "anthropic.beta.Messages.stream",
+            "kind": base.kind or "llm",
+        }
     )
     beta_async_stream_settings = base.model_copy(
-        update={"name": base.name or "anthropic.beta.AsyncMessages.stream"}
+        update={
+            "name": base.name or "anthropic.beta.AsyncMessages.stream",
+            "kind": base.kind or "llm",
+        }
     )
 
     _anthropic_patcher = MultiPatcher(

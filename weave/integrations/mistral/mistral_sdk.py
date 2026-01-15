@@ -117,16 +117,28 @@ def get_mistral_patcher(
 
     base = settings.op_settings
     chat_complete_settings = base.model_copy(
-        update={"name": base.name or "mistralai.chat.complete"}
+        update={
+            "name": base.name or "mistralai.chat.complete",
+            "kind": base.kind or "llm",
+        }
     )
     chat_stream_settings = base.model_copy(
-        update={"name": base.name or "mistralai.chat.stream"}
+        update={
+            "name": base.name or "mistralai.chat.stream",
+            "kind": base.kind or "llm",
+        }
     )
     async_chat_complete_settings = base.model_copy(
-        update={"name": base.name or "mistralai.async_client.chat.complete"}
+        update={
+            "name": base.name or "mistralai.async_client.chat.complete",
+            "kind": base.kind or "llm",
+        }
     )
     async_chat_stream_settings = base.model_copy(
-        update={"name": base.name or "mistralai.async_client.chat.stream"}
+        update={
+            "name": base.name or "mistralai.async_client.chat.stream",
+            "kind": base.kind or "llm",
+        }
     )
 
     _mistral_patcher = MultiPatcher(

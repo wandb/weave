@@ -119,10 +119,16 @@ def get_groq_patcher(
     base = settings.op_settings
 
     chat_completions_settings = base.model_copy(
-        update={"name": base.name or "groq.chat.completions.create"}
+        update={
+            "name": base.name or "groq.chat.completions.create",
+            "kind": base.kind or "llm",
+        }
     )
     async_chat_completions_settings = base.model_copy(
-        update={"name": base.name or "groq.async.chat.completions.create"}
+        update={
+            "name": base.name or "groq.async.chat.completions.create",
+            "kind": base.kind or "llm",
+        }
     )
 
     _groq_patcher = MultiPatcher(

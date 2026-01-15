@@ -103,6 +103,7 @@ def get_crewai_patcher(
                 "name": base.name or f"crewai.Crew.{method_name}",
                 "call_display_name": base.call_display_name,
                 "postprocess_inputs": crew_kickoff_postprocess_inputs,
+                "kind": base.kind or "agent",
             }
         )
 
@@ -113,6 +114,7 @@ def get_crewai_patcher(
             "call_display_name": base.call_display_name
             or default_call_display_name_execute_task,
             "postprocess_inputs": crewai_postprocess_inputs,
+            "kind": base.kind or "agent",
         }
     )
 
@@ -123,6 +125,7 @@ def get_crewai_patcher(
             "call_display_name": base.call_display_name
             or default_call_display_name_execute_sync,
             "postprocess_inputs": crewai_postprocess_inputs,
+            "kind": base.kind or "agent",
         }
     )
 
@@ -131,6 +134,7 @@ def get_crewai_patcher(
         update={
             "name": base.name or "crewai.LLM.call",
             "call_display_name": base.call_display_name,
+            "kind": base.kind or "llm",
         }
     )
 
@@ -149,6 +153,7 @@ def get_crewai_patcher(
                 "call_display_name": base.call_display_name,
                 "postprocess_inputs": lambda inputs: dictify(inputs),
                 "postprocess_output": lambda output: dictify(output),
+                "kind": base.kind or "agent",
             }
         )
 
@@ -187,6 +192,7 @@ def get_crewai_patcher(
                                 "name": base.name or f"crewai_tools.{tool}._run",
                                 "call_display_name": base.call_display_name
                                 or f"{tool}._run",
+                                "kind": base.kind or "tool",
                             }
                         )
                     else:
