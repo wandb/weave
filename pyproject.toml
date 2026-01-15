@@ -114,7 +114,7 @@ instructor = [
   "openai>=1.99.9,<1.100.0",
 ]
 langchain = [
-  "langchain-core>=0.2.1; python_version >= '3.10'",
+  "langchain-core>=0.3.81; python_version >= '3.10'",
   "langchain-openai>=0.1.7; python_version >= '3.10'",
   "langchain-community>=0.2.1; python_version >= '3.10'",
   "langchain-google-vertexai>=2.0.24; platform_python_implementation != 'PyPy' and python_version >= '3.10'",
@@ -128,7 +128,7 @@ langchain = [
   "openai>=1.99.9,<1.100.0",
 ]
 langchain_nvidia_ai_endpoints = [
-  "langchain-core>=0.2.1",
+  "langchain-core>=0.3.81",
   "langchain-nvidia-ai-endpoints",
 ]
 litellm = ["litellm>=1.36.1", "openai>=1.99.9,<1.100.0"]
