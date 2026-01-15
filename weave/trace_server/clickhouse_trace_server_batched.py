@@ -837,9 +837,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         for col in columns:
             cq.add_field(col)
         if req.filter is not None:
-            cq.set_hardcoded_filter(
-                HardCodedFilter(filter=req.filter)
-            )
+            cq.set_hardcoded_filter(HardCodedFilter(filter=req.filter))
         if req.query is not None:
             cq.add_condition(req.query.expr_)
 
