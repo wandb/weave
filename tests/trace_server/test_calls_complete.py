@@ -1,5 +1,6 @@
 import base64
 import datetime
+import json
 import uuid
 from typing import Any
 
@@ -13,9 +14,8 @@ from weave.trace_server.calls_query_builder.utils import param_slot
 from weave.trace_server.clickhouse_trace_server_batched import (
     _end_call_for_insert_to_ch_insertable_end_call,
 )
-from weave.trace_server.errors import CallsCompleteModeRequired
 from weave.trace_server.orm import ParamBuilder
-from weave.trace_server.project_version.types import CallsStorageServerMode
+from weave.trace_server.project_version.types import CallsStorageServerMode, ReadTable
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer
 
 
@@ -60,25 +60,185 @@ def _count_project_rows(ch_client, table: str, project_id: str) -> int:
     return ch_client.query(query, parameters=pb.get_params()).result_rows[0][0]
 
 
-def _insert_merged_call(ch_client, project_id: str) -> None:
+def _insert_merged_call(ch_client, project_id: str, call_id: str | None = None) -> str:
     """Insert a minimal row into calls_merged for residence setup.
 
     Args:
         ch_client: ClickHouse client instance.
         project_id (str): Internal project ID.
+        call_id (str | None): Call ID to insert (generated if None).
 
     Returns:
-        None
+        str: The call ID inserted into calls_merged.
 
     Examples:
-        >>> _insert_merged_call(client, "proj")
+        >>> call_id = _insert_merged_call(client, "proj")
+        >>> call_id = _insert_merged_call(client, "proj", "call-id")
     """
+    call_id = call_id or str(uuid.uuid4())
     ch_client.command(
         f"""
-        INSERT INTO calls_merged (project_id, id, op_name, started_at, trace_id, parent_id)
-        VALUES ('{project_id}', '{uuid.uuid4()}', 'test_op', now(), '{uuid.uuid4()}', '')
+        INSERT INTO calls_merged (
+            project_id,
+            id,
+            op_name,
+            started_at,
+            trace_id,
+            parent_id,
+            attributes_dump,
+            inputs_dump,
+            output_dump,
+            summary_dump
+        )
+        VALUES (
+            '{project_id}',
+            '{call_id}',
+            'test_op',
+            now(),
+            '{uuid.uuid4()}',
+            '',
+            '{{}}',
+            '{{}}',
+            'null',
+            '{{}}'
+        )
         """
     )
+    return call_id
+
+
+def _fetch_call_row(
+    ch_client,
+    table: str,
+    project_id: str,
+    call_id: str,
+    columns: list[str],
+) -> tuple[Any, ...] | None:
+    """Fetch a single call row from ClickHouse."""
+    pb = ParamBuilder()
+    project_param = pb.add_param(project_id)
+    call_param = pb.add_param(call_id)
+    project_slot = param_slot(project_param, "String")
+    call_slot = param_slot(call_param, "String")
+    column_sql = ", ".join(columns)
+    query = f"""
+        SELECT {column_sql}
+        FROM {table}
+        WHERE project_id = {project_slot} AND id = {call_slot}
+        LIMIT 1
+        """
+    result = ch_client.query(query, parameters=pb.get_params()).result_rows
+    if not result:
+        return None
+    return result[0]
+
+
+def _fetch_call_dumps(
+    ch_client, table: str, project_id: str, call_id: str
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Fetch inputs/output dumps for a call from ClickHouse."""
+    row = _fetch_call_row(
+        ch_client, table, project_id, call_id, ["inputs_dump", "output_dump"]
+    )
+    if row is None:
+        return {}, {}
+    inputs_dump, output_dump = row
+    return json.loads(inputs_dump), json.loads(output_dump)
+
+
+def _fetch_call_ended_at(
+    ch_client, table: str, project_id: str, call_id: str
+) -> datetime.datetime | None:
+    """Fetch ended_at for a call from ClickHouse."""
+    row = _fetch_call_row(ch_client, table, project_id, call_id, ["ended_at"])
+    if row is None:
+        return None
+    return row[0]
+
+
+def _fetch_calls_stream(trace_server, project_id: str) -> list[tsi.CallSchema]:
+    """Fetch calls via calls_query_stream for a project.
+
+    Args:
+        trace_server: Trace server fixture to query.
+        project_id (str): External project ID.
+
+    Returns:
+        list[CallSchema]: Calls returned by the stream query.
+
+    Examples:
+        >>> calls = _fetch_calls_stream(server, "entity/project")
+    """
+    return list(
+        trace_server.calls_query_stream(tsi.CallsQueryReq(project_id=project_id))
+    )
+
+
+def _find_call_by_id(
+    calls: list[tsi.CallSchema], call_id: str
+) -> tsi.CallSchema | None:
+    """Find a call by id from a list of calls.
+
+    Args:
+        calls (list[CallSchema]): Calls to search.
+        call_id (str): Call identifier.
+
+    Returns:
+        CallSchema | None: Matching call if present.
+
+    Examples:
+        >>> call = _find_call_by_id(calls, "call-id")
+    """
+    return next((call for call in calls if call.id == call_id), None)
+
+
+def _fetch_call_row(
+    ch_client,
+    table: str,
+    project_id: str,
+    call_id: str,
+    columns: list[str],
+) -> tuple[Any, ...] | None:
+    """Fetch a single call row from ClickHouse."""
+    pb = ParamBuilder()
+    project_param = pb.add_param(project_id)
+    call_param = pb.add_param(call_id)
+    project_slot = param_slot(project_param, "String")
+    call_slot = param_slot(call_param, "String")
+    column_sql = ", ".join(columns)
+    query = f"""
+        SELECT {column_sql}
+        FROM {table}
+        WHERE project_id = {project_slot} AND id = {call_slot}
+        LIMIT 1
+        """
+    result = ch_client.query(query, parameters=pb.get_params()).result_rows
+    if not result:
+        return None
+    return result[0]
+
+
+def _fetch_call_dumps(
+    ch_client, table: str, project_id: str, call_id: str
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Fetch inputs/output dumps for a call from ClickHouse."""
+    row = _fetch_call_row(
+        ch_client, table, project_id, call_id, ["inputs_dump", "output_dump"]
+    )
+    if row is None:
+        return {}, {}
+    inputs_dump, output_dump = row
+    return json.loads(inputs_dump), json.loads(output_dump)
+
+
+def _fetch_call_ended_at(
+    ch_client, table: str, project_id: str, call_id: str
+) -> datetime.datetime | None:
+    """Fetch ended_at for a call from ClickHouse."""
+    row = _fetch_call_row(ch_client, table, project_id, call_id, ["ended_at"])
+    if row is None:
+        return None
+    return row[0]
 
 
 def _make_completed_call(
@@ -132,7 +292,7 @@ def _make_completed_call(
     [
         ("calls_complete_empty", 0, 0, 1, 0),
         ("calls_complete_only", 1, 0, 2, 0),
-        ("calls_complete_merged_only", 0, 1, 0, 1),
+        ("calls_complete_merged_only", 0, 1, 1, 0),
     ],
 )
 def test_calls_complete_routing_by_residence(
@@ -147,19 +307,25 @@ def test_calls_complete_routing_by_residence(
     """Validate calls_complete routing for empty/complete/merged projects."""
     project_id = f"{TEST_ENTITY}/{project_suffix}"
     internal_project_id = b64(project_id)
+    seed_call_ids: list[str] = []
+    merged_call_ids: list[str] = []
     for _ in range(seed_merged):
-        _insert_merged_call(clickhouse_trace_server.ch_client, internal_project_id)
+        merged_call_ids.append(
+            _insert_merged_call(clickhouse_trace_server.ch_client, internal_project_id)
+        )
     for _ in range(seed_complete):
+        seed_call_id = str(uuid.uuid4())
         seed_call = _make_completed_call(
             project_id,
-            str(uuid.uuid4()),
+            seed_call_id,
             str(uuid.uuid4()),
             datetime.datetime.now(),
             datetime.datetime.now() + datetime.timedelta(seconds=1),
         )
+        seed_call_ids.append(seed_call_id)
         trace_server.calls_complete(tsi.CallsUpsertCompleteReq(batch=[seed_call]))
 
-    started_at = datetime.datetime.now()
+    started_at = datetime.datetime.now(datetime.timezone.utc)
     ended_at = started_at + datetime.timedelta(seconds=1)
     call = _make_completed_call(
         project_id,
@@ -182,21 +348,35 @@ def test_calls_complete_routing_by_residence(
         )
         == expected_parts
     )
+    read_table = clickhouse_trace_server.table_routing_resolver.resolve_read_table(
+        internal_project_id,
+        clickhouse_trace_server.ch_client,
+    )
+    if read_table == ReadTable.CALLS_MERGED:
+        expected_call_ids = set(merged_call_ids)
+    else:
+        expected_call_ids = {call.id, *seed_call_ids}
+
+    calls = _fetch_calls_stream(trace_server, project_id)
+    assert len(calls) == len(expected_call_ids)
+    assert {call.id for call in calls} == expected_call_ids
 
 
 def test_calls_complete_converts_data_uri_inputs_and_outputs(
     trace_server, clickhouse_trace_server
 ):
     project_id = f"{TEST_ENTITY}/calls_complete_base64"
+    internal_project_id = b64(project_id)
     raw_bytes = b"a" * (AUTO_CONVERSION_MIN_SIZE + 10)
     b64_data = base64.b64encode(raw_bytes).decode("ascii")
     data_uri = f"data:image/png;base64,{b64_data}"
 
-    started_at = datetime.datetime.now()
+    started_at = datetime.datetime.now(datetime.timezone.utc)
     ended_at = started_at + datetime.timedelta(seconds=1)
+    call_id = str(uuid.uuid4())
     call = _make_completed_call(
         project_id,
-        str(uuid.uuid4()),
+        call_id,
         str(uuid.uuid4()),
         started_at,
         ended_at,
@@ -206,11 +386,19 @@ def test_calls_complete_converts_data_uri_inputs_and_outputs(
 
     trace_server.calls_complete(tsi.CallsUpsertCompleteReq(batch=[call]))
 
-    res = trace_server.calls_query(tsi.CallsQueryReq(project_id=project_id))
-    assert len(res.calls) == 1
-    returned_call = res.calls[0]
-    assert returned_call.inputs["image"]["_type"] == "CustomWeaveType"
-    assert returned_call.output["image"]["_type"] == "CustomWeaveType"
+    inputs_dump, output_dump = _fetch_call_dumps(
+        clickhouse_trace_server.ch_client,
+        "calls_complete",
+        internal_project_id,
+        call_id,
+    )
+    assert inputs_dump["image"]["_type"] == "CustomWeaveType"
+    assert output_dump["image"]["_type"] == "CustomWeaveType"
+    calls = _fetch_calls_stream(trace_server, project_id)
+    assert len(calls) == 1
+    call = calls[0]
+    assert call.inputs["image"]["_type"] == "CustomWeaveType"
+    assert call.output["image"]["_type"] == "CustomWeaveType"
 
 
 def test_call_start_end_v2_updates_calls_complete(
@@ -226,7 +414,7 @@ def test_call_start_end_v2_updates_calls_complete(
     )
     trace_server.calls_complete(tsi.CallsUpsertCompleteReq(batch=[seed_call]))
 
-    started_at = datetime.datetime.now()
+    started_at = datetime.datetime.now(datetime.timezone.utc)
     call_id = str(uuid.uuid4())
     trace_id = str(uuid.uuid4())
     trace_server.call_start_v2(
@@ -270,22 +458,27 @@ def test_call_start_end_v2_updates_calls_complete(
         )
         == 2
     )
-    res = trace_server.calls_query(
-        tsi.CallsQueryReq(
-            project_id=project_id,
-            filter=tsi.CallsFilter(call_ids=[call_id]),
-        )
+    updated_ended_at = _fetch_call_ended_at(
+        clickhouse_trace_server.ch_client,
+        "calls_complete",
+        internal_project_id,
+        call_id,
     )
-    assert res.calls[0].ended_at == ended_at
+    assert updated_ended_at == ended_at.replace(tzinfo=None)
+    calls = _fetch_calls_stream(trace_server, project_id)
+    assert len(calls) == 2
+    updated_call = _find_call_by_id(calls, call_id)
+    assert updated_call is not None
+    assert updated_call.ended_at == ended_at
 
 
-def test_call_start_end_v2_falls_back_to_merged(trace_server, clickhouse_trace_server):
+def test_call_start_end_v2_writes_calls_complete(trace_server, clickhouse_trace_server):
     project_id = f"{TEST_ENTITY}/calls_complete_v2_merged"
     internal_project_id = b64(project_id)
-    _insert_merged_call(clickhouse_trace_server.ch_client, internal_project_id)
 
-    started_at = datetime.datetime.now()
+    started_at = datetime.datetime.now(datetime.timezone.utc)
     call_id = str(uuid.uuid4())
+    _insert_merged_call(clickhouse_trace_server.ch_client, internal_project_id, call_id)
     trace_id = str(uuid.uuid4())
     trace_server.call_start_v2(
         tsi.CallStartV2Req(
@@ -316,48 +509,86 @@ def test_call_start_end_v2_falls_back_to_merged(trace_server, clickhouse_trace_s
         _count_project_rows(
             clickhouse_trace_server.ch_client, "calls_complete", internal_project_id
         )
-        == 0
+        == 1
     )
-    res = trace_server.calls_query(
-        tsi.CallsQueryReq(
-            project_id=project_id,
-            filter=tsi.CallsFilter(call_ids=[call_id]),
-        )
+    ended_at = _fetch_call_ended_at(
+        clickhouse_trace_server.ch_client,
+        "calls_complete",
+        internal_project_id,
+        call_id,
     )
-    assert res.calls[0].ended_at is not None
+    assert ended_at is not None
+    read_table = clickhouse_trace_server.table_routing_resolver.resolve_read_table(
+        internal_project_id,
+        clickhouse_trace_server.ch_client,
+    )
+    expected_call_ids = {call_id}
+    calls = _fetch_calls_stream(trace_server, project_id)
+    assert len(calls) == len(expected_call_ids)
+    assert {call.id for call in calls} == expected_call_ids
+    if read_table == ReadTable.CALLS_COMPLETE:
+        assert calls[0].ended_at is not None
 
 
 def test_call_start_and_end_require_calls_complete_mode(
     trace_server, clickhouse_trace_server
 ):
     project_id = f"{TEST_ENTITY}/calls_complete_v1_start"
-    with pytest.raises(CallsCompleteModeRequired):
-        trace_server.call_start(
-            tsi.CallStartReq(
-                start=tsi.StartedCallSchemaForInsert(
-                    project_id=project_id,
-                    id=str(uuid.uuid4()),
-                    trace_id=str(uuid.uuid4()),
-                    op_name="test_op",
-                    started_at=datetime.datetime.now(),
-                    attributes={},
-                    inputs={},
-                )
+    internal_project_id = b64(project_id)
+    trace_server.call_start(
+        tsi.CallStartReq(
+            start=tsi.StartedCallSchemaForInsert(
+                project_id=project_id,
+                id=str(uuid.uuid4()),
+                trace_id=str(uuid.uuid4()),
+                op_name="test_op",
+                started_at=datetime.datetime.now(),
+                attributes={},
+                inputs={},
             )
         )
+    )
+    assert (
+        _count_project_rows(
+            clickhouse_trace_server.ch_client, "calls_complete", internal_project_id
+        )
+        == 0
+    )
+    assert (
+        _count_project_rows(
+            clickhouse_trace_server.ch_client, "calls_merged", internal_project_id
+        )
+        == 1
+    )
+    calls = _fetch_calls_stream(trace_server, project_id)
+    assert len(calls) == 1
 
     end_project_id = f"{TEST_ENTITY}/calls_complete_v1_end"
-    with pytest.raises(CallsCompleteModeRequired):
-        trace_server.call_end(
-            tsi.CallEndReq(
-                end=tsi.EndedCallSchemaForInsert(
-                    project_id=end_project_id,
-                    id=str(uuid.uuid4()),
-                    ended_at=datetime.datetime.now(),
-                    summary={"usage": {}, "status_counts": {}},
-                )
+    end_internal_project_id = b64(end_project_id)
+    trace_server.call_end(
+        tsi.CallEndReq(
+            end=tsi.EndedCallSchemaForInsert(
+                project_id=end_project_id,
+                id=str(uuid.uuid4()),
+                ended_at=datetime.datetime.now(),
+                summary={"usage": {}, "status_counts": {}},
             )
         )
+    )
+    assert (
+        _count_project_rows(
+            clickhouse_trace_server.ch_client, "calls_complete", end_internal_project_id
+        )
+        == 0
+    )
+    assert (
+        _count_project_rows(
+            clickhouse_trace_server.ch_client, "calls_merged", end_internal_project_id
+        )
+        == 1
+    )
+    calls = _fetch_calls_stream(trace_server, end_project_id)
+    assert len(calls) == 0
 
 
 @pytest.mark.parametrize(
@@ -391,8 +622,29 @@ def test_calls_query_routing_by_residence(
         )
         trace_server.calls_complete(tsi.CallsUpsertCompleteReq(batch=[call]))
 
-    result = trace_server.calls_query(tsi.CallsQueryReq(project_id=project_id))
-    assert len(result.calls) == expected_count
+    read_table = clickhouse_trace_server.table_routing_resolver.resolve_read_table(
+        internal_project_id,
+        clickhouse_trace_server.ch_client,
+    )
+    if seed_complete:
+        assert read_table == ReadTable.CALLS_COMPLETE
+    elif seed_merged:
+        assert read_table == ReadTable.CALLS_MERGED
+    else:
+        assert read_table == ReadTable.CALLS_COMPLETE
+
+    if read_table == ReadTable.CALLS_COMPLETE:
+        table = "calls_complete"
+    else:
+        table = "calls_merged"
+    assert (
+        _count_project_rows(
+            clickhouse_trace_server.ch_client, table, internal_project_id
+        )
+        == expected_count
+    )
+    calls = _fetch_calls_stream(trace_server, project_id)
+    assert len(calls) == expected_count
 
 
 def test_update_call_end_in_calls_complete_requires_started_at(
@@ -400,7 +652,7 @@ def test_update_call_end_in_calls_complete_requires_started_at(
 ):
     """Ensure calls_complete update rejects missing started_at."""
     end_req = tsi.EndedCallSchemaForInsert(
-        project_id="project",
+        project_id=b64("project"),
         id=str(uuid.uuid4()),
         ended_at=datetime.datetime.now(),
         summary={"usage": {}, "status_counts": {}},

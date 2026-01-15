@@ -148,7 +148,7 @@ from weave.trace_server.project_query_builder import make_project_stats_query
 from weave.trace_server.project_version.project_version import (
     TableRoutingResolver,
 )
-from weave.trace_server.project_version.types import WriteTarget
+from weave.trace_server.project_version.types import WriteSourceVersion, WriteTarget
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 from weave.trace_server.table_query_builder import (
     ROW_ORDER_COLUMN_NAME,
@@ -538,7 +538,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         # Check write target - v1 call_start cannot write to calls_complete
         write_target = self.table_routing_resolver.resolve_write_target(
-            ch_call.project_id, self.ch_client
+            ch_call.project_id,
+            self.ch_client,
+            write_source=WriteSourceVersion.V1,
         )
         if write_target == WriteTarget.CALLS_COMPLETE:
             raise CallsCompleteModeRequired(ch_call.project_id)
@@ -567,7 +569,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         # Check write target - v1 call_end cannot write to calls_complete
         write_target = self.table_routing_resolver.resolve_write_target(
-            ch_call.project_id, self.ch_client
+            ch_call.project_id,
+            self.ch_client,
+            write_source=WriteSourceVersion.V1,
         )
         if write_target == WriteTarget.CALLS_COMPLETE:
             raise CallsCompleteModeRequired(ch_call.project_id)
@@ -615,7 +619,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             # is here for technical correctness, in case we relax project_id target
             # constraints intra-batch
             write_target = self.table_routing_resolver.resolve_write_target(
-                complete_call.project_id, self.ch_client
+                complete_call.project_id,
+                self.ch_client,
+                write_source=WriteSourceVersion.V2,
             )
 
             ch_call = _complete_call_to_ch_insertable(complete_call)
@@ -636,7 +642,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         ch_start = _start_call_for_insert_to_ch_insertable_start_call(start_req.start)
 
         write_target = self.table_routing_resolver.resolve_write_target(
-            ch_start.project_id, self.ch_client
+            ch_start.project_id,
+            self.ch_client,
+            write_source=WriteSourceVersion.V2,
         )
         if write_target == WriteTarget.CALLS_COMPLETE:
             ch_complete_start = _start_call_insertable_to_complete_start(ch_start)
@@ -660,16 +668,18 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             CallEndV2Res: Empty response on success.
         """
         req = process_call_req_to_content(req, self)
-        ch_end = _end_call_for_insert_to_ch_insertable_end_call(req.end)
 
         write_target = self.table_routing_resolver.resolve_write_target(
-            req.end.project_id, self.ch_client
+            req.end.project_id,
+            self.ch_client,
+            write_source=WriteSourceVersion.V2,
         )
 
         # If writing to calls_complete, perform lightweight UPDATE
         if write_target == WriteTarget.CALLS_COMPLETE:
-            self._update_call_end_in_calls_complete(ch_end)
+            self._update_call_end_in_calls_complete(req.end)
         elif write_target == WriteTarget.CALLS_MERGED:
+            ch_end = _end_call_for_insert_to_ch_insertable_end_call(req.end)
             self._insert_call(ch_end)
             if self._flush_immediately:
                 self._flush_calls()
@@ -679,42 +689,49 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     @ddtrace.tracer.wrap(
         name="clickhouse_trace_server_batched._update_call_end_in_calls_complete"
     )
-    def _update_call_end_in_calls_complete(self, ch_end: CallEndCHInsertable) -> None:
+    def _update_call_end_in_calls_complete(
+        self, end_call: tsi.EndedCallSchemaForInsertWithStartedAt
+    ) -> None:
         """Update a call's end data in the calls_complete table using lightweight UPDATE.
 
         This is used for eager ops where the call start was written via call_start_v2
         and the end arrives separately via call_end_v2.
 
         Args:
-            ch_end: The end call data to update (must have started_at set for efficient queries).
+            end_call: The end call data to update (requires started_at for efficient queries).
 
         Raises:
             ValueError: If started_at is not set on ch_end.
         """
-        if ch_end.started_at is None:
+        if end_call.started_at is None:
             raise ValueError(
                 "started_at is required for _update_call_end_in_calls_complete"
             )
 
         table_name = self._get_calls_complete_table_name()
 
+        output = end_call.output
+        output_refs = extract_refs_from_values(output)
+        output_dump = _any_value_to_dump(output)
+        summary_dump = _dict_value_to_dump(dict(end_call.summary))
+
         # Convert datetimes to microseconds since epoch for DateTime64(6) parameters.
         # clickhouse-connect truncates datetime objects to seconds when passing as params,
         # but DateTime64(6) requires microsecond precision for exact matching. This is a
         # hack, not sure why inserting a json dump and passing an explicit param differ
-        started_at_us = _datetime_to_microseconds(ch_end.started_at)
-        ended_at_us = _datetime_to_microseconds(ch_end.ended_at)
+        started_at_us = _datetime_to_microseconds(end_call.started_at)
+        ended_at_us = _datetime_to_microseconds(end_call.ended_at)
 
         pb = ParamBuilder()
-        project_id_param = pb.add_param(ch_end.project_id)
-        id_param = pb.add_param(ch_end.id)
+        project_id_param = pb.add_param(end_call.project_id)
+        id_param = pb.add_param(end_call.id)
         started_at_param = pb.add_param(started_at_us)
         ended_at_param = pb.add_param(ended_at_us)
-        exception_param = pb.add_param(ch_end.exception)
-        output_dump_param = pb.add_param(ch_end.output_dump)
-        summary_dump_param = pb.add_param(ch_end.summary_dump)
-        output_refs_param = pb.add_param(ch_end.output_refs)
-        wb_run_step_end_param = pb.add_param(ch_end.wb_run_step_end)
+        exception_param = pb.add_param(end_call.exception)
+        output_dump_param = pb.add_param(output_dump)
+        summary_dump_param = pb.add_param(summary_dump)
+        output_refs_param = pb.add_param(output_refs)
+        wb_run_step_end_param = pb.add_param(end_call.wb_run_step_end)
 
         query = build_calls_complete_update_end_query(
             table_name=table_name,
@@ -5574,7 +5591,9 @@ def _any_value_to_dump(
     return json.dumps(value)
 
 
-def _dict_dump_to_dict(val: str) -> dict[str, Any]:
+def _dict_dump_to_dict(val: str | None) -> dict[str, Any]:
+    if val is None or val == "" or val == "null":
+        return {}
     res = json.loads(val)
     if not isinstance(res, dict):
         raise TypeError(f"Value is not a dict: {val}")
