@@ -182,9 +182,6 @@ class EndedCallSchemaForInsert(BaseModel):
     project_id: str
     id: str
 
-    # Start time is optional but can improve query performance when provided
-    started_at: datetime.datetime | None = None
-
     # End time is required
     ended_at: datetime.datetime
 
@@ -203,6 +200,12 @@ class EndedCallSchemaForInsert(BaseModel):
     @field_serializer("summary")
     def serialize_typed_dicts(self, v: dict[str, Any]) -> dict[str, Any]:
         return dict(v)
+
+
+class EndedCallSchemaForInsertWithStartedAt(EndedCallSchemaForInsert):
+    """Ended call schema with required started_at for v2 end updates."""
+
+    started_at: datetime.datetime
 
 
 class CompletedCallSchemaForInsert(BaseModel):
@@ -250,7 +253,7 @@ class CompletedCallSchemaForInsert(BaseModel):
 
     def split_to_start_and_end(
         self,
-    ) -> tuple["StartedCallSchemaForInsert", "EndedCallSchemaForInsert"]:
+    ) -> tuple["StartedCallSchemaForInsert", "EndedCallSchemaForInsertWithStartedAt"]:
         """Split into separate start and end schemas for legacy table format."""
         start = StartedCallSchemaForInsert(
             project_id=self.project_id,
@@ -270,7 +273,7 @@ class CompletedCallSchemaForInsert(BaseModel):
             wb_run_step=self.wb_run_step,
         )
 
-        end = EndedCallSchemaForInsert(
+        end = EndedCallSchemaForInsertWithStartedAt(
             project_id=self.project_id,
             id=self.id,
             started_at=self.started_at,
@@ -382,19 +385,6 @@ class CallCreateBatchRes(BaseModel):
     res: list[CallStartRes | CallEndRes]
 
 
-class CallCompleteReq(BaseModelStrict):
-    """Request to insert a single complete call."""
-
-    complete: CompletedCallSchemaForInsert
-
-
-class CallCompleteRes(BaseModel):
-    """Response for inserting a single complete call."""
-
-    id: str
-    trace_id: str
-
-
 class CallsUpsertCompleteReq(BaseModel):
     """Request for upserting a batch of completed calls."""
 
@@ -423,10 +413,7 @@ class CallStartV2Res(BaseModel):
 class CallEndV2Req(BaseModelStrict):
     """Request for ending a single call via v2 API."""
 
-    end: EndedCallSchemaForInsert
-
-    # Required for v2 API to enable efficient UPDATE queries in calls_complete
-    started_at: datetime.datetime
+    end: EndedCallSchemaForInsertWithStartedAt
 
 
 class CallEndV2Res(BaseModel):
