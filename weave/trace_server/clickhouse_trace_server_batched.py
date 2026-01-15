@@ -37,6 +37,15 @@ from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_common as tsc
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.actions_worker.dispatcher import execute_batch
+from weave.trace_server.annotation_queues_query_builder import (
+    make_queue_add_calls_check_duplicates_query,
+    make_queue_add_calls_fetch_calls_query,
+    make_queue_create_query,
+    make_queue_items_query,
+    make_queue_read_query,
+    make_queues_query,
+    make_queues_stats_query,
+)
 from weave.trace_server.base64_content_conversion import (
     process_call_req_to_content,
 )
@@ -67,6 +76,7 @@ from weave.trace_server.clickhouse_schema import (
     ObjRefListType,
     SelectableCHObjSchema,
 )
+from weave.trace_server.common_interface import AnnotationQueueItemsFilter
 from weave.trace_server.constants import (
     COMPLETIONS_CREATE_OP_NAME,
     IMAGE_GENERATION_CREATE_OP_NAME,
@@ -270,6 +280,39 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self._table_routing_resolver = TableRoutingResolver()
         return self._table_routing_resolver
 
+    @property
+    def use_distributed_mode(self) -> bool:
+        """Check if ClickHouse is configured to use distributed tables.
+
+        Returns the value from WF_CLICKHOUSE_USE_DISTRIBUTED_TABLES environment variable.
+
+        Returns:
+            bool: True if using distributed tables, False otherwise.
+        """
+        return wf_env.wf_clickhouse_use_distributed_tables()
+
+    @property
+    def clickhouse_cluster_name(self) -> str | None:
+        """Get the ClickHouse cluster name from environment.
+
+        Returns:
+            str | None: The cluster name from WF_CLICKHOUSE_REPLICATED_CLUSTER, or None if not set.
+        """
+        return wf_env.wf_clickhouse_replicated_cluster()
+
+    def _get_calls_complete_table_name(self) -> str:
+        """Get the appropriate table name for calls_complete updates.
+
+        In distributed mode, UPDATE statements must target the local table
+        (with LOCAL_TABLE_SUFFIX) instead of the distributed table.
+
+        Returns:
+            str: Table name to use for UPDATE statements.
+        """
+        if self.use_distributed_mode:
+            return f"calls_complete{ch_settings.LOCAL_TABLE_SUFFIX}"
+        return "calls_complete"
+
     def _noop_project_version_latency_test(self, project_id: str) -> None:
         # NOOP for testing latency impact of project switcher
         try:
@@ -445,7 +488,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.kafka_producer.flush")
     def _flush_kafka_producer(self) -> None:
-        self.kafka_producer.flush()
+        if wf_env.wf_enable_online_eval():
+            self.kafka_producer.flush()
 
     @contextmanager
     def call_batch(self) -> Iterator[None]:
@@ -606,6 +650,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         # We put summary_dump last so that when we compute the costs and summary its in the right place
         if req.include_costs:
+            set_current_span_dd_tags({"include_costs": "true"})
             summary_columns = ["summary", "summary_dump"]
             columns = [
                 *[col for col in columns if col not in summary_columns],
@@ -643,6 +688,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         select_columns = [c.field for c in cq.select_fields]
         expand_columns = req.expand_columns or []
         include_feedback = req.include_feedback or False
+
+        if include_feedback:
+            set_current_span_dd_tags({"include_feedback": "true"})
+        if expand_columns:
+            set_current_span_dd_tags({"expand_columns": "true"})
 
         def row_to_call_schema_dict(row: tuple[Any, ...]) -> dict[str, Any]:
             return _ch_call_dict_to_call_schema_dict(
@@ -1486,6 +1536,451 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 p50_turn_duration_ms=p50_turn_duration_ms,
                 p99_turn_duration_ms=p99_turn_duration_ms,
             )
+
+    # Annotation Queue API
+    def annotation_queue_create(
+        self, req: tsi.AnnotationQueueCreateReq
+    ) -> tsi.AnnotationQueueCreateRes:
+        """Create a new annotation queue."""
+        assert_non_null_wb_user_id(req)
+        pb = ParamBuilder()
+
+        # Generate UUIDv7 for the queue
+        queue_id = generate_id()
+
+        # Get wb_user_id from request (should be set by auth layer)
+        created_by = req.wb_user_id
+        assert created_by is not None  # Ensured by assert_non_null_wb_user_id
+
+        # Build and execute INSERT query
+        query = make_queue_create_query(
+            project_id=req.project_id,
+            queue_id=queue_id,
+            name=req.name,
+            description=req.description,
+            scorer_refs=req.scorer_refs,
+            created_by=created_by,
+            pb=pb,
+        )
+
+        self.ch_client.command(query, parameters=pb.get_params())
+
+        return tsi.AnnotationQueueCreateRes(id=queue_id)
+
+    def annotation_queues_query_stream(
+        self, req: tsi.AnnotationQueuesQueryReq
+    ) -> Iterator[tsi.AnnotationQueueSchema]:
+        """Stream annotation queues for a project."""
+        pb = ParamBuilder()
+
+        query = make_queues_query(
+            project_id=req.project_id,
+            pb=pb,
+            name=req.name,
+            sort_by=req.sort_by,
+            limit=req.limit,
+            offset=req.offset,
+        )
+
+        # Stream the results using _query_stream
+        raw_res = self._query_stream(query, pb.get_params())
+
+        for row in raw_res:
+            (
+                queue_id,
+                project_id,
+                name,
+                description,
+                scorer_refs,
+                created_at,
+                created_by,
+                updated_at,
+                deleted_at,
+            ) = row
+
+            # Ensure datetimes have timezone info
+            created_at_with_tz = _ensure_datetimes_have_tz(created_at)
+            updated_at_with_tz = _ensure_datetimes_have_tz(updated_at)
+            deleted_at_with_tz = _ensure_datetimes_have_tz(deleted_at)
+
+            if created_at_with_tz is None or updated_at_with_tz is None:
+                # Skip queues without valid timestamps
+                continue
+
+            yield tsi.AnnotationQueueSchema(
+                id=str(queue_id),  # Convert UUID to string
+                project_id=project_id,
+                name=name,
+                description=description,
+                scorer_refs=scorer_refs,
+                created_at=created_at_with_tz,
+                created_by=created_by,
+                updated_at=updated_at_with_tz,
+                deleted_at=deleted_at_with_tz,
+            )
+
+    def annotation_queue_read(
+        self, req: tsi.AnnotationQueueReadReq
+    ) -> tsi.AnnotationQueueReadRes:
+        """Read a specific annotation queue."""
+        pb = ParamBuilder()
+
+        query = make_queue_read_query(
+            project_id=req.project_id,
+            queue_id=req.queue_id,
+            pb=pb,
+        )
+
+        result = self.ch_client.query(query, parameters=pb.get_params())
+        rows = result.named_results()
+
+        if not rows:
+            raise NotFoundError(f"Queue {req.queue_id} not found")
+
+        row = next(rows)
+        queue = tsi.AnnotationQueueSchema(
+            id=str(row["id"]),
+            project_id=row["project_id"],
+            name=row["name"],
+            description=row["description"],
+            scorer_refs=row["scorer_refs"],
+            created_at=_ensure_datetimes_have_tz(row["created_at"]),
+            created_by=row["created_by"],
+            updated_at=_ensure_datetimes_have_tz(row["updated_at"]),
+            deleted_at=_ensure_datetimes_have_tz(row["deleted_at"]),
+        )
+
+        return tsi.AnnotationQueueReadRes(queue=queue)
+
+    def annotation_queue_add_calls(
+        self, req: tsi.AnnotationQueueAddCallsReq
+    ) -> tsi.AnnotationQueueAddCallsRes:
+        """Add calls to an annotation queue in batch with duplicate prevention."""
+        assert_non_null_wb_user_id(req)
+        pb = ParamBuilder()
+
+        # Step 1: Check for existing calls (duplicate prevention)
+        dup_query = make_queue_add_calls_check_duplicates_query(
+            project_id=req.project_id,
+            queue_id=req.queue_id,
+            call_ids=req.call_ids,
+            pb=pb,
+        )
+
+        dup_result = self.ch_client.query(dup_query, parameters=pb.get_params())
+        existing_call_ids = {row[0] for row in dup_result.result_rows}
+        new_call_ids = [cid for cid in req.call_ids if cid not in existing_call_ids]
+
+        if not new_call_ids:
+            return tsi.AnnotationQueueAddCallsRes(
+                added_count=0, duplicates=len(req.call_ids)
+            )
+
+        # Step 2: Fetch call details for caching
+        pb2 = ParamBuilder()
+        calls_query = make_queue_add_calls_fetch_calls_query(
+            project_id=req.project_id,
+            call_ids=new_call_ids,
+            pb=pb2,
+        )
+
+        calls_result = self.ch_client.query(calls_query, parameters=pb2.get_params())
+        calls_data = list(calls_result.named_results())
+
+        if not calls_data:
+            # No calls found in database
+            return tsi.AnnotationQueueAddCallsRes(
+                added_count=0, duplicates=len(existing_call_ids)
+            )
+
+        # Step 3: Create queue items
+        queue_items_rows = []
+        added_by = req.wb_user_id
+
+        for call in calls_data:
+            queue_item_id = generate_id()
+
+            # Queue item row (must be tuple in column order)
+            queue_items_rows.append(
+                (
+                    queue_item_id,
+                    req.project_id,
+                    req.queue_id,
+                    call["id"],
+                    call["started_at"],
+                    call["ended_at"],
+                    call["op_name"] or "",
+                    call["trace_id"] or "",
+                    req.display_fields,
+                    added_by,
+                    added_by,
+                )
+            )
+
+        # Step 4: Batch insert queue items
+        self.ch_client.insert(
+            "annotation_queue_items",
+            queue_items_rows,
+            column_names=[
+                "id",
+                "project_id",
+                "queue_id",
+                "call_id",
+                "call_started_at",
+                "call_ended_at",
+                "call_op_name",
+                "call_trace_id",
+                "display_fields",
+                "added_by",
+                "created_by",
+            ],
+        )
+
+        return tsi.AnnotationQueueAddCallsRes(
+            added_count=len(calls_data), duplicates=len(existing_call_ids)
+        )
+
+    def annotation_queue_items_query(
+        self, req: tsi.AnnotationQueueItemsQueryReq
+    ) -> tsi.AnnotationQueueItemsQueryRes:
+        """Query items in an annotation queue with pagination, sorting, and filtering."""
+        pb = ParamBuilder()
+
+        query = make_queue_items_query(
+            project_id=req.project_id,
+            queue_id=req.queue_id,
+            pb=pb,
+            filter=req.filter,
+            sort_by=req.sort_by,
+            limit=req.limit,
+            offset=req.offset,
+            include_position=req.include_position,
+        )
+
+        result = self.ch_client.query(query, parameters=pb.get_params())
+
+        items = []
+        for row in result.named_results():
+            items.append(
+                tsi.AnnotationQueueItemSchema(
+                    id=row["id"],
+                    project_id=row["project_id"],
+                    queue_id=row["queue_id"],
+                    call_id=row["call_id"],
+                    call_started_at=row["call_started_at"],
+                    call_ended_at=row["call_ended_at"],
+                    call_op_name=row["call_op_name"],
+                    call_trace_id=row["call_trace_id"],
+                    display_fields=row["display_fields"],
+                    added_by=row["added_by"],
+                    annotation_state=row["annotation_state"],
+                    created_at=row["created_at"],
+                    created_by=row["created_by"],
+                    updated_at=row["updated_at"],
+                    deleted_at=row["deleted_at"],
+                    position_in_queue=row.get("position_in_queue"),
+                    annotator_user_id=row.get("annotator_user_id"),
+                )
+            )
+
+        return tsi.AnnotationQueueItemsQueryRes(items=items)
+
+    def annotation_queues_stats(
+        self, req: tsi.AnnotationQueuesStatsReq
+    ) -> tsi.AnnotationQueuesStatsRes:
+        """Get stats for multiple annotation queues."""
+        if not req.queue_ids:
+            # Return empty stats if no queue IDs provided
+            return tsi.AnnotationQueuesStatsRes(stats=[])
+
+        pb = ParamBuilder()
+
+        query = make_queues_stats_query(
+            project_id=req.project_id,
+            queue_ids=req.queue_ids,
+            pb=pb,
+        )
+
+        result = self.ch_client.query(query, parameters=pb.get_params())
+
+        stats = []
+        for row in result.result_rows:
+            # Row order: queue_id, total_items, completed_items
+            queue_id, total_items, completed_items = row
+            stats.append(
+                tsi.AnnotationQueueStatsSchema(
+                    queue_id=str(queue_id),
+                    total_items=int(total_items),
+                    completed_items=int(completed_items),
+                )
+            )
+
+        return tsi.AnnotationQueuesStatsRes(stats=stats)
+
+    def annotator_queue_items_progress_update(
+        self, req: tsi.AnnotatorQueueItemsProgressUpdateReq
+    ) -> tsi.AnnotatorQueueItemsProgressUpdateRes:
+        """Update annotation state for a queue item using ClickHouse lightweight update.
+
+        Validates state transitions:
+        - Allowed: (absence) -> 'in_progress', 'completed' or 'skipped'
+        - Allowed: 'in_progress' -> 'completed' or 'skipped'
+        - Rejected: any other transition (including updating to 'in_progress' when record exists)
+        """
+        # Validate annotation_state
+        allowed_states = {"completed", "skipped", "in_progress"}
+        if req.annotation_state not in allowed_states:
+            raise ValueError(
+                f"Invalid annotation_state '{req.annotation_state}'. "
+                f"Must be one of: {', '.join(sorted(allowed_states))}"
+            )
+
+        # Get the annotator ID from the session
+        annotator_id = req.wb_user_id
+        if not annotator_id:
+            raise ValueError("wb_user_id is required")
+
+        pb = ParamBuilder()
+        project_id_param = pb.add(req.project_id)
+        queue_id_param = pb.add(req.queue_id)
+        item_id_param = pb.add(req.item_id)
+        annotator_id_param = pb.add(annotator_id)
+
+        # First, check current state and validate the queue item exists
+        check_query = f"""
+        SELECT
+            annotation_state,
+            COUNT(*) as record_exists
+        FROM annotator_queue_items_progress
+        WHERE project_id = {project_id_param}
+          AND queue_item_id = {item_id_param}
+          AND annotator_id = {annotator_id_param}
+          AND deleted_at IS NULL
+        GROUP BY annotation_state
+        """
+
+        check_result = self.ch_client.query(check_query, parameters=pb.get_params())
+        current_state = None
+        has_record = False
+
+        for row in check_result.named_results():
+            current_state = row["annotation_state"]
+            has_record = row["record_exists"] > 0
+            break
+
+        # Special handling for 'in_progress': only allow when no record exists
+        if req.annotation_state == "in_progress" and has_record:
+            raise ValueError(
+                "Cannot transition to 'in_progress' when a record already exists. "
+                "'in_progress' can only be set on new items."
+            )
+
+        # Validate state transition for other states
+        # Record exists - only allow transition from 'in_progress' or 'unstarted'
+        if (
+            current_state is not None
+            and req.annotation_state != "in_progress"
+            and current_state not in ("in_progress", "unstarted")
+        ):
+            raise ValueError(
+                f"Invalid state transition from '{current_state}' to '{req.annotation_state}'. "
+                f"Only transitions from 'in_progress' or 'unstarted' are allowed."
+            )
+
+        # Also verify the queue item exists in annotation_queue_items
+        item_check_query = f"""
+        SELECT id
+        FROM annotation_queue_items
+        WHERE id = {item_id_param}
+          AND project_id = {project_id_param}
+          AND queue_id = {queue_id_param}
+          AND deleted_at IS NULL
+        LIMIT 1
+        """
+
+        item_check_result = self.ch_client.query(
+            item_check_query, parameters=pb.get_params()
+        )
+        if not list(item_check_result.named_results()):
+            raise ValueError(
+                f"Queue item '{req.item_id}' not found in queue '{req.queue_id}'"
+            )
+
+        new_state_param = pb.add(req.annotation_state)
+        now = datetime.datetime.now(datetime.timezone.utc)
+        now_param = pb.add(now)
+
+        if has_record:
+            # Use ClickHouse lightweight UPDATE for existing record
+            update_query = f"""
+            UPDATE annotator_queue_items_progress
+            SET
+                annotation_state = {new_state_param},
+                updated_at = {now_param}
+            WHERE project_id = {project_id_param}
+              AND queue_item_id = {item_id_param}
+              AND annotator_id = {annotator_id_param}
+              AND deleted_at IS NULL
+            """
+            self.ch_client.command(update_query, parameters=pb.get_params())
+        else:
+            # Create new record
+            progress_id = generate_id()
+            progress_id_param = pb.add(progress_id)
+
+            insert_query = f"""
+            INSERT INTO annotator_queue_items_progress
+                (id, project_id, queue_item_id, queue_id, annotator_id,
+                 annotation_state, created_at, updated_at, deleted_at)
+            VALUES
+                ({progress_id_param}, {project_id_param}, {item_id_param},
+                 {queue_id_param}, {annotator_id_param}, {new_state_param},
+                 {now_param}, {now_param}, NULL)
+            """
+            self.ch_client.command(insert_query, parameters=pb.get_params())
+
+        # Fetch and return the updated queue item
+        # We need to re-query to get the aggregated annotation_state
+        pb_fetch = ParamBuilder()
+        fetch_query = make_queue_items_query(
+            project_id=req.project_id,
+            queue_id=req.queue_id,
+            pb=pb_fetch,
+            filter=AnnotationQueueItemsFilter(id=req.item_id),
+            sort_by=None,
+            limit=1,
+            offset=None,
+            include_position=False,
+        )
+
+        fetch_result = self.ch_client.query(
+            fetch_query, parameters=pb_fetch.get_params()
+        )
+
+        for row in fetch_result.named_results():
+            item = tsi.AnnotationQueueItemSchema(
+                id=row["id"],
+                project_id=row["project_id"],
+                queue_id=row["queue_id"],
+                call_id=row["call_id"],
+                call_started_at=row["call_started_at"],
+                call_ended_at=row["call_ended_at"],
+                call_op_name=row["call_op_name"],
+                call_trace_id=row["call_trace_id"],
+                display_fields=row["display_fields"],
+                added_by=row["added_by"],
+                annotation_state=row["annotation_state"],
+                created_at=row["created_at"],
+                created_by=row["created_by"],
+                updated_at=row["updated_at"],
+                deleted_at=row["deleted_at"],
+                position_in_queue=None,
+                annotator_user_id=row.get("annotator_user_id"),
+            )
+            return tsi.AnnotatorQueueItemsProgressUpdateRes(item=item)
+
+        # This shouldn't happen if our logic is correct
+        raise ValueError(f"Failed to fetch updated item '{req.item_id}'")
 
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
         """Create an op object by delegating to obj_create.
@@ -4575,7 +5070,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     def _run_migrations(self) -> None:
         logger.info("Running migrations")
-        migrator = wf_migrator.ClickHouseTraceServerMigrator(self._mint_client())
+        migrator = wf_migrator.get_clickhouse_trace_server_migrator(
+            self._mint_client(),
+            replicated=wf_env.wf_clickhouse_replicated(),
+            replicated_path=wf_env.wf_clickhouse_replicated_path(),
+            replicated_cluster=wf_env.wf_clickhouse_replicated_cluster(),
+            use_distributed=wf_env.wf_clickhouse_use_distributed_tables(),
+        )
         migrator.apply_migrations(self._database)
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._query_stream")

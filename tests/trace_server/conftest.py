@@ -128,6 +128,10 @@ def get_ch_trace_server(
         host, port = next(ensure_clickhouse_db())
         db_suffix = _get_worker_db_suffix(request)
 
+        # Always add a test-specific suffix to prevent collision with other databases
+        if not db_suffix:
+            db_suffix = "_test"
+
         # Store original environment variable
         original_db = os.environ.get("WF_CLICKHOUSE_DATABASE")
         base_db = original_db or "default"
@@ -165,7 +169,7 @@ def get_ch_trace_server(
             def patched_run_migrations():
                 import weave.trace_server.clickhouse_trace_server_migrator as wf_migrator
 
-                migrator = wf_migrator.ClickHouseTraceServerMigrator(
+                migrator = wf_migrator.get_clickhouse_trace_server_migrator(
                     ch_server._mint_client(), management_db=management_db
                 )
                 migrator.apply_migrations(ch_server._database)

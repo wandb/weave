@@ -12,6 +12,7 @@ from typing_extensions import Self
 
 from weave.trace.env import weave_trace_server_url
 from weave.trace.settings import max_calls_queue_size, should_enable_disk_fallback
+from weave.trace_server import http_service_interface as his
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ids import generate_id
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
@@ -694,6 +695,100 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
     ) -> Iterator[tsi.ThreadSchema]:
         return self._generic_stream_request(
             "/threads/stream_query", req, tsi.ThreadsQueryReq, tsi.ThreadSchema
+        )
+
+    # Annotation Queue API
+    def annotation_queue_create(
+        self, req: tsi.AnnotationQueueCreateReq
+    ) -> tsi.AnnotationQueueCreateRes:
+        return self._generic_request(
+            "/annotation_queues",
+            req,
+            tsi.AnnotationQueueCreateReq,
+            tsi.AnnotationQueueCreateRes,
+        )
+
+    def annotation_queues_query_stream(
+        self, req: tsi.AnnotationQueuesQueryReq
+    ) -> Iterator[tsi.AnnotationQueueSchema]:
+        return self._generic_stream_request(
+            "/annotation_queues/query",
+            req,
+            tsi.AnnotationQueuesQueryReq,
+            tsi.AnnotationQueueSchema,
+        )
+
+    def annotation_queue_read(
+        self, req: tsi.AnnotationQueueReadReq
+    ) -> tsi.AnnotationQueueReadRes:
+        return self._generic_request(
+            f"/annotation_queues/{req.queue_id}",
+            req,
+            tsi.AnnotationQueueReadReq,
+            tsi.AnnotationQueueReadRes,
+            method="GET",
+            params={"project_id": req.project_id},
+        )
+
+    def annotation_queue_add_calls(
+        self, req: tsi.AnnotationQueueAddCallsReq
+    ) -> tsi.AnnotationQueueAddCallsRes:
+        # Convert to Body type to exclude queue_id from request body (it's in the URL path)
+        body = his.AnnotationQueueAddCallsBody(
+            project_id=req.project_id,
+            call_ids=req.call_ids,
+            display_fields=req.display_fields,
+        )
+        return self._generic_request(
+            f"/annotation_queues/{req.queue_id}/items",
+            body,
+            his.AnnotationQueueAddCallsBody,
+            tsi.AnnotationQueueAddCallsRes,
+        )
+
+    def annotation_queue_items_query(
+        self, req: tsi.AnnotationQueueItemsQueryReq
+    ) -> tsi.AnnotationQueueItemsQueryRes:
+        # Convert to Body type to exclude queue_id from request body (it's in the URL path)
+        body = his.AnnotationQueueItemsQueryBody(
+            project_id=req.project_id,
+            filter=req.filter,
+            sort_by=req.sort_by,
+            limit=req.limit,
+            offset=req.offset,
+            include_position=req.include_position,
+        )
+        return self._generic_request(
+            f"/annotation_queues/{req.queue_id}/items/query",
+            body,
+            his.AnnotationQueueItemsQueryBody,
+            tsi.AnnotationQueueItemsQueryRes,
+        )
+
+    def annotation_queues_stats(
+        self, req: tsi.AnnotationQueuesStatsReq
+    ) -> tsi.AnnotationQueuesStatsRes:
+        return self._generic_request(
+            "/annotation_queues/stats",
+            req,
+            tsi.AnnotationQueuesStatsReq,
+            tsi.AnnotationQueuesStatsRes,
+        )
+
+    def annotator_queue_items_progress_update(
+        self, req: tsi.AnnotatorQueueItemsProgressUpdateReq
+    ) -> tsi.AnnotatorQueueItemsProgressUpdateRes:
+        # Convert to Body type to exclude queue_id, item_id, and wb_user_id from request body
+        # (queue_id and item_id are in the URL path, wb_user_id is set server-side from auth)
+        body = his.AnnotationQueueItemProgressUpdateBody(
+            project_id=req.project_id,
+            annotation_state=req.annotation_state,
+        )
+        return self._generic_request(
+            f"/annotation_queues/{req.queue_id}/items/{req.item_id}/progress",
+            body,
+            his.AnnotationQueueItemProgressUpdateBody,
+            tsi.AnnotatorQueueItemsProgressUpdateRes,
         )
 
     def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
