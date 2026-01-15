@@ -13,6 +13,13 @@ class EndBatchItem(BaseModel):
     req: tsi.CallEndReq
 
 
+class CompleteBatchItem(BaseModel):
+    """A complete call ready to be sent to calls_complete endpoint."""
+
+    mode: str = "complete"
+    req: tsi.CompletedCallSchemaForInsert
+
+
 class Batch(BaseModel):
     batch: list[StartBatchItem | EndBatchItem]
 
@@ -20,3 +27,11 @@ class Batch(BaseModel):
 class ServerInfoRes(BaseModel):
     min_required_weave_python_version: str
     trace_server_version: str | None = None
+
+
+class EntityProjectInfo(BaseModel):
+    """Extracted entity and project information from a project_id."""
+
+    entity: str
+    project: str
+    project_id: str

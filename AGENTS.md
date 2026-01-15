@@ -221,6 +221,15 @@ npm run test
 - Add JSDoc comments for TypeScript code
 - Update this file when introducing new patterns or concepts
 
+### Calls Complete (V2 Calls Path)
+
+- The SDK can write complete calls in a single batch via `calls_complete` when `WEAVE_USE_CALLS_COMPLETE=true`.
+- Eager call starts (`@op(eager_call_start=True)`) send a v2 start immediately and a v2 end later for long-running ops.
+- Server-side routing now uses `CallsStorageServerMode.AUTO` by default:
+  - Reads/writes go to `calls_complete` for EMPTY/COMPLETE_ONLY/BOTH projects.
+  - MERGED_ONLY projects continue to use `calls_merged`.
+- For tests, `--calls-complete-only` forces routing to `calls_complete` via patched residence.
+
 ---
 
 ## Integration Patching

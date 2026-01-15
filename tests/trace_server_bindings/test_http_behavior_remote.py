@@ -6,6 +6,9 @@ status codes, and error handling specific to RemoteHTTPTraceServer.
 
 from __future__ import annotations
 
+import datetime
+import json
+import logging
 from types import MethodType
 from unittest.mock import MagicMock, patch
 
@@ -14,9 +17,19 @@ import pytest
 import tenacity
 from pydantic import ValidationError
 
-from tests.trace_server_bindings.conftest import generate_id, generate_start
+from tests.trace_server_bindings.conftest import (
+    generate_end,
+    generate_id,
+    generate_start,
+)
 from weave.trace.display.term import configure_logger
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server_bindings.async_batch_processor import NonRetryableBatchError
+from weave.trace_server_bindings.models import (
+    CompleteBatchItem,
+    EndBatchItem,
+    StartBatchItem,
+)
 from weave.trace_server_bindings.remote_http_trace_server import (
     RemoteHTTPTraceServer,
 )
@@ -63,6 +76,147 @@ def test_invalid_no_retry(unbatched_server):
     """Test that validation errors are not retried."""
     with pytest.raises(ValidationError):
         unbatched_server.call_start(tsi.CallStartReq(start={"invalid": "broken"}))
+
+
+@patch("weave.utils.http_requests.post")
+def test_calls_complete_batch_endpoint_and_payload(mock_post, monkeypatch):
+    """Send calls_complete batches to the v2 endpoint with correct payload."""
+    monkeypatch.setenv("WEAVE_USE_CALLS_COMPLETE", "true")
+    server = RemoteHTTPTraceServer("http://example.com", should_batch=True)
+
+    complete = tsi.CompletedCallSchemaForInsert(
+        project_id="entity/project",
+        id="call-id",
+        trace_id="trace-id",
+        op_name="test_op",
+        started_at=datetime.datetime.now(tz=datetime.timezone.utc),
+        ended_at=datetime.datetime.now(tz=datetime.timezone.utc),
+        attributes={"a": 1},
+        inputs={"b": 2},
+        output={"c": 3},
+        summary={"result": "ok"},
+    )
+    batch = [CompleteBatchItem(req=complete)]
+
+    mock_post.return_value = httpx.Response(
+        200,
+        json={},
+        request=httpx.Request("POST", "http://example.com"),
+    )
+
+    try:
+        server._flush_calls_complete(batch)
+    finally:
+        if server.call_processor:
+            server.call_processor.stop_accepting_new_work_and_flush_queue()
+        if server.feedback_processor:
+            server.feedback_processor.stop_accepting_new_work_and_flush_queue()
+
+    assert mock_post.call_count == 1
+    url = mock_post.call_args[0][0]
+    assert url == "http://example.com/v2/entity/project/calls/complete"
+    sent_data = mock_post.call_args[1]["data"]
+    payload = json.loads(sent_data.decode("utf-8"))
+    expected = tsi.CallsUpsertCompleteReq(batch=[complete]).model_dump(mode="json")
+    assert payload == expected
+
+
+@patch("weave.utils.http_requests.post")
+def test_eager_calls_use_v2_start_end_endpoints(mock_post):
+    """Use v2 endpoints for eager start/end and include started_at in end."""
+    server = RemoteHTTPTraceServer("http://example.com", should_batch=True)
+
+    start = generate_start(id="call-id", project_id="entity/project")
+    end = generate_end(id="call-id", project_id="entity/project")
+    end.started_at = end.ended_at - datetime.timedelta(seconds=1)
+
+    mock_post.side_effect = [
+        httpx.Response(200, request=httpx.Request("POST", "http://example.com")),
+        httpx.Response(200, request=httpx.Request("POST", "http://example.com")),
+    ]
+
+    try:
+        server._flush_calls_eager(
+            [
+                StartBatchItem(req=tsi.CallStartReq(start=start)),
+                EndBatchItem(req=tsi.CallEndReq(end=end)),
+            ]
+        )
+
+        urls = [call[0][0] for call in mock_post.call_args_list]
+        assert urls == [
+            "http://example.com/v2/entity/project/call/start",
+            "http://example.com/v2/entity/project/call/end",
+        ]
+
+        end_payload = json.loads(mock_post.call_args_list[1][1]["data"].decode("utf-8"))
+        started_at = datetime.datetime.fromisoformat(
+            end_payload["started_at"].replace("Z", "+00:00")
+        )
+        assert started_at == end.started_at
+        assert end_payload["end"]["id"] == "call-id"
+    finally:
+        if server.call_processor:
+            server.call_processor.stop_accepting_new_work_and_flush_queue()
+        if server.feedback_processor:
+            server.feedback_processor.stop_accepting_new_work_and_flush_queue()
+
+
+@pytest.mark.disable_logging_error_check
+def test_eager_non_retryable_error_drops_item(caplog):
+    """Drop eager items on non-retryable errors without raising."""
+    server = RemoteHTTPTraceServer("http://example.com", should_batch=True)
+    start = generate_start(id="call-id", project_id="entity/project")
+
+    def _raise_non_retryable(_: StartBatchItem) -> None:
+        raise httpx.HTTPStatusError(
+            "400",
+            request=httpx.Request("POST", "http://example.com"),
+            response=httpx.Response(
+                400, request=httpx.Request("POST", "http://example.com")
+            ),
+        )
+
+    server._send_call_start_v2 = _raise_non_retryable  # type: ignore[assignment]
+
+    caplog.set_level(logging.ERROR)
+    try:
+        server._flush_calls_eager([StartBatchItem(req=tsi.CallStartReq(start=start))])
+    finally:
+        if server.call_processor:
+            server.call_processor.stop_accepting_new_work_and_flush_queue()
+        if server.feedback_processor:
+            server.feedback_processor.stop_accepting_new_work_and_flush_queue()
+
+    assert any("dropped call start ids" in record.message for record in caplog.records)
+
+
+def test_eager_retryable_error_requeues_batch():
+    """Raise NonRetryableBatchError for retryable eager errors."""
+    server = RemoteHTTPTraceServer("http://example.com", should_batch=True)
+    start = generate_start(id="call-id", project_id="entity/project")
+
+    def _raise_retryable(_: StartBatchItem) -> None:
+        raise httpx.HTTPStatusError(
+            "500",
+            request=httpx.Request("POST", "http://example.com"),
+            response=httpx.Response(
+                500, request=httpx.Request("POST", "http://example.com")
+            ),
+        )
+
+    server._send_call_start_v2 = _raise_retryable  # type: ignore[assignment]
+
+    try:
+        with pytest.raises(NonRetryableBatchError):
+            server._flush_calls_eager(
+                [StartBatchItem(req=tsi.CallStartReq(start=start))]
+            )
+    finally:
+        if server.call_processor:
+            server.call_processor.stop_accepting_new_work_and_flush_queue()
+        if server.feedback_processor:
+            server.feedback_processor.stop_accepting_new_work_and_flush_queue()
 
 
 @patch("weave.utils.http_requests.post")

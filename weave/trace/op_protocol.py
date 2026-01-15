@@ -85,6 +85,12 @@ class Op(Protocol[P, R]):
 
     tracing_sample_rate: float
 
+    # Whether this op's call start should be sent eagerly (immediately rather than batched).
+    # Useful for long-running operations that need to be visible in the UI immediately,
+    # like evaluation runs. Flipping this will incur a heavy cost at call-end time, only use
+    # for very long running ops that require in-progress tracking.
+    eager_call_start: bool
+
 
 @dataclass
 class ProcessedInputs:
