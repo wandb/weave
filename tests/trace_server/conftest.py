@@ -3,7 +3,6 @@ from __future__ import annotations
 import os
 from collections.abc import Callable
 from dataclasses import dataclass
-from unittest.mock import patch
 
 import pytest
 
@@ -17,11 +16,9 @@ from tests.trace_server.workers.evaluate_model_test_worker import (
     EvaluateModelTestDispatcher,
 )
 from weave.trace_server import clickhouse_trace_server_batched
-from weave.trace_server.project_version import (
-    clickhouse_project_version,
-    project_version,
+from weave.trace_server.project_version.project_version import (
+    reset_project_residence_cache,
 )
-from weave.trace_server.project_version.types import ProjectDataResidence
 from weave.trace_server.secret_fetcher_context import secret_fetcher_context
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer
 
@@ -69,12 +66,6 @@ def pytest_addoption(parser):
             default="remote",
             help="Specify the remote HTTP trace server implementation: remote or stainless",
         )
-        parser.addoption(
-            "--calls-complete-only",
-            action="store_true",
-            default=False,
-            help="Force calls routing to calls_complete only mode for tests",
-        )
     except ValueError:
         pass
 
@@ -118,42 +109,6 @@ def get_remote_http_trace_server_flag(request):
         str: Either 'remote' for RemoteHTTPTraceServer or 'stainless' for StainlessRemoteHTTPTraceServer
     """
     return request.config.getoption("--remote-http-trace-server")
-
-
-@pytest.fixture(autouse=True)
-def reset_project_version_cache():
-    project_version.reset_project_residence_cache()
-    yield
-    project_version.reset_project_residence_cache()
-
-
-@pytest.fixture(autouse=True, scope="session")
-def calls_complete_only_mode(request):
-    if not request.config.getoption("--calls-complete-only"):
-        yield
-        return
-
-    original_mode = os.environ.get("PROJECT_VERSION_MODE")
-    os.environ["PROJECT_VERSION_MODE"] = "auto"
-    try:
-        with (
-            patch.object(
-                project_version,
-                "get_project_data_residence",
-                return_value=ProjectDataResidence.COMPLETE_ONLY,
-            ),
-            patch.object(
-                clickhouse_project_version,
-                "get_project_data_residence",
-                return_value=ProjectDataResidence.COMPLETE_ONLY,
-            ),
-        ):
-            yield
-    finally:
-        if original_mode is not None:
-            os.environ["PROJECT_VERSION_MODE"] = original_mode
-        else:
-            os.environ.pop("PROJECT_VERSION_MODE", None)
 
 
 def _get_worker_db_suffix(request) -> str:
@@ -314,6 +269,14 @@ class LocalSecretFetcher:
 def local_secret_fetcher():
     with secret_fetcher_context(LocalSecretFetcher()):
         yield
+
+
+@pytest.fixture(autouse=True)
+def reset_project_version_cache():
+    """Reset project data residence cache for each test."""
+    reset_project_residence_cache()
+    yield
+    reset_project_residence_cache()
 
 
 @pytest.fixture

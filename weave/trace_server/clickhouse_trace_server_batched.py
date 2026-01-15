@@ -469,6 +469,18 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             for idx in obj_id_idx_map[result.object_id]:
                 calls[idx][0].op_name = op_ref_uri
 
+        write_target = self.table_routing_resolver.resolve_write_target(
+            req.project_id,
+            self.ch_client,
+            write_source=WriteSourceVersion.V2,
+        )
+        if write_target == WriteTarget.CALLS_COMPLETE:
+            # TODO: Once the SDK ships calls_complete support for OTel, write to
+            # calls_complete instead of call_parts/calls_merged.
+            # Example future path:
+            # self._insert_call_complete(_complete_call_to_ch_insertable(completed))
+            write_target = WriteTarget.CALLS_MERGED
+
         # Convert calls to CH insertable format and then to rows for batch insertion
         batch_rows = []
         for start_call, end_call in calls:
@@ -477,8 +489,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             batch_rows.append(_ch_call_to_row(ch_start))
             batch_rows.append(_ch_call_to_row(ch_end))
 
-        # Insert directly without async_insert for OTEL calls
-        self._insert_call_batch(batch_rows, settings=None, do_sync_insert=True)
+        if write_target == WriteTarget.CALLS_MERGED:
+            # Insert directly without async_insert for OTEL calls
+            self._insert_call_batch(batch_rows, settings=None, do_sync_insert=True)
 
         if rejected_spans > 0:
             # Join the first 20 errors and return them delimited by ';'
@@ -4840,6 +4853,18 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if not req.track_llm_call:
             return tsi.CompletionsCreateRes(response=res.response)
 
+        write_target = self.table_routing_resolver.resolve_write_target(
+            req.project_id,
+            self.ch_client,
+            write_source=WriteSourceVersion.V2,
+        )
+        if write_target == WriteTarget.CALLS_COMPLETE:
+            # TODO: Once the SDK ships calls_complete support for completions,
+            # write a single complete row instead of call_parts/calls_merged.
+            # Future path:
+            # self._insert_call_complete(_complete_call_to_ch_insertable(completed))
+            write_target = WriteTarget.CALLS_MERGED
+
         req.inputs.messages = initial_messages
         start = tsi.StartedCallSchemaForInsert(
             project_id=req.project_id,
@@ -4873,7 +4898,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             values = [call_dict.get(col) for col in ALL_CALL_INSERT_COLUMNS]
             batch_data.append(values)
 
-        self._insert_call_batch(batch_data)
+        if write_target == WriteTarget.CALLS_MERGED:
+            self._insert_call_batch(batch_data)
 
         return tsi.CompletionsCreateRes(
             response=res.response, weave_call_id=start_call.id
@@ -4936,7 +4962,23 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         # Track start call if requested
         start_call: CallStartCHInsertable | None = None
+        write_target: WriteTarget | None = None
         if req.track_llm_call:
+            write_target = self.table_routing_resolver.resolve_write_target(
+                req.project_id,
+                self.ch_client,
+                write_source=WriteSourceVersion.V2,
+            )
+            if write_target == WriteTarget.CALLS_COMPLETE:
+                # TODO: Once the SDK ships calls_complete support for streaming
+                # completions, route start/end via calls_complete.
+                # Example future path (sketch):
+                # ch_complete_start = _start_call_insertable_to_complete_start(start_call)
+                # self._insert_call_complete(ch_complete_start)
+                # insert_call = self._update_call_end_in_calls_complete
+                # REMOVE ME: (for now always default to CALLS_MERGED)
+                write_target = WriteTarget.CALLS_MERGED
+
             # Prepare inputs for tracking: use original messages (with template syntax)
             # and include prompt and template_vars
             tracked_inputs = req.inputs.model_dump(exclude_none=True)
@@ -4957,7 +4999,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             )
             start_call = _start_call_for_insert_to_ch_insertable_start_call(start)
             # Insert immediately so that callers can see the call in progress
-            self._insert_call(start_call)
+            if write_target == WriteTarget.CALLS_MERGED:
+                self._insert_call(start_call)
 
         # Set the combined messages (with template vars replaced) for LiteLLM
         req.inputs.messages = combined_messages
