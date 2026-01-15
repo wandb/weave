@@ -770,11 +770,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         """
         self._noop_project_version_latency_test(req.project_id)
 
-        read_table = self.table_routing_resolver.resolve_read_table(
-            req.project_id, self.ch_client
-        )
         pb = ParamBuilder()
-        query, columns = build_calls_stats_query(req, pb, read_table)
+        query, columns = build_calls_stats_query(req, pb)
         raw_res = self._query(query, pb.get_params())
 
         res_dict = (
@@ -793,12 +790,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         """Returns a stream of calls that match the given query."""
         self._noop_project_version_latency_test(project_id=req.project_id)
 
-        read_table = self.table_routing_resolver.resolve_read_table(
-            req.project_id, self.ch_client
-        )
         cq = CallsQuery(
             project_id=req.project_id,
-            read_table=read_table,
             include_costs=req.include_costs or False,
             include_storage_size=req.include_storage_size or False,
             include_total_storage_size=req.include_total_storage_size or False,
@@ -845,7 +838,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             cq.add_field(col)
         if req.filter is not None:
             cq.set_hardcoded_filter(
-                HardCodedFilter(filter=req.filter, read_table=read_table)
+                HardCodedFilter(filter=req.filter)
             )
         if req.query is not None:
             cq.add_condition(req.query.expr_)
@@ -5894,7 +5887,6 @@ def _end_call_for_insert_to_ch_insertable_end_call(
     return CallEndCHInsertable(
         project_id=end_call.project_id,
         id=end_call.id,
-        started_at=end_call.started_at,
         exception=end_call.exception,
         ended_at=end_call.ended_at,
         summary_dump=_dict_value_to_dump(dict(end_call.summary)),

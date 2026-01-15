@@ -253,7 +253,7 @@ class CompletedCallSchemaForInsert(BaseModel):
 
     def split_to_start_and_end(
         self,
-    ) -> tuple["StartedCallSchemaForInsert", "EndedCallSchemaForInsert"]:
+    ) -> tuple["StartedCallSchemaForInsert", "EndedCallSchemaForInsertWithStartedAt"]:
         """Split into separate start and end schemas for legacy table format."""
         start = StartedCallSchemaForInsert(
             project_id=self.project_id,
@@ -273,7 +273,7 @@ class CompletedCallSchemaForInsert(BaseModel):
             wb_run_step=self.wb_run_step,
         )
 
-        end = EndedCallSchemaForInsert(
+        end = EndedCallSchemaForInsertWithStartedAt(
             project_id=self.project_id,
             id=self.id,
             started_at=self.started_at,
@@ -385,19 +385,6 @@ class CallCreateBatchRes(BaseModel):
     res: list[CallStartRes | CallEndRes]
 
 
-class CallCompleteReq(BaseModelStrict):
-    """Request to insert a single complete call."""
-
-    complete: CompletedCallSchemaForInsert
-
-
-class CallCompleteRes(BaseModel):
-    """Response for inserting a single complete call."""
-
-    id: str
-    trace_id: str
-
-
 class CallsUpsertCompleteReq(BaseModel):
     """Request for upserting a batch of completed calls."""
 
@@ -433,104 +420,6 @@ class CallEndV2Res(BaseModel):
     """Response for ending a single call via v2 API."""
 
     pass
-
-
-# === V2 Calls API Body Classes ===
-
-
-class CallStartV2Body(BaseModel):
-    """Request body for starting a call via REST API.
-
-    This model excludes project_id since it comes from the URL path in RESTful endpoints.
-    """
-
-    id: str | None = Field(
-        None, description="Call ID (will be generated if not provided)"
-    )
-    op_name: str = Field(..., description="Name of the calling function (op)")
-    display_name: str | None = Field(
-        None, description="Optional display name of the call"
-    )
-    trace_id: str | None = Field(
-        None, description="Trace ID (will be generated if not provided)"
-    )
-    parent_id: str | None = Field(
-        None, description="Parent call ID (optional for root calls)"
-    )
-    thread_id: str | None = Field(None, description="Thread ID")
-    turn_id: str | None = Field(None, description="Turn ID")
-    started_at: datetime.datetime = Field(..., description="Start time of the call")
-    attributes: dict[str, Any] = Field(
-        default_factory=dict, description="Properties of the call"
-    )
-    inputs: dict[str, Any] = Field(default_factory=dict, description="Input values")
-    otel_dump: dict[str, Any] | None = Field(
-        None, description="OTEL span data source of truth"
-    )
-    wb_run_id: str | None = Field(None, description="W&B Run ID")
-    wb_run_step: int | None = Field(None, description="W&B Run step")
-
-
-class CallEndV2Body(BaseModel):
-    """Request body for ending a call via REST API.
-
-    This model excludes project_id since it comes from the URL path.
-    """
-
-    id: str = Field(..., description="Call ID to end")
-    started_at: datetime.datetime = Field(
-        ..., description="Start time (required for efficient UPDATE queries)"
-    )
-    ended_at: datetime.datetime = Field(..., description="End time of the call")
-    exception: str | None = Field(
-        None, description="Exception string if the call failed"
-    )
-    output: Any | None = Field(None, description="Output value")
-    summary: dict[str, Any] = Field(
-        default_factory=dict, description="Summary of the call"
-    )
-    wb_run_step_end: int | None = Field(None, description="W&B Run step at end")
-
-
-class CompletedCallBody(BaseModel):
-    """Body for a single completed call in the REST API.
-
-    This model excludes project_id since it comes from the URL path.
-    """
-
-    id: str = Field(..., description="Call ID")
-    trace_id: str = Field(..., description="Trace ID")
-    op_name: str = Field(..., description="Name of the calling function (op)")
-    started_at: datetime.datetime = Field(..., description="Start time")
-    ended_at: datetime.datetime = Field(..., description="End time")
-    display_name: str | None = Field(None, description="Optional display name")
-    parent_id: str | None = Field(None, description="Parent call ID")
-    thread_id: str | None = Field(None, description="Thread ID")
-    turn_id: str | None = Field(None, description="Turn ID")
-    attributes: dict[str, Any] = Field(
-        default_factory=dict, description="Properties of the call"
-    )
-    inputs: dict[str, Any] = Field(default_factory=dict, description="Input values")
-    output: Any | None = Field(None, description="Output value")
-    summary: dict[str, Any] = Field(
-        default_factory=dict, description="Summary of the call"
-    )
-    otel_dump: dict[str, Any] | None = Field(None, description="OTEL span data")
-    exception: str | None = Field(None, description="Exception if the call failed")
-    wb_run_id: str | None = Field(None, description="W&B Run ID")
-    wb_run_step: int | None = Field(None, description="W&B Run step at start")
-    wb_run_step_end: int | None = Field(None, description="W&B Run step at end")
-
-
-class CallsCompleteBody(BaseModel):
-    """Request body for upserting a batch of completed calls via REST API.
-
-    This model excludes project_id since it comes from the URL path.
-    """
-
-    batch: list[CompletedCallBody] = Field(
-        ..., description="Batch of completed calls to upsert"
-    )
 
 
 class CallReadReq(BaseModelStrict):
