@@ -4,6 +4,16 @@ import {WeaveObject} from './weaveObject';
 
 export type ParameterNamesOption = 'useParam0Object' | string[] | undefined;
 
+/**
+ * Categorizes the type of operation for visualization and filtering.
+ */
+export type OpKind = 'agent' | 'llm' | 'tool' | 'search';
+
+/**
+ * Color used for visual representation of the operation in the UI.
+ */
+export type OpColor = 'red' | 'orange' | 'yellow' | 'green' | 'blue' | 'purple';
+
 export type Op<T extends (...args: any[]) => any> = {
   __isOp: true;
   __wrappedFunction: T;
@@ -11,6 +21,8 @@ export type Op<T extends (...args: any[]) => any> = {
   __name: string;
   __savedRef?: OpRef | Promise<OpRef>;
   __parameterNames?: ParameterNamesOption;
+  __kind?: OpKind;
+  __color?: OpColor;
   invoke: CallMethod<T>;
 } & T &
   ((
@@ -64,6 +76,10 @@ export interface OpOptions<T extends (...args: any[]) => any> {
   // If true, the op will adopt the `this` value of the original function
   shouldAdoptThis?: boolean;
   parameterNames?: ParameterNamesOption;
+  // Categorizes the type of operation (e.g., 'agent', 'llm', 'tool', 'search')
+  kind?: OpKind;
+  // Color for visual representation in the UI
+  color?: OpColor;
 }
 
 type AsyncResult<F extends (...args: any[]) => any> = Promise<
@@ -97,6 +113,14 @@ export function getOpName(opValue: Op<any>): string {
 
 export function getOpParameterNames(opValue: Op<any>): ParameterNamesOption {
   return opValue.__parameterNames;
+}
+
+export function getOpKind(opValue: Op<any>): OpKind | undefined {
+  return opValue.__kind;
+}
+
+export function getOpColor(opValue: Op<any>): OpColor | undefined {
+  return opValue.__color;
 }
 
 export class OpRef {

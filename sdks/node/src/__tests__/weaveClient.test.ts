@@ -274,4 +274,143 @@ describe('WeaveClient', () => {
       );
     });
   });
+
+  describe('createCall with op kind and color', () => {
+    let client: WeaveClient;
+    let mockTraceServerApi: jest.Mocked<TraceServerApi<any>>;
+    let mockWandbServerApi: jest.Mocked<WandbServerApi>;
+    let capturedStartReq: any;
+
+    beforeEach(() => {
+      capturedStartReq = null;
+      mockTraceServerApi = {
+        call: {
+          callStartBatchCallUpsertBatchPost: jest
+            .fn()
+            .mockImplementation((req: any) => {
+              capturedStartReq = req.batch[0].req.start;
+              return Promise.resolve({});
+            }),
+        },
+        obj: {
+          objCreateObjCreatePost: jest.fn().mockResolvedValue({
+            data: {digest: 'test-digest'},
+          }),
+        },
+        file: {
+          fileCreateFileCreatePost: jest.fn().mockResolvedValue({}),
+        },
+      } as any;
+      mockWandbServerApi = {} as any;
+      client = new WeaveClient(
+        mockTraceServerApi,
+        mockWandbServerApi,
+        'test-project'
+      );
+      // Speed up tests by reducing batch interval
+      (client as any).BATCH_INTERVAL = 10;
+    });
+
+    it('should include kind in weave attributes when op has kind', async () => {
+      const {op} = await import('../op');
+      const {InternalCall} = await import('../call');
+
+      const testOp = op(async () => 42, {kind: 'llm'});
+      const internalCall = new InternalCall();
+
+      await client.createCall(
+        internalCall,
+        testOp,
+        [],
+        undefined,
+        undefined,
+        {callId: 'test-call-id', traceId: 'test-trace-id', childSummary: {}},
+        undefined,
+        new Date()
+      );
+
+      // Wait for batch processing
+      await (client as any).processBatch();
+
+      expect(capturedStartReq).toBeDefined();
+      expect(capturedStartReq.attributes.weave.kind).toBe('llm');
+    });
+
+    it('should include color in weave attributes when op has color', async () => {
+      const {op} = await import('../op');
+      const {InternalCall} = await import('../call');
+
+      const testOp = op(async () => 42, {color: 'green'});
+      const internalCall = new InternalCall();
+
+      await client.createCall(
+        internalCall,
+        testOp,
+        [],
+        undefined,
+        undefined,
+        {callId: 'test-call-id', traceId: 'test-trace-id', childSummary: {}},
+        undefined,
+        new Date()
+      );
+
+      // Wait for batch processing
+      await (client as any).processBatch();
+
+      expect(capturedStartReq).toBeDefined();
+      expect(capturedStartReq.attributes.weave.color).toBe('green');
+    });
+
+    it('should include both kind and color in weave attributes', async () => {
+      const {op} = await import('../op');
+      const {InternalCall} = await import('../call');
+
+      const testOp = op(async () => 42, {kind: 'agent', color: 'purple'});
+      const internalCall = new InternalCall();
+
+      await client.createCall(
+        internalCall,
+        testOp,
+        [],
+        undefined,
+        undefined,
+        {callId: 'test-call-id', traceId: 'test-trace-id', childSummary: {}},
+        undefined,
+        new Date()
+      );
+
+      // Wait for batch processing
+      await (client as any).processBatch();
+
+      expect(capturedStartReq).toBeDefined();
+      expect(capturedStartReq.attributes.weave.kind).toBe('agent');
+      expect(capturedStartReq.attributes.weave.color).toBe('purple');
+    });
+
+    it('should not include kind or color when not specified on op', async () => {
+      const {op} = await import('../op');
+      const {InternalCall} = await import('../call');
+
+      const testOp = op(async () => 42);
+      const internalCall = new InternalCall();
+
+      await client.createCall(
+        internalCall,
+        testOp,
+        [],
+        undefined,
+        undefined,
+        {callId: 'test-call-id', traceId: 'test-trace-id', childSummary: {}},
+        undefined,
+        new Date()
+      );
+
+      // Wait for batch processing
+      await (client as any).processBatch();
+
+      expect(capturedStartReq).toBeDefined();
+      expect(capturedStartReq.attributes.weave.kind).toBeUndefined();
+      expect(capturedStartReq.attributes.weave.color).toBeUndefined();
+    });
+  });
 });
