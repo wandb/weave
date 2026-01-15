@@ -13,6 +13,8 @@ class ClassNotFoundError(ValueError): ...
 
 def is_running_interactively() -> bool:
     """Check if the code is running in an interactive environment."""
+    # Avoid importing IPython in non-interactive CLI runs since it may
+    # initialize prompt_toolkit and mutate terminal mode.
     if "IPython" not in sys.modules:
         return False
     try:
