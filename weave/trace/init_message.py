@@ -81,19 +81,77 @@ def _print_version_check() -> None:
     _print_weave_version_check()
 
 
-def assert_min_weave_version(
-    min_required_version: str, trace_server_host: str = "https://trace.wandb.ai"
-) -> None:
-    import weave
+def check_min_weave_version(
+    min_required_version: str,
+    trace_server_url: str,
+) -> bool:
+    """Check that the weave client version meets the server's minimum requirement.
 
+    Args:
+        min_required_version: The minimum weave version required by the server.
+        trace_server_url: The trace server URL (for error messages).
+
+    Returns:
+        True if the client version is compatible, False otherwise.
+        When False, a warning is logged and tracing should be disabled.
+    """
     if _parse_version(min_required_version) > _parse_version(weave.__version__):
         message = (
-            f"The target Weave host {trace_server_host} requires a `weave` package version >= {min_required_version}."
-            " To resolve, either:\n"
-            "   * Upgrade `weave` by running: `pip install weave --upgrade`.\n"
-            "   * Disable logging by omitting calls to `weave.init`."
+            f"The target Weave host {trace_server_url} requires a `weave` package version >= {min_required_version}, "
+            f"but you have version {weave.__version__}. "
+            "Tracing will be disabled. "
+            "To resolve, upgrade `weave` by running: `pip install weave --upgrade`."
         )
-        raise ValueError(message)
+        logger.warning(message)
+        return False
+    return True
+
+
+def check_min_trace_server_version(
+    trace_server_version: str | None,
+    min_required_version: str | None,
+    trace_server_url: str,
+) -> bool:
+    """Check that the trace server version meets the client's minimum requirement.
+
+    Args:
+        trace_server_version: The version reported by the server, or None if not available.
+        min_required_version: The minimum version required by this client, or None if no requirement.
+        trace_server_url: The trace server URL (for error messages).
+
+    Returns:
+        True if the server version is compatible, False otherwise.
+        When False, a warning is logged and tracing should be disabled.
+    """
+    # No requirement from client - compatible
+    if min_required_version is None:
+        return True
+
+    # Client requires a version but server didn't report one (old server)
+    if trace_server_version is None:
+        message = (
+            f"This client requires trace server version >= {min_required_version}, "
+            f"but the server at {trace_server_url} does not report its version. "
+            "Tracing will be disabled. "
+            "Please contact your administrator to upgrade the trace server, or "
+            "downgrade your `weave` package to a compatible version."
+        )
+        logger.warning(message)
+        return False
+
+    # Both versions available - compare them
+    if _parse_version(min_required_version) > _parse_version(trace_server_version):
+        message = (
+            f"The trace server at {trace_server_url} is running version {trace_server_version}, "
+            f"but this client requires version >= {min_required_version}. "
+            "Tracing will be disabled. "
+            "Please contact your administrator to upgrade the trace server, or "
+            "downgrade your `weave` package to a compatible version."
+        )
+        logger.warning(message)
+        return False
+
+    return True
 
 
 def print_init_message(
