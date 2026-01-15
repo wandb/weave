@@ -208,7 +208,7 @@ def test_project_version_mode_from_env():
         if "PROJECT_VERSION_MODE" in os.environ:
             del os.environ["PROJECT_VERSION_MODE"]
         mode = CallsStorageServerMode.from_env()
-        assert mode == CallsStorageServerMode.FORCE_LEGACY
+        assert mode == CallsStorageServerMode.AUTO
 
     finally:
         if original_value is not None:
