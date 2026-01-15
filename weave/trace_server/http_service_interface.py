@@ -9,7 +9,6 @@ include all parameters for internal use.
 from pydantic import Field
 
 from weave.trace_server.common_interface import (
-    WB_USER_ID_DESCRIPTION,
     AnnotationQueueItemsFilter,
     BaseModelStrict,
     SortBy,
@@ -25,7 +24,6 @@ class AnnotationQueueAddCallsBody(BaseModelStrict):
         examples=[["input.prompt", "output.text"]],
         description="JSON paths to display to annotators",
     )
-    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
 class AnnotationQueueItemsQueryBody(BaseModelStrict):
@@ -45,4 +43,17 @@ class AnnotationQueueItemsQueryBody(BaseModelStrict):
     include_position: bool = Field(
         default=False,
         description="Include position_in_queue field (1-based index in full queue)",
+    )
+
+
+class AnnotationQueueItemProgressUpdateBody(BaseModelStrict):
+    """Request body for updating annotation progress (queue_id and item_id come from path).
+
+    Note: wb_user_id is not included in the body - it's set server-side from the authenticated session.
+    """
+
+    project_id: str = Field(examples=["entity/project"])
+    annotation_state: str = Field(
+        examples=["in_progress", "completed", "skipped"],
+        description="New state: 'in_progress', 'completed', or 'skipped'",
     )

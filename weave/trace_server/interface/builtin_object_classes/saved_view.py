@@ -34,6 +34,45 @@ class ChartConfig(BaseModel):
     custom_name: str | None = Field(default=None)
 
 
+class ObjectVersionGroup(BaseModel):
+    label: str  # label for the combination of the groups
+    base_ref: str
+    versions: list[str] | Literal["*"]
+    show_version_indicator: bool
+
+
+class ObjectConfig(BaseModel):
+    version_groups: list[ObjectVersionGroup] | None = Field(default=None)
+    display_name_map: dict[str, str] | None = Field(
+        default=None
+    )  # obj -> display name (keys can use "*" wildcards)
+    deselected: list[str] | None = Field(
+        default=None
+    )  # List of dataset refs or patterns to exclude
+
+
+class DynamicLeaderboardColumnConfig(BaseModel):
+    evaluation_object_ref: base_object_def.RefStr | None = Field(default=None)
+    scorer_name: str | None = Field(default=None)
+    display_name: str | None = Field(default=None)
+    summary_metric_path: str | None = Field(default=None)
+    should_minimize: bool | None = Field(default=None)
+    deselected: bool | None = Field(
+        default=None
+    )  # If True, this metric is excluded from the leaderboard
+
+
+class DynamicLeaderboardConfig(BaseModel):
+    # These are initialized to empty lists and dicts by default (show everything)
+    model_configuration: ObjectConfig | None = Field(default=None)
+    dataset_configuration: ObjectConfig | None = Field(default=None)
+    scorer_configuration: ObjectConfig | None = Field(default=None)
+    # Only has entries when a column is marked as deselected or minimized
+    columns_configuration: list[DynamicLeaderboardColumnConfig] | None = Field(
+        default=None
+    )
+
+
 class SavedViewDefinition(BaseModel):
     filter: tsi.CallsFilter | None = Field(default=None)
 
@@ -61,6 +100,9 @@ class SavedViewDefinition(BaseModel):
     # to match all versions.
     dataset_selector: str | None = Field(default=None)
     evaluation_selector: str | None = Field(default=None)
+
+    # Dynamic leaderboards are populated by the evals in a saved view
+    dynamic_leaderboard_config: DynamicLeaderboardConfig | None = Field(default=None)
 
 
 class SavedView(base_object_def.BaseObject):

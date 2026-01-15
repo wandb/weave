@@ -4,6 +4,8 @@ These tests cover the queue-based call annotation system introduced in
 commit 7fd5bfd24bccce8f97449bee1676ac55e74fd993.
 """
 
+import base64
+import time
 from typing import NamedTuple
 
 import pytest
@@ -586,7 +588,6 @@ def test_annotation_queues_stats(client):
         pytest.skip("Direct DB manipulation only works with ClickHouse server")
 
     # Ensure writes are flushed
-    import time
 
     time.sleep(0.5)
 
@@ -1319,3 +1320,591 @@ def test_annotation_queue_items_query_position_with_filter_unstarted(client):
     assert len(query_res.items) == 5
     positions = sorted([item.position_in_queue for item in query_res.items])
     assert positions == [1, 2, 3, 4, 5]
+
+
+# ============================================================================
+# Tests for annotator_queue_items_progress_update
+# ============================================================================
+
+
+def test_annotator_queue_items_progress_update_completed(client):
+    """Test updating queue item state to 'completed'."""
+    if client_is_sqlite(client):
+        pytest.skip("Annotation queues not supported in SQLite")
+
+    # Create queue with 1 call
+    fixture = create_queue_with_calls(
+        client, num_calls=1, queue_name="Progress Update Completed Queue"
+    )
+
+    # Get the queue item
+    query_req = tsi.AnnotationQueueItemsQueryReq(
+        project_id=client._project_id(),
+        queue_id=fixture.queue_id,
+    )
+    query_res = client.server.annotation_queue_items_query(query_req)
+    assert len(query_res.items) == 1
+    item = query_res.items[0]
+
+    # Verify initial state is unstarted with no annotator
+    # ClickHouse String default value is empty string, not NULL
+    assert item.annotation_state == "unstarted"
+    assert item.annotator_user_id == ""
+
+    # Update state to completed
+    update_req = tsi.AnnotatorQueueItemsProgressUpdateReq(
+        project_id=client._project_id(),
+        queue_id=fixture.queue_id,
+        item_id=item.id,
+        annotation_state="completed",
+        wb_user_id="test_annotator",
+    )
+    update_res = client.server.annotator_queue_items_progress_update(update_req)
+
+    # Verify response contains updated item with annotator_user_id
+    # Note: wb_user_id is stored in base64 format in the database
+    expected_annotator_id = base64.b64encode(b"test_annotator").decode()
+    assert update_res.item.id == item.id
+    assert update_res.item.annotation_state == "completed"
+    assert update_res.item.annotator_user_id == expected_annotator_id
+
+    query_req = tsi.AnnotationQueueItemsQueryReq(
+        project_id=client._project_id(),
+        queue_id=fixture.queue_id,
+    )
+
+    # Query again to verify the state and annotator_user_id persisted
+    query_res = client.server.annotation_queue_items_query(query_req)
+    assert len(query_res.items) == 1
+    assert query_res.items[0].annotation_state == "completed"
+    assert query_res.items[0].annotator_user_id == expected_annotator_id
+
+
+def test_annotator_queue_items_progress_update_skipped(client):
+    """Test updating queue item state to 'skipped'."""
+    if client_is_sqlite(client):
+        pytest.skip("Annotation queues not supported in SQLite")
+
+    # Create queue with 1 call
+    fixture = create_queue_with_calls(
+        client, num_calls=1, queue_name="Progress Update Skipped Queue"
+    )
+
+    # Get the queue item
+    query_req = tsi.AnnotationQueueItemsQueryReq(
+        project_id=client._project_id(),
+        queue_id=fixture.queue_id,
+    )
+    query_res = client.server.annotation_queue_items_query(query_req)
+    assert len(query_res.items) == 1
+    item = query_res.items[0]
+
+    # Update state to skipped
+    update_req = tsi.AnnotatorQueueItemsProgressUpdateReq(
+        project_id=client._project_id(),
+        queue_id=fixture.queue_id,
+        item_id=item.id,
+        annotation_state="skipped",
+        wb_user_id="test_annotator",
+    )
+    update_res = client.server.annotator_queue_items_progress_update(update_req)
+
+    # Verify response contains updated item
+    assert update_res.item.id == item.id
+    assert update_res.item.annotation_state == "skipped"
+
+
+def test_annotator_queue_items_progress_update_invalid_state(client):
+    """Test that updating to invalid state raises error."""
+    if client_is_sqlite(client):
+        pytest.skip("Annotation queues not supported in SQLite")
+
+    # Create queue with 1 call
+    fixture = create_queue_with_calls(
+        client, num_calls=1, queue_name="Invalid State Queue"
+    )
+
+    # Get the queue item
+    query_req = tsi.AnnotationQueueItemsQueryReq(
+        project_id=client._project_id(),
+        queue_id=fixture.queue_id,
+    )
+    query_res = client.server.annotation_queue_items_query(query_req)
+    item = query_res.items[0]
+
+    # Try to update to invalid state
+    update_req = tsi.AnnotatorQueueItemsProgressUpdateReq(
+        project_id=client._project_id(),
+        queue_id=fixture.queue_id,
+        item_id=item.id,
+        annotation_state="invalid_state",
+        wb_user_id="test_annotator",
+    )
+
+    # Should raise ValueError
+    with pytest.raises(ValueError, match="Invalid annotation_state"):
+        client.server.annotator_queue_items_progress_update(update_req)
+
+
+def test_annotator_queue_items_progress_update_nonexistent_item(client):
+    """Test that updating nonexistent item raises error."""
+    if client_is_sqlite(client):
+        pytest.skip("Annotation queues not supported in SQLite")
+
+    # Create an empty queue
+    queue_id = create_annotation_queue(client, name="Nonexistent Item Queue")
+
+    # Try to update nonexistent item
+    update_req = tsi.AnnotatorQueueItemsProgressUpdateReq(
+        project_id=client._project_id(),
+        queue_id=queue_id,
+        item_id="nonexistent_item_id",
+        annotation_state="completed",
+        wb_user_id="test_annotator",
+    )
+
+    # Should raise ValueError
+    with pytest.raises(ValueError, match="Queue item .* not found"):
+        client.server.annotator_queue_items_progress_update(update_req)
+
+
+def test_annotator_queue_items_progress_update_no_user_id(client):
+    """Test that updating without user_id raises error."""
+    if client_is_sqlite(client):
+        pytest.skip("Annotation queues not supported in SQLite")
+
+    # Create queue with 1 call
+    fixture = create_queue_with_calls(
+        client, num_calls=1, queue_name="No User ID Queue"
+    )
+
+    # Get the queue item
+    query_req = tsi.AnnotationQueueItemsQueryReq(
+        project_id=client._project_id(),
+        queue_id=fixture.queue_id,
+    )
+    query_res = client.server.annotation_queue_items_query(query_req)
+    item = query_res.items[0]
+
+    # Try to update without user_id
+    update_req = tsi.AnnotatorQueueItemsProgressUpdateReq(
+        project_id=client._project_id(),
+        queue_id=fixture.queue_id,
+        item_id=item.id,
+        annotation_state="completed",
+        wb_user_id=None,
+    )
+
+    # Should raise ValueError
+    with pytest.raises(ValueError, match="wb_user_id is required"):
+        client.server.annotator_queue_items_progress_update(update_req)
+
+
+def test_annotator_queue_items_progress_update_transition_from_in_progress(client):
+    """Test valid state transition from in_progress to completed."""
+    if client_is_sqlite(client):
+        pytest.skip("Annotation queues not supported in SQLite")
+
+    # Create queue with 1 call
+    fixture = create_queue_with_calls(
+        client, num_calls=1, queue_name="Transition From In Progress Queue"
+    )
+
+    # Get the queue item
+    query_req = tsi.AnnotationQueueItemsQueryReq(
+        project_id=client._project_id(),
+        queue_id=fixture.queue_id,
+    )
+    query_res = client.server.annotation_queue_items_query(query_req)
+    item = query_res.items[0]
+
+    # First, mark as in_progress using the API
+    update_req = tsi.AnnotatorQueueItemsProgressUpdateReq(
+        project_id=client._project_id(),
+        queue_id=fixture.queue_id,
+        item_id=item.id,
+        annotation_state="in_progress",
+        wb_user_id="test_annotator",
+    )
+    client.server.annotator_queue_items_progress_update(update_req)
+
+    # Verify state is in_progress
+    # Create new query_req to avoid mutation issues
+    query_req = tsi.AnnotationQueueItemsQueryReq(
+        project_id=client._project_id(),
+        queue_id=fixture.queue_id,
+    )
+    query_res = client.server.annotation_queue_items_query(query_req)
+    assert query_res.items[0].annotation_state == "in_progress"
+
+    # Update from in_progress to completed should succeed
+    # Create new update_req to avoid mutation issues
+    update_req = tsi.AnnotatorQueueItemsProgressUpdateReq(
+        project_id=client._project_id(),
+        queue_id=fixture.queue_id,
+        item_id=item.id,
+        annotation_state="completed",
+        wb_user_id="test_annotator",
+    )
+    update_res = client.server.annotator_queue_items_progress_update(update_req)
+
+    # Verify state is now completed
+    assert update_res.item.annotation_state == "completed"
+
+
+def test_annotator_queue_items_progress_update_invalid_transition_from_completed(
+    client,
+):
+    """Test invalid state transition from completed to skipped."""
+    if client_is_sqlite(client):
+        pytest.skip("Annotation queues not supported in SQLite")
+
+    # Create queue with 1 call
+    fixture = create_queue_with_calls(
+        client, num_calls=1, queue_name="Invalid Transition Queue"
+    )
+
+    # Get the queue item
+    query_req = tsi.AnnotationQueueItemsQueryReq(
+        project_id=client._project_id(),
+        queue_id=fixture.queue_id,
+    )
+    query_res = client.server.annotation_queue_items_query(query_req)
+    item = query_res.items[0]
+
+    # First, mark as completed
+    update_req = tsi.AnnotatorQueueItemsProgressUpdateReq(
+        project_id=client._project_id(),
+        queue_id=fixture.queue_id,
+        item_id=item.id,
+        annotation_state="completed",
+        wb_user_id="test_annotator",
+    )
+    client.server.annotator_queue_items_progress_update(update_req)
+
+    # Try to transition from completed to skipped (should fail)
+    update_req2 = tsi.AnnotatorQueueItemsProgressUpdateReq(
+        project_id=client._project_id(),
+        queue_id=fixture.queue_id,
+        item_id=item.id,
+        annotation_state="skipped",
+        wb_user_id="test_annotator",
+    )
+
+    # Should raise ValueError about invalid state transition
+    with pytest.raises(ValueError, match="Invalid state transition"):
+        client.server.annotator_queue_items_progress_update(update_req2)
+
+
+def test_annotator_queue_items_progress_update_stats_integration(client):
+    """Test that progress updates correctly affect queue stats."""
+    if client_is_sqlite(client):
+        pytest.skip("Annotation queues not supported in SQLite")
+
+    # Create queue with 5 calls
+    fixture = create_queue_with_calls(
+        client, num_calls=5, queue_name="Stats Integration Queue"
+    )
+
+    # Get initial stats (should be 0 completed)
+    stats_req = tsi.AnnotationQueuesStatsReq(
+        project_id=client._project_id(),
+        queue_ids=[fixture.queue_id],
+    )
+    stats_res = client.server.annotation_queues_stats(stats_req)
+    assert len(stats_res.stats) == 1
+    assert stats_res.stats[0].total_items == 5
+    assert stats_res.stats[0].completed_items == 0
+
+    # Get queue items
+    query_req = tsi.AnnotationQueueItemsQueryReq(
+        project_id=client._project_id(),
+        queue_id=fixture.queue_id,
+    )
+    query_res = client.server.annotation_queue_items_query(query_req)
+
+    # Mark 2 items as completed
+    for i in range(2):
+        update_req = tsi.AnnotatorQueueItemsProgressUpdateReq(
+            project_id=client._project_id(),
+            queue_id=fixture.queue_id,
+            item_id=query_res.items[i].id,
+            annotation_state="completed",
+            wb_user_id="test_annotator",
+        )
+        client.server.annotator_queue_items_progress_update(update_req)
+
+    # Mark 1 item as skipped
+    update_req = tsi.AnnotatorQueueItemsProgressUpdateReq(
+        project_id=client._project_id(),
+        queue_id=fixture.queue_id,
+        item_id=query_res.items[2].id,
+        annotation_state="skipped",
+        wb_user_id="test_annotator",
+    )
+    client.server.annotator_queue_items_progress_update(update_req)
+
+    # Get updated stats (should be 3 completed: 2 completed + 1 skipped)
+    # Create new stats_req to avoid mutation issues
+    stats_req = tsi.AnnotationQueuesStatsReq(
+        project_id=client._project_id(),
+        queue_ids=[fixture.queue_id],
+    )
+    stats_res = client.server.annotation_queues_stats(stats_req)
+    assert len(stats_res.stats) == 1
+    assert stats_res.stats[0].total_items == 5
+    assert stats_res.stats[0].completed_items == 3
+
+
+def test_annotator_queue_items_progress_update_in_progress_new(client):
+    """Test updating queue item state to 'in_progress' for a new record."""
+    if client_is_sqlite(client):
+        pytest.skip("Annotation queues not supported in SQLite")
+
+    # Create queue with 1 call
+    fixture = create_queue_with_calls(
+        client, num_calls=1, queue_name="In Progress New Queue"
+    )
+
+    # Get the queue item
+    query_req = tsi.AnnotationQueueItemsQueryReq(
+        project_id=client._project_id(),
+        queue_id=fixture.queue_id,
+    )
+    query_res = client.server.annotation_queue_items_query(query_req)
+    assert len(query_res.items) == 1
+    item = query_res.items[0]
+
+    # Verify initial state is unstarted
+    assert item.annotation_state == "unstarted"
+
+    # Update state to in_progress (should succeed for new record)
+    update_req = tsi.AnnotatorQueueItemsProgressUpdateReq(
+        project_id=client._project_id(),
+        queue_id=fixture.queue_id,
+        item_id=item.id,
+        annotation_state="in_progress",
+        wb_user_id="test_annotator",
+    )
+    update_res = client.server.annotator_queue_items_progress_update(update_req)
+
+    # Verify response contains updated item
+    assert update_res.item.id == item.id
+    assert update_res.item.annotation_state == "in_progress"
+
+    # Query again to verify the state persisted
+    # Create new query_req to avoid mutation issues
+    query_req = tsi.AnnotationQueueItemsQueryReq(
+        project_id=client._project_id(),
+        queue_id=fixture.queue_id,
+    )
+    query_res = client.server.annotation_queue_items_query(query_req)
+    assert len(query_res.items) == 1
+    assert query_res.items[0].annotation_state == "in_progress"
+
+
+def test_annotator_queue_items_progress_update_in_progress_existing(client):
+    """Test that updating to 'in_progress' fails when a record already exists."""
+    if client_is_sqlite(client):
+        pytest.skip("Annotation queues not supported in SQLite")
+
+    # Create queue with 1 call
+    fixture = create_queue_with_calls(
+        client, num_calls=1, queue_name="In Progress Existing Queue"
+    )
+
+    # Get the queue item
+    query_req = tsi.AnnotationQueueItemsQueryReq(
+        project_id=client._project_id(),
+        queue_id=fixture.queue_id,
+    )
+    query_res = client.server.annotation_queue_items_query(query_req)
+    assert len(query_res.items) == 1
+    item = query_res.items[0]
+
+    # First, mark it as in_progress
+    update_req = tsi.AnnotatorQueueItemsProgressUpdateReq(
+        project_id=client._project_id(),
+        queue_id=fixture.queue_id,
+        item_id=item.id,
+        annotation_state="in_progress",
+        wb_user_id="test_annotator",
+    )
+    update_res = client.server.annotator_queue_items_progress_update(update_req)
+    assert update_res.item.annotation_state == "in_progress"
+
+    # Now try to update to in_progress again (should fail)
+    # Create new update_req to avoid mutation issues
+    update_req = tsi.AnnotatorQueueItemsProgressUpdateReq(
+        project_id=client._project_id(),
+        queue_id=fixture.queue_id,
+        item_id=item.id,
+        annotation_state="in_progress",
+        wb_user_id="test_annotator",
+    )
+    with pytest.raises(Exception) as exc_info:
+        client.server.annotator_queue_items_progress_update(update_req)
+
+    assert "Cannot transition to 'in_progress' when a record already exists" in str(
+        exc_info.value
+    )
+
+
+def test_annotator_queue_items_progress_in_progress_to_completed(client):
+    """Test transitioning from 'in_progress' to 'completed'."""
+    if client_is_sqlite(client):
+        pytest.skip("Annotation queues not supported in SQLite")
+
+    # Create queue with 1 call
+    fixture = create_queue_with_calls(
+        client, num_calls=1, queue_name="In Progress to Completed Queue"
+    )
+
+    # Get the queue item
+    query_req = tsi.AnnotationQueueItemsQueryReq(
+        project_id=client._project_id(),
+        queue_id=fixture.queue_id,
+    )
+    query_res = client.server.annotation_queue_items_query(query_req)
+    assert len(query_res.items) == 1
+    item = query_res.items[0]
+
+    # First, mark it as in_progress
+    update_req = tsi.AnnotatorQueueItemsProgressUpdateReq(
+        project_id=client._project_id(),
+        queue_id=fixture.queue_id,
+        item_id=item.id,
+        annotation_state="in_progress",
+        wb_user_id="test_annotator",
+    )
+    update_res = client.server.annotator_queue_items_progress_update(update_req)
+    assert update_res.item.annotation_state == "in_progress"
+
+    # Now update to completed (should succeed)
+    # Create new update_req to avoid mutation issues
+    update_req = tsi.AnnotatorQueueItemsProgressUpdateReq(
+        project_id=client._project_id(),
+        queue_id=fixture.queue_id,
+        item_id=item.id,
+        annotation_state="completed",
+        wb_user_id="test_annotator",
+    )
+    update_res = client.server.annotator_queue_items_progress_update(update_req)
+    assert update_res.item.annotation_state == "completed"
+
+    # Query again to verify
+    # Create new query_req to avoid mutation issues
+    query_req = tsi.AnnotationQueueItemsQueryReq(
+        project_id=client._project_id(),
+        queue_id=fixture.queue_id,
+    )
+    query_res = client.server.annotation_queue_items_query(query_req)
+    assert len(query_res.items) == 1
+    assert query_res.items[0].annotation_state == "completed"
+
+
+def test_annotator_queue_items_progress_in_progress_workflow(client):
+    """Test the full workflow: mark in_progress, then complete."""
+    if client_is_sqlite(client):
+        pytest.skip("Annotation queues not supported in SQLite")
+
+    # Create queue with 3 calls
+    fixture = create_queue_with_calls(
+        client, num_calls=3, queue_name="In Progress Workflow Queue"
+    )
+
+    # Get queue items
+    query_req = tsi.AnnotationQueueItemsQueryReq(
+        project_id=client._project_id(),
+        queue_id=fixture.queue_id,
+    )
+    query_res = client.server.annotation_queue_items_query(query_req)
+    assert len(query_res.items) == 3
+
+    annotator = "workflow_annotator"
+
+    # Workflow for item 1: mark in_progress, then complete
+    item1_id = query_res.items[0].id
+    update_req = tsi.AnnotatorQueueItemsProgressUpdateReq(
+        project_id=client._project_id(),
+        queue_id=fixture.queue_id,
+        item_id=item1_id,
+        annotation_state="in_progress",
+        wb_user_id=annotator,
+    )
+    client.server.annotator_queue_items_progress_update(update_req)
+
+    # Complete item 1
+    # Create new update_req to avoid mutation issues
+    update_req = tsi.AnnotatorQueueItemsProgressUpdateReq(
+        project_id=client._project_id(),
+        queue_id=fixture.queue_id,
+        item_id=item1_id,
+        annotation_state="completed",
+        wb_user_id=annotator,
+    )
+    client.server.annotator_queue_items_progress_update(update_req)
+
+    # Workflow for item 2: mark in_progress, then skip
+    item2_id = query_res.items[1].id
+    update_req = tsi.AnnotatorQueueItemsProgressUpdateReq(
+        project_id=client._project_id(),
+        queue_id=fixture.queue_id,
+        item_id=item2_id,
+        annotation_state="in_progress",
+        wb_user_id=annotator,
+    )
+    client.server.annotator_queue_items_progress_update(update_req)
+
+    # Skip item 2
+    # Create new update_req to avoid mutation issues
+    update_req = tsi.AnnotatorQueueItemsProgressUpdateReq(
+        project_id=client._project_id(),
+        queue_id=fixture.queue_id,
+        item_id=item2_id,
+        annotation_state="skipped",
+        wb_user_id=annotator,
+    )
+    client.server.annotator_queue_items_progress_update(update_req)
+
+    # Item 3: leave as in_progress
+    item3_id = query_res.items[2].id
+    update_req = tsi.AnnotatorQueueItemsProgressUpdateReq(
+        project_id=client._project_id(),
+        queue_id=fixture.queue_id,
+        item_id=item3_id,
+        annotation_state="in_progress",
+        wb_user_id=annotator,
+    )
+    client.server.annotator_queue_items_progress_update(update_req)
+
+    # Query all items and verify states
+    # Create new query_req to avoid mutation issues
+    query_req = tsi.AnnotationQueueItemsQueryReq(
+        project_id=client._project_id(),
+        queue_id=fixture.queue_id,
+    )
+    query_res = client.server.annotation_queue_items_query(query_req)
+    assert len(query_res.items) == 3
+
+    # wb_user_id is stored in base64 format
+    expected_annotator_id = base64.b64encode(annotator.encode()).decode()
+
+    items_by_id = {item.id: item for item in query_res.items}
+    assert items_by_id[item1_id].annotation_state == "completed"
+    assert items_by_id[item1_id].annotator_user_id == expected_annotator_id
+    assert items_by_id[item2_id].annotation_state == "skipped"
+    assert items_by_id[item2_id].annotator_user_id == expected_annotator_id
+    assert items_by_id[item3_id].annotation_state == "in_progress"
+    assert items_by_id[item3_id].annotator_user_id == expected_annotator_id
+
+    # Verify stats (completed count includes skipped)
+    stats_req = tsi.AnnotationQueuesStatsReq(
+        project_id=client._project_id(),
+        queue_ids=[fixture.queue_id],
+    )
+    stats_res = client.server.annotation_queues_stats(stats_req)
+    assert len(stats_res.stats) == 1
+    assert stats_res.stats[0].total_items == 3
+    # Completed count includes both 'completed' and 'skipped'
+    assert stats_res.stats[0].completed_items == 2

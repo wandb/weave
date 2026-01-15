@@ -437,6 +437,7 @@ def make_queue_items_query(
     # enum value (the one with the lowest numeric code), which is 'unstarted'. This naturally
     # handles the case where no annotator has worked on an item yet.
     # Cast annotation_state enum to String so it can be compared with string filters
+    # Also get the wb_user_id of the annotator who owns the most recent state
     inner_query = f"""
     SELECT
         qi.id,
@@ -453,7 +454,8 @@ def make_queue_items_query(
         any(qi.created_by) as created_by,
         any(qi.updated_at) as updated_at,
         any(qi.deleted_at) as deleted_at,
-        toString(argMax(p.annotation_state, p.updated_at)) as annotation_state
+        toString(argMax(p.annotation_state, p.updated_at)) as annotation_state,
+        argMax(p.annotator_id, p.updated_at) as annotator_user_id
     FROM annotation_queue_items qi
     LEFT JOIN annotator_queue_items_progress p
         ON p.queue_item_id = qi.id

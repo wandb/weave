@@ -1425,6 +1425,9 @@ class AnnotationQueueItemSchema(BaseModel):
     display_fields: list[str]  # JSON paths like ['input.prompt', 'output.text']
     added_by: str | None = None  # wb_user_id (nullable)
     annotation_state: AnnotationState
+    annotator_user_id: str | None = (
+        None  # wb_user_id of annotator who owns the most recent state (nullable)
+    )
     created_at: datetime.datetime
     created_by: str  # wb_user_id
     updated_at: datetime.datetime
@@ -1441,6 +1444,7 @@ class AnnotationQueueAddCallsReq(his.AnnotationQueueAddCallsBody):
     """
 
     queue_id: str = Field(examples=["550e8400-e29b-41d4-a716-446655440000"])
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
 class AnnotationQueueAddCallsRes(BaseModel):
@@ -1499,6 +1503,31 @@ class AnnotationQueuesStatsRes(BaseModel):
     """Response with stats for multiple annotation queues."""
 
     stats: list[AnnotationQueueStatsSchema]
+
+
+class AnnotatorQueueItemsProgressUpdateReq(BaseModelStrict):
+    """Request to update the annotation state of a queue item for the current annotator.
+
+    Valid state transitions:
+    - (absence) -> 'in_progress': Mark item as in progress (only when no record exists)
+    - (absence) -> 'completed' or 'skipped': Directly complete/skip item
+    - 'in_progress' or 'unstarted' -> 'completed' or 'skipped': Complete/skip started item
+    """
+
+    project_id: str = Field(examples=["entity/project"])
+    queue_id: str = Field(examples=["550e8400-e29b-41d4-a716-446655440000"])
+    item_id: str = Field(examples=["550e8400-e29b-41d4-a716-446655440001"])
+    annotation_state: str = Field(
+        examples=["in_progress", "completed", "skipped"],
+        description="New state: 'in_progress', 'completed', or 'skipped'",
+    )
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class AnnotatorQueueItemsProgressUpdateRes(BaseModel):
+    """Response from updating annotation state."""
+
+    item: AnnotationQueueItemSchema
 
 
 # Thread API
@@ -2462,6 +2491,10 @@ class TraceServerInterface(Protocol):
     def annotation_queue_items_query(
         self, req: AnnotationQueueItemsQueryReq
     ) -> AnnotationQueueItemsQueryRes: ...
+
+    def annotator_queue_items_progress_update(
+        self, req: AnnotatorQueueItemsProgressUpdateReq
+    ) -> AnnotatorQueueItemsProgressUpdateRes: ...
 
     # Evaluation API
     def evaluate_model(self, req: EvaluateModelReq) -> EvaluateModelRes: ...
