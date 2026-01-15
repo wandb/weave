@@ -26,6 +26,7 @@ from openai.types.chat.chat_completion_message_tool_call import (
 import weave
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
+from weave.trace.context import call_context
 from weave.trace.op import (
     _add_accumulator,
     _default_on_input_handler,
@@ -664,6 +665,20 @@ def should_use_responses_accumulator(inputs: dict) -> bool:
     return isinstance(inputs, dict) and inputs.get("stream") is True
 
 
+def _is_inside_agents_trace() -> bool:
+    """Check if we are currently inside an OpenAI Agents trace context.
+
+    Returns:
+        True if any call in the call stack has an 'agent_trace_id' attribute,
+        indicating we're inside an Agents trace. False otherwise.
+    """
+    call_stack = call_context.get_call_stack()
+    for call in call_stack:
+        if call.attributes and call.attributes.get("agent_trace_id"):
+            return True
+    return False
+
+
 def responses_on_finish_post_processor(value: Response | None) -> dict | None:
     if value is None:
         return None
@@ -689,7 +704,7 @@ def create_wrapper_responses_sync(
 
         op = weave.op(_inner, **op_kwargs)
         op._set_on_input_handler(openai_on_input_handler)
-        return _add_accumulator(
+        wrapped_op = _add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: lambda acc, value: responses_accumulator(
                 acc, value
@@ -697,6 +712,18 @@ def create_wrapper_responses_sync(
             should_accumulate=should_use_responses_accumulator,
             on_finish_post_processor=responses_on_finish_post_processor,
         )
+
+        # Return a wrapper that checks at call time
+        @wraps(wrapped_op)
+        def conditional_wrapper(*args: Any, **kwargs: Any) -> Any:
+            if _is_inside_agents_trace():
+                # Call original function directly, bypassing op wrapper
+                # to avoid double-logging (Agents tracing processor handles it)
+                return fn(*args, **kwargs)
+            # Call through the op wrapper
+            return wrapped_op(*args, **kwargs)
+
+        return conditional_wrapper
 
     return wrapper
 
@@ -713,7 +740,7 @@ def create_wrapper_responses_async(
 
         op = weave.op(_inner, **op_kwargs)
         op._set_on_input_handler(openai_on_input_handler)
-        return _add_accumulator(
+        wrapped_op = _add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: lambda acc, value: responses_accumulator(
                 acc, value
@@ -721,6 +748,18 @@ def create_wrapper_responses_async(
             should_accumulate=should_use_responses_accumulator,
             on_finish_post_processor=responses_on_finish_post_processor,
         )
+
+        # Return a wrapper that checks at call time
+        @wraps(wrapped_op)
+        async def conditional_wrapper(*args: Any, **kwargs: Any) -> Any:
+            if _is_inside_agents_trace():
+                # Call original function directly, bypassing op wrapper
+                # to avoid double-logging (Agents tracing processor handles it)
+                return await fn(*args, **kwargs)
+            # Call through the op wrapper
+            return await wrapped_op(*args, **kwargs)
+
+        return conditional_wrapper
 
     return wrapper
 
