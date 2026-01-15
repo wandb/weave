@@ -58,10 +58,16 @@ def get_notdiamond_patcher(
     base = settings.op_settings
 
     model_select_settings = base.model_copy(
-        update={"name": base.name or "NotDiamond.model_select"}
+        update={
+            "name": base.name or "NotDiamond.model_select",
+            "kind": base.kind or "tool",
+        }
     )
     async_model_select_settings = base.model_copy(
-        update={"name": base.name or "NotDiamond.amodel_select"}
+        update={
+            "name": base.name or "NotDiamond.amodel_select",
+            "kind": base.kind or "tool",
+        }
     )
     patched_client_functions = [
         SymbolPatcher(
@@ -96,10 +102,16 @@ def get_notdiamond_patcher(
     ]
 
     toolkit_custom_router_fit_settings = base.model_copy(
-        update={"name": base.name or "NotDiamond.toolkit.custom_router.fit"}
+        update={
+            "name": base.name or "NotDiamond.toolkit.custom_router.fit",
+            "kind": base.kind or "tool",
+        }
     )
     toolkit_custom_router_eval_settings = base.model_copy(
-        update={"name": base.name or "NotDiamond.toolkit.custom_router.eval"}
+        update={
+            "name": base.name or "NotDiamond.toolkit.custom_router.eval",
+            "kind": base.kind or "tool",
+        }
     )
     patched_toolkit_functions = [
         SymbolPatcher(

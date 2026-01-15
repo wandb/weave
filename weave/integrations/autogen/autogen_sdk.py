@@ -16,7 +16,7 @@ from weave.integrations.patcher import (
 )
 from weave.trace.autopatch import IntegrationSettings, OpSettings
 from weave.trace.op import _add_accumulator
-from weave.trace.op_protocol import Op, ProcessedInputs
+from weave.trace.op_protocol import Op, OpKind, ProcessedInputs
 
 from .config import get_module_patch_configs
 
@@ -343,7 +343,11 @@ def _create_symbol_wrapper(
 
 
 def _get_symbol_patcher(
-    module_path: str, class_name: str, method_name: str, settings: OpSettings
+    module_path: str,
+    class_name: str,
+    method_name: str,
+    settings: OpSettings,
+    kind: OpKind | None = None,
 ) -> SymbolPatcher | None:
     """Creates a SymbolPatcher for a specific method.
 
@@ -355,6 +359,7 @@ def _get_symbol_patcher(
         class_name: The name of the class.
         method_name: The name of the method to patch.
         settings: Operation settings for the patcher.
+        kind: Optional operation kind (e.g., "agent", "llm", "tool").
 
     Returns:
         A SymbolPatcher if successful, None otherwise.
@@ -384,9 +389,11 @@ def _get_symbol_patcher(
 
     display_name = f"{module_path}.{class_name}.{method_name}"
 
-    wrapper_factory = _create_symbol_wrapper(
-        settings.model_copy(update={"display_name": display_name})
-    )
+    update: dict[str, Any] = {"display_name": display_name}
+    if kind:
+        update["kind"] = settings.kind or kind
+
+    wrapper_factory = _create_symbol_wrapper(settings.model_copy(update=update))
     return SymbolPatcher(lambda: module, f"{class_name}.{method_name}", wrapper_factory)
 
 
@@ -397,6 +404,7 @@ def _get_class_and_subclass_patchers(
     settings: OpSettings,
     should_patch_base_class: bool = False,
     should_patch_subclasses: bool = True,
+    kind: OpKind | None = None,
 ) -> list[SymbolPatcher | None]:
     """Creates patchers for a class and its subclasses.
 
@@ -410,6 +418,7 @@ def _get_class_and_subclass_patchers(
         settings: Operation settings for the patchers.
         should_patch_base_class: Whether to patch the base class itself.
         should_patch_subclasses: Whether to patch subclasses.
+        kind: Optional operation kind (e.g., "agent", "llm", "tool").
 
     Returns:
         A list of patchers for the specified methods across classes.
@@ -478,7 +487,7 @@ def _get_class_and_subclass_patchers(
                 patched_methods.add(method_key)
 
                 patcher = _get_symbol_patcher(
-                    cls_module_path, cls_name, method_name, settings
+                    cls_module_path, cls_name, method_name, settings, kind
                 )
                 if patcher is not None:
                     patchers.append(patcher)
@@ -587,6 +596,7 @@ def get_autogen_patcher(
                         settings=op_patch_settings,
                         should_patch_base_class=class_config["should_patch_base_class"],
                         should_patch_subclasses=class_config["should_patch_subclasses"],
+                        kind=class_config.get("kind"),
                     )
                     patchers.extend(class_patchers)
                 except Exception as e:
