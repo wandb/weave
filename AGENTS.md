@@ -51,6 +51,11 @@ _Important:_ For OpenAI Codex agents (most likely you!), your environment does n
   - `weave/` - Python package implementation
   - `weave/trace_server` - Backend server implementation
 
+## Trace Server Notes
+
+- V2 call end requests use `EndedCallSchemaForInsertWithStartedAt` so `started_at`
+  is required for efficient `calls_complete` updates.
+
 ## Python Testing Guidelines
 
 ### Test Framework

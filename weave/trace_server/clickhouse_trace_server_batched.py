@@ -617,15 +617,16 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             CallsUpsertCompleteRes: Empty response on success.
         """
         for complete_call in req.batch:
-            # Validate and convert content (processes base64, etc.)
             complete_call = process_complete_call_to_content(complete_call, self)
 
-            # Determine write target based on project configuration
+            # Determine write target based on project, this should be the same for all
+            # calls in the batch, subsequent calls just hit the in-memory cache. This
+            # is here for technical correctness, in case we relax project_id target
+            # constraints intra-batch
             write_target = self.table_routing_resolver.resolve_write_target(
                 complete_call.project_id, self.ch_client
             )
 
-            # Convert to ClickHouse insertable format
             ch_call = _complete_call_to_ch_insertable(complete_call)
             if write_target == WriteTarget.CALLS_COMPLETE:
                 self._insert_call_complete(ch_call)
@@ -667,14 +668,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         Returns:
             CallEndV2Res: Empty response on success.
         """
-        # Pipe started_at from request to end schema for efficient UPDATE queries
-        req.end.started_at = req.started_at
-
-        # Process the request (validates and converts content)
         req = process_call_req_to_content(req, self)
         ch_end = _end_call_for_insert_to_ch_insertable_end_call(req.end)
 
-        # Determine write target based on project routing
         write_target = self.table_routing_resolver.resolve_write_target(
             req.end.project_id, self.ch_client
         )
@@ -713,7 +709,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         # Convert datetimes to microseconds since epoch for DateTime64(6) parameters.
         # clickhouse-connect truncates datetime objects to seconds when passing as params,
-        # but DateTime64(6) requires microsecond precision for exact matching.
+        # but DateTime64(6) requires microsecond precision for exact matching. This is a
+        # hack, not sure why inserting a json dump and passing an explicit param differ
         started_at_us = _datetime_to_microseconds(ch_end.started_at)
         ended_at_us = _datetime_to_microseconds(ch_end.ended_at)
 
