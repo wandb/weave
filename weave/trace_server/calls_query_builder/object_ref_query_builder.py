@@ -69,6 +69,7 @@ from weave.trace_server.orm import (
     quote_json_path,
     split_escaped_field_path,
 )
+from weave.trace_server.project_version.types import ReadTable
 
 if TYPE_CHECKING:
     from weave.trace_server.calls_query_builder.calls_query_builder import (
@@ -444,11 +445,13 @@ class ObjectRefQueryProcessor:
         table_alias: str,
         expand_columns: list[str],
         field_to_object_join_alias_map: dict[str, str],
+        read_table: ReadTable = ReadTable.CALLS_MERGED,
     ):
         self.pb = pb
         self.table_alias = table_alias
         self.expand_columns = expand_columns
         self.field_to_object_join_alias_map = field_to_object_join_alias_map
+        self.read_table = read_table
         self.fields_used: set[str] = set()
 
     def process_operand(self, operand: "tsi_query.Operand") -> str:
@@ -503,6 +506,7 @@ class ObjectRefQueryProcessor:
                 tsi_query.Query.model_validate({"$expr": {"$and": [operand]}}),
                 self.pb,
                 self.table_alias,
+                read_table=self.read_table,
             )
             self.fields_used.update(f.field for f in filter_conditions.fields_used)
             return combine_conditions(filter_conditions.conditions, "AND")
@@ -922,12 +926,14 @@ def get_all_object_ref_conditions(
     conditions: list["Condition"],
     order_fields: list["OrderField"],
     expand_columns: list[str],
+    table_alias: str,
 ) -> list[ObjectRefCondition]:
     """Get all object reference conditions from a list of conditions.
 
     Args:
         conditions: List of conditions to process
         expand_columns: List of expand columns to match against
+        table_alias: Table alias for the calls table.
 
     Returns:
         List of object reference conditions
@@ -938,7 +944,9 @@ def get_all_object_ref_conditions(
     all_object_ref_conditions: list[ObjectRefCondition] = []
     fields_used: set[str] = set()
     for condition in conditions:
-        object_ref_conditions = condition.get_object_ref_conditions(expand_columns)
+        object_ref_conditions = condition.get_object_ref_conditions(
+            expand_columns, table_alias
+        )
         all_object_ref_conditions.extend(object_ref_conditions)
 
     for order_field in order_fields:

@@ -42,9 +42,9 @@ class CallStartCHInsertable(BaseModel):
 class CallEndCHInsertable(BaseModel):
     project_id: str
     id: str
-    started_at: datetime.datetime | None = (
-        None  # Improves UPDATE performance on calls_complete
-    )
+    # Optional but considerably improves UPDATE performance, strongly encouraged
+    started_at: datetime.datetime | None = None
+
     ended_at: datetime.datetime
     exception: str | None = None
     summary_dump: str

@@ -254,13 +254,13 @@ def test_call_start_end_v2_updates_calls_complete(
     ended_at = started_at + datetime.timedelta(seconds=2)
     trace_server.call_end_v2(
         tsi.CallEndV2Req(
-            end=tsi.EndedCallSchemaForInsert(
+            end=tsi.EndedCallSchemaForInsertWithStartedAt(
                 project_id=project_id,
                 id=call_id,
+                started_at=started_at,
                 ended_at=ended_at,
                 summary={"usage": {}, "status_counts": {}},
-            ),
-            started_at=started_at,
+            )
         )
     )
 
@@ -302,13 +302,13 @@ def test_call_start_end_v2_falls_back_to_merged(trace_server, clickhouse_trace_s
     )
     trace_server.call_end_v2(
         tsi.CallEndV2Req(
-            end=tsi.EndedCallSchemaForInsert(
+            end=tsi.EndedCallSchemaForInsertWithStartedAt(
                 project_id=project_id,
                 id=call_id,
+                started_at=started_at,
                 ended_at=started_at + datetime.timedelta(seconds=1),
                 summary={"usage": {}, "status_counts": {}},
-            ),
-            started_at=started_at,
+            )
         )
     )
 

@@ -26,6 +26,17 @@ _project_residence_cache: LRUCache[str, ProjectDataResidence] = LRUCache(
 _project_residence_cache_lock = threading.Lock()
 
 
+def reset_project_residence_cache() -> None:
+    """Clear the cached project data residence entries.
+
+    Examples:
+        >>> reset_project_residence_cache()
+
+    """
+    with _project_residence_cache_lock:
+        _project_residence_cache.clear()
+
+
 class TableRoutingResolver:
     """Resolver for determining which table to read from or write to based on project data residence.
 
@@ -49,10 +60,6 @@ class TableRoutingResolver:
         if residence != ProjectDataResidence.EMPTY:
             with _project_residence_cache_lock:
                 _project_residence_cache[project_id] = residence
-
-        # TODO: remove me, this is temporary to gage cache size impact
-        if root_span := ddtrace.tracer.current_root_span():
-            root_span.set_tag("cache_size", len(_project_residence_cache))
 
         return residence
 
