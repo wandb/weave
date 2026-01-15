@@ -173,6 +173,9 @@ autogen = ["autogen-agentchat>=0.5.7; python_version >= '3.10'"]
 verifiers = ["verifiers>=0.1.3.post0,<0.1.4; python_version >= '3.11'"]
 
 
+[project.scripts]
+weave = "weave.cli:main"
+
 [project.urls]
 Company = "https://wandb.com"
 Documentation = "https://docs.wandb.com/"
