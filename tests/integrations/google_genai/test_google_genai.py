@@ -1,12 +1,17 @@
 import asyncio
 import os
 from collections.abc import Generator
+from unittest.mock import MagicMock
 
 import pytest
 from google import genai
 from google.genai.types import GenerateImagesConfig
 from pydantic import BaseModel
 
+from weave.integrations.google_genai.gemini_utils import (
+    google_genai_gemini_accumulator,
+    google_genai_gemini_postprocess_inputs,
+)
 from weave.integrations.google_genai.google_genai_sdk import get_google_genai_patcher
 from weave.integrations.integration_utilities import op_name_from_ref
 
@@ -321,3 +326,215 @@ def test_image_generation_async(client):
     trace_name = op_name_from_ref(call.op_name)
     assert trace_name == "google.genai.models.AsyncModels.generate_images"
     assert call.output is not None
+
+
+# Unit tests for gemini_utils functions
+
+
+class TestGoogleGenaiGeminiAccumulator:
+    """Tests for the google_genai_gemini_accumulator function."""
+
+    def _make_mock_response(
+        self,
+        text: str | None = None,
+        thought_text: str | None = None,
+        prompt_token_count: int | None = None,
+        candidates_token_count: int | None = None,
+        total_token_count: int | None = None,
+        cached_content_token_count: int | None = None,
+        thoughts_token_count: int | None = None,
+    ) -> MagicMock:
+        """Create a mock GenerateContentResponse."""
+        response = MagicMock()
+
+        parts = []
+        if text is not None:
+            part = MagicMock()
+            part.text = text
+            part.thought = False
+            parts.append(part)
+        if thought_text is not None:
+            thought_part = MagicMock()
+            thought_part.text = thought_text
+            thought_part.thought = True
+            parts.append(thought_part)
+
+        candidate = MagicMock()
+        candidate.content.parts = parts
+        response.candidates = [candidate]
+
+        response.usage_metadata.prompt_token_count = prompt_token_count
+        response.usage_metadata.candidates_token_count = candidates_token_count
+        response.usage_metadata.total_token_count = total_token_count
+        response.usage_metadata.cached_content_token_count = cached_content_token_count
+        response.usage_metadata.thoughts_token_count = thoughts_token_count
+
+        return response
+
+    def test_returns_value_when_acc_is_none(self):
+        """When acc is None, return value unchanged."""
+        value = self._make_mock_response(text="Hello")
+        result = google_genai_gemini_accumulator(None, value)
+        assert result is value
+
+    def test_token_counts_are_replaced_not_summed(self):
+        """Token counts should be replaced with latest non-None values, not summed."""
+        acc = self._make_mock_response(
+            text="Hello ",
+            prompt_token_count=10,
+            candidates_token_count=5,
+            total_token_count=15,
+        )
+        # Gemini returns cumulative counts, so the second chunk has larger values
+        value = self._make_mock_response(
+            text="world",
+            prompt_token_count=10,
+            candidates_token_count=15,
+            total_token_count=25,
+        )
+
+        result = google_genai_gemini_accumulator(acc, value)
+
+        # Token counts should be replaced (not summed: 10+10=20, 5+15=20, 15+25=40)
+        assert result.usage_metadata.prompt_token_count == 10
+        assert result.usage_metadata.candidates_token_count == 15
+        assert result.usage_metadata.total_token_count == 25
+
+    def test_token_counts_preserved_when_value_is_none(self):
+        """Token counts from acc are preserved if value's counts are None."""
+        acc = self._make_mock_response(
+            text="Hello ",
+            prompt_token_count=10,
+            candidates_token_count=5,
+            total_token_count=15,
+        )
+        value = self._make_mock_response(
+            text="world",
+            prompt_token_count=None,
+            candidates_token_count=None,
+            total_token_count=None,
+        )
+
+        result = google_genai_gemini_accumulator(acc, value)
+
+        assert result.usage_metadata.prompt_token_count == 10
+        assert result.usage_metadata.candidates_token_count == 5
+        assert result.usage_metadata.total_token_count == 15
+
+    def test_thoughts_token_count_accumulated(self):
+        """thoughts_token_count should be accumulated for thinking models."""
+        acc = self._make_mock_response(
+            text="Hello ",
+            thoughts_token_count=100,
+        )
+        value = self._make_mock_response(
+            text="world",
+            thoughts_token_count=250,  # Cumulative count
+        )
+
+        result = google_genai_gemini_accumulator(acc, value)
+
+        assert result.usage_metadata.thoughts_token_count == 250
+
+    def test_thinking_content_accumulated_separately(self):
+        """Thinking content and response content should be accumulated by type."""
+        # First chunk with thinking content
+        acc = self._make_mock_response(thought_text="Let me think...")
+
+        # Second chunk with response content at same index
+        value = self._make_mock_response(text="The answer is 42")
+
+        result = google_genai_gemini_accumulator(acc, value)
+
+        # Both should be preserved
+        parts = result.candidates[0].content.parts
+        assert len(parts) == 2
+
+        thought_parts = [p for p in parts if getattr(p, "thought", False)]
+        response_parts = [p for p in parts if not getattr(p, "thought", False)]
+
+        assert len(thought_parts) == 1
+        assert thought_parts[0].text == "Let me think..."
+        assert len(response_parts) == 1
+        assert response_parts[0].text == "The answer is 42"
+
+    def test_thinking_content_concatenated(self):
+        """Multiple thinking chunks should be concatenated."""
+        acc = self._make_mock_response(thought_text="Let me ")
+        value = self._make_mock_response(thought_text="think about this...")
+
+        result = google_genai_gemini_accumulator(acc, value)
+
+        parts = result.candidates[0].content.parts
+        thought_parts = [p for p in parts if getattr(p, "thought", False)]
+        assert len(thought_parts) == 1
+        assert thought_parts[0].text == "Let me think about this..."
+
+    def test_text_accumulated_correctly(self):
+        """Regular text content should be concatenated."""
+        acc = self._make_mock_response(text="Hello ")
+        value = self._make_mock_response(text="world!")
+
+        result = google_genai_gemini_accumulator(acc, value)
+
+        parts = result.candidates[0].content.parts
+        response_parts = [p for p in parts if not getattr(p, "thought", False)]
+        assert len(response_parts) == 1
+        assert response_parts[0].text == "Hello world!"
+
+
+class TestGoogleGenaiGeminiPostprocessInputs:
+    """Tests for the google_genai_gemini_postprocess_inputs function."""
+
+    def test_extracts_system_instruction_from_config(self):
+        """System instruction should be extracted from config and surfaced at top level."""
+        config = MagicMock()
+        config.system_instruction = "You are a helpful assistant."
+
+        self_obj = MagicMock()
+        self_obj._model = "gemini-2.0-flash"
+
+        inputs = {"self": self_obj, "config": config, "contents": "Hello"}
+
+        result = google_genai_gemini_postprocess_inputs(inputs)
+
+        assert result["system_instruction"] == "You are a helpful assistant."
+        assert result["model"] == "gemini-2.0-flash"
+
+    def test_no_system_instruction_when_not_present(self):
+        """No system_instruction key added when config doesn't have one."""
+        config = MagicMock(spec=["temperature"])  # No system_instruction attr
+
+        self_obj = MagicMock()
+        self_obj._model = "gemini-2.0-flash"
+
+        inputs = {"self": self_obj, "config": config, "contents": "Hello"}
+
+        result = google_genai_gemini_postprocess_inputs(inputs)
+
+        assert "system_instruction" not in result
+
+    def test_no_system_instruction_when_config_is_none(self):
+        """No error when config is None."""
+        self_obj = MagicMock()
+        self_obj._model = "gemini-2.0-flash"
+
+        inputs = {"self": self_obj, "config": None, "contents": "Hello"}
+
+        result = google_genai_gemini_postprocess_inputs(inputs)
+
+        assert "system_instruction" not in result
+
+    def test_no_system_instruction_when_value_is_none(self):
+        """No system_instruction key added when the value is None."""
+        config = MagicMock()
+        config.system_instruction = None
+
+        self_obj = MagicMock()
+        self_obj._model = "gemini-2.0-flash"
+
+        inputs = {"self": self_obj, "config": config, "contents": "Hello"}
+
+        result = google_genai_gemini_postprocess_inputs(inputs)
+
+        assert "system_instruction" not in result
