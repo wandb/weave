@@ -303,16 +303,12 @@ def test_poison_pill_detection_and_immediate_drop():
             assert log_content.count("Unprocessable item detected") == 2
 
         # Test 4: Queue full - items get written to disk instead of being enqueued
-        # Stop the processor to avoid race conditions where the processing thread
-        # consumes items while we're enqueuing (which can happen on Windows)
+        # Stop the processor so nothing drains the queue during this test.
+        # This makes the overflow behavior deterministic.
         processor.stop_accepting_new_work_and_flush_queue()
-        processor.accept_new_work()
-        # Wait for processing thread to enter its sleep phase (min_batch_interval=0.1)
-        # This ensures the thread won't consume items during our enqueue
-        time.sleep(0.15)
 
-        # Now enqueue items - with the queue empty and processing thread sleeping,
-        # fill1-fill5 will fill the queue, and fill6-fill7 will overflow
+        # Now enqueue items - with no processing thread running, fill1-fill5 will
+        # fill the queue, and fill6-fill7 will overflow.
         processor.enqueue(
             ["fill1", "fill2", "fill3", "fill4", "fill5", "fill6", "fill7"]
         )  # Fill the small queue (maxsize=5)
@@ -325,7 +321,7 @@ def test_poison_pill_detection_and_immediate_drop():
             queue_full_entries = [
                 line for line in log_content if "Queue is full" in line
             ]
-            assert len(queue_full_entries) >= 2
+            assert len(queue_full_entries) == 2
 
         # Test 5: Disk fallback disabled - no files should be written
         processor_no_disk = AsyncBatchProcessor(
