@@ -1,3 +1,4 @@
+import logging
 from collections.abc import Callable
 from typing import TypeVar, cast
 
@@ -5,6 +6,8 @@ from pydantic import BaseModel
 
 from weave.trace_server import refs_internal as ri
 from weave.trace_server.errors import InvalidExternalRef
+
+logger = logging.getLogger(__name__)
 
 A = TypeVar("A")
 B = TypeVar("B")
@@ -57,10 +60,12 @@ def universal_ext_to_int_ref_converter(
             if obj.startswith(weave_prefix):
                 return cast(B, replace_ref(obj))
             elif obj.startswith(weave_internal_prefix):
-                # It is important to raise here as this would be the result of
-                # an external client attempting to write internal refs directly.
-                # We want to maintain full control over the internal refs.
-                raise InvalidExternalRef("Encountered unexpected ref format.")
+                # Rather than logger.error, just stuff the error message into the exception.
+                raise InvalidExternalRef(
+                    f"universal_ext_to_int_ref_converter: Encountered unexpected internal ref "
+                    f"when expecting external ref. Expected format: '{weave_prefix}', "
+                    f"but found internal ref: '{obj}'"
+                )
         return obj
 
     return _map_values(obj, mapper)
@@ -112,13 +117,12 @@ def universal_int_to_ext_ref_converter(
             if obj.startswith(weave_internal_prefix):
                 return cast(D, replace_ref(obj))
             elif obj.startswith(weave_prefix):
-                # It is important to raise here as this would be the result of
-                # incorrectly storing an external ref at the database layer,
-                # rather than an internal ref. There is a possibility in the
-                # future that a programming error leads to this situation, in
-                # which case reading this object would consistently fail. We
-                # might want to instead return a private ref in this case.
-                raise InvalidInternalRef("Encountered unexpected ref format.")
+                # Rather than logger.error, just stuff the error message into the exception.
+                raise InvalidInternalRef(
+                    f"universal_int_to_ext_ref_converter: Encountered unexpected external ref "
+                    f"when expecting internal ref. Expected format: '{weave_internal_prefix}', "
+                    f"but found external ref: '{obj}'"
+                )
         return obj
 
     return _map_values(obj, mapper)
