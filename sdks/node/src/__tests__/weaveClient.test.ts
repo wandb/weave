@@ -311,11 +311,11 @@ describe('WeaveClient', () => {
       (client as any).BATCH_INTERVAL = 10;
     });
 
-    it('should include kind in weave attributes when op has kind', async () => {
+    it('should set attributes.weave.kind when op has kind', async () => {
       const {op} = await import('../op');
       const {InternalCall} = await import('../call');
 
-      const testOp = op(async () => 42, {kind: 'llm'});
+      const testOp = op(async () => 42, {kind: 'tool'});
       const internalCall = new InternalCall();
 
       await client.createCall(
@@ -328,89 +328,56 @@ describe('WeaveClient', () => {
         undefined,
         new Date()
       );
-
-      // Wait for batch processing
       await (client as any).processBatch();
 
-      expect(capturedStartReq).toBeDefined();
+      expect(capturedStartReq.attributes.weave.kind).toBe('tool');
+      expect('color' in capturedStartReq.attributes.weave).toBe(false);
+    });
+
+    it('should set attributes.weave.color when op has color', async () => {
+      const {op} = await import('../op');
+      const {InternalCall} = await import('../call');
+
+      const testOp = op(async () => 42, {color: 'blue'});
+      const internalCall = new InternalCall();
+
+      await client.createCall(
+        internalCall,
+        testOp,
+        [],
+        undefined,
+        undefined,
+        {callId: 'test-call-id', traceId: 'test-trace-id', childSummary: {}},
+        undefined,
+        new Date()
+      );
+      await (client as any).processBatch();
+
+      expect(capturedStartReq.attributes.weave.color).toBe('blue');
+      expect('kind' in capturedStartReq.attributes.weave).toBe(false);
+    });
+
+    it('should set both attributes.weave.kind and color when both specified', async () => {
+      const {op} = await import('../op');
+      const {InternalCall} = await import('../call');
+
+      const testOp = op(async () => 42, {kind: 'llm', color: 'green'});
+      const internalCall = new InternalCall();
+
+      await client.createCall(
+        internalCall,
+        testOp,
+        [],
+        undefined,
+        undefined,
+        {callId: 'test-call-id', traceId: 'test-trace-id', childSummary: {}},
+        undefined,
+        new Date()
+      );
+      await (client as any).processBatch();
+
       expect(capturedStartReq.attributes.weave.kind).toBe('llm');
-    });
-
-    it('should include color in weave attributes when op has color', async () => {
-      const {op} = await import('../op');
-      const {InternalCall} = await import('../call');
-
-      const testOp = op(async () => 42, {color: 'green'});
-      const internalCall = new InternalCall();
-
-      await client.createCall(
-        internalCall,
-        testOp,
-        [],
-        undefined,
-        undefined,
-        {callId: 'test-call-id', traceId: 'test-trace-id', childSummary: {}},
-        undefined,
-        new Date()
-      );
-
-      // Wait for batch processing
-      await (client as any).processBatch();
-
-      expect(capturedStartReq).toBeDefined();
       expect(capturedStartReq.attributes.weave.color).toBe('green');
-    });
-
-    it('should include both kind and color in weave attributes', async () => {
-      const {op} = await import('../op');
-      const {InternalCall} = await import('../call');
-
-      const testOp = op(async () => 42, {kind: 'agent', color: 'purple'});
-      const internalCall = new InternalCall();
-
-      await client.createCall(
-        internalCall,
-        testOp,
-        [],
-        undefined,
-        undefined,
-        {callId: 'test-call-id', traceId: 'test-trace-id', childSummary: {}},
-        undefined,
-        new Date()
-      );
-
-      // Wait for batch processing
-      await (client as any).processBatch();
-
-      expect(capturedStartReq).toBeDefined();
-      expect(capturedStartReq.attributes.weave.kind).toBe('agent');
-      expect(capturedStartReq.attributes.weave.color).toBe('purple');
-    });
-
-    it('should not include kind or color when not specified on op', async () => {
-      const {op} = await import('../op');
-      const {InternalCall} = await import('../call');
-
-      const testOp = op(async () => 42);
-      const internalCall = new InternalCall();
-
-      await client.createCall(
-        internalCall,
-        testOp,
-        [],
-        undefined,
-        undefined,
-        {callId: 'test-call-id', traceId: 'test-trace-id', childSummary: {}},
-        undefined,
-        new Date()
-      );
-
-      // Wait for batch processing
-      await (client as any).processBatch();
-
-      expect(capturedStartReq).toBeDefined();
-      expect(capturedStartReq.attributes.weave.kind).toBeUndefined();
-      expect(capturedStartReq.attributes.weave.color).toBeUndefined();
     });
   });
 });
