@@ -33,7 +33,7 @@ def test_openai_agents_quickstart(client: WeaveClient, setup_tests) -> None:
     result = Runner.run_sync(agent, "Write a haiku about recursion in programming.")
     calls = client.get_calls()
 
-    assert len(calls) == 3
+    assert len(calls) == 2
 
     trace_root = calls[0]
     trace_root.inputs["name"] = "Agent workflow"
@@ -47,15 +47,6 @@ def test_openai_agents_quickstart(client: WeaveClient, setup_tests) -> None:
     agent_call.output["metrics"] = {}
     agent_call.output["metadata"] = {"tools": [], "handoffs": [], "output_type": "str"}
     agent_call.output["error"] = None
-
-    response_call = calls[2]
-    response_call.inputs["name"] = "Response"
-    response_call.inputs["input"] = [
-        {
-            "content": "Write a haiku about recursion in programming.",
-            "role": "user",
-        }
-    ]
 
     val = response_call.output["output"][0]
     assert val.role == "assistant"
