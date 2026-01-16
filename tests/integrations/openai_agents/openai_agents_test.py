@@ -9,12 +9,7 @@ from pydantic import BaseModel
 from weave.integrations.openai_agents.openai_agents import WeaveTracingProcessor
 from weave.trace.weave_client import WeaveClient
 
-# TODO: Integration tests (test_openai_agents_quickstart, test_openai_agents_quickstart_homework)
-# need to be updated and re-recorded. Response spans are no longer tracked to prevent
-# double-tracking with openai.responses.create calls. Tests should be updated to:
-# 1. Expect fewer calls (no "Response" calls)
-# 2. Verify openai.responses.create calls are present instead (if OpenAI SDK patching is active)
-# 3. Re-record VCR cassettes with the new behavior
+# TODO: Responses should be updated once we have patching for the new Responses API
 
 
 @pytest.fixture
