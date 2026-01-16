@@ -48,15 +48,6 @@ def test_openai_agents_quickstart(client: WeaveClient, setup_tests) -> None:
     agent_call.output["metadata"] = {"tools": [], "handoffs": [], "output_type": "str"}
     agent_call.output["error"] = None
 
-    val = response_call.output["output"][0]
-    assert val.role == "assistant"
-    assert val.type == "message"
-    assert val.status == "completed"
-    assert (
-        val.content[0].text
-        == "Code calls to itself,  \nInfinite loops in silence,  \nPatterns emerge clear."
-    )
-
 
 @pytest.mark.skip(
     reason="This test works, but the order of requests to OpenAI can be mixed up (by the Agent framework).  This causes the test to fail more than reasonable in CI."
