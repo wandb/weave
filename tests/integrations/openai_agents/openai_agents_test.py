@@ -3,13 +3,18 @@ from unittest.mock import Mock
 import agents
 import pytest
 from agents import Agent, GuardrailFunctionOutput, InputGuardrail, Runner
-from agents.tracing import AgentSpanData, Span, Trace
+from agents.tracing import AgentSpanData, ResponseSpanData, Span, Trace
 from pydantic import BaseModel
 
 from weave.integrations.openai_agents.openai_agents import WeaveTracingProcessor
 from weave.trace.weave_client import WeaveClient
 
-# TODO: Responses should be updated once we have patching for the new Responses API
+# TODO: Integration tests (test_openai_agents_quickstart, test_openai_agents_quickstart_homework)
+# need to be updated and re-recorded. Response spans are no longer tracked to prevent
+# double-tracking with openai.responses.create calls. Tests should be updated to:
+# 1. Expect fewer calls (no "Response" calls)
+# 2. Verify openai.responses.create calls are present instead (if OpenAI SDK patching is active)
+# 3. Re-record VCR cassettes with the new behavior
 
 
 @pytest.fixture
@@ -349,3 +354,55 @@ def test_tracing_processor_cleanup(client: WeaveClient) -> None:
     processor.shutdown()
     assert len(processor._trace_calls) == 0
     assert len(processor._trace_data) == 0
+
+
+def test_response_spans_are_skipped(client: WeaveClient) -> None:
+    """Test that ResponseSpanData spans are skipped to prevent double-tracking.
+
+    Response spans should not be tracked because the openai.responses.create
+    call (from OpenAI SDK integration) already captures this data.
+    """
+    processor = WeaveTracingProcessor()
+
+    # Mock Trace
+    trace = Mock(spec=Trace)
+    trace.trace_id = "trace_1"
+    trace.name = "test_trace"
+
+    # Start Trace
+    processor.on_trace_start(trace)
+    assert "trace_1" in processor._trace_calls
+    assert "trace_1" in processor._trace_data
+
+    # Mock ResponseSpanData
+    response_span_data = Mock(spec=ResponseSpanData)
+    response_span_data.type = "response"
+    response_span_data.input = [{"role": "user", "content": "test"}]
+    response_span_data.response = Mock()
+    response_span_data.response.output = [{"role": "assistant", "content": "response"}]
+    response_span_data.response.metadata = {}
+    response_span_data.response.usage = None
+    response_span_data.response.model_dump = Mock(return_value={})
+    response_span_data.__class__ = ResponseSpanData
+
+    response_span = Mock(spec=Span)
+    response_span.trace_id = "trace_1"
+    response_span.span_id = "response_span_1"
+    response_span.parent_id = None
+    response_span.span_data = response_span_data
+    response_span.error = None
+
+    # Start Response Span - should be skipped
+    processor.on_span_start(response_span)
+    # Response spans are deferred to on_span_end, so not checked here
+
+    # End Response Span - should be skipped entirely
+    processor.on_span_end(response_span)
+
+    # Verify that NO call was created for the Response span
+    assert "response_span_1" not in processor._span_calls
+
+    # Clean up
+    processor.on_trace_end(trace)
+    assert "trace_1" not in processor._trace_calls
+    assert "trace_1" not in processor._trace_data
