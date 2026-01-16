@@ -241,6 +241,55 @@ def _fetch_call_ended_at(
     return row[0]
 
 
+def _fetch_call_row(
+    ch_client,
+    table: str,
+    project_id: str,
+    call_id: str,
+    columns: list[str],
+) -> tuple[Any, ...] | None:
+    """Fetch a single call row from ClickHouse."""
+    pb = ParamBuilder()
+    project_param = pb.add_param(project_id)
+    call_param = pb.add_param(call_id)
+    project_slot = param_slot(project_param, "String")
+    call_slot = param_slot(call_param, "String")
+    column_sql = ", ".join(columns)
+    query = f"""
+        SELECT {column_sql}
+        FROM {table}
+        WHERE project_id = {project_slot} AND id = {call_slot}
+        LIMIT 1
+        """
+    result = ch_client.query(query, parameters=pb.get_params()).result_rows
+    if not result:
+        return None
+    return result[0]
+
+
+def _fetch_call_dumps(
+    ch_client, table: str, project_id: str, call_id: str
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Fetch inputs/output dumps for a call from ClickHouse."""
+    row = _fetch_call_row(
+        ch_client, table, project_id, call_id, ["inputs_dump", "output_dump"]
+    )
+    if row is None:
+        return {}, {}
+    inputs_dump, output_dump = row
+    return json.loads(inputs_dump), json.loads(output_dump)
+
+
+def _fetch_call_ended_at(
+    ch_client, table: str, project_id: str, call_id: str
+) -> datetime.datetime | None:
+    """Fetch ended_at for a call from ClickHouse."""
+    row = _fetch_call_row(ch_client, table, project_id, call_id, ["ended_at"])
+    if row is None:
+        return None
+    return row[0]
+
+
 def _make_completed_call(
     project_id: str,
     call_id: str,

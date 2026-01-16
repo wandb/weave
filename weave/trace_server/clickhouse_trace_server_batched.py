@@ -5634,9 +5634,7 @@ def _any_value_to_dump(
     return json.dumps(value)
 
 
-def _dict_dump_to_dict(val: str | None) -> dict[str, Any]:
-    if val is None or val == "" or val == "null":
-        return {}
+def _dict_dump_to_dict(val: str) -> dict[str, Any]:
     res = json.loads(val)
     if not isinstance(res, dict):
         raise TypeError(f"Value is not a dict: {val}")

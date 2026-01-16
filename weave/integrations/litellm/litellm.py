@@ -118,10 +118,16 @@ def get_litellm_patcher(
     base = settings.op_settings
 
     completion_settings = base.model_copy(
-        update={"name": base.name or "litellm.completion"}
+        update={
+            "name": base.name or "litellm.completion",
+            "kind": base.kind or "llm",
+        }
     )
     acompletion_settings = base.model_copy(
-        update={"name": base.name or "litellm.acompletion"}
+        update={
+            "name": base.name or "litellm.acompletion",
+            "kind": base.kind or "llm",
+        }
     )
 
     _litellm_patcher = MultiPatcher(
