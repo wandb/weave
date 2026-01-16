@@ -137,7 +137,7 @@ def _get_kind_for_span(op_name: str) -> str | None:
     # See https://docs.llamaindex.ai/en/stable/api_reference/retrievers/ for retrieval operation names
     if any(
         retrieval_indicator in op_name_lower
-        for retrieval_indicator in ["retrieve", "search", "query"]
+        for retrieval_indicator in ["retriev", "search", "query"]
     ):
         return "search"
     return None
