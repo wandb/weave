@@ -425,7 +425,7 @@ test = [
   "pytest-xdist>=3.1.0",
   "pytest-rerunfailures>=14.0",
   "pytest-shard==0.1.2",
-  "clickhouse_connect==0.7.0",
+  "clickhouse_connect==0.10.0",
   "fastapi>=0.110.0",
   "sqlparse==0.5.0",
   "freezegun",
