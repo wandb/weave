@@ -10,7 +10,7 @@ from pydantic import BaseModel
 import weave
 from weave.integrations.patcher import SymbolPatcher
 from weave.trace.autopatch import OpSettings
-from weave.trace.op_protocol import Op
+from weave.trace.op_protocol import Op, OpKind
 from weave.trace.serialization.serialize import is_primitive, stringify
 from weave.utils.sanitize import REDACTED_VALUE, should_redact
 
@@ -30,7 +30,10 @@ def pop_history(dictifed_inputs: dict[str, Any]) -> None:
 
 
 def get_symbol_patcher(
-    base_symbol: str, attribute_name: str, settings: OpSettings
+    base_symbol: str,
+    attribute_name: str,
+    settings: OpSettings,
+    kind: OpKind | None = None,
 ) -> SymbolPatcher:
     display_name = base_symbol + "." + attribute_name
     display_name = (
@@ -38,12 +41,13 @@ def get_symbol_patcher(
         if attribute_name.endswith(".__call__")
         else display_name
     )
+    update: dict[str, Any] = {"name": settings.name or display_name}
+    if kind:
+        update["kind"] = settings.kind or kind
     return SymbolPatcher(
         lambda: importlib.import_module(base_symbol),
         attribute_name,
-        dspy_wrapper(
-            settings.model_copy(update={"name": settings.name or display_name})
-        ),
+        dspy_wrapper(settings.model_copy(update=update)),
     )
 
 
