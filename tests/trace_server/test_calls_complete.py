@@ -506,3 +506,86 @@ def test_update_call_end_in_calls_complete_requires_started_at(
     ch_end = _end_call_for_insert_to_ch_insertable_end_call(end_req)
     with pytest.raises(ValueError):
         clickhouse_trace_server._update_call_end_in_calls_complete(ch_end)
+
+
+def test_v1_call_start_raises_calls_complete_mode_required(
+    trace_server, clickhouse_trace_server
+):
+    """Verify v1 call_start raises CallsCompleteModeRequired for calls_complete projects.
+
+    When a project is in calls_complete mode (has existing data in calls_complete),
+    attempting to use the legacy v1 call_start API should raise an error directing
+    the user to upgrade their SDK.
+    """
+    from weave.trace_server.errors import CallsCompleteModeRequired
+
+    project_id = f"{TEST_ENTITY}/calls_complete_v1_error_start"
+
+    # Seed the project with calls_complete data to establish it as a calls_complete project
+    seed_call = _make_completed_call(
+        project_id,
+        str(uuid.uuid4()),
+        str(uuid.uuid4()),
+        datetime.datetime.now(datetime.timezone.utc),
+        datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=1),
+    )
+    trace_server.calls_complete(tsi.CallsUpsertCompleteReq(batch=[seed_call]))
+
+    # Now attempt v1 call_start - should raise CallsCompleteModeRequired
+    with pytest.raises(CallsCompleteModeRequired) as exc_info:
+        trace_server.call_start(
+            tsi.CallStartReq(
+                start=tsi.StartedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=str(uuid.uuid4()),
+                    trace_id=str(uuid.uuid4()),
+                    op_name="test_op",
+                    started_at=datetime.datetime.now(datetime.timezone.utc),
+                    attributes={},
+                    inputs={},
+                )
+            )
+        )
+
+    # Verify error contains helpful information
+    assert "complete" in str(exc_info.value).lower()
+
+
+def test_v1_call_end_raises_calls_complete_mode_required(
+    trace_server, clickhouse_trace_server
+):
+    """Verify v1 call_end raises CallsCompleteModeRequired for calls_complete projects.
+
+    When a project is in calls_complete mode (has existing data in calls_complete),
+    attempting to use the legacy v1 call_end API should raise an error directing
+    the user to upgrade their SDK.
+    """
+    from weave.trace_server.errors import CallsCompleteModeRequired
+
+    project_id = f"{TEST_ENTITY}/calls_complete_v1_error_end"
+
+    # Seed the project with calls_complete data to establish it as a calls_complete project
+    seed_call = _make_completed_call(
+        project_id,
+        str(uuid.uuid4()),
+        str(uuid.uuid4()),
+        datetime.datetime.now(datetime.timezone.utc),
+        datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=1),
+    )
+    trace_server.calls_complete(tsi.CallsUpsertCompleteReq(batch=[seed_call]))
+
+    # Now attempt v1 call_end - should raise CallsCompleteModeRequired
+    with pytest.raises(CallsCompleteModeRequired) as exc_info:
+        trace_server.call_end(
+            tsi.CallEndReq(
+                end=tsi.EndedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=str(uuid.uuid4()),
+                    ended_at=datetime.datetime.now(datetime.timezone.utc),
+                    summary={"usage": {}, "status_counts": {}},
+                )
+            )
+        )
+
+    # Verify error contains helpful information
+    assert "complete" in str(exc_info.value).lower()

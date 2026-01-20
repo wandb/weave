@@ -105,8 +105,16 @@ class TableRoutingResolver:
 
         if self._mode == CallsStorageServerMode.AUTO:
             if write_source == WriteSourceVersion.V1:
-                return WriteTarget.CALLS_MERGED
+                # V1 writes go to MERGED unless project only has COMPLETE data
+                if residence == ProjectDataResidence.COMPLETE_ONLY:
+                    return WriteTarget.CALLS_COMPLETE
+                else:
+                    return WriteTarget.CALLS_MERGED
             if write_source == WriteSourceVersion.V2:
-                return WriteTarget.CALLS_COMPLETE
+                # V2 writes go to MERGED if there is already calls_merged data
+                if residence == ProjectDataResidence.MERGED_ONLY:
+                    return WriteTarget.CALLS_MERGED
+                else:
+                    return WriteTarget.CALLS_COMPLETE
 
         raise ValueError(f"Invalid mode/residence: {self._mode}/{residence}")
