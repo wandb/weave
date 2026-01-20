@@ -51,6 +51,7 @@ def count_queries(ch_client):
         "expected_read_table",
         "expected_v1_write_target",
         "expected_v2_write_target",
+        "expect_dual_residency_warning",
     ),
     [
         # EMPTY: V1 -> MERGED (new projects), V2 -> COMPLETE (new projects)
@@ -59,6 +60,7 @@ def count_queries(ch_client):
             ReadTable.CALLS_COMPLETE,
             WriteTarget.CALLS_MERGED,
             WriteTarget.CALLS_COMPLETE,
+            False,
         ),
         # MERGED_ONLY: V1 -> MERGED, V2 -> MERGED (keep data together)
         (
@@ -66,6 +68,7 @@ def count_queries(ch_client):
             ReadTable.CALLS_MERGED,
             WriteTarget.CALLS_MERGED,
             WriteTarget.CALLS_MERGED,
+            False,
         ),
         # COMPLETE_ONLY: V1 -> COMPLETE (triggers error), V2 -> COMPLETE
         (
@@ -73,6 +76,7 @@ def count_queries(ch_client):
             ReadTable.CALLS_COMPLETE,
             WriteTarget.CALLS_COMPLETE,
             WriteTarget.CALLS_COMPLETE,
+            False,
         ),
         # BOTH: V1 -> MERGED, V2 -> COMPLETE (prefer COMPLETE for new writes)
         (
@@ -80,9 +84,11 @@ def count_queries(ch_client):
             ReadTable.CALLS_COMPLETE,
             WriteTarget.CALLS_MERGED,
             WriteTarget.CALLS_COMPLETE,
+            True,  # Dual residency triggers a warning log
         ),
     ],
 )
+@pytest.mark.parametrize("log_collector", ["warning"], indirect=True)
 def test_version_resolution_by_table_contents(
     client,
     trace_server,
@@ -90,6 +96,8 @@ def test_version_resolution_by_table_contents(
     expected_read_table,
     expected_v1_write_target,
     expected_v2_write_target,
+    expect_dual_residency_warning,
+    log_collector,
 ):
     """Test routing resolution for different project data residency states."""
     if client_is_sqlite(client):
@@ -116,6 +124,20 @@ def test_version_resolution_by_table_contents(
         resolver.resolve_v2_write_target(project_id, ch_server.ch_client)
         == expected_v2_write_target
     )
+
+    # Verify dual residency warning is logged when expected
+    warning_logs = log_collector.get_warning_logs()
+    dual_residency_warnings = [
+        log for log in warning_logs if "dual call residency" in log.message.lower()
+    ]
+    if expect_dual_residency_warning:
+        assert len(dual_residency_warnings) > 0, (
+            "Expected dual residency warning but none was logged"
+        )
+    else:
+        assert len(dual_residency_warnings) == 0, (
+            f"Unexpected dual residency warning: {dual_residency_warnings}"
+        )
 
 
 def test_caching_behavior(client, trace_server):

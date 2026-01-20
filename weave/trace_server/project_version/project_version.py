@@ -57,10 +57,11 @@ class TableRoutingResolver:
 
         residence = get_project_data_residence(project_id, ch_client)
 
-        # Log error if we detect dual residency - data should only ever be in
-        # calls_merged OR calls_complete, not both. TODO: consider raising
+        # Log warning if we detect dual residency - data should only ever be in
+        # calls_merged OR calls_complete, not both. This is handled gracefully but
+        # indicates an unexpected state that should be investigated.
         if residence == ProjectDataResidence.BOTH:
-            logger.error(f"Detected dual call residency for project {project_id}. ")
+            logger.warning(f"Detected dual call residency for project {project_id}. ")
             set_current_span_dd_tags(
                 {
                     "project_version.dual_residency": "true",
