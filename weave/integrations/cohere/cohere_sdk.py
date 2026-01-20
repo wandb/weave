@@ -194,6 +194,126 @@ def cohere_stream_wrapper_v2(settings: OpSettings) -> Callable:
     return wrapper
 
 
+def cohere_embed_wrapper(settings: OpSettings) -> Callable:
+    def wrapper(fn: Callable) -> Callable:
+        def _post_process_response(fn: Callable) -> Any:
+            @wraps(fn)
+            def _wrapper(*args: Any, **kwargs: Any) -> Any:
+                response = fn(*args, **kwargs)
+
+                try:
+                    from cohere.types.embed_response import EmbedResponse
+                    from cohere.types.api_meta import ApiMeta
+                    from cohere.types.api_meta_api_version import ApiMetaApiVersion
+                    from cohere.types.api_meta_billed_units import ApiMetaBilledUnits
+                    from cohere.types.usage import Usage
+                    from cohere.types.usage_tokens import UsageTokens
+                    from cohere.types.usage_billed_units import UsageBilledUnits
+
+                    # Create a new instance with modified `meta`
+                    response_dict = response.dict()
+                    response_dict["meta"] = ApiMeta(
+                        api_version=ApiMetaApiVersion(
+                            version=response.meta.api_version.version,
+                            is_deprecated=response.meta.api_version.is_deprecated,
+                            is_experimental=response.meta.api_version.is_experimental,
+                        ),
+                        billed_units=ApiMetaBilledUnits(
+                            input_tokens=response.meta.billed_units.input_tokens,
+                            output_tokens=response.meta.billed_units.output_tokens,
+                            search_units=response.meta.billed_units.search_units,
+                            classifications=response.meta.billed_units.classifications,
+                        ),
+                        warnings=response.meta.warnings,
+                    )
+
+                    # Add usage data in the format Weave expects
+                    response_dict["usage"] = {
+                        "billed_units": {
+                            "input_tokens": response.meta.billed_units.input_tokens,
+                            "output_tokens": 0,  # Embeddings don't have output tokens
+                        },
+                        "tokens": {
+                            "input_tokens": response.meta.billed_units.input_tokens,
+                            "output_tokens": 0,  # Embeddings don't have output tokens
+                        },
+                    }
+
+                    response = EmbedResponse(**response_dict)
+                except:
+                    pass  # prompt to upgrade cohere sdk
+
+                return response
+
+            return _wrapper
+
+        op_kwargs = settings.model_dump()
+        op = weave.op(_post_process_response(fn), **op_kwargs)
+        return op
+
+    return wrapper
+
+
+def cohere_embed_wrapper_async(settings: OpSettings) -> Callable:
+    def wrapper(fn: Callable) -> Callable:
+        def _post_process_response(fn: Callable) -> Any:
+            @wraps(fn)
+            async def _wrapper(*args: Any, **kwargs: Any) -> Any:
+                response = await fn(*args, **kwargs)
+
+                try:
+                    from cohere.types.embed_response import EmbedResponse
+                    from cohere.types.api_meta import ApiMeta
+                    from cohere.types.api_meta_api_version import ApiMetaApiVersion
+                    from cohere.types.api_meta_billed_units import ApiMetaBilledUnits
+                    from cohere.types.usage import Usage
+                    from cohere.types.usage_tokens import UsageTokens
+                    from cohere.types.usage_billed_units import UsageBilledUnits
+
+                    # Create a new instance with modified `meta`
+                    response_dict = response.dict()
+                    response_dict["meta"] = ApiMeta(
+                        api_version=ApiMetaApiVersion(
+                            version=response.meta.api_version.version,
+                            is_deprecated=response.meta.api_version.is_deprecated,
+                            is_experimental=response.meta.api_version.is_experimental,
+                        ),
+                        billed_units=ApiMetaBilledUnits(
+                            input_tokens=response.meta.billed_units.input_tokens,
+                            output_tokens=response.meta.billed_units.output_tokens,
+                            search_units=response.meta.billed_units.search_units,
+                            classifications=response.meta.billed_units.classifications,
+                        ),
+                        warnings=response.meta.warnings,
+                    )
+
+                    # Add usage data in the format Weave expects
+                    response_dict["usage"] = {
+                        "billed_units": {
+                            "input_tokens": response.meta.billed_units.input_tokens,
+                            "output_tokens": 0,  # Embeddings don't have output tokens
+                        },
+                        "tokens": {
+                            "input_tokens": response.meta.billed_units.input_tokens,
+                            "output_tokens": 0,  # Embeddings don't have output tokens
+                        },
+                    }
+
+                    response = EmbedResponse(**response_dict)
+                except:
+                    pass  # prompt to upgrade cohere sdk
+
+                return response
+
+            return _wrapper
+
+        op_kwargs = settings.model_dump()
+        op = weave.op(_post_process_response(fn), **op_kwargs)
+        return op
+
+    return wrapper
+
+
 def get_cohere_patcher(
     settings: IntegrationSettings | None = None,
 ) -> MultiPatcher | NoOpPatcher:
@@ -257,6 +377,12 @@ def get_cohere_patcher(
             "kind": base.kind or "llm",
         }
     )
+    embed_settings = base.model_copy(
+        update={"name": base.name or "cohere.Client.embed"}
+    )
+    async_embed_settings = base.model_copy(
+        update={"name": base.name or "cohere.AsyncClient.embed"}
+    )
 
     _cohere_patcher = MultiPatcher(
         [
@@ -306,6 +432,18 @@ def get_cohere_patcher(
                 lambda: importlib.import_module("cohere"),
                 "AsyncClientV2.chat_stream",
                 cohere_stream_wrapper_v2(async_chat_stream_v2_settings),
+            ),
+            # Add patch for embeddings
+            SymbolPatcher(
+                lambda: importlib.import_module("cohere"),
+                "Client.embed",
+                cohere_embed_wrapper(embed_settings),
+            ),
+            # Add patch for async embeddings
+            SymbolPatcher(
+                lambda: importlib.import_module("cohere"),
+                "AsyncClient.embed",
+                cohere_embed_wrapper_async(async_embed_settings),
             ),
         ]
     )
