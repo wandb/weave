@@ -148,7 +148,7 @@ from weave.trace_server.project_query_builder import make_project_stats_query
 from weave.trace_server.project_version.project_version import (
     TableRoutingResolver,
 )
-from weave.trace_server.project_version.types import WriteSourceVersion, WriteTarget
+from weave.trace_server.project_version.types import WriteTarget
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 from weave.trace_server.table_query_builder import (
     ROW_ORDER_COLUMN_NAME,
@@ -546,10 +546,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         ch_call = _start_call_for_insert_to_ch_insertable_start_call(req.start)
 
         # Check write target - v1 call_start cannot write to calls_complete
-        write_target = self.table_routing_resolver.resolve_write_target(
+        write_target = self.table_routing_resolver.resolve_v1_write_target(
             ch_call.project_id,
             self.ch_client,
-            write_source=WriteSourceVersion.V1,
         )
         if write_target == WriteTarget.CALLS_COMPLETE:
             raise CallsCompleteModeRequired(ch_call.project_id)
@@ -577,10 +576,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         ch_call = _end_call_for_insert_to_ch_insertable_end_call(req.end)
 
         # Check write target - v1 call_end cannot write to calls_complete
-        write_target = self.table_routing_resolver.resolve_write_target(
+        write_target = self.table_routing_resolver.resolve_v1_write_target(
             ch_call.project_id,
             self.ch_client,
-            write_source=WriteSourceVersion.V1,
         )
         if write_target == WriteTarget.CALLS_COMPLETE:
             raise CallsCompleteModeRequired(ch_call.project_id)
@@ -627,10 +625,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             # calls in the batch, subsequent calls just hit the in-memory cache. This
             # is here for technical correctness, in case we relax project_id target
             # constraints intra-batch
-            write_target = self.table_routing_resolver.resolve_write_target(
+            write_target = self.table_routing_resolver.resolve_v2_write_target(
                 complete_call.project_id,
                 self.ch_client,
-                write_source=WriteSourceVersion.V2,
             )
 
             ch_call = _complete_call_to_ch_insertable(complete_call)
@@ -650,10 +647,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         start_req = process_call_req_to_content(tsi.CallStartReq(start=req.start), self)
         ch_start = _start_call_for_insert_to_ch_insertable_start_call(start_req.start)
 
-        write_target = self.table_routing_resolver.resolve_write_target(
+        write_target = self.table_routing_resolver.resolve_v2_write_target(
             ch_start.project_id,
             self.ch_client,
-            write_source=WriteSourceVersion.V2,
         )
         if write_target == WriteTarget.CALLS_COMPLETE:
             ch_complete_start = _start_call_insertable_to_complete_start(ch_start)
@@ -678,10 +674,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         """
         req = process_call_req_to_content(req, self)
 
-        write_target = self.table_routing_resolver.resolve_write_target(
+        write_target = self.table_routing_resolver.resolve_v2_write_target(
             req.end.project_id,
             self.ch_client,
-            write_source=WriteSourceVersion.V2,
         )
 
         # If writing to calls_complete, perform lightweight UPDATE

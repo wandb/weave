@@ -13,7 +13,6 @@ from weave.trace_server.project_version.types import (
     CallsStorageServerMode,
     ProjectDataResidence,
     ReadTable,
-    WriteSourceVersion,
     WriteTarget,
 )
 
@@ -100,14 +99,24 @@ class TableRoutingResolver:
 
         raise ValueError(f"Invalid mode/residence: {self._mode}/{residence}")
 
-    @ddtrace.tracer.wrap(name="table_routing.resolve_write_target")
-    def resolve_write_target(
+    @ddtrace.tracer.wrap(name="table_routing.resolve_v1_write_target")
+    def resolve_v1_write_target(
         self,
         project_id: str,
         ch_client: CHClient,
-        write_source: WriteSourceVersion,
     ) -> WriteTarget:
-        """Resolve which table(s) to write to for a given project."""
+        """Resolve write target for V1 (legacy) API calls.
+
+        V1 writes go to MERGED unless project only has COMPLETE data.
+        In the COMPLETE_ONLY case, the caller should raise an error.
+
+        Args:
+            project_id: The internal project ID.
+            ch_client: ClickHouse client instance.
+
+        Returns:
+            WriteTarget indicating which table to write to.
+        """
         if self._mode == CallsStorageServerMode.OFF:
             return WriteTarget.CALLS_MERGED
 
@@ -118,17 +127,43 @@ class TableRoutingResolver:
             return WriteTarget.CALLS_MERGED
 
         if self._mode == CallsStorageServerMode.AUTO:
-            if write_source == WriteSourceVersion.V1:
-                # V1 writes go to MERGED unless project only has COMPLETE data
-                if residence == ProjectDataResidence.COMPLETE_ONLY:
-                    return WriteTarget.CALLS_COMPLETE
-                else:
-                    return WriteTarget.CALLS_MERGED
-            if write_source == WriteSourceVersion.V2:
-                # V2 writes go to MERGED if there is already calls_merged data
-                if residence == ProjectDataResidence.MERGED_ONLY:
-                    return WriteTarget.CALLS_MERGED
-                else:
-                    return WriteTarget.CALLS_COMPLETE
+            # V1 writes go to MERGED unless project only has COMPLETE data
+            if residence == ProjectDataResidence.COMPLETE_ONLY:
+                return WriteTarget.CALLS_COMPLETE
+            return WriteTarget.CALLS_MERGED
+
+        raise ValueError(f"Invalid mode/residence: {self._mode}/{residence}")
+
+    @ddtrace.tracer.wrap(name="table_routing.resolve_v2_write_target")
+    def resolve_v2_write_target(
+        self,
+        project_id: str,
+        ch_client: CHClient,
+    ) -> WriteTarget:
+        """Resolve write target for V2 API calls.
+
+        V2 writes go to COMPLETE unless project already has MERGED data.
+
+        Args:
+            project_id: The internal project ID.
+            ch_client: ClickHouse client instance.
+
+        Returns:
+            WriteTarget indicating which table to write to.
+        """
+        if self._mode == CallsStorageServerMode.OFF:
+            return WriteTarget.CALLS_MERGED
+
+        residence = self._get_residence(project_id, ch_client)
+        set_current_span_dd_tags({"project_version.residence": residence.value})
+
+        if self._mode == CallsStorageServerMode.FORCE_LEGACY:
+            return WriteTarget.CALLS_MERGED
+
+        if self._mode == CallsStorageServerMode.AUTO:
+            # V2 writes go to MERGED if there is already calls_merged data
+            if residence == ProjectDataResidence.MERGED_ONLY:
+                return WriteTarget.CALLS_MERGED
+            return WriteTarget.CALLS_COMPLETE
 
         raise ValueError(f"Invalid mode/residence: {self._mode}/{residence}")
