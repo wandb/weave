@@ -369,6 +369,72 @@ def test_call_create(client):
     assert dataclasses.asdict(result._val) == dataclasses.asdict(expected)
 
 
+def test_call_create_with_started_at(client):
+    """Test create_call with a custom started_at timestamp."""
+    import datetime
+
+    custom_start = datetime.datetime(
+        2024, 1, 15, 10, 30, 0, tzinfo=datetime.timezone.utc
+    )
+    call = client.create_call("x", {"a": 5, "b": 10}, started_at=custom_start)
+    client.finish_call(call, "hello")
+
+    result = client.get_call(call.id)
+    assert result.started_at == custom_start
+
+
+def test_finish_call_with_ended_at(client):
+    """Test finish_call with a custom ended_at timestamp."""
+    import datetime
+
+    custom_end = datetime.datetime(2024, 1, 15, 11, 45, 0, tzinfo=datetime.timezone.utc)
+    call = client.create_call("x", {"a": 5, "b": 10})
+    client.finish_call(call, "hello", ended_at=custom_end)
+
+    result = client.get_call(call.id)
+    assert result.ended_at == custom_end
+
+
+def test_call_create_and_finish_with_custom_timestamps(client):
+    """Test both create_call and finish_call with custom timestamps."""
+    import datetime
+
+    custom_start = datetime.datetime(
+        2024, 1, 15, 10, 30, 0, tzinfo=datetime.timezone.utc
+    )
+    custom_end = datetime.datetime(2024, 1, 15, 10, 35, 0, tzinfo=datetime.timezone.utc)
+
+    call = client.create_call("x", {"a": 5, "b": 10}, started_at=custom_start)
+    client.finish_call(call, "hello", ended_at=custom_end)
+
+    result = client.get_call(call.id)
+    assert result.started_at == custom_start
+    assert result.ended_at == custom_end
+
+
+def test_retroactive_call_logging(client):
+    """Test retroactive logging by creating calls with past timestamps."""
+    import datetime
+
+    # Simulate logging an operation that happened in the past
+    past_start = datetime.datetime(2023, 6, 1, 9, 0, 0, tzinfo=datetime.timezone.utc)
+    past_end = datetime.datetime(2023, 6, 1, 9, 5, 30, tzinfo=datetime.timezone.utc)
+
+    call = client.create_call(
+        "historical_processing",
+        {"batch_id": "batch_001", "records": 1000},
+        started_at=past_start,
+    )
+    client.finish_call(call, {"processed": 1000, "errors": 0}, ended_at=past_end)
+
+    result = client.get_call(call.id)
+    assert result.started_at == past_start
+    assert result.ended_at == past_end
+    # Verify duration can be calculated
+    duration = result.ended_at - result.started_at
+    assert duration.total_seconds() == 330  # 5 minutes 30 seconds
+
+
 def test_calls_query(client):
     call0 = client.create_call("x", {"a": 5, "b": 10})
     call1 = client.create_call("x", {"a": 6, "b": 11})

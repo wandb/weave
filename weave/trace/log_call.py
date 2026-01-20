@@ -8,6 +8,7 @@ outputs without using the decorator pattern.
 
 from __future__ import annotations
 
+import datetime
 from collections.abc import Callable
 from typing import Any
 
@@ -27,6 +28,9 @@ def log_call(
     use_stack: bool = True,
     # Additional arguments for call finishing
     exception: BaseException | None = None,
+    # Timestamp overrides for retroactive logging
+    started_at: datetime.datetime | None = None,
+    ended_at: datetime.datetime | None = None,
 ) -> Call:
     """Log a call directly to Weave without using the decorator pattern.
 
@@ -54,6 +58,12 @@ def log_call(
             added to the call stack. Defaults to True.
         exception (BaseException | None): Optional exception to log if the operation
             failed. Defaults to None.
+        started_at (datetime.datetime | None): Optional timestamp for when the call
+            started. If not provided, uses the current time. Useful for retroactive
+            logging of past operations. Defaults to None.
+        ended_at (datetime.datetime | None): Optional timestamp for when the call
+            ended. If not provided, uses the current time. Useful for retroactive
+            logging of past operations. Defaults to None.
 
     Returns:
         Call: The created and finished Call object with full trace information.
@@ -116,9 +126,10 @@ def log_call(
         attributes=attributes,
         display_name=display_name,
         use_stack=use_stack,
+        started_at=started_at,
     )
 
     # Immediately finish the call with the output or exception
-    client.finish_call(call, output=output, exception=exception)
+    client.finish_call(call, output=output, exception=exception, ended_at=ended_at)
 
     return call
