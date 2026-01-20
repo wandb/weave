@@ -5,6 +5,7 @@ import ddtrace
 from cachetools import LRUCache
 from clickhouse_connect.driver.client import Client as CHClient
 
+from weave.trace_server.datadog import set_current_span_dd_tags
 from weave.trace_server.project_version.clickhouse_project_version import (
     get_project_data_residence,
 )
@@ -57,6 +58,17 @@ class TableRoutingResolver:
 
         residence = get_project_data_residence(project_id, ch_client)
 
+        # Log error if we detect dual residency - data should only ever be in
+        # calls_merged OR calls_complete, not both. TODO: consider raising
+        if residence == ProjectDataResidence.BOTH:
+            logger.error(f"Detected dual call residency for project {project_id}. ")
+            set_current_span_dd_tags(
+                {
+                    "project_version.dual_residency": "true",
+                    "project_version.dual_residency.project_id": project_id,
+                }
+            )
+
         # Don't cache if project is empty, we could write to either table.
         if residence != ProjectDataResidence.EMPTY:
             with _project_residence_cache_lock:
@@ -71,6 +83,7 @@ class TableRoutingResolver:
             return ReadTable.CALLS_MERGED
 
         residence = self._get_residence(project_id, ch_client)
+        set_current_span_dd_tags({"project_version.residence": residence.value})
 
         if self._mode == CallsStorageServerMode.FORCE_LEGACY:
             return ReadTable.CALLS_MERGED
@@ -99,6 +112,7 @@ class TableRoutingResolver:
             return WriteTarget.CALLS_MERGED
 
         residence = self._get_residence(project_id, ch_client)
+        set_current_span_dd_tags({"project_version.residence": residence.value})
 
         if self._mode == CallsStorageServerMode.FORCE_LEGACY:
             return WriteTarget.CALLS_MERGED
