@@ -28,6 +28,13 @@ def google_genai_gemini_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, 
     if model_name is not None:
         inputs["model"] = model_name
 
+    # Extract system_instruction from config if present and surface it at top level
+    config = inputs.get("config")
+    if config is not None:
+        system_instruction = getattr(config, "system_instruction", None)
+        if system_instruction is not None:
+            inputs["system_instruction"] = system_instruction
+
     # Convert the `self` parameter which is actually the state of the
     # `google.genai.models.Models` object to a dictionary of attributes that can
     # be displayed in the Weave UI

@@ -282,6 +282,42 @@ def test_function_calling(client):
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 @pytest.mark.skip_clickhouse_client
+def test_system_instruction_extracted_from_config(client):
+    """Test that system_instruction is extracted from config and surfaced at top level of inputs."""
+    google_client = genai.Client(api_key=os.getenv("GOOGLE_GENAI_KEY", "DUMMY_API_KEY"))
+    system_instruction = (
+        "You are a helpful assistant that always responds in haiku format."
+    )
+
+    google_client.models.generate_content(
+        model="gemini-2.0-flash",
+        contents="What's the capital of France?",
+        config=genai.types.GenerateContentConfig(
+            system_instruction=system_instruction,
+            temperature=0.5,
+        ),
+    )
+
+    call = next(iter(client.get_calls()))
+    assert call.started_at < call.ended_at
+    trace_name = op_name_from_ref(call.op_name)
+    assert trace_name == "google.genai.models.Models.generate_content"
+
+    # Verify that system_instruction is surfaced at the top level of inputs
+    assert "system_instruction" in call.inputs
+    assert call.inputs["system_instruction"] == system_instruction
+
+    # Verify that the call was successful
+    assert call.output is not None
+    assert call.output.usageMetadata.candidatesTokenCount > 0
+    assert call.output.usageMetadata.promptTokenCount > 0
+
+
+@pytest.mark.vcr(
+    filter_headers=["authorization", "x-api-key", "x-goog-api-key"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+)
+@pytest.mark.skip_clickhouse_client
 def test_image_generation_sync(client):
     google_client = genai.Client(api_key=os.getenv("GOOGLE_GENAI_KEY", "DUMMY_API_KEY"))
     response = google_client.models.generate_images(
