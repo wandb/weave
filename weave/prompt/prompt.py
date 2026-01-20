@@ -266,7 +266,7 @@ class EasyPrompt(UserList, Prompt):
     @property
     def system_prompt(self) -> "Prompt":
         """Join all messages into a system prompt object."""
-        return Prompt(self.as_str, role="system")
+        return EasyPrompt(self.as_str, role="system")
 
     @property
     def messages(self) -> list[Message]:
