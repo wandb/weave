@@ -49,6 +49,7 @@ def count_queries(ch_client):
 @pytest.mark.parametrize(
     ("tables", "expected_read_table", "expected_write_targets"),
     [
+        # EMPTY: V1 -> MERGED (new projects), V2 -> COMPLETE (new projects)
         (
             [],
             ReadTable.CALLS_COMPLETE,
@@ -57,22 +58,25 @@ def count_queries(ch_client):
                 WriteSourceVersion.V2: WriteTarget.CALLS_COMPLETE,
             },
         ),
+        # MERGED_ONLY: V1 -> MERGED, V2 -> MERGED (keep data together)
         (
             ["calls_merged"],
             ReadTable.CALLS_MERGED,
             {
                 WriteSourceVersion.V1: WriteTarget.CALLS_MERGED,
-                WriteSourceVersion.V2: WriteTarget.CALLS_COMPLETE,
+                WriteSourceVersion.V2: WriteTarget.CALLS_MERGED,
             },
         ),
+        # COMPLETE_ONLY: V1 -> COMPLETE (triggers error), V2 -> COMPLETE
         (
             ["calls_complete"],
             ReadTable.CALLS_COMPLETE,
             {
-                WriteSourceVersion.V1: WriteTarget.CALLS_MERGED,
+                WriteSourceVersion.V1: WriteTarget.CALLS_COMPLETE,
                 WriteSourceVersion.V2: WriteTarget.CALLS_COMPLETE,
             },
         ),
+        # BOTH: V1 -> MERGED, V2 -> COMPLETE (prefer COMPLETE for new writes)
         (
             ["calls_merged", "calls_complete"],
             ReadTable.CALLS_COMPLETE,

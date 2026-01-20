@@ -176,12 +176,15 @@ def _make_completed_call(
         "seed_complete",
         "seed_merged",
         "expected_complete",
-        "expected_parts",
+        "expected_merged",
     ),
     [
+        # EMPTY: V2 writes go to calls_complete
         ("calls_complete_empty", 0, 0, 1, 0),
+        # COMPLETE_ONLY: V2 writes go to calls_complete
         ("calls_complete_only", 1, 0, 2, 0),
-        ("calls_complete_merged_only", 0, 1, 1, 0),
+        # MERGED_ONLY: V2 writes go to calls_merged (keep data together)
+        ("calls_complete_merged_only", 0, 1, 0, 2),
     ],
 )
 def test_calls_complete_routing_by_residence(
@@ -191,7 +194,7 @@ def test_calls_complete_routing_by_residence(
     seed_complete: int,
     seed_merged: int,
     expected_complete: int,
-    expected_parts: int,
+    expected_merged: int,
 ):
     """Validate calls_complete routing for empty/complete/merged projects."""
     project_id = f"{TEST_ENTITY}/{project_suffix}"
@@ -227,9 +230,9 @@ def test_calls_complete_routing_by_residence(
     )
     assert (
         _count_project_rows(
-            clickhouse_trace_server.ch_client, "call_parts", internal_project_id
+            clickhouse_trace_server.ch_client, "calls_merged", internal_project_id
         )
-        == expected_parts
+        == expected_merged
     )
 
 
@@ -334,9 +337,9 @@ def test_call_start_end_v2_updates_calls_complete(
 
 
 def test_call_start_end_v2_writes_calls_complete(trace_server, clickhouse_trace_server):
-    project_id = f"{TEST_ENTITY}/calls_complete_v2_merged"
+    """Test that V2 call_start/call_end writes to calls_complete for empty projects."""
+    project_id = f"{TEST_ENTITY}/calls_complete_v2_empty"
     internal_project_id = b64(project_id)
-    _insert_merged_call(clickhouse_trace_server.ch_client, internal_project_id)
 
     started_at = datetime.datetime.now(datetime.timezone.utc)
     call_id = str(uuid.uuid4())
@@ -379,6 +382,58 @@ def test_call_start_end_v2_writes_calls_complete(trace_server, clickhouse_trace_
         call_id,
     )
     assert ended_at is not None
+
+
+def test_call_start_end_v2_writes_calls_merged_for_merged_project(
+    trace_server, clickhouse_trace_server
+):
+    """Test that V2 call_start/call_end writes to calls_merged for MERGED_ONLY projects."""
+    project_id = f"{TEST_ENTITY}/calls_complete_v2_merged"
+    internal_project_id = b64(project_id)
+    _insert_merged_call(clickhouse_trace_server.ch_client, internal_project_id)
+
+    started_at = datetime.datetime.now(datetime.timezone.utc)
+    call_id = str(uuid.uuid4())
+    trace_id = str(uuid.uuid4())
+    trace_server.call_start_v2(
+        tsi.CallStartV2Req(
+            start=tsi.StartedCallSchemaForInsert(
+                project_id=project_id,
+                id=call_id,
+                trace_id=trace_id,
+                op_name="test_op",
+                started_at=started_at,
+                attributes={},
+                inputs={},
+            )
+        )
+    )
+    trace_server.call_end_v2(
+        tsi.CallEndV2Req(
+            end=tsi.EndedCallSchemaForInsertWithStartedAt(
+                project_id=project_id,
+                id=call_id,
+                started_at=started_at,
+                ended_at=started_at + datetime.timedelta(seconds=1),
+                summary={"usage": {}, "status_counts": {}},
+            )
+        )
+    )
+
+    # V2 writes should go to calls_merged for MERGED_ONLY projects
+    # 1 seeded + 1 from call_start_v2 + 1 from call_end_v2 = 3
+    assert (
+        _count_project_rows(
+            clickhouse_trace_server.ch_client, "calls_merged", internal_project_id
+        )
+        == 3
+    )
+    assert (
+        _count_project_rows(
+            clickhouse_trace_server.ch_client, "calls_complete", internal_project_id
+        )
+        == 0
+    )
 
 
 def test_call_start_and_end_require_calls_complete_mode(
