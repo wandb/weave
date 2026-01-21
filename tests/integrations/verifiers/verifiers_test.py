@@ -95,7 +95,7 @@ def test_verifiers_environment_evaluate_with_mock_env(client: WeaveClient) -> No
 
     env = MockEnv()
 
-    openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY", "DUMMY_API_KEY"))
     results = env.evaluate(
         openai_client,
         "gpt-4.1-mini",
