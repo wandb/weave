@@ -5199,8 +5199,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
             # InsertTooLarge: raise immediately, no retry
             except ValueError as e:
-                _raise_if_insert_too_large(e)
-                _log_and_raise_insert_error(e, table, data)
+                converted = _convert_to_insert_too_large(e)
+                _log_and_raise_insert_error(converted, table, data)
 
             # Empty query error: RETRY (generator was consumed during HTTP retry)
             # We should retry with a fresh generator
@@ -5949,18 +5949,25 @@ def _sanitize_name_for_object_id(name: str) -> str:
 # -----------------------------------------------------------------------------
 
 
-def _raise_if_insert_too_large(e: Exception) -> None:
-    """Raise InsertTooLarge if the error indicates data is too large."""
+def _convert_to_insert_too_large(e: Exception) -> Exception:
+    """Convert ValueError to InsertTooLarge if the error indicates data is too large."""
     if isinstance(e, ValueError) and "negative shift count" in str(e):
-        raise InsertTooLarge(
+        return InsertTooLarge(
             "Database insertion failed. Record too large. "
             "A likely cause is that a single row or cell exceeded "
             "the limit. If logging images, save them as `Image.PIL`."
-        ) from e
+        )
+    return e
 
 
 def _should_retry_empty_query(e: Exception, table: str, attempt: int) -> bool:
-    """Check if we should retry an empty query error. Logs warning if retrying."""
+    """Check if we should retry an empty query error. Logs warning if retrying.
+
+    Attempts to fix a longstanding "Empty query" error that intermittently
+    occurs during ClickHouse inserts. This happens when clickhouse-connect's
+    internal serialization generator gets exhausted during an HTTP connection
+    retry (after CH Cloud's keep-alive timeout causes a connection reset).
+    """
     is_empty_query = isinstance(e, DatabaseError) and "Empty query" in str(e)
     should_retry = is_empty_query and attempt < ch_settings.INSERT_MAX_RETRIES - 1
     if should_retry:
@@ -5989,4 +5996,4 @@ def _log_and_raise_insert_error(
             "data_bytes": data_bytes,
         },
     )
-    raise
+    raise e
