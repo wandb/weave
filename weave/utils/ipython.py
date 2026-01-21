@@ -3,6 +3,10 @@
 import ast
 import sys
 from collections.abc import Callable
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from IPython.core.interactiveshell import InteractiveShell
 
 
 class NotInteractiveEnvironmentError(Exception): ...
@@ -11,14 +15,14 @@ class NotInteractiveEnvironmentError(Exception): ...
 class ClassNotFoundError(ValueError): ...
 
 
-def _get_ipython():
+def _get_ipython() -> InteractiveShell | None:
     # Avoid importing IPython in non-interactive CLI runs since it may
     # initialize prompt_toolkit and mutate terminal mode (e.g., break Textual apps).
     if "IPython" not in sys.modules:
         return None
     try:
-        from IPython import get_ipython
-    except Exception:
+        from IPython.core.getipython import get_ipython
+    except (ImportError, ModuleNotFoundError):
         return None
     return get_ipython()
 
