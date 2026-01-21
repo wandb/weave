@@ -24,12 +24,16 @@ class MockObjectReadError(Exception):
 def test_clickhouse_storage_size_query_generation():
     """Test that ClickHouse storage size query generation works correctly."""
     # Mock the query builder and query stream
+    mock_ch_client = MagicMock()
     with (
         patch(
             "weave.trace_server.clickhouse_trace_server_batched.CallsQuery",
             autospec=True,
         ) as mock_cq,
         patch.object(chts.ClickHouseTraceServer, "_query_stream") as mock_query_stream,
+        patch.object(
+            chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
+        ),
     ):
         # Create a mock CallsQuery instance
         mock_calls_query = Mock()
@@ -348,6 +352,9 @@ def test_completions_create_stream_custom_provider_with_tracking():
         "secrets": {"CUSTOM_API_KEY": "test-api-key-value"}
     }
 
+    # Mock ClickHouse client to prevent real connection
+    mock_ch_client = MagicMock()
+
     with (
         secret_fetcher_context(mock_secret_fetcher),
         patch(
@@ -355,6 +362,9 @@ def test_completions_create_stream_custom_provider_with_tracking():
         ) as mock_litellm,
         patch.object(chts.ClickHouseTraceServer, "obj_read") as mock_obj_read,
         patch.object(chts.ClickHouseTraceServer, "_insert_call") as mock_insert_call,
+        patch.object(
+            chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
+        ),
     ):
         # Mock the litellm completion stream
         mock_stream = MagicMock()
@@ -516,12 +526,18 @@ def test_completions_create_stream_multiple_choices():
     mock_secret_fetcher = MagicMock()
     mock_secret_fetcher.fetch.return_value = {"secrets": {"OPENAI_API_KEY": "test-key"}}
 
+    # Mock ClickHouse client to prevent real connection
+    mock_ch_client = MagicMock()
+
     with (
         secret_fetcher_context(mock_secret_fetcher),
         patch(
             "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
         ) as mock_litellm,
         patch.object(chts.ClickHouseTraceServer, "_insert_call") as mock_insert_call,
+        patch.object(
+            chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
+        ),
     ):
         # Mock the litellm completion stream
         mock_stream = MagicMock()
@@ -649,12 +665,18 @@ def test_completions_create_stream_single_choice_unified_wrapper():
     mock_secret_fetcher = MagicMock()
     mock_secret_fetcher.fetch.return_value = {"secrets": {"OPENAI_API_KEY": "test-key"}}
 
+    # Mock ClickHouse client to prevent real connection
+    mock_ch_client = MagicMock()
+
     with (
         secret_fetcher_context(mock_secret_fetcher),
         patch(
             "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
         ) as mock_litellm,
         patch.object(chts.ClickHouseTraceServer, "_insert_call") as mock_insert_call,
+        patch.object(
+            chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
+        ),
     ):
         # Mock the litellm completion stream
         mock_stream = MagicMock()
