@@ -1,5 +1,6 @@
 import sys
 import types
+from typing import Any, ClassVar
 
 import pytest
 
@@ -28,7 +29,7 @@ def test_get_notebook_source_reads_cells(monkeypatch):
     module = types.ModuleType("IPython")
 
     class DummyShell:
-        user_ns = {"In": ["", "a = 1", "", "b = 2"]}
+        user_ns: ClassVar[dict[str, Any]] = {"In": ["", "a = 1", "", "b = 2"]}
 
     module.get_ipython = lambda: DummyShell()
     monkeypatch.setitem(sys.modules, "IPython", module)
