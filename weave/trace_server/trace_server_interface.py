@@ -502,6 +502,99 @@ class CallsQueryStatsRes(BaseModel):
     total_storage_size_bytes: int | None = None
 
 
+# === Calls Aggregate API ===
+
+# Mode for call aggregation:
+# - "recursive": Return stats per call with descendant totals (for trace view)
+# - "flat": Return one aggregate per trace_id (for table view)
+CallAggregateMode = Literal["recursive", "flat"]
+
+
+class TokenMetrics(BaseModel):
+    """Token metrics for a call or aggregation."""
+
+    prompt_tokens: int = Field(default=0, description="Input/prompt tokens")
+    completion_tokens: int = Field(default=0, description="Output/completion tokens")
+    total_tokens: int = Field(default=0, description="Total tokens")
+
+
+class CostMetrics(BaseModel):
+    """Cost metrics for a call or aggregation."""
+
+    prompt_tokens_total_cost: float | None = Field(
+        default=None, description="Total cost for input/prompt tokens"
+    )
+    completion_tokens_total_cost: float | None = Field(
+        default=None, description="Total cost for output/completion tokens"
+    )
+    total_cost: float | None = Field(
+        default=None, description="Total cost (prompt + completion)"
+    )
+
+
+class CallAggregateStats(BaseModel):
+    """Aggregated statistics for a single call or trace."""
+
+    tokens: TokenMetrics = Field(default_factory=TokenMetrics)
+    costs: CostMetrics = Field(default_factory=CostMetrics)
+
+
+class RecursiveCallAggregate(BaseModel):
+    """Aggregate data for a single call in recursive mode."""
+
+    call_id: str = Field(description="The call ID")
+    own: CallAggregateStats = Field(
+        default_factory=CallAggregateStats,
+        description="Stats for this call only (excluding descendants)",
+    )
+    total: CallAggregateStats = Field(
+        default_factory=CallAggregateStats,
+        description="Stats for this call + all descendants",
+    )
+
+
+class FlatTraceAggregate(BaseModel):
+    """Aggregate data for an entire trace in flat mode."""
+
+    trace_id: str = Field(description="The trace ID")
+    stats: CallAggregateStats = Field(
+        default_factory=CallAggregateStats,
+        description="Aggregated stats for the entire trace",
+    )
+    call_count: int = Field(default=0, description="Number of calls in the trace")
+
+
+class CallsAggregateReq(BaseModelStrict):
+    """Request for aggregating call tokens and costs."""
+
+    project_id: str = Field(description="The project ID")
+    mode: CallAggregateMode = Field(
+        default="flat",
+        description="Aggregation mode: 'recursive' for per-call with descendants, 'flat' for per-trace",
+    )
+    trace_ids: list[str] | None = Field(
+        default=None,
+        description="Filter to specific trace IDs. If None, aggregates all traces in the project.",
+    )
+    call_ids: list[str] | None = Field(
+        default=None,
+        description="Filter to specific call IDs (only used in recursive mode). If None, includes all calls in the specified traces.",
+    )
+
+
+class CallsAggregateRes(BaseModel):
+    """Response containing aggregated call statistics."""
+
+    recursive: list[RecursiveCallAggregate] | None = Field(
+        default=None,
+        description="Recursive aggregates (per-call with descendants) - populated when mode='recursive'",
+    )
+    flat: list[FlatTraceAggregate] | None = Field(
+        default=None,
+        description="Flat aggregates (per-trace) - populated when mode='flat'",
+    )
+
+
 class CallUpdateReq(BaseModelStrict):
     # required for all updates
     project_id: str
@@ -2161,6 +2254,7 @@ class TraceServerInterface(Protocol):
     def calls_query_stream(self, req: CallsQueryReq) -> Iterator[CallSchema]: ...
     def calls_delete(self, req: CallsDeleteReq) -> CallsDeleteRes: ...
     def calls_query_stats(self, req: CallsQueryStatsReq) -> CallsQueryStatsRes: ...
+    def calls_aggregate(self, req: CallsAggregateReq) -> CallsAggregateRes: ...
     def call_update(self, req: CallUpdateReq) -> CallUpdateRes: ...
     def call_start_batch(self, req: CallCreateBatchReq) -> CallCreateBatchRes: ...
 

@@ -610,6 +610,339 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             total_storage_size_bytes=res_dict.get("total_storage_size_bytes"),
         )
 
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.calls_aggregate")
+    def calls_aggregate(
+        self, req: tsi.CallsAggregateReq
+    ) -> tsi.CallsAggregateRes:
+        """Aggregate tokens and costs for calls.
+
+        Supports two modes:
+        - "flat": Returns one aggregate per trace_id (for table view)
+        - "recursive": Returns stats for ALL calls, each showing own + descendants (for trace view)
+        """
+        self._noop_project_version_latency_test(req.project_id)
+
+        if req.mode == "flat":
+            return self._calls_aggregate_flat(req)
+        else:
+            return self._calls_aggregate_recursive(req)
+
+    def _calls_aggregate_flat(
+        self, req: tsi.CallsAggregateReq
+    ) -> tsi.CallsAggregateRes:
+        """Aggregate tokens and costs per trace (flat mode)."""
+        pb = ParamBuilder()
+        project_param = pb.add_param(req.project_id)
+
+        # Build trace_ids filter
+        trace_filter = ""
+        if req.trace_ids:
+            trace_ids_param = pb.add_param(req.trace_ids)
+            trace_filter = f"AND trace_id IN {{{trace_ids_param}:Array(String)}}"
+
+        query = f"""
+        WITH base_calls AS (
+            SELECT
+                id,
+                trace_id,
+                summary_dump
+            FROM calls_merged
+            WHERE project_id = {{{project_param}:String}}
+              {trace_filter}
+              AND deleted_at IS NULL
+            GROUP BY (project_id, id)
+        ),
+        -- Extract usage (tokens) from summary_dump.usage
+        call_usage AS (
+            SELECT
+                id,
+                trace_id,
+                SUM(
+                    ifNull(JSONExtractInt(kv.2, 'prompt_tokens'), 0) +
+                    ifNull(JSONExtractInt(kv.2, 'input_tokens'), 0)
+                ) AS prompt_tokens,
+                SUM(
+                    ifNull(JSONExtractInt(kv.2, 'completion_tokens'), 0) +
+                    ifNull(JSONExtractInt(kv.2, 'output_tokens'), 0)
+                ) AS completion_tokens,
+                SUM(ifNull(JSONExtractInt(kv.2, 'total_tokens'), 0)) AS total_tokens
+            FROM base_calls
+            ARRAY JOIN JSONExtractKeysAndValuesRaw(
+                ifNull(JSONExtractRaw(ifNull(summary_dump, '{{}}'), 'usage'), '{{}}')
+            ) AS kv
+            WHERE kv.1 != ''
+            GROUP BY id, trace_id
+        ),
+        -- Extract pre-computed costs from summary_dump.weave.costs
+        call_costs AS (
+            SELECT
+                id,
+                SUM(JSONExtractFloat(kv.2, 'prompt_tokens_total_cost')) AS prompt_cost,
+                SUM(JSONExtractFloat(kv.2, 'completion_tokens_total_cost')) AS completion_cost
+            FROM base_calls
+            ARRAY JOIN JSONExtractKeysAndValuesRaw(
+                ifNull(JSONExtractRaw(ifNull(summary_dump, '{{}}'), 'weave', 'costs'), '{{}}')
+            ) AS kv
+            WHERE kv.1 != ''
+            GROUP BY id
+        )
+        SELECT
+            bc.trace_id,
+            COUNT(*) AS call_count,
+            SUM(COALESCE(cu.prompt_tokens, 0)) AS prompt_tokens,
+            SUM(COALESCE(cu.completion_tokens, 0)) AS completion_tokens,
+            SUM(COALESCE(cu.total_tokens, 0)) AS total_tokens,
+            SUM(cc.prompt_cost) AS prompt_cost,
+            SUM(cc.completion_cost) AS completion_cost
+        FROM base_calls bc
+        LEFT JOIN call_usage cu ON bc.id = cu.id
+        LEFT JOIN call_costs cc ON bc.id = cc.id
+        GROUP BY bc.trace_id
+        """
+
+        raw_res = self._query(query, pb.get_params())
+
+        flat_results: list[tsi.FlatTraceAggregate] = []
+        for row in raw_res.result_rows:
+            trace_id, call_count, prompt_tokens, completion_tokens, total_tokens, prompt_cost, completion_cost = row
+            total_cost = None
+            if prompt_cost is not None or completion_cost is not None:
+                total_cost = (prompt_cost or 0.0) + (completion_cost or 0.0)
+
+            flat_results.append(
+                tsi.FlatTraceAggregate(
+                    trace_id=trace_id,
+                    call_count=call_count,
+                    stats=tsi.CallAggregateStats(
+                        tokens=tsi.TokenMetrics(
+                            prompt_tokens=int(prompt_tokens or 0),
+                            completion_tokens=int(completion_tokens or 0),
+                            total_tokens=int(total_tokens or 0),
+                        ),
+                        costs=tsi.CostMetrics(
+                            prompt_tokens_total_cost=prompt_cost,
+                            completion_tokens_total_cost=completion_cost,
+                            total_cost=total_cost,
+                        ),
+                    ),
+                )
+            )
+
+        return tsi.CallsAggregateRes(flat=flat_results, recursive=None)
+
+    def _calls_aggregate_recursive(
+        self, req: tsi.CallsAggregateReq
+    ) -> tsi.CallsAggregateRes:
+        """Aggregate tokens and costs per call with descendant rollups (recursive mode)."""
+        pb = ParamBuilder()
+        project_param = pb.add_param(req.project_id)
+
+        # Build filters
+        trace_filter = ""
+        if req.trace_ids:
+            trace_ids_param = pb.add_param(req.trace_ids)
+            trace_filter = f"AND trace_id IN {{{trace_ids_param}:Array(String)}}"
+
+        call_filter = ""
+        if req.call_ids:
+            call_ids_param = pb.add_param(req.call_ids)
+            call_filter = f"AND id IN {{{call_ids_param}:Array(String)}}"
+
+        query = f"""
+        WITH base_calls AS (
+            SELECT
+                id,
+                trace_id,
+                parent_id,
+                summary_dump
+            FROM calls_merged
+            WHERE project_id = {{{project_param}:String}}
+              {trace_filter}
+              {call_filter}
+              AND deleted_at IS NULL
+            GROUP BY (project_id, id)
+        ),
+        -- Extract usage (tokens) from summary_dump.usage
+        call_usage AS (
+            SELECT
+                id,
+                SUM(
+                    ifNull(JSONExtractInt(kv.2, 'prompt_tokens'), 0) +
+                    ifNull(JSONExtractInt(kv.2, 'input_tokens'), 0)
+                ) AS prompt_tokens,
+                SUM(
+                    ifNull(JSONExtractInt(kv.2, 'completion_tokens'), 0) +
+                    ifNull(JSONExtractInt(kv.2, 'output_tokens'), 0)
+                ) AS completion_tokens,
+                SUM(ifNull(JSONExtractInt(kv.2, 'total_tokens'), 0)) AS total_tokens
+            FROM base_calls
+            ARRAY JOIN JSONExtractKeysAndValuesRaw(
+                ifNull(JSONExtractRaw(ifNull(summary_dump, '{{}}'), 'usage'), '{{}}')
+            ) AS kv
+            WHERE kv.1 != ''
+            GROUP BY id
+        ),
+        -- Extract pre-computed costs from summary_dump.weave.costs
+        call_costs AS (
+            SELECT
+                id,
+                SUM(JSONExtractFloat(kv.2, 'prompt_tokens_total_cost')) AS prompt_cost,
+                SUM(JSONExtractFloat(kv.2, 'completion_tokens_total_cost')) AS completion_cost
+            FROM base_calls
+            ARRAY JOIN JSONExtractKeysAndValuesRaw(
+                ifNull(JSONExtractRaw(ifNull(summary_dump, '{{}}'), 'weave', 'costs'), '{{}}')
+            ) AS kv
+            WHERE kv.1 != ''
+            GROUP BY id
+        )
+        SELECT
+            bc.id,
+            bc.trace_id,
+            bc.parent_id,
+            COALESCE(cu.prompt_tokens, 0) AS prompt_tokens,
+            COALESCE(cu.completion_tokens, 0) AS completion_tokens,
+            COALESCE(cu.total_tokens, 0) AS total_tokens,
+            cc.prompt_cost,
+            cc.completion_cost
+        FROM base_calls bc
+        LEFT JOIN call_usage cu ON bc.id = cu.id
+        LEFT JOIN call_costs cc ON bc.id = cc.id
+        """
+
+        raw_res = self._query(query, pb.get_params())
+
+        # Parse raw results into call data
+        calls_data: list[dict[str, Any]] = []
+        for row in raw_res.result_rows:
+            call_id, trace_id, parent_id, prompt_tokens, completion_tokens, total_tokens, prompt_cost, completion_cost = row
+            calls_data.append({
+                "id": call_id,
+                "trace_id": trace_id,
+                "parent_id": parent_id,
+                "prompt_tokens": int(prompt_tokens or 0),
+                "completion_tokens": int(completion_tokens or 0),
+                "total_tokens": int(total_tokens or 0),
+                "prompt_cost": prompt_cost,
+                "completion_cost": completion_cost,
+            })
+
+        # Compute recursive aggregates in Python
+        recursive_results = self._compute_recursive_aggregates(calls_data)
+
+        return tsi.CallsAggregateRes(flat=None, recursive=recursive_results)
+
+    def _compute_recursive_aggregates(
+        self, calls_data: list[dict[str, Any]]
+    ) -> list[tsi.RecursiveCallAggregate]:
+        """Compute recursive aggregates using post-order DFS.
+
+        For each call, computes:
+        - own: stats for this call only
+        - total: stats for this call + all descendants
+        """
+        if not calls_data:
+            return []
+
+        # Build lookup structures
+        call_map: dict[str, dict[str, Any]] = {c["id"]: c for c in calls_data}
+        children_map: dict[str | None, list[str]] = defaultdict(list)
+
+        for call in calls_data:
+            children_map[call["parent_id"]].append(call["id"])
+
+        # Store computed totals
+        totals: dict[str, dict[str, Any]] = {}
+
+        def safe_add(a: float | None, b: float | None) -> float | None:
+            """Safely add two potentially None values."""
+            if a is None and b is None:
+                return None
+            return (a or 0.0) + (b or 0.0)
+
+        def compute_totals(call_id: str) -> dict[str, Any]:
+            """Post-order DFS to compute totals (children first, then self)."""
+            if call_id in totals:
+                return totals[call_id]
+
+            call = call_map[call_id]
+
+            # Start with own stats
+            total = {
+                "prompt_tokens": call["prompt_tokens"],
+                "completion_tokens": call["completion_tokens"],
+                "total_tokens": call["total_tokens"],
+                "prompt_cost": call["prompt_cost"],
+                "completion_cost": call["completion_cost"],
+            }
+
+            # Accumulate from children
+            for child_id in children_map.get(call_id, []):
+                child_total = compute_totals(child_id)
+
+                total["prompt_tokens"] += child_total["prompt_tokens"]
+                total["completion_tokens"] += child_total["completion_tokens"]
+                total["total_tokens"] += child_total["total_tokens"]
+                total["prompt_cost"] = safe_add(
+                    total["prompt_cost"], child_total["prompt_cost"]
+                )
+                total["completion_cost"] = safe_add(
+                    total["completion_cost"], child_total["completion_cost"]
+                )
+
+            totals[call_id] = total
+            return total
+
+        # Process all calls (handles forest case with multiple roots)
+        for call_id in call_map:
+            if call_id not in totals:
+                compute_totals(call_id)
+
+        # Build result
+        results: list[tsi.RecursiveCallAggregate] = []
+        for call in calls_data:
+            call_id = call["id"]
+
+            own_total_cost = None
+            if call["prompt_cost"] is not None or call["completion_cost"] is not None:
+                own_total_cost = (call["prompt_cost"] or 0.0) + (call["completion_cost"] or 0.0)
+
+            total_data = totals[call_id]
+            total_total_cost = None
+            if total_data["prompt_cost"] is not None or total_data["completion_cost"] is not None:
+                total_total_cost = (total_data["prompt_cost"] or 0.0) + (total_data["completion_cost"] or 0.0)
+
+            results.append(
+                tsi.RecursiveCallAggregate(
+                    call_id=call_id,
+                    own=tsi.CallAggregateStats(
+                        tokens=tsi.TokenMetrics(
+                            prompt_tokens=call["prompt_tokens"],
+                            completion_tokens=call["completion_tokens"],
+                            total_tokens=call["total_tokens"],
+                        ),
+                        costs=tsi.CostMetrics(
+                            prompt_tokens_total_cost=call["prompt_cost"],
+                            completion_tokens_total_cost=call["completion_cost"],
+                            total_cost=own_total_cost,
+                        ),
+                    ),
+                    total=tsi.CallAggregateStats(
+                        tokens=tsi.TokenMetrics(
+                            prompt_tokens=total_data["prompt_tokens"],
+                            completion_tokens=total_data["completion_tokens"],
+                            total_tokens=total_data["total_tokens"],
+                        ),
+                        costs=tsi.CostMetrics(
+                            prompt_tokens_total_cost=total_data["prompt_cost"],
+                            completion_tokens_total_cost=total_data["completion_cost"],
+                            total_cost=total_total_cost,
+                        ),
+                    ),
+                )
+            )
+
+        return results
+
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.calls_query_stream")
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
         """Returns a stream of calls that match the given query."""
