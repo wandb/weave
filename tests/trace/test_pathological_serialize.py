@@ -1,8 +1,4 @@
-"""Test that broken serialization doesn't crash.
-
-These tests document that to_json currently crashes on pathological input.
-The fix should make these tests pass by falling back gracefully.
-"""
+"""Test that broken serialization doesn't crash."""
 
 from __future__ import annotations
 
@@ -37,19 +33,13 @@ def mock_client():
     return MagicMock()
 
 
-def test_to_json_broken_dict_should_not_crash(mock_client) -> None:
-    """to_json should handle dict subclasses with broken items() gracefully."""
-    bad_obj = BrokenDict()
-
-    # Currently crashes - this test will pass once the bug is fixed
-    result = to_json(bad_obj, "test/project", mock_client, use_dictify=True)
-    assert result is not None
+def test_to_json_broken_dict_does_not_crash(mock_client) -> None:
+    """to_json handles dict subclasses with broken items() gracefully."""
+    result = to_json(BrokenDict(), "test/project", mock_client, use_dictify=True)
+    assert result == "{}"  # Falls back to string repr
 
 
-def test_to_json_broken_namedtuple_should_not_crash(mock_client) -> None:
-    """to_json should handle namedtuples with broken _asdict() gracefully."""
-    bad_obj = BrokenNamedTuple()
-
-    # Currently crashes - this test will pass once the bug is fixed
-    result = to_json(bad_obj, "test/project", mock_client, use_dictify=True)
-    assert result is not None
+def test_to_json_broken_namedtuple_does_not_crash(mock_client) -> None:
+    """to_json handles namedtuples with broken _asdict() gracefully."""
+    result = to_json(BrokenNamedTuple(), "test/project", mock_client, use_dictify=True)
+    assert result == "(1, 2)"  # Falls back to string repr

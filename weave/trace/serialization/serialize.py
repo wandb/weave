@@ -61,14 +61,23 @@ def to_json(
             res[k] = to_json(v, project_id, client, use_dictify)
         return res
     elif isinstance_namedtuple(obj):
-        return {
-            k: to_json(v, project_id, client, use_dictify)
-            for k, v in obj._asdict().items()
-        }
+        try:
+            return {
+                k: to_json(v, project_id, client, use_dictify)
+                for k, v in obj._asdict().items()
+            }
+        except Exception:
+            return fallback_encode(obj)
     elif isinstance(obj, (list, tuple)):
         return [to_json(v, project_id, client, use_dictify) for v in obj]
     elif isinstance(obj, dict):
-        return {k: to_json(v, project_id, client, use_dictify) for k, v in obj.items()}
+        try:
+            return {
+                k: to_json(v, project_id, client, use_dictify)
+                for k, v in obj.items()
+            }
+        except Exception:
+            return fallback_encode(obj)
     elif is_pydantic_model_class(obj):
         return obj.model_json_schema()
 
