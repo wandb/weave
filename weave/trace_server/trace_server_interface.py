@@ -203,9 +203,14 @@ class EndedCallSchemaForInsert(BaseModel):
 
 
 class EndedCallSchemaForInsertWithStartedAt(EndedCallSchemaForInsert):
-    """Ended call schema with required started_at for v2 end updates."""
+    """Ended call schema with optional started_at for v2 end updates.
 
-    started_at: datetime.datetime
+    When started_at is provided, it enables more efficient ClickHouse queries
+    by utilizing the primary key (project_id, started_at, id). Without it,
+    the query falls back to using only (project_id, id).
+    """
+
+    started_at: datetime.datetime | None = None
 
 
 class CompletedCallSchemaForInsert(BaseModel):

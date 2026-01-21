@@ -436,6 +436,74 @@ def test_call_start_end_v2_writes_calls_merged_for_merged_project(
     )
 
 
+def test_call_end_v2_without_started_at(trace_server, clickhouse_trace_server):
+    """Test that call_end_v2 works without started_at.
+
+    When started_at is not provided, the update should still succeed using
+    only project_id and id in the WHERE clause (less efficient but functional).
+    """
+    project_id = f"{TEST_ENTITY}/calls_complete_v2_no_started_at"
+    internal_project_id = b64(project_id)
+
+    started_at = datetime.datetime.now(datetime.timezone.utc)
+    call_id = str(uuid.uuid4())
+    trace_id = str(uuid.uuid4())
+
+    # First, create the call with call_start_v2
+    trace_server.call_start_v2(
+        tsi.CallStartV2Req(
+            start=tsi.StartedCallSchemaForInsert(
+                project_id=project_id,
+                id=call_id,
+                trace_id=trace_id,
+                op_name="test_op",
+                started_at=started_at,
+                attributes={},
+                inputs={},
+            )
+        )
+    )
+
+    # Verify call was created
+    assert (
+        _count_project_rows(
+            clickhouse_trace_server.ch_client, "calls_complete", internal_project_id
+        )
+        == 1
+    )
+
+    # End the call WITHOUT providing started_at
+    ended_at = started_at + datetime.timedelta(seconds=1)
+    trace_server.call_end_v2(
+        tsi.CallEndV2Req(
+            end=tsi.EndedCallSchemaForInsertWithStartedAt(
+                project_id=project_id,
+                id=call_id,
+                # Note: started_at is intentionally omitted
+                ended_at=ended_at,
+                summary={"usage": {}, "status_counts": {}},
+            )
+        )
+    )
+
+    # Verify the update succeeded
+    assert (
+        _count_project_rows(
+            clickhouse_trace_server.ch_client, "calls_complete", internal_project_id
+        )
+        == 1
+    )
+
+    # Verify ended_at was properly set
+    updated_ended_at = _fetch_call_ended_at(
+        clickhouse_trace_server.ch_client,
+        "calls_complete",
+        internal_project_id,
+        call_id,
+    )
+    assert updated_ended_at == ended_at.replace(tzinfo=None)
+
+
 def test_call_start_and_end_require_calls_complete_mode(
     trace_server, clickhouse_trace_server
 ):

@@ -83,7 +83,12 @@ class TableRoutingResolver:
             return ReadTable.CALLS_MERGED
 
         residence = self._get_residence(project_id, ch_client)
-        set_current_span_dd_tags({"project_version.residence": residence.value})
+        set_current_span_dd_tags(
+            {
+                "project_version.residence": residence.value,
+                "project_version.project_id": project_id,
+            }
+        )
 
         if self._mode == CallsStorageServerMode.FORCE_LEGACY:
             return ReadTable.CALLS_MERGED
@@ -122,7 +127,12 @@ class TableRoutingResolver:
             return WriteTarget.CALLS_MERGED
 
         residence = self._get_residence(project_id, ch_client)
-        set_current_span_dd_tags({"project_version.residence": residence.value})
+        set_current_span_dd_tags(
+            {
+                "project_version.residence": residence.value,
+                "project_version.project_id": project_id,
+            }
+        )
 
         if self._mode == CallsStorageServerMode.FORCE_LEGACY:
             return WriteTarget.CALLS_MERGED
@@ -156,7 +166,12 @@ class TableRoutingResolver:
             return WriteTarget.CALLS_MERGED
 
         residence = self._get_residence(project_id, ch_client)
-        set_current_span_dd_tags({"project_version.residence": residence.value})
+        set_current_span_dd_tags(
+            {
+                "project_version.residence": residence.value,
+                "project_version.project_id": project_id,
+            }
+        )
 
         if self._mode == CallsStorageServerMode.FORCE_LEGACY:
             return WriteTarget.CALLS_MERGED

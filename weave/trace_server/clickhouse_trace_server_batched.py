@@ -702,16 +702,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         and the end arrives separately via call_end_v2.
 
         Args:
-            end_call: The end call data to update (requires started_at for efficient queries).
-
-        Raises:
-            ValueError: If started_at is not set on ch_end.
+            end_call: The end call data to update. If started_at is provided,
+                it enables more efficient queries by utilizing the ClickHouse
+                primary key (project_id, started_at, id).
         """
-        if end_call.started_at is None:
-            raise ValueError(
-                "started_at is required for _update_call_end_in_calls_complete"
-            )
-
         table_name = self._get_calls_complete_table_name()
 
         output = end_call.output
@@ -723,13 +717,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # clickhouse-connect truncates datetime objects to seconds when passing as params,
         # but DateTime64(6) requires microsecond precision for exact matching. This is a
         # hack, not sure why inserting a json dump and passing an explicit param differ
-        started_at_us = _datetime_to_microseconds(end_call.started_at)
         ended_at_us = _datetime_to_microseconds(end_call.ended_at)
 
         pb = ParamBuilder()
         project_id_param = pb.add_param(end_call.project_id)
         id_param = pb.add_param(end_call.id)
-        started_at_param = pb.add_param(started_at_us)
         ended_at_param = pb.add_param(ended_at_us)
         exception_param = pb.add_param(end_call.exception)
         output_dump_param = pb.add_param(output_dump)
@@ -737,10 +729,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         output_refs_param = pb.add_param(output_refs)
         wb_run_step_end_param = pb.add_param(end_call.wb_run_step_end)
 
+        # Add started_at param if provided for more efficient primary key usage
+        started_at_param: str | None = None
+        if end_call.started_at is not None:
+            started_at_us = _datetime_to_microseconds(end_call.started_at)
+            started_at_param = pb.add_param(started_at_us)
+
         query = build_calls_complete_update_end_query(
             table_name=table_name,
             project_id_param=project_id_param,
-            started_at_param=started_at_param,
             id_param=id_param,
             ended_at_param=ended_at_param,
             exception_param=exception_param,
@@ -748,6 +745,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             summary_dump_param=summary_dump_param,
             output_refs_param=output_refs_param,
             wb_run_step_end_param=wb_run_step_end_param,
+            started_at_param=started_at_param,
         )
 
         self.ch_client.command(query, parameters=pb.get_params())
