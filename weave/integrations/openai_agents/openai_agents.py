@@ -327,44 +327,16 @@ class WeaveTracingProcessor(TracingProcessor):  # pyright: ignore[reportGeneralT
         if (wc := get_weave_client()) is None:
             return
 
+        # Skip Response spans entirely to prevent double-tracking.
+        # The openai.responses.create call (from OpenAI SDK integration)
+        # already captures this data with usage/cost information.
+        if isinstance(span.span_data, ResponseSpanData):
+            return
+
         trace_id = span.trace_id
         span_name = _call_name(span)
         span_type = _call_type(span)
         log_data = self._log_data(span)
-
-        # For Response spans, create the call here so we can include input data
-        if (
-            isinstance(span.span_data, ResponseSpanData)
-            and span.span_id not in self._span_calls
-            and trace_id in self._trace_data
-            and (parent_call := self._get_parent_call(span))
-        ):
-            # Create attributes
-            attributes = {
-                "type": span_type,
-                "agent_span_id": span.span_id,
-                "agent_trace_id": trace_id,
-            }
-
-            # Add parent span ID if present
-            if pid := getattr(span, "parent_id", None):
-                attributes["parent_span_id"] = pid
-
-            # Create inputs with both name and input data if available
-            inputs = {
-                "name": span_name,
-                "input": log_data["inputs"].get("input"),
-            }
-
-            # Create the call now that we have the input data
-            span_call = wc.create_call(
-                op=f"openai_agent_{span_type}",
-                inputs=inputs,
-                parent=parent_call,
-                attributes=attributes,
-                display_name=span_name,
-            )
-            self._span_calls[span.span_id] = span_call
 
         # If this span has a call, finish it
         if (span_call := self._span_calls.get(span.span_id)) is None:

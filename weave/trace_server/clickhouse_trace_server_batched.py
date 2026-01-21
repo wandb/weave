@@ -4232,8 +4232,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def _flush_file_chunks(self) -> None:
         if not self._flush_immediately:
             raise ValueError("File chunks must be flushed immediately")
-        self._insert_file_chunks(self._file_batch)
-        self._file_batch = []
+        try:
+            self._insert_file_chunks(self._file_batch)
+        finally:
+            self._file_batch = []
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert_file_chunks")
     def _insert_file_chunks(
@@ -5246,8 +5248,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             # Insert rows one at a time after stripping large values
             for row in batch:
                 self._insert_call_batch([row])
-
-        self._call_batch = []
+        finally:
+            self._call_batch = []
 
     @ddtrace.tracer.wrap(
         name="clickhouse_trace_server_batched._analyze_call_batch_breakdown"

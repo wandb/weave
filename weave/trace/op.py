@@ -312,8 +312,25 @@ def _default_on_input_handler(func: Op, args: tuple, kwargs: dict) -> ProcessedI
 
 
 def _create_call(
-    func: Op, *args: Any, __weave: WeaveKwargs | None = None, **kwargs: Any
+    func: Op,
+    *args: Any,
+    __weave: WeaveKwargs | None = None,
+    use_stack: bool = True,
+    **kwargs: Any,
 ) -> Call:
+    """Create a call object for the given op.
+
+    Args:
+        func: The op being called.
+        *args: Positional arguments to the op.
+        __weave: Optional weave configuration dict.
+        use_stack: Whether to push the call onto the call stack. Defaults to True.
+            For generators, this should be False since they push when iteration starts.
+        **kwargs: Keyword arguments to the op.
+
+    Returns:
+        The created Call object.
+    """
     client = weave_client_context.require_weave_client()
 
     pargs = None
@@ -349,6 +366,7 @@ def _create_call(
         # Very important for `call_time_display_name` to take precedence over `func.call_display_name`
         display_name=call_time_display_name or func.call_display_name,
         attributes=attributes,
+        use_stack=use_stack,
         _call_id_override=preferred_call_id,
     )
 
@@ -709,7 +727,9 @@ def _call_sync_gen(
 
     # Proceed with tracing
     try:
-        call = _create_call(op, *args, __weave=__weave, **kwargs)
+        # For generators, use_stack=False because we push when iteration starts,
+        # not when the call is created. This avoids double-pushing.
+        call = _create_call(op, *args, __weave=__weave, use_stack=False, **kwargs)
     except OpCallError:
         raise
     except Exception:
@@ -919,7 +939,9 @@ async def _call_async_gen(
 
     # Proceed with tracing
     try:
-        call = _create_call(op, *args, __weave=__weave, **kwargs)
+        # For generators, use_stack=False because we push when iteration starts,
+        # not when the call is created. This avoids double-pushing.
+        call = _create_call(op, *args, __weave=__weave, use_stack=False, **kwargs)
     except OpCallError:
         raise
     except Exception:
