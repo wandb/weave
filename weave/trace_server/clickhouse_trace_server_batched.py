@@ -10,12 +10,13 @@ from collections import defaultdict
 from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
 from re import sub
-from typing import Any, cast
+from typing import Any, Never, cast
 from zoneinfo import ZoneInfo
 
 import clickhouse_connect
 import ddtrace
 from clickhouse_connect.driver.client import Client as CHClient
+from clickhouse_connect.driver.exceptions import DatabaseError
 from clickhouse_connect.driver.httputil import get_pool_manager
 from clickhouse_connect.driver.query import QueryResult
 from clickhouse_connect.driver.summary import QuerySummary
@@ -5189,38 +5190,28 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     "clickhouse_trace_server_batched._insert.async_insert": True,
                 }
             )
-        try:
-            return self.ch_client.insert(
-                table, data=data, column_names=column_names, settings=settings
-            )
-        except ValueError as e:
-            if "negative shift count" in str(e):
-                # clickhouse_connect raises a weird error message like
-                # File "/Users/shawn/.pyenv/versions/3.10.13/envs/weave-public-editable/lib/python3.10/site-packages/clickhouse_connect/driver/
-                # │insert.py", line 120, in _calc_block_size
-                # │    return 1 << (21 - int(log(row_size, 2)))
-                # │ValueError: negative shift count
-                # when we try to insert something that's too large.
-                raise InsertTooLarge(
-                    "Database insertion failed. Record too large. "
-                    "A likely cause is that a single row or cell exceeded "
-                    "the limit. If logging images, save them as `Image.PIL`."
-                ) from e
-            raise
-        except Exception as e:
-            # Do potentially expensive data length calculation, only on
-            # error, which should be very rare!
-            data_bytes = sum(_num_bytes(row) for row in data)
-            logger.exception(
-                "clickhouse_insert_error",
-                extra={
-                    "error_str": str(e),
-                    "table": table,
-                    "data_len": len(data),
-                    "data_bytes": data_bytes,
-                },
-            )
-            raise
+
+        for attempt in range(ch_settings.INSERT_MAX_RETRIES):
+            try:
+                return self.ch_client.insert(
+                    table, data=data, column_names=column_names, settings=settings
+                )
+
+            # InsertTooLarge: raise immediately, no retry
+            except ValueError as e:
+                _raise_if_insert_too_large(e)
+                _log_and_raise_insert_error(e, table, data)
+
+            # Empty query error: RETRY (generator was consumed during HTTP retry)
+            # We should retry with a fresh generator
+            except DatabaseError as e:
+                if _should_retry_empty_query(e, table, attempt):
+                    continue
+                _log_and_raise_insert_error(e, table, data)
+
+            # All other errors: raise immediately, no retry
+            except Exception as e:
+                _log_and_raise_insert_error(e, table, data)
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert_call")
     def _insert_call(self, ch_call: CallCHInsertable) -> None:
@@ -5951,3 +5942,51 @@ def _setup_completion_model_info(
 
 def _sanitize_name_for_object_id(name: str) -> str:
     return sub(r"[^a-zA-Z0-9_-]", "_", name)
+
+
+# -----------------------------------------------------------------------------
+# Insert Error Helpers
+# -----------------------------------------------------------------------------
+
+
+def _raise_if_insert_too_large(e: Exception) -> None:
+    """Raise InsertTooLarge if the error indicates data is too large."""
+    if isinstance(e, ValueError) and "negative shift count" in str(e):
+        raise InsertTooLarge(
+            "Database insertion failed. Record too large. "
+            "A likely cause is that a single row or cell exceeded "
+            "the limit. If logging images, save them as `Image.PIL`."
+        ) from e
+
+
+def _should_retry_empty_query(e: Exception, table: str, attempt: int) -> bool:
+    """Check if we should retry an empty query error. Logs warning if retrying."""
+    is_empty_query = isinstance(e, DatabaseError) and "Empty query" in str(e)
+    should_retry = is_empty_query and attempt < ch_settings.INSERT_MAX_RETRIES - 1
+    if should_retry:
+        logger.warning(
+            "clickhouse_insert_empty_query_retry",
+            extra={
+                "table": table,
+                "attempt": attempt + 1,
+                "max_retries": ch_settings.INSERT_MAX_RETRIES,
+            },
+        )
+    return should_retry
+
+
+def _log_and_raise_insert_error(
+    e: Exception, table: str, data: Sequence[Sequence[Any]]
+) -> Never:
+    """Log insert error with data size info and re-raise."""
+    data_bytes = sum(_num_bytes(row) for row in data)
+    logger.exception(
+        "clickhouse_insert_error",
+        extra={
+            "error_str": str(e),
+            "table": table,
+            "data_len": len(data),
+            "data_bytes": data_bytes,
+        },
+    )
+    raise
