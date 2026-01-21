@@ -1,5 +1,7 @@
 """Utilities for working with IPython/Jupyter notebooks."""
 
+from __future__ import annotations
+
 import ast
 import sys
 from collections.abc import Callable
