@@ -256,9 +256,7 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         project_id = item.req.end.project_id
         entity, project = project_id.split("/", 1)
         url = f"/v2/{entity}/{project}/call/end"
-        # started_at is required at top level for efficient UPDATE queries
-        started_at = item.req.end.started_at or item.req.end.ended_at
-        req = tsi.CallEndV2Req(end=item.req.end, started_at=started_at)
+        req = tsi.CallEndV2Req(end=item.req.end)
         r = self.post(url, data=req.model_dump_json().encode("utf-8"))
         handle_response_error(r, url)
 

@@ -205,7 +205,7 @@ class EndedCallSchemaForInsert(BaseModel):
 class EndedCallSchemaForInsertWithStartedAt(EndedCallSchemaForInsert):
     """Ended call schema with required started_at for v2 end updates."""
 
-    started_at: datetime.datetime
+    started_at: datetime.datetime | None = None
 
 
 class CompletedCallSchemaForInsert(BaseModel):
