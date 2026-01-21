@@ -221,6 +221,10 @@ npm run test
 - Add JSDoc comments for TypeScript code
 - Update this file when introducing new patterns or concepts
 
+### LangChain Integration Notes
+
+- `with_structured_output` can pass Pydantic model classes through LangChain metadata/serialized fields; sanitize these before constructing `Run` to avoid Pydantic serialization errors (see `_sanitize_langchain_obj` in `weave/integrations/langchain/langchain.py`).
+
 ---
 
 ## Integration Patching

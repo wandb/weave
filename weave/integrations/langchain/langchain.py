@@ -31,9 +31,13 @@ This approach allows for more flexible runtime configuration while still respect
 import datetime
 import json
 import logging
+from collections.abc import Generator
 from contextlib import contextmanager
 from contextvars import ContextVar
+from typing import Any
 from uuid import UUID
+
+from pydantic import BaseModel
 
 from weave.flow.util import warn_once
 from weave.integrations.integration_utilities import (
@@ -46,6 +50,7 @@ from weave.trace.call import Call
 from weave.trace.context import call_context
 from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace.op_protocol import OpKind
+from weave.trace.serialization.serialize import is_pydantic_model_class, stringify
 
 import_failed = False
 
@@ -58,12 +63,52 @@ try:
 except ImportError:
     import_failed = True
 
-from collections.abc import Generator
-from typing import Any
-
 RUNNABLE_SEQUENCE_NAME = "RunnableSequence"
 
 logger = logging.getLogger(__name__)
+
+_PRIMITIVE_TYPES: tuple[type, ...] = (str, int, float, bool, type(None))
+
+
+def _sanitize_langchain_obj(obj: Any, seen: set[int] | None = None) -> Any:
+    if isinstance(obj, _PRIMITIVE_TYPES):
+        return obj
+
+    if seen is None:
+        seen = set()
+    obj_id = id(obj)
+    if obj_id in seen:
+        return stringify(obj)
+    seen.add(obj_id)
+
+    if is_pydantic_model_class(obj):
+        try:
+            return obj.model_json_schema()
+        except Exception:
+            return stringify(obj)
+
+    if isinstance(obj, BaseModel):
+        try:
+            return obj.model_dump(exclude_none=True)
+        except Exception:
+            return stringify(obj)
+
+    if isinstance(obj, dict):
+        return {
+            (key if isinstance(key, str) else stringify(key)): _sanitize_langchain_obj(
+                value, seen
+            )
+            for key, value in obj.items()
+        }
+
+    if isinstance(obj, (list, tuple, set)):
+        return [_sanitize_langchain_obj(value, seen) for value in obj]
+
+    try:
+        json.dumps(obj)
+        return obj
+    except (TypeError, OverflowError):
+        return stringify(obj)
 
 if not import_failed:
 
@@ -284,14 +329,16 @@ if not import_failed:
             start_time = datetime.datetime.now(datetime.timezone.utc)
             if metadata:
                 kwargs.update({"metadata": metadata})
+            safe_extra = _sanitize_langchain_obj(kwargs)
+            safe_serialized = _sanitize_langchain_obj(serialized)
             chat_model_run = Run(
                 id=run_id,
                 parent_run_id=parent_run_id,
-                serialized=serialized,
+                serialized=safe_serialized,
                 inputs={
                     "messages": [[dumpd(msg) for msg in batch] for batch in messages]
                 },
-                extra=kwargs,
+                extra=safe_extra,
                 events=[{"name": "start", "time": start_time}],
                 start_time=start_time,
                 run_type="llm",
