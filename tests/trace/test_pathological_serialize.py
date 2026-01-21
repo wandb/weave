@@ -1,42 +1,55 @@
-"""Test that broken serialization doesn't crash the user process."""
+"""Test that broken serialization doesn't crash.
+
+These tests document that to_json currently crashes on pathological input.
+The fix should make these tests pass by falling back gracefully.
+"""
 
 from __future__ import annotations
 
-from typing import Any
+from unittest.mock import MagicMock
 
-import weave
+import pytest
 
-
-class Unserializable:
-    """Object that breaks serialization."""
-
-    def __repr__(self) -> str:
-        raise RuntimeError("cannot repr")
-
-    def __str__(self) -> str:
-        raise RuntimeError("cannot str")
-
-    def to_dict(self) -> dict:
-        raise RuntimeError("cannot convert to dict")
+from weave.trace.serialization.serialize import to_json
 
 
-def test_unserializable_input_does_not_crash(client) -> None:
-    """If weave fails to serialize input, the user function should still run."""
+class BrokenDict(dict):
+    """Dict subclass where items() raises."""
 
-    @weave.op
-    def my_function(x: Any) -> str:
-        return "success"
-
-    result = my_function(Unserializable())
-    assert result == "success"
+    def items(self):
+        raise RuntimeError("items() is broken")
 
 
-def test_unserializable_output_does_not_crash(client) -> None:
-    """If weave fails to serialize output, the user function should still return."""
+class BrokenNamedTuple(tuple):
+    """Tuple with broken _asdict."""
 
-    @weave.op
-    def my_function() -> Any:
-        return Unserializable()
+    _fields = ("a", "b")
 
-    result = my_function()
-    assert isinstance(result, Unserializable)
+    def __new__(cls):
+        return super().__new__(cls, (1, 2))
+
+    def _asdict(self):
+        raise RuntimeError("_asdict is broken")
+
+
+@pytest.fixture
+def mock_client():
+    return MagicMock()
+
+
+def test_to_json_broken_dict_should_not_crash(mock_client) -> None:
+    """to_json should handle dict subclasses with broken items() gracefully."""
+    bad_obj = BrokenDict()
+
+    # Currently crashes - this test will pass once the bug is fixed
+    result = to_json(bad_obj, "test/project", mock_client, use_dictify=True)
+    assert result is not None
+
+
+def test_to_json_broken_namedtuple_should_not_crash(mock_client) -> None:
+    """to_json should handle namedtuples with broken _asdict() gracefully."""
+    bad_obj = BrokenNamedTuple()
+
+    # Currently crashes - this test will pass once the bug is fixed
+    result = to_json(bad_obj, "test/project", mock_client, use_dictify=True)
+    assert result is not None
