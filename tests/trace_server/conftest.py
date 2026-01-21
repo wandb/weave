@@ -16,9 +16,7 @@ from tests.trace_server.workers.evaluate_model_test_worker import (
     EvaluateModelTestDispatcher,
 )
 from weave.trace_server import clickhouse_trace_server_batched
-from weave.trace_server.project_version.project_version import (
-    reset_project_residence_cache,
-)
+from weave.trace_server.project_version import project_version
 from weave.trace_server.secret_fetcher_context import secret_fetcher_context
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer
 
@@ -109,6 +107,13 @@ def get_remote_http_trace_server_flag(request):
         str: Either 'remote' for RemoteHTTPTraceServer or 'stainless' for StainlessRemoteHTTPTraceServer
     """
     return request.config.getoption("--remote-http-trace-server")
+
+
+@pytest.fixture(autouse=True)
+def reset_project_version_cache():
+    project_version.reset_project_residence_cache()
+    yield
+    project_version.reset_project_residence_cache()
 
 
 def _get_worker_db_suffix(request) -> str:
@@ -269,14 +274,6 @@ class LocalSecretFetcher:
 def local_secret_fetcher():
     with secret_fetcher_context(LocalSecretFetcher()):
         yield
-
-
-@pytest.fixture(autouse=True)
-def reset_project_version_cache():
-    """Reset project data residence cache for each test."""
-    reset_project_residence_cache()
-    yield
-    reset_project_residence_cache()
 
 
 @pytest.fixture

@@ -1,4 +1,5 @@
 import pytest
+import sqlparse
 
 from tests.trace_server.query_builder.utils import assert_sql
 from weave.trace_server import trace_server_interface as tsi
@@ -1628,18 +1629,27 @@ def test_build_calls_complete_update_end_query() -> None:
         wb_run_step_end_param="wb_run_step_end",
     )
 
-    assert "UPDATE calls_complete" in query
-    assert "ended_at = fromUnixTimestamp64Micro({ended_at:Int64}, 'UTC')" in query
-    assert "exception = {exception:Nullable(String)}" in query
-    assert "output_dump = {output_dump:String}" in query
-    assert "summary_dump = {summary_dump:String}" in query
-    assert "output_refs = {output_refs:Array(String)}" in query
-    assert "wb_run_step_end = {wb_run_step_end:Nullable(UInt64)}" in query
-    assert "WHERE project_id = {project_id:String}" in query
-    assert (
-        "AND started_at = fromUnixTimestamp64Micro({started_at:Int64}, 'UTC')" in query
+    expected = """
+        UPDATE calls_complete
+        SET
+            ended_at = fromUnixTimestamp64Micro({ended_at:Int64}, 'UTC'),
+            exception = {exception:Nullable(String)},
+            output_dump = {output_dump:String},
+            summary_dump = {summary_dump:String},
+            output_refs = {output_refs:Array(String)},
+            wb_run_step_end = {wb_run_step_end:Nullable(UInt64)},
+            updated_at = now64(3)
+        WHERE project_id = {project_id:String}
+            AND started_at = fromUnixTimestamp64Micro({started_at:Int64}, 'UTC')
+            AND id = {id:String}
+    """
+
+    exp_formatted = sqlparse.format(expected, reindent=True)
+    found_formatted = sqlparse.format(query, reindent=True)
+
+    assert exp_formatted == found_formatted, (
+        f"\nExpected:\n{exp_formatted}\n\nGot:\n{found_formatted}"
     )
-    assert "AND id = {id:String}" in query
 
 
 def test_storage_size_fields():

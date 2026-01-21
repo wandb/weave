@@ -5539,7 +5539,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         try:
             self._insert_call_complete_batch(self._calls_complete_batch)
         except InsertTooLarge:
-            # Try 1-by-1
+            # Try 1 by 1
             for row in self._calls_complete_batch:
                 self._insert_call_complete_batch([row])
 
