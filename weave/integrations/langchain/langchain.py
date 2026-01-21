@@ -106,9 +106,10 @@ def _sanitize_langchain_obj(obj: Any, seen: set[int] | None = None) -> Any:
 
     try:
         json.dumps(obj)
-        return obj
     except (TypeError, OverflowError):
         return stringify(obj)
+    return obj
+
 
 if not import_failed:
 
