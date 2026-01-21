@@ -62,10 +62,3 @@ class ReadTable(str, Enum):
 class WriteTarget(str, Enum):
     CALLS_MERGED = "calls_merged"
     CALLS_COMPLETE = "calls_complete"
-
-
-class WriteSourceVersion(str, Enum):
-    """Indicates which versioned API surface is initiating a write."""
-
-    V1 = "v1"
-    V2 = "v2"

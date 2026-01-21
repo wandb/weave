@@ -203,9 +203,14 @@ class EndedCallSchemaForInsert(BaseModel):
 
 
 class EndedCallSchemaForInsertWithStartedAt(EndedCallSchemaForInsert):
-    """Ended call schema with required started_at for v2 end updates."""
+    """Ended call schema with optional started_at for v2 end updates.
 
-    started_at: datetime.datetime
+    When started_at is provided, it enables more efficient ClickHouse queries
+    by utilizing the primary key (project_id, started_at, id). Without it,
+    the query falls back to using only (project_id, id).
+    """
+
+    started_at: datetime.datetime | None = None
 
 
 class CompletedCallSchemaForInsert(BaseModel):
@@ -250,41 +255,6 @@ class CompletedCallSchemaForInsert(BaseModel):
     @field_serializer("attributes", "summary", when_used="unless-none")
     def serialize_typed_dicts(self, v: dict[str, Any]) -> dict[str, Any]:
         return dict(v)
-
-    def split_to_start_and_end(
-        self,
-    ) -> tuple["StartedCallSchemaForInsert", "EndedCallSchemaForInsertWithStartedAt"]:
-        """Split into separate start and end schemas for legacy table format."""
-        start = StartedCallSchemaForInsert(
-            project_id=self.project_id,
-            id=self.id,
-            op_name=self.op_name,
-            display_name=self.display_name,
-            trace_id=self.trace_id,
-            parent_id=self.parent_id,
-            thread_id=self.thread_id,
-            turn_id=self.turn_id,
-            started_at=self.started_at,
-            attributes=self.attributes,
-            inputs=self.inputs,
-            otel_dump=self.otel_dump,
-            wb_user_id=self.wb_user_id,
-            wb_run_id=self.wb_run_id,
-            wb_run_step=self.wb_run_step,
-        )
-
-        end = EndedCallSchemaForInsertWithStartedAt(
-            project_id=self.project_id,
-            id=self.id,
-            started_at=self.started_at,
-            ended_at=self.ended_at,
-            exception=self.exception,
-            output=self.output,
-            summary=self.summary,
-            wb_run_step_end=self.wb_run_step_end,
-        )
-
-        return start, end
 
 
 class ObjSchema(BaseModel):

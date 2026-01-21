@@ -14,7 +14,6 @@ from weave.trace_server.project_version.types import (
     CallsStorageServerMode,
     ProjectDataResidence,
     ReadTable,
-    WriteSourceVersion,
     WriteTarget,
 )
 
@@ -47,45 +46,60 @@ def count_queries(ch_client):
 
 
 @pytest.mark.parametrize(
-    ("tables", "expected_read_table", "expected_write_targets"),
+    (
+        "tables",
+        "expected_read_table",
+        "expected_v1_write_target",
+        "expected_v2_write_target",
+        "expect_dual_residency_warning",
+    ),
     [
+        # EMPTY: V1 -> MERGED (new projects), V2 -> COMPLETE (new projects)
         (
             [],
             ReadTable.CALLS_COMPLETE,
-            {
-                WriteSourceVersion.V1: WriteTarget.CALLS_MERGED,
-                WriteSourceVersion.V2: WriteTarget.CALLS_COMPLETE,
-            },
+            WriteTarget.CALLS_MERGED,
+            WriteTarget.CALLS_COMPLETE,
+            False,
         ),
+        # MERGED_ONLY: V1 -> MERGED, V2 -> MERGED (keep data together)
         (
             ["calls_merged"],
             ReadTable.CALLS_MERGED,
-            {
-                WriteSourceVersion.V1: WriteTarget.CALLS_MERGED,
-                WriteSourceVersion.V2: WriteTarget.CALLS_COMPLETE,
-            },
+            WriteTarget.CALLS_MERGED,
+            WriteTarget.CALLS_MERGED,
+            False,
         ),
+        # COMPLETE_ONLY: V1 -> COMPLETE (triggers error), V2 -> COMPLETE
         (
             ["calls_complete"],
             ReadTable.CALLS_COMPLETE,
-            {
-                WriteSourceVersion.V1: WriteTarget.CALLS_MERGED,
-                WriteSourceVersion.V2: WriteTarget.CALLS_COMPLETE,
-            },
+            WriteTarget.CALLS_COMPLETE,
+            WriteTarget.CALLS_COMPLETE,
+            False,
         ),
+        # BOTH: V1 -> MERGED, V2 -> COMPLETE (prefer COMPLETE for new writes)
         (
             ["calls_merged", "calls_complete"],
             ReadTable.CALLS_COMPLETE,
-            {
-                WriteSourceVersion.V1: WriteTarget.CALLS_MERGED,
-                WriteSourceVersion.V2: WriteTarget.CALLS_COMPLETE,
-            },
+            WriteTarget.CALLS_MERGED,
+            WriteTarget.CALLS_COMPLETE,
+            True,  # Dual residency triggers a warning log
         ),
     ],
 )
+@pytest.mark.parametrize("log_collector", ["warning"], indirect=True)
 def test_version_resolution_by_table_contents(
-    client, trace_server, tables, expected_read_table, expected_write_targets
+    client,
+    trace_server,
+    tables,
+    expected_read_table,
+    expected_v1_write_target,
+    expected_v2_write_target,
+    expect_dual_residency_warning,
+    log_collector,
 ):
+    """Test routing resolution for different project data residency states."""
     if client_is_sqlite(client):
         pytest.skip("ClickHouse-only test")
 
@@ -102,14 +116,27 @@ def test_version_resolution_by_table_contents(
         resolver.resolve_read_table(project_id, ch_server.ch_client)
         == expected_read_table
     )
-    for source_version, expected_write_target in expected_write_targets.items():
-        assert (
-            resolver.resolve_write_target(
-                project_id,
-                ch_server.ch_client,
-                write_source=source_version,
-            )
-            == expected_write_target
+    assert (
+        resolver.resolve_v1_write_target(project_id, ch_server.ch_client)
+        == expected_v1_write_target
+    )
+    assert (
+        resolver.resolve_v2_write_target(project_id, ch_server.ch_client)
+        == expected_v2_write_target
+    )
+
+    # Verify dual residency warning is logged when expected
+    warning_logs = log_collector.get_warning_logs()
+    dual_residency_warnings = [
+        log for log in warning_logs if "dual call residency" in log.message.lower()
+    ]
+    if expect_dual_residency_warning:
+        assert len(dual_residency_warnings) > 0, (
+            "Expected dual residency warning but none was logged"
+        )
+    else:
+        assert len(dual_residency_warnings) == 0, (
+            f"Unexpected dual residency warning: {dual_residency_warnings}"
         )
 
 

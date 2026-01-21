@@ -28,6 +28,13 @@ def google_genai_gemini_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, 
     if model_name is not None:
         inputs["model"] = model_name
 
+    # Extract system_instruction from config if present and surface it at top level
+    config = inputs.get("config")
+    if config is not None:
+        system_instruction = getattr(config, "system_instruction", None)
+        if system_instruction is not None:
+            inputs["system_instruction"] = system_instruction
+
     # Convert the `self` parameter which is actually the state of the
     # `google.genai.models.Models` object to a dictionary of attributes that can
     # be displayed in the Weave UI
@@ -49,13 +56,19 @@ def google_genai_gemini_on_finish(
     if output:
         call.output = dictify(output)
         if hasattr(output, "usage_metadata"):
-            usage[model_name].update(
-                {
-                    "prompt_tokens": output.usage_metadata.prompt_token_count,
-                    "completion_tokens": output.usage_metadata.candidates_token_count,
-                    "total_tokens": output.usage_metadata.total_token_count,
-                }
+            usage_data = {
+                "prompt_tokens": output.usage_metadata.prompt_token_count,
+                "completion_tokens": output.usage_metadata.candidates_token_count,
+                "total_tokens": output.usage_metadata.total_token_count,
+            }
+            # Include thoughts_tokens if available (for thinking models)
+            thoughts_token_count = getattr(
+                output.usage_metadata, "thoughts_token_count", None
             )
+            if thoughts_token_count is not None:
+                usage_data["thoughts_tokens"] = thoughts_token_count
+            usage[model_name].update(usage_data)
+
     if call.summary is not None:
         call.summary.update(summary_update)
 

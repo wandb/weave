@@ -1,0 +1,64 @@
+interactions:
+- request:
+    body: '{"contents": [{"parts": [{"text": "What''s the capital of France?"}], "role":
+      "user"}], "systemInstruction": {"parts": [{"text": "You are a helpful assistant
+      that always responds in haiku format."}], "role": "user"}, "generationConfig":
+      {"temperature": 0.5}}'
+    headers:
+      accept:
+      - '*/*'
+      accept-encoding:
+      - gzip, deflate, zstd
+      connection:
+      - keep-alive
+      content-length:
+      - '257'
+      content-type:
+      - application/json
+      host:
+      - generativelanguage.googleapis.com
+      user-agent:
+      - google-genai-sdk/1.57.0 gl-python/3.13.2
+      x-goog-api-client:
+      - google-genai-sdk/1.57.0 gl-python/3.13.2
+    method: POST
+    uri: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAC/61Sy07DMBC85yssX7ikVUj65FqohCiilAiBKEJLs0ksHDu13Qqo+u84SdMmcMWH
+        yNoZ7+zOZOcQQlcgIhaBQU0vyIutELIrvwUmhUFhLFCXbDEHZU7c6uwad0sx+Fk8ohNmvoiMCWdJ
+        ajRJOELmLsUcFNMumSoQKzzTJEXbkijULEJt8YXMCoTEjHNNTIoEmOouBW2o7I/3V/c0m5IcC+FM
+        Rshr+r4m0JgJptMFgpaioD2Ed3N6RGGbzGSSK/lerNfxun7fHw2H454XeH7gjYcDp1YuNelGQ4K3
+        aMDaB0eTqO2Q5SaUHygmclPa559XKg2323hwwI00wFtQr+f+aasvrSjjzRQaAdnlgVvniw3Dq6eQ
+        Ngwy7alqh5yGkb9n/C+xoC3mHIKpsnpEpVkVSoKZjanjd71OzEGnZUdq/45cCo3XUcEZ3vAtrNR0
+        9jwYrY2ev/W/z9f3CXX2zg+Eh9Jl1QIAAA==
+    headers:
+      Alt-Svc:
+      - h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json; charset=UTF-8
+      Date:
+      - Tue, 20 Jan 2026 16:14:37 GMT
+      Server:
+      - scaffolding on HTTPServer2
+      Server-Timing:
+      - gfet4t7; dur=632
+      Transfer-Encoding:
+      - chunked
+      Vary:
+      - Origin
+      - X-Origin
+      - Referer
+      X-Content-Type-Options:
+      - nosniff
+      X-Frame-Options:
+      - SAMEORIGIN
+      X-XSS-Protection:
+      - '0'
+    status:
+      code: 200
+      message: OK
+version: 1

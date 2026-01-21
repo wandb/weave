@@ -2104,7 +2104,6 @@ def _is_minimal_filter(filter: tsi.CallsFilter | None) -> bool:
 def build_calls_complete_update_end_query(
     table_name: str,
     project_id_param: str,
-    started_at_param: str,
     id_param: str,
     ended_at_param: str,
     exception_param: str,
@@ -2112,13 +2111,13 @@ def build_calls_complete_update_end_query(
     summary_dump_param: str,
     output_refs_param: str,
     wb_run_step_end_param: str,
+    started_at_param: str | None = None,
 ) -> str:
     """Build the calls_complete UPDATE query for call end data.
 
     Args:
         table_name (str): The calls_complete table name.
         project_id_param (str): Param slot key for project_id.
-        started_at_param (str): Param slot key for started_at (Int64 microseconds).
         id_param (str): Param slot key for call id.
         ended_at_param (str): Param slot key for ended_at (Int64 microseconds).
         exception_param (str): Param slot key for exception.
@@ -2126,6 +2125,9 @@ def build_calls_complete_update_end_query(
         summary_dump_param (str): Param slot key for summary_dump.
         output_refs_param (str): Param slot key for output_refs.
         wb_run_step_end_param (str): Param slot key for wb_run_step_end.
+        started_at_param (str | None): Optional param slot key for started_at
+            (Int64 microseconds). When provided, enables more efficient queries
+            by utilizing the ClickHouse primary key (project_id, started_at, id).
 
     Returns:
         str: The formatted ClickHouse UPDATE statement.
@@ -2135,24 +2137,31 @@ def build_calls_complete_update_end_query(
         because clickhouse-connect truncates datetime objects to whole seconds.
         We use fromUnixTimestamp64Micro() to convert back to DateTime64(6).
     """
-    # Build ClickHouse parameter specs separately to avoid Python f-string
-    # interpreting `:Int64` as a format specifier (which causes errors)
-    started_at_spec = f"{started_at_param}:Int64"
-    ended_at_spec = f"{ended_at_param}:Int64"
+    # Build WHERE clause - include started_at if provided for better primary key usage
+    where_clauses = [f"project_id = {{{project_id_param}:String}}"]
+    if started_at_param is not None:
+        where_clauses.append(
+            f"started_at = fromUnixTimestamp64Micro({{{started_at_param}:Int64}}, 'UTC')"
+        )
+    else:
+        # TODO: try to optimistically parse uuidv7, grabbing timestamps from the ID
+        # then use that to narrow the granules we need to search.
+        pass
+
+    where_clauses.append(f"id = {{{id_param}:String}}")
+    where_clause = " AND ".join(where_clauses)
 
     # Use fromUnixTimestamp64Micro to convert Int64 microseconds to DateTime64(6)
     # This preserves full microsecond precision that would be lost with datetime params
     return f"""
         UPDATE {table_name}
         SET
-            ended_at = fromUnixTimestamp64Micro({{{ended_at_spec}}}, 'UTC'),
+            ended_at = fromUnixTimestamp64Micro({{{ended_at_param}:Int64}}, 'UTC'),
             exception = {{{exception_param}:Nullable(String)}},
             output_dump = {{{output_dump_param}:String}},
             summary_dump = {{{summary_dump_param}:String}},
             output_refs = {{{output_refs_param}:Array(String)}},
             wb_run_step_end = {{{wb_run_step_end_param}:Nullable(UInt64)}},
             updated_at = now64(3)
-        WHERE project_id = {{{project_id_param}:String}}
-            AND started_at = fromUnixTimestamp64Micro({{{started_at_spec}}}, 'UTC')
-            AND id = {{{id_param}:String}}
+        WHERE {where_clause}
         """

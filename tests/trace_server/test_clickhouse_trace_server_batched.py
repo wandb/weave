@@ -1,3 +1,5 @@
+import base64
+import datetime as dt
 import json
 from datetime import datetime, timezone
 from unittest.mock import MagicMock, Mock, patch
@@ -879,3 +881,77 @@ def test_completions_create_stream_prompt_not_found_error():
         assert len(chunks) == 1
         assert "error" in chunks[0]
         assert "Failed to resolve and apply prompt" in chunks[0]["error"]
+
+
+class _MockInsertError(Exception):
+    """Simulates a ClickHouse insert error."""
+
+    pass
+
+
+@pytest.mark.disable_logging_error_check
+def test_call_batch_clears_on_insert_failure():
+    """Verify _call_batch is cleared even when insert fails."""
+    mock_ch_client = MagicMock()
+    mock_ch_client.command.return_value = None
+    mock_ch_client.insert.side_effect = _MockInsertError("Connection refused")
+
+    project_id = base64.b64encode(b"test_entity/test_project").decode("utf-8")
+
+    with patch.object(
+        chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
+    ):
+        server = chts.ClickHouseTraceServer(host="test_host")
+
+        for i in range(5):
+            try:
+                req = tsi.CallStartReq(
+                    start=tsi.StartedCallSchemaForInsert(
+                        project_id=project_id,
+                        op_name=f"test_op_{i}",
+                        started_at=dt.datetime.now(dt.timezone.utc),
+                        attributes={},
+                        inputs={"test_input": "value"},
+                    )
+                )
+                server.call_start(req)
+            except _MockInsertError:
+                pass
+
+        assert len(server._call_batch) == 0, (
+            f"Memory leak: _call_batch retained {len(server._call_batch)} rows "
+            f"after failed inserts. Batch should be cleared on any exception."
+        )
+
+
+@pytest.mark.disable_logging_error_check
+def test_file_batch_clears_on_insert_failure():
+    """Verify _file_batch is cleared even when insert fails."""
+    mock_ch_client = MagicMock()
+    mock_ch_client.command.return_value = None
+    mock_ch_client.insert.side_effect = _MockInsertError("Connection refused")
+
+    with patch.object(
+        chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
+    ):
+        server = chts.ClickHouseTraceServer(host="test_host")
+
+        file_chunk = MagicMock()
+        file_chunk.model_dump.return_value = {
+            "project_id": "test",
+            "digest": "digest_0",
+            "n_chunks": 1,
+            "chunk_index": 0,
+            "b64_data": "dGVzdA==",
+        }
+        server._file_batch.append(file_chunk)
+
+        try:
+            server._flush_file_chunks()
+        except _MockInsertError:
+            pass
+
+        assert len(server._file_batch) == 0, (
+            f"Memory leak: _file_batch retained {len(server._file_batch)} items "
+            f"after failed insert. Batch should be cleared on any exception."
+        )
