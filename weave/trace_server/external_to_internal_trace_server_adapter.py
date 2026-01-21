@@ -215,6 +215,10 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
             # TODO: How do we correctly process user_id for the query filters?
         return self._ref_apply(self._internal_trace_server.calls_query_stats, req)
 
+    def calls_aggregate(self, req: tsi.CallsAggregateReq) -> tsi.CallsAggregateRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(self._internal_trace_server.calls_aggregate, req)
+
     def call_update(self, req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         if req.wb_user_id is not None:

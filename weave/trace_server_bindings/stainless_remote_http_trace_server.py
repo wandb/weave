@@ -577,6 +577,22 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
     @validate_call
+    def calls_aggregate(self, req: tsi.CallsAggregateReq) -> tsi.CallsAggregateRes:
+        """Aggregate call tokens and costs.
+
+        Args:
+            req: Calls aggregate request.
+
+        Returns:
+            Calls aggregate response.
+        """
+        return self._stainless_request(
+            req,
+            tsi.CallsAggregateRes,
+            self._stainless_client.calls.aggregate,
+        )
+
+    @validate_call
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
         """Delete calls.
 

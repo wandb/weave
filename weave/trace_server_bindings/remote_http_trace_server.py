@@ -429,6 +429,12 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
     @validate_call
+    def calls_aggregate(self, req: tsi.CallsAggregateReq) -> tsi.CallsAggregateRes:
+        return self._generic_request(
+            "/calls/aggregate", req, tsi.CallsAggregateReq, tsi.CallsAggregateRes
+        )
+
+    @validate_call
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
         return self._generic_request(
             "/calls/delete", req, tsi.CallsDeleteReq, tsi.CallsDeleteRes

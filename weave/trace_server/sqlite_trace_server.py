@@ -735,6 +735,257 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             ),
         )
 
+    def calls_aggregate(
+        self, req: tsi.CallsAggregateReq
+    ) -> tsi.CallsAggregateRes:
+        """Aggregate tokens and costs for calls (SQLite implementation)."""
+        # Build filter for the query
+        filter_conditions: tsi.CallsFilter | None = None
+        if req.trace_ids:
+            filter_conditions = tsi.CallsFilter(trace_ids=req.trace_ids)
+
+        # Fetch all calls matching the filter
+        calls_req = tsi.CallsQueryReq(
+            project_id=req.project_id,
+            filter=filter_conditions,
+        )
+        calls = self.calls_query(calls_req).calls
+
+        # Further filter by call_ids if specified
+        if req.call_ids:
+            call_ids_set = set(req.call_ids)
+            calls = [c for c in calls if c.id in call_ids_set]
+
+        if req.mode == "flat":
+            return self._calls_aggregate_flat(calls)
+        else:
+            return self._calls_aggregate_recursive(calls)
+
+    def _calls_aggregate_flat(
+        self, calls: list[tsi.CallSchema]
+    ) -> tsi.CallsAggregateRes:
+        """Aggregate tokens and costs per trace (flat mode)."""
+        from collections import defaultdict
+
+        trace_stats: dict[str, dict] = defaultdict(
+            lambda: {
+                "call_count": 0,
+                "prompt_tokens": 0,
+                "completion_tokens": 0,
+                "total_tokens": 0,
+                "prompt_cost": None,
+                "completion_cost": None,
+            }
+        )
+
+        for call in calls:
+            trace_id = call.trace_id
+            trace_stats[trace_id]["call_count"] += 1
+
+            # Extract tokens from summary.usage
+            if call.summary and "usage" in call.summary:
+                for model_usage in call.summary["usage"].values():
+                    if isinstance(model_usage, dict):
+                        prompt = (model_usage.get("prompt_tokens") or 0) + (
+                            model_usage.get("input_tokens") or 0
+                        )
+                        completion = (model_usage.get("completion_tokens") or 0) + (
+                            model_usage.get("output_tokens") or 0
+                        )
+                        total = model_usage.get("total_tokens") or 0
+                        trace_stats[trace_id]["prompt_tokens"] += prompt
+                        trace_stats[trace_id]["completion_tokens"] += completion
+                        trace_stats[trace_id]["total_tokens"] += total
+
+            # Extract costs from summary.weave.costs
+            if call.summary and "weave" in call.summary:
+                weave_data = call.summary["weave"]
+                if isinstance(weave_data, dict) and "costs" in weave_data:
+                    for cost_data in weave_data["costs"].values():
+                        if isinstance(cost_data, dict):
+                            pc = cost_data.get("prompt_tokens_total_cost")
+                            cc = cost_data.get("completion_tokens_total_cost")
+                            if pc is not None:
+                                trace_stats[trace_id]["prompt_cost"] = (
+                                    trace_stats[trace_id]["prompt_cost"] or 0.0
+                                ) + pc
+                            if cc is not None:
+                                trace_stats[trace_id]["completion_cost"] = (
+                                    trace_stats[trace_id]["completion_cost"] or 0.0
+                                ) + cc
+
+        flat_results = []
+        for trace_id, stats in trace_stats.items():
+            total_cost = None
+            if stats["prompt_cost"] is not None or stats["completion_cost"] is not None:
+                total_cost = (stats["prompt_cost"] or 0.0) + (
+                    stats["completion_cost"] or 0.0
+                )
+            flat_results.append(
+                tsi.FlatTraceAggregate(
+                    trace_id=trace_id,
+                    call_count=stats["call_count"],
+                    stats=tsi.CallAggregateStats(
+                        tokens=tsi.TokenMetrics(
+                            prompt_tokens=stats["prompt_tokens"],
+                            completion_tokens=stats["completion_tokens"],
+                            total_tokens=stats["total_tokens"],
+                        ),
+                        costs=tsi.CostMetrics(
+                            prompt_tokens_total_cost=stats["prompt_cost"],
+                            completion_tokens_total_cost=stats["completion_cost"],
+                            total_cost=total_cost,
+                        ),
+                    ),
+                )
+            )
+
+        return tsi.CallsAggregateRes(flat=flat_results, recursive=None)
+
+    def _calls_aggregate_recursive(
+        self, calls: list[tsi.CallSchema]
+    ) -> tsi.CallsAggregateRes:
+        """Aggregate tokens and costs per call with descendant rollups."""
+        from collections import defaultdict
+
+        # Extract per-call stats
+        call_stats: dict[str, dict] = {}
+        for call in calls:
+            stats = {
+                "prompt_tokens": 0,
+                "completion_tokens": 0,
+                "total_tokens": 0,
+                "prompt_cost": None,
+                "completion_cost": None,
+                "parent_id": call.parent_id,
+            }
+
+            if call.summary and "usage" in call.summary:
+                for model_usage in call.summary["usage"].values():
+                    if isinstance(model_usage, dict):
+                        stats["prompt_tokens"] += (
+                            model_usage.get("prompt_tokens") or 0
+                        ) + (model_usage.get("input_tokens") or 0)
+                        stats["completion_tokens"] += (
+                            model_usage.get("completion_tokens") or 0
+                        ) + (model_usage.get("output_tokens") or 0)
+                        stats["total_tokens"] += model_usage.get("total_tokens") or 0
+
+            if call.summary and "weave" in call.summary:
+                weave_data = call.summary["weave"]
+                if isinstance(weave_data, dict) and "costs" in weave_data:
+                    for cost_data in weave_data["costs"].values():
+                        if isinstance(cost_data, dict):
+                            pc = cost_data.get("prompt_tokens_total_cost")
+                            cc = cost_data.get("completion_tokens_total_cost")
+                            if pc is not None:
+                                stats["prompt_cost"] = (stats["prompt_cost"] or 0.0) + pc
+                            if cc is not None:
+                                stats["completion_cost"] = (
+                                    stats["completion_cost"] or 0.0
+                                ) + cc
+
+            call_stats[call.id] = stats
+
+        # Build parent->children map
+        children_map: dict[str | None, list[str]] = defaultdict(list)
+        for call_id, stats in call_stats.items():
+            children_map[stats["parent_id"]].append(call_id)
+
+        # Compute totals via post-order DFS
+        totals: dict[str, dict] = {}
+
+        def safe_add(a: float | None, b: float | None) -> float | None:
+            if a is None and b is None:
+                return None
+            return (a or 0.0) + (b or 0.0)
+
+        def compute_totals(call_id: str) -> dict:
+            if call_id in totals:
+                return totals[call_id]
+
+            stats = call_stats[call_id]
+            total = {
+                "prompt_tokens": stats["prompt_tokens"],
+                "completion_tokens": stats["completion_tokens"],
+                "total_tokens": stats["total_tokens"],
+                "prompt_cost": stats["prompt_cost"],
+                "completion_cost": stats["completion_cost"],
+            }
+
+            for child_id in children_map.get(call_id, []):
+                child_total = compute_totals(child_id)
+                total["prompt_tokens"] += child_total["prompt_tokens"]
+                total["completion_tokens"] += child_total["completion_tokens"]
+                total["total_tokens"] += child_total["total_tokens"]
+                total["prompt_cost"] = safe_add(
+                    total["prompt_cost"], child_total["prompt_cost"]
+                )
+                total["completion_cost"] = safe_add(
+                    total["completion_cost"], child_total["completion_cost"]
+                )
+
+            totals[call_id] = total
+            return total
+
+        for call_id in call_stats:
+            if call_id not in totals:
+                compute_totals(call_id)
+
+        # Build results
+        results = []
+        for call in calls:
+            call_id = call.id
+            stats = call_stats[call_id]
+            total_data = totals[call_id]
+
+            own_total_cost = None
+            if stats["prompt_cost"] is not None or stats["completion_cost"] is not None:
+                own_total_cost = (stats["prompt_cost"] or 0.0) + (
+                    stats["completion_cost"] or 0.0
+                )
+
+            total_total_cost = None
+            if (
+                total_data["prompt_cost"] is not None
+                or total_data["completion_cost"] is not None
+            ):
+                total_total_cost = (total_data["prompt_cost"] or 0.0) + (
+                    total_data["completion_cost"] or 0.0
+                )
+
+            results.append(
+                tsi.RecursiveCallAggregate(
+                    call_id=call_id,
+                    own=tsi.CallAggregateStats(
+                        tokens=tsi.TokenMetrics(
+                            prompt_tokens=stats["prompt_tokens"],
+                            completion_tokens=stats["completion_tokens"],
+                            total_tokens=stats["total_tokens"],
+                        ),
+                        costs=tsi.CostMetrics(
+                            prompt_tokens_total_cost=stats["prompt_cost"],
+                            completion_tokens_total_cost=stats["completion_cost"],
+                            total_cost=own_total_cost,
+                        ),
+                    ),
+                    total=tsi.CallAggregateStats(
+                        tokens=tsi.TokenMetrics(
+                            prompt_tokens=total_data["prompt_tokens"],
+                            completion_tokens=total_data["completion_tokens"],
+                            total_tokens=total_data["total_tokens"],
+                        ),
+                        costs=tsi.CostMetrics(
+                            prompt_tokens_total_cost=total_data["prompt_cost"],
+                            completion_tokens_total_cost=total_data["completion_cost"],
+                            total_cost=total_total_cost,
+                        ),
+                    ),
+                )
+            )
+
+        return tsi.CallsAggregateRes(flat=None, recursive=results)
+
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
         assert_non_null_wb_user_id(req)
         # update row with a deleted_at field set to now
