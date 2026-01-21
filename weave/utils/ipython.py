@@ -15,26 +15,14 @@ class NotInteractiveEnvironmentError(Exception): ...
 class ClassNotFoundError(ValueError): ...
 
 
-def _get_ipython() -> InteractiveShell | None:
-    # Avoid importing IPython in non-interactive CLI runs since it may
-    # initialize prompt_toolkit and mutate terminal mode (e.g., break Textual apps).
-    if "IPython" not in sys.modules:
-        return None
-    try:
-        from IPython.core.getipython import get_ipython
-    except (ImportError, ModuleNotFoundError):
-        return None
-    return get_ipython()
-
-
 def is_running_interactively() -> bool:
     """Check if the code is running in an interactive environment."""
-    return _get_ipython() is not None
+    return _lazy_get_ipython() is not None
 
 
 def get_notebook_source() -> str:
     """Get the source code of the running notebook."""
-    shell = _get_ipython()
+    shell = _lazy_get_ipython()
     if shell is None:
         raise NotInteractiveEnvironmentError
 
@@ -66,3 +54,15 @@ def get_class_source(cls: Callable) -> str:
         return segment
 
     raise ClassNotFoundError(f"Class '{class_name}' not found in the notebook")
+
+
+def _lazy_get_ipython() -> InteractiveShell | None:
+    # Avoid importing IPython in non-interactive CLI runs since it may
+    # initialize prompt_toolkit and mutate terminal mode (e.g., break Textual apps).
+    if "IPython" not in sys.modules:
+        return None
+    try:
+        from IPython.core.getipython import get_ipython
+    except (ImportError, ModuleNotFoundError):
+        return None
+    return get_ipython()
