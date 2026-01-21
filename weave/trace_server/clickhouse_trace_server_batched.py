@@ -5977,7 +5977,7 @@ def _should_retry_empty_query(e: Exception, table: str, attempt: int) -> bool:
 
 def _log_and_raise_insert_error(
     e: Exception, table: str, data: Sequence[Sequence[Any]]
-):
+) -> None:
     """Log insert error with data size info and re-raise."""
     data_bytes = sum(_num_bytes(row) for row in data)
     logger.exception(
