@@ -202,6 +202,61 @@ class EndedCallSchemaForInsert(BaseModel):
         return dict(v)
 
 
+class EndedCallSchemaForInsertWithStartedAt(EndedCallSchemaForInsert):
+    """Ended call schema with optional started_at for v2 end updates.
+
+    When started_at is provided, it enables more efficient ClickHouse queries
+    by utilizing the primary key (project_id, started_at, id). Without it,
+    the query falls back to using only (project_id, id).
+    """
+
+    started_at: datetime.datetime | None = None
+
+
+class CompletedCallSchemaForInsert(BaseModel):
+    """Schema for inserting a completed call directly.
+
+    This represents a call that is already finished at insertion time, with both
+    start and end information provided together. Used by the calls_complete endpoint.
+    """
+
+    # Required fields
+    project_id: str
+    id: str
+    trace_id: str
+    op_name: str
+    started_at: datetime.datetime
+    ended_at: datetime.datetime
+
+    # Optional metadata
+    display_name: str | None = None
+    parent_id: str | None = None
+    thread_id: str | None = None
+    turn_id: str | None = None
+
+    # Data fields
+    attributes: dict[str, Any]
+    inputs: dict[str, Any]
+    output: Any | None = None
+    summary: SummaryInsertMap
+
+    # OTEL span data
+    otel_dump: dict[str, Any] | None = None
+
+    # Exception if the call failed
+    exception: str | None = None
+
+    # WB Metadata
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
+    wb_run_id: str | None = None
+    wb_run_step: int | None = None
+    wb_run_step_end: int | None = None
+
+    @field_serializer("attributes", "summary", when_used="unless-none")
+    def serialize_typed_dicts(self, v: dict[str, Any]) -> dict[str, Any]:
+        return dict(v)
+
+
 class ObjSchema(BaseModel):
     project_id: str
     object_id: str
@@ -298,6 +353,43 @@ class CallCreateBatchReq(BaseModelStrict):
 
 class CallCreateBatchRes(BaseModel):
     res: list[CallStartRes | CallEndRes]
+
+
+class CallsUpsertCompleteReq(BaseModel):
+    """Request for upserting a batch of completed calls."""
+
+    batch: list[CompletedCallSchemaForInsert]
+
+
+class CallsUpsertCompleteRes(BaseModel):
+    """Response for upserting a batch of completed calls."""
+
+    pass
+
+
+class CallStartV2Req(BaseModelStrict):
+    """Request for starting a single call via v2 API."""
+
+    start: StartedCallSchemaForInsert
+
+
+class CallStartV2Res(BaseModel):
+    """Response for starting a single call via v2 API."""
+
+    id: str
+    trace_id: str
+
+
+class CallEndV2Req(BaseModelStrict):
+    """Request for ending a single call via v2 API."""
+
+    end: EndedCallSchemaForInsertWithStartedAt
+
+
+class CallEndV2Res(BaseModel):
+    """Response for ending a single call via v2 API."""
+
+    pass
 
 
 class CallReadReq(BaseModelStrict):
@@ -2275,6 +2367,11 @@ class ObjectInterface(Protocol):
     provide cleaner, more RESTful interfaces. Implementations should support
     both this protocol and TraceServerInterface to maintain backward compatibility.
     """
+
+    # Calls V2 API
+    def calls_complete(self, req: CallsUpsertCompleteReq) -> CallsUpsertCompleteRes: ...
+    def call_start_v2(self, req: CallStartV2Req) -> CallStartV2Res: ...
+    def call_end_v2(self, req: CallEndV2Req) -> CallEndV2Res: ...
 
     # Ops
     def op_create(self, req: OpCreateReq) -> OpCreateRes: ...

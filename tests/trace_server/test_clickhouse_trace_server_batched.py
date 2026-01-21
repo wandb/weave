@@ -8,6 +8,10 @@ import pytest
 
 from weave.trace_server import clickhouse_trace_server_batched as chts
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.clickhouse_schema import (
+    CallEndCHInsertable,
+    CallStartCHInsertable,
+)
 from weave.trace_server.secret_fetcher_context import secret_fetcher_context
 
 
@@ -558,8 +562,12 @@ def test_completions_create_stream_multiple_choices():
 
         # Get all the calls
         call_args = [call[0][0] for call in mock_insert_call.call_args_list]
-        start_calls = [call for call in call_args if hasattr(call, "started_at")]
-        end_calls = [call for call in call_args if hasattr(call, "ended_at")]
+        start_calls = [
+            call for call in call_args if isinstance(call, CallStartCHInsertable)
+        ]
+        end_calls = [
+            call for call in call_args if isinstance(call, CallEndCHInsertable)
+        ]
 
         # Should have 1 start call and 1 end call
         assert len(start_calls) == 1
@@ -683,8 +691,12 @@ def test_completions_create_stream_single_choice_unified_wrapper():
 
         # Get all the calls
         call_args = [call[0][0] for call in mock_insert_call.call_args_list]
-        start_calls = [call for call in call_args if hasattr(call, "started_at")]
-        end_calls = [call for call in call_args if hasattr(call, "ended_at")]
+        start_calls = [
+            call for call in call_args if isinstance(call, CallStartCHInsertable)
+        ]
+        end_calls = [
+            call for call in call_args if isinstance(call, CallEndCHInsertable)
+        ]
 
         # Should have 1 start call and 1 end call
         assert len(start_calls) == 1
