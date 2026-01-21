@@ -426,9 +426,13 @@ def zero_stack():
 
 
 @pytest.fixture
-def client(zero_stack, request, trace_server):
+def client(zero_stack, request, trace_server, caching_client_isolation):
     """This is the standard fixture used everywhere in tests to test end to end
     client functionality.
+
+    Note: caching_client_isolation is explicitly depended on to ensure the cache
+    directory is set before the client is created. Without this, the cache might
+    be shared across tests causing flaky test failures.
     """
     client = create_client(request, trace_server)
     try:
@@ -438,8 +442,12 @@ def client(zero_stack, request, trace_server):
 
 
 @pytest.fixture
-def client_creator(zero_stack, request, trace_server):
-    """This fixture is useful for delaying the creation of the client (ex. when you want to set settings first)."""
+def client_creator(zero_stack, request, trace_server, caching_client_isolation):
+    """This fixture is useful for delaying the creation of the client (ex. when you want to set settings first).
+
+    Note: caching_client_isolation is explicitly depended on to ensure the cache
+    directory is set before the client is created.
+    """
 
     @contextlib.contextmanager
     def client(
