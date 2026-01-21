@@ -58,6 +58,18 @@ def litellm_accumulator(
         acc.choices[delta_choice.index].message.content += (
             delta_choice.delta.content or ""
         )
+        # Accumulate reasoning_content for reasoning models (e.g., DeepSeek R1)
+        if (
+            hasattr(delta_choice.delta, "reasoning_content")
+            and delta_choice.delta.reasoning_content
+        ):
+            if not hasattr(
+                acc.choices[delta_choice.index].message, "reasoning_content"
+            ):
+                acc.choices[delta_choice.index].message.reasoning_content = ""
+            acc.choices[delta_choice.index].message.reasoning_content += (
+                delta_choice.delta.reasoning_content
+            )
         if delta_choice.delta.tool_calls:
             if acc.choices[delta_choice.index].message.tool_calls is None:
                 acc.choices[delta_choice.index].message.tool_calls = []

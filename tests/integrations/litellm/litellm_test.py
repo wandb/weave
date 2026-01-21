@@ -8,7 +8,7 @@ import pytest
 from packaging.version import parse as version_parse
 
 import weave
-from weave.integrations.litellm.litellm import get_litellm_patcher
+from weave.integrations.litellm.litellm import get_litellm_patcher, litellm_accumulator
 from weave.integrations.openai.openai_sdk import get_openai_patcher
 
 # This PR:
@@ -280,3 +280,59 @@ def test_model_predict(
     assert d["prompt_tokens_details"]["cached_tokens"] == 0
     assert d["completion_tokens"] == 10
     assert d["total_tokens"] == 38
+
+
+def test_litellm_accumulator_reasoning_content() -> None:
+    """Test that reasoning_content is accumulated from streaming deltas."""
+    from litellm.utils import Delta, ModelResponse, StreamingChoices
+
+    # Simulate streaming chunks with reasoning_content (e.g., from DeepSeek R1)
+    chunk1 = ModelResponse(
+        id="test-id",
+        object="chat.completion.chunk",
+        created=1234567890,
+        model="deepseek-r1",
+        choices=[
+            StreamingChoices(
+                index=0,
+                delta=Delta(role="assistant", content="", reasoning_content="Let me "),
+                finish_reason=None,
+            )
+        ],
+    )
+    chunk2 = ModelResponse(
+        id="test-id",
+        object="chat.completion.chunk",
+        created=1234567890,
+        model="deepseek-r1",
+        choices=[
+            StreamingChoices(
+                index=0,
+                delta=Delta(content="4", reasoning_content="think about this..."),
+                finish_reason=None,
+            )
+        ],
+    )
+    chunk3 = ModelResponse(
+        id="test-id",
+        object="chat.completion.chunk",
+        created=1234567890,
+        model="deepseek-r1",
+        choices=[
+            StreamingChoices(
+                index=0,
+                delta=Delta(content=""),
+                finish_reason="stop",
+            )
+        ],
+    )
+
+    # Accumulate chunks
+    acc = litellm_accumulator(None, chunk1)
+    acc = litellm_accumulator(acc, chunk2)
+    acc = litellm_accumulator(acc, chunk3)
+
+    # Verify both content and reasoning_content are accumulated
+    assert acc.choices[0].message.content == "4"
+    assert acc.choices[0].message.reasoning_content == "Let me think about this..."
+    assert acc.choices[0].finish_reason == "stop"
