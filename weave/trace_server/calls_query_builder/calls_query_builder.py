@@ -2007,6 +2007,11 @@ def build_calls_complete_update_end_query(
         where_clauses.append(
             f"started_at = fromUnixTimestamp64Micro({{{started_at_param}:Int64}}, 'UTC')"
         )
+    else:
+        # TODO: try to optimistically parse uuidv7, grabbing timestamps from the ID
+        # then use that to narrow the granules we need to search.
+        pass
+
     where_clauses.append(f"id = {{{id_param}:String}}")
     where_clause = " AND ".join(where_clauses)
 

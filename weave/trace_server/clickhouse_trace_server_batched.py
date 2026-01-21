@@ -618,23 +618,24 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         Returns:
             CallsUpsertCompleteRes: Empty response on success.
         """
-        for complete_call in req.batch:
-            complete_call = process_complete_call_to_content(complete_call, self)
+        with self.call_batch():
+            for complete_call in req.batch:
+                complete_call = process_complete_call_to_content(complete_call, self)
 
-            # Determine write target based on project, this should be the same for all
-            # calls in the batch, subsequent calls just hit the in-memory cache. This
-            # is here for technical correctness, in case we relax project_id target
-            # constraints intra-batch
-            write_target = self.table_routing_resolver.resolve_v2_write_target(
-                complete_call.project_id,
-                self.ch_client,
-            )
+                # Determine write target based on project, this should be the same for all
+                # calls in the batch, subsequent calls just hit the in-memory cache. This
+                # is here for technical correctness, in case we relax project_id target
+                # constraints intra-batch
+                write_target = self.table_routing_resolver.resolve_v2_write_target(
+                    complete_call.project_id,
+                    self.ch_client,
+                )
 
-            ch_call = _complete_call_to_ch_insertable(complete_call)
-            if write_target == WriteTarget.CALLS_COMPLETE:
-                self._insert_call_complete(ch_call)
-            else:
-                self._insert_call_to_v1(ch_call)
+                ch_call = _complete_call_to_ch_insertable(complete_call)
+                if write_target == WriteTarget.CALLS_COMPLETE:
+                    self._insert_call_complete(ch_call)
+                else:
+                    self._insert_call_to_v1(ch_call)
 
         return tsi.CallsUpsertCompleteRes()
 
