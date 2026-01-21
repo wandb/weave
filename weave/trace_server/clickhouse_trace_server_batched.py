@@ -10,7 +10,7 @@ from collections import defaultdict
 from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
 from re import sub
-from typing import Any, Never, cast
+from typing import Any, cast
 from zoneinfo import ZoneInfo
 
 import clickhouse_connect
@@ -5977,7 +5977,7 @@ def _should_retry_empty_query(e: Exception, table: str, attempt: int) -> bool:
 
 def _log_and_raise_insert_error(
     e: Exception, table: str, data: Sequence[Sequence[Any]]
-) -> Never:
+):
     """Log insert error with data size info and re-raise."""
     data_bytes = sum(_num_bytes(row) for row in data)
     logger.exception(
