@@ -67,9 +67,9 @@ def litellm_accumulator(
                 acc.choices[delta_choice.index].message, "reasoning_content"
             ):
                 acc.choices[delta_choice.index].message.reasoning_content = ""
-            acc.choices[delta_choice.index].message.reasoning_content += (
-                delta_choice.delta.reasoning_content
-            )
+            acc.choices[
+                delta_choice.index
+            ].message.reasoning_content += delta_choice.delta.reasoning_content
         if delta_choice.delta.tool_calls:
             if acc.choices[delta_choice.index].message.tool_calls is None:
                 acc.choices[delta_choice.index].message.tool_calls = []
