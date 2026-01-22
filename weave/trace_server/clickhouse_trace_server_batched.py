@@ -5840,8 +5840,7 @@ def _create_closing_stream_wrapper(
 
     def _stream_wrapper() -> Iterator[dict[str, Any]]:
         try:
-            for chunk in chunk_iter:
-                yield chunk
+            yield from chunk_iter
         finally:
             close_iter = getattr(chunk_iter, "close", None)
             if callable(close_iter):
