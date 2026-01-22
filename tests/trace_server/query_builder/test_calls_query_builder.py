@@ -2512,3 +2512,127 @@ def test_query_filter_with_escaped_dots_in_field_names() -> None:
             "pb_3": "project",
         },
     )
+
+
+def test_calls_complete_with_light_filter_and_order() -> None:
+    """Test calls_complete table with light filter conditions and ordering.
+
+    This test demonstrates that for calls_complete, queries use direct column
+    access without any() aggregation functions. Unlike calls_merged, calls_complete
+    does not use GROUP BY or HAVING, and filter conditions go directly in the
+    WHERE clause.
+    """
+    cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_COMPLETE)
+    cq.add_field("id")
+    cq.add_field("started_at")
+    cq.add_field("op_name")
+    cq.add_condition(
+        tsi_query.AndOperation.model_validate(
+            {
+                "$and": [
+                    {
+                        "$gt": [
+                            {"$getField": "started_at"},
+                            {"$literal": 1709251200},  # 2024-03-01 00:00:00 UTC
+                        ]
+                    },
+                    {"$eq": [{"$getField": "wb_user_id"}, {"$literal": "user_123"}]},
+                ]
+            }
+        )
+    )
+    cq.add_order("started_at", "desc")
+    cq.set_limit(50)
+
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_complete.id AS id,
+            calls_complete.started_at AS started_at,
+            calls_complete.op_name AS op_name
+        FROM calls_complete
+        WHERE calls_complete.project_id = {pb_2:String}
+        AND (
+            ((calls_complete.started_at > {pb_0:UInt64}))
+            AND ((calls_complete.wb_user_id = {pb_1:String}))
+            AND ((calls_complete.deleted_at IS NULL))
+            AND ((NOT ((calls_complete.started_at IS NULL))))
+        )
+        ORDER BY calls_complete.started_at DESC
+        LIMIT 50
+        """,
+        {
+            "pb_0": 1709251200,
+            "pb_1": "user_123",
+            "pb_2": "project",
+        },
+    )
+
+
+def test_calls_complete_with_hardcoded_filter_and_json_condition() -> None:
+    """Test calls_complete table with hardcoded filter combined with JSON field condition.
+
+    This test demonstrates that for calls_complete, when there is a hardcoded filter
+    (op_names, trace_ids) plus a JSON condition on summary, the optimizer creates a
+    CTE to filter by the light conditions first, then joins back to get the full row.
+    """
+    cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_COMPLETE)
+    cq.add_field("id")
+    cq.add_field("started_at")
+    cq.set_hardcoded_filter(
+        HardCodedFilter(
+            filter=tsi.CallsFilter(
+                op_names=["my_op"],
+                trace_ids=["trace_abc"],
+            )
+        )
+    )
+    cq.add_condition(
+        tsi_query.GtOperation.model_validate(
+            {
+                "$gt": [
+                    {"$getField": "summary.latency"},
+                    {"$literal": 1000},
+                ]
+            }
+        )
+    )
+    cq.add_order("started_at", "desc")
+    cq.set_limit(100)
+
+    assert_sql(
+        cq,
+        """
+        WITH filtered_calls AS (
+            SELECT calls_complete.id AS id
+            FROM calls_complete
+            WHERE calls_complete.project_id = {pb_4:String}
+                AND ((calls_complete.op_name IN {pb_2:Array(String)})
+                    OR (calls_complete.op_name IS NULL))
+                AND (calls_complete.trace_id = {pb_3:String}
+                    OR calls_complete.trace_id IS NULL)
+            AND (
+                ((coalesce(nullIf(JSON_VALUE(calls_complete.summary_dump, {pb_0:String}), 'null'), '') > {pb_1:UInt64}))
+                AND ((calls_complete.deleted_at IS NULL))
+                AND ((NOT ((calls_complete.started_at IS NULL))))
+            )
+            ORDER BY calls_complete.started_at DESC
+            LIMIT 100
+        )
+        SELECT
+            calls_complete.id AS id,
+            calls_complete.started_at AS started_at
+        FROM calls_complete
+        WHERE calls_complete.project_id = {pb_4:String}
+            AND (calls_complete.id IN filtered_calls)
+        ORDER BY calls_complete.started_at DESC
+        """,
+        {
+            "pb_0": '$."latency"',
+            "pb_1": 1000,
+            "pb_2": ["my_op"],
+            "pb_3": "trace_abc",
+            "pb_4": "project",
+        },
+    )
