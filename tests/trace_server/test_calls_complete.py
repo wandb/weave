@@ -11,8 +11,17 @@ from tests.trace_server.conftest_lib.trace_server_external_adapter import b64
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.base64_content_conversion import AUTO_CONVERSION_MIN_SIZE
 from weave.trace_server.calls_query_builder.utils import param_slot
+from weave.trace_server.errors import CallsCompleteModeRequired
 from weave.trace_server.orm import ParamBuilder
-from weave.trace_server.project_version.types import CallsStorageServerMode, ReadTable
+from weave.trace_server.project_version.project_version import (
+    reset_project_residence_cache,
+)
+from weave.trace_server.project_version.types import (
+    CallsStorageServerMode,
+    ProjectDataResidence,
+    ReadTable,
+    WriteTarget,
+)
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer
 
 
@@ -78,6 +87,48 @@ def _insert_merged_call(ch_client, project_id: str, call_id: str | None = None) 
             '{project_id}',
             '{call_id}',
             'test_op',
+            now(),
+            '{uuid.uuid4()}',
+            '',
+            '{{}}',
+            '{{}}',
+            'null',
+            '{{}}'
+        )
+        """
+    )
+    return call_id
+
+
+def _insert_complete_call(
+    ch_client, project_id: str, call_id: str | None = None
+) -> str:
+    """Insert a minimal row into calls_complete for residence setup.
+
+    This bypasses routing logic to directly insert into calls_complete,
+    which is useful for setting up specific residence states in tests.
+    """
+    call_id = call_id or str(uuid.uuid4())
+    ch_client.command(
+        f"""
+        INSERT INTO calls_complete (
+            project_id,
+            id,
+            op_name,
+            started_at,
+            ended_at,
+            trace_id,
+            parent_id,
+            attributes_dump,
+            inputs_dump,
+            output_dump,
+            summary_dump
+        )
+        VALUES (
+            '{project_id}',
+            '{call_id}',
+            'test_op',
+            now(),
             now(),
             '{uuid.uuid4()}',
             '',
@@ -273,89 +324,267 @@ def test_calls_complete_routing_both_residence_state(
     Per the routing matrix in project_version/types.py:
         BOTH residence → Read: COMPLETE, Write: COMPLETE
 
-    This test verifies that even in this unexpected state:
-    1. Reads come from calls_complete (not calls_merged)
-    2. Writes go to calls_complete
-    3. The system does not crash or behave unpredictably
+    This test verifies:
+    1. Normal API usage cannot create a BOTH state (routing prevents it)
+    2. When BOTH state exists (via direct SQL), reads come from calls_complete
+    3. When BOTH state exists, V2 writes go to calls_complete
+    4. When BOTH state exists, V1 writes raise CallsCompleteModeRequired
+    5. The system handles this gracefully without crashes
     """
     project_id = f"{TEST_ENTITY}/calls_complete_both_residence"
     internal_project_id = b64(project_id)
 
-    # Manually seed BOTH tables to create the unexpected BOTH state
-    # In production, this should never happen - it's a data inconsistency
-    merged_call_id = _insert_merged_call(
+    # =========================================================================
+    # PART 1: Demonstrate that normal API usage CANNOT create a BOTH state
+    # =========================================================================
+    # First, insert directly into calls_merged (simulating legacy data)
+    merged_call_id_1 = _insert_merged_call(
         clickhouse_trace_server.ch_client, internal_project_id
     )
-    complete_call_id = str(uuid.uuid4())
-    complete_call = _make_completed_call(
+
+    # Now try to use calls_complete API - routing should detect MERGED_ONLY
+    # and route this write to calls_merged (not calls_complete)
+    api_call_id = str(uuid.uuid4())
+    api_call = _make_completed_call(
         project_id,
-        complete_call_id,
+        api_call_id,
         str(uuid.uuid4()),
         datetime.datetime.now(datetime.timezone.utc),
         datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=1),
     )
-    trace_server.calls_complete(tsi.CallsUpsertCompleteReq(batch=[complete_call]))
+    trace_server.calls_complete(tsi.CallsUpsertCompleteReq(batch=[api_call]))
 
-    # Verify we're in the BOTH state
+    # Verify: API correctly routed to calls_merged, NOT calls_complete
+    # This proves the routing system prevents accidental BOTH state creation
     assert (
         _count_project_rows(
             clickhouse_trace_server.ch_client, "calls_merged", internal_project_id
         )
-        == 1
-    )
+        == 2
+    ), "API should route to calls_merged for MERGED_ONLY projects"
     assert (
         _count_project_rows(
             clickhouse_trace_server.ch_client, "calls_complete", internal_project_id
         )
-        == 1
+        == 0
+    ), "calls_complete should remain empty - routing prevented BOTH state"
+
+    # =========================================================================
+    # PART 2: Create actual BOTH state via direct SQL (bypassing routing)
+    # =========================================================================
+    # Clear cache so we detect the new state
+    reset_project_residence_cache()
+
+    # Insert directly into calls_complete - this bypasses routing and creates BOTH state
+    complete_call_id = _insert_complete_call(
+        clickhouse_trace_server.ch_client, internal_project_id
     )
 
-    # Verify routing resolves to COMPLETE for reads (graceful handling of BOTH)
-    read_table = clickhouse_trace_server.table_routing_resolver.resolve_read_table(
-        internal_project_id,
-        clickhouse_trace_server.ch_client,
+    # Verify we're now in the BOTH state
+    merged_count = _count_project_rows(
+        clickhouse_trace_server.ch_client, "calls_merged", internal_project_id
+    )
+    complete_count = _count_project_rows(
+        clickhouse_trace_server.ch_client, "calls_complete", internal_project_id
+    )
+    assert merged_count == 2, f"Expected 2 rows in calls_merged, got {merged_count}"
+    assert complete_count == 1, (
+        f"Expected 1 row in calls_complete, got {complete_count}"
+    )
+
+    # Verify resolver detects BOTH residence
+    resolver = clickhouse_trace_server.table_routing_resolver
+    residence = resolver._get_residence(
+        internal_project_id, clickhouse_trace_server.ch_client
+    )
+    assert residence == ProjectDataResidence.BOTH, (
+        f"Expected BOTH residence, got {residence}"
+    )
+
+    # =========================================================================
+    # PART 3: Verify read routing in BOTH state
+    # =========================================================================
+    read_table = resolver.resolve_read_table(
+        internal_project_id, clickhouse_trace_server.ch_client
     )
     assert read_table == ReadTable.CALLS_COMPLETE, (
-        "BOTH residence state should route reads to calls_complete"
+        "BOTH residence should route reads to calls_complete"
     )
 
-    # Verify reads come from calls_complete (merged_call_id should NOT be visible)
+    # Reads should only see calls_complete data (1 call), not calls_merged (2 calls)
     calls = _fetch_calls_stream(trace_server, project_id)
     call_ids = {c.id for c in calls}
+    assert len(calls) == 1, f"Expected 1 call from calls_complete, got {len(calls)}"
     assert complete_call_id in call_ids, "calls_complete data should be visible"
-    assert merged_call_id not in call_ids, (
-        "calls_merged data should NOT be visible when reading from calls_complete"
+    assert merged_call_id_1 not in call_ids, "calls_merged data should NOT be visible"
+    assert api_call_id not in call_ids, "calls_merged data should NOT be visible"
+
+    # =========================================================================
+    # PART 4: Verify V2 write routing in BOTH state
+    # =========================================================================
+    # V2 writes should go to calls_complete
+    v2_write_target = resolver.resolve_v2_write_target(
+        internal_project_id, clickhouse_trace_server.ch_client
+    )
+    assert v2_write_target == WriteTarget.CALLS_COMPLETE, (
+        "BOTH residence should route V2 writes to calls_complete"
     )
 
-    # Verify new writes go to calls_complete
-    new_call_id = str(uuid.uuid4())
-    new_call = _make_completed_call(
+    # Actually perform a V2 write via calls_complete API
+    new_complete_call_id = str(uuid.uuid4())
+    new_complete_call = _make_completed_call(
         project_id,
-        new_call_id,
+        new_complete_call_id,
         str(uuid.uuid4()),
         datetime.datetime.now(datetime.timezone.utc),
         datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=1),
     )
-    trace_server.calls_complete(tsi.CallsUpsertCompleteReq(batch=[new_call]))
+    trace_server.calls_complete(tsi.CallsUpsertCompleteReq(batch=[new_complete_call]))
 
-    # Verify write went to calls_complete (not calls_merged)
+    # Verify write went to calls_complete
     assert (
         _count_project_rows(
             clickhouse_trace_server.ch_client, "calls_complete", internal_project_id
         )
         == 2
-    ), "New write should go to calls_complete"
+    ), "V2 write should go to calls_complete"
     assert (
         _count_project_rows(
             clickhouse_trace_server.ch_client, "calls_merged", internal_project_id
         )
-        == 1
+        == 2
     ), "calls_merged should remain unchanged"
 
-    # Verify both calls_complete entries are now visible
+    # =========================================================================
+    # PART 5: Verify V2 call_start/call_end in BOTH state
+    # =========================================================================
+    v2_start_call_id = str(uuid.uuid4())
+    started_at = datetime.datetime.now(datetime.timezone.utc)
+    trace_server.call_start_v2(
+        tsi.CallStartV2Req(
+            start=tsi.StartedCallSchemaForInsert(
+                project_id=project_id,
+                id=v2_start_call_id,
+                trace_id=str(uuid.uuid4()),
+                op_name="test_op_v2",
+                started_at=started_at,
+                attributes={},
+                inputs={"test_input": "value"},
+            )
+        )
+    )
+
+    # Verify it went to calls_complete
+    assert (
+        _count_project_rows(
+            clickhouse_trace_server.ch_client, "calls_complete", internal_project_id
+        )
+        == 3
+    ), "V2 call_start should go to calls_complete"
+
+    # End the call
+    trace_server.call_end_v2(
+        tsi.CallEndV2Req(
+            end=tsi.EndedCallSchemaForInsertWithStartedAt(
+                project_id=project_id,
+                id=v2_start_call_id,
+                started_at=started_at,
+                ended_at=started_at + datetime.timedelta(seconds=1),
+                output={"result": "success"},
+                summary={"usage": {}, "status_counts": {}},
+            )
+        )
+    )
+
+    # calls_complete uses ReplacingMergeTree, so count should still be 3
+    # (the end updates the existing row, doesn't add a new one after merge)
+    complete_count_after_end = _count_project_rows(
+        clickhouse_trace_server.ch_client, "calls_complete", internal_project_id
+    )
+    assert complete_count_after_end == 3, (
+        f"Expected 3 rows in calls_complete after end, got {complete_count_after_end}"
+    )
+
+    # =========================================================================
+    # PART 6: Verify V1 endpoints raise CallsCompleteModeRequired in BOTH state
+    # =========================================================================
+    # V1 write target should be COMPLETE (signaling error should be raised)
+    # because BOTH state has calls_complete data
+    v1_write_target = resolver.resolve_v1_write_target(
+        internal_project_id, clickhouse_trace_server.ch_client
+    )
+    assert v1_write_target == WriteTarget.CALLS_COMPLETE, (
+        "V1 write target should be CALLS_COMPLETE for BOTH state to trigger error"
+    )
+
+    # V1 call_start should raise error for projects with calls_complete data
+    with pytest.raises(CallsCompleteModeRequired):
+        trace_server.call_start(
+            tsi.CallStartReq(
+                start=tsi.StartedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=str(uuid.uuid4()),
+                    trace_id=str(uuid.uuid4()),
+                    op_name="test_op_v1",
+                    started_at=datetime.datetime.now(datetime.timezone.utc),
+                    attributes={},
+                    inputs={},
+                )
+            )
+        )
+
+    # V1 call_end should also raise error
+    with pytest.raises(CallsCompleteModeRequired):
+        trace_server.call_end(
+            tsi.CallEndReq(
+                end=tsi.EndedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=str(uuid.uuid4()),
+                    ended_at=datetime.datetime.now(datetime.timezone.utc),
+                    summary={"usage": {}, "status_counts": {}},
+                )
+            )
+        )
+
+    # =========================================================================
+    # PART 7: Verify final data shape
+    # =========================================================================
+    # Verify all calls_complete entries are visible via read API
     calls = _fetch_calls_stream(trace_server, project_id)
-    assert len(calls) == 2
-    assert {c.id for c in calls} == {complete_call_id, new_call_id}
+    assert len(calls) == 3, f"Expected 3 calls visible, got {len(calls)}"
+
+    visible_ids = {c.id for c in calls}
+    assert complete_call_id in visible_ids
+    assert new_complete_call_id in visible_ids
+    assert v2_start_call_id in visible_ids
+
+    # Verify the V2 call has correct data shape
+    v2_call = _find_call_by_id(calls, v2_start_call_id)
+    assert v2_call is not None
+    assert v2_call.op_name == "test_op_v2"
+    assert v2_call.inputs == {"test_input": "value"}
+    assert v2_call.output == {"result": "success"}
+    assert v2_call.ended_at is not None
+
+    # Verify calls_merged data is orphaned (not visible via API)
+    assert merged_call_id_1 not in visible_ids, (
+        "Orphaned merged data should not be visible"
+    )
+    assert api_call_id not in visible_ids, "Orphaned merged data should not be visible"
+
+    # Final count verification
+    assert (
+        _count_project_rows(
+            clickhouse_trace_server.ch_client, "calls_merged", internal_project_id
+        )
+        == 2
+    ), "calls_merged should still have 2 orphaned rows"
+    assert (
+        _count_project_rows(
+            clickhouse_trace_server.ch_client, "calls_complete", internal_project_id
+        )
+        == 3
+    ), "calls_complete should have 3 rows"
 
 
 def test_calls_complete_converts_data_uri_inputs_and_outputs(
@@ -797,8 +1026,6 @@ def test_v1_call_start_raises_calls_complete_mode_required(
     attempting to use the legacy v1 call_start API should raise an error directing
     the user to upgrade their SDK.
     """
-    from weave.trace_server.errors import CallsCompleteModeRequired
-
     project_id = f"{TEST_ENTITY}/calls_complete_v1_error_start"
 
     # Seed the project with calls_complete data to establish it as a calls_complete project
@@ -840,8 +1067,6 @@ def test_v1_call_end_raises_calls_complete_mode_required(
     attempting to use the legacy v1 call_end API should raise an error directing
     the user to upgrade their SDK.
     """
-    from weave.trace_server.errors import CallsCompleteModeRequired
-
     project_id = f"{TEST_ENTITY}/calls_complete_v1_error_end"
 
     # Seed the project with calls_complete data to establish it as a calls_complete project
