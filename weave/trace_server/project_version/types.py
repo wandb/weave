@@ -69,9 +69,6 @@ class WriteTarget(str, Enum):
 class TableConfig:
     """Centralized configuration for table-specific SQL generation.
 
-    This dataclass encapsulates all table-specific decisions to avoid spreading
-    conditional logic throughout the query builders.
-
     Attributes:
         read_table: The ReadTable enum value.
         table_name: SQL table name (e.g., "calls_merged", "calls_complete").
@@ -112,7 +109,7 @@ class TableConfig:
                 use_aggregation=True,
                 datetime_filter_field="sortable_datetime",
             )
-        else:
+        elif read_table == ReadTable.CALLS_COMPLETE:
             return cls(
                 read_table=read_table,
                 table_name="calls_complete",
@@ -120,3 +117,5 @@ class TableConfig:
                 use_aggregation=False,
                 datetime_filter_field="started_at",
             )
+        else:
+            raise ValueError(f"Invalid read table: {read_table}")
