@@ -8,7 +8,6 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     CallsQuery,
     HardCodedFilter,
     build_calls_complete_update_end_query,
-    get_calls_stats_table_name_from_alias,
 )
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.orm import ParamBuilder
@@ -2513,17 +2512,3 @@ def test_query_filter_with_escaped_dots_in_field_names() -> None:
             "pb_3": "project",
         },
     )
-
-
-@pytest.mark.parametrize(
-    ("table_alias", "expected_stats_table"),
-    [
-        ("calls_merged", "calls_merged_stats"),
-        ("calls_complete", "calls_complete_stats"),
-    ],
-)
-def test_get_calls_stats_table_name_from_alias(
-    table_alias: str, expected_stats_table: str
-) -> None:
-    """Ensure stats table name is correctly derived from table alias."""
-    assert get_calls_stats_table_name_from_alias(table_alias) == expected_stats_table

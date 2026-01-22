@@ -261,6 +261,103 @@ def test_calls_complete_routing_by_residence(
     assert {call.id for call in calls} == expected_call_ids
 
 
+def test_calls_complete_routing_both_residence_state(
+    trace_server, clickhouse_trace_server
+):
+    """Test routing when project has data in BOTH tables (unexpected but handled gracefully).
+
+    NOTE: The BOTH residence state is NOT an expected production state. It can only occur
+    through manual database manipulation, migrations, or bugs. However, the routing system
+    should handle this gracefully by preferring calls_complete for reads and writes.
+
+    Per the routing matrix in project_version/types.py:
+        BOTH residence → Read: COMPLETE, Write: COMPLETE
+
+    This test verifies that even in this unexpected state:
+    1. Reads come from calls_complete (not calls_merged)
+    2. Writes go to calls_complete
+    3. The system does not crash or behave unpredictably
+    """
+    project_id = f"{TEST_ENTITY}/calls_complete_both_residence"
+    internal_project_id = b64(project_id)
+
+    # Manually seed BOTH tables to create the unexpected BOTH state
+    # In production, this should never happen - it's a data inconsistency
+    merged_call_id = _insert_merged_call(
+        clickhouse_trace_server.ch_client, internal_project_id
+    )
+    complete_call_id = str(uuid.uuid4())
+    complete_call = _make_completed_call(
+        project_id,
+        complete_call_id,
+        str(uuid.uuid4()),
+        datetime.datetime.now(datetime.timezone.utc),
+        datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=1),
+    )
+    trace_server.calls_complete(tsi.CallsUpsertCompleteReq(batch=[complete_call]))
+
+    # Verify we're in the BOTH state
+    assert (
+        _count_project_rows(
+            clickhouse_trace_server.ch_client, "calls_merged", internal_project_id
+        )
+        == 1
+    )
+    assert (
+        _count_project_rows(
+            clickhouse_trace_server.ch_client, "calls_complete", internal_project_id
+        )
+        == 1
+    )
+
+    # Verify routing resolves to COMPLETE for reads (graceful handling of BOTH)
+    read_table = clickhouse_trace_server.table_routing_resolver.resolve_read_table(
+        internal_project_id,
+        clickhouse_trace_server.ch_client,
+    )
+    assert read_table == ReadTable.CALLS_COMPLETE, (
+        "BOTH residence state should route reads to calls_complete"
+    )
+
+    # Verify reads come from calls_complete (merged_call_id should NOT be visible)
+    calls = _fetch_calls_stream(trace_server, project_id)
+    call_ids = {c.id for c in calls}
+    assert complete_call_id in call_ids, "calls_complete data should be visible"
+    assert merged_call_id not in call_ids, (
+        "calls_merged data should NOT be visible when reading from calls_complete"
+    )
+
+    # Verify new writes go to calls_complete
+    new_call_id = str(uuid.uuid4())
+    new_call = _make_completed_call(
+        project_id,
+        new_call_id,
+        str(uuid.uuid4()),
+        datetime.datetime.now(datetime.timezone.utc),
+        datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=1),
+    )
+    trace_server.calls_complete(tsi.CallsUpsertCompleteReq(batch=[new_call]))
+
+    # Verify write went to calls_complete (not calls_merged)
+    assert (
+        _count_project_rows(
+            clickhouse_trace_server.ch_client, "calls_complete", internal_project_id
+        )
+        == 2
+    ), "New write should go to calls_complete"
+    assert (
+        _count_project_rows(
+            clickhouse_trace_server.ch_client, "calls_merged", internal_project_id
+        )
+        == 1
+    ), "calls_merged should remain unchanged"
+
+    # Verify both calls_complete entries are now visible
+    calls = _fetch_calls_stream(trace_server, project_id)
+    assert len(calls) == 2
+    assert {c.id for c in calls} == {complete_call_id, new_call_id}
+
+
 def test_calls_complete_converts_data_uri_inputs_and_outputs(
     trace_server, clickhouse_trace_server
 ):

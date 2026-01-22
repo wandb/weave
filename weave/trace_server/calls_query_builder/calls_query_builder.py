@@ -63,7 +63,7 @@ from weave.trace_server.orm import (
     python_value_to_ch_type,
     split_escaped_field_path,
 )
-from weave.trace_server.project_version.types import ReadTable
+from weave.trace_server.project_version.types import ReadTable, TableConfig
 from weave.trace_server.token_costs import build_cost_ctes, get_cost_final_select
 from weave.trace_server.trace_server_common import assert_parameter_length_less_than_max
 from weave.trace_server.trace_server_interface_util import (
@@ -1106,14 +1106,14 @@ class CallsQuery(BaseModel):
 
         # Storage size join
         storage_size_join = ""
+        config = TableConfig.from_read_table(self.read_table)
         if self.include_storage_size:
-            stats_table_name = get_calls_stats_table_name_from_alias(table_alias)
             storage_size_join = f"""
             LEFT JOIN (
                 SELECT
                     id,
                     sum(COALESCE(attributes_size_bytes,0) + COALESCE(inputs_size_bytes,0) + COALESCE(output_size_bytes,0) + COALESCE(summary_size_bytes,0)) AS storage_size_bytes
-                FROM {stats_table_name}
+                FROM {config.stats_table_name}
                 WHERE project_id = {param_slot(project_param, "String")}
                 GROUP BY id
             ) AS {STORAGE_SIZE_TABLE_NAME}
@@ -1123,13 +1123,12 @@ class CallsQuery(BaseModel):
         # Total storage size join
         total_storage_size_join = ""
         if self.include_total_storage_size:
-            stats_table_name = get_calls_stats_table_name_from_alias(table_alias)
             total_storage_size_join = f"""
             LEFT JOIN (
                 SELECT
                     trace_id,
                     sum(COALESCE(attributes_size_bytes,0) + COALESCE(inputs_size_bytes,0) + COALESCE(output_size_bytes,0) + COALESCE(summary_size_bytes,0)) AS total_storage_size_bytes
-                FROM {stats_table_name}
+                FROM {config.stats_table_name}
                 WHERE project_id = {param_slot(project_param, "String")}
                 GROUP BY trace_id
             ) AS {ROLLED_UP_CALL_MERGED_STATS_TABLE_NAME}
@@ -1332,17 +1331,7 @@ ROLLED_UP_CALL_MERGED_STATS_TABLE_NAME = "rolled_up_cms"
 
 def get_calls_table_name(read_table: ReadTable) -> str:
     """Return the base calls table name for a read table."""
-    return read_table.value
-
-
-def get_calls_stats_table_name_from_alias(table_alias: str) -> str:
-    """Return the stats table name for a calls table alias."""
-    if table_alias == ReadTable.CALLS_COMPLETE.value:
-        return "calls_complete_stats"
-    elif table_alias == ReadTable.CALLS_MERGED.value:
-        return "calls_merged_stats"
-    else:
-        raise ValueError(f"Invalid table alias: {table_alias}")
+    return TableConfig.from_read_table(read_table).table_name
 
 
 ALLOWED_CALL_FIELDS = {
@@ -2000,9 +1989,7 @@ def build_calls_stats_query(
 
     cq.add_field("id")
     if req.filter is not None:
-        cq.set_hardcoded_filter(
-            HardCodedFilter(filter=req.filter, read_table=read_table)
-        )
+        cq.set_hardcoded_filter(HardCodedFilter(filter=req.filter))
     if req.query is not None:
         cq.add_condition(req.query.expr_)
     if req.limit is not None:
