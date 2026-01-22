@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
+from clickhouse_connect.driver.exceptions import DatabaseError
 
 from weave.trace_server import clickhouse_trace_server_batched as chts
 from weave.trace_server import trace_server_interface as tsi
@@ -909,6 +910,64 @@ class _MockInsertError(Exception):
     """Simulates a ClickHouse insert error."""
 
     pass
+
+
+def test_insert_retries_empty_query_error():
+    """Verify 'Empty query' errors are retried (generator exhaustion during HTTP retry)."""
+    mock_ch_client = MagicMock()
+    mock_ch_client.command.return_value = None
+    mock_summary = MagicMock()
+    # First call fails with empty query, second succeeds
+    mock_ch_client.insert.side_effect = [
+        DatabaseError("Empty query. (SYNTAX_ERROR)"),
+        mock_summary,
+    ]
+
+    with patch.object(
+        chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
+    ):
+        server = chts.ClickHouseTraceServer(host="test_host")
+        result = server._insert("t", data=[[1]], column_names=["a"])
+
+        assert result == mock_summary
+        assert mock_ch_client.insert.call_count == 2  # Retried once
+
+
+@pytest.mark.disable_logging_error_check
+@pytest.mark.parametrize(
+    ("error", "expected_calls"),
+    [
+        # Other errors should NOT be retried (call_count=1)
+        (RuntimeError("unexpected"), 1),
+        (ValueError("some value error"), 1),
+        # Empty query errors retry up to INSERT_MAX_RETRIES
+        pytest.param(
+            "empty_query",
+            3,  # INSERT_MAX_RETRIES
+            id="empty_query_exhausts_retries",
+        ),
+    ],
+)
+def test_insert_error_handling(error, expected_calls):
+    """Verify only 'Empty query' errors are retried; others fail immediately."""
+    mock_ch_client = MagicMock()
+    mock_ch_client.command.return_value = None
+
+    if error == "empty_query":
+        mock_ch_client.insert.side_effect = DatabaseError("Empty query. (SYNTAX_ERROR)")
+        expected_exception = DatabaseError
+    else:
+        mock_ch_client.insert.side_effect = error
+        expected_exception = type(error)
+
+    with patch.object(
+        chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
+    ):
+        server = chts.ClickHouseTraceServer(host="test_host")
+        with pytest.raises(expected_exception):
+            server._insert("t", data=[[1]], column_names=["a"])
+
+        assert mock_ch_client.insert.call_count == expected_calls
 
 
 @pytest.mark.disable_logging_error_check

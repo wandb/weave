@@ -16,6 +16,7 @@ from zoneinfo import ZoneInfo
 import clickhouse_connect
 import ddtrace
 from clickhouse_connect.driver.client import Client as CHClient
+from clickhouse_connect.driver.exceptions import DatabaseError
 from clickhouse_connect.driver.httputil import get_pool_manager
 from clickhouse_connect.driver.query import QueryResult
 from clickhouse_connect.driver.summary import QuerySummary
@@ -893,29 +894,34 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 dict(zip(select_columns, row, strict=False))
             )
 
-        if not expand_columns and not include_feedback:
-            for row in raw_res:
-                yield tsi.CallSchema.model_validate(row_to_call_schema_dict(row))
-            return
+        try:
+            if not expand_columns and not include_feedback:
+                for row in raw_res:
+                    yield tsi.CallSchema.model_validate(row_to_call_schema_dict(row))
+                return
 
-        ref_cache = LRUCache(max_size=1000)
-        batch_processor = DynamicBatchProcessor(
-            initial_size=ch_settings.INITIAL_CALLS_STREAM_BATCH_SIZE,
-            max_size=ch_settings.MAX_CALLS_STREAM_BATCH_SIZE,
-            growth_factor=10,
-        )
+            ref_cache = LRUCache(max_size=1000)
+            batch_processor = DynamicBatchProcessor(
+                initial_size=ch_settings.INITIAL_CALLS_STREAM_BATCH_SIZE,
+                max_size=ch_settings.MAX_CALLS_STREAM_BATCH_SIZE,
+                growth_factor=10,
+            )
 
-        for batch in batch_processor.make_batches(raw_res):
-            call_dicts = [row_to_call_schema_dict(row) for row in batch]
-            if expand_columns and req.return_expanded_column_values:
-                self._expand_call_refs(
-                    req.project_id, call_dicts, expand_columns, ref_cache
-                )
-            if include_feedback:
-                self._add_feedback_to_calls(req.project_id, call_dicts)
+            for batch in batch_processor.make_batches(raw_res):
+                call_dicts = [row_to_call_schema_dict(row) for row in batch]
+                if expand_columns and req.return_expanded_column_values:
+                    self._expand_call_refs(
+                        req.project_id, call_dicts, expand_columns, ref_cache
+                    )
+                if include_feedback:
+                    self._add_feedback_to_calls(req.project_id, call_dicts)
 
-            for call in call_dicts:
-                yield tsi.CallSchema.model_validate(call)
+                for call in call_dicts:
+                    yield tsi.CallSchema.model_validate(call)
+        finally:
+            # Ensure upstream _query_stream is closed on any exit
+            if hasattr(raw_res, "close"):
+                raw_res.close()
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._add_feedback_to_calls")
     def _add_feedback_to_calls(
@@ -5407,38 +5413,28 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     "clickhouse_trace_server_batched._insert.async_insert": True,
                 }
             )
-        try:
-            return self.ch_client.insert(
-                table, data=data, column_names=column_names, settings=settings
-            )
-        except ValueError as e:
-            if "negative shift count" in str(e):
-                # clickhouse_connect raises a weird error message like
-                # File "/Users/shawn/.pyenv/versions/3.10.13/envs/weave-public-editable/lib/python3.10/site-packages/clickhouse_connect/driver/
-                # │insert.py", line 120, in _calc_block_size
-                # │    return 1 << (21 - int(log(row_size, 2)))
-                # │ValueError: negative shift count
-                # when we try to insert something that's too large.
-                raise InsertTooLarge(
-                    "Database insertion failed. Record too large. "
-                    "A likely cause is that a single row or cell exceeded "
-                    "the limit. If logging images, save them as `Image.PIL`."
-                ) from e
-            raise
-        except Exception as e:
-            # Do potentially expensive data length calculation, only on
-            # error, which should be very rare!
-            data_bytes = sum(_num_bytes(row) for row in data)
-            logger.exception(
-                "clickhouse_insert_error",
-                extra={
-                    "error_str": str(e),
-                    "table": table,
-                    "data_len": len(data),
-                    "data_bytes": data_bytes,
-                },
-            )
-            raise
+
+        for attempt in range(ch_settings.INSERT_MAX_RETRIES):
+            try:
+                return self.ch_client.insert(
+                    table, data=data, column_names=column_names, settings=settings
+                )
+
+            # InsertTooLarge: raise immediately, no retry
+            except ValueError as e:
+                converted = _convert_to_insert_too_large(e)
+                _log_and_raise_insert_error(converted, table, data)
+
+            # Empty query error: RETRY (generator was consumed during HTTP retry)
+            # We should retry with a fresh generator
+            except DatabaseError as e:
+                if _should_retry_empty_query(e, table, attempt):
+                    continue
+                _log_and_raise_insert_error(e, table, data)
+
+            # All other errors: raise immediately, no retry
+            except Exception as e:
+                _log_and_raise_insert_error(e, table, data)
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert_call")
     def _insert_call(self, ch_call: CallCHInsertable) -> None:
@@ -5542,8 +5538,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             # Try 1 by 1
             for row in self._calls_complete_batch:
                 self._insert_call_complete_batch([row])
-
-        self._calls_complete_batch = []
+        finally:
+            self._calls_complete_batch = []
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._strip_large_values")
     def _strip_large_values(self, batch: list[list[Any]]) -> list[list[Any]]:
@@ -6334,3 +6330,58 @@ def _setup_completion_model_info(
 
 def _sanitize_name_for_object_id(name: str) -> str:
     return sub(r"[^a-zA-Z0-9_-]", "_", name)
+
+
+# -----------------------------------------------------------------------------
+# Insert Error Helpers
+# -----------------------------------------------------------------------------
+
+
+def _convert_to_insert_too_large(e: Exception) -> Exception:
+    """Convert ValueError to InsertTooLarge if the error indicates data is too large."""
+    if isinstance(e, ValueError) and "negative shift count" in str(e):
+        return InsertTooLarge(
+            "Database insertion failed. Record too large. "
+            "A likely cause is that a single row or cell exceeded "
+            "the limit. If logging images, save them as `Image.PIL`."
+        )
+    return e
+
+
+def _should_retry_empty_query(e: Exception, table: str, attempt: int) -> bool:
+    """Check if we should retry an empty query error. Logs warning if retrying.
+
+    Attempts to fix a longstanding "Empty query" error that intermittently
+    occurs during ClickHouse inserts. This happens when clickhouse-connect's
+    internal serialization generator gets exhausted during an HTTP connection
+    retry (after CH Cloud's keep-alive timeout causes a connection reset).
+    """
+    is_empty_query = isinstance(e, DatabaseError) and "Empty query" in str(e)
+    should_retry = is_empty_query and attempt < ch_settings.INSERT_MAX_RETRIES - 1
+    if should_retry:
+        logger.warning(
+            "clickhouse_insert_empty_query_retry",
+            extra={
+                "table": table,
+                "attempt": attempt + 1,
+                "max_retries": ch_settings.INSERT_MAX_RETRIES,
+            },
+        )
+    return should_retry
+
+
+def _log_and_raise_insert_error(
+    e: Exception, table: str, data: Sequence[Sequence[Any]]
+) -> None:
+    """Log insert error with data size info and re-raise."""
+    data_bytes = sum(_num_bytes(row) for row in data)
+    logger.exception(
+        "clickhouse_insert_error",
+        extra={
+            "error_str": str(e),
+            "table": table,
+            "data_len": len(data),
+            "data_bytes": data_bytes,
+        },
+    )
+    raise e
