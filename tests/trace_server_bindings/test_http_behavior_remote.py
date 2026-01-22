@@ -127,8 +127,15 @@ def test_eager_calls_use_v2_start_end_endpoints(mock_post):
     server = RemoteHTTPTraceServer("http://example.com", should_batch=True)
 
     start = generate_start(id="call-id", project_id="entity/project")
-    end = generate_end(id="call-id", project_id="entity/project")
-    end.started_at = end.ended_at - datetime.timedelta(seconds=1)
+    ended_at = datetime.datetime.now(tz=datetime.timezone.utc)
+    started_at = ended_at - datetime.timedelta(seconds=1)
+    end = tsi.EndedCallSchemaForInsertWithStartedAt(
+        project_id="entity/project",
+        id="call-id",
+        ended_at=ended_at,
+        started_at=started_at,
+        summary={"result": "Test summary"},
+    )
 
     mock_post.side_effect = [
         httpx.Response(200, request=httpx.Request("POST", "http://example.com")),
@@ -150,10 +157,10 @@ def test_eager_calls_use_v2_start_end_endpoints(mock_post):
         ]
 
         end_payload = json.loads(mock_post.call_args_list[1][1]["data"].decode("utf-8"))
-        started_at = datetime.datetime.fromisoformat(
-            end_payload["started_at"].replace("Z", "+00:00")
+        payload_started_at = datetime.datetime.fromisoformat(
+            end_payload["end"]["started_at"].replace("Z", "+00:00")
         )
-        assert started_at == end.started_at
+        assert payload_started_at == end.started_at
         assert end_payload["end"]["id"] == "call-id"
     finally:
         if server.call_processor:
