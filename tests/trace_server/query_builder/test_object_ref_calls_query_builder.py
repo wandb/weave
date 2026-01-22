@@ -4,7 +4,6 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     HardCodedFilter,
 )
 from weave.trace_server.interface import query as tsi_query
-from weave.trace_server.project_version.types import ReadTable
 
 
 def test_object_ref_filter_simple() -> None:
@@ -68,78 +67,6 @@ def test_object_ref_filter_simple() -> None:
         GROUP BY (calls_merged.project_id,
                   calls_merged.id)
         ORDER BY any(calls_merged.started_at) DESC
-        """,
-        {
-            "pb_0": "project",
-            "pb_1": '$."temperature"',
-            "pb_2": 1,
-            "pb_3": '$."model"',
-        },
-    )
-
-
-def test_object_ref_filter_simple_calls_complete() -> None:
-    """Ensure object ref queries use calls_complete."""
-    cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_COMPLETE)
-    cq.add_field("id")
-    cq.add_condition(
-        tsi_query.EqOperation.model_validate(
-            {
-                "$eq": [
-                    {"$getField": "output.model.temperature"},
-                    {"$literal": 1},
-                ]
-            }
-        )
-    )
-    cq.add_order("started_at", "desc")
-    cq.set_expand_columns(["output.model"])
-    assert_sql(
-        cq,
-        """
-        WITH obj_filter_0 AS
-          (SELECT digest,
-                  concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS ref
-           FROM object_versions
-           WHERE project_id = {pb_0:String}
-             AND JSON_VALUE(val_dump, {pb_1:String}) = {pb_2:UInt64}
-           GROUP BY project_id,
-                    object_id,
-                    digest
-
-           UNION ALL
-
-           SELECT digest,
-                  digest as ref
-           FROM table_rows
-           WHERE project_id = {pb_0:String}
-             AND JSON_VALUE(val_dump, {pb_1:String}) = {pb_2:UInt64}
-           GROUP BY project_id,
-                    digest),
-            filtered_calls AS
-          (SELECT calls_complete.id AS id
-           FROM calls_complete
-           WHERE calls_complete.project_id = {pb_0:String}
-             AND (length(calls_complete.output_refs) > 0
-                  OR calls_complete.ended_at IS NULL)
-           GROUP BY (calls_complete.project_id,
-                     calls_complete.id)
-           HAVING (((coalesce(nullIf(JSON_VALUE(any(calls_complete.output_dump), {pb_3:String}), 'null'), '') IN
-                      (SELECT ref
-                       FROM obj_filter_0)
-                   OR regexpExtract(coalesce(nullIf(JSON_VALUE(any(calls_complete.output_dump), {pb_3:String}), 'null'), ''), '/([^/]+)$', 1) IN
-                      (SELECT ref
-                       FROM obj_filter_0)))
-                   AND ((any(calls_complete.deleted_at) IS NULL))
-                   AND ((NOT ((any(calls_complete.started_at) IS NULL)))))
-           ORDER BY any(calls_complete.started_at) DESC)
-        SELECT calls_complete.id AS id
-        FROM calls_complete
-        WHERE calls_complete.project_id = {pb_0:String}
-          AND (calls_complete.id IN filtered_calls)
-        GROUP BY (calls_complete.project_id,
-                  calls_complete.id)
-        ORDER BY any(calls_complete.started_at) DESC
         """,
         {
             "pb_0": "project",

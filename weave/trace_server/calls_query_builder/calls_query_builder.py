@@ -162,7 +162,6 @@ class CallsMergedSummaryField(CallsMergedField):
 
     field: str
     summary_field: str
-    read_table: ReadTable = ReadTable.CALLS_MERGED
 
     def as_sql(
         self,
@@ -173,7 +172,7 @@ class CallsMergedSummaryField(CallsMergedField):
         # Look up handler for the requested summary field
         handler = get_summary_field_handler(self.summary_field)
         if handler:
-            sql = handler(pb, table_alias, self.read_table)
+            sql = handler(pb, table_alias)
             return clickhouse_cast(sql, cast)
         else:
             supported_fields = ", ".join(SUMMARY_FIELD_HANDLERS.keys())
@@ -472,7 +471,6 @@ class Condition(BaseModel):
         table_alias: str,
         expand_columns: list[str] | None = None,
         field_to_object_join_alias_map: dict[str, str] | None = None,
-        read_table: ReadTable = ReadTable.CALLS_MERGED,
     ) -> str:
         # Check if this condition involves object references
         if (
@@ -485,22 +483,18 @@ class Condition(BaseModel):
                 table_alias,
                 expand_columns,
                 field_to_object_join_alias_map,
-                read_table=read_table,
             )
             sql = processor.process_operand(self.operand)
             if self._consumed_fields is None:
                 self._consumed_fields = []
             for raw_field_path in processor.fields_used:
-                self._consumed_fields.append(
-                    get_field_by_name(raw_field_path, read_table)
-                )
+                self._consumed_fields.append(get_field_by_name(raw_field_path))
             return sql
 
         conditions = process_query_to_conditions(
             tsi_query.Query.model_validate({"$expr": {"$and": [self.operand]}}),
             pb,
             table_alias,
-            read_table=read_table,
         )
         if self._consumed_fields is None:
             self._consumed_fields = []
@@ -509,26 +503,22 @@ class Condition(BaseModel):
         return combine_conditions(conditions.conditions, "AND")
 
     def _get_consumed_fields(
-        self, read_table: ReadTable = ReadTable.CALLS_MERGED
+        self, table_alias: str = "calls_merged"
     ) -> list[CallsMergedField]:
         if self._consumed_fields is None:
-            self.as_sql(
-                ParamBuilder(),
-                get_calls_table_name(read_table),
-                read_table=read_table,
-            )
+            self.as_sql(ParamBuilder(), table_alias)
         if self._consumed_fields is None:
             raise ValueError("Consumed fields should not be None")
         return self._consumed_fields
 
-    def is_heavy(self, read_table: ReadTable = ReadTable.CALLS_MERGED) -> bool:
-        for field in self._get_consumed_fields(read_table):
+    def is_heavy(self, table_alias: str = "calls_merged") -> bool:
+        for field in self._get_consumed_fields(table_alias):
             if field.is_heavy():
                 return True
         return False
 
-    def is_feedback(self, read_table: ReadTable = ReadTable.CALLS_MERGED) -> bool:
-        for field in self._get_consumed_fields(read_table):
+    def is_feedback(self, table_alias: str = "calls_merged") -> bool:
+        for field in self._get_consumed_fields(table_alias):
             if isinstance(field, CallsMergedFeedbackPayloadField):
                 return True
         return False
@@ -550,7 +540,6 @@ class Condition(BaseModel):
 
 class HardCodedFilter(BaseModel):
     filter: tsi.CallsFilter
-    read_table: ReadTable = ReadTable.CALLS_MERGED
 
     def is_useful(self) -> bool:
         """Returns True if the filter is useful - i.e. it has any non-null fields
@@ -573,9 +562,7 @@ class HardCodedFilter(BaseModel):
 
     def as_sql(self, pb: ParamBuilder, table_alias: str) -> str:
         return combine_conditions(
-            process_calls_filter_to_conditions(
-                self.filter, pb, table_alias, read_table=self.read_table
-            ),
+            process_calls_filter_to_conditions(self.filter, pb, table_alias),
             "AND",
         )
 
@@ -597,7 +584,7 @@ class CallsQuery(BaseModel):
     read_table: ReadTable = ReadTable.CALLS_MERGED
 
     def add_field(self, field: str) -> "CallsQuery":
-        name = get_field_by_name(field, self.read_table)
+        name = get_field_by_name(field)
         if name in self.select_fields:
             return self
         self.select_fields.append(name)
@@ -626,9 +613,7 @@ class CallsQuery(BaseModel):
             raise ValueError(f"Direction {direction} is not allowed")
         direction = cast(Literal["ASC", "DESC"], direction)
         self.order_fields.append(
-            OrderField(
-                field=get_field_by_name(field, self.read_table), direction=direction
-            )
+            OrderField(field=get_field_by_name(field), direction=direction)
         )
         return self
 
@@ -677,9 +662,10 @@ class CallsQuery(BaseModel):
         or light order filters that can be pushed down into a subquery.
         """
         # First, check if the query has any heavy fields
+        table_name = get_calls_table_name(self.read_table)
         has_heavy_select = any(field.is_heavy() for field in self.select_fields)
         has_heavy_filter = any(
-            condition.is_heavy(self.read_table) for condition in self.query_conditions
+            condition.is_heavy(table_name) for condition in self.query_conditions
         )
         has_heavy_order = any(
             order_field.field.is_heavy() for order_field in self.order_fields
@@ -695,8 +681,7 @@ class CallsQuery(BaseModel):
 
         # If any light conditions exist, use them to filter rows before loading heavy fields
         if any(
-            not condition.is_heavy(self.read_table)
-            for condition in self.query_conditions
+            not condition.is_heavy(table_name) for condition in self.query_conditions
         ):
             return True
 
@@ -866,7 +851,7 @@ class CallsQuery(BaseModel):
                     field_obj, (CallsMergedDynamicField, QueryBuilderDynamicField)
                 ):
                     # we need to add the base field, not the dynamic one
-                    base_field = get_field_by_name(field_obj.field, self.read_table)
+                    base_field = get_field_by_name(field_obj.field)
                     if base_field not in select_query.select_fields:
                         select_query.select_fields.append(base_field)
                 else:
@@ -950,29 +935,23 @@ class CallsQuery(BaseModel):
         # on `NOT any(started_at) is NULL`, we filter out orphaned call ends, ensuring
         # all rows returned at least have a call start.
 
-        op_name = process_op_name_filter_to_sql(
-            self.hardcoded_filter, pb, table_alias, read_table=self.read_table
-        )
+        op_name = process_op_name_filter_to_sql(self.hardcoded_filter, pb, table_alias)
         trace_id = process_trace_id_filter_to_sql(
-            self.hardcoded_filter, pb, table_alias, read_table=self.read_table
+            self.hardcoded_filter, pb, table_alias
         )
         thread_id = process_thread_id_filter_to_sql(
-            self.hardcoded_filter, pb, table_alias, read_table=self.read_table
+            self.hardcoded_filter, pb, table_alias
         )
-        turn_id = process_turn_id_filter_to_sql(
-            self.hardcoded_filter, pb, table_alias, read_table=self.read_table
-        )
+        turn_id = process_turn_id_filter_to_sql(self.hardcoded_filter, pb, table_alias)
         wb_run_id = process_wb_run_ids_filter_to_sql(
-            self.hardcoded_filter, pb, table_alias, read_table=self.read_table
+            self.hardcoded_filter, pb, table_alias
         )
-        ref_filter = process_ref_filters_to_sql(
-            self.hardcoded_filter, pb, table_alias, read_table=self.read_table
-        )
+        ref_filter = process_ref_filters_to_sql(self.hardcoded_filter, pb, table_alias)
         trace_roots_only = process_trace_roots_only_filter_to_sql(
-            self.hardcoded_filter, pb, table_alias, read_table=self.read_table
+            self.hardcoded_filter, pb, table_alias
         )
         parent_ids = process_parent_ids_filter_to_sql(
-            self.hardcoded_filter, pb, table_alias, read_table=self.read_table
+            self.hardcoded_filter, pb, table_alias
         )
 
         # Filter out object ref conditions from optimization since they're handled via CTEs
@@ -1144,10 +1123,9 @@ class CallsQuery(BaseModel):
                     table_alias,
                     expand_columns=expand_columns,
                     field_to_object_join_alias_map=field_to_object_join_alias_map,
-                    read_table=self.read_table,
                 )
                 having_conditions_sql.append(query_condition_sql)
-                if query_condition.is_feedback(self.read_table):
+                if query_condition.is_feedback(table_alias):
                     needs_feedback = True
 
         if self.hardcoded_filter is not None:
@@ -1314,87 +1292,52 @@ ALLOWED_CALL_FIELDS = {
     "otel_dump": CallsMergedAggField(field="otel_dump", agg_fn="any"),
 }
 
-ALLOWED_CALL_FIELDS_COMPLETE = {
-    "project_id": CallsMergedField(field="project_id"),
-    "id": CallsMergedField(field="id"),
-    "trace_id": CallsMergedAggField(field="trace_id", agg_fn="any"),
-    "parent_id": CallsMergedAggField(field="parent_id", agg_fn="any"),
-    "thread_id": CallsMergedAggField(field="thread_id", agg_fn="any"),
-    "turn_id": CallsMergedAggField(field="turn_id", agg_fn="any"),
-    "op_name": CallsMergedAggField(field="op_name", agg_fn="any"),
-    "started_at": CallsMergedAggField(field="started_at", agg_fn="any"),
-    "attributes_dump": CallsMergedDynamicField(field="attributes_dump", agg_fn="any"),
-    "inputs_dump": CallsMergedDynamicField(field="inputs_dump", agg_fn="any"),
-    "input_refs": CallsMergedAggField(field="input_refs", agg_fn="array_concat_agg"),
-    "ended_at": CallsMergedAggField(field="ended_at", agg_fn="any"),
-    "output_dump": CallsMergedDynamicField(field="output_dump", agg_fn="any"),
-    "output_refs": CallsMergedAggField(field="output_refs", agg_fn="array_concat_agg"),
-    "summary_dump": CallsMergedDynamicField(field="summary_dump", agg_fn="any"),
-    "exception": CallsMergedAggField(field="exception", agg_fn="any"),
-    "wb_user_id": CallsMergedAggField(field="wb_user_id", agg_fn="any"),
-    "wb_run_id": CallsMergedAggField(field="wb_run_id", agg_fn="any"),
-    "wb_run_step": CallsMergedAggField(field="wb_run_step", agg_fn="any"),
-    "wb_run_step_end": CallsMergedAggField(field="wb_run_step_end", agg_fn="any"),
-    "deleted_at": CallsMergedAggField(field="deleted_at", agg_fn="any"),
-    "display_name": CallsMergedAggField(field="display_name", agg_fn="any"),
-    "storage_size_bytes": AggFieldWithTableOverrides(
-        field="storage_size_bytes",
-        agg_fn="any",
-        table_name=STORAGE_SIZE_TABLE_NAME,
-    ),
-    "total_storage_size_bytes": AggregatedDataSizeField(
-        field="total_storage_size_bytes",
-        join_table_name=ROLLED_UP_CALL_MERGED_STATS_TABLE_NAME,
-    ),
-    "otel_dump": CallsMergedAggField(field="otel_dump", agg_fn="any"),
-}
-
 DISALLOWED_FILTERING_FIELDS = {"storage_size_bytes", "total_storage_size_bytes"}
 
 
-def get_field_by_name(
-    name: str, read_table: ReadTable = ReadTable.CALLS_MERGED
-) -> CallsMergedField:
-    allowed_fields = (
-        ALLOWED_CALL_FIELDS_COMPLETE
-        if read_table == ReadTable.CALLS_COMPLETE
-        else ALLOWED_CALL_FIELDS
-    )
-    if name not in allowed_fields:
+def get_field_by_name(name: str) -> CallsMergedField:
+    """Get a field definition by name.
+
+    Args:
+        name: Field name (e.g., 'id', 'started_at', 'inputs.foo').
+
+    Returns:
+        CallsMergedField: The field definition.
+
+    Raises:
+        InvalidFieldError: If the field name is not allowed.
+    """
+    if name not in ALLOWED_CALL_FIELDS:
         if name.startswith("feedback."):
             return CallsMergedFeedbackPayloadField.from_path(name[len("feedback.") :])
         elif name.startswith("summary.weave."):
             # Handle summary.weave.* fields
             summary_field = name[len("summary.weave.") :]
-            return CallsMergedSummaryField(
-                field=name, summary_field=summary_field, read_table=read_table
-            )
+            return CallsMergedSummaryField(field=name, summary_field=summary_field)
         else:
             field_parts = split_escaped_field_path(name)
             start_part = field_parts[0]
             dumped_start_part = start_part + "_dump"
-            if dumped_start_part in allowed_fields:
-                field = allowed_fields[dumped_start_part]
+            if dumped_start_part in ALLOWED_CALL_FIELDS:
+                field = ALLOWED_CALL_FIELDS[dumped_start_part]
                 if isinstance(field, CallsMergedDynamicField) and len(field_parts) > 1:
                     return field.with_path(field_parts[1:])
                 return field
             raise InvalidFieldError(f"Field {name} is not allowed")
-    return allowed_fields[name]
+    return ALLOWED_CALL_FIELDS[name]
 
 
 # Handler function for status summary field
-def _handle_status_summary_field(
-    pb: ParamBuilder, table_alias: str, read_table: ReadTable
-) -> str:
+def _handle_status_summary_field(pb: ParamBuilder, table_alias: str) -> str:
     # Status logic:
     # - If exception is not null -> ERROR
     # - Else if ended_at is null -> RUNNING
     # - Else -> SUCCESS
-    exception_sql = get_field_by_name("exception", read_table).as_sql(pb, table_alias)
-    ended_to_sql = get_field_by_name("ended_at", read_table).as_sql(pb, table_alias)
-    status_counts_sql = get_field_by_name(
-        "summary.status_counts.error", read_table
-    ).as_sql(pb, table_alias, cast="int")
+    exception_sql = get_field_by_name("exception").as_sql(pb, table_alias)
+    ended_to_sql = get_field_by_name("ended_at").as_sql(pb, table_alias)
+    status_counts_sql = get_field_by_name("summary.status_counts.error").as_sql(
+        pb, table_alias, cast="int"
+    )
 
     error_param = pb.add_param(tsi.TraceStatus.ERROR.value)
     running_param = pb.add_param(tsi.TraceStatus.RUNNING.value)
@@ -1410,14 +1353,12 @@ def _handle_status_summary_field(
 
 
 # Handler function for latency_ms summary field
-def _handle_latency_ms_summary_field(
-    pb: ParamBuilder, table_alias: str, read_table: ReadTable
-) -> str:
+def _handle_latency_ms_summary_field(pb: ParamBuilder, table_alias: str) -> str:
     # Latency_ms logic:
     # - If ended_at is null or there's an exception, return null
     # - Otherwise calculate milliseconds between started_at and ended_at
-    started_at_sql = get_field_by_name("started_at", read_table).as_sql(pb, table_alias)
-    ended_at_sql = get_field_by_name("ended_at", read_table).as_sql(pb, table_alias)
+    started_at_sql = get_field_by_name("started_at").as_sql(pb, table_alias)
+    ended_at_sql = get_field_by_name("ended_at").as_sql(pb, table_alias)
 
     # Convert time difference to milliseconds
     # Use toUnixTimestamp64Milli for direct and precise millisecond difference
@@ -1430,18 +1371,14 @@ def _handle_latency_ms_summary_field(
 
 
 # Handler function for trace_name summary field
-def _handle_trace_name_summary_field(
-    pb: ParamBuilder, table_alias: str, read_table: ReadTable
-) -> str:
+def _handle_trace_name_summary_field(pb: ParamBuilder, table_alias: str) -> str:
     # Trace_name logic:
     # - If display_name is available, use that
     # - Else if op_name starts with 'weave-trace-internal:///', extract the name using regex
     # - Otherwise, just use op_name directly
 
-    display_name_sql = get_field_by_name("display_name", read_table).as_sql(
-        pb, table_alias
-    )
-    op_name_sql = get_field_by_name("op_name", read_table).as_sql(pb, table_alias)
+    display_name_sql = get_field_by_name("display_name").as_sql(pb, table_alias)
+    op_name_sql = get_field_by_name("op_name").as_sql(pb, table_alias)
 
     return f"""CASE
         WHEN {display_name_sql} IS NOT NULL AND {display_name_sql} != '' THEN {display_name_sql}
@@ -1462,7 +1399,7 @@ SUMMARY_FIELD_HANDLERS = {
 # Helper function to get a summary field handler by name
 def get_summary_field_handler(
     summary_field: str,
-) -> Callable[[ParamBuilder, str, ReadTable], str] | None:
+) -> Callable[[ParamBuilder, str], str] | None:
     """Returns the handler function for a given summary field name."""
     return SUMMARY_FIELD_HANDLERS.get(summary_field)
 
@@ -1477,7 +1414,6 @@ def process_query_to_conditions(
     param_builder: ParamBuilder,
     table_alias: str,
     use_agg_fn: bool = True,
-    read_table: ReadTable = ReadTable.CALLS_MERGED,
 ) -> FilterToConditions:
     """Converts a Query to a list of conditions for a clickhouse query."""
     conditions = []
@@ -1548,7 +1484,7 @@ def process_query_to_conditions(
             if operand.get_field_ in DISALLOWED_FILTERING_FIELDS:
                 raise InvalidFieldError(f"Field {operand.get_field_} is not allowed")
 
-            structured_field = get_field_by_name(operand.get_field_, read_table)
+            structured_field = get_field_by_name(operand.get_field_)
 
             if isinstance(structured_field, CallsMergedDynamicField):
                 field = structured_field.as_sql(
@@ -1591,7 +1527,6 @@ def process_op_name_filter_to_sql(
     hardcoded_filter: HardCodedFilter | None,
     param_builder: ParamBuilder,
     table_alias: str,
-    read_table: ReadTable,
 ) -> str:
     """Pulls out the op_name and returns a sql string if there are any op_names."""
     if hardcoded_filter is None or not hardcoded_filter.filter.op_names:
@@ -1608,7 +1543,7 @@ def process_op_name_filter_to_sql(
     non_wildcarded_names: list[str] = []
     wildcarded_names: list[str] = []
 
-    op_field = get_field_by_name("op_name", read_table)
+    op_field = get_field_by_name("op_name")
     if not isinstance(op_field, CallsMergedAggField):
         raise TypeError("op_name is not an aggregate field")
 
@@ -1643,7 +1578,6 @@ def process_trace_id_filter_to_sql(
     hardcoded_filter: HardCodedFilter | None,
     param_builder: ParamBuilder,
     table_alias: str,
-    read_table: ReadTable,
 ) -> str:
     """Pulls out the trace_id and returns a sql string if there are any trace_ids."""
     if hardcoded_filter is None or not hardcoded_filter.filter.trace_ids:
@@ -1653,7 +1587,7 @@ def process_trace_id_filter_to_sql(
 
     assert_parameter_length_less_than_max("trace_ids", len(trace_ids))
 
-    trace_id_field = get_field_by_name("trace_id", read_table)
+    trace_id_field = get_field_by_name("trace_id")
     if not isinstance(trace_id_field, CallsMergedAggField):
         raise TypeError("trace_id is not an aggregate field")
     trace_id_field_sql = trace_id_field.as_sql(
@@ -1675,7 +1609,6 @@ def process_thread_id_filter_to_sql(
     hardcoded_filter: HardCodedFilter | None,
     param_builder: ParamBuilder,
     table_alias: str,
-    read_table: ReadTable,
 ) -> str:
     """Pulls out the thread_id and returns a sql string if there are any thread_ids."""
     if (
@@ -1689,7 +1622,7 @@ def process_thread_id_filter_to_sql(
 
     assert_parameter_length_less_than_max("thread_ids", len(thread_ids))
 
-    thread_id_field = get_field_by_name("thread_id", read_table)
+    thread_id_field = get_field_by_name("thread_id")
     if not isinstance(thread_id_field, CallsMergedAggField):
         raise TypeError("thread_id is not an aggregate field")
     thread_id_field_sql = thread_id_field.as_sql(
@@ -1711,7 +1644,6 @@ def process_turn_id_filter_to_sql(
     hardcoded_filter: HardCodedFilter | None,
     param_builder: ParamBuilder,
     table_alias: str,
-    read_table: ReadTable,
 ) -> str:
     """Pulls out the turn_id and returns a sql string if there are any turn_ids."""
     if (
@@ -1725,7 +1657,7 @@ def process_turn_id_filter_to_sql(
 
     assert_parameter_length_less_than_max("turn_ids", len(turn_ids))
 
-    turn_id_field = get_field_by_name("turn_id", read_table)
+    turn_id_field = get_field_by_name("turn_id")
     if not isinstance(turn_id_field, CallsMergedAggField):
         raise TypeError("turn_id is not an aggregate field")
     turn_id_field_sql = turn_id_field.as_sql(
@@ -1747,13 +1679,12 @@ def process_trace_roots_only_filter_to_sql(
     hardcoded_filter: HardCodedFilter | None,
     param_builder: ParamBuilder,
     table_alias: str,
-    read_table: ReadTable,
 ) -> str:
     """Pulls out the trace_roots_only and returns a sql string if there are any trace_roots_only."""
     if hardcoded_filter is None or not hardcoded_filter.filter.trace_roots_only:
         return ""
 
-    parent_id_field = get_field_by_name("parent_id", read_table)
+    parent_id_field = get_field_by_name("parent_id")
     if not isinstance(parent_id_field, CallsMergedAggField):
         raise TypeError("parent_id is not an aggregate field")
 
@@ -1768,13 +1699,12 @@ def process_parent_ids_filter_to_sql(
     hardcoded_filter: HardCodedFilter | None,
     param_builder: ParamBuilder,
     table_alias: str,
-    read_table: ReadTable,
 ) -> str:
     """Pulls out the parent_id and returns a sql string if there are any parent_ids."""
     if hardcoded_filter is None or not hardcoded_filter.filter.parent_ids:
         return ""
 
-    parent_id_field = get_field_by_name("parent_id", read_table)
+    parent_id_field = get_field_by_name("parent_id")
     if not isinstance(parent_id_field, CallsMergedAggField):
         raise TypeError("parent_id is not an aggregate field")
 
@@ -1791,7 +1721,6 @@ def process_ref_filters_to_sql(
     hardcoded_filter: HardCodedFilter | None,
     param_builder: ParamBuilder,
     table_alias: str,
-    read_table: ReadTable,
 ) -> str:
     """Adds a ref filter optimization to the query.
 
@@ -1807,7 +1736,7 @@ def process_ref_filters_to_sql(
         return ""
 
     def process_ref_filter(field_name: str, refs: list[str]) -> str:
-        field = get_field_by_name(field_name, read_table)
+        field = get_field_by_name(field_name)
         if not isinstance(field, CallsMergedAggField):
             raise TypeError(f"{field_name} is not an aggregate field")
 
@@ -1858,7 +1787,6 @@ def process_wb_run_ids_filter_to_sql(
     hardcoded_filter: HardCodedFilter | None,
     param_builder: ParamBuilder,
     table_alias: str,
-    read_table: ReadTable,
 ) -> str:
     """Pulls out the wb_run_id and returns a sql string if there are any wb_run_ids."""
     if hardcoded_filter is None or not hardcoded_filter.filter.wb_run_ids:
@@ -1866,7 +1794,7 @@ def process_wb_run_ids_filter_to_sql(
 
     wb_run_ids = hardcoded_filter.filter.wb_run_ids
     assert_parameter_length_less_than_max("wb_run_ids", len(wb_run_ids))
-    wb_run_id_field = get_field_by_name("wb_run_id", read_table)
+    wb_run_id_field = get_field_by_name("wb_run_id")
     if not isinstance(wb_run_id_field, CallsMergedAggField):
         raise TypeError("wb_run_id is not an aggregate field")
 
@@ -1882,7 +1810,6 @@ def process_calls_filter_to_conditions(
     filter: tsi.CallsFilter,
     param_builder: ParamBuilder,
     table_alias: str,
-    read_table: ReadTable = ReadTable.CALLS_MERGED,
 ) -> list[str]:
     """Converts a CallsFilter to a list of conditions for a clickhouse query.
 
@@ -1896,47 +1823,47 @@ def process_calls_filter_to_conditions(
     if filter.input_refs:
         assert_parameter_length_less_than_max("input_refs", len(filter.input_refs))
         conditions.append(
-            f"hasAny({get_field_by_name('input_refs', read_table).as_sql(param_builder, table_alias)}, {param_slot(param_builder.add_param(filter.input_refs), 'Array(String)')})"
+            f"hasAny({get_field_by_name('input_refs').as_sql(param_builder, table_alias)}, {param_slot(param_builder.add_param(filter.input_refs), 'Array(String)')})"
         )
 
     if filter.output_refs:
         assert_parameter_length_less_than_max("output_refs", len(filter.output_refs))
         conditions.append(
-            f"hasAny({get_field_by_name('output_refs', read_table).as_sql(param_builder, table_alias)}, {param_slot(param_builder.add_param(filter.output_refs), 'Array(String)')})"
+            f"hasAny({get_field_by_name('output_refs').as_sql(param_builder, table_alias)}, {param_slot(param_builder.add_param(filter.output_refs), 'Array(String)')})"
         )
 
     if filter.parent_ids:
         assert_parameter_length_less_than_max("parent_ids", len(filter.parent_ids))
         conditions.append(
-            f"{get_field_by_name('parent_id', read_table).as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.parent_ids), 'Array(String)')}"
+            f"{get_field_by_name('parent_id').as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.parent_ids), 'Array(String)')}"
         )
 
     if filter.call_ids:
         assert_parameter_length_less_than_max("call_ids", len(filter.call_ids))
         conditions.append(
-            f"{get_field_by_name('id', read_table).as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.call_ids), 'Array(String)')}"
+            f"{get_field_by_name('id').as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.call_ids), 'Array(String)')}"
         )
 
     if filter.thread_ids is not None:
         assert_parameter_length_less_than_max("thread_ids", len(filter.thread_ids))
         conditions.append(
-            f"{get_field_by_name('thread_id', read_table).as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.thread_ids), 'Array(String)')}"
+            f"{get_field_by_name('thread_id').as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.thread_ids), 'Array(String)')}"
         )
 
     if filter.turn_ids is not None:
         assert_parameter_length_less_than_max("turn_ids", len(filter.turn_ids))
         conditions.append(
-            f"{get_field_by_name('turn_id', read_table).as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.turn_ids), 'Array(String)')}"
+            f"{get_field_by_name('turn_id').as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.turn_ids), 'Array(String)')}"
         )
 
     if filter.wb_user_ids:
         conditions.append(
-            f"{get_field_by_name('wb_user_id', read_table).as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.wb_user_ids), 'Array(String)')}"
+            f"{get_field_by_name('wb_user_id').as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.wb_user_ids), 'Array(String)')}"
         )
 
     if filter.wb_run_ids:
         conditions.append(
-            f"{get_field_by_name('wb_run_id', read_table).as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.wb_run_ids), 'Array(String)')}"
+            f"{get_field_by_name('wb_run_id').as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.wb_run_ids), 'Array(String)')}"
         )
 
     return conditions

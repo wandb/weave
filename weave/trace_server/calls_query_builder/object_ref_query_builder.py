@@ -69,7 +69,6 @@ from weave.trace_server.orm import (
     quote_json_path,
     split_escaped_field_path,
 )
-from weave.trace_server.project_version.types import ReadTable
 
 if TYPE_CHECKING:
     from weave.trace_server.calls_query_builder.calls_query_builder import (
@@ -445,13 +444,11 @@ class ObjectRefQueryProcessor:
         table_alias: str,
         expand_columns: list[str],
         field_to_object_join_alias_map: dict[str, str],
-        read_table: ReadTable = ReadTable.CALLS_MERGED,
     ):
         self.pb = pb
         self.table_alias = table_alias
         self.expand_columns = expand_columns
         self.field_to_object_join_alias_map = field_to_object_join_alias_map
-        self.read_table = read_table
         self.fields_used: set[str] = set()
 
     def process_operand(self, operand: "tsi_query.Operand") -> str:
@@ -506,7 +503,6 @@ class ObjectRefQueryProcessor:
                 tsi_query.Query.model_validate({"$expr": {"$and": [operand]}}),
                 self.pb,
                 self.table_alias,
-                read_table=self.read_table,
             )
             self.fields_used.update(f.field for f in filter_conditions.fields_used)
             return combine_conditions(filter_conditions.conditions, "AND")

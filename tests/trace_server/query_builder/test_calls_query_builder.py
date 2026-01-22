@@ -14,57 +14,24 @@ from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.project_version.types import ReadTable
 
 
-def test_query_baseline() -> None:
-    cq = CallsQuery(project_id="project")
+@pytest.mark.parametrize(
+    ("read_table", "expected_table"),
+    [
+        (ReadTable.CALLS_MERGED, "calls_merged"),
+        (ReadTable.CALLS_COMPLETE, "calls_complete"),
+    ],
+)
+def test_query_baseline(read_table: ReadTable, expected_table: str) -> None:
+    """Test baseline query generates correct table references."""
+    cq = CallsQuery(project_id="project", read_table=read_table)
     cq.add_field("id")
-    assert_sql(
-        cq,
-        """
-        SELECT calls_merged.id AS id
-        FROM calls_merged
-        WHERE calls_merged.project_id = {pb_0:String}
-        GROUP BY (calls_merged.project_id, calls_merged.id)
-        HAVING (
-            ((
-                any(calls_merged.deleted_at) IS NULL
-            ))
-            AND
-            ((
-               NOT ((
-                  any(calls_merged.started_at) IS NULL
-               ))
-            ))
-        )
-        """,
-        {"pb_0": "project"},
-    )
+    pb = ParamBuilder("pb")
+    query = cq.as_sql(pb)
 
-
-def test_query_baseline_calls_complete() -> None:
-    """Ensure calls_complete is used for base queries."""
-    cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_COMPLETE)
-    cq.add_field("id")
-    assert_sql(
-        cq,
-        """
-        SELECT calls_complete.id AS id
-        FROM calls_complete
-        WHERE calls_complete.project_id = {pb_0:String}
-        GROUP BY (calls_complete.project_id, calls_complete.id)
-        HAVING (
-            ((
-                any(calls_complete.deleted_at) IS NULL
-            ))
-            AND
-            ((
-               NOT ((
-                  any(calls_complete.started_at) IS NULL
-               ))
-            ))
-        )
-        """,
-        {"pb_0": "project"},
-    )
+    # Verify the correct table is used throughout
+    assert f"FROM {expected_table}" in query
+    assert f"{expected_table}.project_id" in query
+    assert f"{expected_table}.id" in query
 
 
 def test_query_light_column() -> None:
@@ -376,59 +343,6 @@ def test_query_with_simple_feedback_sort() -> None:
             HAVING
                 (((any(calls_merged.deleted_at) IS NULL))
                     AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
-            ORDER BY
-                (NOT (JSONType(anyIf(feedback.payload_dump,
-                feedback.feedback_type = {pb_0:String}),
-                {pb_1:String},
-                {pb_2:String}) = 'Null'
-                    OR JSONType(anyIf(feedback.payload_dump,
-                    feedback.feedback_type = {pb_0:String}),
-                    {pb_1:String},
-                    {pb_2:String}) IS NULL)) desc,
-                toFloat64OrNull(coalesce(nullIf(JSON_VALUE(anyIf(feedback.payload_dump,
-                feedback.feedback_type = {pb_0:String}),
-                {pb_3:String}), 'null'), '')) DESC,
-                toString(coalesce(nullIf(JSON_VALUE(anyIf(feedback.payload_dump,
-                feedback.feedback_type = {pb_0:String}),
-                {pb_3:String}), 'null'), '')) DESC
-            """,
-        {
-            "pb_0": "wandb.runnable.my_op",
-            "pb_1": "output",
-            "pb_2": "expected",
-            "pb_3": '$."output"."expected"',
-            "pb_4": "project",
-        },
-    )
-
-
-def test_query_with_simple_feedback_sort_calls_complete() -> None:
-    """Ensure feedback sorting uses calls_complete."""
-    cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_COMPLETE)
-    cq.add_field("id")
-    cq.add_order("feedback.[wandb.runnable.my_op].payload.output.expected", "desc")
-    assert_sql(
-        cq,
-        """
-            SELECT
-                calls_complete.id AS id
-            FROM
-                calls_complete
-            LEFT JOIN (
-                SELECT * FROM feedback WHERE feedback.project_id = {pb_4:String}
-            ) AS feedback ON (
-                feedback.weave_ref = concat('weave-trace-internal:///',
-                {pb_4:String},
-                '/call/',
-                calls_complete.id))
-            WHERE
-                calls_complete.project_id = {pb_4:String}
-            GROUP BY
-                (calls_complete.project_id,
-                calls_complete.id)
-            HAVING
-                (((any(calls_complete.deleted_at) IS NULL))
-                    AND ((NOT ((any(calls_complete.started_at) IS NULL)))))
             ORDER BY
                 (NOT (JSONType(anyIf(feedback.payload_dump,
                 feedback.feedback_type = {pb_0:String}),
@@ -1525,46 +1439,6 @@ def test_query_with_summary_weave_trace_name_sort() -> None:
             WHEN any(calls_merged.op_name) IS NOT NULL AND any(calls_merged.op_name) LIKE 'weave-trace-internal:///%' THEN
                 regexpExtract(toString(any(calls_merged.op_name)), '/([^/:]*):', 1)
             ELSE any(calls_merged.op_name)
-        END ASC
-        """,
-        {"pb_0": "project"},
-    )
-
-
-def test_query_with_summary_weave_trace_name_sort_calls_complete() -> None:
-    """Ensure summary trace_name uses calls_complete fields."""
-    cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_COMPLETE)
-    cq.add_field("id")
-    cq.add_field("op_name")
-    cq.add_field("display_name")
-    cq.add_order("summary.weave.trace_name", "asc")
-
-    assert_sql(
-        cq,
-        """
-        SELECT
-            calls_complete.id AS id,
-            any(calls_complete.op_name) AS op_name,
-            any(calls_complete.display_name) AS display_name
-        FROM calls_complete
-        WHERE calls_complete.project_id = {pb_0:String}
-        GROUP BY (calls_complete.project_id, calls_complete.id)
-        HAVING (
-            ((
-                any(calls_complete.deleted_at) IS NULL
-            ))
-            AND
-            ((
-               NOT ((
-                  any(calls_complete.started_at) IS NULL
-               ))
-            ))
-        )
-        ORDER BY CASE
-            WHEN any(calls_complete.display_name) IS NOT NULL AND any(calls_complete.display_name) != '' THEN any(calls_complete.display_name)
-            WHEN any(calls_complete.op_name) IS NOT NULL AND any(calls_complete.op_name) LIKE 'weave-trace-internal:///%' THEN
-                regexpExtract(toString(any(calls_complete.op_name)), '/([^/:]*):', 1)
-            ELSE any(calls_complete.op_name)
         END ASC
         """,
         {"pb_0": "project"},

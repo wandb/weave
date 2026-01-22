@@ -11,9 +11,6 @@ from tests.trace_server.conftest_lib.trace_server_external_adapter import b64
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.base64_content_conversion import AUTO_CONVERSION_MIN_SIZE
 from weave.trace_server.calls_query_builder.utils import param_slot
-from weave.trace_server.clickhouse_trace_server_batched import (
-    _end_call_for_insert_to_ch_insertable_end_call,
-)
 from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.project_version.types import CallsStorageServerMode, ReadTable
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer
@@ -307,7 +304,7 @@ def test_calls_complete_routing_by_residence(
         clickhouse_trace_server.ch_client,
     )
     if read_table == ReadTable.CALLS_MERGED:
-        expected_call_ids = set(merged_call_ids)
+        expected_call_ids = {call.id, *merged_call_ids}
     else:
         expected_call_ids = {call.id, *seed_call_ids}
 
@@ -752,16 +749,15 @@ def test_update_call_end_in_calls_complete_requires_started_at(
     clickhouse_trace_server,
 ):
     """Ensure calls_complete update rejects missing started_at."""
-    end_req = tsi.EndedCallSchemaForInsert(
+    end_req = tsi.EndedCallSchemaForInsertWithStartedAt(
         project_id=b64("project"),
         id=str(uuid.uuid4()),
         ended_at=datetime.datetime.now(),
         summary={"usage": {}, "status_counts": {}},
         started_at=None,
     )
-    ch_end = _end_call_for_insert_to_ch_insertable_end_call(end_req)
     with pytest.raises(ValueError):
-        clickhouse_trace_server._update_call_end_in_calls_complete(ch_end)
+        clickhouse_trace_server._update_call_end_in_calls_complete(end_req)
 
 
 def test_v1_call_start_raises_calls_complete_mode_required(
