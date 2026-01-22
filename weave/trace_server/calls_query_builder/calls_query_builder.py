@@ -77,11 +77,7 @@ CTE_ALL_CALLS = "all_calls"
 
 
 def maybe_agg(expr: str, use_agg_fn: bool) -> str:
-    """Wrap expression in any() aggregate function if needed.
-
-    For calls_merged (AggregatingMergeTree), fields must be aggregated.
-    For calls_complete (ReplacingMergeTree), no aggregation is needed.
-    """
+    """Wrap expression in any() aggregate function if needed."""
     return f"any({expr})" if use_agg_fn else expr
 
 
@@ -647,11 +643,7 @@ class CallsQuery(BaseModel):
 
     @property
     def use_agg_fn(self) -> bool:
-        """Whether to use aggregate functions in SQL generation.
-
-        calls_merged uses AggregatingMergeTree and requires GROUP BY + aggregate functions.
-        calls_complete uses ReplacingMergeTree with single rows per call, no aggregation needed.
-        """
+        """Whether to use aggregate functions in SQL generation."""
         return self.read_table != ReadTable.CALLS_COMPLETE
 
     @property
@@ -1313,14 +1305,9 @@ class CallsQuery(BaseModel):
             expand_columns=expand_columns,
             field_to_object_join_alias_map=field_to_object_join_alias_map,
         )
-
-        # GROUP BY is only needed for AggregatingMergeTree (calls_merged)
-        # ReplacingMergeTree (calls_complete) has single rows per call
-        group_by_sql = (
-            f"GROUP BY ({table_alias}.project_id, {table_alias}.id)"
-            if self.use_agg_fn
-            else ""
-        )
+        group_by_sql = ""
+        if self.use_agg_fn:
+            group_by_sql = f"GROUP BY ({table_alias}.project_id, {table_alias}.id)"
 
         # Assemble the actual SQL query
         raw_sql = f"""

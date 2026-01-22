@@ -495,8 +495,6 @@ def test_call_start_end_v2_writes_calls_merged_for_merged_project(
 
     # Verify read-side returns calls from calls_merged
     calls = _fetch_calls_stream(trace_server, project_id)
-    # calls_merged uses ReplacingMergeTree, so we should see 2 calls (seeded + new)
-    # The call_start_v2 and call_end_v2 rows merge into one
     assert len(calls) >= 1
     call_ids = {c.id for c in calls}
     assert seeded_call_id in call_ids
