@@ -549,6 +549,7 @@ def lite_llm_completion_stream(
 
     # Helper to produce a generator of dicts from litellm chunks
     def _generate_chunks() -> Iterator[dict[str, Any]]:
+        stream = None
         try:
             if provider == "custom" and base_url:
                 headers = extra_headers or {}
@@ -591,6 +592,9 @@ def lite_llm_completion_stream(
         except Exception as e:
             error_message = str(e).replace("litellm.", "")
             yield {"error": error_message}
+        finally:
+            if stream is not None and hasattr(stream, "close"):
+                stream.close()
 
     # If the caller wants a custom return type transformation (currently unused)
     # they can wrap the generator themselves. We just return the raw iterator.
