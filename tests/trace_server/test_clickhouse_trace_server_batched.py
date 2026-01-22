@@ -976,6 +976,10 @@ def test_call_batch_clears_on_insert_failure():
     mock_ch_client = MagicMock()
     mock_ch_client.command.return_value = None
     mock_ch_client.insert.side_effect = _MockInsertError("Connection refused")
+    # Mock query to return empty project (no data in calls_complete or calls_merged)
+    mock_query_result = MagicMock()
+    mock_query_result.result_rows = [(None, None)]
+    mock_ch_client.query.return_value = mock_query_result
 
     project_id = base64.b64encode(b"test_entity/test_project").decode("utf-8")
 
