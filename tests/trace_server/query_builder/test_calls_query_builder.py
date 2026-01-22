@@ -8,6 +8,7 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     CallsQuery,
     HardCodedFilter,
     build_calls_complete_update_end_query,
+    get_calls_stats_table_name_from_alias,
 )
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.orm import ParamBuilder
@@ -22,16 +23,27 @@ from weave.trace_server.project_version.types import ReadTable
     ],
 )
 def test_query_baseline(read_table: ReadTable, expected_table: str) -> None:
-    """Test baseline query generates correct table references."""
+    """Test baseline query generates correct table references and full query shape."""
     cq = CallsQuery(project_id="project", read_table=read_table)
     cq.add_field("id")
-    pb = ParamBuilder("pb")
-    query = cq.as_sql(pb)
-
-    # Verify the correct table is used throughout
-    assert f"FROM {expected_table}" in query
-    assert f"{expected_table}.project_id" in query
-    assert f"{expected_table}.id" in query
+    expected_query = f"""
+        SELECT {expected_table}.id AS id
+        FROM {expected_table}
+        WHERE {expected_table}.project_id = {{pb_0:String}}
+        GROUP BY ({expected_table}.project_id, {expected_table}.id)
+        HAVING (
+            ((
+                any({expected_table}.deleted_at) IS NULL
+            ))
+            AND
+            ((
+               NOT ((
+                  any({expected_table}.started_at) IS NULL
+               ))
+            ))
+        )
+    """
+    assert_sql(cq, expected_query, {"pb_0": "project"})
 
 
 def test_query_light_column() -> None:
@@ -2482,3 +2494,17 @@ def test_query_filter_with_escaped_dots_in_field_names() -> None:
             "pb_3": "project",
         },
     )
+
+
+@pytest.mark.parametrize(
+    ("table_alias", "expected_stats_table"),
+    [
+        ("calls_merged", "calls_merged_stats"),
+        ("calls_complete", "calls_complete_stats"),
+    ],
+)
+def test_get_calls_stats_table_name_from_alias(
+    table_alias: str, expected_stats_table: str
+) -> None:
+    """Ensure stats table name is correctly derived from table alias."""
+    assert get_calls_stats_table_name_from_alias(table_alias) == expected_stats_table

@@ -58,20 +58,7 @@ def _count_project_rows(ch_client, table: str, project_id: str) -> int:
 
 
 def _insert_merged_call(ch_client, project_id: str, call_id: str | None = None) -> str:
-    """Insert a minimal row into calls_merged for residence setup.
-
-    Args:
-        ch_client: ClickHouse client instance.
-        project_id (str): Internal project ID.
-        call_id (str | None): Call ID to insert (generated if None).
-
-    Returns:
-        str: The call ID inserted into calls_merged.
-
-    Examples:
-        >>> call_id = _insert_merged_call(client, "proj")
-        >>> call_id = _insert_merged_call(client, "proj", "call-id")
-    """
+    """Insert a minimal row into calls_merged for residence setup."""
     call_id = call_id or str(uuid.uuid4())
     ch_client.command(
         f"""
@@ -154,18 +141,6 @@ def _fetch_call_ended_at(
 
 
 def _fetch_calls_stream(trace_server, project_id: str) -> list[tsi.CallSchema]:
-    """Fetch calls via calls_query_stream for a project.
-
-    Args:
-        trace_server: Trace server fixture to query.
-        project_id (str): External project ID.
-
-    Returns:
-        list[CallSchema]: Calls returned by the stream query.
-
-    Examples:
-        >>> calls = _fetch_calls_stream(server, "entity/project")
-    """
     return list(
         trace_server.calls_query_stream(tsi.CallsQueryReq(project_id=project_id))
     )
@@ -174,18 +149,7 @@ def _fetch_calls_stream(trace_server, project_id: str) -> list[tsi.CallSchema]:
 def _find_call_by_id(
     calls: list[tsi.CallSchema], call_id: str
 ) -> tsi.CallSchema | None:
-    """Find a call by id from a list of calls.
-
-    Args:
-        calls (list[CallSchema]): Calls to search.
-        call_id (str): Call identifier.
-
-    Returns:
-        CallSchema | None: Matching call if present.
-
-    Examples:
-        >>> call = _find_call_by_id(calls, "call-id")
-    """
+    """Find a call by id from a list of calls."""
     return next((call for call in calls if call.id == call_id), None)
 
 
@@ -198,23 +162,7 @@ def _make_completed_call(
     inputs: dict[str, Any] | None = None,
     output: Any | None = None,
 ) -> tsi.CompletedCallSchemaForInsert:
-    """Build a completed call payload with defaults for server tests.
-
-    Args:
-        project_id (str): External project ID.
-        call_id (str): Call identifier.
-        trace_id (str): Trace identifier.
-        started_at (datetime.datetime): Call start time.
-        ended_at (datetime.datetime): Call end time.
-        inputs (dict[str, Any] | None): Call inputs.
-        output (Any | None): Call output.
-
-    Returns:
-        CompletedCallSchemaForInsert: Payload for calls_complete.
-
-    Examples:
-        >>> call = _make_completed_call("proj", "call", "trace", started, ended)
-    """
+    """Build a completed call payload with defaults for server tests."""
     return tsi.CompletedCallSchemaForInsert(
         project_id=project_id,
         id=call_id,

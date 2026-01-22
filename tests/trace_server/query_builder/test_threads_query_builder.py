@@ -26,13 +26,43 @@ from weave.trace_server.threads_query_builder import (
     ],
 )
 def test_clickhouse_basic_query(read_table: ReadTable, expected_table: str):
-    """Test basic ClickHouse threads query uses correct table for both read modes."""
-    pb = ParamBuilder("pb")
-    query = make_threads_query(pb=pb, project_id="test_project", read_table=read_table)
+    """Test basic ClickHouse threads query uses correct table and full query shape."""
+    expected_query = f"""
+        SELECT
+            aggregated_thread_id AS thread_id,
+            COUNT(*) AS turn_count,
+            min(call_start_time) AS start_time,
+            max(call_end_time) AS last_updated,
+            argMin(id, call_start_time) AS first_turn_id,
+            argMax(id, call_end_time) AS last_turn_id,
+            quantile(0.5)(call_duration) AS p50_turn_duration_ms,
+            quantile(0.99)(call_duration) AS p99_turn_duration_ms
+        FROM (
+            SELECT
+                id,
+                any(thread_id) AS aggregated_thread_id,
+                min(started_at) AS call_start_time,
+                max(ended_at) AS call_end_time,
+                CASE
+                    WHEN call_end_time IS NOT NULL AND call_start_time IS NOT NULL
+                    THEN dateDiff('millisecond', call_start_time, call_end_time)
+                    ELSE NULL
+                END AS call_duration
+            FROM {expected_table}
+            WHERE project_id = {{pb_0: String}}
 
-    assert f"FROM {expected_table}" in query
-    assert "aggregated_thread_id AS thread_id" in query
-    assert "COUNT(*) AS turn_count" in query
+            GROUP BY (project_id, id)
+            HAVING id = any(turn_id) AND aggregated_thread_id IS NOT NULL AND aggregated_thread_id != ''
+        ) AS properly_merged_calls
+        GROUP BY aggregated_thread_id
+        ORDER BY last_updated DESC
+    """
+    assert_clickhouse_sql(
+        expected_query,
+        {"pb_0": "test_project"},
+        project_id="test_project",
+        read_table=read_table,
+    )
 
 
 def test_sqlite_basic_query():

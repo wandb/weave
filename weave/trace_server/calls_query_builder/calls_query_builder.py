@@ -31,6 +31,7 @@ from collections.abc import Callable, KeysView
 from typing import Literal, cast
 
 from pydantic import BaseModel, Field
+from typing_extensions import Self
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.calls_query_builder.cte import CTECollection
@@ -196,7 +197,7 @@ class CallsMergedFeedbackPayloadField(CallsMergedField):
     extra_path: list[str]
 
     @classmethod
-    def from_path(cls, path: str) -> "CallsMergedFeedbackPayloadField":
+    def from_path(cls, path: str) -> Self:
         """Expected format: `[feedback.type].dot.path`.
 
         feedback.type can be '*' to select all feedback types.
@@ -1254,7 +1255,10 @@ def get_calls_stats_table_name_from_alias(table_alias: str) -> str:
     """Return the stats table name for a calls table alias."""
     if table_alias == ReadTable.CALLS_COMPLETE.value:
         return "calls_complete_stats"
-    return "calls_merged_stats"
+    elif table_alias == ReadTable.CALLS_MERGED.value:
+        return "calls_merged_stats"
+    else:
+        raise ValueError(f"Invalid table alias: {table_alias}")
 
 
 ALLOWED_CALL_FIELDS = {
@@ -1296,17 +1300,6 @@ DISALLOWED_FILTERING_FIELDS = {"storage_size_bytes", "total_storage_size_bytes"}
 
 
 def get_field_by_name(name: str) -> CallsMergedField:
-    """Get a field definition by name.
-
-    Args:
-        name: Field name (e.g., 'id', 'started_at', 'inputs.foo').
-
-    Returns:
-        CallsMergedField: The field definition.
-
-    Raises:
-        InvalidFieldError: If the field name is not allowed.
-    """
     if name not in ALLOWED_CALL_FIELDS:
         if name.startswith("feedback."):
             return CallsMergedFeedbackPayloadField.from_path(name[len("feedback.") :])
