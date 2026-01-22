@@ -23,26 +23,51 @@ from weave.trace_server.project_version.types import ReadTable
     ],
 )
 def test_query_baseline(read_table: ReadTable, expected_table: str) -> None:
-    """Test baseline query generates correct table references and full query shape."""
+    """Test baseline query generates correct table references and full query shape.
+
+    calls_merged uses AggregatingMergeTree requiring GROUP BY and aggregate functions.
+    calls_complete uses ReplacingMergeTree with no aggregation needed.
+    """
     cq = CallsQuery(project_id="project", read_table=read_table)
     cq.add_field("id")
-    expected_query = f"""
-        SELECT {expected_table}.id AS id
-        FROM {expected_table}
-        WHERE {expected_table}.project_id = {{pb_0:String}}
-        GROUP BY ({expected_table}.project_id, {expected_table}.id)
-        HAVING (
-            ((
-                any({expected_table}.deleted_at) IS NULL
-            ))
-            AND
-            ((
-               NOT ((
-                  any({expected_table}.started_at) IS NULL
-               ))
-            ))
-        )
-    """
+
+    if read_table == ReadTable.CALLS_MERGED:
+        # AggregatingMergeTree: requires GROUP BY and HAVING with aggregate functions
+        expected_query = f"""
+            SELECT {expected_table}.id AS id
+            FROM {expected_table}
+            WHERE {expected_table}.project_id = {{pb_0:String}}
+            GROUP BY ({expected_table}.project_id, {expected_table}.id)
+            HAVING (
+                ((
+                    any({expected_table}.deleted_at) IS NULL
+                ))
+                AND
+                ((
+                   NOT ((
+                      any({expected_table}.started_at) IS NULL
+                   ))
+                ))
+            )
+        """
+    else:
+        # ReplacingMergeTree: no GROUP BY, no aggregate functions, WHERE conditions
+        expected_query = f"""
+            SELECT {expected_table}.id AS id
+            FROM {expected_table}
+            WHERE {expected_table}.project_id = {{pb_0:String}}
+            AND (
+                ((
+                    {expected_table}.deleted_at IS NULL
+                ))
+                AND
+                ((
+                   NOT ((
+                      {expected_table}.started_at IS NULL
+                   ))
+                ))
+            )
+        """
     assert_sql(cq, expected_query, {"pb_0": "project"})
 
 
