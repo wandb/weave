@@ -2636,3 +2636,152 @@ def test_calls_complete_with_hardcoded_filter_and_json_condition() -> None:
             "pb_4": "project",
         },
     )
+
+
+def test_query_with_simple_feedback_sort_calls_complete() -> None:
+    """Ensure feedback sorting uses calls_complete."""
+    cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_COMPLETE)
+    cq.add_field("id")
+    cq.add_order("feedback.[wandb.runnable.my_op].payload.output.expected", "desc")
+    assert_sql(
+        cq,
+        """
+            SELECT
+                calls_complete.id AS id
+            FROM
+                calls_complete
+            LEFT JOIN (
+                SELECT * FROM feedback WHERE feedback.project_id = {pb_4:String}
+            ) AS feedback ON (
+                feedback.weave_ref = concat('weave-trace-internal:///',
+                {pb_4:String},
+                '/call/',
+                calls_complete.id))
+            WHERE
+                calls_complete.project_id = {pb_4:String}
+            AND (
+                ((calls_complete.deleted_at IS NULL))
+                    AND ((NOT ((calls_complete.started_at IS NULL)))))
+            ORDER BY
+                (NOT (JSONType(anyIf(feedback.payload_dump,
+                feedback.feedback_type = {pb_0:String}),
+                {pb_1:String},
+                {pb_2:String}) = 'Null'
+                    OR JSONType(anyIf(feedback.payload_dump,
+                    feedback.feedback_type = {pb_0:String}),
+                    {pb_1:String},
+                    {pb_2:String}) IS NULL)) desc,
+                toFloat64OrNull(coalesce(nullIf(JSON_VALUE(anyIf(feedback.payload_dump,
+                feedback.feedback_type = {pb_0:String}),
+                {pb_3:String}), 'null'), '')) DESC,
+                toString(coalesce(nullIf(JSON_VALUE(anyIf(feedback.payload_dump,
+                feedback.feedback_type = {pb_0:String}),
+                {pb_3:String}), 'null'), '')) DESC
+            """,
+        {
+            "pb_0": "wandb.runnable.my_op",
+            "pb_1": "output",
+            "pb_2": "expected",
+            "pb_3": '$."output"."expected"',
+            "pb_4": "project",
+        },
+    )
+
+
+def test_calls_complete_with_refs_filter() -> None:
+    """Test calls_complete table with input_refs and output_refs filters.
+
+    This test ensures that object ref filtering works correctly with the
+    calls_complete table, using direct column access without aggregation.
+    """
+    cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_COMPLETE)
+    cq.add_field("id")
+    cq.set_hardcoded_filter(
+        HardCodedFilter(
+            filter=tsi.CallsFilter(
+                input_refs=["weave-trace-internal:///project/object/my_input:abc"],
+                output_refs=["weave-trace-internal:///project/object/my_output:xyz"],
+            )
+        )
+    )
+
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_complete.id AS id
+        FROM calls_complete
+        WHERE calls_complete.project_id = {pb_4:String}
+            AND (((hasAny(calls_complete.input_refs, {pb_2:Array(String)})
+                OR length(calls_complete.input_refs) = 0)
+            AND (hasAny(calls_complete.output_refs, {pb_3:Array(String)})
+                OR length(calls_complete.output_refs) = 0)))
+        AND (
+            ((calls_complete.deleted_at IS NULL))
+            AND ((NOT ((calls_complete.started_at IS NULL))))
+            AND (((hasAny(calls_complete.input_refs, {pb_0:Array(String)}))
+                AND (hasAny(calls_complete.output_refs, {pb_1:Array(String)}))))
+        )
+        """,
+        {
+            "pb_0": ["weave-trace-internal:///project/object/my_input:abc"],
+            "pb_1": ["weave-trace-internal:///project/object/my_output:xyz"],
+            "pb_2": ["weave-trace-internal:///project/object/my_input:abc"],
+            "pb_3": ["weave-trace-internal:///project/object/my_output:xyz"],
+            "pb_4": "project",
+        },
+    )
+
+
+def test_calls_complete_with_feedback_filter() -> None:
+    """Test calls_complete table with feedback filter condition.
+
+    This test ensures that feedback filtering works correctly with the
+    calls_complete table, using anyIf for feedback aggregation while
+    using direct column access for calls_complete fields.
+    """
+    cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_COMPLETE)
+    cq.add_field("id")
+    cq.add_condition(
+        tsi_query.GtOperation.model_validate(
+            {
+                "$gt": [
+                    {
+                        "$getField": "feedback.[wandb.runnable.my_op].payload.output.score"
+                    },
+                    {"$literal": 0.5},
+                ]
+            }
+        )
+    )
+
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_complete.id AS id
+        FROM
+            calls_complete
+        LEFT JOIN (
+            SELECT * FROM feedback WHERE feedback.project_id = {pb_3:String}
+        ) AS feedback ON (
+            feedback.weave_ref = concat('weave-trace-internal:///',
+            {pb_3:String},
+            '/call/',
+            calls_complete.id))
+        WHERE
+            calls_complete.project_id = {pb_3:String}
+        AND (
+            ((coalesce(nullIf(JSON_VALUE(anyIf(feedback.payload_dump,
+            feedback.feedback_type = {pb_0:String}),
+            {pb_1:String}), 'null'), '') > {pb_2:Float64}))
+            AND ((calls_complete.deleted_at IS NULL))
+            AND ((NOT ((calls_complete.started_at IS NULL)))))
+        """,
+        {
+            "pb_0": "wandb.runnable.my_op",
+            "pb_1": '$."output"."score"',
+            "pb_2": 0.5,
+            "pb_3": "project",
+        },
+    )
