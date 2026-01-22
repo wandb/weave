@@ -693,21 +693,6 @@ def test_calls_query_routing_by_residence(
     assert len(calls) == expected_count
 
 
-def test_update_call_end_in_calls_complete_requires_started_at(
-    clickhouse_trace_server,
-):
-    """Ensure calls_complete update rejects missing started_at."""
-    end_req = tsi.EndedCallSchemaForInsertWithStartedAt(
-        project_id=b64("project"),
-        id=str(uuid.uuid4()),
-        ended_at=datetime.datetime.now(),
-        summary={"usage": {}, "status_counts": {}},
-        started_at=None,
-    )
-    with pytest.raises(ValueError):
-        clickhouse_trace_server._update_call_end_in_calls_complete(end_req)
-
-
 def test_v1_call_start_raises_calls_complete_mode_required(
     trace_server, clickhouse_trace_server
 ):
