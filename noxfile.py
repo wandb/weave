@@ -213,6 +213,8 @@ def tests(session: nox.Session, shard: str):
     # Add sharding logic for trace1, trace2, trace3
     pytest_args = [
         "pytest",
+        "-p",
+        "no:ddtrace",  # Disable ddtrace pytest plugin to prevent hangs during initialization
         "--durations=20",
         "--strict-markers",
         "--cov=weave",

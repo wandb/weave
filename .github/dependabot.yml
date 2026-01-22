@@ -202,8 +202,7 @@ updates:
       - "wandb/weave-team"
     # Add prefix to PR titles
     commit-message:
-      prefix: "deps"
-      include: "scope"
+      prefix: "chore(weave)"
     # Ignore major version updates by default - these will need manual review
     ignore:
       - dependency-name: "*"

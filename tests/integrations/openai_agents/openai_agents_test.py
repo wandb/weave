@@ -3,7 +3,7 @@ from unittest.mock import Mock
 import agents
 import pytest
 from agents import Agent, GuardrailFunctionOutput, InputGuardrail, Runner
-from agents.tracing import AgentSpanData, Span, Trace
+from agents.tracing import AgentSpanData, ResponseSpanData, Span, Trace
 from pydantic import BaseModel
 
 from weave.integrations.openai_agents.openai_agents import WeaveTracingProcessor
@@ -33,7 +33,7 @@ def test_openai_agents_quickstart(client: WeaveClient, setup_tests) -> None:
     result = Runner.run_sync(agent, "Write a haiku about recursion in programming.")
     calls = client.get_calls()
 
-    assert len(calls) == 3
+    assert len(calls) == 2
 
     trace_root = calls[0]
     trace_root.inputs["name"] = "Agent workflow"
@@ -47,24 +47,6 @@ def test_openai_agents_quickstart(client: WeaveClient, setup_tests) -> None:
     agent_call.output["metrics"] = {}
     agent_call.output["metadata"] = {"tools": [], "handoffs": [], "output_type": "str"}
     agent_call.output["error"] = None
-
-    response_call = calls[2]
-    response_call.inputs["name"] = "Response"
-    response_call.inputs["input"] = [
-        {
-            "content": "Write a haiku about recursion in programming.",
-            "role": "user",
-        }
-    ]
-
-    val = response_call.output["output"][0]
-    assert val.role == "assistant"
-    assert val.type == "message"
-    assert val.status == "completed"
-    assert (
-        val.content[0].text
-        == "Code calls to itself,  \nInfinite loops in silence,  \nPatterns emerge clear."
-    )
 
 
 @pytest.mark.skip(
@@ -349,3 +331,55 @@ def test_tracing_processor_cleanup(client: WeaveClient) -> None:
     processor.shutdown()
     assert len(processor._trace_calls) == 0
     assert len(processor._trace_data) == 0
+
+
+def test_response_spans_are_skipped(client: WeaveClient) -> None:
+    """Test that ResponseSpanData spans are skipped to prevent double-tracking.
+
+    Response spans should not be tracked because the openai.responses.create
+    call (from OpenAI SDK integration) already captures this data.
+    """
+    processor = WeaveTracingProcessor()
+
+    # Mock Trace
+    trace = Mock(spec=Trace)
+    trace.trace_id = "trace_1"
+    trace.name = "test_trace"
+
+    # Start Trace
+    processor.on_trace_start(trace)
+    assert "trace_1" in processor._trace_calls
+    assert "trace_1" in processor._trace_data
+
+    # Mock ResponseSpanData
+    response_span_data = Mock(spec=ResponseSpanData)
+    response_span_data.type = "response"
+    response_span_data.input = [{"role": "user", "content": "test"}]
+    response_span_data.response = Mock()
+    response_span_data.response.output = [{"role": "assistant", "content": "response"}]
+    response_span_data.response.metadata = {}
+    response_span_data.response.usage = None
+    response_span_data.response.model_dump = Mock(return_value={})
+    response_span_data.__class__ = ResponseSpanData
+
+    response_span = Mock(spec=Span)
+    response_span.trace_id = "trace_1"
+    response_span.span_id = "response_span_1"
+    response_span.parent_id = None
+    response_span.span_data = response_span_data
+    response_span.error = None
+
+    # Start Response Span - should be skipped
+    processor.on_span_start(response_span)
+    # Response spans are deferred to on_span_end, so not checked here
+
+    # End Response Span - should be skipped entirely
+    processor.on_span_end(response_span)
+
+    # Verify that NO call was created for the Response span
+    assert "response_span_1" not in processor._span_calls
+
+    # Clean up
+    processor.on_trace_end(trace)
+    assert "trace_1" not in processor._trace_calls
+    assert "trace_1" not in processor._trace_data

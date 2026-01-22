@@ -1,12 +1,14 @@
 import asyncio
 import os
 from collections.abc import Generator
+from unittest.mock import Mock
 
 import pytest
 from google import genai
 from google.genai.types import GenerateImagesConfig
 from pydantic import BaseModel
 
+from weave.integrations.google_genai.gemini_utils import google_genai_gemini_on_finish
 from weave.integrations.google_genai.google_genai_sdk import get_google_genai_patcher
 from weave.integrations.integration_utilities import op_name_from_ref
 
@@ -282,6 +284,42 @@ def test_function_calling(client):
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 @pytest.mark.skip_clickhouse_client
+def test_system_instruction_extracted_from_config(client):
+    """Test that system_instruction is extracted from config and surfaced at top level of inputs."""
+    google_client = genai.Client(api_key=os.getenv("GOOGLE_GENAI_KEY", "DUMMY_API_KEY"))
+    system_instruction = (
+        "You are a helpful assistant that always responds in haiku format."
+    )
+
+    google_client.models.generate_content(
+        model="gemini-2.0-flash",
+        contents="What's the capital of France?",
+        config=genai.types.GenerateContentConfig(
+            system_instruction=system_instruction,
+            temperature=0.5,
+        ),
+    )
+
+    call = next(iter(client.get_calls()))
+    assert call.started_at < call.ended_at
+    trace_name = op_name_from_ref(call.op_name)
+    assert trace_name == "google.genai.models.Models.generate_content"
+
+    # Verify that system_instruction is surfaced at the top level of inputs
+    assert "system_instruction" in call.inputs
+    assert call.inputs["system_instruction"] == system_instruction
+
+    # Verify that the call was successful
+    assert call.output is not None
+    assert call.output.usageMetadata.candidatesTokenCount > 0
+    assert call.output.usageMetadata.promptTokenCount > 0
+
+
+@pytest.mark.vcr(
+    filter_headers=["authorization", "x-api-key", "x-goog-api-key"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+)
+@pytest.mark.skip_clickhouse_client
 def test_image_generation_sync(client):
     google_client = genai.Client(api_key=os.getenv("GOOGLE_GENAI_KEY", "DUMMY_API_KEY"))
     response = google_client.models.generate_images(
@@ -321,3 +359,72 @@ def test_image_generation_async(client):
     trace_name = op_name_from_ref(call.op_name)
     assert trace_name == "google.genai.models.AsyncModels.generate_images"
     assert call.output is not None
+
+
+def test_thoughts_token_count_included_in_usage():
+    """Test that thoughts_token_count is included in usage data when available."""
+    from weave.trace.call import Call
+
+    # Create a mock call with model name in inputs
+    call = Mock(spec=Call)
+    call.inputs = {"model": "gemini-2.0-flash-thinking-exp"}
+    call.summary = {}
+
+    # Create a mock output with usage_metadata including thoughts_token_count
+    usage_metadata = Mock()
+    usage_metadata.prompt_token_count = 100
+    usage_metadata.candidates_token_count = 50
+    usage_metadata.total_token_count = 200
+    usage_metadata.thoughts_token_count = 50  # Thinking model token count
+
+    output = Mock()
+    output.usage_metadata = usage_metadata
+
+    # Call the on_finish handler
+    google_genai_gemini_on_finish(call, output, None)
+
+    # Verify that thoughts_tokens is included in the usage data
+    assert call.summary is not None
+    assert "usage" in call.summary
+    model_usage = call.summary["usage"]["gemini-2.0-flash-thinking-exp"]
+    assert model_usage["prompt_tokens"] == 100
+    assert model_usage["completion_tokens"] == 50
+    assert model_usage["total_tokens"] == 200
+    assert model_usage["thoughts_tokens"] == 50
+    assert model_usage["requests"] == 1
+
+
+def test_thoughts_token_count_not_included_when_missing():
+    """Test that thoughts_tokens is not included when thoughts_token_count is not available."""
+    from weave.trace.call import Call
+
+    # Create a mock call with model name in inputs
+    call = Mock(spec=Call)
+    call.inputs = {"model": "gemini-2.0-flash"}
+    call.summary = {}
+
+    # Create a mock output with usage_metadata without thoughts_token_count
+    # Use spec_set to prevent Mock from auto-creating attributes
+    usage_metadata = Mock(
+        spec=["prompt_token_count", "candidates_token_count", "total_token_count"]
+    )
+    usage_metadata.prompt_token_count = 100
+    usage_metadata.candidates_token_count = 50
+    usage_metadata.total_token_count = 150
+    # thoughts_token_count is not in spec, so getattr will return None
+
+    output = Mock()
+    output.usage_metadata = usage_metadata
+
+    # Call the on_finish handler
+    google_genai_gemini_on_finish(call, output, None)
+
+    # Verify that thoughts_tokens is NOT included in the usage data
+    assert call.summary is not None
+    assert "usage" in call.summary
+    model_usage = call.summary["usage"]["gemini-2.0-flash"]
+    assert model_usage["prompt_tokens"] == 100
+    assert model_usage["completion_tokens"] == 50
+    assert model_usage["total_tokens"] == 150
+    assert "thoughts_tokens" not in model_usage
+    assert model_usage["requests"] == 1

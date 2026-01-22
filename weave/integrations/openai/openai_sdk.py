@@ -743,18 +743,26 @@ def get_openai_patcher(
     completions_create_settings = base.model_copy(
         update={
             "name": base.name or "openai.chat.completions.create",
+            "kind": base.kind or "llm",
         }
     )
     async_completions_create_settings = base.model_copy(
         update={
             "name": base.name or "openai.chat.completions.create",
+            "kind": base.kind or "llm",
         }
     )
     completions_parse_settings = base.model_copy(
-        update={"name": base.name or "openai.chat.completions.parse"}
+        update={
+            "name": base.name or "openai.chat.completions.parse",
+            "kind": base.kind or "llm",
+        }
     )
     async_completions_parse_settings = base.model_copy(
-        update={"name": base.name or "openai.chat.completions.parse"}
+        update={
+            "name": base.name or "openai.chat.completions.parse",
+            "kind": base.kind or "llm",
+        }
     )
     moderation_create_settings = base.model_copy(
         update={"name": base.name or "openai.moderations.create"}
@@ -763,22 +771,40 @@ def get_openai_patcher(
         update={"name": base.name or "openai.moderations.create"}
     )
     embeddings_create_settings = base.model_copy(
-        update={"name": base.name or "openai.embeddings.create"}
+        update={
+            "name": base.name or "openai.embeddings.create",
+            "kind": base.kind or "llm",
+        }
     )
     async_embeddings_create_settings = base.model_copy(
-        update={"name": base.name or "openai.embeddings.create"}
+        update={
+            "name": base.name or "openai.embeddings.create",
+            "kind": base.kind or "llm",
+        }
     )
     responses_create_settings = base.model_copy(
-        update={"name": base.name or "openai.responses.create"}
+        update={
+            "name": base.name or "openai.responses.create",
+            "kind": base.kind or "llm",
+        }
     )
     async_responses_create_settings = base.model_copy(
-        update={"name": base.name or "openai.responses.create"}
+        update={
+            "name": base.name or "openai.responses.create",
+            "kind": base.kind or "llm",
+        }
     )
     responses_parse_settings = base.model_copy(
-        update={"name": base.name or "openai.responses.parse"}
+        update={
+            "name": base.name or "openai.responses.parse",
+            "kind": base.kind or "llm",
+        }
     )
     async_responses_parse_settings = base.model_copy(
-        update={"name": base.name or "openai.responses.parse"}
+        update={
+            "name": base.name or "openai.responses.parse",
+            "kind": base.kind or "llm",
+        }
     )
 
     _openai_patcher = MultiPatcher(

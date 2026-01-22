@@ -2,7 +2,7 @@ import datetime
 
 from weave.trace_server.common_interface import SortBy
 from weave.trace_server.orm import ParamBuilder
-from weave.trace_server.project_version.types import ReadTable
+from weave.trace_server.project_version.types import ReadTable, TableConfig
 
 
 def make_threads_query(
@@ -58,13 +58,12 @@ def make_threads_query(
         SQL query string for threads aggregation
     """
     project_id_param = pb.add_param(project_id)
-    table_name = read_table.value
+    config = TableConfig.from_read_table(read_table)
+    table_name = config.table_name
 
     # Build optional sortable_datetime filter clauses for ClickHouse granule optimization
     sortable_datetime_filter_clauses = []
-    datetime_filter_field = (
-        "sortable_datetime" if read_table == ReadTable.CALLS_MERGED else "started_at"
-    )
+    datetime_filter_field = config.datetime_filter_field
 
     if sortable_datetime_after is not None:
         # Convert to datetime string format expected by ClickHouse

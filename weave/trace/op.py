@@ -50,6 +50,8 @@ from weave.trace.op_protocol import (
     OnInputHandlerType,
     OnOutputHandlerType,
     Op,
+    OpColor,
+    OpKind,
     PostprocessInputsFunc,
     PostprocessOutputFunc,
     ProcessedInputs,
@@ -193,16 +195,32 @@ class OpKwargs(TypedDict, total=False):
     tracing_sample_rate: float
     enable_code_capture: bool
     accumulator: Callable[[Any | None, Any], Any] | None
+    kind: OpKind | None
+    color: OpColor | None
     eager_call_start: bool
 
 
-def setup_dunder_weave_dict(d: WeaveKwargs | None = None) -> WeaveKwargs:
-    """Sets up a __weave dict used to pass WeaveKwargs to ops."""
+def setup_dunder_weave_dict(op: Op, d: WeaveKwargs | None = None) -> WeaveKwargs:
+    """Sets up a __weave dict used to pass WeaveKwargs to ops.
+
+    Args:
+        d: Optional existing WeaveKwargs dict to update.
+        op: Op to extract kind and color from.
+
+    Returns:
+        WeaveKwargs dict with attributes, display_name, and optionally kind/color set.
+    """
     res: dict[str, Any] = {}
     if d is not None:
         res = cast(dict[str, Any], d)
-    res.setdefault("attributes", defaultdict(dict))
+    weave_dict = res.setdefault("attributes", defaultdict(dict)).setdefault("weave", {})
     res.setdefault("display_name", None)
+
+    if op.kind:
+        weave_dict["kind"] = op.kind
+    if op.color:
+        weave_dict["color"] = op.color
+
     return cast(WeaveKwargs, res)
 
 
@@ -295,8 +313,25 @@ def _default_on_input_handler(func: Op, args: tuple, kwargs: dict) -> ProcessedI
 
 
 def _create_call(
-    func: Op, *args: Any, __weave: WeaveKwargs | None = None, **kwargs: Any
+    func: Op,
+    *args: Any,
+    __weave: WeaveKwargs | None = None,
+    use_stack: bool = True,
+    **kwargs: Any,
 ) -> Call:
+    """Create a call object for the given op.
+
+    Args:
+        func: The op being called.
+        *args: Positional arguments to the op.
+        __weave: Optional weave configuration dict.
+        use_stack: Whether to push the call onto the call stack. Defaults to True.
+            For generators, this should be False since they push when iteration starts.
+        **kwargs: Keyword arguments to the op.
+
+    Returns:
+        The created Call object.
+    """
     client = weave_client_context.require_weave_client()
 
     pargs = None
@@ -332,6 +367,7 @@ def _create_call(
         # Very important for `call_time_display_name` to take precedence over `func.call_display_name`
         display_name=call_time_display_name or func.call_display_name,
         attributes=attributes,
+        use_stack=use_stack,
         _call_id_override=preferred_call_id,
     )
 
@@ -411,7 +447,7 @@ def _call_sync_func(
             call.output = res
             return res, call
 
-    __weave = setup_dunder_weave_dict(__weave)
+    __weave = setup_dunder_weave_dict(op, __weave)
     _set_python_function_type_on_weave_dict(__weave, "function")
 
     # Proceed with tracing. Note that we don't check the sample rate here.
@@ -556,7 +592,7 @@ async def _call_async_func(
             call.output = res
             return res, call
 
-    __weave = setup_dunder_weave_dict(__weave)
+    __weave = setup_dunder_weave_dict(op, __weave)
     _set_python_function_type_on_weave_dict(__weave, "async_function")
 
     # Proceed with tracing
@@ -687,12 +723,14 @@ def _call_sync_gen(
             call.output = gen
             return gen, call
 
-    __weave = setup_dunder_weave_dict(__weave)
+    __weave = setup_dunder_weave_dict(op, __weave)
     _set_python_function_type_on_weave_dict(__weave, "generator")
 
     # Proceed with tracing
     try:
-        call = _create_call(op, *args, __weave=__weave, **kwargs)
+        # For generators, use_stack=False because we push when iteration starts,
+        # not when the call is created. This avoids double-pushing.
+        call = _create_call(op, *args, __weave=__weave, use_stack=False, **kwargs)
     except OpCallError:
         raise
     except Exception:
@@ -897,12 +935,14 @@ async def _call_async_gen(
             call.output = gen
             return gen, call
 
-    __weave = setup_dunder_weave_dict(__weave)
+    __weave = setup_dunder_weave_dict(op, __weave)
     _set_python_function_type_on_weave_dict(__weave, "async_generator")
 
     # Proceed with tracing
     try:
-        call = _create_call(op, *args, __weave=__weave, **kwargs)
+        # For generators, use_stack=False because we push when iteration starts,
+        # not when the call is created. This avoids double-pushing.
+        call = _create_call(op, *args, __weave=__weave, use_stack=False, **kwargs)
     except OpCallError:
         raise
     except Exception:
@@ -1170,6 +1210,8 @@ def op(
     tracing_sample_rate: float = 1.0,
     enable_code_capture: bool = True,
     accumulator: Callable[[Any | None, Any], Any] | None = None,
+    kind: OpKind | None = None,
+    color: OpColor | None = None,
     eager_call_start: bool = False,
 ) -> Callable[[Callable[P, R]], Op[P, R]] | Op[P, R]:
     """A decorator to weave op-ify a function or method. Works for both sync and async.
@@ -1291,6 +1333,9 @@ def op(
             wrapper._is_async = is_async  # type: ignore
             wrapper._is_generator = is_sync_generator  # type: ignore
             wrapper._is_async_generator = is_async_generator  # type: ignore
+
+            wrapper.kind = kind  # type: ignore
+            wrapper.color = color  # type: ignore
 
             return cast(Op[P, R], wrapper)
 

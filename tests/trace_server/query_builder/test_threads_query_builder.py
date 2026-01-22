@@ -18,10 +18,16 @@ from weave.trace_server.threads_query_builder import (
 # Basic Functionality Tests
 
 
-def test_clickhouse_basic_query():
-    """Test basic ClickHouse query with turn-only filtering."""
-    assert_clickhouse_sql(
-        """
+@pytest.mark.parametrize(
+    ("read_table", "expected_table"),
+    [
+        (ReadTable.CALLS_MERGED, "calls_merged"),
+        (ReadTable.CALLS_COMPLETE, "calls_complete"),
+    ],
+)
+def test_clickhouse_basic_query(read_table: ReadTable, expected_table: str):
+    """Test basic ClickHouse threads query uses correct table and full query shape."""
+    expected_query = f"""
         SELECT
             aggregated_thread_id AS thread_id,
             COUNT(*) AS turn_count,
@@ -42,17 +48,20 @@ def test_clickhouse_basic_query():
                     THEN dateDiff('millisecond', call_start_time, call_end_time)
                     ELSE NULL
                 END AS call_duration
-            FROM calls_merged
-            WHERE project_id = {pb_0: String}
+            FROM {expected_table}
+            WHERE project_id = {{pb_0: String}}
 
             GROUP BY (project_id, id)
             HAVING id = any(turn_id) AND aggregated_thread_id IS NOT NULL AND aggregated_thread_id != ''
         ) AS properly_merged_calls
         GROUP BY aggregated_thread_id
         ORDER BY last_updated DESC
-        """,
+    """
+    assert_clickhouse_sql(
+        expected_query,
         {"pb_0": "test_project"},
         project_id="test_project",
+        read_table=read_table,
     )
 
 

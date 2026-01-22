@@ -24,7 +24,7 @@ from weave.trace_server.calls_query_builder.utils import (
 )
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.orm import clickhouse_cast
-from weave.trace_server.project_version.types import ReadTable
+from weave.trace_server.project_version.types import ReadTable, TableConfig
 
 if TYPE_CHECKING:
     from weave.trace_server.calls_query_builder.calls_query_builder import (
@@ -337,8 +337,11 @@ def process_query_to_optimization_sql(
     heavy_field_result_sql = heavy_field_processor.finalize_sql(heavy_field_result)
 
     sortable_datetime_result_sql = None
-    if read_table == ReadTable.CALLS_MERGED:
-        # Apply sortable_datetime optimization only for calls_merged
+    config = TableConfig.from_read_table(read_table)
+    if config.use_aggregation:
+        # Apply sortable_datetime optimization only for aggregated tables (calls_merged)
+        # The sortable_datetime column is specific to calls_merged's materialized view
+        # and enables efficient granule-level filtering before aggregation.
         sortable_datetime_processor = SortableDatetimeOptimizationProcessor(
             param_builder, table_alias
         )

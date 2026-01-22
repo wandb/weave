@@ -1,4 +1,5 @@
 import pytest
+import sqlparse
 
 from tests.trace_server.query_builder.utils import assert_sql
 from weave.trace_server import trace_server_interface as tsi
@@ -13,57 +14,54 @@ from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.project_version.types import ReadTable
 
 
-def test_query_baseline() -> None:
-    cq = CallsQuery(project_id="project")
+@pytest.mark.parametrize(
+    ("read_table", "expected_table"),
+    [
+        (ReadTable.CALLS_MERGED, "calls_merged"),
+        (ReadTable.CALLS_COMPLETE, "calls_complete"),
+    ],
+)
+def test_query_baseline(read_table: ReadTable, expected_table: str) -> None:
+    """Test baseline query generates correct table references and full query shape."""
+    cq = CallsQuery(project_id="project", read_table=read_table)
     cq.add_field("id")
-    assert_sql(
-        cq,
-        """
-        SELECT calls_merged.id AS id
-        FROM calls_merged
-        WHERE calls_merged.project_id = {pb_0:String}
-        GROUP BY (calls_merged.project_id, calls_merged.id)
-        HAVING (
-            ((
-                any(calls_merged.deleted_at) IS NULL
-            ))
-            AND
-            ((
-               NOT ((
-                  any(calls_merged.started_at) IS NULL
-               ))
-            ))
-        )
-        """,
-        {"pb_0": "project"},
-    )
 
-
-def test_query_baseline_calls_complete() -> None:
-    """Ensure calls_complete is used for base queries."""
-    cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_COMPLETE)
-    cq.add_field("id")
-    assert_sql(
-        cq,
+    if read_table == ReadTable.CALLS_MERGED:
+        expected_query = f"""
+            SELECT {expected_table}.id AS id
+            FROM {expected_table}
+            WHERE {expected_table}.project_id = {{pb_0:String}}
+            GROUP BY ({expected_table}.project_id, {expected_table}.id)
+            HAVING (
+                ((
+                    any({expected_table}.deleted_at) IS NULL
+                ))
+                AND
+                ((
+                   NOT ((
+                      any({expected_table}.started_at) IS NULL
+                   ))
+                ))
+            )
         """
-        SELECT calls_complete.id AS id
-        FROM calls_complete
-        WHERE calls_complete.project_id = {pb_0:String}
-        GROUP BY (calls_complete.project_id, calls_complete.id)
-        HAVING (
-            ((
-                any(calls_complete.deleted_at) IS NULL
-            ))
-            AND
-            ((
-               NOT ((
-                  any(calls_complete.started_at) IS NULL
-               ))
-            ))
-        )
-        """,
-        {"pb_0": "project"},
-    )
+    else:
+        expected_query = f"""
+            SELECT {expected_table}.id AS id
+            FROM {expected_table}
+            WHERE {expected_table}.project_id = {{pb_0:String}}
+            AND (
+                ((
+                    {expected_table}.deleted_at IS NULL
+                ))
+                AND
+                ((
+                   NOT ((
+                      {expected_table}.started_at IS NULL
+                   ))
+                ))
+            )
+        """
+    assert_sql(cq, expected_query, {"pb_0": "project"})
 
 
 def test_query_light_column() -> None:
@@ -1530,46 +1528,6 @@ def test_query_with_summary_weave_trace_name_sort() -> None:
     )
 
 
-def test_query_with_summary_weave_trace_name_sort_calls_complete() -> None:
-    """Ensure summary trace_name uses calls_complete fields."""
-    cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_COMPLETE)
-    cq.add_field("id")
-    cq.add_field("op_name")
-    cq.add_field("display_name")
-    cq.add_order("summary.weave.trace_name", "asc")
-
-    assert_sql(
-        cq,
-        """
-        SELECT
-            calls_complete.id AS id,
-            any(calls_complete.op_name) AS op_name,
-            any(calls_complete.display_name) AS display_name
-        FROM calls_complete
-        WHERE calls_complete.project_id = {pb_0:String}
-        GROUP BY (calls_complete.project_id, calls_complete.id)
-        HAVING (
-            ((
-                any(calls_complete.deleted_at) IS NULL
-            ))
-            AND
-            ((
-               NOT ((
-                  any(calls_complete.started_at) IS NULL
-               ))
-            ))
-        )
-        ORDER BY CASE
-            WHEN any(calls_complete.display_name) IS NOT NULL AND any(calls_complete.display_name) != '' THEN any(calls_complete.display_name)
-            WHEN any(calls_complete.op_name) IS NOT NULL AND any(calls_complete.op_name) LIKE 'weave-trace-internal:///%' THEN
-                regexpExtract(toString(any(calls_complete.op_name)), '/([^/:]*):', 1)
-            ELSE any(calls_complete.op_name)
-        END ASC
-        """,
-        {"pb_0": "project"},
-    )
-
-
 def test_query_with_summary_weave_trace_name_filter() -> None:
     """Test filtering by summary.weave.trace_name field."""
     cq = CallsQuery(project_id="project")
@@ -1628,18 +1586,27 @@ def test_build_calls_complete_update_end_query() -> None:
         wb_run_step_end_param="wb_run_step_end",
     )
 
-    assert "UPDATE calls_complete" in query
-    assert "ended_at = fromUnixTimestamp64Micro({ended_at:Int64}, 'UTC')" in query
-    assert "exception = {exception:Nullable(String)}" in query
-    assert "output_dump = {output_dump:String}" in query
-    assert "summary_dump = {summary_dump:String}" in query
-    assert "output_refs = {output_refs:Array(String)}" in query
-    assert "wb_run_step_end = {wb_run_step_end:Nullable(UInt64)}" in query
-    assert "WHERE project_id = {project_id:String}" in query
-    assert (
-        "AND started_at = fromUnixTimestamp64Micro({started_at:Int64}, 'UTC')" in query
+    expected = """
+        UPDATE calls_complete
+        SET
+            ended_at = fromUnixTimestamp64Micro({ended_at:Int64}, 'UTC'),
+            exception = {exception:Nullable(String)},
+            output_dump = {output_dump:String},
+            summary_dump = {summary_dump:String},
+            output_refs = {output_refs:Array(String)},
+            wb_run_step_end = {wb_run_step_end:Nullable(UInt64)},
+            updated_at = now64(3)
+        WHERE project_id = {project_id:String}
+            AND started_at = fromUnixTimestamp64Micro({started_at:Int64}, 'UTC')
+            AND id = {id:String}
+    """
+
+    exp_formatted = sqlparse.format(expected, reindent=True)
+    found_formatted = sqlparse.format(query, reindent=True)
+
+    assert exp_formatted == found_formatted, (
+        f"\nExpected:\n{exp_formatted}\n\nGot:\n{found_formatted}"
     )
-    assert "AND id = {id:String}" in query
 
 
 def test_storage_size_fields():
@@ -2596,5 +2563,129 @@ def test_query_filter_with_escaped_dots_in_field_names() -> None:
             "pb_1": 42,
             "pb_2": "%42%",
             "pb_3": "project",
+        },
+    )
+
+
+def test_calls_complete_with_light_filter_and_order() -> None:
+    """Test calls_complete table with light filter conditions and ordering.
+
+    This test demonstrates that for calls_complete, queries use direct column
+    access without any() aggregation functions. Unlike calls_merged, calls_complete
+    does not use GROUP BY or HAVING, and filter conditions go directly in the
+    WHERE clause.
+    """
+    cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_COMPLETE)
+    cq.add_field("id")
+    cq.add_field("started_at")
+    cq.add_field("op_name")
+    cq.add_condition(
+        tsi_query.AndOperation.model_validate(
+            {
+                "$and": [
+                    {
+                        "$gt": [
+                            {"$getField": "started_at"},
+                            {"$literal": 1709251200},  # 2024-03-01 00:00:00 UTC
+                        ]
+                    },
+                    {"$eq": [{"$getField": "wb_user_id"}, {"$literal": "user_123"}]},
+                ]
+            }
+        )
+    )
+    cq.add_order("started_at", "desc")
+    cq.set_limit(50)
+
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_complete.id AS id,
+            calls_complete.started_at AS started_at,
+            calls_complete.op_name AS op_name
+        FROM calls_complete
+        WHERE calls_complete.project_id = {pb_2:String}
+        AND (
+            ((calls_complete.started_at > {pb_0:UInt64}))
+            AND ((calls_complete.wb_user_id = {pb_1:String}))
+            AND ((calls_complete.deleted_at IS NULL))
+            AND ((NOT ((calls_complete.started_at IS NULL))))
+        )
+        ORDER BY calls_complete.started_at DESC
+        LIMIT 50
+        """,
+        {
+            "pb_0": 1709251200,
+            "pb_1": "user_123",
+            "pb_2": "project",
+        },
+    )
+
+
+def test_calls_complete_with_hardcoded_filter_and_json_condition() -> None:
+    """Test calls_complete table with hardcoded filter combined with JSON field condition.
+
+    This test demonstrates that for calls_complete, when there is a hardcoded filter
+    (op_names, trace_ids) plus a JSON condition on summary, the optimizer creates a
+    CTE to filter by the light conditions first, then joins back to get the full row.
+    """
+    cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_COMPLETE)
+    cq.add_field("id")
+    cq.add_field("started_at")
+    cq.set_hardcoded_filter(
+        HardCodedFilter(
+            filter=tsi.CallsFilter(
+                op_names=["my_op"],
+                trace_ids=["trace_abc"],
+            )
+        )
+    )
+    cq.add_condition(
+        tsi_query.GtOperation.model_validate(
+            {
+                "$gt": [
+                    {"$getField": "summary.latency"},
+                    {"$literal": 1000},
+                ]
+            }
+        )
+    )
+    cq.add_order("started_at", "desc")
+    cq.set_limit(100)
+
+    assert_sql(
+        cq,
+        """
+        WITH filtered_calls AS (
+            SELECT calls_complete.id AS id
+            FROM calls_complete
+            WHERE calls_complete.project_id = {pb_4:String}
+                AND ((calls_complete.op_name IN {pb_2:Array(String)})
+                    OR (calls_complete.op_name IS NULL))
+                AND (calls_complete.trace_id = {pb_3:String}
+                    OR calls_complete.trace_id IS NULL)
+            AND (
+                ((coalesce(nullIf(JSON_VALUE(calls_complete.summary_dump, {pb_0:String}), 'null'), '') > {pb_1:UInt64}))
+                AND ((calls_complete.deleted_at IS NULL))
+                AND ((NOT ((calls_complete.started_at IS NULL))))
+            )
+            ORDER BY calls_complete.started_at DESC
+            LIMIT 100
+        )
+        SELECT
+            calls_complete.id AS id,
+            calls_complete.started_at AS started_at
+        FROM calls_complete
+        WHERE calls_complete.project_id = {pb_4:String}
+            AND (calls_complete.id IN filtered_calls)
+        ORDER BY calls_complete.started_at DESC
+        """,
+        {
+            "pb_0": '$."latency"',
+            "pb_1": 1000,
+            "pb_2": ["my_op"],
+            "pb_3": "trace_abc",
+            "pb_4": "project",
         },
     )
