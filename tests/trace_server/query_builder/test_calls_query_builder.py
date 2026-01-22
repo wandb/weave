@@ -617,6 +617,56 @@ def test_query_with_simple_feedback_sort_and_filter() -> None:
     )
 
 
+def test_query_with_simple_feedback_filter_calls_complete() -> None:
+    """Test feedback filter on calls_complete table - should NOT use GROUP BY or aggregation."""
+    cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_COMPLETE)
+    cq.add_field("id")
+    cq.add_condition(
+        tsi_query.GtOperation.model_validate(
+            {
+                "$gt": [
+                    {
+                        "$getField": "feedback.[wandb.runnable.my_op].payload.output.expected"
+                    },
+                    {
+                        "$getField": "feedback.[wandb.runnable.my_op].payload.output.found"
+                    },
+                ]
+            }
+        )
+    )
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_complete.id AS id
+        FROM
+            calls_complete
+                    LEFT JOIN (
+                SELECT * FROM feedback WHERE feedback.project_id = {pb_3:String}
+            ) AS feedback ON (
+            feedback.weave_ref = concat('weave-trace-internal:///',
+            {pb_3:String},
+            '/call/',
+            calls_complete.id))
+        WHERE
+            calls_complete.project_id = {pb_3:String}
+        AND
+            (((coalesce(nullIf(JSON_VALUE(CASE WHEN feedback.feedback_type = {pb_0:String} THEN feedback.payload_dump END,
+            {pb_1:String}), 'null'), '') > coalesce(nullIf(JSON_VALUE(CASE WHEN feedback.feedback_type = {pb_0:String} THEN feedback.payload_dump END,
+            {pb_2:String}), 'null'), '')))
+                AND ((calls_complete.deleted_at IS NULL))
+                    AND ((NOT ((calls_complete.started_at IS NULL)))))
+        """,
+        {
+            "pb_0": "wandb.runnable.my_op",
+            "pb_1": '$."output"."expected"',
+            "pb_2": '$."output"."found"',
+            "pb_3": "project",
+        },
+    )
+
+
 def test_calls_query_multiple_select_columns() -> None:
     cq = CallsQuery(project_id="project")
     cq.add_field("id")
@@ -2663,19 +2713,19 @@ def test_query_with_simple_feedback_sort_calls_complete() -> None:
                 ((calls_complete.deleted_at IS NULL))
                     AND ((NOT ((calls_complete.started_at IS NULL)))))
             ORDER BY
-                (NOT (JSONType(anyIf(feedback.payload_dump,
-                feedback.feedback_type = {pb_0:String}),
+                (NOT (JSONType(CASE WHEN feedback.feedback_type = {pb_0:String}
+                THEN feedback.payload_dump END,
                 {pb_1:String},
                 {pb_2:String}) = 'Null'
-                    OR JSONType(anyIf(feedback.payload_dump,
-                    feedback.feedback_type = {pb_0:String}),
+                    OR JSONType(CASE WHEN feedback.feedback_type = {pb_0:String}
+                    THEN feedback.payload_dump END,
                     {pb_1:String},
                     {pb_2:String}) IS NULL)) desc,
-                toFloat64OrNull(coalesce(nullIf(JSON_VALUE(anyIf(feedback.payload_dump,
-                feedback.feedback_type = {pb_0:String}),
+                toFloat64OrNull(coalesce(nullIf(JSON_VALUE(CASE WHEN feedback.feedback_type = {pb_0:String}
+                THEN feedback.payload_dump END,
                 {pb_3:String}), 'null'), '')) DESC,
-                toString(coalesce(nullIf(JSON_VALUE(anyIf(feedback.payload_dump,
-                feedback.feedback_type = {pb_0:String}),
+                toString(coalesce(nullIf(JSON_VALUE(CASE WHEN feedback.feedback_type = {pb_0:String}
+                THEN feedback.payload_dump END,
                 {pb_3:String}), 'null'), '')) DESC
             """,
         {
@@ -2737,7 +2787,7 @@ def test_calls_complete_with_feedback_filter() -> None:
     """Test calls_complete table with feedback filter condition.
 
     This test ensures that feedback filtering works correctly with the
-    calls_complete table, using anyIf for feedback aggregation while
+    calls_complete table, using CASE WHEN for feedback field access while
     using direct column access for calls_complete fields.
     """
     cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_COMPLETE)
@@ -2772,8 +2822,8 @@ def test_calls_complete_with_feedback_filter() -> None:
         WHERE
             calls_complete.project_id = {pb_3:String}
         AND (
-            ((coalesce(nullIf(JSON_VALUE(anyIf(feedback.payload_dump,
-            feedback.feedback_type = {pb_0:String}),
+            ((coalesce(nullIf(JSON_VALUE(CASE WHEN feedback.feedback_type = {pb_0:String}
+            THEN feedback.payload_dump END,
             {pb_1:String}), 'null'), '') > {pb_2:Float64}))
             AND ((calls_complete.deleted_at IS NULL))
             AND ((NOT ((calls_complete.started_at IS NULL)))))

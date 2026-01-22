@@ -253,13 +253,35 @@ class CallsMergedFeedbackPayloadField(CallsMergedField):
         pb: ParamBuilder,
         table_alias: str,
         cast: tsi_query.CastTo | None = None,
+        use_agg_fn: bool = True,
     ) -> str:
+        """Generate SQL for accessing feedback payload fields.
+
+        Args:
+            pb: Parameter builder for query parameterization
+            table_alias: The table alias (unused, always uses 'feedback')
+            cast: Optional cast type for the result
+            use_agg_fn: Whether to use aggregate functions (anyIf/any).
+                When True (calls_merged): uses anyIf() to pick one feedback entry per call
+                When False (calls_complete): uses CASE WHEN to conditionally access feedback
+
+        Returns:
+            SQL expression for the feedback field
+        """
         inner = super().as_sql(pb, "feedback")
         if self.feedback_type == "*":
-            res = f"any({inner})"
+            # If we are aggregating (calls_merged) use any, non-aggregate uses directly
+            res = inner
+            if use_agg_fn:
+                res = f"any({inner})"
         else:
             param_name = pb.add_param(self.feedback_type)
-            res = f"anyIf({inner}, feedback.feedback_type = {param_slot(param_name, 'String')})"
+            if use_agg_fn:
+                # Use anyIf to aggregate and filter by feedback_type
+                res = f"anyIf({inner}, feedback.feedback_type = {param_slot(param_name, 'String')})"
+            else:
+                # Use CASE WHEN to conditionally access the field without aggregation
+                res = f"CASE WHEN feedback.feedback_type = {param_slot(param_name, 'String')} THEN {inner} END"
         # If there is no extra path, then we can just return the inner sql (JSON_VALUE does not like empty extra_path)
         if not self.extra_path:
             return res
@@ -487,7 +509,9 @@ class OrderField(BaseModel):
         """Build ORDER BY SQL for standard fields."""
         parts = []
         for cast_to, direction in options:
-            if isinstance(self.field, CallsMergedAggField):
+            if isinstance(
+                self.field, (CallsMergedAggField, CallsMergedFeedbackPayloadField)
+            ):
                 field_sql = self.field.as_sql(
                     pb, table_alias, cast_to, use_agg_fn=use_agg_fn
                 )
@@ -1552,11 +1576,14 @@ def process_query_to_conditions(
 
             structured_field = get_field_by_name(operand.get_field_)
 
-            if isinstance(structured_field, CallsMergedDynamicField):
-                field = structured_field.as_sql(
-                    param_builder, table_alias, use_agg_fn=use_agg_fn
-                )
-            elif isinstance(structured_field, CallsMergedAggField):
+            if isinstance(
+                structured_field,
+                (
+                    CallsMergedDynamicField,
+                    CallsMergedAggField,
+                    CallsMergedFeedbackPayloadField,
+                ),
+            ):
                 field = structured_field.as_sql(
                     param_builder, table_alias, use_agg_fn=use_agg_fn
                 )
