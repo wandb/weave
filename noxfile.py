@@ -230,7 +230,7 @@ def tests(session: nox.Session, shard: str):
         pytest_args.extend(["-m", "not trace_server"])
 
     if shard == "trace_calls_complete_only":
-        pytest_args.append("--calls-complete-only")
+        env["WEAVE_USE_CALLS_COMPLETE"] = "true"
 
     # Set trace-server flag for stainless shard
     if shard == "stainless":
