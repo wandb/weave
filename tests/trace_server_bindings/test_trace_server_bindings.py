@@ -22,8 +22,6 @@ from tests.trace_server_bindings.conftest import (
     generate_start,
 )
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
-from weave.trace_server_bindings.call_batch_processor import CallBatchProcessor
 from weave.trace_server_bindings.models import (
     Batch,
     EndBatchItem,
@@ -38,11 +36,8 @@ from weave.trace_server_bindings.remote_http_trace_server import (
 def test_large_batch_is_split_into_multiple_smaller_batches(server):
     """Test that a batch exceeding the size limit is split into smaller batches."""
     batch = []
-    for _ in range(3):
+    for _ in range(20):
         start, end = generate_call_start_end_pair()
-        start.start.attributes["large_data"] = "x" * (
-            server.remote_request_bytes_limit // 2
-        )
         batch.append(StartBatchItem(req=start))
         batch.append(EndBatchItem(req=end))
 
@@ -67,45 +62,27 @@ def test_large_batch_is_split_into_multiple_smaller_batches(server):
 
 
 @pytest.mark.parametrize("server", ["normal"], indirect=True)
-@pytest.mark.parametrize("batch_size", [0, 1])
-def test_small_or_empty_batch_handling(server, batch_size):
-    """Handle empty batches as no-ops and small batches in one request."""
-    batch = []
-    if batch_size:
-        start, _ = generate_call_start_end_pair()
-        batch = [StartBatchItem(req=start)]
+def test_small_batch_is_sent_in_one_request(server):
+    """Test that a small batch is sent without splitting."""
+    start, _ = generate_call_start_end_pair()
+    batch = [StartBatchItem(req=start)]
     server._flush_calls(batch)
 
-    if batch_size == 0:
-        assert server._send_batch_to_server.call_count == 0
-    else:
-        assert server._send_batch_to_server.call_count == 1
-        called_data = server._send_batch_to_server.call_args[0][0]
-        decoded_batch = json.loads(called_data.decode("utf-8"))
-        assert len(decoded_batch["batch"]) == 1
+    # Verify _send_batch_to_server was called once with the entire batch
+    assert server._send_batch_to_server.call_count == 1
+    called_data = server._send_batch_to_server.call_args[0][0]
+    decoded_batch = json.loads(called_data.decode("utf-8"))
+    assert len(decoded_batch["batch"]) == 1
 
 
-@pytest.mark.parametrize(
-    ("env_value", "expected_class"),
-    [("true", CallBatchProcessor), (None, AsyncBatchProcessor)],
-)
-def test_call_processor_selection(monkeypatch, server_class, env_value, expected_class):
-    """Select CallBatchProcessor only when calls_complete mode is enabled."""
-    if server_class is not RemoteHTTPTraceServer:
-        pytest.skip("calls_complete batching only applies to RemoteHTTPTraceServer")
+@pytest.mark.parametrize("server", ["normal"], indirect=True)
+def test_empty_batch_is_noop(server):
+    """Test that an empty batch doesn't trigger any server calls."""
+    batch = []
+    server._flush_calls(batch)
 
-    if env_value is None:
-        monkeypatch.delenv("WEAVE_USE_CALLS_COMPLETE", raising=False)
-    else:
-        monkeypatch.setenv("WEAVE_USE_CALLS_COMPLETE", env_value)
-    server = server_class("http://example.com", should_batch=True)
-
-    assert isinstance(server.get_call_processor(), expected_class)
-
-    if server.call_processor:
-        server.call_processor.stop_accepting_new_work_and_flush_queue()
-    if server.feedback_processor:
-        server.feedback_processor.stop_accepting_new_work_and_flush_queue()
+    # Verify _send_batch_to_server was not called
+    assert server._send_batch_to_server.call_count == 0
 
 
 @pytest.mark.disable_logging_error_check
@@ -143,10 +120,11 @@ def test_multi_level_recursive_splitting(server):
     # Create a very large batch with many items to force multiple levels of splitting.
     # Some items are larger than others to test non-uniform sizes.
     batch = []
-    for _i in range(4):
+    for i in range(50):
         start = generate_start()
         end = generate_end()
-        start.attributes = {"data": "x" * server.remote_request_bytes_limit}
+        if i % 5 == 0:
+            start.attributes = {"data": "x" * 500}
         batch.append(StartBatchItem(req=tsi.CallStartReq(start=start)))
         batch.append(EndBatchItem(req=tsi.CallEndReq(end=end)))
 
@@ -170,7 +148,7 @@ def test_multi_level_recursive_splitting(server):
 def test_dynamic_batch_size_adjustment(server):
     """Test that max_batch_size is dynamically adjusted based on item sizes."""
     batch = []
-    for _ in range(5):
+    for _ in range(10):
         start, end = generate_call_start_end_pair()
         batch.append(StartBatchItem(req=start))
 
@@ -201,21 +179,19 @@ def test_non_uniform_batch_items(server):
     batch = []
 
     # Add several small items
-    for _ in range(2):
+    for _ in range(5):
         start, _ = generate_call_start_end_pair()
         batch.append(StartBatchItem(req=start))
 
     # Add one medium item
     start = generate_start()
-    start.attributes = {
-        "medium_data": "y" * int(server.remote_request_bytes_limit * 0.5)
-    }
+    start.attributes = {"medium_data": "y" * 300}
     batch.append(StartBatchItem(req=tsi.CallStartReq(start=start)))
 
     # Add one large item (but still under the limit)
     start = generate_start()
     start.attributes = {
-        "large_data": "z" * int(server.remote_request_bytes_limit * 0.75),
+        "large_data": "z" * (server.remote_request_bytes_limit // 2),
     }
     batch.append(StartBatchItem(req=tsi.CallStartReq(start=start)))
 

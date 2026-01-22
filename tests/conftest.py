@@ -419,21 +419,6 @@ def create_client(
     return client
 
 
-@contextlib.contextmanager
-def _force_legacy_project_version_mode() -> Iterator[None]:
-    """Force legacy project version routing unless explicitly configured."""
-    original_mode = os.environ.get("PROJECT_VERSION_MODE")
-    if original_mode is None:
-        os.environ["PROJECT_VERSION_MODE"] = "force_legacy"
-    try:
-        yield
-    finally:
-        if original_mode is None:
-            os.environ.pop("PROJECT_VERSION_MODE", None)
-        else:
-            os.environ["PROJECT_VERSION_MODE"] = original_mode
-
-
 @pytest.fixture
 def zero_stack():
     with set_call_stack([]):
@@ -449,12 +434,11 @@ def client(zero_stack, request, trace_server, caching_client_isolation):
     directory is set before the client is created. Without this, the cache might
     be shared across tests causing flaky test failures.
     """
-    with _force_legacy_project_version_mode():
-        client = create_client(request, trace_server)
-        try:
-            yield client
-        finally:
-            weave_client_context.set_weave_client_global(None)
+    client = create_client(request, trace_server)
+    try:
+        yield client
+    finally:
+        weave_client_context.set_weave_client_global(None)
 
 
 @pytest.fixture
@@ -472,16 +456,15 @@ def client_creator(zero_stack, request, trace_server, caching_client_isolation):
     ):
         if settings is not None:
             weave.trace.settings.parse_and_apply_settings(settings)
-        with _force_legacy_project_version_mode():
-            client = create_client(request, trace_server, global_attributes)
-            try:
-                yield client
-            finally:
-                weave_client_context.set_weave_client_global(None)
-                weave.trace.api._global_attributes = {}
-                weave.trace.settings.parse_and_apply_settings(
-                    weave.trace.settings.UserSettings()
-                )
+        client = create_client(request, trace_server, global_attributes)
+        try:
+            yield client
+        finally:
+            weave_client_context.set_weave_client_global(None)
+            weave.trace.api._global_attributes = {}
+            weave.trace.settings.parse_and_apply_settings(
+                weave.trace.settings.UserSettings()
+            )
 
     return client
 

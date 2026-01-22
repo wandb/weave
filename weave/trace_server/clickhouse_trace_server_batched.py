@@ -5533,7 +5533,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         try:
             self._insert_call_complete_batch(self._calls_complete_batch)
         except InsertTooLarge:
-            # Try 1-by-1
+            # Try 1 by 1
             for row in self._calls_complete_batch:
                 self._insert_call_complete_batch([row])
         finally:
@@ -5621,9 +5621,7 @@ def _any_value_to_dump(
     return json.dumps(value)
 
 
-def _dict_dump_to_dict(val: str | None) -> dict[str, Any]:
-    if val is None or val == "" or val == "null":
-        return {}
+def _dict_dump_to_dict(val: str) -> dict[str, Any]:
     res = json.loads(val)
     if not isinstance(res, dict):
         raise TypeError(f"Value is not a dict: {val}")

@@ -778,7 +778,6 @@ def test_call_start_end_v2_writes_calls_merged_for_merged_project(
 
     started_at = datetime.datetime.now(datetime.timezone.utc)
     call_id = str(uuid.uuid4())
-    _insert_merged_call(clickhouse_trace_server.ch_client, internal_project_id, call_id)
     trace_id = str(uuid.uuid4())
     trace_server.call_start_v2(
         tsi.CallStartV2Req(
@@ -817,7 +816,7 @@ def test_call_start_end_v2_writes_calls_merged_for_merged_project(
         _count_project_rows(
             clickhouse_trace_server.ch_client, "calls_complete", internal_project_id
         )
-        == 1
+        == 0
     )
 
     # Verify read-side returns calls from calls_merged
