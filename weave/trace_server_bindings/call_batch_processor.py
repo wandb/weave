@@ -232,6 +232,10 @@ class CallBatchProcessor(AsyncBatchProcessor[BatchItem]):
         if eager_call_start:
             self._eager_call_ids[call_id] = True
             self._queue_item(item)
+            # If end already arrived (race condition), queue it separately too
+            if call_id in self._pending_ends:
+                end_item = self._pending_ends.pop(call_id)
+                self._queue_item(end_item)  # Queue as EndBatchItem, not complete
             return
 
         # Check if we already have the end waiting

@@ -330,7 +330,7 @@ class CallStartRes(BaseModel):
 
 
 class CallEndReq(BaseModelStrict):
-    end: EndedCallSchemaForInsert
+    end: EndedCallSchemaForInsertWithStartedAt
 
 
 class CallEndRes(BaseModel):

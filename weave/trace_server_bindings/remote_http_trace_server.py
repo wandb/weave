@@ -2,7 +2,7 @@ import datetime
 import io
 import logging
 from collections.abc import Iterator
-from typing import Any
+from typing import Any, cast
 from zoneinfo import ZoneInfo
 
 import httpx
@@ -27,6 +27,7 @@ from weave.trace_server_bindings.call_batch_processor import CallBatchProcessor
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface
 from weave.trace_server_bindings.http_utils import (
     REMOTE_REQUEST_BYTES_LIMIT,
+    CallsCompleteModeRequired,
     handle_response_error,
     log_dropped_call_batch,
     log_dropped_feedback_batch,
@@ -95,6 +96,8 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         self._auth: tuple[str, str] | None = auth
         self._extra_headers: dict[str, str] | None = extra_headers
         self.remote_request_bytes_limit = remote_request_bytes_limit
+        # Track whether we've warned about automatic upgrade to calls_complete mode
+        self._warned_about_calls_complete_upgrade = False
 
     def ensure_project_exists(
         self, entity: str, project: str
@@ -191,17 +194,75 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
             data = Batch(batch=batch).model_dump_json()
             return data.encode("utf-8")
 
-        process_batch_with_retry(
-            batch_name="calls",
-            batch=batch,
-            remote_request_bytes_limit=self.remote_request_bytes_limit,
-            send_batch_fn=self._send_batch_to_server,
-            processor_obj=self.call_processor,
-            should_update_batch_size=_should_update_batch_size,
-            get_item_id_fn=get_item_id,
-            log_dropped_fn=log_dropped_call_batch,
-            encode_batch_fn=encode_batch,
+        try:
+            process_batch_with_retry(
+                batch_name="calls",
+                batch=batch,
+                remote_request_bytes_limit=self.remote_request_bytes_limit,
+                send_batch_fn=self._send_batch_to_server,
+                processor_obj=self.call_processor,
+                should_update_batch_size=_should_update_batch_size,
+                get_item_id_fn=get_item_id,
+                log_dropped_fn=log_dropped_call_batch,
+                encode_batch_fn=encode_batch,
+            )
+        except CallsCompleteModeRequired as e:
+            # Project requires calls_complete mode - upgrade and re-enqueue the batch
+            self._upgrade_to_calls_complete(batch, str(e))
+
+    def _upgrade_to_calls_complete(
+        self, batch: list[StartBatchItem | EndBatchItem], error_message: str
+    ) -> None:
+        """Upgrade from legacy AsyncBatchProcessor to CallBatchProcessor.
+
+        This is called when the server indicates a project requires calls_complete mode.
+        The upgrade happens transparently: we replace the processor and re-enqueue
+        the current batch items.
+
+        Args:
+            batch: The batch of items that failed to send (will be re-enqueued).
+            error_message: The error message from the server (for logging).
+        """
+        # Log warning only once per client instance
+        if not self._warned_about_calls_complete_upgrade:
+            self._warned_about_calls_complete_upgrade = True
+            logger.warning(
+                "Project requires 'calls_complete' mode. "
+                "Automatically upgrading SDK to use the more performant calls_complete processor. "
+                f"Server message: {error_message}"
+            )
+
+        # Already upgraded? Just re-enqueue to the new processor
+        if self.use_calls_complete:
+            if isinstance(self.call_processor, CallBatchProcessor):
+                self.call_processor.enqueue(
+                    cast(list[StartBatchItem | EndBatchItem | CompleteBatchItem], batch)
+                )
+            return
+
+        # Store old processor reference for cleanup
+        old_processor = self.call_processor
+
+        # Create new CallBatchProcessor
+        self.use_calls_complete = True
+        self.call_processor = CallBatchProcessor(
+            complete_processor_fn=self._flush_calls_complete,
+            eager_processor_fn=self._flush_calls_eager,
+            max_queue_size=max_calls_queue_size(),
+            enable_disk_fallback=should_enable_disk_fallback(),
         )
+
+        # Re-enqueue the batch items to the new processor
+        # Cast needed: list is invariant, but StartBatchItem | EndBatchItem is a valid subset of BatchItem
+        self.call_processor.enqueue(
+            cast(list[StartBatchItem | EndBatchItem | CompleteBatchItem], batch)
+        )
+
+        # Stop the old processor gracefully (it will drain any remaining items)
+        # We do this in a non-blocking way since the old processor's items
+        # will fail anyway (server rejects legacy calls for this project)
+        if old_processor is not None:
+            old_processor.stop_accepting_work_event.set()
 
     def _flush_calls_eager(
         self,
@@ -226,9 +287,9 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         for item in batch:
             try:
                 if isinstance(item, StartBatchItem):
-                    self._send_call_start_v2(item)
+                    self._send_call_start_v2(item.req.start)
                 elif isinstance(item, EndBatchItem):
-                    self._send_call_end_v2(item)
+                    self._send_call_end_v2(item.req.end)
             except Exception as e:
                 if not _is_retryable_exception(e):
                     # Non-retryable error (e.g., 404, 400) - log and drop this item
@@ -241,22 +302,22 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
                     ) from e
 
     @with_retry
-    def _send_call_start_v2(self, item: StartBatchItem) -> None:
+    def _send_call_start_v2(self, start: tsi.StartedCallSchemaForInsert) -> None:
         """Send a single call start to the v2 endpoint."""
-        project_id = item.req.start.project_id
+        project_id = start.project_id
         entity, project = project_id.split("/", 1)
         url = f"/v2/{entity}/{project}/call/start"
-        req = tsi.CallStartV2Req(start=item.req.start)
+        req = tsi.CallStartV2Req(start=start)
         r = self.post(url, data=req.model_dump_json().encode("utf-8"))
         handle_response_error(r, url)
 
     @with_retry
-    def _send_call_end_v2(self, item: EndBatchItem) -> None:
+    def _send_call_end_v2(self, end: tsi.EndedCallSchemaForInsertWithStartedAt) -> None:
         """Send a single call end to the v2 endpoint."""
-        project_id = item.req.end.project_id
+        project_id = end.project_id
         entity, project = project_id.split("/", 1)
         url = f"/v2/{entity}/{project}/call/end"
-        req = tsi.CallEndV2Req(end=item.req.end)
+        req = tsi.CallEndV2Req(end=end)
         r = self.post(url, data=req.model_dump_json().encode("utf-8"))
         handle_response_error(r, url)
 

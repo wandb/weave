@@ -171,6 +171,9 @@ def process_batch_with_retry(
 
     try:
         send_batch_fn(encoded_data)
+    except CallsCompleteModeRequired:
+        # Re-raise so caller can handle the upgrade to calls_complete mode
+        raise
     except Exception as e:
         # Handle 413 specially: server rejected as too large, split and retry
         if _is_413_error(e) and len(batch) > 1:

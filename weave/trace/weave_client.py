@@ -111,6 +111,7 @@ from weave.trace_server.trace_server_interface import (
     CostQueryOutput,
     CostQueryReq,
     EndedCallSchemaForInsert,
+    EndedCallSchemaForInsertWithStartedAt,
     FeedbackCreateReq,
     FileCreateReq,
     FileCreateRes,
@@ -965,7 +966,7 @@ class WeaveClient:
             )
 
             call_end_req = CallEndReq(
-                end=EndedCallSchemaForInsert(
+                end=EndedCallSchemaForInsertWithStartedAt(
                     project_id=project_id,
                     id=call.id,
                     started_at=call.started_at,
