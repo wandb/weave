@@ -789,7 +789,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             req.project_id, self.ch_client
         )
         pb = ParamBuilder()
-        query, columns = build_calls_stats_query(req, pb, read_table)
+        query, columns = build_calls_stats_query(
+            req, pb, read_table, cluster_name=self.clickhouse_cluster_name
+        )
         raw_res = self._query(query, pb.get_params())
 
         res_dict = (
@@ -815,6 +817,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             include_costs=req.include_costs or False,
             include_storage_size=req.include_storage_size or False,
             include_total_storage_size=req.include_total_storage_size or False,
+            cluster_name=self.clickhouse_cluster_name,
         )
         columns = ALL_CALL_SELECT_COLUMNS
         if req.columns:
