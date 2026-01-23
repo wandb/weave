@@ -18,7 +18,6 @@ import tenacity
 from pydantic import ValidationError
 
 from tests.trace_server_bindings.conftest import (
-    generate_end,
     generate_id,
     generate_start,
 )

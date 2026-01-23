@@ -110,7 +110,6 @@ from weave.trace_server.trace_server_interface import (
     CostPurgeReq,
     CostQueryOutput,
     CostQueryReq,
-    EndedCallSchemaForInsert,
     EndedCallSchemaForInsertWithStartedAt,
     FeedbackCreateReq,
     FileCreateReq,
