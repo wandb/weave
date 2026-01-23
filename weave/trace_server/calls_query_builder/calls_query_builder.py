@@ -1336,7 +1336,11 @@ class CallsQuery(BaseModel):
         # Use PREWHERE for project_id to filter data before reading from disk
         # This is a ClickHouse optimization for high-selectivity filters
         where_filters_sql = where_filters.to_sql()
-        where_clause = f"WHERE {where_filters_sql[4:]}" if where_filters_sql else ""
+        # Strip leading "AND " from where_filters since PREWHERE handles the first condition
+        where_filters_stripped = re.sub(r"^\s*AND\s+", "", where_filters_sql)
+        where_clause = (
+            f"WHERE {where_filters_stripped}" if where_filters_stripped else ""
+        )
         raw_sql = f"""
         SELECT {select_fields_sql}
         FROM {table_alias}
