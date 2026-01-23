@@ -78,11 +78,13 @@ def count_queries(ch_client):
             WriteTarget.CALLS_COMPLETE,
             False,
         ),
-        # BOTH: V1 -> MERGED, V2 -> COMPLETE (prefer COMPLETE for new writes)
+        # BOTH: Unexpected state - data should never be in both tables in production.
+        # This is a graceful failure: V1 -> COMPLETE (triggers error to prompt upgrade),
+        # V2 -> COMPLETE. Reads from COMPLETE to ensure latest data is visible.
         (
             ["calls_merged", "calls_complete"],
             ReadTable.CALLS_COMPLETE,
-            WriteTarget.CALLS_MERGED,
+            WriteTarget.CALLS_COMPLETE,
             WriteTarget.CALLS_COMPLETE,
             True,  # Dual residency triggers a warning log
         ),

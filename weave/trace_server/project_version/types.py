@@ -2,6 +2,7 @@
 
 import logging
 import os
+from dataclasses import dataclass
 from enum import Enum
 
 logger = logging.getLogger(__name__)
@@ -62,3 +63,59 @@ class ReadTable(str, Enum):
 class WriteTarget(str, Enum):
     CALLS_MERGED = "calls_merged"
     CALLS_COMPLETE = "calls_complete"
+
+
+@dataclass(frozen=True)
+class TableConfig:
+    """Centralized configuration for table-specific SQL generation.
+
+    Attributes:
+        read_table: The ReadTable enum value.
+        table_name: SQL table name (e.g., "calls_merged", "calls_complete").
+        stats_table_name: Associated stats table (e.g., "calls_merged_stats").
+        use_aggregation: Whether to use aggregate functions (GROUP BY semantics).
+            True for calls_merged (requires aggregation to resolve concurrent writes).
+            False for calls_complete (single-row per call, no aggregation needed).
+        datetime_filter_field: Column name for datetime-based optimizations.
+            "sortable_datetime" for calls_merged, "started_at" for calls_complete.
+    """
+
+    read_table: ReadTable
+    table_name: str
+    stats_table_name: str
+    use_aggregation: bool
+    datetime_filter_field: str
+
+    @classmethod
+    def from_read_table(cls, read_table: ReadTable) -> "TableConfig":
+        """Create a TableConfig from a ReadTable enum.
+
+        Args:
+            read_table: The table to configure for.
+
+        Returns:
+            TableConfig with all derived values populated.
+
+        Examples:
+            >>> config = TableConfig.from_read_table(ReadTable.CALLS_MERGED)
+            >>> config.use_aggregation
+            True
+        """
+        if read_table == ReadTable.CALLS_MERGED:
+            return cls(
+                read_table=read_table,
+                table_name="calls_merged",
+                stats_table_name="calls_merged_stats",
+                use_aggregation=True,
+                datetime_filter_field="sortable_datetime",
+            )
+        elif read_table == ReadTable.CALLS_COMPLETE:
+            return cls(
+                read_table=read_table,
+                table_name="calls_complete",
+                stats_table_name="calls_complete_stats",
+                use_aggregation=False,
+                datetime_filter_field="started_at",
+            )
+        else:
+            raise ValueError(f"Invalid read table: {read_table}")
