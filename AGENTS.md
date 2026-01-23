@@ -19,7 +19,6 @@
 - Note: Imports inside functions are not caught by linting. **Agents must self-enforce this rule.**
 
 ❌ **Never do this:**
-
 ```python
 def my_function():
     import re  # BAD: import inside function
@@ -27,7 +26,6 @@ def my_function():
 ```
 
 ✅ **Always do this:**
-
 ```python
 import re  # GOOD: import at top of file
 
@@ -52,6 +50,7 @@ _Important:_ For OpenAI Codex agents (most likely you!), your environment does n
 - `weave/` - Core implementation
   - `weave/` - Python package implementation
   - `weave/trace_server` - Backend server implementation
+
 
 ## Python Testing Guidelines
 
@@ -222,15 +221,6 @@ npm run test
 - Update relevant docstrings for Python code
 - Add JSDoc comments for TypeScript code
 - Update this file when introducing new patterns or concepts
-
-### Calls Complete (V2 Calls Path)
-
-- The SDK can write complete calls in a single batch via `calls_complete` when `WEAVE_USE_CALLS_COMPLETE=true`.
-- Eager call starts (`@op(eager_call_start=True)`) send a v2 start immediately and a v2 end later for long-running ops.
-- Server-side routing now uses `CallsStorageServerMode.AUTO` by default:
-  - Reads/writes go to `calls_complete` for EMPTY/COMPLETE_ONLY/BOTH projects.
-  - MERGED_ONLY projects continue to use `calls_merged`.
-- For tests, set `WEAVE_USE_CALLS_COMPLETE=true` environment variable to force routing to `calls_complete`. The `trace_calls_complete_only` nox shard sets this automatically.
 
 ---
 

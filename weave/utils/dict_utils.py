@@ -5,13 +5,9 @@ particularly useful when dealing with JSON-like data where keys might not exist 
 """
 
 import json
+import numbers
 from collections import defaultdict
 from typing import Any, TypeVar
-
-# Use concrete numeric types instead of numbers.Number ABC to avoid recursion
-# issues when the call stack is nearly exhausted (e.g., after a RecursionError).
-# The ABC isinstance check uses __subclasscheck__ which can hit recursion limits.
-_NUMERIC_TYPES = (int, float, complex, bool)
 
 T = TypeVar("T")
 
@@ -106,9 +102,7 @@ def sum_dict_leaves(dicts: list[dict]) -> dict:
     # Sum those values that are numbers
     for k, values in result.items():
         # we only sum numbers if we are not going to combine nested dicts later
-        # Note: We use _NUMERIC_TYPES instead of numbers.Number ABC to avoid
-        # recursion issues when the call stack is nearly exhausted.
-        if k not in nested_dicts and all(isinstance(v, _NUMERIC_TYPES) for v in values):
+        if k not in nested_dicts and all(isinstance(v, numbers.Number) for v in values):
             result[k] = sum(values)
 
     # Then recursively sum each collection of nested dictionaries

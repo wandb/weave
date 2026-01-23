@@ -65,45 +65,6 @@ def test_clickhouse_basic_query(read_table: ReadTable, expected_table: str):
     )
 
 
-def test_clickhouse_basic_query_calls_complete():
-    """Test ClickHouse query against calls_complete."""
-    assert_clickhouse_sql(
-        """
-        SELECT
-            aggregated_thread_id AS thread_id,
-            COUNT(*) AS turn_count,
-            min(call_start_time) AS start_time,
-            max(call_end_time) AS last_updated,
-            argMin(id, call_start_time) AS first_turn_id,
-            argMax(id, call_end_time) AS last_turn_id,
-            quantile(0.5)(call_duration) AS p50_turn_duration_ms,
-            quantile(0.99)(call_duration) AS p99_turn_duration_ms
-        FROM (
-            SELECT
-                id,
-                any(thread_id) AS aggregated_thread_id,
-                min(started_at) AS call_start_time,
-                max(ended_at) AS call_end_time,
-                CASE
-                    WHEN call_end_time IS NOT NULL AND call_start_time IS NOT NULL
-                    THEN dateDiff('millisecond', call_start_time, call_end_time)
-                    ELSE NULL
-                END AS call_duration
-            FROM calls_complete
-            WHERE project_id = {pb_0: String}
-
-            GROUP BY (project_id, id)
-            HAVING id = any(turn_id) AND aggregated_thread_id IS NOT NULL AND aggregated_thread_id != ''
-        ) AS properly_merged_calls
-        GROUP BY aggregated_thread_id
-        ORDER BY last_updated DESC
-        """,
-        {"pb_0": "test_project"},
-        project_id="test_project",
-        read_table=ReadTable.CALLS_COMPLETE,
-    )
-
-
 def test_sqlite_basic_query():
     """Test basic SQLite query with turn-only filtering."""
     assert_sqlite_sql(
