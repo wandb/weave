@@ -6,7 +6,7 @@ Optimizations should be conservative, not guaranteed to full filter down but sho
 
 Key strategies:
 1. Heavy field optimization - Uses LIKE patterns for values in JSON fields (strings, numbers)
-2. ID-based optimization - Uses sortable_datetime column for datetime filtering
+2. ID-based optimization - Uses sortable_datetime for calls_merged or started_at for calls_complete
 
 Optimization SQL is applied before GROUP BY, reducing memory usage and
 improving performance for complex conditions.
@@ -24,6 +24,7 @@ from weave.trace_server.calls_query_builder.utils import (
 )
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.orm import clickhouse_cast
+from weave.trace_server.project_version.types import ReadTable, TableConfig
 
 if TYPE_CHECKING:
     from weave.trace_server.calls_query_builder.calls_query_builder import (
@@ -243,6 +244,9 @@ class SortableDatetimeOptimizationProcessor(QueryOptimizationProcessor):
     doing more complex operations after aggregation.
     """
 
+    def __init__(self, pb: "ParamBuilder", table_alias: str) -> None:
+        super().__init__(pb, table_alias)
+
     def process_eq(self, operation: tsi_query.EqOperation) -> str | None:
         """Not implemented for sortable_datetime optimization."""
         return None
@@ -305,6 +309,7 @@ def process_query_to_optimization_sql(
     conditions: list["Condition"],
     param_builder: "ParamBuilder",
     table_alias: str,
+    read_table: ReadTable,
 ) -> OptimizationConditions:
     """Converts a list of conditions to optimization conditions for a clickhouse query.
 
@@ -331,16 +336,21 @@ def process_query_to_optimization_sql(
     heavy_field_result = apply_processor(heavy_field_processor, and_operation)
     heavy_field_result_sql = heavy_field_processor.finalize_sql(heavy_field_result)
 
-    # Apply sortable_datetime optimization
-    sortable_datetime_processor = SortableDatetimeOptimizationProcessor(
-        param_builder, table_alias
-    )
-    sortable_datetime_result = apply_processor(
-        sortable_datetime_processor, and_operation
-    )
-    sortable_datetime_result_sql = sortable_datetime_processor.finalize_sql(
-        sortable_datetime_result
-    )
+    sortable_datetime_result_sql = None
+    config = TableConfig.from_read_table(read_table)
+    if config.use_aggregation:
+        # Apply sortable_datetime optimization only for aggregated tables (calls_merged)
+        # The sortable_datetime column is specific to calls_merged's materialized view
+        # and enables efficient granule-level filtering before aggregation.
+        sortable_datetime_processor = SortableDatetimeOptimizationProcessor(
+            param_builder, table_alias
+        )
+        sortable_datetime_result = apply_processor(
+            sortable_datetime_processor, and_operation
+        )
+        sortable_datetime_result_sql = sortable_datetime_processor.finalize_sql(
+            sortable_datetime_result
+        )
 
     return OptimizationConditions(
         heavy_filter_opt_sql=heavy_field_result_sql,

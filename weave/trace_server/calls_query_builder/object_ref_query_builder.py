@@ -922,12 +922,14 @@ def get_all_object_ref_conditions(
     conditions: list["Condition"],
     order_fields: list["OrderField"],
     expand_columns: list[str],
+    table_alias: str,
 ) -> list[ObjectRefCondition]:
     """Get all object reference conditions from a list of conditions.
 
     Args:
         conditions: List of conditions to process
         expand_columns: List of expand columns to match against
+        table_alias: Table alias for the calls table.
 
     Returns:
         List of object reference conditions
@@ -938,7 +940,9 @@ def get_all_object_ref_conditions(
     all_object_ref_conditions: list[ObjectRefCondition] = []
     fields_used: set[str] = set()
     for condition in conditions:
-        object_ref_conditions = condition.get_object_ref_conditions(expand_columns)
+        object_ref_conditions = condition.get_object_ref_conditions(
+            expand_columns, table_alias
+        )
         all_object_ref_conditions.extend(object_ref_conditions)
 
     for order_field in order_fields:
