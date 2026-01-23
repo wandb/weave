@@ -2115,9 +2115,7 @@ def _try_optimized_stats_query(
     return None
 
 
-def _format_table_name_with_cluster(
-    table_name: str, cluster_name: str | None
-) -> str:
+def _format_table_name_with_cluster(table_name: str, cluster_name: str | None) -> str:
     """Format a table name with ON CLUSTER clause if cluster_name is provided."""
     if cluster_name:
         return f"{table_name} ON CLUSTER {cluster_name}"

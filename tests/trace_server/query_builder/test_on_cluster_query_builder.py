@@ -232,22 +232,41 @@ def test_set_cluster_name_method() -> None:
 
 def test_stats_query_with_cluster() -> None:
     """Test that build_calls_stats_query includes ON CLUSTER in distributed mode."""
+    import sqlparse
+
     req = tsi.CallsQueryStatsReq(
         project_id="test/project",
         filter=tsi.CallsFilter(op_names=["my_op"]),
     )
-    pb = ParamBuilder("pb")
-
-    # Without cluster_name - no ON CLUSTER
-    query_without_cluster, _ = build_calls_stats_query(req, pb)
-    assert "ON CLUSTER" not in query_without_cluster
 
     # With cluster_name - includes ON CLUSTER
     pb = ParamBuilder("pb")
-    query_with_cluster, _ = build_calls_stats_query(
-        req, pb, cluster_name=CLUSTER_NAME
+    query, _ = build_calls_stats_query(req, pb, cluster_name=CLUSTER_NAME)
+    params = pb.get_params()
+
+    expected_query = f"""
+    SELECT count()
+    FROM (
+        SELECT calls_merged.id AS id
+        FROM calls_merged ON CLUSTER {CLUSTER_NAME}
+        WHERE calls_merged.project_id = {{pb_1:String}}
+            AND ((calls_merged.op_name IN {{pb_0:Array(String)}})
+                OR (calls_merged.op_name IS NULL))
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING (
+            ((any(calls_merged.deleted_at) IS NULL))
+            AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+        )
     )
-    assert f"ON CLUSTER {CLUSTER_NAME}" in query_with_cluster
+    """
+    expected_params = {"pb_0": ["my_op"], "pb_1": "test/project"}
+
+    actual_formatted = sqlparse.format(query.strip(), reindent=True)
+    expected_formatted = sqlparse.format(expected_query.strip(), reindent=True)
+    assert actual_formatted == expected_formatted, (
+        f"Query mismatch:\nExpected:\n{expected_formatted}\n\nGot:\n{actual_formatted}"
+    )
+    assert params == expected_params, f"Params mismatch: {params} != {expected_params}"
 
 
 def test_stats_query_optimized_with_cluster() -> None:
@@ -255,21 +274,34 @@ def test_stats_query_optimized_with_cluster() -> None:
 
     This tests the optimized path (limit=1, no filters) which bypasses CallsQuery.
     """
+    import sqlparse
+
     # This request triggers the optimized _optimized_project_contains_call_query path
     req = tsi.CallsQueryStatsReq(
         project_id="test/project",
         limit=1,
         # No filter, no query - triggers optimization
     )
-    pb = ParamBuilder("pb")
-
-    # Without cluster_name - no ON CLUSTER
-    query_without_cluster, _ = build_calls_stats_query(req, pb)
-    assert "ON CLUSTER" not in query_without_cluster
 
     # With cluster_name - includes ON CLUSTER
     pb = ParamBuilder("pb")
-    query_with_cluster, _ = build_calls_stats_query(
-        req, pb, cluster_name=CLUSTER_NAME
+    query, _ = build_calls_stats_query(req, pb, cluster_name=CLUSTER_NAME)
+    params = pb.get_params()
+
+    expected_query = f"""
+    SELECT toUInt8(count()) AS has_any
+    FROM (
+        SELECT 1
+        FROM calls_merged ON CLUSTER {CLUSTER_NAME}
+        WHERE project_id = {{pb_0:String}}
+        LIMIT 1
     )
-    assert f"ON CLUSTER {CLUSTER_NAME}" in query_with_cluster
+    """
+    expected_params = {"pb_0": "test/project"}
+
+    actual_formatted = sqlparse.format(query.strip(), reindent=True)
+    expected_formatted = sqlparse.format(expected_query.strip(), reindent=True)
+    assert actual_formatted == expected_formatted, (
+        f"Query mismatch:\nExpected:\n{expected_formatted}\n\nGot:\n{actual_formatted}"
+    )
+    assert params == expected_params, f"Params mismatch: {params} != {expected_params}"
