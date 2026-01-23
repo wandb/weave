@@ -84,11 +84,13 @@ def test_video_with_no_ext_converted(
     # Load the video without extension
     clip = VideoFileClip(test_path)
 
-    # Try to publish it - this should use DEFAULT_VIDEO_FORMAT (gif)
+    # Try to publish it - this should use DEFAULT_VIDEO_FORMAT (mp4)
     ref = weave.publish(clip)
 
     # Check that we can get it back
-    recovered = weave.ref(ref.uri()).get()
+    # Use ref.get() directly instead of weave.ref(ref.uri()).get() to avoid
+    # potential race conditions with ref resolution
+    recovered = ref.get()
     assert isinstance(recovered, VideoClip)
 
 
