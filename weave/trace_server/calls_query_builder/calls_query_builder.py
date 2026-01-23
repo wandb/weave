@@ -664,6 +664,7 @@ class CallsQuery(BaseModel):
     include_storage_size: bool = False
     include_total_storage_size: bool = False
     read_table: ReadTable = ReadTable.CALLS_MERGED
+    cluster_name: str | None = None
 
     @property
     def use_agg_fn(self) -> bool:
@@ -735,11 +736,39 @@ class CallsQuery(BaseModel):
             limit=self.limit,
             offset=self.offset,
             read_table=self.read_table,
+            cluster_name=self.cluster_name,
         )
+
+    def set_cluster_name(self, cluster_name: str | None) -> "CallsQuery":
+        """Set the cluster name for distributed mode queries.
+
+        Args:
+            cluster_name: The ClickHouse cluster name for ON CLUSTER clause.
+                         If None, no ON CLUSTER clause will be added.
+
+        Returns:
+            Self for method chaining.
+        """
+        self.cluster_name = cluster_name
+        return self
 
     def set_include_costs(self, include_costs: bool) -> "CallsQuery":
         self.include_costs = include_costs
         return self
+
+    def _format_table_with_cluster(self, table_name: str) -> str:
+        """Format a table name with ON CLUSTER clause if cluster_name is set.
+
+        Args:
+            table_name: The table name to format.
+
+        Returns:
+            Table name with ON CLUSTER clause if cluster_name is set,
+            otherwise just the table name.
+        """
+        if self.cluster_name:
+            return f"{table_name} ON CLUSTER {self.cluster_name}"
+        return table_name
 
     def set_expand_columns(self, expand_columns: list[str]) -> "CallsQuery":
         self.expand_columns = expand_columns
@@ -900,13 +929,16 @@ class CallsQuery(BaseModel):
 
         # Build two queries, first filter query CTE, then select the columns
         filter_query = CallsQuery(
-            project_id=self.project_id, read_table=self.read_table
+            project_id=self.project_id,
+            read_table=self.read_table,
+            cluster_name=self.cluster_name,
         )
         select_query = CallsQuery(
             project_id=self.project_id,
             include_storage_size=self.include_storage_size,
             include_total_storage_size=self.include_total_storage_size,
             read_table=self.read_table,
+            cluster_name=self.cluster_name,
         )
 
         # Select Fields:
@@ -1118,12 +1150,15 @@ class CallsQuery(BaseModel):
         Returns:
             QueryJoins object containing all join SQL strings
         """
+        # Format table names with ON CLUSTER if cluster_name is set
+        feedback_table = self._format_table_with_cluster("feedback")
+
         # Feedback join
         feedback_join = ""
         if needs_feedback:
             feedback_join = f"""
             LEFT JOIN (
-                SELECT * FROM feedback WHERE feedback.project_id = {param_slot(project_param, "String")}
+                SELECT * FROM {feedback_table} WHERE feedback.project_id = {param_slot(project_param, "String")}
             ) AS feedback ON (
                 feedback.weave_ref = concat('weave-trace-internal:///', {param_slot(project_param, "String")}, '/call/', {table_alias}.id))
             """
@@ -1137,7 +1172,7 @@ class CallsQuery(BaseModel):
                 SELECT
                     id,
                     sum(COALESCE(attributes_size_bytes,0) + COALESCE(inputs_size_bytes,0) + COALESCE(output_size_bytes,0) + COALESCE(summary_size_bytes,0)) AS storage_size_bytes
-                FROM {config.stats_table_name}
+                FROM {self._format_table_with_cluster(config.stats_table_name)}
                 WHERE project_id = {param_slot(project_param, "String")}
                 GROUP BY id
             ) AS {STORAGE_SIZE_TABLE_NAME}
@@ -1152,7 +1187,7 @@ class CallsQuery(BaseModel):
                 SELECT
                     trace_id,
                     sum(COALESCE(attributes_size_bytes,0) + COALESCE(inputs_size_bytes,0) + COALESCE(output_size_bytes,0) + COALESCE(summary_size_bytes,0)) AS total_storage_size_bytes
-                FROM {config.stats_table_name}
+                FROM {self._format_table_with_cluster(config.stats_table_name)}
                 WHERE project_id = {param_slot(project_param, "String")}
                 GROUP BY trace_id
             ) AS {ROLLED_UP_CALL_MERGED_STATS_TABLE_NAME}
@@ -1332,10 +1367,12 @@ class CallsQuery(BaseModel):
         if self.use_agg_fn:
             group_by_sql = f"GROUP BY ({table_alias}.project_id, {table_alias}.id)"
 
-        # Assemble the actual SQL query
+        # Format table name with ON CLUSTER if cluster_name is set
+        formatted_table = self._format_table_with_cluster(table_alias)
+
         raw_sql = f"""
         SELECT {select_fields_sql}
-        FROM {table_alias}
+        FROM {formatted_table}
         {joins.to_sql()}
         WHERE {table_alias}.project_id = {param_slot(project_param, "String")}
         {where_filters.to_sql()}
@@ -1987,6 +2024,7 @@ def build_calls_stats_query(
     req: tsi.CallsQueryStatsReq,
     param_builder: ParamBuilder,
     read_table: ReadTable = ReadTable.CALLS_MERGED,
+    cluster_name: str | None = None,
 ) -> tuple[str, KeysView[str]]:
     """Build a stats query for calls, automatically using optimized queries when possible.
 
@@ -1997,6 +2035,7 @@ def build_calls_stats_query(
         req: The stats query request
         param_builder: Parameter builder for query parameterization
         read_table: Which calls table to read from
+        cluster_name: The ClickHouse cluster name for ON CLUSTER clause (distributed mode)
 
     Returns:
         Tuple of (SQL query string, column names in the result)
@@ -2004,7 +2043,9 @@ def build_calls_stats_query(
     aggregated_columns = {"count": "count()"}
 
     # Try optimized special case queries first
-    if opt_query := _try_optimized_stats_query(req, param_builder, read_table):
+    if opt_query := _try_optimized_stats_query(
+        req, param_builder, read_table, cluster_name
+    ):
         return (opt_query, aggregated_columns.keys())
 
     # Fall back to general query builder
@@ -2012,6 +2053,7 @@ def build_calls_stats_query(
         project_id=req.project_id,
         include_total_storage_size=req.include_total_storage_size or False,
         read_table=read_table,
+        cluster_name=cluster_name,
     )
 
     cq.add_field("id")
@@ -2040,6 +2082,7 @@ def _try_optimized_stats_query(
     req: tsi.CallsQueryStatsReq,
     param_builder: ParamBuilder,
     read_table: ReadTable,
+    cluster_name: str | None = None,
 ) -> str | None:
     """Try to match request to an optimized special-case query.
 
@@ -2054,7 +2097,7 @@ def _try_optimized_stats_query(
         and not req.include_total_storage_size
     ):
         return _optimized_project_contains_call_query(
-            req.project_id, param_builder, read_table
+            req.project_id, param_builder, read_table, cluster_name
         )
 
     # Pattern 2: Query with wb_run_id check (limit=1, query present, minimal filter)
@@ -2066,26 +2109,35 @@ def _try_optimized_stats_query(
         and _is_minimal_filter(req.filter)
     ):
         return _optimized_wb_run_id_not_null_query(
-            req.project_id, param_builder, read_table
+            req.project_id, param_builder, read_table, cluster_name
         )
 
     return None
+
+
+def _format_table_name_with_cluster(table_name: str, cluster_name: str | None) -> str:
+    """Format a table name with ON CLUSTER clause if cluster_name is provided."""
+    if cluster_name:
+        return f"{table_name} ON CLUSTER {cluster_name}"
+    return table_name
 
 
 def _optimized_project_contains_call_query(
     project_id: str,
     param_builder: ParamBuilder,
     read_table: ReadTable,
+    cluster_name: str | None = None,
 ) -> str:
     """Returns a query that checks if the project contains any calls."""
     table_name = get_calls_table_name(read_table)
+    formatted_table = _format_table_name_with_cluster(table_name, cluster_name)
     return safely_format_sql(
         f"""SELECT
     toUInt8(count()) AS has_any
     FROM
     (
         SELECT 1
-        FROM {table_name}
+        FROM {formatted_table}
         WHERE project_id = {param_slot(param_builder.add_param(project_id), "String")}
         LIMIT 1
     )
@@ -2098,6 +2150,7 @@ def _optimized_wb_run_id_not_null_query(
     project_id: str,
     param_builder: ParamBuilder,
     read_table: ReadTable,
+    cluster_name: str | None = None,
 ) -> str:
     """Optimized query for checking existence of calls with wb_run_id not null.
 
@@ -2105,10 +2158,11 @@ def _optimized_wb_run_id_not_null_query(
     """
     project_id_param = param_builder.add_param(project_id)
     table_name = get_calls_table_name(read_table)
+    formatted_table = _format_table_name_with_cluster(table_name, cluster_name)
     return f"""
         SELECT count() FROM (
             SELECT {table_name}.id AS id
-            FROM {table_name}
+            FROM {formatted_table}
             WHERE {table_name}.project_id = {param_slot(project_id_param, "String")}
                 AND {table_name}.wb_run_id IS NOT NULL
                 AND {table_name}.deleted_at IS NULL
