@@ -751,6 +751,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             output_refs_param=output_refs_param,
             wb_run_step_end_param=wb_run_step_end_param,
             started_at_param=started_at_param,
+            cluster_name=self.clickhouse_cluster_name,
         )
 
         self.ch_client.command(query, parameters=pb.get_params())

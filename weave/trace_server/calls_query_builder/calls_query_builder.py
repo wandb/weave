@@ -2198,6 +2198,7 @@ def build_calls_complete_update_end_query(
     output_refs_param: str,
     wb_run_step_end_param: str,
     started_at_param: str | None = None,
+    cluster_name: str | None = None,
 ) -> str:
     """Build the calls_complete UPDATE query for call end data.
 
@@ -2214,6 +2215,9 @@ def build_calls_complete_update_end_query(
         started_at_param (str | None): Optional param slot key for started_at
             (Int64 microseconds). When provided, enables more efficient queries
             by utilizing the ClickHouse primary key (project_id, started_at, id).
+        cluster_name (str | None): Optional ClickHouse cluster name for ON CLUSTER
+            clause in distributed mode. When provided, the UPDATE will be executed
+            across all cluster nodes.
 
     Returns:
         str: The formatted ClickHouse UPDATE statement.
@@ -2237,10 +2241,13 @@ def build_calls_complete_update_end_query(
     where_clauses.append(f"id = {{{id_param}:String}}")
     where_clause = " AND ".join(where_clauses)
 
+    # Format table name with ON CLUSTER if cluster_name is provided
+    formatted_table = _format_table_name_with_cluster(table_name, cluster_name)
+
     # Use fromUnixTimestamp64Micro to convert Int64 microseconds to DateTime64(6)
     # This preserves full microsecond precision that would be lost with datetime params
     return f"""
-        UPDATE {table_name}
+        UPDATE {formatted_table}
         SET
             ended_at = fromUnixTimestamp64Micro({{{ended_at_param}:Int64}}, 'UTC'),
             exception = {{{exception_param}:Nullable(String)}},
