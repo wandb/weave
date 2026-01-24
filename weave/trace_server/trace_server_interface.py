@@ -1083,6 +1083,18 @@ class EnsureProjectExistsRes(BaseModel):
     project_name: str
 
 
+class GetProjectIdReq(BaseModelStrict):
+    """Request to get the internal project ID for a project."""
+
+    project_id: str  # External format: entity/project
+
+
+class GetProjectIdRes(BaseModel):
+    """Response containing the internal project ID."""
+
+    internal_project_id: str | None = None  # None if server doesn't support this
+
+
 class CostCreateInput(BaseModelStrict):
     prompt_token_cost: float
     completion_token_cost: float

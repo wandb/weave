@@ -1,22 +1,23 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from types import CoroutineType
 from typing import TYPE_CHECKING, Any, Literal, TypedDict
 
 from pydantic import BaseModel
 
 from weave.trace.object_record import ObjectRecord
-from weave.trace.refs import ObjectRef, Ref, TableRef
+from weave.trace.refs import ObjectRef, OpRef, Ref, TableRef
 from weave.trace.serialization import custom_objs
+from weave.trace_server import refs_internal
 from weave.trace.serialization.dictifiable import try_to_dict
 from weave.trace_server.trace_server_interface import (
     FileContentReadReq,
     FileCreateReq,
     TraceServerInterface,
 )
-from weave.trace_server.trace_server_interface_util import bytes_digest
+from weave.trace_server.client_server_common.digest import bytes_digest
 from weave.utils.sanitize import REDACTED_VALUE, should_redact
 
 if TYPE_CHECKING:
@@ -99,6 +100,126 @@ def to_json(
         elif as_dict := try_to_dict(obj):
             return {
                 k: to_json(v, project_id, client, use_dictify)
+                for k, v in as_dict.items()
+            }
+        return fallback_encode(obj)
+    result = _build_result_from_encoded(encoded, project_id, client)
+    return result
+
+
+InternalProjectIdGetter = "Callable[[str], str]"
+
+
+def _ref_to_internal_uri(
+    ref: Ref,
+    get_internal_project_id: Callable[[str], str],
+) -> str:
+    """Convert a ref to its internal URI format for client-side digest calculation.
+
+    Args:
+        ref: The ref to convert (TableRef, ObjectRef, or OpRef).
+        get_internal_project_id: Callback to get internal project ID from
+            external "entity/project" format.
+
+    Returns:
+        The internal URI string.
+    """
+    if isinstance(ref, TableRef):
+        ext_project = f"{ref.entity}/{ref.project}"
+        internal_pid = get_internal_project_id(ext_project)
+        return f"{refs_internal.WEAVE_INTERNAL_SCHEME}:///{internal_pid}/table/{ref.digest}"
+    elif isinstance(ref, OpRef):
+        ext_project = f"{ref.entity}/{ref.project}"
+        internal_pid = get_internal_project_id(ext_project)
+        u = f"{refs_internal.WEAVE_INTERNAL_SCHEME}:///{internal_pid}/op/{ref.name}:{ref.digest}"
+        if ref.extra:
+            u += "/" + "/".join(refs_internal.extra_value_quoter(e) for e in ref.extra)
+        return u
+    elif isinstance(ref, ObjectRef):
+        ext_project = f"{ref.entity}/{ref.project}"
+        internal_pid = get_internal_project_id(ext_project)
+        u = f"{refs_internal.WEAVE_INTERNAL_SCHEME}:///{internal_pid}/object/{ref.name}:{ref.digest}"
+        if ref.extra:
+            u += "/" + "/".join(refs_internal.extra_value_quoter(e) for e in ref.extra)
+        return u
+    else:
+        raise ValueError(f"Unsupported ref type for internal conversion: {type(ref)}")
+
+
+def to_json_internal(
+    obj: Any,
+    project_id: str,
+    client: WeaveClient,
+    get_internal_project_id: Callable[[str], str],
+    use_dictify: bool = False,
+) -> Any:
+    """Serialize object with refs in weave-trace-internal format.
+
+    This is used for client-side digest calculation, where the client constructs
+    refs using the internal PROJECT_ID format to produce identical digests to
+    the server.
+
+    Args:
+        obj: The object to serialize.
+        project_id: The external project ID (entity/project).
+        client: The WeaveClient instance.
+        get_internal_project_id: Callback to get internal project ID from
+            external "entity/project" format.
+        use_dictify: Whether to use dictify for unknown objects.
+
+    Returns:
+        JSON-serializable representation with internal refs.
+    """
+    if isinstance(obj, TableRef):
+        return _ref_to_internal_uri(obj, get_internal_project_id)
+    elif isinstance(obj, ObjectRef):
+        return _ref_to_internal_uri(obj, get_internal_project_id)
+    elif isinstance(obj, ObjectRecord):
+        res = {"_type": obj._class_name}
+        for k, v in obj.__dict__.items():
+            if k == "ref":
+                if v is not None:
+                    logging.exception(f"Unexpected ref in object record: {obj}")
+                else:
+                    logging.warning(f"Unexpected null ref in object record: {obj}")
+                    continue
+            res[k] = to_json_internal(v, project_id, client, get_internal_project_id, use_dictify)
+        return res
+    elif isinstance_namedtuple(obj):
+        return {
+            k: to_json_internal(v, project_id, client, get_internal_project_id, use_dictify)
+            for k, v in obj._asdict().items()
+        }
+    elif isinstance(obj, (list, tuple)):
+        return [to_json_internal(v, project_id, client, get_internal_project_id, use_dictify) for v in obj]
+    elif isinstance(obj, dict):
+        return {k: to_json_internal(v, project_id, client, get_internal_project_id, use_dictify) for k, v in obj.items()}
+    elif is_pydantic_model_class(obj):
+        return obj.model_json_schema()
+
+    if isinstance(obj, (int, float, str, bool)) or obj is None:
+        return obj
+
+    from weave.flow.scorer import WeaveScorerResult
+
+    if isinstance(obj, WeaveScorerResult):
+        return {
+            k: to_json_internal(v, project_id, client, get_internal_project_id, use_dictify)
+            for k, v in obj.model_dump().items()
+        }
+
+    encoded = custom_objs.encode_custom_obj(obj)
+    if encoded is None:
+        if (
+            use_dictify
+            and not isinstance(obj, ALWAYS_STRINGIFY)
+            and not has_custom_repr(obj)
+        ):
+            return dictify(obj)
+
+        elif as_dict := try_to_dict(obj):
+            return {
+                k: to_json_internal(v, project_id, client, get_internal_project_id, use_dictify)
                 for k, v in as_dict.items()
             }
         return fallback_encode(obj)

@@ -70,7 +70,9 @@ from weave.trace.serialization.serialize import (
     from_json,
     isinstance_namedtuple,
     to_json,
+    to_json_internal,
 )
+from weave.trace_server.client_server_common.digest import str_digest
 from weave.trace.serialization.serializer import get_serializer_for_obj
 from weave.trace.settings import (
     client_parallelism,
@@ -114,6 +116,7 @@ from weave.trace_server.trace_server_interface import (
     FeedbackCreateReq,
     FileCreateReq,
     FileCreateRes,
+    GetProjectIdReq,
     ObjCreateReq,
     ObjCreateRes,
     ObjDeleteReq,
@@ -349,6 +352,63 @@ class WeaveClient:
         if hasattr(self.server, "get_feedback_processor"):
             self._server_feedback_processor = self.server.get_feedback_processor()
         self.send_file_cache = WeaveClientSendFileCache()
+
+        # Cache for internal project IDs (entity/project -> internal_id)
+        # Used for client-side digest calculation with cross-project ref support
+        self._project_id_cache: dict[str, str] = {}
+        # Whether the server supports client-side digest calculation
+        # None = not yet determined, True/False = determined
+        self._use_client_side_digest: bool | None = None
+
+    ################ Internal Project ID Methods ################
+
+    def _get_internal_project_id(self, ext_project_id: str) -> str:
+        """Get internal project_id, fetching from server if not cached.
+
+        Supports cross-project refs by caching multiple project mappings.
+
+        Args:
+            ext_project_id: External project ID in "entity/project" format.
+
+        Returns:
+            The internal project ID.
+
+        Raises:
+            ValueError: If the server does not support client-side digest
+                calculation (returns None for internal_project_id).
+        """
+        if ext_project_id not in self._project_id_cache:
+            resp = self.server.get_project_id(GetProjectIdReq(project_id=ext_project_id))
+            if resp.internal_project_id is None:
+                raise ValueError(
+                    "Server does not support client-side digest calculation"
+                )
+            self._project_id_cache[ext_project_id] = resp.internal_project_id
+        return self._project_id_cache[ext_project_id]
+
+    def _can_use_client_side_digest(self) -> bool:
+        """Check if server supports client-side digest calculation.
+
+        Probes the server on first call and caches the result.
+
+        Returns:
+            True if server supports client-side digest, False otherwise.
+        """
+        if self._use_client_side_digest is None:
+            try:
+                # Try to get project_id for current project
+                ext_project_id = self._project_id()
+                resp = self.server.get_project_id(
+                    GetProjectIdReq(project_id=ext_project_id)
+                )
+                self._use_client_side_digest = resp.internal_project_id is not None
+                if self._use_client_side_digest:
+                    # Cache the result for the current project
+                    self._project_id_cache[ext_project_id] = resp.internal_project_id
+            except Exception:
+                # Old server - endpoint doesn't exist
+                self._use_client_side_digest = False
+        return self._use_client_side_digest
 
     ################ High Level Convenience Methods ################
 
@@ -1633,6 +1693,69 @@ class WeaveClient:
 
         name = sanitize_object_name(name)
 
+        # Try client-side digest if server supports it
+        if self._can_use_client_side_digest():
+            return self._save_object_with_client_digest(orig_val, val, name, branch)
+        else:
+            return self._save_object_with_server_digest(orig_val, val, name, branch)
+
+    def _save_object_with_client_digest(
+        self, orig_val: Any, val: Any, name: str, branch: str
+    ) -> ObjectRef:
+        """Save object with client-side digest calculation.
+
+        Computes the digest locally using internal refs format, enabling
+        fire-and-forget publishing without waiting for server response.
+        """
+        # Serialize with internal refs for identical digest calculation
+        json_val = to_json_internal(
+            val,
+            self._project_id(),
+            self,
+            self._get_internal_project_id,
+        )
+
+        # Compute digest locally - matches server calculation exactly
+        digest = str_digest(json.dumps(json_val))
+
+        # Create ref with known digest (not a Future)
+        ref: Ref
+        if is_op(orig_val):
+            ref = OpRef(self.entity, self.project, name, digest)
+        else:
+            ref = ObjectRef(self.entity, self.project, name, digest)
+
+        # Attach the ref to the object immediately
+        try:
+            set_ref(orig_val, ref)
+        except Exception:
+            # Don't worry if we can't set the ref.
+            # This can happen for primitive types that don't have __dict__
+            pass
+
+        # Fire-and-forget to server - json_val already has internal refs
+        # which the server will accept and validate
+        def send_obj_create() -> ObjCreateRes:
+            req = ObjCreateReq(
+                obj=ObjSchemaForInsert(
+                    project_id=self.entity + "/" + self.project,
+                    object_id=name,
+                    val=json_val,
+                )
+            )
+            return self.server.obj_create(req)
+
+        self.future_executor.defer(send_obj_create)
+        return ref
+
+    def _save_object_with_server_digest(
+        self, orig_val: Any, val: Any, name: str, branch: str
+    ) -> ObjectRef:
+        """Save object with server-side digest calculation (legacy path).
+
+        Used when server doesn't support client-side digest calculation.
+        Returns a ref with a Future for the digest.
+        """
         def send_obj_create() -> ObjCreateRes:
             # `to_json` is mostly fast, except for CustomWeaveTypes
             # which incur network costs to serialize the payload

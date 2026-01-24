@@ -17,24 +17,55 @@ class InvalidInternalRef(ValueError):
     pass
 
 
+def _extract_project_from_internal_ref(ref_str: str) -> str:
+    """Extract the project_id from an internal ref string.
+
+    Args:
+        ref_str: Internal ref in format weave-trace-internal:///project_id/...
+
+    Returns:
+        The project_id.
+
+    Raises:
+        InvalidExternalRef: If the ref format is invalid.
+    """
+    if not ref_str.startswith(weave_internal_prefix):
+        raise InvalidExternalRef(f"Invalid internal ref: {ref_str}")
+    rest = ref_str[len(weave_internal_prefix) :]
+    parts = rest.split("/", 1)
+    if len(parts) < 1 or not parts[0]:
+        raise InvalidExternalRef(f"Invalid internal ref format: {ref_str}")
+    return parts[0]
+
+
 def universal_ext_to_int_ref_converter(
-    obj: A, convert_ext_to_int_project_id: Callable[[str], str]
+    obj: A,
+    convert_ext_to_int_project_id: Callable[[str], str],
+    validate_internal_project_access: Callable[[str], bool] | None = None,
 ) -> A:
     """Takes any object and recursively replaces all external references with
     internal references. The external references are expected to be in the
     format of `weave:///entity/project/...` and the internal references are
     expected to be in the format of `weave-trace-internal:///project_id/...`.
 
+    If validate_internal_project_access is provided, internal refs from the
+    client are accepted if the validation callback returns True for the
+    project_id in the ref. This enables client-side digest calculation.
+
     Args:
         obj: The object to convert.
         convert_ext_to_int_project_id: A function that takes an external
             project ID and returns the internal project ID.
+        validate_internal_project_access: Optional callback to validate that
+            the authenticated user has read access to the project_id in an
+            internal ref. If None, internal refs from clients are rejected.
 
     Returns:
         The object with all external references replaced with internal
         references.
     """
     ext_to_int_project_cache: dict[str, str] = {}
+    validated_project_ids: set[str] = set()
 
     def replace_ref(ref_str: str) -> str:
         if not ref_str.startswith(weave_prefix):
@@ -52,14 +83,33 @@ def universal_ext_to_int_ref_converter(
         internal_project_id = ext_to_int_project_cache[project_key]
         return f"{ri.WEAVE_INTERNAL_SCHEME}:///{internal_project_id}/{tail}"
 
+    def validate_and_pass_internal_ref(ref_str: str) -> str:
+        """Validate and pass through an internal ref from the client."""
+        project_id = _extract_project_from_internal_ref(ref_str)
+
+        # Cache validation results to avoid repeated checks
+        if project_id not in validated_project_ids:
+            if validate_internal_project_access is None:
+                raise InvalidExternalRef(
+                    "Internal refs not allowed from client (server does not support validation)"
+                )
+            if not validate_internal_project_access(project_id):
+                raise InvalidExternalRef(
+                    f"No read access to project in ref: {project_id}"
+                )
+            validated_project_ids.add(project_id)
+
+        return ref_str
+
     def mapper(obj: B) -> B:
         if isinstance(obj, str):
             if obj.startswith(weave_prefix):
                 return cast(B, replace_ref(obj))
             elif obj.startswith(weave_internal_prefix):
-                # It is important to raise here as this would be the result of
-                # an external client attempting to write internal refs directly.
-                # We want to maintain full control over the internal refs.
+                # Client is sending internal refs directly - validate access
+                if validate_internal_project_access is not None:
+                    return cast(B, validate_and_pass_internal_ref(obj))
+                # No validation callback - reject internal refs (legacy behavior)
                 raise InvalidExternalRef("Encountered unexpected ref format.")
         return obj
 

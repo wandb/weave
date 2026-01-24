@@ -1,7 +1,6 @@
 # Sqlite Trace Server
 
 import datetime
-import hashlib
 import json
 import sqlite3
 import threading
@@ -57,6 +56,7 @@ from weave.trace_server.trace_server_interface_util import (
     bytes_digest,
     extract_refs_from_values,
     str_digest,
+    table_digest_from_row_digests,
 )
 from weave.trace_server.validation import object_id_validator
 from weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker import (
@@ -1042,11 +1042,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             )
 
             row_digests = [r[1] for r in insert_rows]
-
-            table_hasher = hashlib.sha256()
-            for row_digest in row_digests:
-                table_hasher.update(row_digest.encode())
-            digest = table_hasher.hexdigest()
+            digest = table_digest_from_row_digests(row_digests)
 
             cursor.execute(
                 "INSERT OR IGNORE INTO tables (project_id, digest, row_digests) VALUES (?, ?, ?)",
@@ -1061,12 +1057,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
     ) -> tsi.TableCreateFromDigestsRes:
         """Create a table by specifying row digests, instead actual rows."""
         conn, cursor = get_conn_cursor(self.db_path)
-
-        # Calculate table digest from row digests
-        table_hasher = hashlib.sha256()
-        for row_digest in req.row_digests:
-            table_hasher.update(row_digest.encode())
-        digest = table_hasher.hexdigest()
+        digest = table_digest_from_row_digests(req.row_digests)
 
         with self.lock:
             cursor.execute(
@@ -1138,10 +1129,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 new_rows_needed_to_insert,
             )
 
-            table_hasher = hashlib.sha256()
-            for row_digest in final_row_digests:
-                table_hasher.update(row_digest.encode())
-            digest = table_hasher.hexdigest()
+            digest = table_digest_from_row_digests(final_row_digests)
 
             cursor.execute(
                 "INSERT OR IGNORE INTO tables (project_id, digest, row_digests) VALUES (?, ?, ?)",

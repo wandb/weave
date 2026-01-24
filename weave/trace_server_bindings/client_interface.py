@@ -24,3 +24,9 @@ class TraceServerClientInterface(FullTraceServerInterface, Protocol):
     def ensure_project_exists(
         self, entity: str, project: str
     ) -> tsi.EnsureProjectExistsRes: ...
+    def get_project_id(self, req: tsi.GetProjectIdReq) -> tsi.GetProjectIdRes:
+        """Get the internal project ID for a project.
+
+        Returns None for internal_project_id if not supported (older servers).
+        """
+        ...
