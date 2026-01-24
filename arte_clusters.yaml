@@ -1,0 +1,39 @@
+name: demo-project-qwen-email-agent-with-art-weave-models Trace Clusters
+weave_project: demo-project-qwen-email-agent-with-art-weave-models
+weave_entity: wandb
+last_clustering: '2025-12-15'
+trace_list: https://wandb.ai/wandb/demo-project-qwen-email-agent-with-art-weave-models/weave/traces?filters={%22items%22:[{%22field%22:%22wb_run_id%22,%22operator%22:%22(string):%20equals%22,%22value%22:%22UHJvamVjdEludGVybmFsSWQ6NDMxMjY0Njg=:7zzpju4g%22}]}&cols={%22wb_run_id%22:true}
+clusters:
+- cluster_name: incorrect_output_generation
+  cluster_definition: The agent produced a final answer that is factually incorrect,
+    incomplete, contains extraneous details, or otherwise does not fully meet the
+    user's request, even if some relevant information was retrieved.
+  sample_traces:
+  - https://wandb.ai/wandb/demo-project-qwen-email-agent-with-art-weave-models/weave/calls/019add5e-87a4-7b16-90af-d7fdadd72039
+  - https://wandb.ai/wandb/demo-project-qwen-email-agent-with-art-weave-models/weave/calls/019add4d-0e24-78db-acaf-bade91b240cc
+  - https://wandb.ai/wandb/demo-project-qwen-email-agent-with-art-weave-models/weave/calls/019add48-e967-7f49-a14a-6c6d8db3a69f
+- cluster_name: evaluation_system_mismatch
+  cluster_definition: Discrepancies exist between automated evaluation metrics and
+    human expert judgment, indicating a potential issue with the evaluation system's
+    accuracy rather than the agent's actual performance.
+  sample_traces:
+  - https://wandb.ai/wandb/demo-project-qwen-email-agent-with-art-weave-models/weave/calls/019add5e-87a4-7b16-90af-d7fdadd72039
+  - https://wandb.ai/wandb/demo-project-qwen-email-agent-with-art-weave-models/weave/calls/019add19-919e-7f4d-8705-9caf75b98c52
+  - https://wandb.ai/wandb/demo-project-qwen-email-agent-with-art-weave-models/weave/calls/019add15-c790-7eb4-85c7-97bbaa4f6080
+- cluster_name: information_retrieval_failure
+  cluster_definition: The agent failed to successfully locate or extract the necessary
+    information from available data sources, often due to ineffective search parameters,
+    empty results, or a general inability to find relevant content.
+  sample_traces:
+  - https://wandb.ai/wandb/demo-project-qwen-email-agent-with-art-weave-models/weave/calls/019add5e-87a4-7b16-90af-d7fdadd72039
+  - https://wandb.ai/wandb/demo-project-qwen-email-agent-with-art-weave-models/weave/calls/019add32-31ea-75e7-bbf6-5d0e2aa3ec1d
+  - https://wandb.ai/wandb/demo-project-qwen-email-agent-with-art-weave-models/weave/calls/019add19-919e-7f4d-8705-9caf75b98c52
+- cluster_name: suboptimal_tool_orchestration
+  cluster_definition: The agent utilized its available tools or processed retrieved
+    information in an inefficient, redundant, or illogical sequence, leading to unnecessary
+    steps, incomplete exploration of sources, or a failure to make progress towards
+    the goal.
+  sample_traces:
+  - https://wandb.ai/wandb/demo-project-qwen-email-agent-with-art-weave-models/weave/calls/019add4d-0e24-78db-acaf-bade91b240cc
+  - https://wandb.ai/wandb/demo-project-qwen-email-agent-with-art-weave-models/weave/calls/019add19-919e-7f4d-8705-9caf75b98c52
+  - https://wandb.ai/wandb/demo-project-qwen-email-agent-with-art-weave-models/weave/calls/019adcba-0fa5-73b2-bd87-3a4ce100f696

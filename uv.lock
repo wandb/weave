@@ -14214,6 +14214,12 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
+analytics = [
+    { name = "litellm", version = "1.60.2", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.14' and platform_python_implementation == 'CPython' and extra == 'extra-5-weave-crewai') or (python_full_version >= '3.14' and extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-dspy') or (python_full_version >= '3.14' and extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-instructor') or (python_full_version >= '3.14' and extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-langchain') or (python_full_version >= '3.14' and extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-scorers') or (platform_python_implementation != 'CPython' and extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-dspy') or (platform_python_implementation != 'CPython' and extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-instructor') or (platform_python_implementation != 'CPython' and extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-langchain') or (platform_python_implementation != 'CPython' and extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-scorers') or (platform_python_implementation != 'CPython' and extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai') or (extra != 'extra-5-weave-crewai' and extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
+    { name = "litellm", version = "1.80.0", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.14' and platform_python_implementation == 'CPython') or (python_full_version < '3.14' and extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-dspy') or (python_full_version < '3.14' and extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-instructor') or (python_full_version < '3.14' and extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-langchain') or (python_full_version < '3.14' and extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-scorers') or (platform_python_implementation == 'CPython' and extra != 'extra-5-weave-crewai') or (platform_python_implementation != 'CPython' and extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-dspy') or (platform_python_implementation != 'CPython' and extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-instructor') or (platform_python_implementation != 'CPython' and extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-langchain') or (platform_python_implementation != 'CPython' and extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-scorers') or (platform_python_implementation != 'CPython' and extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
+    { name = "requests", marker = "platform_python_implementation == 'CPython' or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-dspy') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-instructor') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-langchain') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-scorers') or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
+    { name = "rich", marker = "platform_python_implementation == 'CPython' or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-dspy') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-instructor') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-langchain') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-scorers') or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
+]
 anthropic = [
     { name = "anthropic", marker = "platform_python_implementation == 'CPython' or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-dspy') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-instructor') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-langchain') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-scorers') or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
 ]
@@ -14469,6 +14475,7 @@ requires-dist = [
     { name = "langchain-openai", marker = "python_full_version >= '3.10' and extra == 'langchain'", specifier = ">=0.1.7" },
     { name = "levenshtein", marker = "extra == 'scorers'", specifier = ">=0.26.0" },
     { name = "litellm", marker = "python_full_version >= '3.10' and extra == 'smolagents'", specifier = ">=1.58" },
+    { name = "litellm", marker = "extra == 'analytics'", specifier = ">=1.36.1" },
     { name = "litellm", marker = "extra == 'litellm'", specifier = ">=1.36.1" },
     { name = "litellm", marker = "extra == 'scorers'", specifier = ">=1.58" },
     { name = "litellm", marker = "extra == 'trace-server'", specifier = ">=1.36.1" },
@@ -14504,6 +14511,8 @@ requires-dist = [
     { name = "pydantic", specifier = ">=2.0.0" },
     { name = "pysqlite3", marker = "python_full_version >= '3.10' and sys_platform == 'linux' and extra == 'langchain'" },
     { name = "python-dotenv", marker = "extra == 'modal'" },
+    { name = "requests", marker = "extra == 'analytics'", specifier = ">=2.31.0" },
+    { name = "rich", marker = "extra == 'analytics'", specifier = ">=13.0.0" },
     { name = "rich", marker = "extra == 'rich'" },
     { name = "scikit-learn", marker = "extra == 'scorers'", specifier = ">=1.5.2" },
     { name = "sentence-transformers", marker = "extra == 'scorers'", specifier = ">=3.3.1" },
@@ -14522,7 +14531,7 @@ requires-dist = [
     { name = "wandb", specifier = ">=0.17.1" },
     { name = "wandb", marker = "extra == 'wandb'", specifier = ">=0.17.1" },
 ]
-provides-extras = ["anthropic", "autogen", "bedrock", "cerebras", "cohere", "crewai", "dspy", "google-genai", "groq", "huggingface", "instructor", "langchain", "langchain-nvidia-ai-endpoints", "litellm", "llamaindex", "mcp", "mistral", "modal", "notdiamond", "openai", "openai-agents", "presidio", "rich", "scorers", "smolagents", "trace-server", "verdict", "verifiers", "vertexai", "video-support", "wandb"]
+provides-extras = ["analytics", "anthropic", "autogen", "bedrock", "cerebras", "cohere", "crewai", "dspy", "google-genai", "groq", "huggingface", "instructor", "langchain", "langchain-nvidia-ai-endpoints", "litellm", "llamaindex", "mcp", "mistral", "modal", "notdiamond", "openai", "openai-agents", "presidio", "rich", "scorers", "smolagents", "trace-server", "verdict", "verifiers", "vertexai", "video-support", "wandb"]
 
 [package.metadata.requires-dev]
 autogen-tests = [
