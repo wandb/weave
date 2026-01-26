@@ -1094,3 +1094,130 @@ def test_v1_call_end_raises_calls_complete_mode_required(
 
     # Verify error contains helpful information
     assert "complete" in str(exc_info.value).lower()
+
+
+def test_calls_complete_query_with_status_filter(trace_server, clickhouse_trace_server):
+    """Test that filtering by summary.weave.status works on calls_complete table."""
+    project_id = f"{TEST_ENTITY}/calls_complete_status_filter"
+    internal_project_id = b64(project_id)
+
+    # Create calls with different statuses:
+    # 1. A successful call (has ended_at, no exception)
+    success_call = _make_completed_call(
+        project_id,
+        str(uuid.uuid4()),
+        str(uuid.uuid4()),
+        datetime.datetime.now(datetime.timezone.utc),
+        datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=1),
+    )
+
+    # 2. An error call (has exception)
+    error_call_id = str(uuid.uuid4())
+    error_call = tsi.CompletedCallSchemaForInsert(
+        project_id=project_id,
+        id=error_call_id,
+        trace_id=str(uuid.uuid4()),
+        op_name="error_op",
+        started_at=datetime.datetime.now(datetime.timezone.utc),
+        ended_at=datetime.datetime.now(datetime.timezone.utc)
+        + datetime.timedelta(seconds=1),
+        attributes={},
+        inputs={},
+        output=None,
+        exception="TestException: Something went wrong",
+        summary={"usage": {}, "status_counts": {}},
+    )
+
+    trace_server.calls_complete(
+        tsi.CallsUpsertCompleteReq(batch=[success_call, error_call])
+    )
+
+    # Verify we're reading from calls_complete
+    read_table = clickhouse_trace_server.table_routing_resolver.resolve_read_table(
+        internal_project_id,
+        clickhouse_trace_server.ch_client,
+    )
+    assert read_table == ReadTable.CALLS_COMPLETE
+
+    # Test filtering by status - this is the query that was failing with ILLEGAL_AGGREGATION
+    # Filter for error status
+    error_calls = list(
+        trace_server.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=project_id,
+                query={
+                    "$expr": {
+                        "$eq": [
+                            {"$getField": "summary.weave.status"},
+                            {"$literal": "error"},
+                        ]
+                    }
+                },
+            )
+        )
+    )
+    assert len(error_calls) == 1
+    assert error_calls[0].id == error_call_id
+    assert error_calls[0].exception is not None
+
+    # Filter for success status
+    success_calls = list(
+        trace_server.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=project_id,
+                query={
+                    "$expr": {
+                        "$eq": [
+                            {"$getField": "summary.weave.status"},
+                            {"$literal": "success"},
+                        ]
+                    }
+                },
+            )
+        )
+    )
+    assert len(success_calls) == 1
+    assert success_calls[0].id == success_call.id
+    assert success_calls[0].exception is None
+
+    # Test sorting by status (also exercises the status field generation)
+    sorted_calls = list(
+        trace_server.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=project_id,
+                sort_by=[{"field": "summary.weave.status", "direction": "asc"}],
+            )
+        )
+    )
+    assert len(sorted_calls) == 2
+    # Error sorts before success alphabetically
+    assert sorted_calls[0].id == error_call_id
+    assert sorted_calls[1].id == success_call.id
+
+    # Test filtering with OR condition (multiple status values)
+    all_status_calls = list(
+        trace_server.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=project_id,
+                query={
+                    "$expr": {
+                        "$or": [
+                            {
+                                "$eq": [
+                                    {"$getField": "summary.weave.status"},
+                                    {"$literal": "success"},
+                                ]
+                            },
+                            {
+                                "$eq": [
+                                    {"$getField": "summary.weave.status"},
+                                    {"$literal": "error"},
+                                ]
+                            },
+                        ]
+                    }
+                },
+            )
+        )
+    )
+    assert len(all_status_calls) == 2
