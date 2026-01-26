@@ -1419,6 +1419,19 @@ def get_field_by_name(name: str) -> CallsMergedField:
     return ALLOWED_CALL_FIELDS[name]
 
 
+def _field_as_sql_maybe_agg(
+    field: CallsMergedField,
+    pb: ParamBuilder,
+    table_alias: str,
+    use_agg_fn: bool = True,
+    cast: tsi_query.CastTo | None = None,
+) -> str:
+    """Convert a field to SQL, passing use_agg_fn if the field supports it."""
+    if isinstance(field, CallsMergedAggField):
+        return field.as_sql(pb, table_alias, cast=cast, use_agg_fn=use_agg_fn)
+    return field.as_sql(pb, table_alias, cast=cast)
+
+
 # Handler function for status summary field
 def _handle_status_summary_field(
     pb: ParamBuilder, table_alias: str, use_agg_fn: bool = True
@@ -1431,23 +1444,13 @@ def _handle_status_summary_field(
     ended_at_field = get_field_by_name("ended_at")
     status_counts_field = get_field_by_name("summary.status_counts.error")
 
-    # These fields support use_agg_fn parameter
-    if isinstance(exception_field, CallsMergedAggField):
-        exception_sql = exception_field.as_sql(pb, table_alias, use_agg_fn=use_agg_fn)
-    else:
-        exception_sql = exception_field.as_sql(pb, table_alias)
-
-    if isinstance(ended_at_field, CallsMergedAggField):
-        ended_to_sql = ended_at_field.as_sql(pb, table_alias, use_agg_fn=use_agg_fn)
-    else:
-        ended_to_sql = ended_at_field.as_sql(pb, table_alias)
-
-    if isinstance(status_counts_field, CallsMergedDynamicField):
-        status_counts_sql = status_counts_field.as_sql(
-            pb, table_alias, cast="int", use_agg_fn=use_agg_fn
-        )
-    else:
-        status_counts_sql = status_counts_field.as_sql(pb, table_alias, cast="int")
+    exception_sql = _field_as_sql_maybe_agg(
+        exception_field, pb, table_alias, use_agg_fn
+    )
+    ended_to_sql = _field_as_sql_maybe_agg(ended_at_field, pb, table_alias, use_agg_fn)
+    status_counts_sql = _field_as_sql_maybe_agg(
+        status_counts_field, pb, table_alias, use_agg_fn, cast="int"
+    )
 
     error_param = pb.add_param(tsi.TraceStatus.ERROR.value)
     running_param = pb.add_param(tsi.TraceStatus.RUNNING.value)
@@ -1472,15 +1475,10 @@ def _handle_latency_ms_summary_field(
     started_at_field = get_field_by_name("started_at")
     ended_at_field = get_field_by_name("ended_at")
 
-    if isinstance(started_at_field, CallsMergedAggField):
-        started_at_sql = started_at_field.as_sql(pb, table_alias, use_agg_fn=use_agg_fn)
-    else:
-        started_at_sql = started_at_field.as_sql(pb, table_alias)
-
-    if isinstance(ended_at_field, CallsMergedAggField):
-        ended_at_sql = ended_at_field.as_sql(pb, table_alias, use_agg_fn=use_agg_fn)
-    else:
-        ended_at_sql = ended_at_field.as_sql(pb, table_alias)
+    started_at_sql = _field_as_sql_maybe_agg(
+        started_at_field, pb, table_alias, use_agg_fn
+    )
+    ended_at_sql = _field_as_sql_maybe_agg(ended_at_field, pb, table_alias, use_agg_fn)
 
     # Convert time difference to milliseconds
     # Use toUnixTimestamp64Milli for direct and precise millisecond difference
@@ -1503,17 +1501,10 @@ def _handle_trace_name_summary_field(
     display_name_field = get_field_by_name("display_name")
     op_name_field = get_field_by_name("op_name")
 
-    if isinstance(display_name_field, CallsMergedAggField):
-        display_name_sql = display_name_field.as_sql(
-            pb, table_alias, use_agg_fn=use_agg_fn
-        )
-    else:
-        display_name_sql = display_name_field.as_sql(pb, table_alias)
-
-    if isinstance(op_name_field, CallsMergedAggField):
-        op_name_sql = op_name_field.as_sql(pb, table_alias, use_agg_fn=use_agg_fn)
-    else:
-        op_name_sql = op_name_field.as_sql(pb, table_alias)
+    display_name_sql = _field_as_sql_maybe_agg(
+        display_name_field, pb, table_alias, use_agg_fn
+    )
+    op_name_sql = _field_as_sql_maybe_agg(op_name_field, pb, table_alias, use_agg_fn)
 
     return f"""CASE
         WHEN {display_name_sql} IS NOT NULL AND {display_name_sql} != '' THEN {display_name_sql}
