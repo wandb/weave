@@ -42,6 +42,14 @@ from weave.trace_server.base64_content_conversion import (
     process_call_req_to_content,
     process_complete_call_to_content,
 )
+from weave.trace_server.call_stats_helpers import (
+    rows_to_bucket_dicts,
+    split_usage_metrics,
+    validate_call_stats_range,
+)
+from weave.trace_server.calls_query_builder.call_metrics_query_builder import (
+    build_call_metrics_query,
+)
 from weave.trace_server.calls_query_builder.calls_query_builder import (
     CallsQuery,
     HardCodedFilter,
@@ -51,6 +59,9 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     build_calls_complete_update_end_query,
     build_calls_stats_query,
     combine_conditions,
+)
+from weave.trace_server.calls_query_builder.usage_query_builder import (
+    build_usage_query,
 )
 from weave.trace_server.clickhouse_schema import (
     ALL_CALL_COMPLETE_INSERT_COLUMNS,
@@ -164,6 +175,7 @@ from weave.trace_server.table_query_builder import (
 from weave.trace_server.threads_query_builder import make_threads_query
 from weave.trace_server.token_costs import (
     LLM_TOKEN_PRICES_TABLE,
+    build_model_prices_query,
     validate_cost_purge_req,
 )
 from weave.trace_server.trace_server_common import (
@@ -801,6 +813,130 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         return tsi.CallsQueryStatsRes(
             count=res_dict.get("count", 0),
             total_storage_size_bytes=res_dict.get("total_storage_size_bytes"),
+        )
+
+    def _get_prices_for_models(
+        self, models: set[str], project_id: str
+    ) -> dict[str, dict[str, float]]:
+        """Query llm_token_prices for the given models and return best prices.
+
+        Returns a dict mapping model -> {prompt_token_cost, completion_token_cost}.
+        Uses pricing level priority: project > default, newest effective_date.
+        """
+        if not models:
+            return {}
+
+        try:
+            sql, params = build_model_prices_query(project_id, list(models))
+            result = self._query(sql, params)
+        except Exception:
+            # If price query fails, return empty prices (costs will be 0)
+            return {}
+
+        prices: dict[str, dict[str, float]] = {}
+        for row in result.result_rows:
+            llm_id, prompt_cost, completion_cost = row
+            prices[llm_id] = {
+                "prompt_token_cost": float(prompt_cost) if prompt_cost else 0.0,
+                "completion_token_cost": float(completion_cost)
+                if completion_cost
+                else 0.0,
+            }
+        return prices
+
+    def _compute_costs_for_buckets(
+        self,
+        usage_buckets: list[dict[str, Any]],
+        project_id: str,
+        requested_cost_metrics: set[str],
+    ) -> None:
+        """Compute cost metrics for usage buckets by multiplying tokens by prices.
+
+        Args:
+            usage_buckets: Buckets with token counts (modified in place).
+            project_id: Project ID for pricing lookup.
+            requested_cost_metrics: Set of cost metrics to compute (input_cost, output_cost, total_cost).
+        """
+        if not requested_cost_metrics or not usage_buckets:
+            return
+
+        # Get unique models from buckets
+        models = {b.get("model", "") for b in usage_buckets if b.get("model")}
+
+        # Query prices for those models
+        prices = self._get_prices_for_models(models, project_id)
+
+        # Compute costs for each bucket
+        for bucket in usage_buckets:
+            model = bucket.get("model", "")
+            model_prices = prices.get(model, {})
+            prompt_cost = model_prices.get("prompt_token_cost", 0.0)
+            completion_cost = model_prices.get("completion_token_cost", 0.0)
+
+            input_tokens = bucket.get("sum_input_tokens", 0) or 0
+            output_tokens = bucket.get("sum_output_tokens", 0) or 0
+
+            if "input_cost" in requested_cost_metrics:
+                bucket["sum_input_cost"] = input_tokens * prompt_cost
+
+            if "output_cost" in requested_cost_metrics:
+                bucket["sum_output_cost"] = output_tokens * completion_cost
+
+            if "total_cost" in requested_cost_metrics:
+                input_cost = bucket.get("sum_input_cost", input_tokens * prompt_cost)
+                output_cost = bucket.get(
+                    "sum_output_cost", output_tokens * completion_cost
+                )
+                bucket["sum_total_cost"] = input_cost + output_cost
+
+    def call_stats(self, req: tsi.CallStatsReq) -> tsi.CallStatsRes:
+        """Return call statistics grouped by bucket with requested aggregations.
+
+        Usage metrics (tokens, cost) are grouped by model.
+        Call metrics (latency, counts) are not grouped by model.
+
+        Cost metrics are computed post-query by multiplying token counts by prices.
+        """
+        usage_buckets: list[dict[str, Any]] = []
+        call_buckets: list[dict[str, Any]] = []
+        granularity = 0
+        start = req.start
+        end = req.end or datetime.datetime.now(datetime.timezone.utc)
+        validate_call_stats_range(start, end)
+
+        token_metrics, requested_cost_metrics = split_usage_metrics(req.usage_metrics)
+
+        # Process token metrics (grouped by model)
+        if token_metrics:
+            pb = ParamBuilder()
+            sql, columns, parameters, granularity, start, end = build_usage_query(
+                req, token_metrics, pb
+            )
+            query_result = self._query(sql, parameters)
+            usage_buckets = rows_to_bucket_dicts(columns, query_result.result_rows)
+
+        # Compute costs post-query if cost metrics were requested
+        if requested_cost_metrics and usage_buckets:
+            self._compute_costs_for_buckets(
+                usage_buckets, req.project_id, requested_cost_metrics
+            )
+
+        # Process call metrics (not grouped by model)
+        if req.call_metrics:
+            pb = ParamBuilder()
+            sql, columns, parameters, granularity, start, end = (
+                build_call_metrics_query(req, req.call_metrics, pb)
+            )
+            query_result = self._query(sql, parameters)
+            call_buckets = rows_to_bucket_dicts(columns, query_result.result_rows)
+
+        return tsi.CallStatsRes(
+            start=start,
+            end=end,
+            granularity=granularity,
+            timezone=req.timezone or "UTC",
+            usage_buckets=usage_buckets,
+            call_buckets=call_buckets,
         )
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.calls_query_stream")
@@ -5540,6 +5676,45 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 self._insert_call_complete_batch([row])
         finally:
             self._calls_complete_batch = []
+
+    @ddtrace.tracer.wrap(
+        name="clickhouse_trace_server_batched._analyze_call_batch_breakdown"
+    )
+    def _analyze_call_batch_breakdown(self) -> None:
+        """Analyze the batch to count calls with starts but no ends"""
+        if not self._call_batch:
+            return
+
+        try:
+            id_idx = ALL_CALL_INSERT_COLUMNS.index("id")
+            started_at_idx = ALL_CALL_INSERT_COLUMNS.index("started_at")
+            ended_at_idx = ALL_CALL_INSERT_COLUMNS.index("ended_at")
+
+            started_call_ids: set[str] = set()
+            ended_call_ids: set[str] = set()
+
+            for row in self._call_batch:
+                call_id = row[id_idx]
+                started_at = row[started_at_idx]
+                ended_at = row[ended_at_idx]
+
+                if started_at is not None:
+                    started_call_ids.add(call_id)
+                if ended_at is not None:
+                    ended_call_ids.add(call_id)
+
+            unmatched_starts = started_call_ids - ended_call_ids
+
+            set_current_span_dd_tags(
+                {
+                    "weave_trace_server._flush_calls.unmatched_starts": len(
+                        unmatched_starts
+                    ),
+                }
+            )
+        except Exception:
+            # Under no circumstances should we block ingest with an error
+            pass
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._strip_large_values")
     def _strip_large_values(self, batch: list[list[Any]]) -> list[list[Any]]:
