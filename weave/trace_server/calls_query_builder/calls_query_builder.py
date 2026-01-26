@@ -186,11 +186,12 @@ class CallsMergedSummaryField(CallsMergedField):
         pb: ParamBuilder,
         table_alias: str,
         cast: tsi_query.CastTo | None = None,
+        use_agg_fn: bool = True,
     ) -> str:
         # Look up handler for the requested summary field
         handler = get_summary_field_handler(self.summary_field)
         if handler:
-            sql = handler(pb, table_alias)
+            sql = handler(pb, table_alias, use_agg_fn)
             return clickhouse_cast(sql, cast)
         else:
             supported_fields = ", ".join(SUMMARY_FIELD_HANDLERS.keys())
@@ -202,7 +203,7 @@ class CallsMergedSummaryField(CallsMergedField):
     def as_select_sql(
         self, pb: ParamBuilder, table_alias: str, use_agg_fn: bool = True
     ) -> str:
-        return f"{self.as_sql(pb, table_alias)} AS {self.field}"
+        return f"{self.as_sql(pb, table_alias, use_agg_fn=use_agg_fn)} AS {self.field}"
 
     def is_heavy(self) -> bool:
         # These are computed from non-heavy fields (status uses exception and ended_at)
@@ -1419,16 +1420,34 @@ def get_field_by_name(name: str) -> CallsMergedField:
 
 
 # Handler function for status summary field
-def _handle_status_summary_field(pb: ParamBuilder, table_alias: str) -> str:
+def _handle_status_summary_field(
+    pb: ParamBuilder, table_alias: str, use_agg_fn: bool = True
+) -> str:
     # Status logic:
     # - If exception is not null -> ERROR
     # - Else if ended_at is null -> RUNNING
     # - Else -> SUCCESS
-    exception_sql = get_field_by_name("exception").as_sql(pb, table_alias)
-    ended_to_sql = get_field_by_name("ended_at").as_sql(pb, table_alias)
-    status_counts_sql = get_field_by_name("summary.status_counts.error").as_sql(
-        pb, table_alias, cast="int"
-    )
+    exception_field = get_field_by_name("exception")
+    ended_at_field = get_field_by_name("ended_at")
+    status_counts_field = get_field_by_name("summary.status_counts.error")
+
+    # These fields support use_agg_fn parameter
+    if isinstance(exception_field, CallsMergedAggField):
+        exception_sql = exception_field.as_sql(pb, table_alias, use_agg_fn=use_agg_fn)
+    else:
+        exception_sql = exception_field.as_sql(pb, table_alias)
+
+    if isinstance(ended_at_field, CallsMergedAggField):
+        ended_to_sql = ended_at_field.as_sql(pb, table_alias, use_agg_fn=use_agg_fn)
+    else:
+        ended_to_sql = ended_at_field.as_sql(pb, table_alias)
+
+    if isinstance(status_counts_field, CallsMergedDynamicField):
+        status_counts_sql = status_counts_field.as_sql(
+            pb, table_alias, cast="int", use_agg_fn=use_agg_fn
+        )
+    else:
+        status_counts_sql = status_counts_field.as_sql(pb, table_alias, cast="int")
 
     error_param = pb.add_param(tsi.TraceStatus.ERROR.value)
     running_param = pb.add_param(tsi.TraceStatus.RUNNING.value)
@@ -1444,12 +1463,24 @@ def _handle_status_summary_field(pb: ParamBuilder, table_alias: str) -> str:
 
 
 # Handler function for latency_ms summary field
-def _handle_latency_ms_summary_field(pb: ParamBuilder, table_alias: str) -> str:
+def _handle_latency_ms_summary_field(
+    pb: ParamBuilder, table_alias: str, use_agg_fn: bool = True
+) -> str:
     # Latency_ms logic:
     # - If ended_at is null or there's an exception, return null
     # - Otherwise calculate milliseconds between started_at and ended_at
-    started_at_sql = get_field_by_name("started_at").as_sql(pb, table_alias)
-    ended_at_sql = get_field_by_name("ended_at").as_sql(pb, table_alias)
+    started_at_field = get_field_by_name("started_at")
+    ended_at_field = get_field_by_name("ended_at")
+
+    if isinstance(started_at_field, CallsMergedAggField):
+        started_at_sql = started_at_field.as_sql(pb, table_alias, use_agg_fn=use_agg_fn)
+    else:
+        started_at_sql = started_at_field.as_sql(pb, table_alias)
+
+    if isinstance(ended_at_field, CallsMergedAggField):
+        ended_at_sql = ended_at_field.as_sql(pb, table_alias, use_agg_fn=use_agg_fn)
+    else:
+        ended_at_sql = ended_at_field.as_sql(pb, table_alias)
 
     # Convert time difference to milliseconds
     # Use toUnixTimestamp64Milli for direct and precise millisecond difference
@@ -1462,14 +1493,27 @@ def _handle_latency_ms_summary_field(pb: ParamBuilder, table_alias: str) -> str:
 
 
 # Handler function for trace_name summary field
-def _handle_trace_name_summary_field(pb: ParamBuilder, table_alias: str) -> str:
+def _handle_trace_name_summary_field(
+    pb: ParamBuilder, table_alias: str, use_agg_fn: bool = True
+) -> str:
     # Trace_name logic:
     # - If display_name is available, use that
     # - Else if op_name starts with 'weave-trace-internal:///', extract the name using regex
     # - Otherwise, just use op_name directly
+    display_name_field = get_field_by_name("display_name")
+    op_name_field = get_field_by_name("op_name")
 
-    display_name_sql = get_field_by_name("display_name").as_sql(pb, table_alias)
-    op_name_sql = get_field_by_name("op_name").as_sql(pb, table_alias)
+    if isinstance(display_name_field, CallsMergedAggField):
+        display_name_sql = display_name_field.as_sql(
+            pb, table_alias, use_agg_fn=use_agg_fn
+        )
+    else:
+        display_name_sql = display_name_field.as_sql(pb, table_alias)
+
+    if isinstance(op_name_field, CallsMergedAggField):
+        op_name_sql = op_name_field.as_sql(pb, table_alias, use_agg_fn=use_agg_fn)
+    else:
+        op_name_sql = op_name_field.as_sql(pb, table_alias)
 
     return f"""CASE
         WHEN {display_name_sql} IS NOT NULL AND {display_name_sql} != '' THEN {display_name_sql}
@@ -1490,7 +1534,7 @@ SUMMARY_FIELD_HANDLERS = {
 # Helper function to get a summary field handler by name
 def get_summary_field_handler(
     summary_field: str,
-) -> Callable[[ParamBuilder, str], str] | None:
+) -> Callable[[ParamBuilder, str, bool], str] | None:
     """Returns the handler function for a given summary field name."""
     return SUMMARY_FIELD_HANDLERS.get(summary_field)
 
@@ -1583,6 +1627,7 @@ def process_query_to_conditions(
                     CallsMergedDynamicField,
                     CallsMergedAggField,
                     CallsMergedFeedbackPayloadField,
+                    CallsMergedSummaryField,
                 ),
             ):
                 field = structured_field.as_sql(
