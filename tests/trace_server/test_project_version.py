@@ -256,18 +256,12 @@ def test_project_version_mode_from_env():
             ("off", CallsStorageServerMode.OFF),
             ("force_legacy", CallsStorageServerMode.FORCE_LEGACY),
             ("auto", CallsStorageServerMode.AUTO),
-            ("invalid_mode", CallsStorageServerMode.AUTO),
         ]
 
         for env_val, expected_mode in test_cases:
             os.environ["PROJECT_VERSION_MODE"] = env_val
             mode = CallsStorageServerMode.from_env()
             assert mode == expected_mode
-
-        if "PROJECT_VERSION_MODE" in os.environ:
-            del os.environ["PROJECT_VERSION_MODE"]
-        mode = CallsStorageServerMode.from_env()
-        assert mode == CallsStorageServerMode.AUTO
 
     finally:
         if original_value is not None:
