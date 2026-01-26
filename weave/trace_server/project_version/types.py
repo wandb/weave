@@ -7,7 +7,7 @@ from enum import Enum
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_SERVER_MODE = "auto"
+DEFAULT_SERVER_MODE = "force_legacy"
 
 # Project Version Routing Matrix
 # ==============================
