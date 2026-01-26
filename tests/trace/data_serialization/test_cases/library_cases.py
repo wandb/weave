@@ -72,11 +72,16 @@ def evaluation_equality_check(a, b):
     return True
 
 
+# Runtime serialization produces version-dependent digest (for non-legacy tests)
 llm_as_a_judge_scorer_digest = (
     "t7mpggmkUX0XDd9gi2K2J01r657NtnfGlnc0cb8hScs"
     if sys.version_info.major >= 3 and sys.version_info.minor >= 13
     else "hhCGYF6e9ybgkNGlFyXNxwAYArvjeCDXtEFUkcvgK3c"
 )
+
+# Legacy exp_val always produces this digest regardless of Python version (for legacy tests)
+# This is because the exp_val was captured from Python < 3.13 serialization
+llm_as_a_judge_scorer_legacy_digest = "hhCGYF6e9ybgkNGlFyXNxwAYArvjeCDXtEFUkcvgK3c"
 
 library_cases = [
     SerializationTestCase(
@@ -291,6 +296,7 @@ library_cases = [
         python_version_code_capture=(3, 13),
     ),
     # Legacy v3: Preserves backward compatibility for data written before eager_call_start was added
+    # Uses llm_as_a_judge_scorer_legacy_digest because the exp_val was captured from Python < 3.13
     SerializationTestCase(
         id="Library Objects - Scorer, Evaluation, Dataset, LLMAsAJudgeScorer, LLMStructuredCompletionModel (legacy v3)",
         runtime_object_factory=lambda: make_evaluation(),
@@ -303,7 +309,7 @@ library_cases = [
             "dataset": "weave:///shawn/test-project/object/Dataset:N0VKaX8wr9kF9QQzM7mSQz3yKrJJjTiJi4c9Bt7RSTA",
             "scorers": [
                 "weave:///shawn/test-project/object/MyScorer:ILpCvdAsCLLLt9wU28MU9ugSScTkg7L3XX6PlUgFvlg",
-                f"weave:///shawn/test-project/object/LLMAsAJudgeScorer:{llm_as_a_judge_scorer_digest}",
+                f"weave:///shawn/test-project/object/LLMAsAJudgeScorer:{llm_as_a_judge_scorer_legacy_digest}",
             ],
             "preprocess_model_input": None,
             "trials": 1,
@@ -362,7 +368,7 @@ library_cases = [
             },
             {
                 "object_id": "LLMAsAJudgeScorer",
-                "digest": llm_as_a_judge_scorer_digest,
+                "digest": llm_as_a_judge_scorer_legacy_digest,
                 "exp_val": {
                     "_type": "LLMAsAJudgeScorer",
                     "name": None,
