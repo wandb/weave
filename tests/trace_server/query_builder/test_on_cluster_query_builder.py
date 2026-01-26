@@ -10,6 +10,7 @@ import sqlparse
 from weave.trace_server.calls_query_builder.calls_query_builder import (
     build_calls_complete_update_end_query,
 )
+from weave.trace_server.clickhouse_trace_server_settings import LOCAL_TABLE_SUFFIX
 
 CLUSTER_NAME = "weave_cluster"
 
@@ -19,9 +20,9 @@ CLUSTER_NAME = "weave_cluster"
     [
         # In distributed mode: use _local table with ON CLUSTER
         (
-            "calls_complete_local",
+            "calls_complete",
             CLUSTER_NAME,
-            f"calls_complete_local ON CLUSTER {CLUSTER_NAME}",
+            f"calls_complete{LOCAL_TABLE_SUFFIX} ON CLUSTER {CLUSTER_NAME}",
         ),
         # In non-distributed mode: use regular table without ON CLUSTER
         ("calls_complete", None, "calls_complete"),
