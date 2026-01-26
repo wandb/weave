@@ -14,6 +14,7 @@ from weave.trace_server.project_version.types import (
     CallsStorageServerMode,
     ProjectDataResidence,
     ReadTable,
+    WriteTarget,
 )
 
 
@@ -44,7 +45,63 @@ def count_queries(ch_client):
         yield lambda: call_count
 
 
-def test_version_resolution_by_table_contents(client, trace_server):
+@pytest.mark.parametrize(
+    (
+        "tables",
+        "expected_read_table",
+        "expected_v1_write_target",
+        "expected_v2_write_target",
+        "expect_dual_residency_warning",
+    ),
+    [
+        # EMPTY: V1 -> MERGED (new projects), V2 -> COMPLETE (new projects)
+        (
+            [],
+            ReadTable.CALLS_COMPLETE,
+            WriteTarget.CALLS_MERGED,
+            WriteTarget.CALLS_COMPLETE,
+            False,
+        ),
+        # MERGED_ONLY: V1 -> MERGED, V2 -> MERGED (keep data together)
+        (
+            ["calls_merged"],
+            ReadTable.CALLS_MERGED,
+            WriteTarget.CALLS_MERGED,
+            WriteTarget.CALLS_MERGED,
+            False,
+        ),
+        # COMPLETE_ONLY: V1 -> COMPLETE (triggers error), V2 -> COMPLETE
+        (
+            ["calls_complete"],
+            ReadTable.CALLS_COMPLETE,
+            WriteTarget.CALLS_COMPLETE,
+            WriteTarget.CALLS_COMPLETE,
+            False,
+        ),
+        # BOTH: Unexpected state - data should never be in both tables in production.
+        # This is a graceful failure: V1 -> COMPLETE (triggers error to prompt upgrade),
+        # V2 -> COMPLETE. Reads from COMPLETE to ensure latest data is visible.
+        (
+            ["calls_merged", "calls_complete"],
+            ReadTable.CALLS_COMPLETE,
+            WriteTarget.CALLS_COMPLETE,
+            WriteTarget.CALLS_COMPLETE,
+            True,  # Dual residency triggers a warning log
+        ),
+    ],
+)
+@pytest.mark.parametrize("log_collector", ["warning"], indirect=True)
+def test_version_resolution_by_table_contents(
+    client,
+    trace_server,
+    tables,
+    expected_read_table,
+    expected_v1_write_target,
+    expected_v2_write_target,
+    expect_dual_residency_warning,
+    log_collector,
+):
+    """Test routing resolution for different project data residency states."""
     if client_is_sqlite(client):
         pytest.skip("ClickHouse-only test")
 
@@ -53,91 +110,36 @@ def test_version_resolution_by_table_contents(client, trace_server):
     # manually set this to auto so we can test the switching
     resolver._mode = CallsStorageServerMode.AUTO
 
-    empty_proj = make_project_id("empty_project")
+    project_id = make_project_id("table_contents")
+    for table in tables:
+        insert_call(ch_server.ch_client, table, project_id)
+
     assert (
-        resolver.resolve_read_table(empty_proj, ch_server.ch_client)
-        == ReadTable.CALLS_COMPLETE
-    )
-
-    merged_proj = make_project_id("merged_only")
-    insert_call(ch_server.ch_client, "calls_merged", merged_proj)
-    assert (
-        resolver.resolve_read_table(merged_proj, ch_server.ch_client)
-        == ReadTable.CALLS_MERGED
-    )
-
-    complete_proj = make_project_id("complete_only")
-    insert_call(ch_server.ch_client, "calls_complete", complete_proj)
-    assert (
-        resolver.resolve_read_table(complete_proj, ch_server.ch_client)
-        == ReadTable.CALLS_COMPLETE
-    )
-
-    both_proj = make_project_id("both_tables")
-    insert_call(ch_server.ch_client, "calls_merged", both_proj)
-    insert_call(ch_server.ch_client, "calls_complete", both_proj)
-    # When both tables have data, calls_complete takes priority
-    assert (
-        resolver.resolve_read_table(both_proj, ch_server.ch_client)
-        == ReadTable.CALLS_COMPLETE
-    )
-
-
-def test_version_resolution_by_table_duel_write(client, trace_server):
-    if client_is_sqlite(client):
-        pytest.skip("ClickHouse-only test")
-
-    ch_server = trace_server._internal_trace_server
-    resolver = ch_server.table_routing_resolver
-
-    empty_proj = make_project_id("empty_project")
-
-    merged_proj = make_project_id("merged_only")
-    insert_call(ch_server.ch_client, "calls_merged", merged_proj)
-
-    complete_proj = make_project_id("complete_only")
-    insert_call(ch_server.ch_client, "calls_complete", complete_proj)
-
-    both_proj = make_project_id("both_tables")
-    insert_call(ch_server.ch_client, "calls_merged", both_proj)
-    insert_call(ch_server.ch_client, "calls_complete", both_proj)
-
-    resolver._mode = CallsStorageServerMode.DUAL_WRITE_READ_MERGED
-    assert (
-        resolver.resolve_read_table(empty_proj, ch_server.ch_client)
-        == ReadTable.CALLS_MERGED
+        resolver.resolve_read_table(project_id, ch_server.ch_client)
+        == expected_read_table
     )
     assert (
-        resolver.resolve_read_table(merged_proj, ch_server.ch_client)
-        == ReadTable.CALLS_MERGED
+        resolver.resolve_v1_write_target(project_id, ch_server.ch_client)
+        == expected_v1_write_target
     )
     assert (
-        resolver.resolve_read_table(complete_proj, ch_server.ch_client)
-        == ReadTable.CALLS_MERGED
-    )
-    assert (
-        resolver.resolve_read_table(both_proj, ch_server.ch_client)
-        == ReadTable.CALLS_MERGED
+        resolver.resolve_v2_write_target(project_id, ch_server.ch_client)
+        == expected_v2_write_target
     )
 
-    # Now test duel write read complete
-    resolver._mode = CallsStorageServerMode.DUAL_WRITE_READ_COMPLETE
-    assert (
-        resolver.resolve_read_table(empty_proj, ch_server.ch_client)
-        == ReadTable.CALLS_COMPLETE
-    )
-    assert (
-        resolver.resolve_read_table(merged_proj, ch_server.ch_client)
-        == ReadTable.CALLS_MERGED
-    )
-    assert (
-        resolver.resolve_read_table(complete_proj, ch_server.ch_client)
-        == ReadTable.CALLS_COMPLETE
-    )
-    assert (
-        resolver.resolve_read_table(both_proj, ch_server.ch_client)
-        == ReadTable.CALLS_COMPLETE
-    )
+    # Verify dual residency warning is logged when expected
+    warning_logs = log_collector.get_warning_logs()
+    dual_residency_warnings = [
+        log for log in warning_logs if "dual call residency" in log.message.lower()
+    ]
+    if expect_dual_residency_warning:
+        assert len(dual_residency_warnings) > 0, (
+            "Expected dual residency warning but none was logged"
+        )
+    else:
+        assert len(dual_residency_warnings) == 0, (
+            f"Unexpected dual residency warning: {dual_residency_warnings}"
+        )
 
 
 def test_caching_behavior(client, trace_server):
@@ -254,7 +256,7 @@ def test_project_version_mode_from_env():
             ("off", CallsStorageServerMode.OFF),
             ("force_legacy", CallsStorageServerMode.FORCE_LEGACY),
             ("auto", CallsStorageServerMode.AUTO),
-            ("invalid_mode", CallsStorageServerMode.FORCE_LEGACY),
+            ("invalid_mode", CallsStorageServerMode.AUTO),
         ]
 
         for env_val, expected_mode in test_cases:
@@ -265,7 +267,7 @@ def test_project_version_mode_from_env():
         if "PROJECT_VERSION_MODE" in os.environ:
             del os.environ["PROJECT_VERSION_MODE"]
         mode = CallsStorageServerMode.from_env()
-        assert mode == CallsStorageServerMode.FORCE_LEGACY
+        assert mode == CallsStorageServerMode.AUTO
 
     finally:
         if original_value is not None:
