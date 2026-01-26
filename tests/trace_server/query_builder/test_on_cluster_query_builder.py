@@ -313,13 +313,6 @@ def test_update_query_cluster_support(
         cluster_name=cluster_name,
     )
 
-    # Verify ON CLUSTER presence/absence
-    if cluster_name:
-        assert "ON CLUSTER" in query
-        assert "_local" in query
-    else:
-        assert "ON CLUSTER" not in query
-
     expected = f"""
         UPDATE {expected_table_clause}
         SET
