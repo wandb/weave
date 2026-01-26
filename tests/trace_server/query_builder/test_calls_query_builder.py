@@ -2835,3 +2835,69 @@ def test_calls_complete_with_feedback_filter() -> None:
             "pb_3": "project",
         },
     )
+
+
+def test_query_with_summary_weave_status_filter_calls_complete() -> None:
+    """Test that summary.weave.status filter on calls_complete does NOT use aggregate functions.
+
+    This test verifies the fix for the ILLEGAL_AGGREGATION error that occurred when
+    filtering by summary.weave.status on the calls_complete table. The calls_complete
+    table is pre-aggregated, so queries should NOT use any() aggregate functions.
+    """
+    cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_COMPLETE)
+    cq.add_field("id")
+
+    # Add a condition to filter for successful or error calls (similar to real usage)
+    cq.add_condition(
+        tsi_query.OrOperation.model_validate(
+            {
+                "$or": [
+                    {
+                        "$eq": [
+                            {"$getField": "summary.weave.status"},
+                            {"$literal": "success"},
+                        ]
+                    },
+                    {
+                        "$eq": [
+                            {"$getField": "summary.weave.status"},
+                            {"$literal": "error"},
+                        ]
+                    },
+                ]
+            }
+        )
+    )
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_complete.id AS id
+        FROM calls_complete
+        WHERE calls_complete.project_id = {pb_5:String}
+        AND (
+            (((CASE
+                WHEN calls_complete.exception IS NOT NULL THEN {pb_1:String}
+                WHEN IFNULL(toInt64OrNull(coalesce(nullIf(JSON_VALUE(calls_complete.summary_dump, {pb_0:String}), 'null'), '')), 0) > 0 THEN {pb_4:String}
+                WHEN calls_complete.ended_at IS NULL THEN {pb_2:String}
+                ELSE {pb_3:String}
+            END = {pb_3:String})
+            OR
+            (CASE
+                WHEN calls_complete.exception IS NOT NULL THEN {pb_1:String}
+                WHEN IFNULL(toInt64OrNull(coalesce(nullIf(JSON_VALUE(calls_complete.summary_dump, {pb_0:String}), 'null'), '')), 0) > 0 THEN {pb_4:String}
+                WHEN calls_complete.ended_at IS NULL THEN {pb_2:String}
+                ELSE {pb_3:String}
+            END = {pb_1:String})))
+            AND ((calls_complete.deleted_at IS NULL))
+            AND ((NOT ((calls_complete.started_at IS NULL)))))
+        """,
+        {
+            "pb_0": '$."status_counts"."error"',
+            "pb_1": "error",
+            "pb_2": "running",
+            "pb_3": "success",
+            "pb_4": "descendant_error",
+            "pb_5": "project",
+        },
+    )
