@@ -45,6 +45,8 @@ def test_clickhouse_batching():
 
     # Mock the insert method to track calls
     mock_ch_client.insert.return_value = MagicMock()
+    # MagicMock is truthy, so get_project_data_residence() returns BOTH, which is incorrect, mock it
+    mock_ch_client.query.return_value.result_rows = []
 
     # Create a ClickHouseTraceServer instance and patch _mint_client
     with patch.object(
@@ -54,6 +56,11 @@ def test_clickhouse_batching():
 
         # Use properly base64 encoded project_id (entity/project format)
         project_id = base64.b64encode(b"test_entity/test_project").decode("utf-8")
+
+        # Simulate a legacy project by returning merged-only residence.
+        mock_query_result = MagicMock()
+        mock_query_result.result_rows = [[0, 1]]  # has_complete=0, has_merged=1
+        mock_ch_client.query.return_value = mock_query_result
 
         # Create a batch of call start requests
         batch_req = tsi.CallCreateBatchReq(
