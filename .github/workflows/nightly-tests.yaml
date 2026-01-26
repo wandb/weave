@@ -80,7 +80,7 @@ jobs:
         ports:
           - "10000:10000"
       weave_clickhouse:
-        image: clickhouse/clickhouse-server:25.4
+        image: clickhouse/clickhouse-server:25.10
         env:
           CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
           CLICKHOUSE_USER: default

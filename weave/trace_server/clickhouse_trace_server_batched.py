@@ -16,6 +16,7 @@ from zoneinfo import ZoneInfo
 import clickhouse_connect
 import ddtrace
 from clickhouse_connect.driver.client import Client as CHClient
+from clickhouse_connect.driver.exceptions import DatabaseError
 from clickhouse_connect.driver.httputil import get_pool_manager
 from clickhouse_connect.driver.query import QueryResult
 from clickhouse_connect.driver.summary import QuerySummary
@@ -48,6 +49,15 @@ from weave.trace_server.annotation_queues_query_builder import (
 )
 from weave.trace_server.base64_content_conversion import (
     process_call_req_to_content,
+    process_complete_call_to_content,
+)
+from weave.trace_server.call_stats_helpers import (
+    rows_to_bucket_dicts,
+    split_usage_metrics,
+    validate_call_stats_range,
+)
+from weave.trace_server.calls_query_builder.call_metrics_query_builder import (
+    build_call_metrics_query,
 )
 from weave.trace_server.calls_query_builder.calls_query_builder import (
     CallsQuery,
@@ -55,10 +65,15 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     OrderField,
     QueryBuilderDynamicField,
     QueryBuilderField,
+    build_calls_complete_update_end_query,
     build_calls_stats_query,
     combine_conditions,
 )
+from weave.trace_server.calls_query_builder.usage_query_builder import (
+    build_usage_query,
+)
 from weave.trace_server.clickhouse_schema import (
+    ALL_CALL_COMPLETE_INSERT_COLUMNS,
     ALL_CALL_INSERT_COLUMNS,
     ALL_CALL_JSON_COLUMNS,
     ALL_CALL_SELECT_COLUMNS,
@@ -66,6 +81,7 @@ from weave.trace_server.clickhouse_schema import (
     ALL_OBJ_INSERT_COLUMNS,
     REQUIRED_CALL_COLUMNS,
     CallCHInsertable,
+    CallCompleteCHInsertable,
     CallDeleteCHInsertable,
     CallEndCHInsertable,
     CallStartCHInsertable,
@@ -86,6 +102,7 @@ from weave.trace_server.datadog import (
     set_root_span_dd_tags,
 )
 from weave.trace_server.errors import (
+    CallsCompleteModeRequired,
     InsertTooLarge,
     InvalidRequest,
     MissingLLMApiKeyError,
@@ -143,6 +160,7 @@ from weave.trace_server.project_query_builder import make_project_stats_query
 from weave.trace_server.project_version.project_version import (
     TableRoutingResolver,
 )
+from weave.trace_server.project_version.types import WriteTarget
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 from weave.trace_server.table_query_builder import (
     ROW_ORDER_COLUMN_NAME,
@@ -155,6 +173,7 @@ from weave.trace_server.table_query_builder import (
 from weave.trace_server.threads_query_builder import make_threads_query
 from weave.trace_server.token_costs import (
     LLM_TOKEN_PRICES_TABLE,
+    build_model_prices_query,
     validate_cost_purge_req,
 )
 from weave.trace_server.trace_server_common import (
@@ -243,6 +262,16 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def _file_batch(self, value: list[FileChunkCreateCHInsertable]) -> None:
         self._thread_local.file_batch = value
 
+    @property
+    def _calls_complete_batch(self) -> list[list[Any]]:
+        if not hasattr(self._thread_local, "calls_complete_batch"):
+            self._thread_local.calls_complete_batch = []
+        return self._thread_local.calls_complete_batch
+
+    @_calls_complete_batch.setter
+    def _calls_complete_batch(self, value: list[list[Any]]) -> None:
+        self._thread_local.calls_complete_batch = value
+
     @classmethod
     def from_env(
         cls, use_async_insert: bool = False, **kwargs: Any
@@ -312,15 +341,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if self.use_distributed_mode:
             return f"calls_complete{ch_settings.LOCAL_TABLE_SUFFIX}"
         return "calls_complete"
-
-    def _noop_project_version_latency_test(self, project_id: str) -> None:
-        # NOOP for testing latency impact of project switcher
-        try:
-            self.table_routing_resolver.resolve_read_table(project_id, self.ch_client)
-        except Exception as e:
-            logger.warning(
-                f"Error getting project version for project [{project_id}]: {e}"
-            )
 
     def _get_existing_ops_from_spans(
         self, seen_ids: set[str], project_id: str, limit: int | None = None
@@ -462,6 +482,17 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             for idx in obj_id_idx_map[result.object_id]:
                 calls[idx][0].op_name = op_ref_uri
 
+        write_target = self.table_routing_resolver.resolve_v2_write_target(
+            req.project_id,
+            self.ch_client,
+        )
+        if write_target == WriteTarget.CALLS_COMPLETE:
+            # TODO: Once the SDK ships calls_complete support for OTel, write to
+            # calls_complete instead of call_parts/calls_merged.
+            # Example future path:
+            # self._insert_call_complete(_complete_call_to_ch_insertable(completed))
+            write_target = WriteTarget.CALLS_MERGED
+
         # Convert calls to CH insertable format and then to rows for batch insertion
         batch_rows = []
         for start_call, end_call in calls:
@@ -470,8 +501,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             batch_rows.append(_ch_call_to_row(ch_start))
             batch_rows.append(_ch_call_to_row(ch_end))
 
-        # Insert directly without async_insert for OTEL calls
-        self._insert_call_batch(batch_rows, settings=None, do_sync_insert=True)
+        if write_target == WriteTarget.CALLS_MERGED:
+            # Insert directly without async_insert for OTEL calls
+            self._insert_call_batch(batch_rows, settings=None, do_sync_insert=True)
 
         if rejected_spans > 0:
             # Join the first 20 errors and return them delimited by ';'
@@ -500,10 +532,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             self._flush_immediately = True
             self._flush_file_chunks()
             self._flush_calls()
+            self._flush_calls_complete()
             self._flush_kafka_producer()
         finally:
             self._file_batch = []
             self._call_batch = []
+            self._calls_complete_batch = []
             self._flush_immediately = True
 
     def call_start_batch(self, req: tsi.CallCreateBatchReq) -> tsi.CallCreateBatchRes:
@@ -527,6 +561,14 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         req = process_call_req_to_content(req, self)
         ch_call = _start_call_for_insert_to_ch_insertable_start_call(req.start)
 
+        # Check write target - v1 call_start cannot write to calls_complete
+        write_target = self.table_routing_resolver.resolve_v1_write_target(
+            ch_call.project_id,
+            self.ch_client,
+        )
+        if write_target == WriteTarget.CALLS_COMPLETE:
+            raise CallsCompleteModeRequired(ch_call.project_id)
+
         # Inserts the call into the clickhouse database, verifying that
         # the call does not already exist
         self._insert_call(ch_call)
@@ -549,6 +591,14 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         req = process_call_req_to_content(req, self)
         ch_call = _end_call_for_insert_to_ch_insertable_end_call(req.end)
 
+        # Check write target - v1 call_end cannot write to calls_complete
+        write_target = self.table_routing_resolver.resolve_v1_write_target(
+            ch_call.project_id,
+            self.ch_client,
+        )
+        if write_target == WriteTarget.CALLS_COMPLETE:
+            raise CallsCompleteModeRequired(ch_call.project_id)
+
         # Inserts the call into the clickhouse database, verifying that
         # the call does not already exist
         self._insert_call(ch_call)
@@ -564,6 +614,159 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         # Returns the id of the newly created call
         return tsi.CallEndRes()
+
+    # === Calls V2 API ===
+
+    def calls_complete(
+        self, req: tsi.CallsUpsertCompleteReq
+    ) -> tsi.CallsUpsertCompleteRes:
+        """Insert a batch of complete calls.
+
+        Each call in the batch contains both start and end information.
+        This is used by the SDK when use_calls_complete is enabled.
+
+        Writes to calls_complete table for v2 projects, or call_parts table
+        for v1 projects (backwards compatible).
+
+        Args:
+            req: Request containing a batch of complete calls to insert.
+
+        Returns:
+            CallsUpsertCompleteRes: Empty response on success.
+        """
+        with self.call_batch():
+            for complete_call in req.batch:
+                complete_call = process_complete_call_to_content(complete_call, self)
+
+                # Determine write target based on project, this should be the same for all
+                # calls in the batch, subsequent calls just hit the in-memory cache. This
+                # is here for technical correctness, in case we relax project_id target
+                # constraints intra-batch
+                write_target = self.table_routing_resolver.resolve_v2_write_target(
+                    complete_call.project_id,
+                    self.ch_client,
+                )
+
+                ch_call = _complete_call_to_ch_insertable(complete_call)
+                if write_target == WriteTarget.CALLS_COMPLETE:
+                    self._insert_call_complete(ch_call)
+                else:
+                    self._insert_call_to_v1(ch_call)
+
+        return tsi.CallsUpsertCompleteRes()
+
+    def call_start_v2(self, req: tsi.CallStartV2Req) -> tsi.CallStartV2Res:
+        """Start a single call (v2 API).
+
+        This is used for eager ops like Evaluation.evaluate that need
+        their start to be visible immediately in the UI.
+        """
+        start_req = process_call_req_to_content(tsi.CallStartReq(start=req.start), self)
+        ch_start = _start_call_for_insert_to_ch_insertable_start_call(start_req.start)
+
+        write_target = self.table_routing_resolver.resolve_v2_write_target(
+            ch_start.project_id,
+            self.ch_client,
+        )
+        if write_target == WriteTarget.CALLS_COMPLETE:
+            ch_complete_start = _start_call_insertable_to_complete_start(ch_start)
+            self._insert_call_complete(ch_complete_start)
+        else:
+            self._insert_call(ch_start)
+
+        return tsi.CallStartV2Res(id=ch_start.id, trace_id=ch_start.trace_id)
+
+    def call_end_v2(self, req: tsi.CallEndV2Req) -> tsi.CallEndV2Res:
+        """End a single call (v2 API).
+
+        This is used for eager ops like Evaluation.evaluate that need
+        their end sent separately from their start. For calls written to calls_complete
+        via call_start_v2, this performs a lightweight UPDATE on that table.
+
+        Args:
+            req: The call end request containing end information.
+
+        Returns:
+            CallEndV2Res: Empty response on success.
+        """
+        req = process_call_req_to_content(req, self)
+
+        write_target = self.table_routing_resolver.resolve_v2_write_target(
+            req.end.project_id,
+            self.ch_client,
+        )
+
+        # If writing to calls_complete, perform lightweight UPDATE
+        if write_target == WriteTarget.CALLS_COMPLETE:
+            self._update_call_end_in_calls_complete(req.end)
+        elif write_target == WriteTarget.CALLS_MERGED:
+            ch_end = _end_call_for_insert_to_ch_insertable_end_call(req.end)
+            self._insert_call(ch_end)
+            if self._flush_immediately:
+                self._flush_calls()
+
+        return tsi.CallEndV2Res()
+
+    @ddtrace.tracer.wrap(
+        name="clickhouse_trace_server_batched._update_call_end_in_calls_complete"
+    )
+    def _update_call_end_in_calls_complete(
+        self, end_call: tsi.EndedCallSchemaForInsertWithStartedAt
+    ) -> None:
+        """Update a call's end data in the calls_complete table using lightweight UPDATE.
+
+        This is used for eager ops where the call start was written via call_start_v2
+        and the end arrives separately via call_end_v2.
+
+        Args:
+            end_call: The end call data to update. If started_at is provided,
+                it enables more efficient queries by utilizing the ClickHouse
+                primary key (project_id, started_at, id).
+        """
+        table_name = self._get_calls_complete_table_name()
+
+        output = end_call.output
+        output_refs = extract_refs_from_values(output)
+        output_dump = _any_value_to_dump(output)
+        summary_dump = _dict_value_to_dump(dict(end_call.summary))
+
+        # Convert datetimes to microseconds since epoch for DateTime64(6) parameters.
+        # clickhouse-connect truncates datetime objects to seconds when passing as params,
+        # but DateTime64(6) requires microsecond precision for exact matching. This is a
+        # hack, not sure why inserting a json dump and passing an explicit param differ
+        ended_at_us = _datetime_to_microseconds(end_call.ended_at)
+
+        pb = ParamBuilder()
+        project_id_param = pb.add_param(end_call.project_id)
+        id_param = pb.add_param(end_call.id)
+        ended_at_param = pb.add_param(ended_at_us)
+        exception_param = pb.add_param(end_call.exception)
+        output_dump_param = pb.add_param(output_dump)
+        summary_dump_param = pb.add_param(summary_dump)
+        output_refs_param = pb.add_param(output_refs)
+        wb_run_step_end_param = pb.add_param(end_call.wb_run_step_end)
+
+        # Add started_at param if provided for more efficient primary key usage
+        started_at_param: str | None = None
+        if end_call.started_at is not None:
+            started_at_us = _datetime_to_microseconds(end_call.started_at)
+            started_at_param = pb.add_param(started_at_us)
+
+        query = build_calls_complete_update_end_query(
+            table_name=table_name,
+            project_id_param=project_id_param,
+            id_param=id_param,
+            ended_at_param=ended_at_param,
+            exception_param=exception_param,
+            output_dump_param=output_dump_param,
+            summary_dump_param=summary_dump_param,
+            output_refs_param=output_refs_param,
+            wb_run_step_end_param=wb_run_step_end_param,
+            started_at_param=started_at_param,
+            cluster_name=self.clickhouse_cluster_name,
+        )
+
+        self.ch_client.command(query, parameters=pb.get_params())
 
     def call_read(self, req: tsi.CallReadReq) -> tsi.CallReadRes:
         res = self.calls_query_stream(
@@ -593,10 +796,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         """Returns a stats object for the given query. This is useful for counts or other
         aggregate statistics that are not directly queryable from the calls themselves.
         """
-        self._noop_project_version_latency_test(req.project_id)
-
+        read_table = self.table_routing_resolver.resolve_read_table(
+            req.project_id, self.ch_client
+        )
         pb = ParamBuilder()
-        query, columns = build_calls_stats_query(req, pb)
+        query, columns = build_calls_stats_query(req, pb, read_table)
         raw_res = self._query(query, pb.get_params())
 
         res_dict = (
@@ -610,13 +814,139 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             total_storage_size_bytes=res_dict.get("total_storage_size_bytes"),
         )
 
+    def _get_prices_for_models(
+        self, models: set[str], project_id: str
+    ) -> dict[str, dict[str, float]]:
+        """Query llm_token_prices for the given models and return best prices.
+
+        Returns a dict mapping model -> {prompt_token_cost, completion_token_cost}.
+        Uses pricing level priority: project > default, newest effective_date.
+        """
+        if not models:
+            return {}
+
+        try:
+            sql, params = build_model_prices_query(project_id, list(models))
+            result = self._query(sql, params)
+        except Exception:
+            # If price query fails, return empty prices (costs will be 0)
+            return {}
+
+        prices: dict[str, dict[str, float]] = {}
+        for row in result.result_rows:
+            llm_id, prompt_cost, completion_cost = row
+            prices[llm_id] = {
+                "prompt_token_cost": float(prompt_cost) if prompt_cost else 0.0,
+                "completion_token_cost": float(completion_cost)
+                if completion_cost
+                else 0.0,
+            }
+        return prices
+
+    def _compute_costs_for_buckets(
+        self,
+        usage_buckets: list[dict[str, Any]],
+        project_id: str,
+        requested_cost_metrics: set[str],
+    ) -> None:
+        """Compute cost metrics for usage buckets by multiplying tokens by prices.
+
+        Args:
+            usage_buckets: Buckets with token counts (modified in place).
+            project_id: Project ID for pricing lookup.
+            requested_cost_metrics: Set of cost metrics to compute (input_cost, output_cost, total_cost).
+        """
+        if not requested_cost_metrics or not usage_buckets:
+            return
+
+        # Get unique models from buckets
+        models = {b.get("model", "") for b in usage_buckets if b.get("model")}
+
+        # Query prices for those models
+        prices = self._get_prices_for_models(models, project_id)
+
+        # Compute costs for each bucket
+        for bucket in usage_buckets:
+            model = bucket.get("model", "")
+            model_prices = prices.get(model, {})
+            prompt_cost = model_prices.get("prompt_token_cost", 0.0)
+            completion_cost = model_prices.get("completion_token_cost", 0.0)
+
+            input_tokens = bucket.get("sum_input_tokens", 0) or 0
+            output_tokens = bucket.get("sum_output_tokens", 0) or 0
+
+            if "input_cost" in requested_cost_metrics:
+                bucket["sum_input_cost"] = input_tokens * prompt_cost
+
+            if "output_cost" in requested_cost_metrics:
+                bucket["sum_output_cost"] = output_tokens * completion_cost
+
+            if "total_cost" in requested_cost_metrics:
+                input_cost = bucket.get("sum_input_cost", input_tokens * prompt_cost)
+                output_cost = bucket.get(
+                    "sum_output_cost", output_tokens * completion_cost
+                )
+                bucket["sum_total_cost"] = input_cost + output_cost
+
+    def call_stats(self, req: tsi.CallStatsReq) -> tsi.CallStatsRes:
+        """Return call statistics grouped by bucket with requested aggregations.
+
+        Usage metrics (tokens, cost) are grouped by model.
+        Call metrics (latency, counts) are not grouped by model.
+
+        Cost metrics are computed post-query by multiplying token counts by prices.
+        """
+        usage_buckets: list[dict[str, Any]] = []
+        call_buckets: list[dict[str, Any]] = []
+        granularity = 0
+        start = req.start
+        end = req.end or datetime.datetime.now(datetime.timezone.utc)
+        validate_call_stats_range(start, end)
+
+        token_metrics, requested_cost_metrics = split_usage_metrics(req.usage_metrics)
+
+        # Process token metrics (grouped by model)
+        if token_metrics:
+            pb = ParamBuilder()
+            sql, columns, parameters, granularity, start, end = build_usage_query(
+                req, token_metrics, pb
+            )
+            query_result = self._query(sql, parameters)
+            usage_buckets = rows_to_bucket_dicts(columns, query_result.result_rows)
+
+        # Compute costs post-query if cost metrics were requested
+        if requested_cost_metrics and usage_buckets:
+            self._compute_costs_for_buckets(
+                usage_buckets, req.project_id, requested_cost_metrics
+            )
+
+        # Process call metrics (not grouped by model)
+        if req.call_metrics:
+            pb = ParamBuilder()
+            sql, columns, parameters, granularity, start, end = (
+                build_call_metrics_query(req, req.call_metrics, pb)
+            )
+            query_result = self._query(sql, parameters)
+            call_buckets = rows_to_bucket_dicts(columns, query_result.result_rows)
+
+        return tsi.CallStatsRes(
+            start=start,
+            end=end,
+            granularity=granularity,
+            timezone=req.timezone or "UTC",
+            usage_buckets=usage_buckets,
+            call_buckets=call_buckets,
+        )
+
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.calls_query_stream")
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
         """Returns a stream of calls that match the given query."""
-        self._noop_project_version_latency_test(project_id=req.project_id)
-
+        read_table = self.table_routing_resolver.resolve_read_table(
+            req.project_id, self.ch_client
+        )
         cq = CallsQuery(
             project_id=req.project_id,
+            read_table=read_table,
             include_costs=req.include_costs or False,
             include_storage_size=req.include_storage_size or False,
             include_total_storage_size=req.include_total_storage_size or False,
@@ -699,29 +1029,34 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 dict(zip(select_columns, row, strict=False))
             )
 
-        if not expand_columns and not include_feedback:
-            for row in raw_res:
-                yield tsi.CallSchema.model_validate(row_to_call_schema_dict(row))
-            return
+        try:
+            if not expand_columns and not include_feedback:
+                for row in raw_res:
+                    yield tsi.CallSchema.model_validate(row_to_call_schema_dict(row))
+                return
 
-        ref_cache = LRUCache(max_size=1000)
-        batch_processor = DynamicBatchProcessor(
-            initial_size=ch_settings.INITIAL_CALLS_STREAM_BATCH_SIZE,
-            max_size=ch_settings.MAX_CALLS_STREAM_BATCH_SIZE,
-            growth_factor=10,
-        )
+            ref_cache = LRUCache(max_size=1000)
+            batch_processor = DynamicBatchProcessor(
+                initial_size=ch_settings.INITIAL_CALLS_STREAM_BATCH_SIZE,
+                max_size=ch_settings.MAX_CALLS_STREAM_BATCH_SIZE,
+                growth_factor=10,
+            )
 
-        for batch in batch_processor.make_batches(raw_res):
-            call_dicts = [row_to_call_schema_dict(row) for row in batch]
-            if expand_columns and req.return_expanded_column_values:
-                self._expand_call_refs(
-                    req.project_id, call_dicts, expand_columns, ref_cache
-                )
-            if include_feedback:
-                self._add_feedback_to_calls(req.project_id, call_dicts)
+            for batch in batch_processor.make_batches(raw_res):
+                call_dicts = [row_to_call_schema_dict(row) for row in batch]
+                if expand_columns and req.return_expanded_column_values:
+                    self._expand_call_refs(
+                        req.project_id, call_dicts, expand_columns, ref_cache
+                    )
+                if include_feedback:
+                    self._add_feedback_to_calls(req.project_id, call_dicts)
 
-            for call in call_dicts:
-                yield tsi.CallSchema.model_validate(call)
+                for call in call_dicts:
+                    yield tsi.CallSchema.model_validate(call)
+        finally:
+            # Ensure upstream _query_stream is closed on any exit
+            if hasattr(raw_res, "close"):
+                raw_res.close()
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._add_feedback_to_calls")
     def _add_feedback_to_calls(
@@ -1451,8 +1786,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         return tsi.RefsReadBatchRes(vals=vals)
 
     def project_stats(self, req: tsi.ProjectStatsReq) -> tsi.ProjectStatsRes:
-        self._noop_project_version_latency_test(req.project_id)
-
         def _default_true(val: bool | None) -> bool:
             return True if val is None else val
 
@@ -1478,8 +1811,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self, req: tsi.ThreadsQueryReq
     ) -> Iterator[tsi.ThreadSchema]:
         """Stream threads with aggregated statistics sorted by last activity."""
-        self._noop_project_version_latency_test(req.project_id)
-
         pb = ParamBuilder()
 
         # Extract filter values
@@ -4232,8 +4563,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def _flush_file_chunks(self) -> None:
         if not self._flush_immediately:
             raise ValueError("File chunks must be flushed immediately")
-        self._insert_file_chunks(self._file_batch)
-        self._file_batch = []
+        try:
+            self._insert_file_chunks(self._file_batch)
+        finally:
+            self._file_batch = []
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert_file_chunks")
     def _insert_file_chunks(
@@ -4656,6 +4989,17 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if not req.track_llm_call:
             return tsi.CompletionsCreateRes(response=res.response)
 
+        write_target = self.table_routing_resolver.resolve_v2_write_target(
+            req.project_id,
+            self.ch_client,
+        )
+        if write_target == WriteTarget.CALLS_COMPLETE:
+            # TODO: Once the SDK ships calls_complete support for completions,
+            # write a single complete row instead of call_parts/calls_merged.
+            # Future path:
+            # self._insert_call_complete(_complete_call_to_ch_insertable(completed))
+            write_target = WriteTarget.CALLS_MERGED
+
         req.inputs.messages = initial_messages
         start = tsi.StartedCallSchemaForInsert(
             project_id=req.project_id,
@@ -4689,7 +5033,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             values = [call_dict.get(col) for col in ALL_CALL_INSERT_COLUMNS]
             batch_data.append(values)
 
-        self._insert_call_batch(batch_data)
+        if write_target == WriteTarget.CALLS_MERGED:
+            self._insert_call_batch(batch_data)
 
         return tsi.CompletionsCreateRes(
             response=res.response, weave_call_id=start_call.id
@@ -4752,7 +5097,22 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         # Track start call if requested
         start_call: CallStartCHInsertable | None = None
+        write_target: WriteTarget | None = None
         if req.track_llm_call:
+            write_target = self.table_routing_resolver.resolve_v2_write_target(
+                req.project_id,
+                self.ch_client,
+            )
+            if write_target == WriteTarget.CALLS_COMPLETE:
+                # TODO: Once the SDK ships calls_complete support for streaming
+                # completions, route start/end via calls_complete.
+                # Example future path (sketch):
+                # ch_complete_start = _start_call_insertable_to_complete_start(start_call)
+                # self._insert_call_complete(ch_complete_start)
+                # insert_call = self._update_call_end_in_calls_complete
+                # REMOVE ME: (for now always default to CALLS_MERGED)
+                write_target = WriteTarget.CALLS_MERGED
+
             # Prepare inputs for tracking: use original messages (with template syntax)
             # and include prompt and template_vars
             tracked_inputs = req.inputs.model_dump(exclude_none=True)
@@ -4773,7 +5133,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             )
             start_call = _start_call_for_insert_to_ch_insertable_start_call(start)
             # Insert immediately so that callers can see the call in progress
-            self._insert_call(start_call)
+            if write_target == WriteTarget.CALLS_MERGED:
+                self._insert_call(start_call)
 
         # Set the combined messages (with template vars replaced) for LiteLLM
         req.inputs.messages = combined_messages
@@ -5187,38 +5548,28 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     "clickhouse_trace_server_batched._insert.async_insert": True,
                 }
             )
-        try:
-            return self.ch_client.insert(
-                table, data=data, column_names=column_names, settings=settings
-            )
-        except ValueError as e:
-            if "negative shift count" in str(e):
-                # clickhouse_connect raises a weird error message like
-                # File "/Users/shawn/.pyenv/versions/3.10.13/envs/weave-public-editable/lib/python3.10/site-packages/clickhouse_connect/driver/
-                # │insert.py", line 120, in _calc_block_size
-                # │    return 1 << (21 - int(log(row_size, 2)))
-                # │ValueError: negative shift count
-                # when we try to insert something that's too large.
-                raise InsertTooLarge(
-                    "Database insertion failed. Record too large. "
-                    "A likely cause is that a single row or cell exceeded "
-                    "the limit. If logging images, save them as `Image.PIL`."
-                ) from e
-            raise
-        except Exception as e:
-            # Do potentially expensive data length calculation, only on
-            # error, which should be very rare!
-            data_bytes = sum(_num_bytes(row) for row in data)
-            logger.exception(
-                "clickhouse_insert_error",
-                extra={
-                    "error_str": str(e),
-                    "table": table,
-                    "data_len": len(data),
-                    "data_bytes": data_bytes,
-                },
-            )
-            raise
+
+        for attempt in range(ch_settings.INSERT_MAX_RETRIES):
+            try:
+                return self.ch_client.insert(
+                    table, data=data, column_names=column_names, settings=settings
+                )
+
+            # InsertTooLarge: raise immediately, no retry
+            except ValueError as e:
+                converted = _convert_to_insert_too_large(e)
+                _log_and_raise_insert_error(converted, table, data)
+
+            # Empty query error: RETRY (generator was consumed during HTTP retry)
+            # We should retry with a fresh generator
+            except DatabaseError as e:
+                if _should_retry_empty_query(e, table, attempt):
+                    continue
+                _log_and_raise_insert_error(e, table, data)
+
+            # All other errors: raise immediately, no retry
+            except Exception as e:
+                _log_and_raise_insert_error(e, table, data)
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert_call")
     def _insert_call(self, ch_call: CallCHInsertable) -> None:
@@ -5232,12 +5583,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._flush_calls")
     def _flush_calls(self) -> None:
-        self._analyze_call_batch_breakdown()
-        if len(self._call_batch) > 0:
-            project_id_idx = ALL_CALL_INSERT_COLUMNS.index("project_id")
-            project_id = self._call_batch[0][project_id_idx]
-            self._noop_project_version_latency_test(project_id=project_id)
-
         try:
             self._insert_call_batch(self._call_batch)
         except InsertTooLarge:
@@ -5246,8 +5591,90 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             # Insert rows one at a time after stripping large values
             for row in batch:
                 self._insert_call_batch([row])
+        finally:
+            self._call_batch = []
 
-        self._call_batch = []
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert_call_complete")
+    def _insert_call_complete(self, ch_call: CallCompleteCHInsertable) -> None:
+        """Insert a complete call into the calls_complete batch.
+
+        Args:
+            ch_call: The complete call to insert.
+        """
+        parameters = ch_call.model_dump()
+        row = []
+        for key in ALL_CALL_COMPLETE_INSERT_COLUMNS:
+            row.append(parameters.get(key, None))
+        self._calls_complete_batch.append(row)
+        if self._flush_immediately:
+            self._flush_calls_complete()
+
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert_call_to_v1")
+    def _insert_call_to_v1(self, ch_call: CallCompleteCHInsertable) -> None:
+        """Insert a complete call into the v1 call_parts table.
+
+        This allows the calls_complete endpoint to write to v1 storage
+        for backwards compatibility with projects not yet migrated to v2.
+
+        Args:
+            ch_call: The complete call to insert.
+        """
+        parameters = ch_call.model_dump()
+        row = []
+        for key in ALL_CALL_INSERT_COLUMNS:
+            row.append(parameters.get(key, None))
+        self._call_batch.append(row)
+        if self._flush_immediately:
+            self._flush_calls()
+
+    @ddtrace.tracer.wrap(
+        name="clickhouse_trace_server_batched._insert_call_complete_batch"
+    )
+    def _insert_call_complete_batch(
+        self,
+        batch: list,
+        settings: dict[str, Any] | None = None,
+        do_sync_insert: bool = False,
+    ) -> None:
+        """Insert a batch of complete calls into the calls_complete table.
+
+        Args:
+            batch: List of rows to insert.
+            settings: Optional ClickHouse settings.
+            do_sync_insert: If True, use synchronous insert.
+        """
+        set_current_span_dd_tags(
+            {
+                "clickhouse_trace_server_batched._insert_call_complete_batch.count": str(
+                    len(batch)
+                )
+            }
+        )
+        if not batch:
+            return
+
+        self._insert(
+            "calls_complete",
+            data=batch,
+            column_names=ALL_CALL_COMPLETE_INSERT_COLUMNS,
+            settings=settings,
+            do_sync_insert=do_sync_insert,
+        )
+
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._flush_calls_complete")
+    def _flush_calls_complete(self) -> None:
+        """Flush the calls_complete batch to the database."""
+        if not self._calls_complete_batch:
+            return
+
+        try:
+            self._insert_call_complete_batch(self._calls_complete_batch)
+        except InsertTooLarge:
+            # Try 1 by 1
+            for row in self._calls_complete_batch:
+                self._insert_call_complete_batch([row])
+        finally:
+            self._calls_complete_batch = []
 
     @ddtrace.tracer.wrap(
         name="clickhouse_trace_server_batched._analyze_call_batch_breakdown"
@@ -5284,7 +5711,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     ),
                 }
             )
-        except Exception as e:
+        except Exception:
             # Under no circumstances should we block ingest with an error
             pass
 
@@ -5407,6 +5834,33 @@ def _ensure_datetimes_have_tz_strict(
     if res is None:
         raise ValueError(f"Datetime is None: {dt}")
     return res
+
+
+def _datetime_to_microseconds(dt: datetime.datetime) -> int:
+    """Convert a datetime to microseconds since Unix epoch.
+
+    This is needed for DateTime64(6) parameterized queries because
+    clickhouse-connect truncates datetime objects to whole seconds
+    when passing them as parameters. By converting to microseconds
+    and using Int64 type, we preserve full precision.
+
+    Args:
+        dt: A datetime object (should be timezone-aware).
+
+    Returns:
+        int: Microseconds since Unix epoch (1970-01-01 00:00:00 UTC).
+
+    Examples:
+        >>> import datetime
+        >>> dt = datetime.datetime(2026, 1, 14, 23, 15, 38, 704246, tzinfo=datetime.timezone.utc)
+        >>> _datetime_to_microseconds(dt)
+        1768432538704246
+    """
+    # Ensure we have timezone info for accurate conversion
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=datetime.timezone.utc)
+    # Convert to microseconds: timestamp() gives seconds as float, multiply by 1M
+    return int(dt.timestamp() * 1_000_000)
 
 
 def _nullable_any_dump_to_any(
@@ -5535,6 +5989,60 @@ def _start_call_for_insert_to_ch_insertable_start_call(
     )
 
 
+def _start_call_insertable_to_complete_start(
+    ch_start: CallStartCHInsertable,
+) -> CallCompleteCHInsertable:
+    """Convert a start-only call into a calls_complete insertable row.
+
+    Args:
+        ch_start: The start-only ClickHouse insertable call.
+
+    Returns:
+        CallCompleteCHInsertable: A calls_complete insertable row with an empty end.
+
+    Examples:
+        >>> import datetime
+        >>> ch_start = CallStartCHInsertable(
+        ...     project_id="entity/project",
+        ...     id="call-id",
+        ...     trace_id="trace-id",
+        ...     op_name="op",
+        ...     started_at=datetime.datetime(2024, 1, 1),
+        ...     attributes_dump="{}",
+        ...     inputs_dump="{}",
+        ...     input_refs=[],
+        ...     output_refs=[],
+        ... )
+        >>> complete = _start_call_insertable_to_complete_start(ch_start)
+        >>> complete.ended_at is None
+        True
+    """
+    return CallCompleteCHInsertable(
+        project_id=ch_start.project_id,
+        id=ch_start.id,
+        trace_id=ch_start.trace_id,
+        parent_id=ch_start.parent_id,
+        thread_id=ch_start.thread_id,
+        turn_id=ch_start.turn_id,
+        op_name=ch_start.op_name,
+        display_name=ch_start.display_name,
+        started_at=ch_start.started_at,
+        ended_at=None,
+        exception=None,
+        attributes_dump=ch_start.attributes_dump,
+        inputs_dump=ch_start.inputs_dump,
+        input_refs=ch_start.input_refs,
+        output_dump=_any_value_to_dump(None),
+        summary_dump=_dict_value_to_dump({}),
+        otel_dump=ch_start.otel_dump,
+        output_refs=ch_start.output_refs,
+        wb_user_id=ch_start.wb_user_id,
+        wb_run_id=ch_start.wb_run_id,
+        wb_run_step=ch_start.wb_run_step,
+        wb_run_step_end=None,
+    )
+
+
 def _end_call_for_insert_to_ch_insertable_end_call(
     end_call: tsi.EndedCallSchemaForInsert,
 ) -> CallEndCHInsertable:
@@ -5553,6 +6061,53 @@ def _end_call_for_insert_to_ch_insertable_end_call(
         output_dump=_any_value_to_dump(output),
         output_refs=output_refs,
         wb_run_step_end=end_call.wb_run_step_end,
+    )
+
+
+def _complete_call_to_ch_insertable(
+    complete_call: tsi.CompletedCallSchemaForInsert,
+) -> CallCompleteCHInsertable:
+    """Convert a completed call schema to a ClickHouse insertable format.
+
+    Args:
+        complete_call: The completed call schema from the API.
+
+    Returns:
+        CallCompleteCHInsertable: The ClickHouse insertable representation.
+    """
+    inputs = complete_call.inputs
+    input_refs = extract_refs_from_values(inputs)
+
+    output = complete_call.output
+    output_refs = extract_refs_from_values(output)
+
+    otel_dump_str = None
+    if complete_call.otel_dump is not None:
+        otel_dump_str = _dict_value_to_dump(complete_call.otel_dump)
+
+    return CallCompleteCHInsertable(
+        project_id=complete_call.project_id,
+        id=complete_call.id,
+        trace_id=complete_call.trace_id,
+        parent_id=complete_call.parent_id,
+        thread_id=complete_call.thread_id,
+        turn_id=complete_call.turn_id,
+        op_name=complete_call.op_name,
+        display_name=complete_call.display_name,
+        started_at=complete_call.started_at,
+        ended_at=complete_call.ended_at,
+        exception=complete_call.exception,
+        attributes_dump=_dict_value_to_dump(complete_call.attributes),
+        inputs_dump=_dict_value_to_dump(inputs),
+        input_refs=input_refs,
+        output_dump=_any_value_to_dump(output),
+        summary_dump=_dict_value_to_dump(dict(complete_call.summary)),
+        otel_dump=otel_dump_str,
+        output_refs=output_refs,
+        wb_user_id=complete_call.wb_user_id,
+        wb_run_id=complete_call.wb_run_id,
+        wb_run_step=complete_call.wb_run_step,
+        wb_run_step_end=complete_call.wb_run_step_end,
     )
 
 
@@ -5949,3 +6504,58 @@ def _setup_completion_model_info(
 
 def _sanitize_name_for_object_id(name: str) -> str:
     return sub(r"[^a-zA-Z0-9_-]", "_", name)
+
+
+# -----------------------------------------------------------------------------
+# Insert Error Helpers
+# -----------------------------------------------------------------------------
+
+
+def _convert_to_insert_too_large(e: Exception) -> Exception:
+    """Convert ValueError to InsertTooLarge if the error indicates data is too large."""
+    if isinstance(e, ValueError) and "negative shift count" in str(e):
+        return InsertTooLarge(
+            "Database insertion failed. Record too large. "
+            "A likely cause is that a single row or cell exceeded "
+            "the limit. If logging images, save them as `Image.PIL`."
+        )
+    return e
+
+
+def _should_retry_empty_query(e: Exception, table: str, attempt: int) -> bool:
+    """Check if we should retry an empty query error. Logs warning if retrying.
+
+    Attempts to fix a longstanding "Empty query" error that intermittently
+    occurs during ClickHouse inserts. This happens when clickhouse-connect's
+    internal serialization generator gets exhausted during an HTTP connection
+    retry (after CH Cloud's keep-alive timeout causes a connection reset).
+    """
+    is_empty_query = isinstance(e, DatabaseError) and "Empty query" in str(e)
+    should_retry = is_empty_query and attempt < ch_settings.INSERT_MAX_RETRIES - 1
+    if should_retry:
+        logger.warning(
+            "clickhouse_insert_empty_query_retry",
+            extra={
+                "table": table,
+                "attempt": attempt + 1,
+                "max_retries": ch_settings.INSERT_MAX_RETRIES,
+            },
+        )
+    return should_retry
+
+
+def _log_and_raise_insert_error(
+    e: Exception, table: str, data: Sequence[Sequence[Any]]
+) -> None:
+    """Log insert error with data size info and re-raise."""
+    data_bytes = sum(_num_bytes(row) for row in data)
+    logger.exception(
+        "clickhouse_insert_error",
+        extra={
+            "error_str": str(e),
+            "table": table,
+            "data_len": len(data),
+            "data_bytes": data_bytes,
+        },
+    )
+    raise e

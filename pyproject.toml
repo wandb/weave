@@ -48,7 +48,7 @@ dependencies = [
 
   # Used for content type detection
   # Remove once license content filtering is upstreamed
-  "polyfile-weave",
+  "polyfile-weave>=0.5.9",
 ]
 
 [project.optional-dependencies]
@@ -126,6 +126,7 @@ langchain = [
   "pysqlite3; platform_system == 'Linux' and python_version >= '3.10'",
   "opentelemetry-exporter-otlp; python_version >= '3.10'",
   "openai>=1.99.9,<1.100.0",
+  "google-cloud-iam; python_version >= '3.13'",
 ]
 langchain_nvidia_ai_endpoints = [
   "langchain-core>=0.2.1",
@@ -329,7 +330,7 @@ disallow_untyped_defs = true
 disallow_untyped_calls = true
 
 [tool.bumpversion]
-current_version = "0.52.25-dev0"
+current_version = "0.52.26-dev0"
 parse = """(?x)
     (?P<major>0|[1-9]\\d*)\\.
     (?P<minor>0|[1-9]\\d*)\\.
