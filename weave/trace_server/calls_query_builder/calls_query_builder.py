@@ -562,6 +562,7 @@ class Condition(BaseModel):
                 table_alias,
                 expand_columns,
                 field_to_object_join_alias_map,
+                use_agg_fn=use_agg_fn,
             )
             sql = processor.process_operand(self.operand)
             if self._consumed_fields is None:
