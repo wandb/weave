@@ -6,6 +6,7 @@
 - If there is something that doesn't make sense architecturally, devex-wise, or product-wise, please update the `Requests to Humans` section below.
 - Always follow the established coding patterns and conventions in the codebase.
 - Document any significant architectural decisions or changes.
+- **After writing or modifying code, run `nox -e lint` to apply automatic linting fixes.** This ensures consistent code style and catches common issues.
 
 ## Python Import Rules
 
@@ -35,13 +36,44 @@ def my_function():
 
 ## Development Setup
 
-- Your machine should be setup for you automatically via `bin/codex_setup.sh`
-- If you encounter any setup issues:
-  1. Check the setup script for potential problems
-  2. Update `bin/codex_setup.sh` with necessary fixes
-  3. Document any manual steps required in this section
+### Environment Setup with uv
 
-_Important:_ For OpenAI Codex agents (most likely you!), your environment does not have internet access. If you need something setup beforehand, this is where you need to do it.
+Set up your development environment using `uv`:
+
+```bash
+# Create and activate virtual environment
+uv venv
+source .venv/bin/activate
+
+# Install base dependencies
+uv sync
+
+# Install with dev tools (linting, pre-commit)
+uv sync --group dev
+
+# Install with test dependencies
+uv sync --group test
+
+# Install with specific integration extras (e.g., openai, anthropic)
+uv sync --group test --extra openai
+
+# Install for trace server development
+uv sync --group test --group trace_server --group trace_server_tests
+```
+
+### Available Dependency Groups
+
+- `dev` - Development tools (pre-commit, linting, codegen)
+- `test` - Test framework (pytest, nox, coverage)
+- `trace_server` - Trace server runtime dependencies
+- `trace_server_tests` - Additional trace server test dependencies
+
+### Offline/Air-gapped Environments
+
+For environments without internet access:
+- Your machine may be setup automatically via `bin/codex_setup.sh`
+- Use `nox --no-install` to skip dependency installation (requires pre-installed dependencies)
+- If you encounter setup issues, check and update `bin/codex_setup.sh` with necessary fixes
 
 ## Codebase Structure
 
@@ -72,13 +104,32 @@ Focus on these primary test shards:
 
 **IMPORTANT**: Any test depending on the `client` fixture runs against either SQLite backend or Clickhouse. By default it will run against SQLite for performance. However, it is critical to test both. Use the pytest custom flag `--trace-server=clickhouse` with `--clickhouse-process=true` to run tests against the clickhouse implementation.
 
+#### Environment Setup for Tests
+
+Before running tests, ensure your environment is set up:
+
+```bash
+# Activate your virtual environment
+source .venv/bin/activate
+
+# Install test dependencies (nox will also do this automatically)
+uv sync --group test
+
+# For trace server tests, also install trace server dependencies
+uv sync --group test --group trace_server --group trace_server_tests
+
+# For integration tests, install the relevant extra
+uv sync --group test --extra openai  # for OpenAI integration tests
+uv sync --group test --extra anthropic  # for Anthropic integration tests
+```
+
 #### Basic Test Commands
 
-1. Run all tests in a specific shard: `nox --no-install -e "tests-3.12(shard='trace')"`
-2. Run a specific test by appending `-- [test]` like so: `nox --no-install -e "tests-3.12(shard='trace')" -- tests/trace/test_client_trace.py::test_simple_op`
-3. Run linting: `nox --no-install -e lint` (Note: This will modify files)
+1. Run all tests in a specific shard: `nox -e "tests-3.12(shard='trace')"`
+2. Run a specific test by appending `-- [test]` like so: `nox -e "tests-3.12(shard='trace')" -- tests/trace/test_client_trace.py::test_simple_op`
+3. Run linting: `nox -e lint` (Note: This will modify files)
 
-_Important:_ Since you don't have internet access, you must run `nox` with `--no-install`. We have pre-installed the requirements on the above shards.
+_Note for offline environments:_ If you don't have internet access, run `nox` with `--no-install` (requires pre-installed dependencies).
 
 #### Critical Path Information
 
