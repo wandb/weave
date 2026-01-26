@@ -2133,6 +2133,13 @@ def _is_minimal_filter(filter: tsi.CallsFilter | None) -> bool:
     )
 
 
+def _format_table_name_with_cluster(table_name: str, cluster_name: str | None) -> str:
+    """Format a table name with ON CLUSTER clause if cluster_name is provided."""
+    if cluster_name:
+        return f"{table_name} ON CLUSTER {cluster_name}"
+    return table_name
+
+
 def build_calls_complete_update_end_query(
     table_name: str,
     project_id_param: str,
