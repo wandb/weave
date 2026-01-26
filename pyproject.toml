@@ -161,7 +161,7 @@ presidio = [
   "presidio-anonymizer==2.2.357; python_version < '3.13'",
 ]
 modal = ["modal", "python-dotenv"]
-mcp = ["mcp[cli]>=1.6.0,<1.10.0; python_version >= '3.10'"]
+mcp = ["mcp[cli]>=1.6.0,<1.27.0; python_version >= '3.10'"]
 vertexai = [
   "vertexai>=1.70.0; platform_python_implementation != 'PyPy' and python_version < '3.13'",
   "shapely<=2.0.6; platform_python_implementation != 'PyPy'",
