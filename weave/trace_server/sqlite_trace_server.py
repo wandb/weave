@@ -64,14 +64,24 @@ from weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker impo
     EvaluateModelDispatcher,
 )
 
-_conn_cursor: ContextVar[tuple[sqlite3.Connection, sqlite3.Cursor] | None] = ContextVar(
-    "conn_cursor", default=None
-)
+_conn_cursor: ContextVar[
+    tuple[int, dict[str, tuple[sqlite3.Connection, sqlite3.Cursor]]] | None
+] = ContextVar("conn_cursor", default=None)
+
+
+def _get_conn_map() -> dict[str, tuple[sqlite3.Connection, sqlite3.Cursor]]:
+    conn_state = _conn_cursor.get()
+    current_thread = threading.get_ident()
+    if conn_state is None or conn_state[0] != current_thread:
+        conn_map: dict[str, tuple[sqlite3.Connection, sqlite3.Cursor]] = {}
+        _conn_cursor.set((current_thread, conn_map))
+        return conn_map
+    return conn_state[1]
 
 
 def get_conn_cursor(db_path: str) -> tuple[sqlite3.Connection, sqlite3.Cursor]:
-    # conn_cursor = _conn_cursor.get()
-    conn_cursor = None
+    conn_map = _get_conn_map()
+    conn_cursor = conn_map.get(db_path)
     if conn_cursor is None:
         # Use uri=True for URIs like "file::memory:?cache=shared"
         # This is required on Windows to properly handle URI paths
@@ -81,8 +91,34 @@ def get_conn_cursor(db_path: str) -> tuple[sqlite3.Connection, sqlite3.Cursor]:
         conn.create_function("reverse", 1, lambda x: x[::-1])
         cursor = conn.cursor()
         conn_cursor = (conn, cursor)
-        _conn_cursor.set(conn_cursor)
+        conn_map[db_path] = conn_cursor
     return conn_cursor
+
+
+def close_conn_cursor(db_path: str | None = None) -> None:
+    conn_state = _conn_cursor.get()
+    if conn_state is None:
+        return
+    current_thread = threading.get_ident()
+    if conn_state[0] != current_thread:
+        return
+    conn_map = conn_state[1]
+    if db_path is None:
+        db_paths = list(conn_map.keys())
+    else:
+        db_paths = [db_path] if db_path in conn_map else []
+    for path in db_paths:
+        conn, cursor = conn_map.pop(path)
+        try:
+            cursor.close()
+        except Exception:
+            pass
+        try:
+            conn.close()
+        except Exception:
+            pass
+    if not conn_map:
+        _conn_cursor.set(None)
 
 
 class SqliteTraceServer(tsi.FullTraceServerInterface):
@@ -94,6 +130,9 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         self.lock = threading.Lock()
         self.db_path = db_path
         self._evaluate_model_dispatcher = evaluate_model_dispatcher
+
+    def close(self) -> None:
+        close_conn_cursor(self.db_path)
 
     def drop_tables(self) -> None:
         conn, cursor = get_conn_cursor(self.db_path)
