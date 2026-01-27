@@ -1336,12 +1336,20 @@ class CallsQuery(BaseModel):
             group_by_sql = f"GROUP BY ({table_alias}.project_id, {table_alias}.id)"
 
         # Assemble the actual SQL query
+        # Use PREWHERE for project_id to filter data before reading from disk
+        # This is a ClickHouse optimization for high-selectivity filters
+        where_filters_sql = where_filters.to_sql()
+        # Strip leading "AND " from where_filters since PREWHERE handles the first condition
+        where_filters_stripped = re.sub(r"^\s*AND\s+", "", where_filters_sql)
+        where_clause = (
+            f"WHERE {where_filters_stripped}" if where_filters_stripped else ""
+        )
         raw_sql = f"""
         SELECT {select_fields_sql}
         FROM {table_alias}
         {joins.to_sql()}
-        WHERE {table_alias}.project_id = {param_slot(project_param, "String")}
-        {where_filters.to_sql()}
+        PREWHERE {table_alias}.project_id = {param_slot(project_param, "String")}
+        {where_clause}
         {group_by_sql}
         {filter_sql}
         {order_by_sql}
