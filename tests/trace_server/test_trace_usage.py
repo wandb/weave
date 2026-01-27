@@ -1,114 +1,18 @@
-"""Tests for usage utilities and the trace_usage endpoint."""
-
-import uuid
+"""Tests for the trace_usage endpoint."""
 from datetime import datetime, timezone
 
 import pytest
 
+from tests.trace_server.conftest import TEST_ENTITY
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server import usage_utils
-from weave.trace_server.sqlite_trace_server import SqliteTraceServer
-
-
-def make_sqlite_server() -> SqliteTraceServer:
-    """Create an isolated SQLite server with a unique in-memory database."""
-    # Each call gets a unique database name to prevent test interference
-    # Format: file:{name}?mode=memory&cache=shared gives isolation between names
-    db_path = f"file:{uuid.uuid4().hex}?mode=memory&cache=shared"
-    server = SqliteTraceServer(db_path)
-    server.setup_tables()
-    return server
-
-
-def make_call_schema(
-    call_id: str,
-    trace_id: str,
-    parent_id: str | None,
-    usage: dict | None = None,
-    costs: dict | None = None,
-) -> tsi.CallSchema:
-    """Helper to create a CallSchema for testing."""
-    summary: tsi.SummaryMap | None = None
-    if usage or costs:
-        summary = {}
-        if usage:
-            summary["usage"] = usage
-        if costs:
-            summary["weave"] = {"costs": costs}
-
-    return tsi.CallSchema(
-        id=call_id,
-        project_id="test_project",
-        op_name="test_op",
-        trace_id=trace_id,
-        parent_id=parent_id,
-        started_at=datetime(2024, 1, 1, 0, 0, 0, tzinfo=timezone.utc),
-        attributes={},
-        inputs={},
-        output=None,
-        summary=summary,
-    )
-
-
-class TestUsageUtils:
-    """Tests for usage extraction helpers."""
-
-    def test_single_call_with_usage(self):
-        """Test extraction from a single call."""
-        # Create a call with usage data
-        call = make_call_schema(
-            call_id="call1",
-            trace_id="trace1",
-            parent_id=None,
-            usage={
-                "gpt-4": {
-                    "prompt_tokens": 100,
-                    "completion_tokens": 50,
-                    "total_tokens": 150,
-                    "requests": 1,
-                }
-            },
-        )
-
-        # Test the extraction logic using shared utility
-        result = usage_utils.extract_usage_from_call(call, include_costs=False)
-
-        assert "gpt-4" in result
-        assert result["gpt-4"].prompt_tokens == 100
-        assert result["gpt-4"].completion_tokens == 50
-        assert result["gpt-4"].total_tokens == 150
-        assert result["gpt-4"].requests == 1
-
-    def test_input_output_tokens_alias(self):
-        """Test that input_tokens/output_tokens are handled as aliases."""
-        call = make_call_schema(
-            call_id="call1",
-            trace_id="trace1",
-            parent_id=None,
-            usage={
-                "gpt-4": {
-                    "input_tokens": 100,
-                    "output_tokens": 50,
-                }
-            },
-        )
-
-        result = usage_utils.extract_usage_from_call(call, include_costs=False)
-
-        # input_tokens should be added to prompt_tokens
-        assert result["gpt-4"].prompt_tokens == 100
-        # output_tokens should be added to completion_tokens
-        assert result["gpt-4"].completion_tokens == 50
-
-
 class TestTraceUsage:
     """Tests for /trace/usage endpoint (per-call usage with descendant rollup)."""
 
-    def test_single_call(self):
+    def test_single_call(self, trace_server):
         """Test trace usage with a single root call."""
-        server = make_sqlite_server()
-        project_id = "test_project"
-        trace_id = "trace1"
+        server = trace_server
+        project_id = f"{TEST_ENTITY}/trace_usage_single_call"
+        trace_id = "trace_single_call"
 
         # Create a call
         server.call_start(
@@ -156,11 +60,11 @@ class TestTraceUsage:
         assert usage["gpt-4"].prompt_tokens == 100
         assert usage["gpt-4"].completion_tokens == 50
 
-    def test_parent_child_rollup(self):
+    def test_parent_child_rollup(self, trace_server):
         """Test that child metrics roll up to parent."""
-        server = make_sqlite_server()
-        project_id = "test_project"
-        trace_id = "trace1"
+        server = trace_server
+        project_id = f"{TEST_ENTITY}/trace_usage_parent_child_rollup"
+        trace_id = "trace_parent_child_rollup"
 
         # Create root call
         server.call_start(
@@ -245,11 +149,11 @@ class TestTraceUsage:
         assert root_usage["gpt-4"].prompt_tokens == 300  # 100 + 200
         assert root_usage["gpt-4"].completion_tokens == 150  # 50 + 100
 
-    def test_deep_hierarchy(self):
+    def test_deep_hierarchy(self, trace_server):
         """Test recursive aggregation with a deeper call hierarchy."""
-        server = make_sqlite_server()
-        project_id = "test_project"
-        trace_id = "trace1"
+        server = trace_server
+        project_id = f"{TEST_ENTITY}/trace_usage_deep_hierarchy"
+        trace_id = "trace_deep_hierarchy"
 
         # Tree structure:
         # root (100 tokens)
@@ -313,11 +217,11 @@ class TestTraceUsage:
         # root has its own + child1 (with grandchild) + child2
         assert res.call_usage["root"]["gpt-4"].prompt_tokens == 1000  # 100 + 500 + 400
 
-    def test_mixed_llms_in_hierarchy(self):
+    def test_mixed_llms_in_hierarchy(self, trace_server):
         """Test recursive aggregation with different LLMs at different levels."""
-        server = make_sqlite_server()
-        project_id = "test_project"
-        trace_id = "trace1"
+        server = trace_server
+        project_id = f"{TEST_ENTITY}/trace_usage_mixed_llms"
+        trace_id = "trace_mixed_llms"
 
         # Root uses gpt-4
         server.call_start(
@@ -391,16 +295,11 @@ class TestTraceUsage:
 class TestTraceUsageIntegration:
     """Integration tests using actual database operations."""
 
-    @pytest.fixture
-    def server(self):
-        """Create a SQLite server with initialized tables."""
-        server = make_sqlite_server()
-        return server
-
-    def test_full_workflow_trace_usage(self, server):
+    def test_full_workflow_trace_usage(self, trace_server):
         """Test full workflow with trace_usage (per-call with rollup)."""
-        project_id = "test_project"
-        trace_id = "test_trace"
+        server = trace_server
+        project_id = f"{TEST_ENTITY}/trace_usage_full_workflow"
+        trace_id = "trace_full_workflow"
 
         # Create root call
         server.call_start(
@@ -479,10 +378,11 @@ class TestTraceUsageIntegration:
         # Child should have only its own metrics
         assert res.call_usage["child"]["gpt-4"].prompt_tokens == 200
 
-    def test_with_costs(self, server):
+    def test_with_costs(self, trace_server):
         """Test trace_usage with cost data."""
-        project_id = "test_project"
-        trace_id = "test_trace"
+        server = trace_server
+        project_id = f"{TEST_ENTITY}/trace_usage_with_costs"
+        trace_id = "trace_with_costs"
 
         # Complete cost data matching LLMCostSchema requirements
         cost_data = {
