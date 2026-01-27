@@ -16,6 +16,7 @@ from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
 from weave.trace_server import constants, object_creation_utils
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server import usage_utils
 from weave.trace_server.common_interface import SortBy
 from weave.trace_server.errors import (
     InvalidRequest,
@@ -734,6 +735,31 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 if call.total_storage_size_bytes is not None
             ),
         )
+
+    def trace_usage(self, req: tsi.TraceUsageReq) -> tsi.TraceUsageRes:
+        """Compute per-call usage for a trace, with descendant rollup.
+
+        Uses an iterative bottom-up approach to avoid recursion limits.
+        """
+        calls = self.calls_query(
+            tsi.CallsQueryReq(
+                project_id=req.project_id,
+                filter=req.filter,
+                query=req.query,
+                include_costs=req.include_costs,
+                limit=req.limit,
+            )
+        ).calls
+
+        if not calls:
+            return tsi.TraceUsageRes(call_usage={})
+
+        # Use shared utility for iterative aggregation
+        aggregated_usage = usage_utils.aggregate_usage_with_descendants(
+            calls, req.include_costs
+        )
+
+        return tsi.TraceUsageRes(call_usage=aggregated_usage)
 
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
         assert_non_null_wb_user_id(req)

@@ -163,6 +163,9 @@ class ThrowingServer(tsi.TraceServerInterface):
     def calls_query_stats(self, req: tsi.CallsQueryStatsReq) -> tsi.CallsQueryStatsRes:
         raise DummyTestException("FAILURE - calls_query_stats, req:", req)
 
+    def trace_usage(self, req: tsi.TraceUsageReq) -> tsi.TraceUsageRes:
+        raise DummyTestException("FAILURE - trace_usage, req:", req)
+
     def call_update(self, req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
         raise DummyTestException("FAILURE - call_update, req:", req)
 

@@ -577,6 +577,21 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
     @validate_call
+    def trace_usage(self, req: tsi.TraceUsageReq) -> tsi.TraceUsageRes:
+        """Compute per-call usage for a trace with descendant rollup.
+
+        Args:
+            req: Trace usage request.
+
+        Returns:
+            Trace usage response.
+
+        Raises:
+            NotImplementedError: Not yet implemented in stainless client.
+        """
+        raise NotImplementedError("trace_usage not yet implemented in stainless client")
+
+    @validate_call
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
         """Delete calls.
 

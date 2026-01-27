@@ -297,6 +297,10 @@ class CrossProcessTraceServerSender(tsi.TraceServerInterface):
         """Query call statistics."""
         return self._send_request("calls_query_stats", req)
 
+    def trace_usage(self, req: tsi.TraceUsageReq) -> tsi.TraceUsageRes:
+        """Compute per-call usage metrics with descendant rollup for traces."""
+        return self._send_request("trace_usage", req)
+
     def call_update(self, req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
         """Update a call."""
         return self._send_request("call_update", req)

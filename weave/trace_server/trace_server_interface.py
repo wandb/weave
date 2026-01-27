@@ -594,6 +594,59 @@ class CallsQueryStatsRes(BaseModel):
     total_storage_size_bytes: int | None = None
 
 
+class LLMAggregatedUsage(BaseModel):
+    """Aggregated usage metrics for a specific LLM."""
+
+    requests: int = 0
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    total_tokens: int = 0
+    # Cost fields - only populated when include_costs=True
+    prompt_tokens_total_cost: float | None = None
+    completion_tokens_total_cost: float | None = None
+
+
+# --- /trace/usage endpoint (per-call usage with descendant rollup) ---
+
+
+class TraceUsageReq(BaseModelStrict):
+    """Request to compute per-call usage for a trace, with descendant rollup.
+
+    This endpoint returns usage metrics for each call in the trace, where each
+    call's metrics include the sum of its own usage plus all descendants' usage.
+    Use this for trace view where you want to see rolled-up metrics per call.
+
+    Note: All matching calls are loaded into memory for aggregation. For very large
+    result sets (>100k calls), consider using more specific filters or pagination
+    at the application layer.
+    """
+
+    project_id: str
+    filter: CallsFilter | None = Field(
+        default=None,
+        description="Filter to select calls. Typically use trace_ids to get all calls in a trace.",
+    )
+    query: Query | None = Field(
+        default=None,
+        description="Additional query conditions for filtering calls.",
+    )
+    include_costs: bool = Field(
+        default=False,
+        description="If true, include cost calculations in the usage.",
+    )
+    limit: int = Field(
+        default=100_000,
+        description="Maximum number of calls to process. Acts as a safety limit to prevent unbounded memory usage.",
+    )
+
+
+class TraceUsageRes(BaseModel):
+    """Response with per-call usage metrics (each includes descendant contributions)."""
+
+    # Mapping from call_id to usage metrics (own + descendants)
+    call_usage: dict[str, dict[str, LLMAggregatedUsage]] = Field(default_factory=dict)
+
+
 class CallUpdateReq(BaseModelStrict):
     # required for all updates
     project_id: str
@@ -2253,6 +2306,7 @@ class TraceServerInterface(Protocol):
     def calls_query_stream(self, req: CallsQueryReq) -> Iterator[CallSchema]: ...
     def calls_delete(self, req: CallsDeleteReq) -> CallsDeleteRes: ...
     def calls_query_stats(self, req: CallsQueryStatsReq) -> CallsQueryStatsRes: ...
+    def trace_usage(self, req: TraceUsageReq) -> TraceUsageRes: ...
     def call_update(self, req: CallUpdateReq) -> CallUpdateRes: ...
     def call_start_batch(self, req: CallCreateBatchReq) -> CallCreateBatchRes: ...
 
