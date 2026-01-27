@@ -499,6 +499,10 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
 
     # === V2 APIs ===
 
+    def call_stats(self, req: tsi.CallStatsReq) -> tsi.CallStatsRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(self._internal_trace_server.call_stats, req)
+
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         return self._ref_apply(self._internal_trace_server.op_create, req)
