@@ -37,6 +37,7 @@ from weave.trace_server import environment as wf_env
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_common as tsc
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server import usage_utils
 from weave.trace_server.actions_worker.dispatcher import execute_batch
 from weave.trace_server.annotation_queues_query_builder import (
     make_queue_add_calls_check_duplicates_query,
@@ -937,6 +938,33 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             usage_buckets=usage_buckets,
             call_buckets=call_buckets,
         )
+
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.trace_usage")
+    def trace_usage(self, req: tsi.TraceUsageReq) -> tsi.TraceUsageRes:
+        """Compute per-call usage for a trace, with descendant rollup.
+
+        Each call's usage = its own metrics + sum of all descendants' metrics.
+        Uses an iterative bottom-up approach to avoid recursion limits.
+        """
+        calls_req = tsi.CallsQueryReq(
+            project_id=req.project_id,
+            filter=req.filter,
+            query=req.query,
+            columns=["id", "parent_id", "summary"],
+            include_costs=req.include_costs,
+            limit=req.limit,
+        )
+
+        calls = list(self.calls_query_stream(calls_req))
+
+        if not calls:
+            return tsi.TraceUsageRes(call_usage={})
+
+        aggregated_usage = usage_utils.aggregate_usage_with_descendants(
+            calls, req.include_costs
+        )
+
+        return tsi.TraceUsageRes(call_usage=aggregated_usage)
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.calls_query_stream")
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
