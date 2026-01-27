@@ -1,8 +1,8 @@
 import abc
-import typing
 import types
+import typing
 from collections.abc import Callable, Iterator
-from typing import TypeVar
+from typing import ClassVar, TypeVar, cast
 
 from pydantic import BaseModel
 
@@ -65,9 +65,12 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         self._internal_trace_server = internal_trace_server
         self._idc = id_converter
 
-    _STREAM_METHOD_SUFFIXES = ("_stream", "_list")
-    _AUTO_SKIP_REF_METHODS = {"file_create", "file_content_read"}
-    _AUTO_STRICT_PROJECT_METHODS = {
+    _STREAM_METHOD_SUFFIXES: ClassVar[tuple[str, ...]] = ("_stream", "_list")
+    _AUTO_SKIP_REF_METHODS: ClassVar[set[str]] = {
+        "file_create",
+        "file_content_read",
+    }
+    _AUTO_STRICT_PROJECT_METHODS: ClassVar[set[str]] = {
         "call_read",
         "calls_query",
         "calls_query_stream",
@@ -100,12 +103,23 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
                 if isinstance(sole_value, BaseModel):
                     req = sole_value
             if req is not None:
+                stream = name.endswith(self._STREAM_METHOD_SUFFIXES)
+                convert_refs = name not in self._AUTO_SKIP_REF_METHODS
+                strict_project_match = name in self._AUTO_STRICT_PROJECT_METHODS
+                if stream:
+                    return self._auto_forward(
+                        attr,
+                        req,
+                        stream=True,
+                        convert_refs=convert_refs,
+                        strict_project_match=strict_project_match,
+                    )
                 return self._auto_forward(
                     attr,
                     req,
-                    stream=name.endswith(self._STREAM_METHOD_SUFFIXES),
-                    convert_refs=name not in self._AUTO_SKIP_REF_METHODS,
-                    strict_project_match=name in self._AUTO_STRICT_PROJECT_METHODS,
+                    stream=False,
+                    convert_refs=convert_refs,
+                    strict_project_match=strict_project_match,
                 )
             return attr(*args, **kwargs)
 
@@ -310,24 +324,24 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
 
     def _auto_forward(
         self,
-        method: Callable[[A], B] | Callable[[A], Iterator[B]],
+        method: Callable[[A], typing.Any],
         req: A,
         *,
         stream: bool = False,
         convert_refs: bool = True,
         strict_project_match: bool = False,
-    ) -> B | Iterator[B]:
+    ) -> typing.Any:
         req_conv, project_id_map = self._prepare_request(req, convert_refs=convert_refs)
         res = method(req_conv)
         if stream:
             return self._finalize_stream_response(
-                res,
+                cast(Iterator[B], res),
                 project_id_map=project_id_map,
                 convert_refs=convert_refs,
                 strict_project_match=strict_project_match,
             )
         return self._finalize_response(
-            res,
+            cast(B, res),
             project_id_map=project_id_map,
             convert_refs=convert_refs,
             strict_project_match=strict_project_match,
@@ -392,7 +406,9 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
     ) -> tsi.ActionsExecuteBatchRes:
         if req.wb_user_id is None:
             raise ValueError("wb_user_id cannot be None")
-        return self._auto_forward(self._internal_trace_server.actions_execute_batch, req)
+        return self._auto_forward(
+            self._internal_trace_server.actions_execute_batch, req
+        )
 
     def completions_create_stream(
         self, req: tsi.CompletionsCreateReq
