@@ -512,7 +512,12 @@ class OrderField(BaseModel):
         parts = []
         for cast_to, direction in options:
             if isinstance(
-                self.field, (CallsMergedAggField, CallsMergedFeedbackPayloadField)
+                self.field,
+                (
+                    CallsMergedAggField,
+                    CallsMergedFeedbackPayloadField,
+                    CallsMergedSummaryField,
+                ),
             ):
                 field_sql = self.field.as_sql(
                     pb, table_alias, cast_to, use_agg_fn=use_agg_fn
