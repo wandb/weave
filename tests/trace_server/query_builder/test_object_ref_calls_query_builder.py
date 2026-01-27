@@ -944,9 +944,8 @@ def test_object_ref_filter_calls_complete() -> None:
                     digest),
              filtered_calls AS
           (SELECT calls_complete.id AS id
-           FROM calls_complete
-           WHERE calls_complete.project_id = {pb_0:String}
-             AND (length(calls_complete.output_refs) > 0
+           FROM calls_complete PREWHERE calls_complete.project_id = {pb_0:String}
+           WHERE (length(calls_complete.output_refs) > 0
                   OR calls_complete.ended_at IS NULL)
            AND (((coalesce(nullIf(JSON_VALUE(calls_complete.output_dump, {pb_3:String}), 'null'), '') IN
                       (SELECT ref
@@ -958,9 +957,8 @@ def test_object_ref_filter_calls_complete() -> None:
                    AND ((NOT ((calls_complete.started_at IS NULL)))))
            ORDER BY calls_complete.started_at DESC)
         SELECT calls_complete.id AS id
-        FROM calls_complete
-        WHERE calls_complete.project_id = {pb_0:String}
-          AND (calls_complete.id IN filtered_calls)
+        FROM calls_complete PREWHERE calls_complete.project_id = {pb_0:String}
+        WHERE (calls_complete.id IN filtered_calls)
         ORDER BY calls_complete.started_at DESC
         """,
         {
@@ -1032,9 +1030,8 @@ def test_object_ref_filter_calls_complete_mixed_conditions() -> None:
                     digest),
              filtered_calls AS (
         SELECT calls_complete.id AS id
-        FROM calls_complete
-        WHERE calls_complete.project_id = {pb_0:String}
-          AND (calls_complete.parent_id IS NULL)
+        FROM calls_complete PREWHERE calls_complete.project_id = {pb_0:String}
+        WHERE (calls_complete.parent_id IS NULL)
           AND (length(calls_complete.input_refs) > 0
                OR calls_complete.started_at IS NULL)
         AND (((((coalesce(nullIf(JSON_VALUE(calls_complete.inputs_dump, {pb_3:String}), 'null'), '') IN
@@ -1050,9 +1047,8 @@ def test_object_ref_filter_calls_complete_mixed_conditions() -> None:
                 LIMIT 10)
         SELECT calls_complete.id AS id,
                calls_complete.inputs_dump AS inputs_dump
-        FROM calls_complete
-        WHERE calls_complete.project_id = {pb_0:String}
-          AND (calls_complete.id IN filtered_calls)
+        FROM calls_complete PREWHERE calls_complete.project_id = {pb_0:String}
+        WHERE (calls_complete.id IN filtered_calls)
         ORDER BY calls_complete.started_at DESC
         """,
         {

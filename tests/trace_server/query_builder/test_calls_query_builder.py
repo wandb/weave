@@ -2853,8 +2853,7 @@ def test_query_with_summary_weave_status_filter_calls_complete() -> None:
         """
         SELECT
             calls_complete.id AS id
-        FROM calls_complete
-        WHERE calls_complete.project_id = {pb_5:String}
+        FROM calls_complete PREWHERE calls_complete.project_id = {pb_5:String}
         AND (
             (((CASE
                 WHEN calls_complete.exception IS NOT NULL THEN {pb_1:String}
