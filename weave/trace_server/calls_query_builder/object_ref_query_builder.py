@@ -444,11 +444,13 @@ class ObjectRefQueryProcessor:
         table_alias: str,
         expand_columns: list[str],
         field_to_object_join_alias_map: dict[str, str],
+        use_agg_fn: bool = True,
     ):
         self.pb = pb
         self.table_alias = table_alias
         self.expand_columns = expand_columns
         self.field_to_object_join_alias_map = field_to_object_join_alias_map
+        self.use_agg_fn = use_agg_fn
         self.fields_used: set[str] = set()
 
     def process_operand(self, operand: "tsi_query.Operand") -> str:
@@ -491,7 +493,10 @@ class ObjectRefQueryProcessor:
             condition = object_ref_conditions[0]
             self.fields_used.add(condition.field_path)
             return condition.as_sql_condition(
-                self.pb, self.table_alias, self.field_to_object_join_alias_map
+                self.pb,
+                self.table_alias,
+                self.field_to_object_join_alias_map,
+                use_agg_fn=self.use_agg_fn,
             )
         else:
             # Handle as normal condition
@@ -503,6 +508,7 @@ class ObjectRefQueryProcessor:
                 tsi_query.Query.model_validate({"$expr": {"$and": [operand]}}),
                 self.pb,
                 self.table_alias,
+                use_agg_fn=self.use_agg_fn,
             )
             self.fields_used.update(f.field for f in filter_conditions.fields_used)
             return combine_conditions(filter_conditions.conditions, "AND")

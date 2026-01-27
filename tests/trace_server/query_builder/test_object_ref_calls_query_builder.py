@@ -4,6 +4,7 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     HardCodedFilter,
 )
 from weave.trace_server.interface import query as tsi_query
+from weave.trace_server.project_version.types import ReadTable
 
 
 def test_object_ref_filter_simple() -> None:
@@ -893,5 +894,173 @@ def test_object_ref_filter_complex_nested_path() -> None:
             "pb_2": "test_value",
             "pb_3": '$."c"."d"',
             "pb_4": '$."a"."b"',
+        },
+    )
+
+
+def test_object_ref_filter_calls_complete() -> None:
+    """Test object ref filtering with calls_complete table.
+
+    This test ensures that when using ReadTable.CALLS_COMPLETE:
+    1. No aggregate functions like any() are used
+    2. No GROUP BY clause is generated
+    3. Filter conditions use AND clauses instead of HAVING
+    """
+    cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_COMPLETE)
+    cq.add_field("id")
+    cq.add_condition(
+        tsi_query.EqOperation.model_validate(
+            {
+                "$eq": [
+                    {"$getField": "output.model.temperature"},
+                    {"$literal": 1},
+                ]
+            }
+        )
+    )
+    cq.add_order("started_at", "desc")
+    cq.set_expand_columns(["output.model"])
+    assert_sql(
+        cq,
+        """
+        WITH obj_filter_0 AS
+          (SELECT digest,
+                  concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS ref
+           FROM object_versions
+           WHERE project_id = {pb_0:String}
+             AND JSON_VALUE(val_dump, {pb_1:String}) = {pb_2:UInt64}
+           GROUP BY project_id,
+                    object_id,
+                    digest
+
+           UNION ALL
+
+           SELECT digest,
+                  digest as ref
+           FROM table_rows
+           WHERE project_id = {pb_0:String}
+             AND JSON_VALUE(val_dump, {pb_1:String}) = {pb_2:UInt64}
+           GROUP BY project_id,
+                    digest),
+             filtered_calls AS
+          (SELECT calls_complete.id AS id
+           FROM calls_complete
+           WHERE calls_complete.project_id = {pb_0:String}
+             AND (length(calls_complete.output_refs) > 0
+                  OR calls_complete.ended_at IS NULL)
+           AND (((coalesce(nullIf(JSON_VALUE(calls_complete.output_dump, {pb_3:String}), 'null'), '') IN
+                      (SELECT ref
+                       FROM obj_filter_0)
+                   OR regexpExtract(coalesce(nullIf(JSON_VALUE(calls_complete.output_dump, {pb_3:String}), 'null'), ''), '/([^/]+)$', 1) IN
+                      (SELECT ref
+                       FROM obj_filter_0)))
+                   AND ((calls_complete.deleted_at IS NULL))
+                   AND ((NOT ((calls_complete.started_at IS NULL)))))
+           ORDER BY calls_complete.started_at DESC)
+        SELECT calls_complete.id AS id
+        FROM calls_complete
+        WHERE calls_complete.project_id = {pb_0:String}
+          AND (calls_complete.id IN filtered_calls)
+        ORDER BY calls_complete.started_at DESC
+        """,
+        {
+            "pb_0": "project",
+            "pb_1": '$."temperature"',
+            "pb_2": 1,
+            "pb_3": '$."model"',
+        },
+    )
+
+
+def test_object_ref_filter_calls_complete_mixed_conditions() -> None:
+    """Test calls_complete with mixed object ref and non-object ref conditions.
+
+    Verifies that both object ref conditions and regular conditions work
+    correctly without aggregate functions when using calls_complete.
+    """
+    cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_COMPLETE)
+    cq.add_field("id")
+    cq.add_field("inputs")
+    cq.add_condition(
+        tsi_query.OrOperation.model_validate(
+            {
+                "$or": [
+                    # Object ref condition
+                    {
+                        "$eq": [
+                            {"$getField": "inputs.model.provider"},
+                            {"$literal": "openai"},
+                        ]
+                    },
+                    # Non-object ref condition
+                    {
+                        "$eq": [
+                            {"$getField": "inputs.prompt"},
+                            {"$literal": "test prompt"},
+                        ]
+                    },
+                ]
+            }
+        )
+    )
+    cq.set_hardcoded_filter(HardCodedFilter(filter={"trace_roots_only": True}))
+    cq.add_order("started_at", "desc")
+    cq.set_limit(10)
+    cq.set_expand_columns(["inputs.model"])
+
+    assert_sql(
+        cq,
+        """
+        WITH obj_filter_0 AS
+          (SELECT digest,
+                  concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS ref
+           FROM object_versions
+           WHERE project_id = {pb_0:String}
+             AND JSON_VALUE(val_dump, {pb_1:String}) = {pb_2:String}
+           GROUP BY project_id,
+                    object_id,
+                    digest
+
+           UNION ALL
+
+           SELECT digest,
+                  digest as ref
+           FROM table_rows
+           WHERE project_id = {pb_0:String}
+             AND JSON_VALUE(val_dump, {pb_1:String}) = {pb_2:String}
+           GROUP BY project_id,
+                    digest),
+             filtered_calls AS (
+        SELECT calls_complete.id AS id
+        FROM calls_complete
+        WHERE calls_complete.project_id = {pb_0:String}
+          AND (calls_complete.parent_id IS NULL)
+          AND (length(calls_complete.input_refs) > 0
+               OR calls_complete.started_at IS NULL)
+        AND (((((coalesce(nullIf(JSON_VALUE(calls_complete.inputs_dump, {pb_3:String}), 'null'), '') IN
+                       (SELECT ref
+                        FROM obj_filter_0)
+                     OR regexpExtract(coalesce(nullIf(JSON_VALUE(calls_complete.inputs_dump, {pb_3:String}), 'null'), ''), '/([^/]+)$', 1) IN
+                       (SELECT ref
+                        FROM obj_filter_0)))
+                  OR ((coalesce(nullIf(JSON_VALUE(calls_complete.inputs_dump, {pb_4:String}), 'null'), '') = {pb_5:String}))))
+                AND ((calls_complete.deleted_at IS NULL))
+                AND ((NOT ((calls_complete.started_at IS NULL)))))
+                ORDER BY calls_complete.started_at DESC
+                LIMIT 10)
+        SELECT calls_complete.id AS id,
+               calls_complete.inputs_dump AS inputs_dump
+        FROM calls_complete
+        WHERE calls_complete.project_id = {pb_0:String}
+          AND (calls_complete.id IN filtered_calls)
+        ORDER BY calls_complete.started_at DESC
+        """,
+        {
+            "pb_0": "project",
+            "pb_1": '$."provider"',
+            "pb_2": "openai",
+            "pb_3": '$."model"',
+            "pb_4": '$."prompt"',
+            "pb_5": "test prompt",
         },
     )
