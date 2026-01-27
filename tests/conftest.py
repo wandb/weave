@@ -5,6 +5,7 @@ import os
 import typing
 from collections.abc import Callable
 from datetime import datetime
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -151,11 +152,11 @@ _TRACE_SERVER_METHOD_NAMES = frozenset(
 
 
 class ThrowingServer(tsi.TraceServerInterface):
-    def __getattr__(self, name: str) -> Callable[..., typing.Any]:
+    def __getattr__(self, name: str) -> Callable[..., Any]:
         if name not in _TRACE_SERVER_METHOD_NAMES:
             raise AttributeError(name)
 
-        def _raise(*args: typing.Any, **kwargs: typing.Any) -> typing.Any:
+        def _raise(*args: Any, **kwargs: Any) -> Any:
             if args:
                 req = args[0]
             elif "req" in kwargs:
