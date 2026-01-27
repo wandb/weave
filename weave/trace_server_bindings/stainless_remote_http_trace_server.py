@@ -30,10 +30,10 @@ from weave.trace_server_bindings.models import (
     ServerInfoRes,
     StartBatchItem,
 )
+from weave.utils import http_requests
 from weave.utils.project_id import from_project_id
 from weave.utils.retry import get_current_retry_id, with_retry
 from weave.wandb_interface import project_creator
-from weave.utils import http_requests
 
 TReq = TypeVar("TReq", bound=BaseModel)
 TRes = TypeVar("TRes", bound=BaseModel)

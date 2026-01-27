@@ -20,7 +20,7 @@ def aggregate_usage_with_descendants(
         return {}
 
     calls_by_id = {call.id: call for call in calls_list}
-    children_remaining = {call_id: 0 for call_id in calls_by_id}
+    children_remaining = dict.fromkeys(calls_by_id, 0)
     parent_by_id: dict[str, str] = {}
 
     for call in calls_list:

@@ -32,12 +32,11 @@ from tenacity import (
 
 from weave.trace_server import clickhouse_trace_server_migrator as wf_migrator
 from weave.trace_server import clickhouse_trace_server_settings as ch_settings
-from weave.trace_server import constants, object_creation_utils
+from weave.trace_server import constants, object_creation_utils, usage_utils
 from weave.trace_server import environment as wf_env
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_common as tsc
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server import usage_utils
 from weave.trace_server.actions_worker.dispatcher import execute_batch
 from weave.trace_server.annotation_queues_query_builder import (
     make_queue_add_calls_check_duplicates_query,
