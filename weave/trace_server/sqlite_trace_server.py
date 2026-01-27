@@ -7,6 +7,7 @@ import sqlite3
 import threading
 from collections.abc import Iterator
 from contextvars import ContextVar
+from dataclasses import dataclass
 from typing import Any, cast
 
 from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
@@ -64,19 +65,30 @@ from weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker impo
     EvaluateModelDispatcher,
 )
 
-_conn_cursor: ContextVar[
-    tuple[int, dict[str, tuple[sqlite3.Connection, sqlite3.Cursor]]] | None
-] = ContextVar("conn_cursor", default=None)
+@dataclass(frozen=True)
+class ConnCursor:
+    conn: sqlite3.Connection
+    cursor: sqlite3.Cursor
 
 
-def _get_conn_map() -> dict[str, tuple[sqlite3.Connection, sqlite3.Cursor]]:
+@dataclass(frozen=True)
+class ConnCursorState:
+    thread_id: int
+    conn_map: dict[str, ConnCursor]
+
+
+_conn_cursor: ContextVar[ConnCursorState | None] = ContextVar(
+    "conn_cursor", default=None
+)
+
+
+def _get_conn_map() -> dict[str, ConnCursor]:
     conn_state = _conn_cursor.get()
     current_thread = threading.get_ident()
-    if conn_state is None or conn_state[0] != current_thread:
-        conn_map: dict[str, tuple[sqlite3.Connection, sqlite3.Cursor]] = {}
-        _conn_cursor.set((current_thread, conn_map))
-        return conn_map
-    return conn_state[1]
+    if conn_state is None or conn_state.thread_id != current_thread:
+        conn_state = ConnCursorState(current_thread, {})
+        _conn_cursor.set(conn_state)
+    return conn_state.conn_map
 
 
 def get_conn_cursor(db_path: str) -> tuple[sqlite3.Connection, sqlite3.Cursor]:
@@ -90,9 +102,9 @@ def get_conn_cursor(db_path: str) -> tuple[sqlite3.Connection, sqlite3.Cursor]:
         # Create an array reverse function.
         conn.create_function("reverse", 1, lambda x: x[::-1])
         cursor = conn.cursor()
-        conn_cursor = (conn, cursor)
+        conn_cursor = ConnCursor(conn, cursor)
         conn_map[db_path] = conn_cursor
-    return conn_cursor
+    return conn_cursor.conn, conn_cursor.cursor
 
 
 def close_conn_cursor(db_path: str | None = None) -> None:
@@ -100,21 +112,21 @@ def close_conn_cursor(db_path: str | None = None) -> None:
     if conn_state is None:
         return
     current_thread = threading.get_ident()
-    if conn_state[0] != current_thread:
+    if conn_state.thread_id != current_thread:
         return
-    conn_map = conn_state[1]
+    conn_map = conn_state.conn_map
     if db_path is None:
         db_paths = list(conn_map.keys())
     else:
         db_paths = [db_path] if db_path in conn_map else []
     for path in db_paths:
-        conn, cursor = conn_map.pop(path)
+        conn_cursor = conn_map.pop(path)
         try:
-            cursor.close()
+            conn_cursor.cursor.close()
         except Exception:
             pass
         try:
-            conn.close()
+            conn_cursor.conn.close()
         except Exception:
             pass
     if not conn_map:
