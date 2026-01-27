@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import BaseModel
 
 from weave.trace_server import trace_server_interface as tsi
@@ -16,7 +18,7 @@ class EndBatchItem(BaseModel):
 class CompleteBatchItem(BaseModel):
     """A complete call ready to be sent to calls_complete endpoint."""
 
-    mode: str = "complete"
+    mode: Literal["complete"] = "complete"
     req: tsi.CompletedCallSchemaForInsert
 
 

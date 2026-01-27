@@ -23,7 +23,6 @@ from tests.trace_server_bindings.conftest import (
 )
 from weave.trace.display.term import configure_logger
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server_bindings.async_batch_processor import NonRetryableBatchError
 from weave.trace_server_bindings.models import (
     CompleteBatchItem,
     EndBatchItem,
@@ -197,32 +196,48 @@ def test_eager_non_retryable_error_drops_item(caplog):
     assert any("dropped call start ids" in record.message for record in caplog.records)
 
 
-def test_eager_retryable_error_requeues_batch():
-    """Raise NonRetryableBatchError for retryable eager errors."""
+@pytest.mark.disable_logging_error_check
+def test_eager_retryable_error_logs_and_continues(caplog):
+    """Log and drop item on retryable error, continue with remaining items."""
     server = RemoteHTTPTraceServer("http://example.com", should_batch=True)
-    start = generate_start(id="call-id", project_id="entity/project")
+    start1 = generate_start(id="call-id-1", project_id="entity/project")
+    start2 = generate_start(id="call-id-2", project_id="entity/project")
 
-    def _raise_retryable(_: StartBatchItem) -> None:
-        raise httpx.HTTPStatusError(
-            "500",
-            request=httpx.Request("POST", "http://example.com"),
-            response=httpx.Response(
-                500, request=httpx.Request("POST", "http://example.com")
-            ),
-        )
+    call_attempts = []
 
-    server._send_call_start_v2 = _raise_retryable  # type: ignore[assignment]
+    def _raise_retryable_once(start) -> None:
+        call_attempts.append(start.id)
+        if start.id == "call-id-1":
+            raise httpx.HTTPStatusError(
+                "500",
+                request=httpx.Request("POST", "http://example.com"),
+                response=httpx.Response(
+                    500, request=httpx.Request("POST", "http://example.com")
+                ),
+            )
+        # call-id-2 succeeds
+
+    server._send_call_start_v2 = _raise_retryable_once  # type: ignore[assignment]
 
     try:
-        with pytest.raises(NonRetryableBatchError):
-            server._flush_calls_eager(
-                [StartBatchItem(req=tsi.CallStartReq(start=start))]
-            )
+        # Should NOT raise - logs and drops item 1, continues with item 2
+        server._flush_calls_eager(
+            [
+                StartBatchItem(req=tsi.CallStartReq(start=start1)),
+                StartBatchItem(req=tsi.CallStartReq(start=start2)),
+            ]
+        )
     finally:
         if server.call_processor:
             server.call_processor.stop_accepting_new_work_and_flush_queue()
         if server.feedback_processor:
             server.feedback_processor.stop_accepting_new_work_and_flush_queue()
+
+    # Item 1 was logged as dropped
+    assert any("dropped call start ids" in record.message for record in caplog.records)
+    assert any("call-id-1" in record.message for record in caplog.records)
+    # Item 2 was still processed
+    assert "call-id-2" in call_attempts
 
 
 @patch("weave.utils.http_requests.post")

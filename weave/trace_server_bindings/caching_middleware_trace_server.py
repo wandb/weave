@@ -424,12 +424,7 @@ class CachingMiddlewareTraceServer(TraceServerClientInterface):
         return self._next_trace_server.ensure_project_exists(entity, project)
 
     # Call API
-    def call_start(
-        self, req: tsi.CallStartReq, *, eager_call_start: bool = False
-    ) -> tsi.CallStartRes:
-        # Pass through eager_call_start to batching clients that support it
-        if eager_call_start:
-            return self._next_trace_server.call_start(req, eager_call_start=True)  # type: ignore[call-arg]
+    def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
         return self._next_trace_server.call_start(req)
 
     def call_end(self, req: tsi.CallEndReq) -> tsi.CallEndRes:

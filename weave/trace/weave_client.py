@@ -814,7 +814,7 @@ class WeaveClient:
             # we need to change the interface itself.
             call_processor = _get_call_processor(self.server)
             if call_processor is not None:
-                eager = getattr(op, "eager_call_start", False)
+                eager = op.eager_call_start
                 call_processor.enqueue_start(
                     StartBatchItem(req=call_start_req), eager_call_start=eager
                 )

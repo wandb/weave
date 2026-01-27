@@ -103,6 +103,8 @@ jobs:
   trace-tests:
     name: Trace nox tests
     timeout-minutes: 15
+    # TODO: refactor to use matrix.include for runner selection
+    # Use 8-core runners for trace and trace_calls_complete_only shards (resource-intensive)
     runs-on: ${{ (matrix.nox-shard == 'trace' || matrix.nox-shard == 'trace_calls_complete_only') && 'ubuntu-latest-8-cores' || 'ubuntu-latest' }}
     strategy:
       matrix:

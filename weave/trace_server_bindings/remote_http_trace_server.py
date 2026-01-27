@@ -19,10 +19,7 @@ from weave.trace.settings import (
 from weave.trace_server import http_service_interface as his
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ids import generate_id
-from weave.trace_server_bindings.async_batch_processor import (
-    AsyncBatchProcessor,
-    NonRetryableBatchError,
-)
+from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
 from weave.trace_server_bindings.call_batch_processor import CallBatchProcessor
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface
 from weave.trace_server_bindings.http_utils import (
@@ -43,7 +40,7 @@ from weave.trace_server_bindings.models import (
 )
 from weave.utils import http_requests
 from weave.utils.project_id import from_project_id
-from weave.utils.retry import _is_retryable_exception, get_current_retry_id, with_retry
+from weave.utils.retry import get_current_retry_id, with_retry
 from weave.wandb_interface import project_creator
 
 logger = logging.getLogger(__name__)
@@ -96,8 +93,6 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         self._auth: tuple[str, str] | None = auth
         self._extra_headers: dict[str, str] | None = extra_headers
         self.remote_request_bytes_limit = remote_request_bytes_limit
-        # Track whether we've warned about automatic upgrade to calls_complete mode
-        self._warned_about_calls_complete_upgrade = False
 
     def ensure_project_exists(
         self, entity: str, project: str
@@ -223,15 +218,6 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
             batch: The batch of items that failed to send (will be re-enqueued).
             error_message: The error message from the server (for logging).
         """
-        # Log warning only once per client instance
-        if not self._warned_about_calls_complete_upgrade:
-            self._warned_about_calls_complete_upgrade = True
-            logger.warning(
-                "Project requires 'calls_complete' mode. "
-                "Automatically upgrading SDK to use the more performant calls_complete processor. "
-                f"Server message: {error_message}"
-            )
-
         # Already upgraded? Just re-enqueue to the new processor
         if self.use_calls_complete:
             if isinstance(self.call_processor, CallBatchProcessor):
@@ -239,6 +225,12 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
                     cast(list[StartBatchItem | EndBatchItem | CompleteBatchItem], batch)
                 )
             return
+
+        logger.warning(
+            "Project requires 'calls_complete' mode. "
+            "Automatically upgrading SDK to use the more performant calls_complete processor. "
+            f"Server message: {error_message}"
+        )
 
         # Store old processor reference for cleanup
         old_processor = self.call_processor
@@ -276,14 +268,10 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         to be visible immediately in the UI. Uses single call/start and call/end
         endpoints for easier rate limiting.
 
-        Handles errors gracefully:
-        - Non-retryable errors (4xx except 429): log and drop the item
-        - Retryable errors: raise NonRetryableBatchError to signal batch processor
-          to requeue without trying individual processing
+        Each item is sent individually with retry logic (@with_retry). If all retries
+        are exhausted, the item is logged and dropped, then processing continues
+        with remaining items in the batch.
         """
-        if not batch:
-            return
-
         for item in batch:
             try:
                 if isinstance(item, StartBatchItem):
@@ -291,15 +279,7 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
                 elif isinstance(item, EndBatchItem):
                     self._send_call_end_v2(item.req.end)
             except Exception as e:
-                if not _is_retryable_exception(e):
-                    # Non-retryable error (e.g., 404, 400) - log and drop this item
-                    log_dropped_call_batch([item], e)
-                else:
-                    # Retryable error - raise special exception to trigger requeue
-                    # without falling back to individual processing
-                    raise NonRetryableBatchError(
-                        f"Eager batch failed with retryable error: {e}"
-                    ) from e
+                log_dropped_call_batch([item], e)
 
     @with_retry
     def _send_call_start_v2(self, start: tsi.StartedCallSchemaForInsert) -> None:

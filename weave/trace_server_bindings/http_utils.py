@@ -356,14 +356,15 @@ def is_calls_complete_mode_error(error: Exception) -> bool:
         True if the error indicates calls_complete mode is required
     """
     response = getattr(error, "response", None)
-    if response is not None:
-        try:
-            error_data = response.json()
-            if isinstance(error_data, dict):
-                return (
-                    error_data.get("error_code")
-                    == ERROR_CODE_CALLS_COMPLETE_MODE_REQUIRED
-                )
-        except (json.JSONDecodeError, ValueError, AttributeError):
-            pass
-    return False
+    if response is None:
+        return False
+
+    try:
+        error_data = response.json()
+    except (json.JSONDecodeError, ValueError, AttributeError):
+        return False
+    else:
+        return (
+            isinstance(error_data, dict)
+            and error_data.get("error_code") == ERROR_CODE_CALLS_COMPLETE_MODE_REQUIRED
+        )
