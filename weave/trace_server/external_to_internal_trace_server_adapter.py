@@ -1,5 +1,6 @@
 import abc
 import typing
+import types
 from collections.abc import Callable, Iterator
 from typing import TypeVar
 
@@ -73,6 +74,17 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         "obj_read",
         "objs_query",
     }
+
+    def __getattribute__(self, name: str) -> typing.Any:
+        if name.startswith("_"):
+            return object.__getattribute__(self, name)
+
+        attr = object.__getattribute__(self, name)
+        if isinstance(attr, types.MethodType):
+            func = attr.__func__
+            if func.__module__ == "weave.trace_server.trace_server_interface":
+                return object.__getattribute__(self, "__getattr__")(name)
+        return attr
 
     def __getattr__(self, name: str) -> typing.Any:
         attr = getattr(self._internal_trace_server, name)
