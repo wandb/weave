@@ -155,7 +155,7 @@ class ThrowingServer(tsi.TraceServerInterface):
         if name in _TRACE_SERVER_METHOD_NAMES:
 
             def _raise(*args: Any, **kwargs: Any) -> Any:
-                if args:
+                if len(args) > 0:
                     req = args[0]
                 elif "req" in kwargs:
                     req = kwargs["req"]
