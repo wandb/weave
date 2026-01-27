@@ -84,26 +84,30 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
     }
 
     def __getattribute__(self, name: str) -> typing.Any:
+        # Route Protocol stubs through __getattr__ so auto-forward runs even when
+        # the Protocol already defines the method on the class.
         if name.startswith("_"):
             return object.__getattribute__(self, name)
 
         attr = object.__getattribute__(self, name)
         if isinstance(attr, types.MethodType):
             func = attr.__func__
-            # FullTraceServerInterface is a Protocol with stub methods; route those
-            # back through __getattr__ so we can apply ID/ref conversion defaults.
+            # Protocol stubs live in trace_server_interface; redirect them so the
+            # adapter can wrap internal calls with ID/ref conversions by default.
             if func.__module__ == "weave.trace_server.trace_server_interface":
                 return object.__getattribute__(self, "__getattr__")(name)
         return attr
 
     def __getattr__(self, name: str) -> typing.Any:
+        # Dynamic fallback: wrap internal methods so most calls auto-forward with
+        # ID/ref conversion and stream handling without per-method adapters.
         attr = getattr(self._internal_trace_server, name)
         if not callable(attr):
             return attr
 
         def wrapper(*args: typing.Any, **kwargs: typing.Any) -> typing.Any:
-            # Default adapter path: detect the single Pydantic request argument
-            # and run it through the ID/ref conversion pipeline automatically.
+            # Adapter wrapper: detect the standard single-BaseModel request so we can
+            # apply conversions and stream handling automatically.
             req: BaseModel | None = None
             if len(args) == 1 and not kwargs and isinstance(args[0], BaseModel):
                 req = args[0]
@@ -112,6 +116,7 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
                 if isinstance(sole_value, BaseModel):
                     req = sole_value
             if req is not None:
+                # Method name conventions drive default stream/ref/user handling.
                 stream = name.endswith(self._STREAM_METHOD_SUFFIXES)
                 convert_refs = name not in self._AUTO_SKIP_REF_METHODS
                 strict_project_match = name in self._AUTO_STRICT_PROJECT_METHODS
@@ -129,12 +134,14 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
                     attr,
                     req,
                     stream=False,
-                    convert_refs=convert_refs,
-                    strict_project_match=strict_project_match,
-                    convert_user_ids=convert_user_ids,
-                )
+                        convert_refs=convert_refs,
+                        strict_project_match=strict_project_match,
+                        convert_user_ids=convert_user_ids,
+                    )
+            # Non-standard signature: call the internal method directly.
             return attr(*args, **kwargs)
 
+        # Preserve method metadata/name so caches keyed by method name still work.
         return functools.wraps(attr)(wrapper)
 
     def _convert_ids(
@@ -145,6 +152,7 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         run_id_converter: Callable[[str], str],
         user_id_converter: Callable[[str], str],
     ) -> None:
+        # Recursively walk BaseModels and convert project/run/user IDs in-place.
         if isinstance(value, BaseModel):
             for field_name in value.model_fields:
                 field_value = getattr(value, field_name)
@@ -215,6 +223,7 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
                     )
 
     def _convert_request_ids(self, req: BaseModel) -> dict[str, str]:
+        # Convert external IDs to internal ones while recording a reverse map.
         project_id_map: dict[str, str] = {}
 
         def convert_project_id(project_id: str) -> str:
@@ -238,6 +247,7 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         strict_project_match: bool = False,
         convert_user_ids: bool = True,
     ) -> None:
+        # Convert response IDs back to external values (optionally preserving user IDs).
         def convert_project_id(project_id: str) -> str:
             if project_id in project_id_map:
                 return project_id_map[project_id]

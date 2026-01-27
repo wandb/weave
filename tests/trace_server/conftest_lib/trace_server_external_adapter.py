@@ -98,11 +98,13 @@ class TestOnlyUserInjectingExternalTraceServer(
         self._user_id = user_id
 
     def __getattribute__(self, name: str) -> typing.Any:
+        # Test helper: wrap public callables so BaseModel requests get wb_user_id.
         attr = super().__getattribute__(name)
         if name.startswith("_") or not callable(attr):
             return attr
 
         def wrapper(*args: typing.Any, **kwargs: typing.Any) -> typing.Any:
+            # Detect the single BaseModel request argument for user injection.
             req: BaseModel | None = None
             if len(args) == 1 and not kwargs and isinstance(args[0], BaseModel):
                 req = args[0]
@@ -116,9 +118,11 @@ class TestOnlyUserInjectingExternalTraceServer(
                 self._inject_user_id(req)
             return attr(*args, **kwargs)
 
+        # Preserve method metadata/name so caches keyed by method name still work.
         return functools.wraps(attr)(wrapper)
 
     def _inject_user_id(self, value: typing.Any) -> None:
+        # Walk the request tree and force wb_user_id for all BaseModel nodes.
         if isinstance(value, BaseModel):
             for field_name in value.model_fields:
                 field_value = getattr(value, field_name)
