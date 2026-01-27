@@ -135,6 +135,8 @@ from weave.trace_server.trace_server_interface import (
     TraceServerInterface,
     TraceStatus,
 )
+from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
+from weave.trace_server_bindings.call_batch_processor import CallBatchProcessor
 from weave.trace_server_bindings.http_utils import (
     REMOTE_REQUEST_BYTES_LIMIT,
     ROW_COUNT_CHUNKING_THRESHOLD,
@@ -336,20 +338,17 @@ class WeaveClient:
             # Set Client project name with updated project name
             self.project = resp.project_name
 
-        self._server_call_processor = None
         self._server_feedback_processor = None
-        # This is a short-term hack to get around the fact that we are reaching into
-        # the underlying implementation of the specific server to get the call processor.
-        # The `RemoteHTTPTraceServer` contains a call processor and we use that to control
-        # some client-side flushing mechanics. We should move this to the interface layer. However,
-        # we don't really want the server-side implementations to need to define no-ops as that is
-        # even uglier. So we are using this "hasattr" check to avoid forcing the server-side implementations
-        # to define no-ops.
-        if hasattr(self.server, "get_call_processor"):
-            self._server_call_processor = self.server.get_call_processor()
         if hasattr(self.server, "get_feedback_processor"):
             self._server_feedback_processor = self.server.get_feedback_processor()
         self.send_file_cache = WeaveClientSendFileCache()
+
+    @property
+    def _server_call_processor(self) -> AsyncBatchProcessor | CallBatchProcessor | None:
+        """Get the server's call processor (fetched fresh to handle runtime upgrades)."""
+        if hasattr(self.server, "get_call_processor"):
+            return self.server.get_call_processor()
+        return None
 
     ################ High Level Convenience Methods ################
 
@@ -773,6 +772,13 @@ class WeaveClient:
         should_print_call_link_ = should_print_call_link()
         current_call = call_context.get_current_call()
 
+        # Check if using CallBatchProcessor with non-eager mode (calls_complete path)
+        # In this case, we delay printing the call link until finish_call
+        uses_calls_complete_path = (
+            isinstance(self._server_call_processor, CallBatchProcessor)
+            and not op.eager_call_start
+        )
+
         def send_start_call() -> bool:
             maybe_redacted_inputs_with_refs = inputs_with_refs
             if should_redact_pii():
@@ -826,7 +832,13 @@ class WeaveClient:
         def on_complete(f: Future) -> None:
             try:
                 root_call_did_not_error = f.result() and not current_call
-                if root_call_did_not_error and should_print_call_link_:
+                # For calls_complete path (non-eager CallBatchProcessor), the link is
+                # printed in finish_call after the complete call is queued to ensure
+                if (
+                    root_call_did_not_error
+                    and should_print_call_link_
+                    and not uses_calls_complete_path
+                ):
                     print_call_link(call)
             except Exception:
                 pass
@@ -984,7 +996,34 @@ class WeaveClient:
                 )
             self.server.call_end(call_end_req)
 
-        self.future_executor.defer(send_end_call)
+        # For calls_complete path (non-eager CallBatchProcessor), print the call link
+        # after finish_call, when the complete call is queued to the batch processor.
+        # Note: We fetch fresh from server instead of using cached _server_call_processor
+        # because the processor can be upgraded at runtime via _upgrade_to_calls_complete
+        is_root_call = call.parent_id is None
+        call_processor = (
+            self.server.get_call_processor()
+            if hasattr(self.server, "get_call_processor")
+            else None
+        )
+        uses_calls_complete_path = isinstance(
+            call_processor, CallBatchProcessor
+        ) and not (op is not None and op.eager_call_start)
+
+        def on_end_complete(f: Future) -> None:
+            try:
+                f.result()  # Check for errors
+                if (
+                    is_root_call
+                    and uses_calls_complete_path
+                    and should_print_call_link()
+                ):
+                    print_call_link(call)
+            except Exception:
+                pass
+
+        fut = self.future_executor.defer(send_end_call)
+        fut.add_done_callback(on_end_complete)
 
         # If a turn call is finishing, reset turn context for next sibling
         if call.turn_id == call.id and call.thread_id:
