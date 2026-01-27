@@ -263,6 +263,10 @@ def get_sqlite_trace_server(
             sqlite_server.drop_tables()
         except Exception:
             pass  # Best effort cleanup
+        try:
+            sqlite_server.close()
+        except Exception:
+            pass  # Best effort cleanup
 
 
 class LocalSecretFetcher:
