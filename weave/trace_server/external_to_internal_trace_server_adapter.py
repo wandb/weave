@@ -1,4 +1,5 @@
 import abc
+import functools
 import types
 import typing
 from collections.abc import Callable, Iterator
@@ -77,6 +78,10 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         "obj_read",
         "objs_query",
     }
+    _AUTO_SKIP_USER_ID_RESPONSE_METHODS: ClassVar[set[str]] = {
+        "obj_read",
+        "objs_query",
+    }
 
     def __getattribute__(self, name: str) -> typing.Any:
         if name.startswith("_"):
@@ -106,6 +111,7 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
                 stream = name.endswith(self._STREAM_METHOD_SUFFIXES)
                 convert_refs = name not in self._AUTO_SKIP_REF_METHODS
                 strict_project_match = name in self._AUTO_STRICT_PROJECT_METHODS
+                convert_user_ids = name not in self._AUTO_SKIP_USER_ID_RESPONSE_METHODS
                 if stream:
                     return self._auto_forward(
                         attr,
@@ -113,6 +119,7 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
                         stream=True,
                         convert_refs=convert_refs,
                         strict_project_match=strict_project_match,
+                        convert_user_ids=convert_user_ids,
                     )
                 return self._auto_forward(
                     attr,
@@ -120,10 +127,11 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
                     stream=False,
                     convert_refs=convert_refs,
                     strict_project_match=strict_project_match,
+                    convert_user_ids=convert_user_ids,
                 )
             return attr(*args, **kwargs)
 
-        return wrapper
+        return functools.wraps(attr)(wrapper)
 
     def _convert_ids(
         self,
@@ -224,6 +232,7 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         *,
         project_id_map: dict[str, str],
         strict_project_match: bool = False,
+        convert_user_ids: bool = True,
     ) -> None:
         def convert_project_id(project_id: str) -> str:
             if project_id in project_id_map:
@@ -233,11 +242,15 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
             external_id = self._idc.int_to_ext_project_id(project_id)
             return external_id if external_id is not None else project_id
 
+        user_id_converter: Callable[[str], str] = self._idc.int_to_ext_user_id
+        if not convert_user_ids:
+            user_id_converter = lambda user_id: user_id
+
         self._convert_ids(
             res,
             project_id_converter=convert_project_id,
             run_id_converter=self._idc.int_to_ext_run_id,
-            user_id_converter=self._idc.int_to_ext_user_id,
+            user_id_converter=user_id_converter,
         )
 
     def _prepare_request(
@@ -259,6 +272,7 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         project_id_map: dict[str, str],
         convert_refs: bool = True,
         strict_project_match: bool = False,
+        convert_user_ids: bool = True,
     ) -> B:
         if convert_refs:
             res = universal_int_to_ext_ref_converter(
@@ -268,6 +282,7 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
             res,
             project_id_map=project_id_map,
             strict_project_match=strict_project_match,
+            convert_user_ids=convert_user_ids,
         )
         return res
 
@@ -278,6 +293,7 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         project_id_map: dict[str, str],
         convert_refs: bool = True,
         strict_project_match: bool = False,
+        convert_user_ids: bool = True,
     ) -> Iterator[B]:
         int_to_ext_project_cache: dict[str, str | None] = {}
 
@@ -297,6 +313,7 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
                 item,
                 project_id_map=project_id_map,
                 strict_project_match=strict_project_match,
+                convert_user_ids=convert_user_ids,
             )
             yield item
 
@@ -330,6 +347,7 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         stream: bool = False,
         convert_refs: bool = True,
         strict_project_match: bool = False,
+        convert_user_ids: bool = True,
     ) -> typing.Any:
         req_conv, project_id_map = self._prepare_request(req, convert_refs=convert_refs)
         res = method(req_conv)
@@ -339,12 +357,14 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
                 project_id_map=project_id_map,
                 convert_refs=convert_refs,
                 strict_project_match=strict_project_match,
+                convert_user_ids=convert_user_ids,
             )
         return self._finalize_response(
             cast(typing.Any, res),
             project_id_map=project_id_map,
             convert_refs=convert_refs,
             strict_project_match=strict_project_match,
+            convert_user_ids=convert_user_ids,
         )
 
     # Standard API Below:

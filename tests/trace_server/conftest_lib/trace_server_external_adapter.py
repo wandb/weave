@@ -1,4 +1,5 @@
 import base64
+import functools
 import typing
 
 from pydantic import BaseModel
@@ -113,7 +114,7 @@ class TestOnlyUserInjectingExternalTraceServer(
                 self._inject_user_id(req)
             return attr(*args, **kwargs)
 
-        return wrapper
+        return functools.wraps(attr)(wrapper)
 
     def _inject_user_id(self, value: typing.Any) -> None:
         if isinstance(value, BaseModel):
