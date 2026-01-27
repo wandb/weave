@@ -20,6 +20,7 @@ from weave.trace import weave_client, weave_init
 from weave.trace.context import weave_client_context
 from weave.trace.context.call_context import set_call_stack
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.kafka import KafkaProducer
 from weave.trace_server_bindings.caching_middleware_trace_server import (
     CachingMiddlewareTraceServer,
 )
@@ -36,10 +37,7 @@ def patch_kafka_producer():
 
     If a test needs to test the Kafka producer, they should orride this patch explicitly.
     """
-    with patch(
-        "weave.trace_server.kafka.KafkaProducer.from_env",
-        return_value=MagicMock(),
-    ):
+    with patch.object(KafkaProducer, "from_env", return_value=MagicMock()):
         yield
 
 
