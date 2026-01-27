@@ -447,6 +447,7 @@ class CachingMiddlewareTraceServer(TraceServerClientInterface):
 
     def trace_usage(self, req: tsi.TraceUsageReq) -> tsi.TraceUsageRes:
         return self._next_trace_server.trace_usage(req)
+
     def call_stats(self, req: tsi.CallStatsReq) -> tsi.CallStatsRes:
         return self._next_trace_server.call_stats(req)
 

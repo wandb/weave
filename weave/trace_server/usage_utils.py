@@ -111,7 +111,9 @@ def merge_usage(
         if source_usage.prompt_tokens_total_cost is not None:
             if target_usage.prompt_tokens_total_cost is None:
                 target_usage.prompt_tokens_total_cost = 0.0
-            target_usage.prompt_tokens_total_cost += source_usage.prompt_tokens_total_cost
+            target_usage.prompt_tokens_total_cost += (
+                source_usage.prompt_tokens_total_cost
+            )
 
         if source_usage.completion_tokens_total_cost is not None:
             if target_usage.completion_tokens_total_cost is None:
@@ -181,7 +183,7 @@ def aggregate_usage_with_descendants(
 
     # Count children within our result set for each call
     # (only count children that are in call_map)
-    child_count: dict[str, int] = {call_id: 0 for call_id in call_map}
+    child_count: dict[str, int] = dict.fromkeys(call_map, 0)
     for call_id in call_map:
         for child_id in children_map.get(call_id, []):
             if child_id in call_map:
