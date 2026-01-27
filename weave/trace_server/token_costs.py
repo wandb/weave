@@ -1,7 +1,7 @@
 import base64
 import re
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.calls_query_builder.cte import CTE
@@ -63,6 +63,54 @@ LLM_TOKEN_PRICES_TABLE_NAME = "llm_token_prices"
 LLM_TOKEN_PRICES_TABLE = Table(
     name=LLM_TOKEN_PRICES_TABLE_NAME, cols=LLM_TOKEN_PRICES_COLUMNS
 )
+
+
+def build_model_prices_query(
+    project_id: str, models: list[str]
+) -> tuple[str, dict[str, Any]]:
+    """Build SQL to get the current price per model.
+
+    Uses project-level pricing if available, otherwise falls back to default.
+
+    Args:
+        project_id: Project ID for project-level pricing.
+        models: List of model/llm_id values to look up.
+
+    Returns:
+        SQL string and parameters dict.
+    """
+    sql = f"""
+    SELECT llm_id, prompt_token_cost, completion_token_cost
+    FROM (
+        SELECT
+            llm_id,
+            prompt_token_cost,
+            completion_token_cost,
+            ROW_NUMBER() OVER (
+                PARTITION BY llm_id
+                ORDER BY
+                    CASE
+                        WHEN pricing_level = '{PRICING_LEVELS["PROJECT"]}' AND pricing_level_id = {{project:String}} THEN 1
+                        WHEN pricing_level = '{PRICING_LEVELS["DEFAULT"]}' AND pricing_level_id = {{default:String}} THEN 2
+                        ELSE 3
+                    END,
+                    effective_date DESC
+            ) AS rank
+        FROM {LLM_TOKEN_PRICES_TABLE_NAME}
+        WHERE llm_id IN {{models:Array(String)}}
+          AND (
+              (pricing_level = '{PRICING_LEVELS["PROJECT"]}' AND pricing_level_id = {{project:String}})
+              OR (pricing_level = '{PRICING_LEVELS["DEFAULT"]}' AND pricing_level_id = {{default:String}})
+          )
+    )
+    WHERE rank = 1
+    """
+    params = {
+        "models": models,
+        "project": project_id,
+        "default": DEFAULT_PRICING_LEVEL_ID,
+    }
+    return sql, params
 
 
 def get_calls_merged_columns() -> list[Column]:

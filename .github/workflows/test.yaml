@@ -198,12 +198,14 @@ jobs:
           WB_SERVER_HOST: http://wandbservice
           WF_CLICKHOUSE_HOST: weave_clickhouse
           WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
-          WANDB_API_KEY: ${{ secrets.WANDB_API_KEY }}
-          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          # Use dummy API keys when secrets aren't available (e.g., Dependabot PRs)
+          # Tests use VCR recordings so real keys aren't needed
+          WANDB_API_KEY: ${{ secrets.WANDB_API_KEY || 'DUMMY_API_KEY' }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY || 'DUMMY_API_KEY' }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || 'DUMMY_API_KEY' }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY || 'DUMMY_API_KEY' }}
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY || 'DUMMY_API_KEY' }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY || 'DUMMY_API_KEY' }}
           DD_TRACE_ENABLED: false
         run: |
           nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- \
@@ -343,12 +345,14 @@ jobs:
           WB_SERVER_HOST: http://localhost
           WF_CLICKHOUSE_HOST: localhost
           WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
-          WANDB_API_KEY: ${{ secrets.WANDB_API_KEY }}
-          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          # Use dummy API keys when secrets aren't available (e.g., Dependabot PRs)
+          # Tests use VCR recordings so real keys aren't needed
+          WANDB_API_KEY: ${{ secrets.WANDB_API_KEY || 'DUMMY_API_KEY' }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY || 'DUMMY_API_KEY' }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || 'DUMMY_API_KEY' }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY || 'DUMMY_API_KEY' }}
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY || 'DUMMY_API_KEY' }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY || 'DUMMY_API_KEY' }}
           DD_TRACE_ENABLED: false
         run: |
           nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- -m "trace_server" --trace-server=sqlite
