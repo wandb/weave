@@ -25,8 +25,11 @@ class MyScorer(weave.Scorer):
         return user_input in output
 
 
-def make_evaluation():
+def make_evaluation(media_scoring_json_paths_name="media_scoring_json_paths"):
     dataset = [{"user_input": "Tim"}, {"user_input": "Sweeney"}]
+    media_scoring_json_paths = {
+        media_scoring_json_paths_name: ["$.messages[0].content[1].input_audio"]
+    }
     return weave.Evaluation(
         dataset=dataset,
         scorers=[
@@ -46,7 +49,7 @@ def make_evaluation():
                 ),
                 scoring_prompt="Here are the inputs: {inputs}. Here is the output: {output}. Is the output correct?",
                 enable_audio_input_scoring=True,
-                media_scoring_json_paths=["$.messages[0].content[1].input_audio"],
+                **media_scoring_json_paths,
             ),
         ],
     )
@@ -81,9 +84,11 @@ llm_as_a_judge_scorer_digest = (
 library_cases = [
     SerializationTestCase(
         id="Library Objects - Scorer, Evaluation, Dataset, LLMAsAJudgeScorer, LLMStructuredCompletionModel",
-        runtime_object_factory=lambda: make_evaluation(),
+        runtime_object_factory=lambda: make_evaluation(
+            media_scoring_json_paths_name="audio_input_scoring_json_paths"
+        ),
         inline_call_param=False,
-        is_legacy=False,
+        is_legacy=True,
         exp_json={
             "_type": "Evaluation",
             "name": None,
@@ -158,7 +163,7 @@ library_cases = [
                     "column_map": None,
                     "model": "weave:///shawn/test-project/object/LLMStructuredCompletionModel:VUqRnYmuvNhu3zgfDb9hnZhLRFM1vKKI1WEpw3bsViE",
                     "enable_audio_input_scoring": True,
-                    "media_scoring_json_paths": [
+                    "audio_input_scoring_json_paths": [
                         "$.messages[0].content[1].input_audio"
                     ],
                     "scoring_prompt": "Here are the inputs: {inputs}. Here is the output: {output}. Is the output correct?",
