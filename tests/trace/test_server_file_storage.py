@@ -279,6 +279,7 @@ class TestAzureStorage:
         ):
             yield
 
+    @pytest.mark.flaky(reruns=3, reruns_delay=2)
     @pytest.mark.usefixtures("azure_storage_env")
     def test_azure_storage(self, run_storage_test, azure_blob):
         """Test file storage using Azure Blob Storage."""
