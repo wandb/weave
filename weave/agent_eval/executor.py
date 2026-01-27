@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import asyncio
 import os
+import sys
 import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from .artifacts import ArtifactManager, RunArtifacts, TaskArtifacts
 from .config.schema import EvalConfig, HarnessConfig, TaskConfig
@@ -17,6 +18,12 @@ from .harnesses.base import HarnessAdapter
 from .harnesses.registry import get_harness
 from .scorers.base import ScoreResult, Scorer
 from .scorers.deterministic import DeterministicScorer
+
+
+def _default_log(msg: str, end: str = "\n") -> None:
+    """Default logging function that writes to stderr."""
+    sys.stderr.write(msg + end)
+    sys.stderr.flush()
 
 
 @dataclass
@@ -82,11 +89,21 @@ class EvalResult:
 class Executor:
     """Orchestrates evaluation runs."""
 
-    def __init__(self, config: EvalConfig, config_dir: Path | None = None):
+    def __init__(
+        self,
+        config: EvalConfig,
+        config_dir: Path | None = None,
+        log: Callable[[str], None] | None = None,
+    ):
         self.config = config
         self.config_dir = config_dir or Path.cwd()
         self.driver: Driver | None = None
         self.artifacts: ArtifactManager | None = None
+        self._log = log or _default_log
+
+    def log(self, msg: str, end: str = "\n") -> None:
+        """Log a message to the output."""
+        self._log(msg, end)
 
     async def run(self) -> EvalResult:
         """Execute the full evaluation.
@@ -96,10 +113,15 @@ class Executor:
         """
         started_at = datetime.now()
 
+        self.log(f"Starting evaluation run...")
+
         # Initialize artifacts manager
         output_dir = self.config_dir / self.config.output.directory
         self.artifacts = ArtifactManager(output_dir)
         run = self.artifacts.create_run()
+
+        self.log(f"Run ID: {run.run_id}")
+        self.log(f"Output directory: {output_dir}")
 
         result = EvalResult(
             run_id=run.run_id,
@@ -109,13 +131,17 @@ class Executor:
 
         try:
             # Resolve environment variables
+            self.log("Resolving environment variables...")
             env = self._resolve_env()
+            self.log(f"  Found {len(env)} required variables")
 
             # Create driver
+            self.log(f"Initializing {self.config.driver.type.value} driver...")
             self.driver = create_driver(self.config.driver)
 
             # Expand matrix
             combinations = self.config.expand_matrix()
+            self.log(f"Expanded matrix: {len(combinations)} task/harness combinations")
 
             # Write run metadata
             run.write_metadata({
@@ -128,17 +154,35 @@ class Executor:
                 },
             })
 
+            self.log("")
+
             # Execute each combination
-            for harness_config, task_config in combinations:
+            for i, (harness_config, task_config) in enumerate(combinations, 1):
+                self.log(f"[{i}/{len(combinations)}] Running task: {task_config.id}")
+                self.log(f"  Harness: {harness_config.type.value}:{harness_config.model}")
+                
                 task_result = await self._run_task(
                     run, harness_config, task_config, env
                 )
                 result.task_results.append(task_result)
+                
+                # Show result
+                if task_result.success:
+                    status = "PASS" if task_result.overall_pass else "FAIL"
+                    self.log(f"  Result: {status}")
+                    if task_result.scores:
+                        for name, score in task_result.scores.items():
+                            self.log(f"    {name}: {score.score:.0f}%")
+                else:
+                    self.log(f"  Result: ERROR - {task_result.error}")
+                self.log("")
 
         except Exception as e:
+            self.log(f"Error: {e}")
             result.error = str(e)
 
         result.completed_at = datetime.now()
+        duration = (result.completed_at - started_at).total_seconds()
 
         # Update run metadata
         run.write_metadata({
@@ -146,6 +190,8 @@ class Executor:
             "completed_at": result.completed_at.isoformat(),
             "summary": result.summary(),
         })
+
+        self.log(f"Evaluation completed in {duration:.1f}s")
 
         return result
 
@@ -201,9 +247,11 @@ class Executor:
         adapter = get_harness(harness_config)
 
         # Build image
+        self.log(f"  Building container image...")
         skill_path = self.config_dir / self.config.skill.path
         layers = [self.config_dir / layer for layer in self.config.environment.layers]
 
+        build_start = time.time()
         image_result = await self.driver.build_image(
             base_image=self.config.environment.base_image,
             layers=layers,
@@ -212,8 +260,10 @@ class Executor:
             setup_commands=self.config.environment.setup + adapter.get_setup_commands(),
             tag=f"agent-eval-{self.config.name}-{task_config.id}",
         )
+        build_duration = time.time() - build_start
 
         if not image_result.success:
+            self.log(f"  Image build failed after {build_duration:.1f}s")
             return TaskResult(
                 task_id=task_config.id,
                 harness=harness_config.type.value,
@@ -226,6 +276,8 @@ class Executor:
                 ),
                 error=image_result.error,
             )
+        
+        self.log(f"  Image built in {build_duration:.1f}s")
 
         # Build command
         command = adapter.build_command(
@@ -258,6 +310,7 @@ class Executor:
         })
 
         # Run job
+        self.log(f"  Running harness (timeout: {task_config.timeout}s)...")
         job_result = await self.driver.run_job(
             image=image_result.image_id,
             command=command,
@@ -266,6 +319,7 @@ class Executor:
             artifacts_dir=task_artifacts.path,
             network_allowlist=self.config.network.allowed_hosts,
         )
+        self.log(f"  Harness completed in {job_result.duration_seconds:.1f}s (exit code: {job_result.exit_code})")
 
         # Update metadata
         task_artifacts.write_metadata({
@@ -284,14 +338,18 @@ class Executor:
 
         # Run scorers if job succeeded
         if job_result.success:
+            self.log(f"  Running scorers...")
             scores = await self._run_scorers(task_artifacts)
             task_result.scores = scores
 
             # Write scores to artifacts
             for scorer_name, score in scores.items():
                 task_artifacts.write_score(scorer_name, score.to_dict())
+        elif job_result.error:
+            self.log(f"  Skipping scoring due to job error: {job_result.error}")
 
         # Cleanup image
+        self.log(f"  Cleaning up...")
         try:
             await self.driver.cleanup(image_result.image_id)
         except Exception:

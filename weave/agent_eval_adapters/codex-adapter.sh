@@ -3,10 +3,13 @@
 #
 # Environment variables:
 #   AGENT_EVAL_PROMPT      - The user prompt to execute
-#   AGENT_EVAL_SKILL_PATH  - Path to skill directory
+#   AGENT_EVAL_SKILL_PATH  - Path to skill directory (copied to .codex/skills/)
 #   AGENT_EVAL_WORKDIR     - Working directory
-#   AGENT_EVAL_TIMEOUT     - Timeout in seconds
+#   AGENT_EVAL_TIMEOUT     - Timeout in seconds (handled by Docker, not codex)
 #   OPENAI_API_KEY         - OpenAI API key
+#
+# Codex CLI loads skills from .codex/skills/ in the working directory.
+# The Dockerfile copies skills there during image build.
 
 set -e
 
@@ -22,27 +25,21 @@ if [ -z "$OPENAI_API_KEY" ]; then
 fi
 
 # Set defaults
-SKILL_PATH="${AGENT_EVAL_SKILL_PATH:-/skill}"
 WORKDIR="${AGENT_EVAL_WORKDIR:-/workspace}"
-TIMEOUT="${AGENT_EVAL_TIMEOUT:-300}"
 
 # Change to working directory
 cd "$WORKDIR"
 
-# Build codex command
-CMD="codex exec --json --full-auto"
+# Ensure artifacts directories exist
+mkdir -p /artifacts/workspace
 
-# Add skills path if it exists
-if [ -d "$SKILL_PATH" ]; then
-    CMD="$CMD --skills-path $SKILL_PATH"
-fi
-
-# Add timeout
-CMD="$CMD --timeout $TIMEOUT"
-
-# Execute and capture output
-echo "Running: $CMD \"$AGENT_EVAL_PROMPT\"" >&2
-$CMD "$AGENT_EVAL_PROMPT" > /artifacts/trajectory.jsonl
+# Execute codex and capture output
+echo "Running codex exec..." >&2
+codex exec --json --full-auto "$AGENT_EVAL_PROMPT" > /artifacts/trajectory.jsonl 2>&1 || {
+    EXIT_CODE=$?
+    echo "Codex exited with code $EXIT_CODE" >&2
+    # Still copy the trajectory even on failure
+}
 
 # Copy workspace to artifacts
 cp -r "$WORKDIR"/* /artifacts/workspace/ 2>/dev/null || true

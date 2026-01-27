@@ -14,7 +14,19 @@ if TYPE_CHECKING:
 
 @register_harness("codex")
 class CodexAdapter(HarnessAdapter):
-    """Adapter for OpenAI Codex CLI."""
+    """Adapter for OpenAI Codex CLI.
+    
+    Codex CLI reference: https://github.com/openai/codex
+    
+    Key flags:
+      --json           Output JSONL trajectory to stdout
+      --full-auto      Sandboxed automatic execution (workspace-write)
+      --model MODEL    Model to use
+      -C DIR           Working directory
+    
+    Note: Codex doesn't have --timeout or --skills-path flags.
+    Skills are loaded from .codex/skills/ in the working directory.
+    """
 
     @property
     def name(self) -> str:
@@ -32,31 +44,30 @@ class CodexAdapter(HarnessAdapter):
         model: str,
         extra_args: list[str],
     ) -> list[str]:
-        """Build codex exec command."""
+        """Build codex exec command.
+        
+        Note: timeout is handled at the Docker level, not by codex itself.
+        Skills must be copied to .codex/skills/ in the workspace.
+        """
         cmd = [
             "codex",
             "exec",
             "--json",  # Output JSONL trajectory
-            "--full-auto",  # Allow file system changes
+            "--full-auto",  # Sandboxed automatic execution
+            "--skip-git-repo-check",  # Allow running outside git repo
             "--model", model,
-            "--timeout", str(timeout),
         ]
-
-        # Add skills path if provided
-        if skill_path:
-            cmd.extend(["--skills-path", skill_path])
 
         # Add any extra arguments
         cmd.extend(extra_args)
 
-        # Add the prompt
+        # Add the prompt last
         cmd.append(prompt)
 
         return cmd
 
     def get_adapter_script_path(self) -> Path | None:
         """Return path to codex adapter script."""
-        # Look for adapter in agent_eval_adapters directory
         adapter_path = Path(__file__).parent.parent.parent / "agent_eval_adapters" / "codex-adapter.sh"
         if adapter_path.exists():
             return adapter_path

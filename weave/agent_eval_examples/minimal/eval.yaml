@@ -2,11 +2,18 @@ version: "1.0"
 name: minimal-eval
 description: The simplest possible agent_eval example.
 
+# Explicitly specify harness (defaults to codex:gpt-4o if not specified)
+# matrix:
+#   harness:
+#     - type: codex
+#       model: gpt-4o
+
 driver:
   type: docker
 
 environment:
-  base_image: python:3.12-slim
+  # Use node image since codex CLI requires npm
+  base_image: node:20-slim
 
 skill:
   path: ./skill

@@ -81,10 +81,11 @@ class DockerDriver(Driver):
                 f"FROM {base_image}",
                 "",
                 "# Create directories",
-                "RUN mkdir -p /workspace /artifacts /skill",
+                "RUN mkdir -p /workspace /artifacts /workspace/.codex/skills",
                 "",
-                "# Copy skill",
+                "# Copy skill to both /skill (generic) and .codex/skills (for Codex CLI)",
                 "COPY skill /skill",
+                "COPY skill /workspace/.codex/skills/",
                 "",
             ]
 
@@ -126,10 +127,16 @@ class DockerDriver(Driver):
             returncode, stdout, stderr = await self._run_cmd(build_args, timeout=600)
 
             if returncode != 0:
+                # Include more context in the error
+                error_msg = f"Build failed (exit code {returncode})"
+                if stderr:
+                    # Truncate stderr if too long
+                    stderr_preview = stderr[:1000] + "..." if len(stderr) > 1000 else stderr
+                    error_msg += f": {stderr_preview}"
                 return ImageBuildResult(
                     image_id="",
                     build_logs=build_logs,
-                    error=f"Build failed: {stderr}",
+                    error=error_msg,
                 )
 
             image_id = stdout.strip()
@@ -195,6 +202,9 @@ class DockerDriver(Driver):
             error = "Job timed out"
         elif returncode != 0:
             error = f"Job failed with exit code {returncode}"
+            if stderr:
+                stderr_preview = stderr[:500] + "..." if len(stderr) > 500 else stderr
+                error += f": {stderr_preview}"
 
         return JobResult(
             exit_code=returncode,

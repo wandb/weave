@@ -40,7 +40,8 @@ def get_harness(config: HarnessConfig) -> HarnessAdapter:
     Raises:
         ValueError: If harness type is not registered.
     """
-    harness_type = config.type.value
+    # Handle both enum and string types
+    harness_type = config.type.value if hasattr(config.type, "value") else str(config.type)
     if harness_type not in _REGISTRY:
         raise ValueError(
             f"Unknown harness type: {harness_type}. "
