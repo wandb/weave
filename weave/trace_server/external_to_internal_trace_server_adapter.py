@@ -326,6 +326,7 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         stream: typing.Literal[True],
         convert_refs: bool = True,
         strict_project_match: bool = False,
+        convert_user_ids: bool = True,
     ) -> Iterator[B]: ...
 
     @typing.overload
@@ -337,6 +338,7 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         stream: typing.Literal[False] = False,
         convert_refs: bool = True,
         strict_project_match: bool = False,
+        convert_user_ids: bool = True,
     ) -> B: ...
 
     def _auto_forward(
