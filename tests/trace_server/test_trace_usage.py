@@ -418,7 +418,7 @@ class TestTraceUsageIntegration:
     def test_with_costs(self, trace_server):
         """Test trace_usage with cost data."""
         server = trace_server
-        project_id = f"{TEST_ENTITY}/trace_usage_with_costs"
+        project_id = f"{TEST_ENTITY}/test-project"
         trace_id = uuid7()
         call1_id = uuid7()
         call2_id = uuid7()
