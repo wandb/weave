@@ -335,13 +335,13 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         res = method(req_conv)
         if stream:
             return self._finalize_stream_response(
-                cast(Iterator[B], res),
+                cast(Iterator[typing.Any], res),
                 project_id_map=project_id_map,
                 convert_refs=convert_refs,
                 strict_project_match=strict_project_match,
             )
         return self._finalize_response(
-            cast(B, res),
+            cast(typing.Any, res),
             project_id_map=project_id_map,
             convert_refs=convert_refs,
             strict_project_match=strict_project_match,
