@@ -65,6 +65,7 @@ from weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker impo
     EvaluateModelDispatcher,
 )
 
+
 @dataclass(frozen=True)
 class ConnCursor:
     conn: sqlite3.Connection
