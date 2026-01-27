@@ -111,6 +111,8 @@ class TestOnlyUserInjectingExternalTraceServer(
                 if isinstance(sole_value, BaseModel):
                     req = sole_value
             if req is not None:
+                # Test adapter: inject wb_user_id on all BaseModel requests so
+                # callers don't need per-method overrides.
                 self._inject_user_id(req)
             return attr(*args, **kwargs)
 

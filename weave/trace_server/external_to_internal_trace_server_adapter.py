@@ -90,6 +90,8 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         attr = object.__getattribute__(self, name)
         if isinstance(attr, types.MethodType):
             func = attr.__func__
+            # FullTraceServerInterface is a Protocol with stub methods; route those
+            # back through __getattr__ so we can apply ID/ref conversion defaults.
             if func.__module__ == "weave.trace_server.trace_server_interface":
                 return object.__getattribute__(self, "__getattr__")(name)
         return attr
@@ -100,6 +102,8 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
             return attr
 
         def wrapper(*args: typing.Any, **kwargs: typing.Any) -> typing.Any:
+            # Default adapter path: detect the single Pydantic request argument
+            # and run it through the ID/ref conversion pipeline automatically.
             req: BaseModel | None = None
             if len(args) == 1 and not kwargs and isinstance(args[0], BaseModel):
                 req = args[0]
