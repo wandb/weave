@@ -31,7 +31,8 @@ class LLMAsAJudgeScorer(Scorer):
     scoring_prompt: str | MessagesPrompt
     enable_audio_input_scoring: bool = False
     media_scoring_json_paths: list[str] | None = Field(
-        default=None, alias="audio_input_scoring_json_paths"
+        default=None,
+        alias="audio_input_scoring_json_paths",
     )
 
     @field_validator("scoring_prompt", mode="before")

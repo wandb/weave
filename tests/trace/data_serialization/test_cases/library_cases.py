@@ -25,11 +25,8 @@ class MyScorer(weave.Scorer):
         return user_input in output
 
 
-def make_evaluation(media_scoring_json_paths_name="media_scoring_json_paths"):
+def make_evaluation():
     dataset = [{"user_input": "Tim"}, {"user_input": "Sweeney"}]
-    media_scoring_json_paths = {
-        media_scoring_json_paths_name: ["$.messages[0].content[1].input_audio"]
-    }
     return weave.Evaluation(
         dataset=dataset,
         scorers=[
@@ -49,7 +46,7 @@ def make_evaluation(media_scoring_json_paths_name="media_scoring_json_paths"):
                 ),
                 scoring_prompt="Here are the inputs: {inputs}. Here is the output: {output}. Is the output correct?",
                 enable_audio_input_scoring=True,
-                **media_scoring_json_paths,
+                media_scoring_json_paths=["$.messages[0].content[1].input_audio"],
             ),
         ],
     )
@@ -76,17 +73,15 @@ def evaluation_equality_check(a, b):
 
 
 llm_as_a_judge_scorer_digest = (
-    "t7mpggmkUX0XDd9gi2K2J01r657NtnfGlnc0cb8hScs"
+    "hhCGYF6e9ybgkNGlFyXNxwAYArvjeCDXtEFUkcvgK3c"
     if sys.version_info.major >= 3 and sys.version_info.minor >= 13
     else "hhCGYF6e9ybgkNGlFyXNxwAYArvjeCDXtEFUkcvgK3c"
 )
 
 library_cases = [
     SerializationTestCase(
-        id="Library Objects - Scorer, Evaluation, Dataset, LLMAsAJudgeScorer, LLMStructuredCompletionModel",
-        runtime_object_factory=lambda: make_evaluation(
-            media_scoring_json_paths_name="audio_input_scoring_json_paths"
-        ),
+        id="Library Objects - Scorer, Evaluation, Dataset, LLMAsAJudgeScorer, LLMStructuredCompletionModel (legacy v3)",
+        runtime_object_factory=lambda: make_evaluation(),
         inline_call_param=False,
         is_legacy=True,
         exp_json={
