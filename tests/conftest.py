@@ -3,7 +3,6 @@ import json
 import logging
 import os
 import typing
-from collections.abc import Callable
 from datetime import datetime
 from typing import Any
 from unittest.mock import MagicMock, patch
@@ -152,20 +151,20 @@ _TRACE_SERVER_METHOD_NAMES = frozenset(
 
 
 class ThrowingServer(tsi.TraceServerInterface):
-    def __getattr__(self, name: str) -> Callable[..., Any]:
-        if name not in _TRACE_SERVER_METHOD_NAMES:
-            raise AttributeError(name)
+    def __getattribute__(self, name: str) -> Any:
+        if name in _TRACE_SERVER_METHOD_NAMES:
+            def _raise(*args: Any, **kwargs: Any) -> Any:
+                if args:
+                    req = args[0]
+                elif "req" in kwargs:
+                    req = kwargs["req"]
+                else:
+                    req = None
+                raise DummyTestException(f"FAILURE - {name}, req:", req)
 
-        def _raise(*args: Any, **kwargs: Any) -> Any:
-            if args:
-                req = args[0]
-            elif "req" in kwargs:
-                req = kwargs["req"]
-            else:
-                req = None
-            raise DummyTestException(f"FAILURE - {name}, req:", req)
+            return _raise
 
-        return _raise
+        return super().__getattribute__(name)
 
 
 @pytest.fixture
