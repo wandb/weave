@@ -1,4 +1,7 @@
 import base64
+import typing
+
+from pydantic import BaseModel
 
 from weave.trace_server import (
     external_to_internal_trace_server_adapter,
@@ -93,68 +96,46 @@ class TestOnlyUserInjectingExternalTraceServer(
         super().__init__(internal_trace_server, id_converter)
         self._user_id = user_id
 
-    def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
-        req.start.wb_user_id = self._user_id
-        return super().call_start(req)
+    def __getattribute__(self, name: str) -> typing.Any:
+        attr = super().__getattribute__(name)
+        if name.startswith("_") or not callable(attr):
+            return attr
 
-    def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
-        req.wb_user_id = self._user_id
-        return super().calls_delete(req)
+        def wrapper(*args: typing.Any, **kwargs: typing.Any) -> typing.Any:
+            req: BaseModel | None = None
+            if len(args) == 1 and not kwargs and isinstance(args[0], BaseModel):
+                req = args[0]
+            elif not args and len(kwargs) == 1:
+                sole_value = next(iter(kwargs.values()))
+                if isinstance(sole_value, BaseModel):
+                    req = sole_value
+            if req is not None:
+                self._inject_user_id(req)
+            return attr(*args, **kwargs)
 
-    def call_update(self, req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
-        req.wb_user_id = self._user_id
-        return super().call_update(req)
+        return wrapper
 
-    def feedback_create(self, req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
-        req.wb_user_id = self._user_id
-        return super().feedback_create(req)
-
-    def feedback_create_batch(
-        self, req: tsi.FeedbackCreateBatchReq
-    ) -> tsi.FeedbackCreateBatchRes:
-        for feedback_req in req.batch:
-            feedback_req.wb_user_id = self._user_id
-        return super().feedback_create_batch(req)
-
-    def cost_create(self, req: tsi.CostCreateReq) -> tsi.CostCreateRes:
-        req.wb_user_id = self._user_id
-        return super().cost_create(req)
-
-    def actions_execute_batch(
-        self, req: tsi.ActionsExecuteBatchReq
-    ) -> tsi.ActionsExecuteBatchRes:
-        req.wb_user_id = self._user_id
-        return super().actions_execute_batch(req)
-
-    def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
-        req.obj.wb_user_id = self._user_id
-        return super().obj_create(req)
-
-    def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
-        req.wb_user_id = self._user_id
-        return super().evaluate_model(req)
-
-    def evaluation_run_delete(
-        self, req: tsi.EvaluationRunDeleteReq
-    ) -> tsi.EvaluationRunDeleteRes:
-        req.wb_user_id = self._user_id
-        return super().evaluation_run_delete(req)
-
-    def evaluation_run_finish(
-        self, req: tsi.EvaluationRunFinishReq
-    ) -> tsi.EvaluationRunFinishRes:
-        req.wb_user_id = self._user_id
-        return super().evaluation_run_finish(req)
-
-    def prediction_delete(
-        self, req: tsi.PredictionDeleteReq
-    ) -> tsi.PredictionDeleteRes:
-        req.wb_user_id = self._user_id
-        return super().prediction_delete(req)
-
-    def score_delete(self, req: tsi.ScoreDeleteReq) -> tsi.ScoreDeleteRes:
-        req.wb_user_id = self._user_id
-        return super().score_delete(req)
+    def _inject_user_id(self, value: typing.Any) -> None:
+        if isinstance(value, BaseModel):
+            for field_name in value.model_fields:
+                field_value = getattr(value, field_name)
+                if field_name == "wb_user_id":
+                    setattr(value, field_name, self._user_id)
+                    field_value = getattr(value, field_name)
+                if isinstance(field_value, BaseModel):
+                    self._inject_user_id(field_value)
+                elif isinstance(field_value, dict):
+                    for item in field_value.values():
+                        if isinstance(item, BaseModel):
+                            self._inject_user_id(item)
+                elif isinstance(field_value, (list, tuple, set)):
+                    for item in field_value:
+                        if isinstance(item, BaseModel):
+                            self._inject_user_id(item)
+        elif isinstance(value, dict):
+            for item in value.values():
+                if isinstance(item, BaseModel):
+                    self._inject_user_id(item)
 
 
 def externalize_trace_server(
