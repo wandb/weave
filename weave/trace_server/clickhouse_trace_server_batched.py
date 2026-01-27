@@ -821,8 +821,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         Each call's usage = its own metrics + sum of all descendants' metrics.
         Uses an iterative bottom-up approach to avoid recursion limits.
         """
-        self._noop_project_version_latency_test(req.project_id)
-
         # Fetch calls with usage data (apply limit for memory safety)
         calls_req = tsi.CallsQueryReq(
             project_id=req.project_id,
