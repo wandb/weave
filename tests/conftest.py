@@ -153,6 +153,7 @@ _TRACE_SERVER_METHOD_NAMES = frozenset(
 class ThrowingServer(tsi.TraceServerInterface):
     def __getattribute__(self, name: str) -> Any:
         if name in _TRACE_SERVER_METHOD_NAMES:
+
             def _raise(*args: Any, **kwargs: Any) -> Any:
                 if args:
                     req = args[0]
