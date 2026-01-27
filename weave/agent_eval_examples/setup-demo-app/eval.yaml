@@ -1,0 +1,122 @@
+version: "1.0"
+name: setup-demo-app-eval
+description: |
+  Evaluate the setup-demo-app skill from the OpenAI blog post.
+  Tests explicit invocation, implicit triggering, and negative controls.
+
+# Test across multiple harness configurations
+matrix:
+  harness:
+    - type: codex
+      model: gpt-4o
+
+driver:
+  type: docker
+
+environment:
+  base_image: node:20-slim
+  setup:
+    - npm install -g create-vite
+
+skill:
+  path: ./skill
+
+tasks:
+  # Test 1: Explicit skill invocation
+  - id: explicit-invoke
+    prompt: "Create a demo app named demo-app using the $setup-demo-app skill"
+    expected_trigger: true
+    timeout: 300
+
+  # Test 2: Implicit skill triggering (should match skill description)
+  - id: implicit-invoke
+    prompt: "Set up a minimal React demo app with Tailwind for quick UI experiments"
+    expected_trigger: true
+    timeout: 300
+
+  # Test 3: Contextual invocation with domain-specific context
+  - id: contextual-invoke
+    prompt: "Create a small demo app to showcase a new API feature"
+    expected_trigger: true
+    timeout: 300
+
+  # Test 4: Negative control - skill should NOT trigger
+  - id: negative-control
+    prompt: "Add Tailwind styling to my existing React app"
+    expected_trigger: false
+    timeout: 120
+
+scoring:
+  deterministic:
+    checks:
+      # File existence checks
+      - type: file_exists
+        path: demo-app/package.json
+
+      - type: file_exists
+        path: demo-app/src/components/Header.tsx
+
+      - type: file_exists
+        path: demo-app/src/components/Card.tsx
+
+      - type: file_exists
+        path: demo-app/src/index.css
+
+      - type: file_exists
+        path: demo-app/vite.config.ts
+
+      # Command execution checks
+      - type: trajectory_contains
+        pattern: "npm install"
+
+      - type: trajectory_contains
+        pattern: "npm create vite"
+
+      # Content checks
+      - type: file_contains
+        path: demo-app/src/index.css
+        pattern: "tailwindcss"
+
+  # LLM rubric scoring (requires additional setup)
+  # rubric:
+  #   model: gpt-4o
+  #   prompt: |
+  #     Evaluate the demo-app repository against these requirements:
+  #     
+  #     1. **vite**: Vite + React + TypeScript project exists and is properly configured
+  #     2. **tailwind**: Tailwind is configured via @tailwindcss/vite and CSS imports tailwindcss
+  #     3. **structure**: src/components contains Header.tsx and Card.tsx
+  #     4. **style**: Components are functional and styled with Tailwind utility classes (no CSS modules)
+  #     
+  #     Score each check: vite, tailwind, structure, style
+  #   schema:
+  #     type: object
+  #     properties:
+  #       overall_pass:
+  #         type: boolean
+  #       score:
+  #         type: integer
+  #         minimum: 0
+  #         maximum: 100
+  #       checks:
+  #         type: array
+  #         items:
+  #           type: object
+  #           properties:
+  #             id:
+  #               type: string
+  #               enum: [vite, tailwind, structure, style]
+  #             pass:
+  #               type: boolean
+  #             notes:
+  #               type: string
+  #           required: [id, pass, notes]
+  #     required: [overall_pass, score, checks]
+
+network:
+  allowed_hosts:
+    - api.openai.com
+    - registry.npmjs.org
+
+output:
+  directory: ./results

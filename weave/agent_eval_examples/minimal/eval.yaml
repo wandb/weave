@@ -1,0 +1,29 @@
+version: "1.0"
+name: minimal-eval
+description: The simplest possible agent_eval example.
+
+driver:
+  type: docker
+
+environment:
+  base_image: python:3.12-slim
+
+skill:
+  path: ./skill
+
+tasks:
+  - id: basic
+    prompt: "Create a file called output.txt containing 'Hello, World!'"
+    timeout: 60
+
+scoring:
+  deterministic:
+    checks:
+      - type: file_exists
+        path: output.txt
+      - type: file_contains
+        path: output.txt
+        pattern: "Hello"
+
+output:
+  directory: ./results
