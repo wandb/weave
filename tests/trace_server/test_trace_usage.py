@@ -1,34 +1,12 @@
 """Tests for the trace_usage endpoint."""
 
-import random
-import time
 from datetime import datetime, timezone
+import uuid
 
 import pytest
 
 from tests.trace_server.conftest import TEST_ENTITY
 from weave.trace_server import trace_server_interface as tsi
-
-
-def uuid7() -> str:
-    """Generate a UUIDv7-like identifier (RFC 9562 layout)."""
-    ts_ms = int(time.time() * 1000)
-    ts = ts_ms & ((1 << 48) - 1)
-    time_low = ts & 0xFFFFFFFF
-    time_mid = (ts >> 32) & 0xFFFF
-    time_hi = (ts >> 48) & 0x0FFF
-    time_hi_version = (0x7 << 12) | time_hi
-
-    clock_seq = random.getrandbits(14)
-    clock_seq_hi_variant = 0x80 | ((clock_seq >> 8) & 0x3F)
-    clock_seq_low = clock_seq & 0xFF
-
-    node = random.getrandbits(48)
-
-    return (
-        f"{time_low:08x}-{time_mid:04x}-{time_hi_version:04x}-"
-        f"{clock_seq_hi_variant:02x}{clock_seq_low:02x}-{node:012x}"
-    )
 
 
 class TestTraceUsage:
@@ -38,8 +16,8 @@ class TestTraceUsage:
         """Test trace usage with a single root call."""
         server = trace_server
         project_id = f"{TEST_ENTITY}/trace_usage_single_call"
-        trace_id = uuid7()
-        call_id = uuid7()
+        trace_id = str(uuid.uuid7())
+        call_id = str(uuid.uuid7())
 
         # Create a call
         server.call_start(
@@ -91,9 +69,9 @@ class TestTraceUsage:
         """Test that child metrics roll up to parent."""
         server = trace_server
         project_id = f"{TEST_ENTITY}/trace_usage_parent_child_rollup"
-        trace_id = uuid7()
-        root_id = uuid7()
-        child_id = uuid7()
+        trace_id = str(uuid.uuid7())
+        root_id = str(uuid.uuid7())
+        child_id = str(uuid.uuid7())
 
         # Create root call
         server.call_start(
@@ -182,11 +160,11 @@ class TestTraceUsage:
         """Test recursive aggregation with a deeper call hierarchy."""
         server = trace_server
         project_id = f"{TEST_ENTITY}/trace_usage_deep_hierarchy"
-        trace_id = uuid7()
-        root_id = uuid7()
-        child1_id = uuid7()
-        grandchild1_id = uuid7()
-        child2_id = uuid7()
+        trace_id = str(uuid.uuid7())
+        root_id = str(uuid.uuid7())
+        child1_id = str(uuid.uuid7())
+        grandchild1_id = str(uuid.uuid7())
+        child2_id = str(uuid.uuid7())
 
         # Tree structure:
         # root (100 tokens)
@@ -254,9 +232,9 @@ class TestTraceUsage:
         """Test recursive aggregation with different LLMs at different levels."""
         server = trace_server
         project_id = f"{TEST_ENTITY}/trace_usage_mixed_llms"
-        trace_id = uuid7()
-        root_id = uuid7()
-        child_id = uuid7()
+        trace_id = str(uuid.uuid7())
+        root_id = str(uuid.uuid7())
+        child_id = str(uuid.uuid7())
 
         # Root uses gpt-4
         server.call_start(
@@ -334,9 +312,9 @@ class TestTraceUsageIntegration:
         """Test full workflow with trace_usage (per-call with rollup)."""
         server = trace_server
         project_id = f"{TEST_ENTITY}/trace_usage_full_workflow"
-        trace_id = uuid7()
-        root_id = uuid7()
-        child_id = uuid7()
+        trace_id = str(uuid.uuid7())
+        root_id = str(uuid.uuid7())
+        child_id = str(uuid.uuid7())
 
         # Create root call
         server.call_start(
@@ -419,9 +397,9 @@ class TestTraceUsageIntegration:
         """Test trace_usage with cost data."""
         server = trace_server
         project_id = f"{TEST_ENTITY}/test-project"
-        trace_id = uuid7()
-        call1_id = uuid7()
-        call2_id = uuid7()
+        trace_id = str(uuid.uuid7())
+        call1_id = str(uuid.uuid7())
+        call2_id = str(uuid.uuid7())
 
         # Complete cost data matching LLMCostSchema requirements
         cost_data = {
