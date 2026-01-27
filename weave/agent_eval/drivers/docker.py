@@ -72,8 +72,10 @@ class DockerDriver(Driver):
                 build_logs.append(f"Copied layer {i} from {layer}")
 
             # Copy adapter script if provided
+            adapter_filename = None
             if adapter_script and adapter_script.exists():
-                shutil.copy2(adapter_script, ctx / "adapter.sh")
+                adapter_filename = adapter_script.name
+                shutil.copy2(adapter_script, ctx / adapter_filename)
                 build_logs.append(f"Copied adapter from {adapter_script}")
 
             # Generate Dockerfile
@@ -94,12 +96,14 @@ class DockerDriver(Driver):
                 dockerfile_lines.append(f"COPY layer_{i} /workspace/")
 
             # Copy adapter if present
-            if adapter_script and adapter_script.exists():
+            if adapter_filename:
+                # Determine destination filename (preserve original name for clarity)
+                dest_name = adapter_filename
                 dockerfile_lines.extend([
                     "",
                     "# Copy adapter script",
-                    "COPY adapter.sh /usr/local/bin/adapter.sh",
-                    "RUN chmod +x /usr/local/bin/adapter.sh",
+                    f"COPY {adapter_filename} /usr/local/bin/{dest_name}",
+                    f"RUN chmod +x /usr/local/bin/{dest_name}",
                 ])
 
             # Run setup commands
@@ -153,6 +157,7 @@ class DockerDriver(Driver):
         artifacts_dir: Path,
         network_allowlist: list[str] | None = None,
         workdir: str = "/workspace",
+        use_host_network: bool = True,
     ) -> JobResult:
         """Run a job in a container."""
         start_time = time.time()
@@ -160,6 +165,12 @@ class DockerDriver(Driver):
 
         # Build docker run command
         run_args = ["run", "--rm"]
+
+        # Use host network for reliable API access
+        # This is necessary because some CLI tools (like Codex) have issues
+        # with Docker's default bridge network DNS resolution
+        if use_host_network:
+            run_args.append("--network=host")
 
         # Environment variables
         for key, value in env.items():
@@ -170,13 +181,6 @@ class DockerDriver(Driver):
 
         # Working directory
         run_args.extend(["-w", workdir])
-
-        # Network restrictions (simplified - full implementation would use
-        # custom network with iptables rules)
-        if network_allowlist is not None:
-            # For now, just use host network if allowlist is provided
-            # TODO: Implement proper network filtering
-            pass
 
         # Image and command
         run_args.append(image)

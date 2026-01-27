@@ -62,7 +62,7 @@ def list_harnesses() -> list[str]:
 # Import adapters to trigger registration
 def _load_adapters():
     """Load all adapter modules to register them."""
-    from . import codex, claude, opencode, generic  # noqa: F401
+    from . import codex, claude, opencode, generic, openai_agent  # noqa: F401
 
 
 _load_adapters()

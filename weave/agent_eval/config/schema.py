@@ -12,6 +12,7 @@ class HarnessType(str, Enum):
     """Supported harness types."""
 
     CODEX = "codex"
+    OPENAI_AGENT = "openai-agent"  # Simple OpenAI API-based agent (works in Docker)
     CLAUDE = "claude"
     OPENCODE = "opencode"
     GENERIC = "generic"
@@ -63,6 +64,7 @@ class DriverConfig(BaseModel):
     type: DriverType = DriverType.DOCKER
     # Docker-specific options
     docker_host: str | None = None
+    use_host_network: bool = True  # Use host network for reliable API access
     # Modal-specific options (future)
     modal_app: str | None = None
 

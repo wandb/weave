@@ -78,6 +78,7 @@ class Driver(ABC):
         artifacts_dir: Path,
         network_allowlist: list[str] | None = None,
         workdir: str = "/workspace",
+        use_host_network: bool = True,
     ) -> JobResult:
         """Run a job in a container.
 
@@ -89,6 +90,7 @@ class Driver(ABC):
             artifacts_dir: Directory to store artifacts.
             network_allowlist: Optional list of allowed hosts.
             workdir: Working directory inside container.
+            use_host_network: Use host network for API access (default True).
 
         Returns:
             JobResult with exit code and artifacts path.

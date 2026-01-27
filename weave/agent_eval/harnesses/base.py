@@ -100,6 +100,7 @@ class HarnessAdapter(ABC):
         skill_path: str,
         workdir: str,
         timeout: int,
+        model: str | None = None,
     ) -> dict[str, str]:
         """Build environment variables for the harness.
 
@@ -110,13 +111,17 @@ class HarnessAdapter(ABC):
             skill_path: Path to skill directory.
             workdir: Working directory.
             timeout: Timeout in seconds.
+            model: Model identifier (optional).
 
         Returns:
             Dictionary of environment variables.
         """
-        return {
+        env = {
             "AGENT_EVAL_PROMPT": prompt,
             "AGENT_EVAL_SKILL_PATH": skill_path,
             "AGENT_EVAL_WORKDIR": workdir,
             "AGENT_EVAL_TIMEOUT": str(timeout),
         }
+        if model:
+            env["AGENT_EVAL_MODEL"] = model
+        return env

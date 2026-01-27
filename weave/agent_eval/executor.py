@@ -199,11 +199,19 @@ class Executor:
         """Resolve required environment variables."""
         required_keys: set[str] = set()
 
-        # Collect from all harnesses in matrix
-        if self.config.matrix:
-            for harness_config in self.config.matrix.harness:
-                adapter = get_harness(harness_config)
-                required_keys.update(adapter.required_env_keys(harness_config))
+        # Get harnesses from expanded matrix (handles default harness case)
+        combinations = self.config.expand_matrix()
+        seen_harnesses: set[tuple[str, str]] = set()
+        
+        for harness_config, _ in combinations:
+            # Avoid duplicate checks for same harness
+            key = (harness_config.type.value, harness_config.model)
+            if key in seen_harnesses:
+                continue
+            seen_harnesses.add(key)
+            
+            adapter = get_harness(harness_config)
+            required_keys.update(adapter.required_env_keys(harness_config))
 
         # Add environment-specified keys
         required_keys.update(self.config.environment.additional_env_keys)
@@ -295,6 +303,7 @@ class Executor:
             skill_path="/skill",
             workdir="/workspace",
             timeout=task_config.timeout,
+            model=harness_config.model,
         )
         full_env = {**env, **harness_env}
 
@@ -318,6 +327,7 @@ class Executor:
             timeout=task_config.timeout,
             artifacts_dir=task_artifacts.path,
             network_allowlist=self.config.network.allowed_hosts,
+            use_host_network=self.config.driver.use_host_network,
         )
         self.log(f"  Harness completed in {job_result.duration_seconds:.1f}s (exit code: {job_result.exit_code})")
 
