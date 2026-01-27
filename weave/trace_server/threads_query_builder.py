@@ -2,6 +2,7 @@ import datetime
 
 from weave.trace_server.common_interface import SortBy
 from weave.trace_server.orm import ParamBuilder
+from weave.trace_server.project_version.types import ReadTable, TableConfig
 
 
 def make_threads_query(
@@ -14,6 +15,7 @@ def make_threads_query(
     sortable_datetime_after: datetime.datetime | None = None,
     sortable_datetime_before: datetime.datetime | None = None,
     thread_ids: list[str] | None = None,
+    read_table: ReadTable = ReadTable.CALLS_MERGED,
 ) -> str:
     """Generate a query to fetch threads with aggregated statistics from turn calls only.
 
@@ -50,21 +52,25 @@ def make_threads_query(
         sortable_datetime_before: Only include calls with sortable_datetime before this timestamp.
                                  Uses sortable_datetime column for efficient granule filtering.
         thread_ids: Only include threads with thread_ids in this list
+        read_table: Which calls table to query against (default: calls_merged).
 
     Returns:
         SQL query string for threads aggregation
     """
     project_id_param = pb.add_param(project_id)
+    config = TableConfig.from_read_table(read_table)
+    table_name = config.table_name
 
     # Build optional sortable_datetime filter clauses for ClickHouse granule optimization
     sortable_datetime_filter_clauses = []
+    datetime_filter_field = config.datetime_filter_field
 
     if sortable_datetime_after is not None:
         # Convert to datetime string format expected by ClickHouse
         datetime_str = sortable_datetime_after.strftime("%Y-%m-%d %H:%M:%S.%f")
         sortable_datetime_param = pb.add_param(datetime_str)
         sortable_datetime_filter_clauses.append(
-            f"AND sortable_datetime > {{{sortable_datetime_param}: String}}"
+            f"AND {datetime_filter_field} > {{{sortable_datetime_param}: String}}"
         )
 
     if sortable_datetime_before is not None:
@@ -72,7 +78,7 @@ def make_threads_query(
         datetime_str = sortable_datetime_before.strftime("%Y-%m-%d %H:%M:%S.%f")
         sortable_datetime_param = pb.add_param(datetime_str)
         sortable_datetime_filter_clauses.append(
-            f"AND sortable_datetime < {{{sortable_datetime_param}: String}}"
+            f"AND {datetime_filter_field} < {{{sortable_datetime_param}: String}}"
         )
 
     sortable_datetime_filter_clause = " ".join(sortable_datetime_filter_clauses)
@@ -154,7 +160,7 @@ def make_threads_query(
                 THEN dateDiff('millisecond', call_start_time, call_end_time)
                 ELSE NULL
             END AS call_duration
-        FROM calls_merged
+        FROM {table_name}
         WHERE project_id = {{{project_id_param}: String}}
             {sortable_datetime_filter_clause}
             {where_thread_filter_clause}

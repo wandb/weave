@@ -113,8 +113,9 @@ class TableRoutingResolver:
     ) -> WriteTarget:
         """Resolve write target for V1 (legacy) API calls.
 
-        V1 writes go to MERGED unless project only has COMPLETE data.
-        In the COMPLETE_ONLY case, the caller should raise an error.
+        V1 writes go to MERGED unless project has any COMPLETE data.
+        In the COMPLETE_ONLY or BOTH case, the caller should raise an error
+        to prompt users to upgrade their SDK.
 
         Args:
             project_id: The internal project ID.
@@ -138,8 +139,12 @@ class TableRoutingResolver:
             return WriteTarget.CALLS_MERGED
 
         if self._mode == CallsStorageServerMode.AUTO:
-            # V1 writes go to MERGED unless project only has COMPLETE data
-            if residence == ProjectDataResidence.COMPLETE_ONLY:
+            # V1 writes go to MERGED unless project has any calls_complete data.
+            # COMPLETE_ONLY or BOTH → return COMPLETE to signal caller should raise error.
+            if residence in (
+                ProjectDataResidence.COMPLETE_ONLY,
+                ProjectDataResidence.BOTH,
+            ):
                 return WriteTarget.CALLS_COMPLETE
             return WriteTarget.CALLS_MERGED
 

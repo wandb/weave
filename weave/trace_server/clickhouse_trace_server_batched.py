@@ -52,6 +52,14 @@ from weave.trace_server.base64_content_conversion import (
     process_call_req_to_content,
     process_complete_call_to_content,
 )
+from weave.trace_server.call_stats_helpers import (
+    rows_to_bucket_dicts,
+    split_usage_metrics,
+    validate_call_stats_range,
+)
+from weave.trace_server.calls_query_builder.call_metrics_query_builder import (
+    build_call_metrics_query,
+)
 from weave.trace_server.calls_query_builder.calls_query_builder import (
     CallsQuery,
     HardCodedFilter,
@@ -61,6 +69,9 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     build_calls_complete_update_end_query,
     build_calls_stats_query,
     combine_conditions,
+)
+from weave.trace_server.calls_query_builder.usage_query_builder import (
+    build_usage_query,
 )
 from weave.trace_server.clickhouse_schema import (
     ALL_CALL_COMPLETE_INSERT_COLUMNS,
@@ -163,6 +174,7 @@ from weave.trace_server.table_query_builder import (
 from weave.trace_server.threads_query_builder import make_threads_query
 from weave.trace_server.token_costs import (
     LLM_TOKEN_PRICES_TABLE,
+    build_model_prices_query,
     validate_cost_purge_req,
 )
 from weave.trace_server.trace_server_common import (
@@ -331,15 +343,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             return f"calls_complete{ch_settings.LOCAL_TABLE_SUFFIX}"
         return "calls_complete"
 
-    def _noop_project_version_latency_test(self, project_id: str) -> None:
-        # NOOP for testing latency impact of project switcher
-        try:
-            self.table_routing_resolver.resolve_read_table(project_id, self.ch_client)
-        except Exception as e:
-            logger.warning(
-                f"Error getting project version for project [{project_id}]: {e}"
-            )
-
     def _get_existing_ops_from_spans(
         self, seen_ids: set[str], project_id: str, limit: int | None = None
     ) -> list[tsi.ObjSchema]:
@@ -480,6 +483,17 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             for idx in obj_id_idx_map[result.object_id]:
                 calls[idx][0].op_name = op_ref_uri
 
+        write_target = self.table_routing_resolver.resolve_v2_write_target(
+            req.project_id,
+            self.ch_client,
+        )
+        if write_target == WriteTarget.CALLS_COMPLETE:
+            # TODO: Once the SDK ships calls_complete support for OTel, write to
+            # calls_complete instead of call_parts/calls_merged.
+            # Example future path:
+            # self._insert_call_complete(_complete_call_to_ch_insertable(completed))
+            write_target = WriteTarget.CALLS_MERGED
+
         # Convert calls to CH insertable format and then to rows for batch insertion
         batch_rows = []
         for start_call, end_call in calls:
@@ -488,8 +502,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             batch_rows.append(_ch_call_to_row(ch_start))
             batch_rows.append(_ch_call_to_row(ch_end))
 
-        # Insert directly without async_insert for OTEL calls
-        self._insert_call_batch(batch_rows, settings=None, do_sync_insert=True)
+        if write_target == WriteTarget.CALLS_MERGED:
+            # Insert directly without async_insert for OTEL calls
+            self._insert_call_batch(batch_rows, settings=None, do_sync_insert=True)
 
         if rejected_spans > 0:
             # Join the first 20 errors and return them delimited by ';'
@@ -749,6 +764,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             output_refs_param=output_refs_param,
             wb_run_step_end_param=wb_run_step_end_param,
             started_at_param=started_at_param,
+            cluster_name=self.clickhouse_cluster_name,
         )
 
         self.ch_client.command(query, parameters=pb.get_params())
@@ -781,10 +797,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         """Returns a stats object for the given query. This is useful for counts or other
         aggregate statistics that are not directly queryable from the calls themselves.
         """
-        self._noop_project_version_latency_test(req.project_id)
-
+        read_table = self.table_routing_resolver.resolve_read_table(
+            req.project_id, self.ch_client
+        )
         pb = ParamBuilder()
-        query, columns = build_calls_stats_query(req, pb)
+        query, columns = build_calls_stats_query(req, pb, read_table)
         raw_res = self._query(query, pb.get_params())
 
         res_dict = (
@@ -828,14 +845,139 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
 
         return tsi.TraceUsageRes(call_usage=aggregated_usage)
+    def _get_prices_for_models(
+        self, models: set[str], project_id: str
+    ) -> dict[str, dict[str, float]]:
+        """Query llm_token_prices for the given models and return best prices.
+
+        Returns a dict mapping model -> {prompt_token_cost, completion_token_cost}.
+        Uses pricing level priority: project > default, newest effective_date.
+        """
+        if not models:
+            return {}
+
+        try:
+            sql, params = build_model_prices_query(project_id, list(models))
+            result = self._query(sql, params)
+        except Exception:
+            # If price query fails, return empty prices (costs will be 0)
+            return {}
+
+        prices: dict[str, dict[str, float]] = {}
+        for row in result.result_rows:
+            llm_id, prompt_cost, completion_cost = row
+            prices[llm_id] = {
+                "prompt_token_cost": float(prompt_cost) if prompt_cost else 0.0,
+                "completion_token_cost": float(completion_cost)
+                if completion_cost
+                else 0.0,
+            }
+        return prices
+
+    def _compute_costs_for_buckets(
+        self,
+        usage_buckets: list[dict[str, Any]],
+        project_id: str,
+        requested_cost_metrics: set[str],
+    ) -> None:
+        """Compute cost metrics for usage buckets by multiplying tokens by prices.
+
+        Args:
+            usage_buckets: Buckets with token counts (modified in place).
+            project_id: Project ID for pricing lookup.
+            requested_cost_metrics: Set of cost metrics to compute (input_cost, output_cost, total_cost).
+        """
+        if not requested_cost_metrics or not usage_buckets:
+            return
+
+        # Get unique models from buckets
+        models = {b.get("model", "") for b in usage_buckets if b.get("model")}
+
+        # Query prices for those models
+        prices = self._get_prices_for_models(models, project_id)
+
+        # Compute costs for each bucket
+        for bucket in usage_buckets:
+            model = bucket.get("model", "")
+            model_prices = prices.get(model, {})
+            prompt_cost = model_prices.get("prompt_token_cost", 0.0)
+            completion_cost = model_prices.get("completion_token_cost", 0.0)
+
+            input_tokens = bucket.get("sum_input_tokens", 0) or 0
+            output_tokens = bucket.get("sum_output_tokens", 0) or 0
+
+            if "input_cost" in requested_cost_metrics:
+                bucket["sum_input_cost"] = input_tokens * prompt_cost
+
+            if "output_cost" in requested_cost_metrics:
+                bucket["sum_output_cost"] = output_tokens * completion_cost
+
+            if "total_cost" in requested_cost_metrics:
+                input_cost = bucket.get("sum_input_cost", input_tokens * prompt_cost)
+                output_cost = bucket.get(
+                    "sum_output_cost", output_tokens * completion_cost
+                )
+                bucket["sum_total_cost"] = input_cost + output_cost
+
+    def call_stats(self, req: tsi.CallStatsReq) -> tsi.CallStatsRes:
+        """Return call statistics grouped by bucket with requested aggregations.
+
+        Usage metrics (tokens, cost) are grouped by model.
+        Call metrics (latency, counts) are not grouped by model.
+
+        Cost metrics are computed post-query by multiplying token counts by prices.
+        """
+        usage_buckets: list[dict[str, Any]] = []
+        call_buckets: list[dict[str, Any]] = []
+        granularity = 0
+        start = req.start
+        end = req.end or datetime.datetime.now(datetime.timezone.utc)
+        validate_call_stats_range(start, end)
+
+        token_metrics, requested_cost_metrics = split_usage_metrics(req.usage_metrics)
+
+        # Process token metrics (grouped by model)
+        if token_metrics:
+            pb = ParamBuilder()
+            sql, columns, parameters, granularity, start, end = build_usage_query(
+                req, token_metrics, pb
+            )
+            query_result = self._query(sql, parameters)
+            usage_buckets = rows_to_bucket_dicts(columns, query_result.result_rows)
+
+        # Compute costs post-query if cost metrics were requested
+        if requested_cost_metrics and usage_buckets:
+            self._compute_costs_for_buckets(
+                usage_buckets, req.project_id, requested_cost_metrics
+            )
+
+        # Process call metrics (not grouped by model)
+        if req.call_metrics:
+            pb = ParamBuilder()
+            sql, columns, parameters, granularity, start, end = (
+                build_call_metrics_query(req, req.call_metrics, pb)
+            )
+            query_result = self._query(sql, parameters)
+            call_buckets = rows_to_bucket_dicts(columns, query_result.result_rows)
+
+        return tsi.CallStatsRes(
+            start=start,
+            end=end,
+            granularity=granularity,
+            timezone=req.timezone or "UTC",
+            usage_buckets=usage_buckets,
+            call_buckets=call_buckets,
+        )
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.calls_query_stream")
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
         """Returns a stream of calls that match the given query."""
-        self._noop_project_version_latency_test(project_id=req.project_id)
-
+        read_table = self.table_routing_resolver.resolve_read_table(
+            req.project_id, self.ch_client
+        )
         cq = CallsQuery(
             project_id=req.project_id,
+            read_table=read_table,
             include_costs=req.include_costs or False,
             include_storage_size=req.include_storage_size or False,
             include_total_storage_size=req.include_total_storage_size or False,
@@ -1675,8 +1817,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         return tsi.RefsReadBatchRes(vals=vals)
 
     def project_stats(self, req: tsi.ProjectStatsReq) -> tsi.ProjectStatsRes:
-        self._noop_project_version_latency_test(req.project_id)
-
         def _default_true(val: bool | None) -> bool:
             return True if val is None else val
 
@@ -1702,8 +1842,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self, req: tsi.ThreadsQueryReq
     ) -> Iterator[tsi.ThreadSchema]:
         """Stream threads with aggregated statistics sorted by last activity."""
-        self._noop_project_version_latency_test(req.project_id)
-
         pb = ParamBuilder()
 
         # Extract filter values
@@ -4882,6 +5020,17 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if not req.track_llm_call:
             return tsi.CompletionsCreateRes(response=res.response)
 
+        write_target = self.table_routing_resolver.resolve_v2_write_target(
+            req.project_id,
+            self.ch_client,
+        )
+        if write_target == WriteTarget.CALLS_COMPLETE:
+            # TODO: Once the SDK ships calls_complete support for completions,
+            # write a single complete row instead of call_parts/calls_merged.
+            # Future path:
+            # self._insert_call_complete(_complete_call_to_ch_insertable(completed))
+            write_target = WriteTarget.CALLS_MERGED
+
         req.inputs.messages = initial_messages
         start = tsi.StartedCallSchemaForInsert(
             project_id=req.project_id,
@@ -4915,7 +5064,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             values = [call_dict.get(col) for col in ALL_CALL_INSERT_COLUMNS]
             batch_data.append(values)
 
-        self._insert_call_batch(batch_data)
+        if write_target == WriteTarget.CALLS_MERGED:
+            self._insert_call_batch(batch_data)
 
         return tsi.CompletionsCreateRes(
             response=res.response, weave_call_id=start_call.id
@@ -4978,7 +5128,22 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         # Track start call if requested
         start_call: CallStartCHInsertable | None = None
+        write_target: WriteTarget | None = None
         if req.track_llm_call:
+            write_target = self.table_routing_resolver.resolve_v2_write_target(
+                req.project_id,
+                self.ch_client,
+            )
+            if write_target == WriteTarget.CALLS_COMPLETE:
+                # TODO: Once the SDK ships calls_complete support for streaming
+                # completions, route start/end via calls_complete.
+                # Example future path (sketch):
+                # ch_complete_start = _start_call_insertable_to_complete_start(start_call)
+                # self._insert_call_complete(ch_complete_start)
+                # insert_call = self._update_call_end_in_calls_complete
+                # REMOVE ME: (for now always default to CALLS_MERGED)
+                write_target = WriteTarget.CALLS_MERGED
+
             # Prepare inputs for tracking: use original messages (with template syntax)
             # and include prompt and template_vars
             tracked_inputs = req.inputs.model_dump(exclude_none=True)
@@ -4999,7 +5164,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             )
             start_call = _start_call_for_insert_to_ch_insertable_start_call(start)
             # Insert immediately so that callers can see the call in progress
-            self._insert_call(start_call)
+            if write_target == WriteTarget.CALLS_MERGED:
+                self._insert_call(start_call)
 
         # Set the combined messages (with template vars replaced) for LiteLLM
         req.inputs.messages = combined_messages
@@ -5448,12 +5614,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._flush_calls")
     def _flush_calls(self) -> None:
-        self._analyze_call_batch_breakdown()
-        if len(self._call_batch) > 0:
-            project_id_idx = ALL_CALL_INSERT_COLUMNS.index("project_id")
-            project_id = self._call_batch[0][project_id_idx]
-            self._noop_project_version_latency_test(project_id=project_id)
-
         try:
             self._insert_call_batch(self._call_batch)
         except InsertTooLarge:
@@ -5582,7 +5742,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     ),
                 }
             )
-        except Exception as e:
+        except Exception:
             # Under no circumstances should we block ingest with an error
             pass
 
