@@ -1,6 +1,6 @@
 from typing import Any
 
-from pydantic import field_validator
+from pydantic import AliasChoices, ConfigDict, Field, field_validator
 
 from weave.flow.scorer import Scorer
 from weave.prompt.prompt import MessagesPrompt
@@ -22,13 +22,20 @@ class LLMAsAJudgeScorer(Scorer):
         scoring_prompt: Either a string template with {variable} placeholders,
             or a MessagesPrompt object (can be passed via weave.ref()).
         enable_audio_input_scoring: Specifies whether the scorer should score audio input.
-        audio_input_scoring_json_paths: Specifies the JSON paths to use to extract audio content from the input
+        media_scoring_json_paths: Specifies the JSON paths to use to extract media content from the input
     """
+
+    model_config = ConfigDict(populate_by_name=True)
 
     model: LLMStructuredCompletionModel
     scoring_prompt: str | MessagesPrompt
     enable_audio_input_scoring: bool = False
-    audio_input_scoring_json_paths: list[str] | None = None
+    media_scoring_json_paths: list[str] | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "media_scoring_json_paths", "audio_input_scoring_json_paths"
+        ),
+    )
 
     @field_validator("scoring_prompt", mode="before")
     @classmethod

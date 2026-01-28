@@ -3,7 +3,6 @@ import uuid
 from typing import Any
 
 import pytest
-
 from tests.trace.util import client_is_sqlite
 from weave.trace import weave_client
 from weave.trace_server import trace_server_interface as tsi

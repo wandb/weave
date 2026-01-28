@@ -212,12 +212,15 @@ def _make_completed_call(
     ended_at: datetime.datetime,
     inputs: dict[str, Any] | None = None,
     output: Any | None = None,
+    parent_id: str | None = None,
+    display_name: str | None = None,
 ) -> tsi.CompletedCallSchemaForInsert:
     """Build a completed call payload with defaults for server tests."""
     return tsi.CompletedCallSchemaForInsert(
         project_id=project_id,
         id=call_id,
         trace_id=trace_id,
+        parent_id=parent_id,
         op_name="test_op",
         started_at=started_at,
         ended_at=ended_at,
@@ -225,6 +228,7 @@ def _make_completed_call(
         inputs=inputs or {},
         output=output,
         summary={"usage": {}, "status_counts": {}},
+        display_name=display_name,
     )
 
 
@@ -1094,3 +1098,289 @@ def test_v1_call_end_raises_calls_complete_mode_required(
 
     # Verify error contains helpful information
     assert "complete" in str(exc_info.value).lower()
+
+
+def test_calls_complete_query_with_status_filter(trace_server, clickhouse_trace_server):
+    """Test that filtering by summary.weave.status works on calls_complete table."""
+    project_id = f"{TEST_ENTITY}/calls_complete_status_filter"
+    internal_project_id = b64(project_id)
+
+    # Create calls with different statuses:
+    # 1. A successful call (has ended_at, no exception)
+    success_call = _make_completed_call(
+        project_id,
+        str(uuid.uuid4()),
+        str(uuid.uuid4()),
+        datetime.datetime.now(datetime.timezone.utc),
+        datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=1),
+    )
+
+    # 2. An error call (has exception)
+    error_call_id = str(uuid.uuid4())
+    error_call = tsi.CompletedCallSchemaForInsert(
+        project_id=project_id,
+        id=error_call_id,
+        trace_id=str(uuid.uuid4()),
+        op_name="error_op",
+        started_at=datetime.datetime.now(datetime.timezone.utc),
+        ended_at=datetime.datetime.now(datetime.timezone.utc)
+        + datetime.timedelta(seconds=1),
+        attributes={},
+        inputs={},
+        output=None,
+        exception="TestException: Something went wrong",
+        summary={"usage": {}, "status_counts": {}},
+    )
+
+    trace_server.calls_complete(
+        tsi.CallsUpsertCompleteReq(batch=[success_call, error_call])
+    )
+
+    # Verify we're reading from calls_complete
+    read_table = clickhouse_trace_server.table_routing_resolver.resolve_read_table(
+        internal_project_id,
+        clickhouse_trace_server.ch_client,
+    )
+    assert read_table == ReadTable.CALLS_COMPLETE
+
+    # Test filtering by status - this is the query that was failing with ILLEGAL_AGGREGATION
+    # Filter for error status
+    error_calls = list(
+        trace_server.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=project_id,
+                query={
+                    "$expr": {
+                        "$eq": [
+                            {"$getField": "summary.weave.status"},
+                            {"$literal": "error"},
+                        ]
+                    }
+                },
+            )
+        )
+    )
+    assert len(error_calls) == 1
+    assert error_calls[0].id == error_call_id
+    assert error_calls[0].exception is not None
+
+    # Filter for success status
+    success_calls = list(
+        trace_server.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=project_id,
+                query={
+                    "$expr": {
+                        "$eq": [
+                            {"$getField": "summary.weave.status"},
+                            {"$literal": "success"},
+                        ]
+                    }
+                },
+            )
+        )
+    )
+    assert len(success_calls) == 1
+    assert success_calls[0].id == success_call.id
+    assert success_calls[0].exception is None
+
+    # Test sorting by status (also exercises the status field generation)
+    sorted_calls = list(
+        trace_server.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=project_id,
+                sort_by=[{"field": "summary.weave.status", "direction": "asc"}],
+            )
+        )
+    )
+    assert len(sorted_calls) == 2
+    # Error sorts before success alphabetically
+    assert sorted_calls[0].id == error_call_id
+    assert sorted_calls[1].id == success_call.id
+
+    # Test filtering with OR condition (multiple status values)
+    all_status_calls = list(
+        trace_server.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=project_id,
+                query={
+                    "$expr": {
+                        "$or": [
+                            {
+                                "$eq": [
+                                    {"$getField": "summary.weave.status"},
+                                    {"$literal": "success"},
+                                ]
+                            },
+                            {
+                                "$eq": [
+                                    {"$getField": "summary.weave.status"},
+                                    {"$literal": "error"},
+                                ]
+                            },
+                        ]
+                    }
+                },
+            )
+        )
+    )
+    assert len(all_status_calls) == 2
+
+
+def _create_call_hierarchy(
+    trace_server, project_id: str, trace_id: str, structure: dict[str | None, list[str]]
+) -> dict[str, str]:
+    """Create a call hierarchy and return mapping of names to generated UUIDs."""
+    ids: dict[str, str] = {}
+    calls = []
+    base_time = datetime.datetime.now(datetime.timezone.utc)
+
+    # Generate all IDs first
+    for parent, children in structure.items():
+        if parent and parent not in ids:
+            ids[parent] = str(uuid.uuid4())
+        for child in children:
+            ids[child] = str(uuid.uuid4())
+
+    # Create calls with proper parent references
+    for parent, children in structure.items():
+        for i, child in enumerate(children):
+            calls.append(
+                _make_completed_call(
+                    project_id,
+                    ids[child],
+                    trace_id,
+                    base_time + datetime.timedelta(seconds=i),
+                    base_time + datetime.timedelta(seconds=i + 1),
+                    parent_id=ids.get(parent),
+                )
+            )
+
+    trace_server.calls_complete(tsi.CallsUpsertCompleteReq(batch=calls))
+    return ids
+
+
+def test_call_update_display_name(trace_server, clickhouse_trace_server):
+    """Test display_name updates: setting from null and overwriting existing values."""
+    project_id = f"{TEST_ENTITY}/calls_complete_display_name"
+    internal_project_id = b64(project_id)
+    call_id = str(uuid.uuid4())
+
+    call = _make_completed_call(
+        project_id,
+        call_id,
+        str(uuid.uuid4()),
+        datetime.datetime.now(datetime.timezone.utc),
+        datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=1),
+    )
+    trace_server.calls_complete(tsi.CallsUpsertCompleteReq(batch=[call]))
+    assert _fetch_calls_stream(trace_server, project_id)[0].display_name is None
+
+    # Set display_name from null
+    trace_server.call_update(
+        tsi.CallUpdateReq(project_id=project_id, call_id=call_id, display_name="First")
+    )
+    assert _fetch_calls_stream(trace_server, project_id)[0].display_name == "First"
+
+    # Overwrite existing display_name
+    trace_server.call_update(
+        tsi.CallUpdateReq(project_id=project_id, call_id=call_id, display_name="Second")
+    )
+    assert _fetch_calls_stream(trace_server, project_id)[0].display_name == "Second"
+
+    # Verify directly in ClickHouse
+    row = _fetch_call_row(
+        clickhouse_trace_server.ch_client,
+        "calls_complete",
+        internal_project_id,
+        call_id,
+        ["display_name"],
+    )
+    assert row[0] == "Second"
+
+
+def test_calls_delete(trace_server, clickhouse_trace_server):
+    """Test basic deletion: single call and multiple calls in one batch."""
+    project_id = f"{TEST_ENTITY}/calls_complete_delete"
+
+    # Create 3 unrelated calls
+    call_ids = [str(uuid.uuid4()) for _ in range(3)]
+    calls = [
+        _make_completed_call(
+            project_id,
+            cid,
+            str(uuid.uuid4()),
+            datetime.datetime.now(datetime.timezone.utc),
+            datetime.datetime.now(datetime.timezone.utc)
+            + datetime.timedelta(seconds=1),
+        )
+        for cid in call_ids
+    ]
+    trace_server.calls_complete(tsi.CallsUpsertCompleteReq(batch=calls))
+    assert len(_fetch_calls_stream(trace_server, project_id)) == 3
+
+    # Delete single call
+    res = trace_server.calls_delete(
+        tsi.CallsDeleteReq(project_id=project_id, call_ids=[call_ids[0]])
+    )
+    assert res.num_deleted == 1
+    remaining = _fetch_calls_stream(trace_server, project_id)
+    assert len(remaining) == 2
+    assert call_ids[0] not in {c.id for c in remaining}
+
+    # Delete multiple calls
+    res = trace_server.calls_delete(
+        tsi.CallsDeleteReq(project_id=project_id, call_ids=[call_ids[1], call_ids[2]])
+    )
+    assert res.num_deleted == 2
+    assert len(_fetch_calls_stream(trace_server, project_id)) == 0
+
+
+def test_calls_delete_cascade(trace_server, clickhouse_trace_server):
+    """Test cascade deletion: parent cascades down, child doesn't cascade up, middle cascades to subtree only."""
+    trace_id = str(uuid.uuid4())
+
+    # Test 1: Leaf deletion doesn't affect parent/siblings
+    project1 = f"{TEST_ENTITY}/calls_complete_cascade_leaf"
+    ids1 = _create_call_hierarchy(
+        trace_server, project1, trace_id, {None: ["root"], "root": ["child1", "child2"]}
+    )
+    assert len(_fetch_calls_stream(trace_server, project1)) == 3
+    res = trace_server.calls_delete(
+        tsi.CallsDeleteReq(project_id=project1, call_ids=[ids1["child1"]])
+    )
+    assert res.num_deleted == 1
+    remaining = {c.id for c in _fetch_calls_stream(trace_server, project1)}
+    assert remaining == {ids1["root"], ids1["child2"]}
+
+    # Test 2: Middle node deletion cascades to subtree only
+    project2 = f"{TEST_ENTITY}/calls_complete_cascade_middle"
+    ids2 = _create_call_hierarchy(
+        trace_server,
+        project2,
+        trace_id,
+        {None: ["root"], "root": ["middle"], "middle": ["leaf1", "leaf2"]},
+    )
+    assert len(_fetch_calls_stream(trace_server, project2)) == 4
+    res = trace_server.calls_delete(
+        tsi.CallsDeleteReq(project_id=project2, call_ids=[ids2["middle"]])
+    )
+    assert res.num_deleted == 3  # middle + 2 leaves
+    remaining = _fetch_calls_stream(trace_server, project2)
+    assert len(remaining) == 1
+    assert remaining[0].id == ids2["root"]
+
+    # Test 3: Root deletion cascades to entire tree
+    project3 = f"{TEST_ENTITY}/calls_complete_cascade_root"
+    ids3 = _create_call_hierarchy(
+        trace_server,
+        project3,
+        trace_id,
+        {None: ["root"], "root": ["child1", "child2"], "child1": ["grandchild"]},
+    )
+    assert len(_fetch_calls_stream(trace_server, project3)) == 4
+    res = trace_server.calls_delete(
+        tsi.CallsDeleteReq(project_id=project3, call_ids=[ids3["root"]])
+    )
+    assert res.num_deleted == 4
+    assert len(_fetch_calls_stream(trace_server, project3)) == 0

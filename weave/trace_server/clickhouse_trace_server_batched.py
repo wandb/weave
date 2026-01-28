@@ -60,21 +60,20 @@ from weave.trace_server.calls_query_builder.call_metrics_query_builder import (
     build_call_metrics_query,
 )
 from weave.trace_server.calls_query_builder.calls_query_builder import (
-    CTE_ALL_CALLS,
     CallsQuery,
     HardCodedFilter,
     OrderField,
     QueryBuilderDynamicField,
     QueryBuilderField,
+    build_calls_complete_delete_query,
     build_calls_complete_update_end_query,
+    build_calls_complete_update_query,
     build_calls_stats_query,
     combine_conditions,
 )
-from weave.trace_server.calls_query_builder.cte import CTECollection
 from weave.trace_server.calls_query_builder.usage_query_builder import (
     build_usage_query,
 )
-from weave.trace_server.calls_query_builder.utils import param_slot
 from weave.trace_server.clickhouse_schema import (
     ALL_CALL_COMPLETE_INSERT_COLUMNS,
     ALL_CALL_INSERT_COLUMNS,
@@ -177,7 +176,6 @@ from weave.trace_server.threads_query_builder import make_threads_query
 from weave.trace_server.token_costs import (
     LLM_TOKEN_PRICES_TABLE,
     build_model_prices_query,
-    get_cost_final_select,
     validate_cost_purge_req,
 )
 from weave.trace_server.trace_server_common import (
@@ -770,7 +768,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             cluster_name=self.clickhouse_cluster_name,
         )
 
-        self.ch_client.command(query, parameters=pb.get_params())
+        self._command(query, parameters=pb.get_params())
 
     def call_read(self, req: tsi.CallReadReq) -> tsi.CallReadRes:
         res = self.calls_query_stream(
@@ -1274,6 +1272,14 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             all_calls=all_calls,
         )
 
+        write_target = self.table_routing_resolver.resolve_v1_write_target(
+            req.project_id,
+            self.ch_client,
+        )
+        if write_target == WriteTarget.CALLS_COMPLETE:
+            self._delete_calls_complete(req.project_id, all_descendants)
+            return tsi.CallsDeleteRes(num_deleted=len(all_descendants))
+
         deleted_at = datetime.datetime.now()
         insertables = [
             CallDeleteCHInsertable(
@@ -1291,6 +1297,19 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         return tsi.CallsDeleteRes(num_deleted=len(all_descendants))
 
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._delete_calls_complete")
+    def _delete_calls_complete(self, project_id: str, call_ids: list[str]) -> None:
+        pb = ParamBuilder()
+        project_id_param = pb.add_param(project_id)
+        call_ids_param = pb.add_param(call_ids)
+        delete_query = build_calls_complete_delete_query(
+            "calls_complete",
+            project_id_param,
+            call_ids_param,
+            cluster_name=self.clickhouse_cluster_name,
+        )
+        self._command(delete_query, parameters=pb.get_params())
+
     def _ensure_valid_update_field(self, req: tsi.CallUpdateReq) -> None:
         valid_update_fields = ["display_name"]
         for field in valid_update_fields:
@@ -1305,6 +1324,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def call_update(self, req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
         assert_non_null_wb_user_id(req)
         self._ensure_valid_update_field(req)
+
+        write_target = self.table_routing_resolver.resolve_v1_write_target(
+            req.project_id,
+            self.ch_client,
+        )
+        if write_target == WriteTarget.CALLS_COMPLETE:
+            self._update_calls_complete(req.project_id, req.call_id, req.display_name)
+            return tsi.CallUpdateRes()
+
         renamed_insertable = CallUpdateCHInsertable(
             project_id=req.project_id,
             id=req.call_id,
@@ -1314,6 +1342,23 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self._insert_call(renamed_insertable)
 
         return tsi.CallUpdateRes()
+
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._update_calls_complete")
+    def _update_calls_complete(
+        self, project_id: str, call_id: str, display_name: str
+    ) -> None:
+        pb = ParamBuilder()
+        project_id_param = pb.add_param(project_id)
+        call_id_param = pb.add_param(call_id)
+        display_name_param = pb.add_param(display_name)
+        update_query = build_calls_complete_update_query(
+            "calls_complete",
+            project_id_param,
+            call_id_param,
+            display_name_param,
+            cluster_name=self.clickhouse_cluster_name,
+        )
+        self._command(update_query, parameters=pb.get_params())
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.obj_create")
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
@@ -1980,7 +2025,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             pb=pb,
         )
 
-        self.ch_client.command(query, parameters=pb.get_params())
+        self._command(query, parameters=pb.get_params())
 
         return tsi.AnnotationQueueCreateRes(id=queue_id)
 
@@ -2339,7 +2384,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
               AND annotator_id = {annotator_id_param}
               AND deleted_at IS NULL
             """
-            self.ch_client.command(update_query, parameters=pb.get_params())
+            self._command(update_query, parameters=pb.get_params())
         else:
             # Create new record
             progress_id = generate_id()
@@ -2354,7 +2399,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                  {queue_id_param}, {annotator_id_param}, {new_state_param},
                  {now_param}, {now_param}, NULL)
             """
-            self.ch_client.command(insert_query, parameters=pb.get_params())
+            self._command(insert_query, parameters=pb.get_params())
 
         # Fetch and return the updated queue item
         # We need to re-query to get the aggregated annotation_state
@@ -5601,6 +5646,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             )
             # always raises, optionally with custom error class
             handle_clickhouse_query_error(e)
+            return None
 
         logger.info(
             "clickhouse_query",
@@ -5611,6 +5657,52 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             },
         )
         return res
+
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._command")
+    def _command(
+        self,
+        command: str,
+        parameters: dict[str, Any] | None = None,
+        settings: dict[str, Any] | None = None,
+    ) -> None:
+        """Execute a mutation command (INSERT, UPDATE, DELETE) that doesn't return results.
+
+        Args:
+            command: The SQL command to execute.
+            parameters: Optional dictionary of query parameters.
+            settings: Optional dictionary of ClickHouse settings.
+        """
+        if not settings:
+            settings = {}
+        settings.update(ch_settings.CLICKHOUSE_DEFAULT_QUERY_SETTINGS)
+
+        processed_params = _process_parameters(parameters) if parameters else None
+        try:
+            self.ch_client.command(
+                command,
+                parameters=processed_params,
+                settings=settings,
+            )
+        except Exception as e:
+            logger.exception(
+                "clickhouse_command_error",
+                extra={
+                    "error_str": str(e),
+                    "command": command,
+                    "parameters": processed_params,
+                },
+            )
+            handle_clickhouse_query_error(e)
+            return
+
+        logger.info(
+            "clickhouse_command",
+            extra={
+                "command": command,
+                "parameters": processed_params,
+            },
+        )
+        return
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert")
     def _insert(
