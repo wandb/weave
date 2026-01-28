@@ -8,10 +8,27 @@ import pytest
 
 import weave
 from weave.evaluation.eval_imperative import EvaluationLogger, Model, Scorer
+from weave.evaluation.eval_imperative_v1 import EvaluationLoggerV1
+from weave.evaluation.eval_imperative_v2 import EvaluationLoggerV2
 from weave.integrations.integration_utilities import op_name_from_call
 from weave.trace.context import call_context
 from weave.trace.serialization.serialize import to_json
 from weave.trace_server.trace_server_interface import ObjectVersionFilter
+
+
+@pytest.fixture
+def use_v2(request, monkeypatch):
+    """Fixture to control which EvaluationLogger version is used.
+
+    Use with @pytest.mark.parametrize("use_v2", [False, True], indirect=True)
+    """
+    if hasattr(request, "param"):
+        use_v2_value = request.param
+    else:
+        use_v2_value = False
+
+    monkeypatch.setenv("WEAVE_USE_EVALUATION_LOGGER_V2", str(use_v2_value).lower())
+    return use_v2_value
 
 
 class ExampleRow(TypedDict):
@@ -1139,3 +1156,314 @@ def test_log_example_after_log_summary_raises_error(client):
             output="another answer",
             scores={"score": 0.5},
         )
+
+
+# =============================================================================
+# Tests for V1/V2 dispatcher mechanism
+# =============================================================================
+
+
+def test_evaluation_logger_dispatches_to_v1_by_default(client, monkeypatch):
+    """Test that EvaluationLogger returns V1 instance by default."""
+    # Ensure the setting is False (default)
+    monkeypatch.setenv("WEAVE_USE_EVALUATION_LOGGER_V2", "false")
+
+    ev = EvaluationLogger()
+    assert isinstance(ev, EvaluationLoggerV1)
+    ev.finish()
+
+
+def test_evaluation_logger_dispatches_to_v2_when_enabled(client, monkeypatch):
+    """Test that EvaluationLogger returns V2 instance when setting is enabled."""
+    monkeypatch.setenv("WEAVE_USE_EVALUATION_LOGGER_V2", "true")
+
+    ev = EvaluationLogger()
+    assert isinstance(ev, EvaluationLoggerV2)
+    ev.finish()
+
+
+def test_evaluation_logger_v1_attributes_accessible(client, monkeypatch):
+    """Test that V1-specific attributes are accessible when dispatching to V1."""
+    monkeypatch.setenv("WEAVE_USE_EVALUATION_LOGGER_V2", "false")
+
+    ev = EvaluationLogger()
+
+    # V1-specific attributes should be accessible
+    assert hasattr(ev, "_evaluate_call")
+    assert hasattr(ev, "_pseudo_evaluation")
+    assert hasattr(ev, "model")
+    assert hasattr(ev, "dataset")
+
+    ev.finish()
+
+
+def test_evaluation_logger_v2_attributes_accessible(client, monkeypatch):
+    """Test that V2-specific attributes are accessible when dispatching to V2."""
+    monkeypatch.setenv("WEAVE_USE_EVALUATION_LOGGER_V2", "true")
+
+    ev = EvaluationLogger()
+
+    # V2-specific attributes should be accessible
+    assert hasattr(ev, "_evaluation_run_id")
+    assert hasattr(ev, "_evaluation_ref")
+    assert hasattr(ev, "_model_ref")
+    assert hasattr(ev, "_dataset_ref")
+
+    ev.finish()
+
+
+# =============================================================================
+# Tests that work with both V1 and V2
+# =============================================================================
+
+
+@pytest.mark.parametrize("use_v2", [False, True], indirect=True)
+def test_basic_evaluation_both_versions(
+    client,
+    use_v2,
+    user_dataset: list[ExampleRow],
+    user_model: Callable[[int, int], int],
+):
+    """Test basic evaluation workflow works with both V1 and V2."""
+    ev = EvaluationLogger()
+
+    # Verify the correct version was instantiated
+    if use_v2:
+        assert isinstance(ev, EvaluationLoggerV2)
+    else:
+        assert isinstance(ev, EvaluationLoggerV1)
+
+    # Basic workflow should work with both
+    for row in user_dataset:
+        output = user_model(row["a"], row["b"])
+        pred = ev.log_prediction(inputs=row, output=output)
+        pred.log_score(scorer="test_scorer", score=output > 2)
+        pred.finish()
+
+    ev.log_summary({"avg_score": 1.0, "total_examples": 3})
+    client.flush()
+
+    # Both versions should successfully finalize
+    assert ev._is_finalized
+
+
+@pytest.mark.parametrize("use_v2", [False, True], indirect=True)
+def test_log_example_both_versions(client, use_v2):
+    """Test log_example works with both V1 and V2."""
+    ev = EvaluationLogger()
+
+    ev.log_example(
+        inputs={"question": "What is 2+2?"},
+        output="4",
+        scores={"correctness": 1.0, "fluency": 0.9},
+    )
+
+    ev.log_summary({"avg_score": 0.95})
+    client.flush()
+
+    assert ev._is_finalized
+
+
+@pytest.mark.parametrize("use_v2", [False, True], indirect=True)
+def test_evaluation_fail_both_versions(client, use_v2):
+    """Test that fail() works with both V1 and V2."""
+    ev = EvaluationLogger()
+    ex = ValueError("test error")
+    ev.fail(exception=ex)
+    client.flush()
+
+    assert ev._is_finalized
+
+
+@pytest.mark.parametrize("use_v2", [False, True], indirect=True)
+def test_evaluation_finish_without_summary_both_versions(client, use_v2):
+    """Test that finish() works without calling log_summary for both versions."""
+    ev = EvaluationLogger()
+
+    pred = ev.log_prediction(inputs={"a": 1}, output=2)
+    pred.log_score("scorer", 0.5)
+    pred.finish()
+
+    # Finish without log_summary
+    ev.finish()
+    client.flush()
+
+    assert ev._is_finalized
+
+
+@pytest.mark.parametrize("use_v2", [False, True], indirect=True)
+def test_custom_model_and_dataset_both_versions(client, use_v2):
+    """Test custom model and dataset work with both versions."""
+    model_dict = {"name": "test_model", "version": "1.0"}
+    dataset_list = [{"input": 1}, {"input": 2}]
+
+    ev = EvaluationLogger(model=model_dict, dataset=dataset_list)
+
+    for row in dataset_list:
+        pred = ev.log_prediction(inputs=row, output=row["input"] * 2)
+        pred.log_score("doubler_check", True)
+        pred.finish()
+
+    ev.log_summary({"success": True})
+    client.flush()
+
+    assert ev._is_finalized
+
+
+@pytest.mark.parametrize("use_v2", [False, True], indirect=True)
+def test_predefined_scorers_warning_both_versions(client, use_v2, caplog):
+    """Test that warning is issued for unlisted scorers in both versions."""
+    import logging
+
+    ev = EvaluationLogger(
+        scorers=["accuracy", "precision"],
+    )
+
+    with caplog.at_level(logging.WARNING):
+        pred = ev.log_prediction({"input": 1}, 1)
+
+        # These should not warn
+        pred.log_score("accuracy", 0.9)
+        pred.log_score("precision", 0.85)
+
+        # This should warn
+        pred.log_score("recall", 0.8)
+
+        pred.finish()
+
+    # Verify warning was issued
+    warning_messages = [r.message for r in caplog.records]
+    assert any(
+        "recall" in msg and "not in the predefined scorers list" in msg
+        for msg in warning_messages
+    )
+
+    ev.finish()
+
+
+@pytest.mark.parametrize("use_v2", [False, True], indirect=True)
+def test_context_manager_prediction_both_versions(client, use_v2):
+    """Test using prediction as context manager works with both versions."""
+    ev = EvaluationLogger()
+
+    with ev.log_prediction(inputs={"q": "test"}) as pred:
+        pred.output = "answer"
+        pred.log_score("score", 0.9)
+        # finish() called automatically
+
+    ev.log_summary({})
+    client.flush()
+
+    assert ev._is_finalized
+
+
+@pytest.mark.parametrize("use_v2", [False, True], indirect=True)
+def test_multiple_predictions_both_versions(client, use_v2):
+    """Test logging multiple predictions works with both versions."""
+    ev = EvaluationLogger()
+
+    for i in range(5):
+        pred = ev.log_prediction(inputs={"idx": i}, output=i * 2)
+        pred.log_score("is_even", i % 2 == 0)
+        pred.finish()
+
+    ev.log_summary({"count": 5})
+    client.flush()
+
+    assert ev._is_finalized
+
+
+@pytest.mark.parametrize("use_v2", [False, True], indirect=True)
+def test_evaluation_no_auto_summarize_both_versions(client, use_v2):
+    """Test auto_summarize=False works with both versions."""
+    ev = EvaluationLogger()
+
+    pred = ev.log_prediction(inputs={"a": 1}, output=2)
+    pred.log_score("scorer", True)
+    pred.finish()
+
+    ev.log_summary(auto_summarize=False)
+    client.flush()
+
+    assert ev._is_finalized
+
+
+# =============================================================================
+# V2-specific tests
+# =============================================================================
+
+
+def test_v2_creates_evaluation_run(client, monkeypatch):
+    """Test that V2 creates an evaluation run via Object APIs."""
+    monkeypatch.setenv("WEAVE_USE_EVALUATION_LOGGER_V2", "true")
+
+    ev = EvaluationLogger()
+
+    # V2 should have created an evaluation run
+    assert ev._evaluation_run_id is not None
+    assert ev._evaluation_ref is not None
+    assert ev._model_ref is not None
+    assert ev._dataset_ref is not None
+
+    ev.finish()
+
+
+def test_v2_creates_predictions(client, monkeypatch):
+    """Test that V2 creates predictions via Object APIs."""
+    monkeypatch.setenv("WEAVE_USE_EVALUATION_LOGGER_V2", "true")
+
+    ev = EvaluationLogger()
+
+    pred = ev.log_prediction(inputs={"q": "test"}, output="answer")
+
+    # V2 should have created a prediction with an ID
+    assert pred._prediction_id is not None
+
+    pred.finish()
+    ev.finish()
+
+
+def test_v2_with_existing_refs(client, monkeypatch):
+    """Test that V2 can use existing weave:// refs for model and dataset."""
+    monkeypatch.setenv("WEAVE_USE_EVALUATION_LOGGER_V2", "true")
+
+    # First, publish objects to get refs
+    model = weave.Model(name="ref_test_model")
+    dataset = weave.Dataset(name="ref_test_dataset", rows=[{"a": 1}])
+
+    model_ref = weave.publish(model)
+    dataset_ref = weave.publish(dataset)
+
+    # Now use the refs directly
+    ev = EvaluationLogger(
+        model=model_ref.uri(),
+        dataset=dataset_ref.uri(),
+    )
+
+    # The refs should be used directly
+    assert ev._model_ref == model_ref.uri()
+    assert ev._dataset_ref == dataset_ref.uri()
+
+    ev.finish()
+
+
+def test_v2_accumulated_predictions_tracking(client, monkeypatch):
+    """Test that V2 tracks accumulated predictions correctly."""
+    monkeypatch.setenv("WEAVE_USE_EVALUATION_LOGGER_V2", "true")
+
+    ev = EvaluationLogger()
+
+    # Log multiple predictions
+    for i in range(3):
+        pred = ev.log_prediction(inputs={"idx": i}, output=i * 2)
+        pred.log_score("test", float(i))
+        pred.finish()
+
+    # All predictions should be tracked
+    assert len(ev._accumulated_predictions) == 3
+
+    # Each prediction should have captured scores
+    for i, pred in enumerate(ev._accumulated_predictions):
+        assert pred._captured_scores["test"] == float(i)
+
+    ev.finish()

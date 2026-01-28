@@ -213,6 +213,15 @@ class UserSettings(BaseModel):
     Can be overridden with the environment variable `WEAVE_USE_STAINLESS_SERVER`
     """
 
+    use_evaluation_logger_v2: bool = False
+    """
+    Toggles use of the new Object APIs for EvaluationLogger.
+
+    If True, uses the new Object APIs (v2) for evaluation logging.
+    If False, uses the legacy call-based approach.
+    Can be overridden with the environment variable `WEAVE_USE_EVALUATION_LOGGER_V2`
+    """
+
     model_config = ConfigDict(extra="forbid")
     _is_first_apply: bool = PrivateAttr(True)
 
@@ -345,6 +354,11 @@ def http_timeout() -> float:
 def should_use_stainless_server() -> bool:
     """Returns whether the stainless-generated HTTP client should be used."""
     return _should("use_stainless_server")
+
+
+def should_use_evaluation_logger_v2() -> bool:
+    """Returns whether the new Object APIs (v2) should be used for EvaluationLogger."""
+    return _should("use_evaluation_logger_v2")
 
 
 def parse_and_apply_settings(
