@@ -503,6 +503,7 @@ class Executor:
             prompt=task_config.prompt,
             job_result=job_result,
             timeout=task_config.timeout,
+            error=job_result.error,  # Propagate job error to task result
         )
 
         # Run scorers if job succeeded

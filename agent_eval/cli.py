@@ -114,6 +114,9 @@ def run(config_path: str, task: str | None, harness: str | None, dry_run: bool, 
     )
     try:
         result = asyncio.run(executor.run())
+    except KeyboardInterrupt:
+        click.echo("\nInterrupted by user. Cleaning up...", err=True)
+        sys.exit(130)  # Standard exit code for Ctrl+C
     except EnvironmentError as e:
         click.echo(f"Environment error: {e}", err=True)
         sys.exit(1)

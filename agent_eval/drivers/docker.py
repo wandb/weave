@@ -203,6 +203,17 @@ class DockerDriver(Driver):
 
         returncode, stdout, stderr = await self._run_cmd(run_args, timeout=timeout)
         duration = time.time() - start_time
+        
+        # If timed out, explicitly stop and kill the container
+        if returncode == -1:
+            try:
+                await self._run_cmd(["stop", "-t", "5", container_name], timeout=10)
+            except Exception:
+                pass
+            try:
+                await self._run_cmd(["kill", container_name], timeout=5)
+            except Exception:
+                pass
 
         # Save stdout and stderr to files
         if stdout:
