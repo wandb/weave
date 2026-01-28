@@ -983,115 +983,40 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if not req.call_ids:
             return tsi.CallsUsageRes(call_usage={})
 
-        def _add_default_call_filters(query: CallsQuery) -> None:
-            query.add_condition(
-                tsi_query.EqOperation.model_validate(
-                    {"$eq": [{"$getField": "deleted_at"}, {"$literal": None}]}
+        root_calls = self.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=req.project_id,
+                filter=tsi.CallsFilter(call_ids=req.call_ids),
+                columns=["trace_id"],
+                limit=len(req.call_ids),
+            )
+        )
+        trace_ids = {call.trace_id for call in root_calls}
+        if not trace_ids:
+            root_usage = {call_id: {} for call_id in req.call_ids}
+            return tsi.CallsUsageRes(call_usage=root_usage)
+
+        calls = self.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=req.project_id,
+                filter=tsi.CallsFilter(trace_ids=list(trace_ids)),
+                columns=["id", "parent_id", "summary"],
+                include_costs=req.include_costs,
+                limit=req.limit,
+            )
+        )
+
+        def iter_calls() -> Iterator[usage_utils.UsageCall]:
+            for call in calls:
+                yield usage_utils.UsageCall(
+                    id=call.id,
+                    parent_id=call.parent_id,
+                    summary=call.summary,
                 )
-            )
-            query.add_condition(
-                tsi_query.NotOperation.model_validate(
-                    {
-                        "$not": [
-                            {"$eq": [{"$getField": "started_at"}, {"$literal": None}]}
-                        ]
-                    }
-                )
-            )
 
-        read_table = self.table_routing_resolver.resolve_read_table(
-            req.project_id, self.ch_client
+        aggregated_usage = usage_utils.aggregate_usage_with_descendants(
+            iter_calls(), req.include_costs
         )
-        table_alias = CallsQuery(
-            project_id=req.project_id,
-            read_table=read_table,
-        ).table_name
-
-        pb = ParamBuilder()
-        ctes = CTECollection()
-
-        root_traces_query = CallsQuery(
-            project_id=req.project_id,
-            read_table=read_table,
-        )
-        root_traces_query.add_field("trace_id")
-        root_traces_query.set_hardcoded_filter(
-            HardCodedFilter(filter=tsi.CallsFilter(call_ids=req.call_ids))
-        )
-        _add_default_call_filters(root_traces_query)
-        root_traces_sql = root_traces_query._as_sql_base_format(pb, table_alias)
-        ctes.add_cte("root_traces", root_traces_sql)
-
-        project_param = pb.add_param(req.project_id)
-        filtered_calls_sql = f"""
-        SELECT {table_alias}.id
-        FROM {table_alias}
-        PREWHERE {table_alias}.project_id = {param_slot(project_param, "String")}
-        WHERE {table_alias}.trace_id IN (SELECT trace_id FROM root_traces)
-        GROUP BY ({table_alias}.project_id, {table_alias}.id)
-        """
-        ctes.add_cte("calls_usage_ids", filtered_calls_sql)
-
-        calls_query = CallsQuery(
-            project_id=req.project_id,
-            read_table=read_table,
-        )
-        calls_query.add_field("id")
-        calls_query.add_field("parent_id")
-        calls_query.add_field("summary")
-        _add_default_call_filters(calls_query)
-        if req.include_costs:
-            for field in ALL_CALL_SELECT_COLUMNS:
-                calls_query.add_field(field)
-        if req.limit is not None:
-            calls_query.set_limit(req.limit)
-
-        base_sql = calls_query._as_sql_base_format(
-            pb,
-            table_alias,
-            id_subquery_name="calls_usage_ids",
-        )
-
-        if req.include_costs:
-            ctes.add_cte(CTE_ALL_CALLS, base_sql)
-            calls_query._add_cost_ctes_to_builder(ctes, pb)
-            select_fields = [field.field for field in calls_query.select_fields]
-            final_select = get_cost_final_select(
-                pb, select_fields, calls_query.order_fields, req.project_id
-            )
-            sql = ctes.to_sql() + "\n" + final_select
-            columns = [f for f in select_fields if f != "summary_dump"] + [
-                "summary_dump"
-            ]
-        else:
-            sql = ctes.to_sql() + "\n" + base_sql
-            columns = [field.field for field in calls_query.select_fields]
-
-        raw_res = self._query_stream(sql, pb.get_params())
-        try:
-
-            def iter_calls() -> Iterator[usage_utils.UsageCall]:
-                for row in raw_res:
-                    row_dict = dict(zip(columns, row, strict=False))
-                    summary = _nullable_any_dump_to_any(row_dict.get("summary_dump"))
-                    call_id = row_dict.get("id")
-                    if call_id is None:
-                        continue
-                    parent_id = row_dict.get("parent_id")
-                    yield usage_utils.UsageCall(
-                        id=cast(str, call_id),
-                        parent_id=(
-                            cast(str, parent_id) if parent_id is not None else None
-                        ),
-                        summary=summary,
-                    )
-
-            aggregated_usage = usage_utils.aggregate_usage_with_descendants(
-                iter_calls(), req.include_costs
-            )
-        finally:
-            if hasattr(raw_res, "close"):
-                raw_res.close()
 
         root_usage = {
             call_id: aggregated_usage.get(call_id, {}) for call_id in req.call_ids
