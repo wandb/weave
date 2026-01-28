@@ -82,6 +82,8 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         "obj_read",
         "objs_query",
     }
+    _USER_ID_FIELDS: ClassVar[set[str]] = {"wb_user_id", "created_by", "added_by"}
+    _USER_ID_LIST_FIELDS: ClassVar[set[str]] = {"wb_user_ids"}
 
     def __getattribute__(self, name: str) -> typing.Any:
         # Route Protocol stubs through __getattr__ so auto-forward runs even when
@@ -162,7 +164,7 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
                 elif field_name == "wb_run_id" and field_value is not None:
                     setattr(value, field_name, run_id_converter(field_value))
                     field_value = getattr(value, field_name)
-                elif field_name == "wb_user_id" and field_value is not None:
+                elif field_name in self._USER_ID_FIELDS and isinstance(field_value, str):
                     setattr(value, field_name, user_id_converter(field_value))
                     field_value = getattr(value, field_name)
                 elif field_name == "wb_run_ids" and isinstance(field_value, list):
@@ -171,7 +173,9 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
                         field_name,
                         [run_id_converter(item) for item in field_value],
                     )
-                elif field_name == "wb_user_ids" and isinstance(field_value, list):
+                elif field_name in self._USER_ID_LIST_FIELDS and isinstance(
+                    field_value, list
+                ):
                     setattr(
                         value,
                         field_name,

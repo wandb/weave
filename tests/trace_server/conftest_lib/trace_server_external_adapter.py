@@ -127,7 +127,8 @@ class TestOnlyUserInjectingExternalTraceServer(
             for field_name in value.model_fields:
                 field_value = getattr(value, field_name)
                 if field_name == "wb_user_id":
-                    setattr(value, field_name, self._user_id)
+                    if "wb_user_id" not in value.model_fields_set:
+                        setattr(value, field_name, self._user_id)
                     field_value = getattr(value, field_name)
                 if isinstance(field_value, BaseModel):
                     self._inject_user_id(field_value)
