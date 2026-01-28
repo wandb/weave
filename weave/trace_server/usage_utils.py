@@ -15,36 +15,44 @@ def aggregate_usage_with_descendants(
 
     Uses a bottom-up traversal to avoid recursion limits.
     """
+    # This materializes the calls into memory, which is not ideal for
+    # large traces, but is necessary for this approach
     calls_list = list(calls)
     if not calls_list:
         return {}
 
+    # Index calls for O(1) parent lookups and child counting.
     calls_by_id = {call.id: call for call in calls_list}
     children_remaining = dict.fromkeys(calls_by_id, 0)
     parent_by_id: dict[str, str] = {}
 
+    # Count in-scope children and record each call's parent.
     for call in calls_list:
         parent_id = call.parent_id
         if parent_id and parent_id in calls_by_id:
             children_remaining[parent_id] += 1
             parent_by_id[call.id] = parent_id
 
+    # Seed each call's usage with its own summary data.
     aggregated_usage: dict[str, dict[str, tsi.LLMAggregatedUsage]] = {}
     for call in calls_list:
         aggregated_usage[call.id] = _extract_call_usage(call, include_costs)
 
+    # Start from leaves (calls with no remaining children) for bottom-up merge.
     queue = deque(
         [call_id for call_id, count in children_remaining.items() if count == 0]
     )
 
     while queue:
         call_id = queue.popleft()
+        # Merge this call's usage into its parent once all children are merged.
         parent_id = parent_by_id.get(call_id)
         if parent_id is None:
             continue
         _merge_usage(
             aggregated_usage[parent_id], aggregated_usage[call_id], include_costs
         )
+        # Decrement child count and enqueue parent when it becomes a leaf.
         children_remaining[parent_id] -= 1
         if children_remaining[parent_id] == 0:
             queue.append(parent_id)
@@ -56,21 +64,25 @@ def _extract_call_usage(
     call: tsi.CallSchema,
     include_costs: bool,
 ) -> dict[str, tsi.LLMAggregatedUsage]:
+    # Pull the usage map out of the call summary (if present).
     summary = call.summary or {}
     usage_map = summary.get("usage")
     if not isinstance(usage_map, dict):
         return {}
 
+    # Optional cost data lives in a separate "weave" summary block.
     costs_map: dict[str, Any] = {}
     if include_costs:
         weave_summary = summary.get("weave")
         if isinstance(weave_summary, dict):
             costs_map = weave_summary.get("costs") or {}
 
+    # Build per-model usage objects, skipping malformed entries.
     aggregated: dict[str, tsi.LLMAggregatedUsage] = {}
     for model_name, usage in usage_map.items():
         if not isinstance(usage, dict):
             continue
+        # Normalize token counts across multiple field names.
         prompt_tokens = _safe_int(usage.get("prompt_tokens")) + _safe_int(
             usage.get("input_tokens")
         )
@@ -82,6 +94,7 @@ def _extract_call_usage(
         if total_tokens == 0:
             total_tokens = prompt_tokens + completion_tokens
 
+        # Costs are optional and only populated when requested.
         prompt_cost: float | None = None
         completion_cost: float | None = None
         if include_costs:
@@ -96,6 +109,7 @@ def _extract_call_usage(
                     cost_entry.get("completion_tokens_total_cost")
                 )
 
+        # Only store entries that contain any usage (or cost when requested).
         usage_obj = tsi.LLMAggregatedUsage(
             requests=requests,
             prompt_tokens=prompt_tokens,
@@ -121,26 +135,18 @@ def _merge_usage(
         if existing is None:
             target[model_name] = usage.model_copy(deep=True)
         else:
-            _add_usage(existing, usage, include_costs)
+            existing.requests += usage.requests
+            existing.prompt_tokens += usage.prompt_tokens
+            existing.completion_tokens += usage.completion_tokens
+            existing.total_tokens += usage.total_tokens
 
-
-def _add_usage(
-    target: tsi.LLMAggregatedUsage,
-    source: tsi.LLMAggregatedUsage,
-    include_costs: bool,
-) -> None:
-    target.requests += source.requests
-    target.prompt_tokens += source.prompt_tokens
-    target.completion_tokens += source.completion_tokens
-    target.total_tokens += source.total_tokens
-
-    if include_costs:
-        target.prompt_tokens_total_cost = (target.prompt_tokens_total_cost or 0.0) + (
-            source.prompt_tokens_total_cost or 0.0
-        )
-        target.completion_tokens_total_cost = (
-            target.completion_tokens_total_cost or 0.0
-        ) + (source.completion_tokens_total_cost or 0.0)
+            if include_costs:
+                existing.prompt_tokens_total_cost = (
+                    existing.prompt_tokens_total_cost or 0.0
+                ) + (usage.prompt_tokens_total_cost or 0.0)
+                existing.completion_tokens_total_cost = (
+                    existing.completion_tokens_total_cost or 0.0
+                ) + (usage.completion_tokens_total_cost or 0.0)
 
 
 def _safe_int(value: Any) -> int:

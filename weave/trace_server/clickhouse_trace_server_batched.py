@@ -945,19 +945,16 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         Each call's usage = its own metrics + sum of all descendants' metrics.
         Uses an iterative bottom-up approach to avoid recursion limits.
         """
-        calls_req = tsi.CallsQueryReq(
-            project_id=req.project_id,
-            filter=req.filter,
-            query=req.query,
-            columns=["id", "parent_id", "summary"],
-            include_costs=req.include_costs,
-            limit=req.limit,
+        calls = self.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=req.project_id,
+                filter=req.filter,
+                query=req.query,
+                columns=["id", "parent_id", "summary"],
+                include_costs=req.include_costs,
+                limit=req.limit,
+            )
         )
-
-        calls = list(self.calls_query_stream(calls_req))
-
-        if not calls:
-            return tsi.TraceUsageRes(call_usage={})
 
         aggregated_usage = usage_utils.aggregate_usage_with_descendants(
             calls, req.include_costs
