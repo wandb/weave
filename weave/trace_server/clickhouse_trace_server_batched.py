@@ -1085,9 +1085,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 for row in raw_res:
                     row_dict = dict(zip(columns, row, strict=False))
                     summary = _nullable_any_dump_to_any(row_dict.get("summary_dump"))
+                    call_id = row_dict.get("id")
+                    if call_id is None:
+                        continue
+                    parent_id = row_dict.get("parent_id")
                     yield _UsageCall(
-                        id=row_dict.get("id"),
-                        parent_id=row_dict.get("parent_id"),
+                        id=cast(str, call_id),
+                        parent_id=(
+                            cast(str, parent_id) if parent_id is not None else None
+                        ),
                         summary=summary,
                     )
 

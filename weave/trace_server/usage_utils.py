@@ -70,7 +70,7 @@ def aggregate_usage_with_descendants(
 
 
 def _extract_call_usage(
-    call: tsi.CallSchema,
+    call: UsageCall,
     include_costs: bool,
 ) -> dict[str, tsi.LLMAggregatedUsage]:
     # Pull the usage map out of the call summary (if present).
