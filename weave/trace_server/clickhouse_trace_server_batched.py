@@ -61,6 +61,7 @@ from weave.trace_server.calls_query_builder.call_metrics_query_builder import (
 )
 from weave.trace_server.calls_query_builder.calls_query_builder import (
     CallsQuery,
+    CTE_ALL_CALLS,
     HardCodedFilter,
     OrderField,
     QueryBuilderDynamicField,
@@ -69,6 +70,7 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     build_calls_stats_query,
     combine_conditions,
 )
+from weave.trace_server.calls_query_builder.cte import CTECollection
 from weave.trace_server.calls_query_builder.utils import param_slot
 from weave.trace_server.calls_query_builder.usage_query_builder import (
     build_usage_query,
@@ -175,6 +177,7 @@ from weave.trace_server.threads_query_builder import make_threads_query
 from weave.trace_server.token_costs import (
     LLM_TOKEN_PRICES_TABLE,
     build_model_prices_query,
+    get_cost_final_select,
     validate_cost_purge_req,
 )
 from weave.trace_server.trace_server_common import (
@@ -844,31 +847,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             }
         return prices
 
-    def _apply_costs_to_aggregated_usage(
-        self,
-        aggregated_usage: dict[str, dict[str, tsi.LLMAggregatedUsage]],
-        project_id: str,
-    ) -> None:
-        """Populate cost fields on aggregated usage using current model prices."""
-        if not aggregated_usage:
-            return
-
-        models: set[str] = set()
-        for call_usage in aggregated_usage.values():
-            models.update(call_usage.keys())
-
-        prices = self._get_prices_for_models(models, project_id)
-
-        for call_usage in aggregated_usage.values():
-            for model_name, usage in call_usage.items():
-                model_prices = prices.get(model_name, {})
-                prompt_cost = model_prices.get("prompt_token_cost", 0.0)
-                completion_cost = model_prices.get("completion_token_cost", 0.0)
-                usage.prompt_tokens_total_cost = usage.prompt_tokens * prompt_cost
-                usage.completion_tokens_total_cost = (
-                    usage.completion_tokens * completion_cost
-                )
-
     def _compute_costs_for_buckets(
         self,
         usage_buckets: list[dict[str, Any]],
@@ -1012,24 +990,28 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         ).table_name
 
         pb = ParamBuilder()
+        ctes = CTECollection()
+
+        root_traces_query = CallsQuery(
+            project_id=req.project_id,
+            read_table=read_table,
+        )
+        root_traces_query.add_field("trace_id")
+        root_traces_query.set_hardcoded_filter(
+            HardCodedFilter(filter=tsi.CallsFilter(call_ids=req.call_ids))
+        )
+        root_traces_sql = root_traces_query._as_sql_base_format(pb, table_alias)
+        ctes.add_cte("root_traces", root_traces_sql)
+
         project_param = pb.add_param(req.project_id)
-        call_ids_param = pb.add_param(req.call_ids)
-
-        root_traces_subquery = f"""
-        SELECT {table_alias}.trace_id
-        FROM {table_alias}
-        PREWHERE {table_alias}.project_id = {param_slot(project_param, "String")}
-        WHERE {table_alias}.id IN {param_slot(call_ids_param, "Array(String)")}
-        GROUP BY ({table_alias}.project_id, {table_alias}.id)
-        """
-
-        calls_ids_subquery = f"""
+        filtered_calls_sql = f"""
         SELECT {table_alias}.id
         FROM {table_alias}
         PREWHERE {table_alias}.project_id = {param_slot(project_param, "String")}
-        WHERE {table_alias}.trace_id IN ({root_traces_subquery})
+        WHERE {table_alias}.trace_id IN (SELECT trace_id FROM root_traces)
         GROUP BY ({table_alias}.project_id, {table_alias}.id)
         """
+        ctes.add_cte("calls_usage_ids", filtered_calls_sql)
 
         calls_query = CallsQuery(
             project_id=req.project_id,
@@ -1043,11 +1025,23 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         base_sql = calls_query._as_sql_base_format(
             pb,
             table_alias,
-            id_subquery_name=f"({calls_ids_subquery})",
+            id_subquery_name="calls_usage_ids",
         )
 
-        sql = base_sql
-        columns = [field.field for field in calls_query.select_fields]
+        if req.include_costs:
+            ctes.add_cte(CTE_ALL_CALLS, base_sql)
+            calls_query._add_cost_ctes_to_builder(ctes, pb)
+            select_fields = [field.field for field in calls_query.select_fields]
+            final_select = get_cost_final_select(
+                pb, select_fields, calls_query.order_fields, req.project_id
+            )
+            sql = ctes.to_sql() + "\n" + final_select
+            columns = [f for f in select_fields if f != "summary_dump"] + [
+                "summary_dump"
+            ]
+        else:
+            sql = ctes.to_sql() + "\n" + base_sql
+            columns = [field.field for field in calls_query.select_fields]
 
         raw_res = self._query_stream(sql, pb.get_params())
         try:
@@ -1062,14 +1056,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     )
 
             aggregated_usage = usage_utils.aggregate_usage_with_descendants(
-                iter_calls(), include_costs=False
+                iter_calls(), req.include_costs
             )
         finally:
             if hasattr(raw_res, "close"):
                 raw_res.close()
-
-        if req.include_costs:
-            self._apply_costs_to_aggregated_usage(aggregated_usage, req.project_id)
 
         root_usage = {
             call_id: aggregated_usage.get(call_id, {}) for call_id in req.call_ids
