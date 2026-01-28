@@ -82,6 +82,17 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         "obj_read",
         "objs_query",
     }
+    # Methods that should pass through directly to the internal server without
+    # any ID conversion. These methods are typically used by worker subclasses
+    # (like UserInjectingExternalTraceServer) that handle their own ID management.
+    # Adding a method here maintains backwards compatibility with master branch
+    # behavior where __getattr__ returned internal methods directly.
+    _AUTO_PASSTHROUGH_METHODS: ClassVar[set[str]] = {
+        "call_start",
+        "call_end",
+        "call_start_v2",
+        "call_end_v2",
+    }
     _USER_ID_FIELDS: ClassVar[set[str]] = {"wb_user_id", "created_by", "added_by"}
     _USER_ID_LIST_FIELDS: ClassVar[set[str]] = {"wb_user_ids"}
 
@@ -105,6 +116,11 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         # ID/ref conversion and stream handling without per-method adapters.
         attr = getattr(self._internal_trace_server, name)
         if not callable(attr):
+            return attr
+
+        # Passthrough methods return the internal method directly without wrapping.
+        # This is for methods used by worker subclasses that manage their own IDs.
+        if name in self._AUTO_PASSTHROUGH_METHODS:
             return attr
 
         def wrapper(*args: typing.Any, **kwargs: typing.Any) -> typing.Any:
