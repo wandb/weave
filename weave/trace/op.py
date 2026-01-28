@@ -197,6 +197,7 @@ class OpKwargs(TypedDict, total=False):
     accumulator: Callable[[Any | None, Any], Any] | None
     kind: OpKind | None
     color: OpColor | None
+    eager_call_start: bool
 
 
 def setup_dunder_weave_dict(op: Op, d: WeaveKwargs | None = None) -> WeaveKwargs:
@@ -1211,9 +1212,23 @@ def op(
     accumulator: Callable[[Any | None, Any], Any] | None = None,
     kind: OpKind | None = None,
     color: OpColor | None = None,
+    eager_call_start: bool = False,
 ) -> Callable[[Callable[P, R]], Op[P, R]] | Op[P, R]:
     """A decorator to weave op-ify a function or method. Works for both sync and async.
     Automatically detects iterator functions and applies appropriate behavior.
+
+    Args:
+        func: The function to decorate.
+        name: Custom name for the op. Defaults to the function name.
+        call_display_name: Display name for calls, can be a string or callable.
+        postprocess_inputs: Function to transform inputs before logging.
+        postprocess_output: Function to transform output before logging.
+        tracing_sample_rate: Fraction of calls to trace (0.0 to 1.0).
+        enable_code_capture: Whether to capture source code for this op.
+        accumulator: Function to accumulate results for streaming ops.
+        eager_call_start: If True, call starts are sent immediately rather than batched.
+            Useful for long-running operations like evaluations that should
+            be visible in the UI immediately.
     """
     if not isinstance(tracing_sample_rate, (int, float)):
         raise TypeError("tracing_sample_rate must be a float")
@@ -1304,6 +1319,7 @@ def op(
 
             wrapper.get_captured_code = partial(get_captured_code, wrapper)  # type: ignore
             wrapper._code_capture_enabled = enable_code_capture  # type: ignore
+            wrapper.eager_call_start = eager_call_start  # type: ignore
 
             if callable(call_display_name):
                 params = inspect.signature(call_display_name).parameters
