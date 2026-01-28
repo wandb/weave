@@ -1221,3 +1221,435 @@ def test_calls_complete_query_with_status_filter(trace_server, clickhouse_trace_
         )
     )
     assert len(all_status_calls) == 2
+
+
+def _make_completed_call_with_parent(
+    project_id: str,
+    call_id: str,
+    trace_id: str,
+    parent_id: str | None,
+    started_at: datetime.datetime,
+    ended_at: datetime.datetime,
+    inputs: dict[str, Any] | None = None,
+    output: Any | None = None,
+    display_name: str | None = None,
+) -> tsi.CompletedCallSchemaForInsert:
+    """Build a completed call payload with parent_id for hierarchy tests."""
+    return tsi.CompletedCallSchemaForInsert(
+        project_id=project_id,
+        id=call_id,
+        trace_id=trace_id,
+        parent_id=parent_id,
+        op_name="test_op",
+        started_at=started_at,
+        ended_at=ended_at,
+        attributes={},
+        inputs=inputs or {},
+        output=output,
+        summary={"usage": {}, "status_counts": {}},
+        display_name=display_name,
+    )
+
+
+def _fetch_call_display_name(
+    ch_client, table: str, project_id: str, call_id: str
+) -> str | None:
+    """Fetch display_name for a call from ClickHouse."""
+    row = _fetch_call_row(ch_client, table, project_id, call_id, ["display_name"])
+    if row is None:
+        return None
+    return row[0]
+
+
+def test_call_update_display_name_on_calls_complete(
+    trace_server, clickhouse_trace_server
+):
+    """Test that call_update updates display_name on calls_complete table."""
+    project_id = f"{TEST_ENTITY}/calls_complete_display_name"
+    internal_project_id = b64(project_id)
+
+    # Create a call first
+    call_id = str(uuid.uuid4())
+    call = _make_completed_call(
+        project_id,
+        call_id,
+        str(uuid.uuid4()),
+        datetime.datetime.now(datetime.timezone.utc),
+        datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=1),
+    )
+    trace_server.calls_complete(tsi.CallsUpsertCompleteReq(batch=[call]))
+
+    # Verify call exists and has no display_name
+    calls = _fetch_calls_stream(trace_server, project_id)
+    assert len(calls) == 1
+    assert calls[0].display_name is None
+
+    # Update display_name
+    new_display_name = "My Custom Display Name"
+    trace_server.call_update(
+        tsi.CallUpdateReq(
+            project_id=project_id,
+            call_id=call_id,
+            display_name=new_display_name,
+        )
+    )
+
+    # Verify display_name was updated via query
+    calls = _fetch_calls_stream(trace_server, project_id)
+    assert len(calls) == 1
+    assert calls[0].display_name == new_display_name
+
+    # Also verify directly in ClickHouse
+    db_display_name = _fetch_call_display_name(
+        clickhouse_trace_server.ch_client,
+        "calls_complete",
+        internal_project_id,
+        call_id,
+    )
+    assert db_display_name == new_display_name
+
+
+def test_call_update_display_name_overwrite(trace_server, clickhouse_trace_server):
+    """Test that call_update can overwrite an existing display_name."""
+    project_id = f"{TEST_ENTITY}/calls_complete_display_name_overwrite"
+
+    # Create a call with initial display_name
+    call_id = str(uuid.uuid4())
+    initial_display_name = "Initial Name"
+    call = _make_completed_call_with_parent(
+        project_id,
+        call_id,
+        str(uuid.uuid4()),
+        parent_id=None,
+        started_at=datetime.datetime.now(datetime.timezone.utc),
+        ended_at=datetime.datetime.now(datetime.timezone.utc)
+        + datetime.timedelta(seconds=1),
+        display_name=initial_display_name,
+    )
+    trace_server.calls_complete(tsi.CallsUpsertCompleteReq(batch=[call]))
+
+    # Verify initial display_name
+    calls = _fetch_calls_stream(trace_server, project_id)
+    assert len(calls) == 1
+    assert calls[0].display_name == initial_display_name
+
+    # Update to new display_name
+    updated_display_name = "Updated Name"
+    trace_server.call_update(
+        tsi.CallUpdateReq(
+            project_id=project_id,
+            call_id=call_id,
+            display_name=updated_display_name,
+        )
+    )
+
+    # Verify display_name was updated
+    calls = _fetch_calls_stream(trace_server, project_id)
+    assert len(calls) == 1
+    assert calls[0].display_name == updated_display_name
+
+
+def test_calls_delete_single_call(trace_server, clickhouse_trace_server):
+    """Test that calls_delete removes a single call from calls_complete."""
+    project_id = f"{TEST_ENTITY}/calls_complete_delete_single"
+    internal_project_id = b64(project_id)
+
+    # Create a call
+    call_id = str(uuid.uuid4())
+    call = _make_completed_call(
+        project_id,
+        call_id,
+        str(uuid.uuid4()),
+        datetime.datetime.now(datetime.timezone.utc),
+        datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=1),
+    )
+    trace_server.calls_complete(tsi.CallsUpsertCompleteReq(batch=[call]))
+
+    # Verify call exists
+    calls = _fetch_calls_stream(trace_server, project_id)
+    assert len(calls) == 1
+    assert (
+        _count_project_rows(
+            clickhouse_trace_server.ch_client, "calls_complete", internal_project_id
+        )
+        == 1
+    )
+
+    # Delete the call
+    delete_res = trace_server.calls_delete(
+        tsi.CallsDeleteReq(
+            project_id=project_id,
+            call_ids=[call_id],
+        )
+    )
+
+    # Verify deletion response
+    assert delete_res.num_deleted == 1
+
+    # Verify call is no longer queryable
+    calls = _fetch_calls_stream(trace_server, project_id)
+    assert len(calls) == 0
+
+
+def test_calls_delete_multiple_calls(trace_server, clickhouse_trace_server):
+    """Test that calls_delete can remove multiple unrelated calls."""
+    project_id = f"{TEST_ENTITY}/calls_complete_delete_multiple"
+    internal_project_id = b64(project_id)
+
+    # Create multiple calls with different trace_ids
+    call_ids = [str(uuid.uuid4()) for _ in range(3)]
+    calls_to_create = [
+        _make_completed_call(
+            project_id,
+            call_id,
+            str(uuid.uuid4()),  # different trace_id for each
+            datetime.datetime.now(datetime.timezone.utc),
+            datetime.datetime.now(datetime.timezone.utc)
+            + datetime.timedelta(seconds=1),
+        )
+        for call_id in call_ids
+    ]
+    trace_server.calls_complete(tsi.CallsUpsertCompleteReq(batch=calls_to_create))
+
+    # Verify calls exist
+    calls = _fetch_calls_stream(trace_server, project_id)
+    assert len(calls) == 3
+
+    # Delete first two calls
+    delete_res = trace_server.calls_delete(
+        tsi.CallsDeleteReq(
+            project_id=project_id,
+            call_ids=call_ids[:2],
+        )
+    )
+
+    assert delete_res.num_deleted == 2
+
+    # Verify only the third call remains
+    calls = _fetch_calls_stream(trace_server, project_id)
+    assert len(calls) == 1
+    assert calls[0].id == call_ids[2]
+
+
+def test_calls_delete_parent_cascades_to_children(
+    trace_server, clickhouse_trace_server
+):
+    """Test that deleting a parent call also deletes all its children."""
+    project_id = f"{TEST_ENTITY}/calls_complete_delete_cascade"
+    internal_project_id = b64(project_id)
+    trace_id = str(uuid.uuid4())
+
+    # Create a call hierarchy:
+    # parent
+    #   ├── child1
+    #   │     └── grandchild1
+    #   └── child2
+    parent_id = str(uuid.uuid4())
+    child1_id = str(uuid.uuid4())
+    child2_id = str(uuid.uuid4())
+    grandchild1_id = str(uuid.uuid4())
+
+    base_time = datetime.datetime.now(datetime.timezone.utc)
+
+    parent_call = _make_completed_call_with_parent(
+        project_id,
+        parent_id,
+        trace_id,
+        parent_id=None,
+        started_at=base_time,
+        ended_at=base_time + datetime.timedelta(seconds=10),
+    )
+    child1_call = _make_completed_call_with_parent(
+        project_id,
+        child1_id,
+        trace_id,
+        parent_id=parent_id,
+        started_at=base_time + datetime.timedelta(seconds=1),
+        ended_at=base_time + datetime.timedelta(seconds=5),
+    )
+    child2_call = _make_completed_call_with_parent(
+        project_id,
+        child2_id,
+        trace_id,
+        parent_id=parent_id,
+        started_at=base_time + datetime.timedelta(seconds=1),
+        ended_at=base_time + datetime.timedelta(seconds=5),
+    )
+    grandchild1_call = _make_completed_call_with_parent(
+        project_id,
+        grandchild1_id,
+        trace_id,
+        parent_id=child1_id,
+        started_at=base_time + datetime.timedelta(seconds=2),
+        ended_at=base_time + datetime.timedelta(seconds=3),
+    )
+
+    # Insert all calls
+    trace_server.calls_complete(
+        tsi.CallsUpsertCompleteReq(
+            batch=[parent_call, child1_call, child2_call, grandchild1_call]
+        )
+    )
+
+    # Verify all 4 calls exist
+    calls = _fetch_calls_stream(trace_server, project_id)
+    assert len(calls) == 4
+    call_ids_before = {c.id for c in calls}
+    assert call_ids_before == {parent_id, child1_id, child2_id, grandchild1_id}
+
+    # Delete the parent - should cascade to all descendants
+    delete_res = trace_server.calls_delete(
+        tsi.CallsDeleteReq(
+            project_id=project_id,
+            call_ids=[parent_id],
+        )
+    )
+
+    # All 4 calls should be deleted (parent + 2 children + 1 grandchild)
+    assert delete_res.num_deleted == 4
+
+    # Verify no calls remain
+    calls = _fetch_calls_stream(trace_server, project_id)
+    assert len(calls) == 0
+
+
+def test_calls_delete_child_does_not_delete_parent(
+    trace_server, clickhouse_trace_server
+):
+    """Test that deleting a child call does not affect the parent or siblings."""
+    project_id = f"{TEST_ENTITY}/calls_complete_delete_child_only"
+    trace_id = str(uuid.uuid4())
+
+    # Create parent with two children
+    parent_id = str(uuid.uuid4())
+    child1_id = str(uuid.uuid4())
+    child2_id = str(uuid.uuid4())
+
+    base_time = datetime.datetime.now(datetime.timezone.utc)
+
+    parent_call = _make_completed_call_with_parent(
+        project_id,
+        parent_id,
+        trace_id,
+        parent_id=None,
+        started_at=base_time,
+        ended_at=base_time + datetime.timedelta(seconds=10),
+    )
+    child1_call = _make_completed_call_with_parent(
+        project_id,
+        child1_id,
+        trace_id,
+        parent_id=parent_id,
+        started_at=base_time + datetime.timedelta(seconds=1),
+        ended_at=base_time + datetime.timedelta(seconds=5),
+    )
+    child2_call = _make_completed_call_with_parent(
+        project_id,
+        child2_id,
+        trace_id,
+        parent_id=parent_id,
+        started_at=base_time + datetime.timedelta(seconds=1),
+        ended_at=base_time + datetime.timedelta(seconds=5),
+    )
+
+    trace_server.calls_complete(
+        tsi.CallsUpsertCompleteReq(batch=[parent_call, child1_call, child2_call])
+    )
+
+    # Verify all 3 calls exist
+    calls = _fetch_calls_stream(trace_server, project_id)
+    assert len(calls) == 3
+
+    # Delete only child1
+    delete_res = trace_server.calls_delete(
+        tsi.CallsDeleteReq(
+            project_id=project_id,
+            call_ids=[child1_id],
+        )
+    )
+
+    assert delete_res.num_deleted == 1
+
+    # Verify parent and child2 still exist
+    calls = _fetch_calls_stream(trace_server, project_id)
+    assert len(calls) == 2
+    remaining_ids = {c.id for c in calls}
+    assert remaining_ids == {parent_id, child2_id}
+
+
+def test_calls_delete_middle_node_cascades_to_subtree(
+    trace_server, clickhouse_trace_server
+):
+    """Test that deleting a middle node deletes its subtree but not its parent."""
+    project_id = f"{TEST_ENTITY}/calls_complete_delete_middle"
+    trace_id = str(uuid.uuid4())
+
+    # Create hierarchy:
+    # root
+    #   └── middle
+    #         ├── leaf1
+    #         └── leaf2
+    root_id = str(uuid.uuid4())
+    middle_id = str(uuid.uuid4())
+    leaf1_id = str(uuid.uuid4())
+    leaf2_id = str(uuid.uuid4())
+
+    base_time = datetime.datetime.now(datetime.timezone.utc)
+
+    root_call = _make_completed_call_with_parent(
+        project_id,
+        root_id,
+        trace_id,
+        parent_id=None,
+        started_at=base_time,
+        ended_at=base_time + datetime.timedelta(seconds=10),
+    )
+    middle_call = _make_completed_call_with_parent(
+        project_id,
+        middle_id,
+        trace_id,
+        parent_id=root_id,
+        started_at=base_time + datetime.timedelta(seconds=1),
+        ended_at=base_time + datetime.timedelta(seconds=8),
+    )
+    leaf1_call = _make_completed_call_with_parent(
+        project_id,
+        leaf1_id,
+        trace_id,
+        parent_id=middle_id,
+        started_at=base_time + datetime.timedelta(seconds=2),
+        ended_at=base_time + datetime.timedelta(seconds=4),
+    )
+    leaf2_call = _make_completed_call_with_parent(
+        project_id,
+        leaf2_id,
+        trace_id,
+        parent_id=middle_id,
+        started_at=base_time + datetime.timedelta(seconds=2),
+        ended_at=base_time + datetime.timedelta(seconds=4),
+    )
+
+    trace_server.calls_complete(
+        tsi.CallsUpsertCompleteReq(
+            batch=[root_call, middle_call, leaf1_call, leaf2_call]
+        )
+    )
+
+    # Verify all 4 calls exist
+    calls = _fetch_calls_stream(trace_server, project_id)
+    assert len(calls) == 4
+
+    # Delete the middle node - should delete middle + leaf1 + leaf2
+    delete_res = trace_server.calls_delete(
+        tsi.CallsDeleteReq(
+            project_id=project_id,
+            call_ids=[middle_id],
+        )
+    )
+
+    assert delete_res.num_deleted == 3  # middle + 2 leaves
+
+    # Verify only root remains
+    calls = _fetch_calls_stream(trace_server, project_id)
+    assert len(calls) == 1
+    assert calls[0].id == root_id
