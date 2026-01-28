@@ -4,17 +4,20 @@ from weave.trace.op import _IteratorWrapper
 
 
 class _AsyncContextIterator:
-    def __init__(self) -> None:
+    def __init__(self, open_handles: list["_AsyncContextIterator"]) -> None:
         self.entered = False
         self.exited = False
+        self._open_handles = open_handles
         self._items = iter([1, 2])
 
     async def __aenter__(self) -> "_AsyncContextIterator":
         self.entered = True
+        self._open_handles.append(self)
         return self
 
     async def __aexit__(self, exc_type, exc, tb) -> None:
         self.exited = True
+        self._open_handles.remove(self)
 
     def __aiter__(self) -> "_AsyncContextIterator":
         return self
@@ -28,7 +31,8 @@ class _AsyncContextIterator:
 
 @pytest.mark.asyncio
 async def test_iterator_wrapper_delegates_aexit() -> None:
-    stream = _AsyncContextIterator()
+    open_handles: list[_AsyncContextIterator] = []
+    stream = _AsyncContextIterator(open_handles)
     wrapper = _IteratorWrapper(stream, lambda _: None, lambda _: None, lambda: None)
 
     async with wrapper as wrapped:
@@ -36,4 +40,8 @@ async def test_iterator_wrapper_delegates_aexit() -> None:
         values = [value async for value in wrapped]
 
     assert values == [1, 2]
+    # If this fails, _IteratorWrapper.__aexit__ is not delegating to the wrapped
+    # async context manager, which can leak resources in streaming integrations.
     assert stream.exited is True
+    # This models an unclosed stream/connection handle that would remain open.
+    assert open_handles == []
