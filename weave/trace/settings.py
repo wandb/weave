@@ -97,6 +97,13 @@ class UserSettings(BaseModel):
     Can be overridden with the environment variable `WEAVE_REDACT_PII_FIELDS`
     """
 
+    redact_pii_exclude_fields: list[str] = []
+    """List of PII entity types to exclude from redaction.
+
+    Only applies when `redact_pii` is True. Entities in this list are removed from the redaction set.
+    Can be overridden with the environment variable `WEAVE_REDACT_PII_EXCLUDE_FIELDS`
+    """
+
     capture_client_info: bool = True
     """Toggles capture of client information (Python version, SDK version) for ops."""
 
@@ -267,6 +274,10 @@ def should_redact_pii() -> bool:
 
 def redact_pii_fields() -> list[str]:
     return _list_str("redact_pii_fields")
+
+
+def redact_pii_exclude_fields() -> list[str]:
+    return _list_str("redact_pii_exclude_fields")
 
 
 def use_server_cache() -> bool:

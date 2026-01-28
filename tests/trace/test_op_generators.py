@@ -3,6 +3,7 @@ from collections.abc import AsyncGenerator, Generator
 import pytest
 
 import weave
+from weave.trace.context import call_context
 
 
 @weave.op
@@ -238,3 +239,101 @@ async def test_async_generator_with_decorator_accumulator(client):
     calls = client.get_calls()
     assert len(calls) == 1
     assert calls[0].output == [0, 1, 2]
+
+
+def test_nested_generator_multiple_iterations(client):
+    """Test that nested generators work correctly when called multiple times.
+
+    This is a regression test for a bug where the call context was being double-pushed
+    for generators, causing incorrect parent-child relationships when the same
+    generator was called multiple times in a loop.
+    """
+
+    @weave.op
+    def inner_gen():
+        yield 1
+
+    @weave.op
+    def outer_gen():
+        yield from inner_gen()
+
+    # Call outer_gen multiple times in a loop
+    results = []
+    for _ in range(2):
+        for val in outer_gen():
+            results.append(val)
+
+    assert results == [1, 1]
+
+    # Verify call stack is empty after all iterations
+    assert call_context.get_call_stack() == []
+
+    # Get all calls
+    calls = client.get_calls()
+
+    # Should have 4 calls total: 2 outer_gen calls, each with 1 inner_gen child
+    assert len(calls) == 4
+
+    # Find outer calls
+    outer_calls = [c for c in calls if "outer_gen" in c.op_name]
+    assert len(outer_calls) == 2
+
+    # Each outer call should have no parent (they are root calls)
+    for outer_call in outer_calls:
+        assert outer_call.parent_id is None
+
+    # Each outer call should have exactly one inner_gen child
+    for outer_call in outer_calls:
+        children = list(outer_call.children())
+        assert len(children) == 1
+        assert "inner_gen" in children[0].op_name
+
+
+@pytest.mark.asyncio
+async def test_nested_async_generator_multiple_iterations(client):
+    """Test that nested async generators work correctly when called multiple times.
+
+    This is a regression test for a bug where the call context was being double-pushed
+    for generators, causing incorrect parent-child relationships when the same
+    generator was called multiple times in a loop.
+    """
+
+    @weave.op
+    async def inner_gen():
+        yield 1
+
+    @weave.op
+    async def outer_gen():
+        async for x in inner_gen():
+            yield x
+
+    # Call outer_gen multiple times in a loop
+    results = []
+    for _ in range(2):
+        async for val in outer_gen():
+            results.append(val)
+
+    assert results == [1, 1]
+
+    # Verify call stack is empty after all iterations
+    assert call_context.get_call_stack() == []
+
+    # Get all calls
+    calls = client.get_calls()
+
+    # Should have 4 calls total: 2 outer_gen calls, each with 1 inner_gen child
+    assert len(calls) == 4
+
+    # Find outer calls
+    outer_calls = [c for c in calls if "outer_gen" in c.op_name]
+    assert len(outer_calls) == 2
+
+    # Each outer call should have no parent (they are root calls)
+    for outer_call in outer_calls:
+        assert outer_call.parent_id is None
+
+    # Each outer call should have exactly one inner_gen child
+    for outer_call in outer_calls:
+        children = list(outer_call.children())
+        assert len(children) == 1
+        assert "inner_gen" in children[0].op_name

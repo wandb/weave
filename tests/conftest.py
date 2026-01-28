@@ -3,8 +3,8 @@ import json
 import logging
 import os
 import typing
-from collections.abc import Iterator
 from datetime import datetime
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -140,91 +140,32 @@ def pytest_sessionfinish(session, exitstatus):
         session.exitstatus = 0
 
 
+_TRACE_SERVER_METHOD_NAMES = frozenset(
+    {
+        name
+        for interface in (tsi.TraceServerInterface, tsi.ObjectInterface)
+        for name, value in vars(interface).items()
+        if callable(value) and not name.startswith("_")
+    }
+)
+
+
 class ThrowingServer(tsi.TraceServerInterface):
-    # Call API
-    def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
-        raise DummyTestException("FAILURE - call_start, req:", req)
+    def __getattribute__(self, name: str) -> Any:
+        if name in _TRACE_SERVER_METHOD_NAMES:
 
-    def call_end(self, req: tsi.CallEndReq) -> tsi.CallEndRes:
-        raise DummyTestException("FAILURE - call_end, req:", req)
+            def _raise(*args: Any, **kwargs: Any) -> Any:
+                if len(args) > 0:
+                    req = args[0]
+                elif "req" in kwargs:
+                    req = kwargs["req"]
+                else:
+                    req = None
+                raise DummyTestException(f"FAILURE - {name}, req:", req)
 
-    def call_read(self, req: tsi.CallReadReq) -> tsi.CallReadRes:
-        raise DummyTestException("FAILURE - call_read, req:", req)
+            return _raise
 
-    def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
-        raise DummyTestException("FAILURE - calls_query, req:", req)
-
-    def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
-        raise DummyTestException("FAILURE - calls_query_stream, req:", req)
-
-    def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
-        raise DummyTestException("FAILURE - calls_delete, req:", req)
-
-    def calls_query_stats(self, req: tsi.CallsQueryStatsReq) -> tsi.CallsQueryStatsRes:
-        raise DummyTestException("FAILURE - calls_query_stats, req:", req)
-
-    def call_update(self, req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
-        raise DummyTestException("FAILURE - call_update, req:", req)
-
-    # Cost API
-    def cost_create(self, req: tsi.CostCreateReq) -> tsi.CostCreateRes:
-        raise DummyTestException("FAILURE - cost_create, req:", req)
-
-    def cost_query(self, req: tsi.CostQueryReq) -> tsi.CostQueryRes:
-        raise DummyTestException("FAILURE - cost_query, req:", req)
-
-    def cost_purge(self, req: tsi.CostPurgeReq) -> tsi.CostPurgeRes:
-        raise DummyTestException("FAILURE - cost_purge, req:", req)
-
-    # Obj API
-    def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
-        raise DummyTestException("FAILURE - obj_create, req:", req)
-
-    def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
-        raise DummyTestException("FAILURE - obj_read, req:", req)
-
-    def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
-        raise DummyTestException("FAILURE - objs_query, req:", req)
-
-    def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
-        raise DummyTestException("FAILURE - table_create, req:", req)
-
-    def table_update(self, req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
-        raise DummyTestException("FAILURE - table_update, req:", req)
-
-    def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
-        raise DummyTestException("FAILURE - table_query, req:", req)
-
-    def refs_read_batch(self, req: tsi.RefsReadBatchReq) -> tsi.RefsReadBatchRes:
-        raise DummyTestException("FAILURE - refs_read_batch, req:", req)
-
-    def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
-        raise DummyTestException("FAILURE - file_create, req:", req)
-
-    def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
-        raise DummyTestException("FAILURE - file_content_read, req:", req)
-
-    def feedback_create(self, req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
-        raise DummyTestException("FAILURE - feedback_create, req:", req)
-
-    def feedback_create_batch(
-        self, req: tsi.FeedbackCreateBatchReq
-    ) -> tsi.FeedbackCreateBatchRes:
-        raise DummyTestException("FAILURE - feedback_create_batch, req:", req)
-
-    def feedback_query(self, req: tsi.FeedbackQueryReq) -> tsi.FeedbackQueryRes:
-        raise DummyTestException("FAILURE - feedback_query, req:", req)
-
-    def feedback_purge(self, req: tsi.FeedbackPurgeReq) -> tsi.FeedbackPurgeRes:
-        raise DummyTestException("FAILURE - feedback_purge, req:", req)
-
-    def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
-        raise DummyTestException("FAILURE - evaluate_model, req:", req)
-
-    def evaluation_status(
-        self, req: tsi.EvaluationStatusReq
-    ) -> tsi.EvaluationStatusRes:
-        raise DummyTestException("FAILURE - evaluation_status, req:", req)
+        return super().__getattribute__(name)
 
 
 @pytest.fixture
@@ -426,9 +367,13 @@ def zero_stack():
 
 
 @pytest.fixture
-def client(zero_stack, request, trace_server):
+def client(zero_stack, request, trace_server, caching_client_isolation):
     """This is the standard fixture used everywhere in tests to test end to end
     client functionality.
+
+    Note: caching_client_isolation is explicitly depended on to ensure the cache
+    directory is set before the client is created. Without this, the cache might
+    be shared across tests causing flaky test failures.
     """
     client = create_client(request, trace_server)
     try:
@@ -438,8 +383,12 @@ def client(zero_stack, request, trace_server):
 
 
 @pytest.fixture
-def client_creator(zero_stack, request, trace_server):
-    """This fixture is useful for delaying the creation of the client (ex. when you want to set settings first)."""
+def client_creator(zero_stack, request, trace_server, caching_client_isolation):
+    """This fixture is useful for delaying the creation of the client (ex. when you want to set settings first).
+
+    Note: caching_client_isolation is explicitly depended on to ensure the cache
+    directory is set before the client is created.
+    """
 
     @contextlib.contextmanager
     def client(

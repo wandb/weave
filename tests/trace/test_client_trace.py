@@ -42,6 +42,7 @@ from weave.trace.vals import MissingSelfInstanceError
 from weave.trace.weave_client import sanitize_object_name
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.clickhouse_trace_server_settings import ENTITY_TOO_LARGE_PAYLOAD
+from weave.trace_server.common_interface import SortBy
 from weave.trace_server.errors import InsertTooLarge, InvalidFieldError, InvalidRequest
 from weave.trace_server.ids import generate_id
 from weave.trace_server.refs_internal import extra_value_quoter
@@ -619,7 +620,7 @@ def test_trace_call_wb_run_step_query(client):
     res = server.calls_query(
         tsi.CallsQueryReq(
             project_id=get_client_project_id(client),
-            sort_by=[tsi.SortBy(field="wb_run_step", direction="desc")],
+            sort_by=[SortBy(field="wb_run_step", direction="desc")],
         )
     )
     exp_steps = sorted(exp_start_steps, reverse=True)
@@ -629,7 +630,7 @@ def test_trace_call_wb_run_step_query(client):
     res = server.calls_query(
         tsi.CallsQueryReq(
             project_id=get_client_project_id(client),
-            sort_by=[tsi.SortBy(field="wb_run_step_end", direction="desc")],
+            sort_by=[SortBy(field="wb_run_step_end", direction="desc")],
         )
     )
     exp_steps = sorted(exp_end_steps, reverse=True)
@@ -675,7 +676,7 @@ def test_trace_call_wb_run_context_override(client):
     res = server.calls_query(
         tsi.CallsQueryReq(
             project_id=get_client_project_id(client),
-            sort_by=[tsi.SortBy(field="wb_run_step", direction="desc")],
+            sort_by=[SortBy(field="wb_run_step", direction="desc")],
         )
     )
     assert all(c.wb_run_step == 0 for c in res.calls)
@@ -684,7 +685,7 @@ def test_trace_call_wb_run_context_override(client):
     res = server.calls_query(
         tsi.CallsQueryReq(
             project_id=get_client_project_id(client),
-            sort_by=[tsi.SortBy(field="wb_run_step_end", direction="desc")],
+            sort_by=[SortBy(field="wb_run_step_end", direction="desc")],
         )
     )
     assert all(c.wb_run_step_end == 0 for c in res.calls)
@@ -703,7 +704,7 @@ def test_trace_call_wb_run_context_override(client):
     res = server.calls_query(
         tsi.CallsQueryReq(
             project_id=get_client_project_id(client),
-            sort_by=[tsi.SortBy(field="started_at", direction="desc")],
+            sort_by=[SortBy(field="started_at", direction="desc")],
             limit=1,
         )
     )
@@ -1046,14 +1047,14 @@ def test_trace_call_query_timings(client):
         result = get_client_trace_server(client).calls_query_stream(
             tsi.CallsQueryReq(
                 project_id=get_client_project_id(client),
-                sort_by=[tsi.SortBy(field="started_at", direction="desc")],
+                sort_by=[SortBy(field="started_at", direction="desc")],
             )
         )
         return list(result)
 
     def query_client(page_size):
         res = client.get_calls(
-            sort_by=[tsi.SortBy(field="started_at", direction="desc")],
+            sort_by=[SortBy(field="started_at", direction="desc")],
             page_size=page_size,
         )
         return list(res)
@@ -1093,13 +1094,13 @@ def test_trace_call_sort(client):
         basic_op({"prim": i, "list": [i], "dict": {"inner": i}}, i / 10)
 
     for first, last, sort_by in [
-        (2, 0, [tsi.SortBy(field="started_at", direction="desc")]),
-        (2, 0, [tsi.SortBy(field="inputs.in_val.prim", direction="desc")]),
-        (2, 0, [tsi.SortBy(field="inputs.in_val.list.0", direction="desc")]),
-        (2, 0, [tsi.SortBy(field="inputs.in_val.dict.inner", direction="desc")]),
-        (2, 0, [tsi.SortBy(field="output.prim", direction="desc")]),
-        (2, 0, [tsi.SortBy(field="output.list.0", direction="desc")]),
-        (2, 0, [tsi.SortBy(field="output.dict.inner", direction="desc")]),
+        (2, 0, [SortBy(field="started_at", direction="desc")]),
+        (2, 0, [SortBy(field="inputs.in_val.prim", direction="desc")]),
+        (2, 0, [SortBy(field="inputs.in_val.list.0", direction="desc")]),
+        (2, 0, [SortBy(field="inputs.in_val.dict.inner", direction="desc")]),
+        (2, 0, [SortBy(field="output.prim", direction="desc")]),
+        (2, 0, [SortBy(field="output.list.0", direction="desc")]),
+        (2, 0, [SortBy(field="output.dict.inner", direction="desc")]),
     ]:
         inner_res = get_client_trace_server(client).calls_query(
             tsi.CallsQueryReq(
@@ -1149,7 +1150,7 @@ def test_trace_call_sort_with_mixed_types(client):
         inner_res = get_client_trace_server(client).calls_query(
             tsi.CallsQueryReq(
                 project_id=get_client_project_id(client),
-                sort_by=[tsi.SortBy(field="inputs.in_val.prim", direction=direction)],
+                sort_by=[SortBy(field="inputs.in_val.prim", direction=direction)],
             )
         )
 
@@ -1832,7 +1833,7 @@ def test_table_query_empty_sort_field_validation(client):
                     tsi.TableQueryReq(
                         project_id=get_client_project_id(client),
                         digest=table_ref.digest,
-                        sort_by=[tsi.SortBy(field=invalid_field, direction="asc")],
+                        sort_by=[SortBy(field=invalid_field, direction="asc")],
                     )
                 )
             )
@@ -2909,10 +2910,10 @@ def test_sort_and_filter_through_refs(client):
     )
 
     for first, _last, sort_by in [
-        (0, 21, [tsi.SortBy(field="inputs.val.a.b.c.d", direction="asc")]),
-        (21, 0, [tsi.SortBy(field="inputs.val.a.b.c.d", direction="desc")]),
-        (0, 21, [tsi.SortBy(field="output.a.b.c.d", direction="asc")]),
-        (21, 0, [tsi.SortBy(field="output.a.b.c.d", direction="desc")]),
+        (0, 21, [SortBy(field="inputs.val.a.b.c.d", direction="asc")]),
+        (21, 0, [SortBy(field="inputs.val.a.b.c.d", direction="desc")]),
+        (0, 21, [SortBy(field="output.a.b.c.d", direction="asc")]),
+        (21, 0, [SortBy(field="output.a.b.c.d", direction="desc")]),
     ]:
         inner_res = get_client_trace_server(client).calls_query(
             tsi.CallsQueryReq(
@@ -2966,9 +2967,7 @@ def test_sort_and_filter_through_refs(client):
             tsi.CallsQueryReq.model_validate(
                 {
                     "project_id": get_client_project_id(client),
-                    "sort_by": [
-                        tsi.SortBy(field="inputs.val.a.b.c.d", direction="asc")
-                    ],
+                    "sort_by": [SortBy(field="inputs.val.a.b.c.d", direction="asc")],
                     "query": {"$expr": query},
                 }
             )
@@ -5260,7 +5259,7 @@ def test_threads_query_endpoint(client):
         client.server.threads_query_stream(
             tsi.ThreadsQueryReq(
                 project_id=get_client_project_id(client),
-                sort_by=[tsi.SortBy(field="thread_id", direction="asc")],
+                sort_by=[SortBy(field="thread_id", direction="asc")],
             )
         )
     )
@@ -5272,7 +5271,7 @@ def test_threads_query_endpoint(client):
         client.server.threads_query_stream(
             tsi.ThreadsQueryReq(
                 project_id=get_client_project_id(client),
-                sort_by=[tsi.SortBy(field="turn_count", direction="desc")],
+                sort_by=[SortBy(field="turn_count", direction="desc")],
             )
         )
     )
@@ -5284,7 +5283,7 @@ def test_threads_query_endpoint(client):
         client.server.threads_query_stream(
             tsi.ThreadsQueryReq(
                 project_id=get_client_project_id(client),
-                sort_by=[tsi.SortBy(field="last_updated", direction="desc")],
+                sort_by=[SortBy(field="last_updated", direction="desc")],
             )
         )
     )
@@ -5372,7 +5371,7 @@ def test_threads_query_endpoint(client):
             tsi.ThreadsQueryReq(
                 project_id=get_client_project_id(client),
                 limit=1,
-                sort_by=[tsi.SortBy(field="turn_count", direction="desc")],
+                sort_by=[SortBy(field="turn_count", direction="desc")],
                 filter=tsi.ThreadsQueryFilter(
                     thread_ids=["analytics_thread"],
                     after_datetime=middle_time,
@@ -5392,7 +5391,7 @@ def test_threads_query_endpoint(client):
                 project_id=get_client_project_id(client),
                 limit=5,
                 offset=0,
-                sort_by=[tsi.SortBy(field="turn_count", direction="desc")],
+                sort_by=[SortBy(field="turn_count", direction="desc")],
                 filter=tsi.ThreadsQueryFilter(after_datetime=middle_time),
             )
         )
@@ -5542,7 +5541,7 @@ def test_threads_query_aggregation_fields(client):
         client.server.threads_query_stream(
             tsi.ThreadsQueryReq(
                 project_id=get_client_project_id(client),
-                sort_by=[tsi.SortBy(field="p50_turn_duration_ms", direction="desc")],
+                sort_by=[SortBy(field="p50_turn_duration_ms", direction="desc")],
             )
         )
     )
@@ -5553,7 +5552,7 @@ def test_threads_query_aggregation_fields(client):
         client.server.threads_query_stream(
             tsi.ThreadsQueryReq(
                 project_id=get_client_project_id(client),
-                sort_by=[tsi.SortBy(field="p99_turn_duration_ms", direction="asc")],
+                sort_by=[SortBy(field="p99_turn_duration_ms", direction="asc")],
             )
         )
     )

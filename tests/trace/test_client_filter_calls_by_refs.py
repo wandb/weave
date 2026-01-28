@@ -5,7 +5,7 @@ import pytest
 import weave
 from tests.trace.util import client_is_sqlite
 from weave import Evaluation
-from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.common_interface import SortBy
 
 
 def test_filter_calls_by_ref_properties(client):
@@ -293,7 +293,7 @@ def test_filter_calls_by_ref_properties(client):
     calls = list(
         client.get_calls(
             sort_by=[
-                tsi.SortBy(
+                SortBy(
                     field="inputs.worker_config.config.nested.nested key with spaces.one",
                     direction="asc",
                 )
@@ -322,7 +322,7 @@ def test_filter_calls_by_ref_properties(client):
     calls = list(
         client.get_calls(
             sort_by=[
-                tsi.SortBy(
+                SortBy(
                     field="inputs.worker_config.config.nested.nested key with spaces.one",
                     direction="desc",
                 )
@@ -422,7 +422,7 @@ def test_filter_calls_by_ref_properties_with_table_rows_simple(client):
     # now order by a table row ref field
     calls = list(
         client.get_calls(
-            sort_by=[tsi.SortBy(field="inputs.example.target", direction="asc")],
+            sort_by=[SortBy(field="inputs.example.target", direction="asc")],
             expand_columns=["inputs.example"],
         )
     )
@@ -435,7 +435,7 @@ def test_filter_calls_by_ref_properties_with_table_rows_simple(client):
     # now order by a table row ref field desc
     calls = list(
         client.get_calls(
-            sort_by=[tsi.SortBy(field="inputs.example.target", direction="desc")],
+            sort_by=[SortBy(field="inputs.example.target", direction="desc")],
             expand_columns=["inputs.example"],
         )
     )
@@ -473,7 +473,7 @@ def test_filter_calls_by_ref_properties_with_table_rows_simple(client):
     # # now order by a table row ref field
     # calls = list(
     #     client.get_calls(
-    #         sort_by=[tsi.SortBy(field="inputs.example.object.a", direction="asc")],
+    #         sort_by=[SortBy(field="inputs.example.object.a", direction="asc")],
     #         expand_columns=["inputs.example"],
     #     )
     # )
@@ -486,7 +486,7 @@ def test_filter_calls_by_ref_properties_with_table_rows_simple(client):
     # # now order by a table row ref field desc
     # calls = list(
     #     client.get_calls(
-    #         sort_by=[tsi.SortBy(field="inputs.example.object.a", direction="desc")],
+    #         sort_by=[SortBy(field="inputs.example.object.a", direction="desc")],
     #         expand_columns=["inputs.example"],
     #     )
     # )

@@ -48,7 +48,7 @@ dependencies = [
 
   # Used for content type detection
   # Remove once license content filtering is upstreamed
-  "polyfile-weave",
+  "polyfile-weave>=0.5.9",
 ]
 
 [project.optional-dependencies]
@@ -126,6 +126,7 @@ langchain = [
   "pysqlite3; platform_system == 'Linux' and python_version >= '3.10'",
   "opentelemetry-exporter-otlp; python_version >= '3.10'",
   "openai>=1.99.9,<1.100.0",
+  "google-cloud-iam; python_version >= '3.13'",
 ]
 langchain_nvidia_ai_endpoints = [
   "langchain-core>=0.2.1",
@@ -150,7 +151,7 @@ scorers = [
   "huggingface_hub>=0.28.1",
 ]
 notdiamond = [
-  "notdiamond>=0.4.9; platform_python_implementation != 'PyPy' and python_version > '3.10' and python_version < '3.13'",
+  "notdiamond>=0.4.9,<1.4.0; platform_python_implementation != 'PyPy' and python_version > '3.10' and python_version < '3.13'",
   "pandas>=2.0.0",
 ]
 openai = ["openai>=1.99.9,<1.100.0"]
@@ -206,6 +207,8 @@ filterwarnings = [
   # ignore deprecation warnings from installed packages, they're printed at the
   # bottom of test output, making it hard to find the actual errors.
   "ignore::DeprecationWarning",
+  # google.api_core warns about Python 3.10 EOL; keep pytest output clean.
+  "ignore:You are using a Python version .*:FutureWarning:google\\.api_core\\._python_version_support",
 ]
 addopts = "-v"
 markers = [
@@ -329,7 +332,7 @@ disallow_untyped_defs = true
 disallow_untyped_calls = true
 
 [tool.bumpversion]
-current_version = "0.52.23-dev0"
+current_version = "0.52.26-dev0"
 parse = """(?x)
     (?P<major>0|[1-9]\\d*)\\.
     (?P<minor>0|[1-9]\\d*)\\.
@@ -497,7 +500,7 @@ include = ["weave"]
 exclude = ["tests", "examples", "pyproject.toml"]
 
 [tool.ty.environment]
-python-version= "3.10"
+python-version = "3.10"
 
 [tool.ty.rules]
 # These are ignored for the sake of getting the type checker added.

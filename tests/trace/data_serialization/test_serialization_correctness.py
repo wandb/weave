@@ -165,11 +165,15 @@ def test_serialization_correctness(
                         obj={
                             "project_id": project_id,
                             "object_id": obj["object_id"],
-                            "digest": obj["digest"],
                             "val": obj["exp_val"],
                         }
                     )
                 )
+
+                # Assert that the generated digest matches the one provided in the test case
+                # If this assert triggers, there are a couple of ways to fix it:
+                #  1) least intrusive: update the test case
+                #  2) more intrusive: obj_create could be updated to allow the caller to pass in a digest that would override the generated one
                 assert obj_res.digest == obj["digest"]
 
         if case.exp_files:

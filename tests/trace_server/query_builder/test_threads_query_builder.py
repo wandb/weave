@@ -6,8 +6,9 @@ from tests.trace_server.query_builder.utils import (
     assert_clickhouse_sql,
     assert_sqlite_sql,
 )
-from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.common_interface import SortBy
 from weave.trace_server.orm import ParamBuilder
+from weave.trace_server.project_version.types import ReadTable
 from weave.trace_server.threads_query_builder import (
     _validate_and_map_sort_field,
     make_threads_query,
@@ -17,10 +18,16 @@ from weave.trace_server.threads_query_builder import (
 # Basic Functionality Tests
 
 
-def test_clickhouse_basic_query():
-    """Test basic ClickHouse query with turn-only filtering."""
-    assert_clickhouse_sql(
-        """
+@pytest.mark.parametrize(
+    ("read_table", "expected_table"),
+    [
+        (ReadTable.CALLS_MERGED, "calls_merged"),
+        (ReadTable.CALLS_COMPLETE, "calls_complete"),
+    ],
+)
+def test_clickhouse_basic_query(read_table: ReadTable, expected_table: str):
+    """Test basic ClickHouse threads query uses correct table and full query shape."""
+    expected_query = f"""
         SELECT
             aggregated_thread_id AS thread_id,
             COUNT(*) AS turn_count,
@@ -41,17 +48,20 @@ def test_clickhouse_basic_query():
                     THEN dateDiff('millisecond', call_start_time, call_end_time)
                     ELSE NULL
                 END AS call_duration
-            FROM calls_merged
-            WHERE project_id = {pb_0: String}
+            FROM {expected_table}
+            WHERE project_id = {{pb_0: String}}
 
             GROUP BY (project_id, id)
             HAVING id = any(turn_id) AND aggregated_thread_id IS NOT NULL AND aggregated_thread_id != ''
         ) AS properly_merged_calls
         GROUP BY aggregated_thread_id
         ORDER BY last_updated DESC
-        """,
+    """
+    assert_clickhouse_sql(
+        expected_query,
         {"pb_0": "test_project"},
         project_id="test_project",
+        read_table=read_table,
     )
 
 
@@ -97,8 +107,8 @@ def test_sqlite_basic_query():
 def test_clickhouse_custom_sorting():
     """Test ClickHouse query with custom sorting."""
     sort_by = [
-        tsi.SortBy(field="turn_count", direction="asc"),
-        tsi.SortBy(field="start_time", direction="desc"),
+        SortBy(field="turn_count", direction="asc"),
+        SortBy(field="start_time", direction="desc"),
     ]
 
     assert_clickhouse_sql(
@@ -141,8 +151,8 @@ def test_clickhouse_custom_sorting():
 def test_sqlite_custom_sorting():
     """Test SQLite query with custom sorting."""
     sort_by = [
-        tsi.SortBy(field="thread_id", direction="asc"),
-        tsi.SortBy(field="turn_count", direction="desc"),
+        SortBy(field="thread_id", direction="asc"),
+        SortBy(field="turn_count", direction="desc"),
     ]
 
     assert_sqlite_sql(
@@ -404,7 +414,7 @@ def test_clickhouse_full_featured_query():
     """Test ClickHouse query with all features: custom sorting, pagination, and date filtering."""
     after_date = datetime.datetime(2024, 1, 1)
     before_date = datetime.datetime(2024, 12, 31)
-    sort_by = [tsi.SortBy(field="turn_count", direction="desc")]
+    sort_by = [SortBy(field="turn_count", direction="desc")]
 
     assert_clickhouse_sql(
         """
@@ -459,8 +469,8 @@ def test_sqlite_full_featured_query():
     """Test SQLite query with all features: custom sorting, pagination, and date filtering."""
     after_date = datetime.datetime(2024, 3, 15)
     sort_by = [
-        tsi.SortBy(field="last_updated", direction="asc"),
-        tsi.SortBy(field="thread_id", direction="desc"),
+        SortBy(field="last_updated", direction="asc"),
+        SortBy(field="thread_id", direction="desc"),
     ]
 
     assert_sqlite_sql(
@@ -624,7 +634,7 @@ def test_validate_and_map_sort_field():
 def test_sort_field_validation_in_query():
     """Test that invalid sort fields raise errors in query generation."""
     with pytest.raises(ValueError):
-        invalid_sort = [tsi.SortBy(field="nonexistent_field", direction="asc")]
+        invalid_sort = [SortBy(field="nonexistent_field", direction="asc")]
         make_threads_query_sqlite(project_id="test_project", sort_by=invalid_sort)
 
 
@@ -844,7 +854,7 @@ def test_clickhouse_with_thread_id_and_all_options():
     """Test ClickHouse query with thread_id, dates, sorting, and pagination."""
     after_date = datetime.datetime(2024, 1, 1)
     before_date = datetime.datetime(2024, 12, 31)
-    sort_by = [tsi.SortBy(field="turn_count", direction="desc")]
+    sort_by = [SortBy(field="turn_count", direction="desc")]
 
     assert_clickhouse_sql(
         """
@@ -902,8 +912,8 @@ def test_sqlite_with_thread_id_and_all_options():
     """Test SQLite query with thread_id, dates, sorting, and pagination."""
     after_date = datetime.datetime(2024, 3, 15)
     sort_by = [
-        tsi.SortBy(field="last_updated", direction="asc"),
-        tsi.SortBy(field="thread_id", direction="desc"),
+        SortBy(field="last_updated", direction="asc"),
+        SortBy(field="thread_id", direction="desc"),
     ]
 
     assert_sqlite_sql(

@@ -13,6 +13,7 @@ import weave.integrations.patch as patch_module
 from weave.integrations.patch import (
     _PATCHED_INTEGRATIONS,
     _patch_if_needed,
+    _patch_integration,
     implicit_patch,
     patch_openai,
     register_import_hook,
@@ -249,19 +250,23 @@ def test_explicit_patch_still_works(setup_env, monkeypatch):
     """Test that explicit patching still works alongside implicit patching."""
     _inject_fake_module(monkeypatch, "openai")
 
-    with patch(
-        "weave.integrations.openai.openai_sdk.get_openai_patcher"
-    ) as mock_get_patcher:
-        mock_patcher = MagicMock()
-        mock_patcher.attempt_patch.return_value = True
-        mock_get_patcher.return_value = mock_patcher
+    mock_patcher = MagicMock()
+    mock_patcher.attempt_patch.return_value = True
+    mock_get_patcher = MagicMock(return_value=mock_patcher)
 
+    fake_module = types.ModuleType("weave.integrations.openai.openai_sdk")
+    fake_module.get_openai_patcher = mock_get_patcher
+
+    with patch(
+        "weave.integrations.patch.importlib.import_module",
+        return_value=fake_module,
+    ):
         patch_openai()
 
         mock_get_patcher.assert_called_once()
         mock_patcher.attempt_patch.assert_called_once()
 
-        assert "openai" in _PATCHED_INTEGRATIONS
+        assert "openai" in patch_module._PATCHED_INTEGRATIONS
 
 
 def test_reset_patched_integrations(setup_env, monkeypatch):
@@ -282,3 +287,117 @@ def test_unregister_import_hook(setup_env):
 
     unregister_import_hook()
     assert patch_module._IMPORT_HOOK is None
+
+
+@pytest.mark.parametrize("success", [True, False])
+def test_patch_integration(setup_env, success):
+    """The basic case where a single integration is patched and it has a single
+    triggering symbol.
+
+    SUCCESS:
+        1. Patcher is called once;
+        2. Symbol is tracked in patched_integrations.
+        3. Subsequent calls to _patch_integration for the same integration do not trigger a new patch.
+    """
+    mock_patcher = MagicMock()
+    mock_patcher.attempt_patch.return_value = success
+    mock_getter = MagicMock(return_value=mock_patcher)
+
+    fake_module = types.ModuleType("fake_integration_module")
+    fake_module.get_fake_patcher = mock_getter
+
+    with patch(
+        "weave.integrations.patch.importlib.import_module",
+        return_value=fake_module,
+    ):
+        # First call - should patch
+        _patch_integration(
+            module_path="fake.integration.module",
+            patcher_func_getter_name="get_fake_patcher",
+            triggering_symbols=["single_symbol"],
+        )
+
+        mock_getter.assert_called_once()
+        mock_patcher.attempt_patch.assert_called_once()
+
+        # True if patched, False if not
+        assert ("single_symbol" in patch_module._PATCHED_INTEGRATIONS) is success
+
+        # Second call behavior depends on whether first patch succeeded
+        mock_getter.reset_mock()
+        mock_patcher.reset_mock()
+        _patch_integration(
+            module_path="fake.integration.module",
+            patcher_func_getter_name="get_fake_patcher",
+            triggering_symbols=["single_symbol"],
+        )
+
+        if success:
+            # If first patch succeeded, should NOT patch again
+            mock_getter.assert_not_called()
+            mock_patcher.attempt_patch.assert_not_called()
+        else:
+            # If first patch failed, should try again (symbol wasn't added to _PATCHED_INTEGRATIONS)
+            mock_getter.assert_called_once()
+            mock_patcher.attempt_patch.assert_called_once()
+        assert ("single_symbol" in patch_module._PATCHED_INTEGRATIONS) is success
+
+
+@pytest.mark.parametrize("success", [True, False])
+def test_patch_integration_multi(setup_env, success):
+    """A secondary case where a single integration is patched and it has
+    multiple triggering symbols.  This is common for libraries like langchain
+    or crewai where users may not necessarily just import the root module, but
+    rather some combination of submodules.
+
+    SUCCESS:
+        1. Patcher is called once;
+        2. All symbols for this integration are tracked in patched_integrations.
+        3. Subsequent calls to _patch_integration for the same integration do not trigger a new patch.
+    """
+    mock_patcher = MagicMock()
+    mock_patcher.attempt_patch.return_value = success
+    mock_getter = MagicMock(return_value=mock_patcher)
+
+    fake_module = types.ModuleType("fake_integration_module")
+    fake_module.get_fake_patcher = mock_getter
+
+    with patch(
+        "weave.integrations.patch.importlib.import_module",
+        return_value=fake_module,
+    ):
+        # First call - should patch
+        _patch_integration(
+            module_path="fake.integration.module",
+            patcher_func_getter_name="get_fake_patcher",
+            triggering_symbols=["symbol1", "symbol2", "symbol3"],
+        )
+
+        mock_getter.assert_called_once()
+        mock_patcher.attempt_patch.assert_called_once()
+
+        # All True if patched, all False if not
+        assert ("symbol1" in patch_module._PATCHED_INTEGRATIONS) is success
+        assert ("symbol2" in patch_module._PATCHED_INTEGRATIONS) is success
+        assert ("symbol3" in patch_module._PATCHED_INTEGRATIONS) is success
+
+        # Second call behavior depends on whether first patch succeeded
+        mock_getter.reset_mock()
+        mock_patcher.reset_mock()
+        _patch_integration(
+            module_path="fake.integration.module",
+            patcher_func_getter_name="get_fake_patcher",
+            triggering_symbols=["symbol1", "symbol2", "symbol3"],
+        )
+
+        if success:
+            # If first patch succeeded, should NOT patch again (checking by any of the symbols)
+            mock_getter.assert_not_called()
+            mock_patcher.attempt_patch.assert_not_called()
+        else:
+            # If first patch failed, should try again (symbols weren't added to _PATCHED_INTEGRATIONS)
+            mock_getter.assert_called_once()
+            mock_patcher.attempt_patch.assert_called_once()
+        assert ("symbol1" in patch_module._PATCHED_INTEGRATIONS) is success
+        assert ("symbol2" in patch_module._PATCHED_INTEGRATIONS) is success
+        assert ("symbol3" in patch_module._PATCHED_INTEGRATIONS) is success

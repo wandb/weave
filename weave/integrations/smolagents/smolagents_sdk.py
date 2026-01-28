@@ -7,6 +7,7 @@ from typing import Any
 import weave
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
+from weave.trace.op_protocol import OpKind
 from weave.trace.serialization.serialize import dictify
 
 _smolagents_patcher: MultiPatcher | None = None
@@ -39,7 +40,10 @@ def smolagents_wrapper(settings: OpSettings) -> Callable[[Callable], Callable]:
 
 
 def get_symbol_patcher(
-    base_symbol: str, attribute_name: str, settings: OpSettings
+    base_symbol: str,
+    attribute_name: str,
+    settings: OpSettings,
+    kind: OpKind | None = None,
 ) -> SymbolPatcher | None:
     try:
         module = importlib.import_module(base_symbol)
@@ -63,12 +67,13 @@ def get_symbol_patcher(
         if attribute_name.endswith(".__call__")
         else display_name
     )
+    update: dict[str, str | None] = {"name": settings.name or display_name}
+    if kind:
+        update["kind"] = settings.kind or kind
     return SymbolPatcher(
         lambda: module,
         attribute_name,
-        smolagents_wrapper(
-            settings.model_copy(update={"name": settings.name or display_name})
-        ),
+        smolagents_wrapper(settings.model_copy(update=update)),
     )
 
 
@@ -76,15 +81,27 @@ def get_multi_step_agent_patchers(
     agent_class_name: str, settings: OpSettings
 ) -> list[SymbolPatcher | None]:
     return [
-        get_symbol_patcher("smolagents", f"{agent_class_name}.run", settings),
         get_symbol_patcher(
-            "smolagents", f"{agent_class_name}.provide_final_answer", settings
+            "smolagents", f"{agent_class_name}.run", settings, kind="agent"
         ),
         get_symbol_patcher(
-            "smolagents", f"{agent_class_name}.execute_tool_call", settings
+            "smolagents",
+            f"{agent_class_name}.provide_final_answer",
+            settings,
+            kind="agent",
         ),
-        get_symbol_patcher("smolagents", f"{agent_class_name}.__call__", settings),
-        get_symbol_patcher("smolagents", f"{agent_class_name}.step", settings),
+        get_symbol_patcher(
+            "smolagents",
+            f"{agent_class_name}.execute_tool_call",
+            settings,
+            kind="agent",
+        ),
+        get_symbol_patcher(
+            "smolagents", f"{agent_class_name}.__call__", settings, kind="agent"
+        ),
+        get_symbol_patcher(
+            "smolagents", f"{agent_class_name}.step", settings, kind="agent"
+        ),
     ]
 
 
@@ -105,38 +122,78 @@ def get_smolagents_patcher(
     patchers = [
         patcher
         for patcher in [
-            # Patch model-related classes
-            get_symbol_patcher("smolagents", "TransformersModel.__call__", base),
-            get_symbol_patcher("smolagents", "HfApiModel.__call__", base),
-            get_symbol_patcher("smolagents", "InferenceClientModel.__call__", base),
-            get_symbol_patcher("smolagents", "LiteLLMModel.__call__", base),
-            get_symbol_patcher("smolagents", "OpenAIServerModel.__call__", base),
-            get_symbol_patcher("smolagents", "AzureOpenAIServerModel.__call__", base),
-            get_symbol_patcher("smolagents", "MLXModel.__call__", base),
-            get_symbol_patcher("smolagents", "VLLMModel.__call__", base),
-            # Patch relevant Agent functions
+            # Patch model-related classes (kind="llm")
+            get_symbol_patcher(
+                "smolagents", "TransformersModel.__call__", base, kind="llm"
+            ),
+            get_symbol_patcher("smolagents", "HfApiModel.__call__", base, kind="llm"),
+            get_symbol_patcher(
+                "smolagents", "InferenceClientModel.__call__", base, kind="llm"
+            ),
+            get_symbol_patcher("smolagents", "LiteLLMModel.__call__", base, kind="llm"),
+            get_symbol_patcher(
+                "smolagents", "OpenAIServerModel.__call__", base, kind="llm"
+            ),
+            get_symbol_patcher(
+                "smolagents", "AzureOpenAIServerModel.__call__", base, kind="llm"
+            ),
+            get_symbol_patcher("smolagents", "MLXModel.__call__", base, kind="llm"),
+            get_symbol_patcher("smolagents", "VLLMModel.__call__", base, kind="llm"),
+            # Patch relevant Agent functions (kind="agent" - handled in get_multi_step_agent_patchers)
             *get_multi_step_agent_patchers("MultiStepAgent", base),
             *get_multi_step_agent_patchers("ToolCallingAgent", base),
             *get_multi_step_agent_patchers("CodeAgent", base),
-            # Patch relevant Tool functions
-            get_symbol_patcher("smolagents", "Tool.forward", base),
-            get_symbol_patcher("smolagents", "Tool.__call__", base),
-            get_symbol_patcher("smolagents", "PipelineTool.forward", base),
-            get_symbol_patcher("smolagents", "PipelineTool.__call__", base),
-            get_symbol_patcher("smolagents", "PythonInterpreterTool.forward", base),
-            get_symbol_patcher("smolagents", "PythonInterpreterTool.__call__", base),
-            get_symbol_patcher("smolagents", "FinalAnswerTool.forward", base),
-            get_symbol_patcher("smolagents", "FinalAnswerTool.__call__", base),
-            get_symbol_patcher("smolagents", "UserInputTool.forward", base),
-            get_symbol_patcher("smolagents", "UserInputTool.__call__", base),
-            get_symbol_patcher("smolagents", "DuckDuckGoSearchTool.forward", base),
-            get_symbol_patcher("smolagents", "DuckDuckGoSearchTool.__call__", base),
-            get_symbol_patcher("smolagents", "GoogleSearchTool.forward", base),
-            get_symbol_patcher("smolagents", "GoogleSearchTool.__call__", base),
-            get_symbol_patcher("smolagents", "VisitWebpageTool.forward", base),
-            get_symbol_patcher("smolagents", "VisitWebpageTool.__call__", base),
-            get_symbol_patcher("smolagents", "SpeechToTextTool.forward", base),
-            get_symbol_patcher("smolagents", "SpeechToTextTool.__call__", base),
+            # Patch relevant Tool functions (kind="tool")
+            get_symbol_patcher("smolagents", "Tool.forward", base, kind="tool"),
+            get_symbol_patcher("smolagents", "Tool.__call__", base, kind="tool"),
+            get_symbol_patcher("smolagents", "PipelineTool.forward", base, kind="tool"),
+            get_symbol_patcher(
+                "smolagents", "PipelineTool.__call__", base, kind="tool"
+            ),
+            get_symbol_patcher(
+                "smolagents", "PythonInterpreterTool.forward", base, kind="tool"
+            ),
+            get_symbol_patcher(
+                "smolagents", "PythonInterpreterTool.__call__", base, kind="tool"
+            ),
+            get_symbol_patcher(
+                "smolagents", "FinalAnswerTool.forward", base, kind="tool"
+            ),
+            get_symbol_patcher(
+                "smolagents", "FinalAnswerTool.__call__", base, kind="tool"
+            ),
+            get_symbol_patcher(
+                "smolagents", "UserInputTool.forward", base, kind="tool"
+            ),
+            get_symbol_patcher(
+                "smolagents", "UserInputTool.__call__", base, kind="tool"
+            ),
+            # Search tools (kind="search")
+            get_symbol_patcher(
+                "smolagents", "DuckDuckGoSearchTool.forward", base, kind="search"
+            ),
+            get_symbol_patcher(
+                "smolagents", "DuckDuckGoSearchTool.__call__", base, kind="search"
+            ),
+            get_symbol_patcher(
+                "smolagents", "GoogleSearchTool.forward", base, kind="search"
+            ),
+            get_symbol_patcher(
+                "smolagents", "GoogleSearchTool.__call__", base, kind="search"
+            ),
+            # Other tools (kind="tool")
+            get_symbol_patcher(
+                "smolagents", "VisitWebpageTool.forward", base, kind="tool"
+            ),
+            get_symbol_patcher(
+                "smolagents", "VisitWebpageTool.__call__", base, kind="tool"
+            ),
+            get_symbol_patcher(
+                "smolagents", "SpeechToTextTool.forward", base, kind="tool"
+            ),
+            get_symbol_patcher(
+                "smolagents", "SpeechToTextTool.__call__", base, kind="tool"
+            ),
         ]
         # Filter out None values
         # Some symbols may not exist in every Agent type for example

@@ -7,6 +7,7 @@ import sqlite3
 import threading
 from collections.abc import Iterator
 from contextvars import ContextVar
+from dataclasses import dataclass
 from typing import Any, cast
 
 from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
@@ -16,6 +17,7 @@ from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
 from weave.trace_server import constants, object_creation_utils
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.common_interface import SortBy
 from weave.trace_server.errors import (
     InvalidRequest,
     NotFoundError,
@@ -63,14 +65,36 @@ from weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker impo
     EvaluateModelDispatcher,
 )
 
-_conn_cursor: ContextVar[tuple[sqlite3.Connection, sqlite3.Cursor] | None] = ContextVar(
+
+@dataclass(frozen=True)
+class ConnCursor:
+    conn: sqlite3.Connection
+    cursor: sqlite3.Cursor
+
+
+@dataclass(frozen=True)
+class ConnCursorState:
+    thread_id: int
+    conn_map: dict[str, ConnCursor]
+
+
+_conn_cursor: ContextVar[ConnCursorState | None] = ContextVar(
     "conn_cursor", default=None
 )
 
 
+def _get_conn_map() -> dict[str, ConnCursor]:
+    conn_state = _conn_cursor.get()
+    current_thread = threading.get_ident()
+    if conn_state is None or conn_state.thread_id != current_thread:
+        conn_state = ConnCursorState(current_thread, {})
+        _conn_cursor.set(conn_state)
+    return conn_state.conn_map
+
+
 def get_conn_cursor(db_path: str) -> tuple[sqlite3.Connection, sqlite3.Cursor]:
-    # conn_cursor = _conn_cursor.get()
-    conn_cursor = None
+    conn_map = _get_conn_map()
+    conn_cursor = conn_map.get(db_path)
     if conn_cursor is None:
         # Use uri=True for URIs like "file::memory:?cache=shared"
         # This is required on Windows to properly handle URI paths
@@ -79,9 +103,35 @@ def get_conn_cursor(db_path: str) -> tuple[sqlite3.Connection, sqlite3.Cursor]:
         # Create an array reverse function.
         conn.create_function("reverse", 1, lambda x: x[::-1])
         cursor = conn.cursor()
-        conn_cursor = (conn, cursor)
-        _conn_cursor.set(conn_cursor)
-    return conn_cursor
+        conn_cursor = ConnCursor(conn, cursor)
+        conn_map[db_path] = conn_cursor
+    return conn_cursor.conn, conn_cursor.cursor
+
+
+def close_conn_cursor(db_path: str | None = None) -> None:
+    conn_state = _conn_cursor.get()
+    if conn_state is None:
+        return
+    current_thread = threading.get_ident()
+    if conn_state.thread_id != current_thread:
+        return
+    conn_map = conn_state.conn_map
+    if db_path is None:
+        db_paths = list(conn_map.keys())
+    else:
+        db_paths = [db_path] if db_path in conn_map else []
+    for path in db_paths:
+        conn_cursor = conn_map.pop(path)
+        try:
+            conn_cursor.cursor.close()
+        except Exception:
+            pass
+        try:
+            conn_cursor.conn.close()
+        except Exception:
+            pass
+    if not conn_map:
+        _conn_cursor.set(None)
 
 
 class SqliteTraceServer(tsi.FullTraceServerInterface):
@@ -93,6 +143,9 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         self.lock = threading.Lock()
         self.db_path = db_path
         self._evaluate_model_dispatcher = evaluate_model_dispatcher
+
+    def close(self) -> None:
+        close_conn_cursor(self.db_path)
 
     def drop_tables(self) -> None:
         conn, cursor = get_conn_cursor(self.db_path)
@@ -1648,6 +1701,49 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 p50_turn_duration_ms=p50_turn_duration_ms,
                 p99_turn_duration_ms=p99_turn_duration_ms,
             )
+
+    # Annotation Queue API - Stub implementations (not supported in SQLite)
+    def annotation_queue_create(
+        self, req: tsi.AnnotationQueueCreateReq
+    ) -> tsi.AnnotationQueueCreateRes:
+        """Annotation queues not supported in SQLite."""
+        raise NotImplementedError("Annotation queues are not supported in SQLite")
+
+    def annotation_queues_query_stream(
+        self, req: tsi.AnnotationQueuesQueryReq
+    ) -> Iterator[tsi.AnnotationQueueSchema]:
+        """Annotation queues not supported in SQLite."""
+        raise NotImplementedError("Annotation queues are not supported in SQLite")
+
+    def annotation_queue_read(
+        self, req: tsi.AnnotationQueueReadReq
+    ) -> tsi.AnnotationQueueReadRes:
+        """Annotation queues not supported in SQLite."""
+        raise NotImplementedError("Annotation queues are not supported in SQLite")
+
+    def annotation_queue_add_calls(
+        self, req: tsi.AnnotationQueueAddCallsReq
+    ) -> tsi.AnnotationQueueAddCallsRes:
+        """Annotation queues not supported in SQLite."""
+        raise NotImplementedError("Annotation queues are not supported in SQLite")
+
+    def annotation_queue_items_query(
+        self, req: tsi.AnnotationQueueItemsQueryReq
+    ) -> tsi.AnnotationQueueItemsQueryRes:
+        """Annotation queues not supported in SQLite."""
+        raise NotImplementedError("Annotation queues are not supported in SQLite")
+
+    def annotation_queues_stats(
+        self, req: tsi.AnnotationQueuesStatsReq
+    ) -> tsi.AnnotationQueuesStatsRes:
+        """Annotation queues not supported in SQLite."""
+        raise NotImplementedError("Annotation queues are not supported in SQLite")
+
+    def annotator_queue_items_progress_update(
+        self, req: tsi.AnnotatorQueueItemsProgressUpdateReq
+    ) -> tsi.AnnotatorQueueItemsProgressUpdateRes:
+        """Annotation queues not supported in SQLite."""
+        raise NotImplementedError("Annotation queues are not supported in SQLite")
 
     def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
         if self._evaluate_model_dispatcher is None:
@@ -3484,7 +3580,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         limit: int | None = None,
         include_deleted: bool = False,
         offset: int | None = None,
-        sort_by: list[tsi.SortBy] | None = None,
+        sort_by: list[SortBy] | None = None,
     ) -> list[tsi.ObjSchema]:
         conn, cursor = get_conn_cursor(self.db_path)
         conditions = conditions or []

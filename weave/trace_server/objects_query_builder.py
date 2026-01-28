@@ -1,8 +1,8 @@
 from collections.abc import Iterator
 from typing import Any
 
-from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.clickhouse_schema import SelectableCHObjSchema
+from weave.trace_server.common_interface import SortBy
 from weave.trace_server.orm import combine_conditions
 from weave.trace_server.trace_server_common import digest_is_version_like
 
@@ -45,7 +45,7 @@ def _make_offset_part(offset: int | None) -> str:
     return _make_optional_part("OFFSET", str(offset))
 
 
-def _make_sort_part(sort_by: list[tsi.SortBy] | None) -> str:
+def _make_sort_part(sort_by: list[SortBy] | None) -> str:
     if not sort_by:
         return ""
 
@@ -122,7 +122,7 @@ class ObjectMetadataQueryBuilder:
         self._object_id_conditions: list[str] = object_id_conditions or []
         self._limit: int | None = None
         self._offset: int | None = None
-        self._sort_by: list[tsi.SortBy] = []
+        self._sort_by: list[SortBy] = []
         self._include_deleted: bool = include_deleted
         self.include_storage_size: bool = False
 
@@ -246,7 +246,7 @@ class ObjectMetadataQueryBuilder:
         direction = direction.lower()
         if direction not in ("asc", "desc"):
             raise ValueError(f"Direction {direction} is not allowed")
-        self._sort_by.append(tsi.SortBy(field=field, direction=direction))
+        self._sort_by.append(SortBy(field=field, direction=direction))
 
     def set_limit(self, limit: int) -> None:
         if limit < 0:

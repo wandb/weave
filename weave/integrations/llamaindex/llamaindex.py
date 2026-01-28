@@ -114,6 +114,48 @@ def _get_op_name_from_span(span_id: str) -> str:
     return f"llama_index.span.{op_name_base}"
 
 
+def _get_kind_for_span(op_name: str) -> str | None:
+    """Determine the OpKind for a span based on its operation name."""
+    op_name_lower = op_name.lower()
+    # LLM-related operations
+    # See https://docs.llamaindex.ai/en/stable/api_reference/llms/ for LLM operation names
+    if any(
+        llm_indicator in op_name_lower
+        for llm_indicator in [
+            "stream_complete",
+            "astream_complete",
+            "stream_chat",
+            "astream_chat",
+            "complete",
+            "chat",
+            "llm",
+            "predict",
+        ]
+    ):
+        return "llm"
+    # Retrieval operations
+    # See https://docs.llamaindex.ai/en/stable/api_reference/retrievers/ for retrieval operation names
+    if any(
+        retrieval_indicator in op_name_lower
+        for retrieval_indicator in ["retrieve", "search", "query"]
+    ):
+        return "search"
+    return None
+
+
+def _get_kind_for_event(base_event_name: str) -> str | None:
+    """Determine the OpKind for an event based on its base name."""
+    event_to_kind = {
+        "LLMCompletion": "llm",
+        "LLMChat": "llm",
+        "LLMPredict": "llm",
+        "Embedding": "llm",
+        "Retrieval": "search",
+        "Reranking": "search",
+    }
+    return event_to_kind.get(base_event_name)
+
+
 if not _import_failed:
 
     class WeaveSpanHandler(BaseSpanHandler[Any]):  # pyright: ignore[reportRedeclaration]
@@ -226,7 +268,13 @@ if not _import_failed:
             )
 
             try:
-                call = gc.create_call(op_name, inputs, parent_call)
+                # Determine kind based on operation name
+                kind = _get_kind_for_span(op_name)
+                span_attributes = {"weave": {"kind": kind}} if kind else None
+
+                call = gc.create_call(
+                    op_name, inputs, parent_call, attributes=span_attributes
+                )
                 _weave_calls_map[id_] = call  # Store by full span ID
                 # we store the spans that are streaming in nature as a dict of id_ to call
                 if self._is_streaming:
@@ -356,13 +404,20 @@ if not _import_failed:
             except Exception:
                 raw_event_payload = {"detail": str(event)}
 
+            # Determine kind based on event name
+            kind = _get_kind_for_event(base_event_name)
+            event_attributes = {"weave": {"kind": kind}} if kind else None
+
             try:
                 if is_start_event:
                     # Parent: span call or global root
                     parent_call_for_event = _weave_calls_map.get(event.span_id)
                     # Create a new call for the start event
                     call = gc.create_call(
-                        op_name, raw_event_payload, parent_call_for_event
+                        op_name,
+                        raw_event_payload,
+                        parent_call_for_event,
+                        attributes=event_attributes,
                     )
                     _weave_calls_map[event_pairing_key] = call
 
@@ -377,7 +432,10 @@ if not _import_failed:
                         progress_event_key = (event.span_id, progress_op_name)
                         # Create InProgress call as child of LLM start event
                         progress_call = gc.create_call(
-                            progress_op_name, raw_event_payload, call
+                            progress_op_name,
+                            raw_event_payload,
+                            call,
+                            attributes=event_attributes,
                         )
                         _weave_calls_map[progress_event_key] = progress_call
                         # Update accumulator to point to the pre-created progress call
@@ -426,7 +484,10 @@ if not _import_failed:
                     else:
                         # No matching start event found, create a standalone call
                         call = gc.create_call(
-                            op_name, raw_event_payload, parent_call_for_event
+                            op_name,
+                            raw_event_payload,
+                            parent_call_for_event,
+                            attributes=event_attributes,
                         )
                         gc.finish_call(call, raw_event_payload)
 
@@ -458,7 +519,10 @@ if not _import_failed:
                     parent_call_for_event = _weave_calls_map.get(event.span_id)
                     # Handle non-start/end events as instantaneous events
                     call = gc.create_call(
-                        op_name, raw_event_payload, parent_call_for_event
+                        op_name,
+                        raw_event_payload,
+                        parent_call_for_event,
+                        attributes=event_attributes,
                     )
                     gc.finish_call(call, raw_event_payload)
             except Exception as e:

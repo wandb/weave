@@ -445,6 +445,9 @@ class CachingMiddlewareTraceServer(TraceServerClientInterface):
     def calls_query_stats(self, req: tsi.CallsQueryStatsReq) -> tsi.CallsQueryStatsRes:
         return self._next_trace_server.calls_query_stats(req)
 
+    def call_stats(self, req: tsi.CallStatsReq) -> tsi.CallStatsRes:
+        return self._next_trace_server.call_stats(req)
+
     def call_update(self, req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
         return self._next_trace_server.call_update(req)
 
@@ -513,6 +516,43 @@ class CachingMiddlewareTraceServer(TraceServerClientInterface):
         self, req: tsi.ThreadsQueryReq
     ) -> Iterator[tsi.ThreadSchema]:
         return self._next_trace_server.threads_query_stream(req)
+
+    # === Annotation Queue APIs ===
+
+    def annotation_queue_create(
+        self, req: tsi.AnnotationQueueCreateReq
+    ) -> tsi.AnnotationQueueCreateRes:
+        return self._next_trace_server.annotation_queue_create(req)
+
+    def annotation_queues_query_stream(
+        self, req: tsi.AnnotationQueuesQueryReq
+    ) -> Iterator[tsi.AnnotationQueueSchema]:
+        return self._next_trace_server.annotation_queues_query_stream(req)
+
+    def annotation_queue_read(
+        self, req: tsi.AnnotationQueueReadReq
+    ) -> tsi.AnnotationQueueReadRes:
+        return self._next_trace_server.annotation_queue_read(req)
+
+    def annotation_queue_add_calls(
+        self, req: tsi.AnnotationQueueAddCallsReq
+    ) -> tsi.AnnotationQueueAddCallsRes:
+        return self._next_trace_server.annotation_queue_add_calls(req)
+
+    def annotation_queue_items_query(
+        self, req: tsi.AnnotationQueueItemsQueryReq
+    ) -> tsi.AnnotationQueueItemsQueryRes:
+        return self._next_trace_server.annotation_queue_items_query(req)
+
+    def annotation_queues_stats(
+        self, req: tsi.AnnotationQueuesStatsReq
+    ) -> tsi.AnnotationQueuesStatsRes:
+        return self._next_trace_server.annotation_queues_stats(req)
+
+    def annotator_queue_items_progress_update(
+        self, req: tsi.AnnotatorQueueItemsProgressUpdateReq
+    ) -> tsi.AnnotatorQueueItemsProgressUpdateRes:
+        return self._next_trace_server.annotator_queue_items_progress_update(req)
 
     def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
         return self._next_trace_server.evaluate_model(req)
