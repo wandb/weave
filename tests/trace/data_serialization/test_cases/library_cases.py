@@ -80,10 +80,10 @@ llm_as_a_judge_scorer_digest = (
 
 library_cases = [
     SerializationTestCase(
-        id="Library Objects - Scorer, Evaluation, Dataset, LLMAsAJudgeScorer, LLMStructuredCompletionModel",
+        id="Library Objects - Scorer, Evaluation, Dataset, LLMAsAJudgeScorer, LLMStructuredCompletionModel (legacy v4)",
         runtime_object_factory=lambda: make_evaluation(),
-        inline_call_param=False,
-        is_legacy=False,
+        inline_call_param=True,
+        is_legacy=True,
         exp_json={
             "_type": "Evaluation",
             "name": None,
@@ -91,7 +91,7 @@ library_cases = [
             "dataset": "weave:///shawn/test-project/object/Dataset:N0VKaX8wr9kF9QQzM7mSQz3yKrJJjTiJi4c9Bt7RSTA",
             "scorers": [
                 "weave:///shawn/test-project/object/MyScorer:ILpCvdAsCLLLt9wU28MU9ugSScTkg7L3XX6PlUgFvlg",
-                f"weave:///shawn/test-project/object/LLMAsAJudgeScorer:{llm_as_a_judge_scorer_digest}",
+                "weave:///shawn/test-project/object/LLMAsAJudgeScorer:GuTiuaw9aciXWCWPU5cvWtQqs0lcBtJPfYRlYH3GUwk",
             ],
             "preprocess_model_input": None,
             "trials": 1,
@@ -150,7 +150,7 @@ library_cases = [
             },
             {
                 "object_id": "LLMAsAJudgeScorer",
-                "digest": llm_as_a_judge_scorer_digest,
+                "digest": "GuTiuaw9aciXWCWPU5cvWtQqs0lcBtJPfYRlYH3GUwk",
                 "exp_val": {
                     "_type": "LLMAsAJudgeScorer",
                     "name": None,
