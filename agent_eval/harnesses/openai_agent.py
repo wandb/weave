@@ -70,7 +70,7 @@ class OpenAIAgentAdapter(HarnessAdapter):
 
     def get_adapter_script_path(self) -> Path | None:
         """Return path to the Node.js adapter script."""
-        adapter_path = Path(__file__).parent.parent.parent / "agent_eval_adapters" / "openai-agent-adapter.js"
+        adapter_path = Path(__file__).parent.parent / "adapters" / "openai-agent-adapter.js"
         if adapter_path.exists():
             return adapter_path
         return None

@@ -178,7 +178,7 @@ tasks:
         
         assert len(combinations) == 1
         harness, task = combinations[0]
-        assert harness.type == HarnessType.CODEX
+        assert harness.type == HarnessType.OPENCODE
         assert harness.model == "gpt-4o"
 
 

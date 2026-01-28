@@ -213,7 +213,7 @@ class EvalConfig(BaseModel):
         """Expand matrix into list of (harness, task) combinations."""
         harnesses = self.matrix.harness if self.matrix else []
         if not harnesses:
-            # Default to codex with gpt-4o if no matrix specified
-            harnesses = [HarnessConfig(type=HarnessType.CODEX, model="gpt-4o")]
+            # Default to opencode with gpt-4o if no matrix specified
+            harnesses = [HarnessConfig(type=HarnessType.OPENCODE, model="gpt-4o")]
 
         return [(h, t) for h in harnesses for t in self.tasks]

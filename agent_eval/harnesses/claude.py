@@ -51,7 +51,7 @@ class ClaudeAdapter(HarnessAdapter):
 
     def get_adapter_script_path(self) -> Path | None:
         """Return path to claude adapter script."""
-        adapter_path = Path(__file__).parent.parent.parent / "agent_eval_adapters" / "claude-adapter.sh"
+        adapter_path = Path(__file__).parent.parent / "adapters" / "claude-adapter.sh"
         if adapter_path.exists():
             return adapter_path
         return None

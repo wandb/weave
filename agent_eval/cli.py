@@ -120,7 +120,20 @@ def run(config_path: str, task: str | None, harness: str | None, dry_run: bool, 
                       f"({sum(1 for c in score.checks if c.passed)}/{len(score.checks)} checks)")
 
     click.echo()
-    click.echo(f"Results saved to: {config.output.directory}")
+    
+    # Show where results are saved and how to view them
+    # Build the full path relative to the config file
+    output_dir = config_path.parent / config.output.directory / result.run_id
+    click.echo(f"Results saved to: {output_dir}")
+    click.echo()
+    click.echo("To view detailed results:")
+    click.echo(f"  python -m agent_eval.cli show {output_dir}")
+    click.echo()
+    click.echo("Artifacts include:")
+    click.echo("  - stdout.log / stderr.log  (command output)")
+    click.echo("  - workspace/               (files created/modified)")
+    click.echo("  - metadata.json            (task metadata)")
+    click.echo("  - scores/                  (scoring results)")
 
     # Exit with error code if any failures
     if not result.success:
@@ -226,6 +239,155 @@ def list_harnesses_cmd():
     click.echo("Available harness types:")
     for h in harnesses:
         click.echo(f"  - {h}")
+
+
+@cli.command("show")
+@click.argument("results_path", type=click.Path(exists=True))
+@click.option("--task", "-t", help="Show only this task")
+@click.option("--logs/--no-logs", default=True, help="Show stdout/stderr logs")
+@click.option("--files/--no-files", default=True, help="Show workspace files")
+@click.option("--limit", "-n", default=50, help="Max lines of logs to show")
+def show_results(results_path: str, task: str | None, logs: bool, files: bool, limit: int):
+    """Show results from a completed run.
+    
+    RESULTS_PATH is the path to a run directory (e.g., results/run_20260127_...)
+    or a specific task directory within a run.
+    """
+    results_path = Path(results_path)
+    
+    # Check if this is a run directory or task directory
+    if (results_path / "run_metadata.json").exists():
+        # This is a run directory, list all tasks
+        run_meta = json.loads((results_path / "run_metadata.json").read_text())
+        click.echo(f"Run: {run_meta.get('config_name', 'unknown')}")
+        click.echo(f"Started: {run_meta.get('started_at', 'unknown')}")
+        click.echo()
+        
+        # Find all task directories
+        task_dirs = [d for d in results_path.iterdir() 
+                     if d.is_dir() and not d.name.startswith('.')]
+        
+        if task:
+            task_dirs = [d for d in task_dirs if task in d.name]
+        
+        for task_dir in sorted(task_dirs):
+            _show_task_results(task_dir, logs, files, limit)
+            click.echo()
+    elif (results_path / "metadata.json").exists():
+        # This is a task directory
+        _show_task_results(results_path, logs, files, limit)
+    else:
+        click.echo(f"Not a valid results directory: {results_path}", err=True)
+        sys.exit(1)
+
+
+def _show_task_results(task_path: Path, show_logs: bool, show_files: bool, limit: int):
+    """Show results for a single task."""
+    click.echo(f"{'=' * 60}")
+    click.echo(f"Task: {task_path.name}")
+    click.echo(f"{'=' * 60}")
+    
+    # Load metadata
+    meta_file = task_path / "metadata.json"
+    if meta_file.exists():
+        meta = json.loads(meta_file.read_text())
+        click.echo(f"  Harness: {meta.get('harness', 'unknown')}:{meta.get('model', 'unknown')}")
+        click.echo(f"  Prompt: {meta.get('prompt', 'unknown')[:80]}...")
+        click.echo(f"  Exit code: {meta.get('exit_code', 'unknown')}")
+        click.echo(f"  Duration: {meta.get('duration_seconds', 0):.1f}s")
+    
+    # Show scores if available
+    scores_dir = task_path / "scores"
+    if scores_dir.exists():
+        click.echo()
+        click.echo("  Scores:")
+        for score_file in scores_dir.glob("*.json"):
+            score_data = json.loads(score_file.read_text())
+            score_name = score_file.stem
+            overall = score_data.get("overall_pass", False)
+            score_val = score_data.get("score", 0)
+            status = "PASS" if overall else "FAIL"
+            click.echo(f"    [{status}] {score_name}: {score_val:.0f}%")
+            
+            # Show individual checks
+            for check in score_data.get("checks", []):
+                check_status = "OK" if check.get("pass") else "FAIL"
+                check_id = check.get("id", "unknown")
+                check_notes = check.get("notes", "")
+                click.echo(f"      [{check_status}] {check_id}: {check_notes}")
+    
+    # Show logs
+    if show_logs:
+        click.echo()
+        click.echo("  Logs:")
+        
+        stdout_file = task_path / "stdout.log"
+        if stdout_file.exists():
+            stdout = stdout_file.read_text()
+            lines = stdout.splitlines()
+            click.echo(f"    stdout ({len(lines)} lines):")
+            for line in lines[:limit]:
+                click.echo(f"      {line}")
+            if len(lines) > limit:
+                click.echo(f"      ... ({len(lines) - limit} more lines)")
+        
+        stderr_file = task_path / "stderr.log"
+        if stderr_file.exists():
+            stderr = stderr_file.read_text()
+            lines = stderr.splitlines()
+            if lines:
+                click.echo(f"    stderr ({len(lines)} lines):")
+                for line in lines[:limit]:
+                    click.echo(f"      {line}")
+                if len(lines) > limit:
+                    click.echo(f"      ... ({len(lines) - limit} more lines)")
+    
+    # Show workspace files
+    if show_files:
+        click.echo()
+        click.echo("  Workspace files:")
+        
+        workspace_dir = task_path / "workspace"
+        if workspace_dir.exists():
+            _list_files(workspace_dir, "    ", max_depth=3)
+        else:
+            click.echo("    (no workspace captured)")
+
+
+def _list_files(directory: Path, prefix: str = "", max_depth: int = 3, current_depth: int = 0):
+    """List files in a directory tree."""
+    if current_depth >= max_depth:
+        click.echo(f"{prefix}...")
+        return
+    
+    try:
+        items = sorted(directory.iterdir())
+    except PermissionError:
+        click.echo(f"{prefix}(permission denied)")
+        return
+    
+    # Skip hidden files and common non-essential directories
+    skip_dirs = {'.git', '__pycache__', 'node_modules', '.npm', '.cache'}
+    items = [i for i in items if not i.name.startswith('.') or i.name in {'.env'}]
+    items = [i for i in items if i.name not in skip_dirs]
+    
+    for item in items:
+        if item.is_dir():
+            click.echo(f"{prefix}{item.name}/")
+            _list_files(item, prefix + "  ", max_depth, current_depth + 1)
+        else:
+            # Show file size
+            try:
+                size = item.stat().st_size
+                if size < 1024:
+                    size_str = f"{size}B"
+                elif size < 1024 * 1024:
+                    size_str = f"{size / 1024:.1f}KB"
+                else:
+                    size_str = f"{size / (1024 * 1024):.1f}MB"
+                click.echo(f"{prefix}{item.name} ({size_str})")
+            except Exception:
+                click.echo(f"{prefix}{item.name}")
 
 
 def main():

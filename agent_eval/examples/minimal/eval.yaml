@@ -2,10 +2,10 @@ version: "1.0"
 name: minimal-eval
 description: The simplest possible agent_eval example.
 
-# Explicitly specify harness (defaults to codex:gpt-4o if not specified)
+# Explicitly specify harness (defaults to opencode:gpt-4o if not specified)
 # matrix:
 #   harness:
-#     - type: codex
+#     - type: opencode
 #       model: gpt-4o
 
 driver:

@@ -68,7 +68,7 @@ class CodexAdapter(HarnessAdapter):
 
     def get_adapter_script_path(self) -> Path | None:
         """Return path to codex adapter script."""
-        adapter_path = Path(__file__).parent.parent.parent / "agent_eval_adapters" / "codex-adapter.sh"
+        adapter_path = Path(__file__).parent.parent / "adapters" / "codex-adapter.sh"
         if adapter_path.exists():
             return adapter_path
         return None

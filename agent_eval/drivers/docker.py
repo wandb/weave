@@ -159,16 +159,31 @@ class DockerDriver(Driver):
         workdir: str = "/workspace",
         use_host_network: bool = True,
     ) -> JobResult:
-        """Run a job in a container."""
+        """Run a job in a container.
+        
+        This method:
+        1. Creates a container (without --rm) so we can extract files after
+        2. Runs the command and captures stdout/stderr
+        3. Copies the workspace contents to artifacts for inspection
+        4. Saves logs to files
+        5. Cleans up the container
+        """
+        import uuid
+        
         start_time = time.time()
         artifacts_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Create workspace output directory
+        workspace_out = artifacts_dir / "workspace"
+        workspace_out.mkdir(parents=True, exist_ok=True)
+        
+        # Generate a unique container name
+        container_name = f"agent-eval-{uuid.uuid4().hex[:12]}"
 
-        # Build docker run command
-        run_args = ["run", "--rm"]
+        # Build docker run command (no --rm so we can copy files out)
+        run_args = ["run", "--name", container_name]
 
         # Use host network for reliable API access
-        # This is necessary because some CLI tools (like Codex) have issues
-        # with Docker's default bridge network DNS resolution
         if use_host_network:
             run_args.append("--network=host")
 
@@ -176,7 +191,7 @@ class DockerDriver(Driver):
         for key, value in env.items():
             run_args.extend(["-e", f"{key}={value}"])
 
-        # Mount artifacts directory
+        # Mount artifacts directory for any direct writes (e.g., trajectory.jsonl)
         run_args.extend(["-v", f"{artifacts_dir.absolute()}:/artifacts"])
 
         # Working directory
@@ -189,17 +204,48 @@ class DockerDriver(Driver):
         returncode, stdout, stderr = await self._run_cmd(run_args, timeout=timeout)
         duration = time.time() - start_time
 
+        # Save stdout and stderr to files
+        if stdout:
+            (artifacts_dir / "stdout.log").write_text(stdout)
+        if stderr:
+            (artifacts_dir / "stderr.log").write_text(stderr)
+        
+        # Copy workspace from container to artifacts
+        # This captures all files created/modified by the agent
+        try:
+            cp_returncode, _, cp_stderr = await self._run_cmd(
+                ["cp", f"{container_name}:{workdir}/.", str(workspace_out)],
+                timeout=60
+            )
+            if cp_returncode != 0:
+                # Log but don't fail - workspace copy is best-effort
+                (artifacts_dir / "workspace_copy_error.log").write_text(
+                    f"Failed to copy workspace: {cp_stderr}"
+                )
+        except Exception as e:
+            (artifacts_dir / "workspace_copy_error.log").write_text(
+                f"Exception copying workspace: {e}"
+            )
+        
+        # Remove the container
+        try:
+            await self._run_cmd(["rm", "-f", container_name], timeout=30)
+        except Exception:
+            pass  # Ignore cleanup errors
+
         # Write metadata
         metadata = {
             "exit_code": returncode,
             "duration_seconds": duration,
             "command": command,
             "image": image,
+            "container_name": container_name,
+            "has_stdout": bool(stdout),
+            "has_stderr": bool(stderr),
+            "stdout_lines": len(stdout.splitlines()) if stdout else 0,
+            "stderr_lines": len(stderr.splitlines()) if stderr else 0,
         }
         (artifacts_dir / "metadata.json").write_text(json.dumps(metadata, indent=2))
-
-        # Copy workspace to artifacts if container exited
-        # (workspace is already in artifacts via volume mount for trajectory)
 
         error = None
         if returncode == -1:

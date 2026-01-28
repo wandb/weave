@@ -36,29 +36,38 @@ class OpenCodeAdapter(HarnessAdapter):
         model: str,
         extra_args: list[str],
     ) -> list[str]:
-        """Build opencode command."""
+        """Build opencode command.
+        
+        OpenCode CLI reference:
+          opencode run [message..] - run opencode with a message
+          --format json            - output raw JSON events
+          --model provider/model   - model to use (e.g., openai/gpt-4o)
+          --print-logs             - print logs to stderr
+        """
+        # Model format is provider/model for opencode
+        # If model doesn't contain /, assume openai provider
+        if "/" not in model:
+            model = f"openai/{model}"
+        
         cmd = [
             "opencode",
-            "exec",
-            "--json",  # Output JSON
+            "run",
+            "--format", "json",  # Output JSON events
             "--model", model,
+            "--print-logs",  # Print logs for debugging
         ]
-
-        # Add skills path if provided
-        if skill_path:
-            cmd.extend(["--skills-path", skill_path])
 
         # Add any extra arguments
         cmd.extend(extra_args)
 
-        # Add the prompt
+        # Add the prompt as the message
         cmd.append(prompt)
 
         return cmd
 
     def get_adapter_script_path(self) -> Path | None:
         """Return path to opencode adapter script."""
-        adapter_path = Path(__file__).parent.parent.parent / "agent_eval_adapters" / "opencode-adapter.sh"
+        adapter_path = Path(__file__).parent.parent / "adapters" / "opencode-adapter.sh"
         if adapter_path.exists():
             return adapter_path
         return None
@@ -66,5 +75,5 @@ class OpenCodeAdapter(HarnessAdapter):
     def get_setup_commands(self) -> list[str]:
         """Return setup commands to install OpenCode CLI."""
         return [
-            "npm install -g @anomalyco/opencode",
+            "npm install -g opencode-ai",
         ]
