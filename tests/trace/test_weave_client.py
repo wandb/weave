@@ -32,6 +32,7 @@ from weave.trace.context import call_context
 from weave.trace.context.call_context import tracing_disabled
 from weave.trace.isinstance import weave_isinstance
 from weave.trace.op import is_op
+from weave.trace.wandb_run_context import WandbRunContext
 from weave.trace.refs import (
     DICT_KEY_EDGE_NAME,
     LIST_INDEX_EDGE_NAME,
@@ -4054,9 +4055,6 @@ def test_table_create_from_digests(network_proxy_client):
 def test_calls_query_with_wb_run_id_not_null(client, monkeypatch):
     """Test optimized stats query for wb_run_id not null."""
     # Mock wandb to simulate a run
-    from weave.trace import weave_client
-    from weave.trace.wandb_run_context import WandbRunContext
-
     mock_run_id = f"{client._project_id()}/test_run_123"
     monkeypatch.setattr(
         weave_client,
@@ -4077,6 +4075,33 @@ def test_calls_query_with_wb_run_id_not_null(client, monkeypatch):
         tsi.CallsQueryReq(project_id=client._project_id())
     ).calls
     assert len(calls) == 1
+    assert calls[0].wb_run_id == mock_run_id
+
+
+def test_get_calls_columns_wb_run_id(client, monkeypatch):
+    mock_run_id = f"{client._project_id()}/test_run_456"
+    monkeypatch.setattr(
+        weave_client,
+        "get_global_wb_run_context",
+        lambda: WandbRunContext(run_id="test_run_456", step=7),
+    )
+
+    @weave.op
+    def test_op(x: int) -> int:
+        return x * 3
+
+    _, call = test_op.call(2)
+    client.flush()
+
+    calls = list(
+        client.get_calls(
+            columns=["wb_run_id"],
+            filter=tsi.CallsFilter(call_ids=[call.id]),
+        )
+    )
+
+    assert len(calls) == 1
+    assert hasattr(calls[0], "wb_run_id")
     assert calls[0].wb_run_id == mock_run_id
 
     # Now query for calls with wb_run_id not null using limit=1 to trigger optimization

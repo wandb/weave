@@ -24,4 +24,9 @@ def test_call_to_dict(client):
         "thread_id": call.thread_id,
         "turn_id": call.turn_id,
         "project_id": call.project_id,
+        "wb_run_id": call.wb_run_id,
+        "wb_run_step": call.wb_run_step,
+        "wb_run_step_end": call.wb_run_step_end,
+        "storage_size_bytes": call.storage_size_bytes,
+        "total_storage_size_bytes": call.total_storage_size_bytes,
     }
