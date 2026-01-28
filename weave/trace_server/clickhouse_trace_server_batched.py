@@ -5564,6 +5564,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             )
             # always raises, optionally with custom error class
             handle_clickhouse_query_error(e)
+            return None
 
         logger.info(
             "clickhouse_query",
@@ -5613,6 +5614,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 },
             )
             handle_clickhouse_query_error(e)
+            return ""
 
         logger.info(
             "clickhouse_command",
