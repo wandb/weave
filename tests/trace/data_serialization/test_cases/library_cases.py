@@ -164,7 +164,7 @@ library_cases = [
                     "column_map": None,
                     "model": "weave:///shawn/test-project/object/LLMStructuredCompletionModel:VUqRnYmuvNhu3zgfDb9hnZhLRFM1vKKI1WEpw3bsViE",
                     "enable_audio_input_scoring": True,
-                    "audio_input_scoring_json_paths": [
+                    "media_scoring_json_paths": [
                         "$.messages[0].content[1].input_audio"
                     ],
                     "scoring_prompt": "Here are the inputs: {inputs}. Here is the output: {output}. Is the output correct?",
@@ -376,7 +376,7 @@ library_cases = [
                     "column_map": None,
                     "model": "weave:///shawn/test-project/object/LLMStructuredCompletionModel:VUqRnYmuvNhu3zgfDb9hnZhLRFM1vKKI1WEpw3bsViE",
                     "enable_audio_input_scoring": True,
-                    "media_scoring_json_paths": [
+                    "audio_input_scoring_json_paths": [
                         "$.messages[0].content[1].input_audio"
                     ],
                     "scoring_prompt": "Here are the inputs: {inputs}. Here is the output: {output}. Is the output correct?",
