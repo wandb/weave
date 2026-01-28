@@ -19,7 +19,6 @@ from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcesso
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface
 from weave.trace_server_bindings.http_utils import (
     REMOTE_REQUEST_BYTES_LIMIT,
-    handle_response_error,
     log_dropped_call_batch,
     log_dropped_feedback_batch,
     process_batch_with_retry,
@@ -30,7 +29,6 @@ from weave.trace_server_bindings.models import (
     ServerInfoRes,
     StartBatchItem,
 )
-from weave.utils import http_requests
 from weave.utils.project_id import from_project_id
 from weave.utils.retry import get_current_retry_id, with_retry
 from weave.wandb_interface import project_creator
@@ -136,13 +134,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             self._stainless_client = self._stainless_client.copy(
                 default_headers=headers
             )
-
-    def _build_dynamic_request_headers(self) -> dict[str, str]:
-        """Build headers for direct HTTP requests, including retry IDs."""
-        headers = self._extra_headers.copy()
-        if retry_id := get_current_retry_id():
-            headers["X-Weave-Retry-Id"] = retry_id
-        return headers
 
     def _stainless_request(
         self,
@@ -587,26 +578,24 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
 
     @validate_call
     def trace_usage(self, req: tsi.TraceUsageReq) -> tsi.TraceUsageRes:
-        """Compute per-call usage with descendant rollup."""
-        self._update_client_headers()
-        req_dict = req.model_dump(by_alias=True)
-        trace_client = getattr(self._stainless_client, "trace", None) or getattr(
-            self._stainless_client, "traces", None
-        )
-        if trace_client is not None:
-            usage_fn = getattr(trace_client, "usage", None)
-            if callable(usage_fn):
-                response = usage_fn(**req_dict)
-                return tsi.TraceUsageRes.model_validate(response)
+        """Compute per-call usage with descendant rollup.
 
-        r = http_requests.post(
-            f"{self.trace_server_url}/trace/usage",
-            json=req_dict,
-            auth=(self._username, self._password),
-            headers=self._build_dynamic_request_headers(),
+        Args:
+            req: Trace usage request.
+
+        Returns:
+            Trace usage response.
+
+        Examples:
+            >>> server = StainlessRemoteHTTPTraceServer("http://example.com")
+            >>> req = tsi.TraceUsageReq(project_id="entity/project")
+            >>> _ = server.trace_usage(req)  # doctest: +SKIP
+        """
+        return self._stainless_request(
+            req,
+            tsi.TraceUsageRes,
+            self._stainless_client.trace.usage,
         )
-        handle_response_error(r, "/trace/usage")
-        return tsi.TraceUsageRes.model_validate(r.json())
 
     @validate_call
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
