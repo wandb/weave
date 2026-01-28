@@ -981,6 +981,18 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             parent_id: str | None
             summary: dict[str, Any] | None
 
+        def _add_default_call_filters(query: CallsQuery) -> None:
+            query.add_condition(
+                tsi_query.EqOperation.model_validate(
+                    {"$eq": [{"$getField": "deleted_at"}, {"$literal": None}]}
+                )
+            )
+            query.add_condition(
+                tsi_query.NotOperation.model_validate(
+                    {"$not": [{"$eq": [{"$getField": "started_at"}, {"$literal": None}]}]}
+                )
+            )
+
         read_table = self.table_routing_resolver.resolve_read_table(
             req.project_id, self.ch_client
         )
@@ -1000,6 +1012,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         root_traces_query.set_hardcoded_filter(
             HardCodedFilter(filter=tsi.CallsFilter(call_ids=req.call_ids))
         )
+        _add_default_call_filters(root_traces_query)
         root_traces_sql = root_traces_query._as_sql_base_format(pb, table_alias)
         ctes.add_cte("root_traces", root_traces_sql)
 
@@ -1020,7 +1033,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         calls_query.add_field("id")
         calls_query.add_field("parent_id")
         calls_query.add_field("summary")
-        calls_query.set_limit(req.limit)
+        _add_default_call_filters(calls_query)
+        if req.limit is not None:
+            calls_query.set_limit(req.limit)
 
         base_sql = calls_query._as_sql_base_format(
             pb,
