@@ -2613,7 +2613,7 @@ class TraceUsageReq(BaseModelStrict):
     Use this for trace view where you want to see rolled-up metrics per call.
 
     Note: All matching calls are loaded into memory for aggregation. For very large
-    result sets (>100k calls), consider using more specific filters or pagination
+    result sets (>10k calls), consider using more specific filters or pagination
     at the application layer.
     """
 
@@ -2631,7 +2631,7 @@ class TraceUsageReq(BaseModelStrict):
         description="If true, include cost calculations in the usage.",
     )
     limit: int = Field(
-        default=100_000,
+        default=10_000,
         description="Maximum number of calls to process. Acts as a safety limit to prevent unbounded memory usage.",
     )
 
