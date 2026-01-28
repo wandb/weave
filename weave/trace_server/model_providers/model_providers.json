@@ -15,6 +15,10 @@
     "litellm_provider": "coreweave",
     "api_key_name": "WANDB_API_KEY"
   },
+  "Qwen/Qwen3-30B-A3B-Instruct-2507": {
+    "litellm_provider": "coreweave",
+    "api_key_name": "WANDB_API_KEY"
+  },
   "Qwen/Qwen3-235B-A22B-Instruct-2507": {
     "litellm_provider": "coreweave",
     "api_key_name": "WANDB_API_KEY"
@@ -161,6 +165,10 @@
   },
   "us.amazon.nova-2-lite-v1:0": {
     "litellm_provider": "bedrock_converse",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
+  "amazon.nova-2-multimodal-embeddings-v1:0": {
+    "litellm_provider": "bedrock",
     "api_key_name": "BEDROCK_API_KEY"
   },
   "amazon.nova-micro-v1:0": {
@@ -363,6 +371,10 @@
     "litellm_provider": "azure_ai",
     "api_key_name": "AZURE_API_KEY"
   },
+  "azure_ai/claude-opus-4-5": {
+    "litellm_provider": "azure_ai",
+    "api_key_name": "AZURE_API_KEY"
+  },
   "azure_ai/claude-opus-4-1": {
     "litellm_provider": "azure_ai",
     "api_key_name": "AZURE_API_KEY"
@@ -377,6 +389,10 @@
   },
   "azure/container": {
     "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure_ai/gpt-oss-120b": {
+    "litellm_provider": "azure_ai",
     "api_key_name": "AZURE_API_KEY"
   },
   "azure/eu/gpt-4o-2024-08-06": {
@@ -743,7 +759,15 @@
     "litellm_provider": "azure",
     "api_key_name": "AZURE_API_KEY"
   },
+  "azure/gpt-5.2-chat": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
   "azure/gpt-5.2-chat-2025-12-11": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/gpt-5.2-codex": {
     "litellm_provider": "azure",
     "api_key_name": "AZURE_API_KEY"
   },
@@ -808,6 +832,14 @@
     "api_key_name": "AZURE_API_KEY"
   },
   "azure/gpt-image-1-mini": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/gpt-image-1.5": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/gpt-image-1.5-2025-12-16": {
     "litellm_provider": "azure",
     "api_key_name": "AZURE_API_KEY"
   },
@@ -1064,6 +1096,10 @@
     "api_key_name": "AZURE_API_KEY"
   },
   "azure_ai/FLUX.1-Kontext-pro": {
+    "litellm_provider": "azure_ai",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure_ai/flux.2-pro": {
     "litellm_provider": "azure_ai",
     "api_key_name": "AZURE_API_KEY"
   },
@@ -1791,6 +1827,14 @@
     "litellm_provider": "azure",
     "api_key_name": "AZURE_API_KEY"
   },
+  "dall-e-2": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "dall-e-3": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
   "deepseek-chat": {
     "litellm_provider": "deepseek",
     "api_key_name": "DEEPSEEK_API_KEY"
@@ -1948,6 +1992,10 @@
     "api_key_name": "OPENAI_API_KEY"
   },
   "gemini/gemini-live-2.5-flash-preview-native-audio-09-2025": {
+    "litellm_provider": "gemini",
+    "api_key_name": "GEMINI_API_KEY"
+  },
+  "gemini/gemini-robotics-er-1.5-preview": {
     "litellm_provider": "gemini",
     "api_key_name": "GEMINI_API_KEY"
   },
@@ -2211,6 +2259,14 @@
     "litellm_provider": "gemini",
     "api_key_name": "GEMINI_API_KEY"
   },
+  "gemini/veo-3.1-fast-generate-001": {
+    "litellm_provider": "gemini",
+    "api_key_name": "GEMINI_API_KEY"
+  },
+  "gemini/veo-3.1-generate-001": {
+    "litellm_provider": "gemini",
+    "api_key_name": "GEMINI_API_KEY"
+  },
   "google.gemma-3-12b-it": {
     "litellm_provider": "bedrock_converse",
     "api_key_name": "BEDROCK_API_KEY"
@@ -2383,6 +2439,26 @@
     "litellm_provider": "openai",
     "api_key_name": "OPENAI_API_KEY"
   },
+  "gpt-audio": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "gpt-audio-2025-08-28": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "gpt-audio-mini": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "gpt-audio-mini-2025-10-06": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "gpt-audio-mini-2025-12-15": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
   "gpt-4o-mini": {
     "litellm_provider": "openai",
     "api_key_name": "OPENAI_API_KEY"
@@ -2459,6 +2535,126 @@
     "litellm_provider": "openai",
     "api_key_name": "OPENAI_API_KEY"
   },
+  "low/1024-x-1024/gpt-image-1.5": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "low/1024-x-1536/gpt-image-1.5": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "low/1536-x-1024/gpt-image-1.5": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "medium/1024-x-1024/gpt-image-1.5": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "medium/1024-x-1536/gpt-image-1.5": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "medium/1536-x-1024/gpt-image-1.5": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "high/1024-x-1024/gpt-image-1.5": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "high/1024-x-1536/gpt-image-1.5": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "high/1536-x-1024/gpt-image-1.5": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "standard/1024-x-1024/gpt-image-1.5": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "standard/1024-x-1536/gpt-image-1.5": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "standard/1536-x-1024/gpt-image-1.5": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "1024-x-1024/gpt-image-1.5": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "1024-x-1536/gpt-image-1.5": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "1536-x-1024/gpt-image-1.5": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "low/1024-x-1024/gpt-image-1.5-2025-12-16": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "low/1024-x-1536/gpt-image-1.5-2025-12-16": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "low/1536-x-1024/gpt-image-1.5-2025-12-16": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "medium/1024-x-1024/gpt-image-1.5-2025-12-16": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "medium/1024-x-1536/gpt-image-1.5-2025-12-16": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "medium/1536-x-1024/gpt-image-1.5-2025-12-16": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "high/1024-x-1024/gpt-image-1.5-2025-12-16": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "high/1024-x-1536/gpt-image-1.5-2025-12-16": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "high/1536-x-1024/gpt-image-1.5-2025-12-16": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "standard/1024-x-1024/gpt-image-1.5-2025-12-16": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "standard/1024-x-1536/gpt-image-1.5-2025-12-16": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "standard/1536-x-1024/gpt-image-1.5-2025-12-16": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "1024-x-1024/gpt-image-1.5-2025-12-16": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "1024-x-1536/gpt-image-1.5-2025-12-16": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "1536-x-1024/gpt-image-1.5-2025-12-16": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
   "gpt-5": {
     "litellm_provider": "openai",
     "api_key_name": "OPENAI_API_KEY"
@@ -2531,6 +2727,10 @@
     "litellm_provider": "openai",
     "api_key_name": "OPENAI_API_KEY"
   },
+  "gpt-5.2-codex": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
   "gpt-5-mini": {
     "litellm_provider": "openai",
     "api_key_name": "OPENAI_API_KEY"
@@ -2567,59 +2767,7 @@
     "litellm_provider": "openai",
     "api_key_name": "OPENAI_API_KEY"
   },
-  "groq/deepseek-r1-distill-llama-70b": {
-    "litellm_provider": "groq",
-    "api_key_name": "GROQ_API_KEY"
-  },
-  "groq/distil-whisper-large-v3-en": {
-    "litellm_provider": "groq",
-    "api_key_name": "GROQ_API_KEY"
-  },
-  "groq/gemma-7b-it": {
-    "litellm_provider": "groq",
-    "api_key_name": "GROQ_API_KEY"
-  },
-  "groq/gemma2-9b-it": {
-    "litellm_provider": "groq",
-    "api_key_name": "GROQ_API_KEY"
-  },
-  "groq/llama-3.1-405b-reasoning": {
-    "litellm_provider": "groq",
-    "api_key_name": "GROQ_API_KEY"
-  },
-  "groq/llama-3.1-70b-versatile": {
-    "litellm_provider": "groq",
-    "api_key_name": "GROQ_API_KEY"
-  },
   "groq/llama-3.1-8b-instant": {
-    "litellm_provider": "groq",
-    "api_key_name": "GROQ_API_KEY"
-  },
-  "groq/llama-3.2-11b-text-preview": {
-    "litellm_provider": "groq",
-    "api_key_name": "GROQ_API_KEY"
-  },
-  "groq/llama-3.2-11b-vision-preview": {
-    "litellm_provider": "groq",
-    "api_key_name": "GROQ_API_KEY"
-  },
-  "groq/llama-3.2-1b-preview": {
-    "litellm_provider": "groq",
-    "api_key_name": "GROQ_API_KEY"
-  },
-  "groq/llama-3.2-3b-preview": {
-    "litellm_provider": "groq",
-    "api_key_name": "GROQ_API_KEY"
-  },
-  "groq/llama-3.2-90b-text-preview": {
-    "litellm_provider": "groq",
-    "api_key_name": "GROQ_API_KEY"
-  },
-  "groq/llama-3.2-90b-vision-preview": {
-    "litellm_provider": "groq",
-    "api_key_name": "GROQ_API_KEY"
-  },
-  "groq/llama-3.3-70b-specdec": {
     "litellm_provider": "groq",
     "api_key_name": "GROQ_API_KEY"
   },
@@ -2627,19 +2775,11 @@
     "litellm_provider": "groq",
     "api_key_name": "GROQ_API_KEY"
   },
-  "groq/llama-guard-3-8b": {
+  "groq/gemma-7b-it": {
     "litellm_provider": "groq",
     "api_key_name": "GROQ_API_KEY"
   },
-  "groq/llama2-70b-4096": {
-    "litellm_provider": "groq",
-    "api_key_name": "GROQ_API_KEY"
-  },
-  "groq/llama3-groq-70b-8192-tool-use-preview": {
-    "litellm_provider": "groq",
-    "api_key_name": "GROQ_API_KEY"
-  },
-  "groq/llama3-groq-8b-8192-tool-use-preview": {
+  "groq/meta-llama/llama-guard-4-12b": {
     "litellm_provider": "groq",
     "api_key_name": "GROQ_API_KEY"
   },
@@ -2648,18 +2788,6 @@
     "api_key_name": "GROQ_API_KEY"
   },
   "groq/meta-llama/llama-4-scout-17b-16e-instruct": {
-    "litellm_provider": "groq",
-    "api_key_name": "GROQ_API_KEY"
-  },
-  "groq/mistral-saba-24b": {
-    "litellm_provider": "groq",
-    "api_key_name": "GROQ_API_KEY"
-  },
-  "groq/mixtral-8x7b-32768": {
-    "litellm_provider": "groq",
-    "api_key_name": "GROQ_API_KEY"
-  },
-  "groq/moonshotai/kimi-k2-instruct": {
     "litellm_provider": "groq",
     "api_key_name": "GROQ_API_KEY"
   },
@@ -3200,6 +3328,58 @@
     "api_key_name": "BEDROCK_API_KEY"
   },
   "stability.stable-image-core-v1:0": {
+    "litellm_provider": "bedrock",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
+  "stability.stable-conservative-upscale-v1:0": {
+    "litellm_provider": "bedrock",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
+  "stability.stable-creative-upscale-v1:0": {
+    "litellm_provider": "bedrock",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
+  "stability.stable-fast-upscale-v1:0": {
+    "litellm_provider": "bedrock",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
+  "stability.stable-outpaint-v1:0": {
+    "litellm_provider": "bedrock",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
+  "stability.stable-image-control-sketch-v1:0": {
+    "litellm_provider": "bedrock",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
+  "stability.stable-image-control-structure-v1:0": {
+    "litellm_provider": "bedrock",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
+  "stability.stable-image-erase-object-v1:0": {
+    "litellm_provider": "bedrock",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
+  "stability.stable-image-inpaint-v1:0": {
+    "litellm_provider": "bedrock",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
+  "stability.stable-image-remove-background-v1:0": {
+    "litellm_provider": "bedrock",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
+  "stability.stable-image-search-recolor-v1:0": {
+    "litellm_provider": "bedrock",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
+  "stability.stable-image-search-replace-v1:0": {
+    "litellm_provider": "bedrock",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
+  "stability.stable-image-style-guide-v1:0": {
+    "litellm_provider": "bedrock",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
+  "stability.stable-style-transfer-v1:0": {
     "litellm_provider": "bedrock",
     "api_key_name": "BEDROCK_API_KEY"
   },

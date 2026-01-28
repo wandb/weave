@@ -208,6 +208,8 @@ filterwarnings = [
   # ignore deprecation warnings from installed packages, they're printed at the
   # bottom of test output, making it hard to find the actual errors.
   "ignore::DeprecationWarning",
+  # google.api_core warns about Python 3.10 EOL; keep pytest output clean.
+  "ignore:You are using a Python version .*:FutureWarning:google\\.api_core\\._python_version_support",
 ]
 addopts = "-v"
 markers = [
