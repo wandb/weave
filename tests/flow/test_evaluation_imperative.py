@@ -606,6 +606,66 @@ def test_evaluation_logger_with_custom_attributes(client):
     assert calls[0].attributes["custom_attribute"] == "value"
 
 
+def test_evaluation_logger_prediction_metadata(client):
+    ev = weave.EvaluationLogger()
+    pred = ev.log_prediction(
+        inputs={"a": 1},
+        output=2,
+        metadata={"prediction_metadata": "value"},
+    )
+    pred.finish()
+    ev.finish()
+    client.flush()
+
+    calls = client.get_calls()
+    predict_and_score_call = next(
+        c for c in calls if op_name_from_call(c) == "Evaluation.predict_and_score"
+    )
+    predict_call = next(c for c in calls if op_name_from_call(c) == "Model.predict")
+
+    assert predict_and_score_call.attributes["prediction_metadata"] == "value"
+    assert predict_call.attributes["prediction_metadata"] == "value"
+
+
+def test_evaluation_logger_example_metadata(client):
+    ev = weave.EvaluationLogger()
+    ev.log_example(
+        inputs={"a": 1},
+        output=2,
+        scores={"correctness": 1.0},
+        metadata={"prediction_metadata": "value"},
+    )
+    ev.finish()
+    client.flush()
+
+    calls = client.get_calls()
+    predict_and_score_call = next(
+        c for c in calls if op_name_from_call(c) == "Evaluation.predict_and_score"
+    )
+    predict_call = next(c for c in calls if op_name_from_call(c) == "Model.predict")
+
+    assert predict_and_score_call.attributes["prediction_metadata"] == "value"
+    assert predict_call.attributes["prediction_metadata"] == "value"
+
+
+def test_evaluation_logger_score_metadata(client):
+    ev = weave.EvaluationLogger()
+    with ev.log_prediction(inputs={"a": 1}, output=2) as pred:
+        pred.log_score("correctness", 1.0, metadata={"score_metadata": "direct"})
+        with pred.log_score("quality", metadata={"score_metadata": "context"}) as score:
+            score.value = 0.9
+
+    ev.finish()
+    client.flush()
+
+    calls = client.get_calls()
+    correctness_call = next(c for c in calls if op_name_from_call(c) == "correctness")
+    quality_call = next(c for c in calls if op_name_from_call(c) == "quality")
+
+    assert correctness_call.attributes["score_metadata"] == "direct"
+    assert quality_call.attributes["score_metadata"] == "context"
+
+
 def test_evaluation_logger_uses_passed_output_not_model_predict(client):
     """Test that EvaluationLogger uses the passed output instead of calling model.predict.
 
