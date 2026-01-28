@@ -18,6 +18,7 @@ from .harnesses.base import HarnessAdapter
 from .harnesses.registry import get_harness
 from .scorers.base import ScoreResult, Scorer
 from .scorers.deterministic import DeterministicScorer
+from .scorers.llm_rubric import LLMRubricScorer
 
 
 def _default_log(msg: str, end: str = "\n") -> None:
@@ -94,12 +95,22 @@ class Executor:
         config: EvalConfig,
         config_dir: Path | None = None,
         log: Callable[[str], None] | None = None,
+        max_parallel: int = 4,
+        weave_project: str | None = None,
     ):
         self.config = config
         self.config_dir = config_dir or Path.cwd()
         self.driver: Driver | None = None
         self.artifacts: ArtifactManager | None = None
         self._log = log or _default_log
+        self.max_parallel = max_parallel
+        self._log_lock = asyncio.Lock()
+        self.weave_project = weave_project
+
+    async def log_async(self, msg: str, end: str = "\n") -> None:
+        """Log a message to the output (thread-safe for parallel execution)."""
+        async with self._log_lock:
+            self._log(msg, end)
 
     def log(self, msg: str, end: str = "\n") -> None:
         """Log a message to the output."""
@@ -156,26 +167,86 @@ class Executor:
 
             self.log("")
 
-            # Execute each combination
-            for i, (harness_config, task_config) in enumerate(combinations, 1):
-                self.log(f"[{i}/{len(combinations)}] Running task: {task_config.id}")
-                self.log(f"  Harness: {harness_config.type.value}:{harness_config.model}")
-                
-                task_result = await self._run_task(
-                    run, harness_config, task_config, env
-                )
-                result.task_results.append(task_result)
-                
-                # Show result
-                if task_result.success:
-                    status = "PASS" if task_result.overall_pass else "FAIL"
-                    self.log(f"  Result: {status}")
-                    if task_result.scores:
-                        for name, score in task_result.scores.items():
-                            self.log(f"    {name}: {score.score:.0f}%")
-                else:
-                    self.log(f"  Result: ERROR - {task_result.error}")
+            # Execute combinations in parallel with concurrency limit
+            if self.max_parallel > 1 and len(combinations) > 1:
+                self.log(f"Running {len(combinations)} tasks in parallel (max {self.max_parallel} concurrent)...")
                 self.log("")
+                
+                # Create semaphore to limit concurrency
+                semaphore = asyncio.Semaphore(self.max_parallel)
+                
+                async def run_with_semaphore(idx: int, harness_config: HarnessConfig, task_config: TaskConfig) -> TaskResult:
+                    async with semaphore:
+                        task_id = f"{task_config.id}_{harness_config.type.value}_{harness_config.model}"
+                        task_id = task_id.replace("/", "_")
+                        await self.log_async(f"[{idx}/{len(combinations)}] Starting: {task_config.id} ({harness_config.type.value}:{harness_config.model})")
+                        
+                        task_result = await self._run_task(
+                            run, harness_config, task_config, env
+                        )
+                        
+                        # Log completion
+                        if task_result.success:
+                            status = "PASS" if task_result.overall_pass else "FAIL"
+                            score_info = ""
+                            if task_result.scores:
+                                scores_str = ", ".join(f"{n}: {s.score:.0f}%" for n, s in task_result.scores.items())
+                                score_info = f" [{scores_str}]"
+                            await self.log_async(f"[{idx}/{len(combinations)}] Completed: {task_config.id} ({harness_config.type.value}:{harness_config.model}) -> {status}{score_info}")
+                        else:
+                            await self.log_async(f"[{idx}/{len(combinations)}] Completed: {task_config.id} ({harness_config.type.value}:{harness_config.model}) -> ERROR: {task_result.error}")
+                        
+                        return task_result
+                
+                # Launch all tasks
+                tasks = [
+                    run_with_semaphore(i, harness_config, task_config)
+                    for i, (harness_config, task_config) in enumerate(combinations, 1)
+                ]
+                
+                # Wait for all to complete
+                task_results = await asyncio.gather(*tasks, return_exceptions=True)
+                
+                # Process results
+                for i, task_result in enumerate(task_results):
+                    if isinstance(task_result, Exception):
+                        # Handle exceptions from individual tasks
+                        harness_config, task_config = combinations[i]
+                        result.task_results.append(TaskResult(
+                            task_id=task_config.id,
+                            harness=harness_config.type.value,
+                            model=harness_config.model,
+                            job_result=JobResult(
+                                exit_code=-1,
+                                artifacts_path=Path("."),
+                                duration_seconds=0,
+                                error=str(task_result),
+                            ),
+                            error=str(task_result),
+                        ))
+                    else:
+                        result.task_results.append(task_result)
+            else:
+                # Sequential execution
+                for i, (harness_config, task_config) in enumerate(combinations, 1):
+                    self.log(f"[{i}/{len(combinations)}] Running task: {task_config.id}")
+                    self.log(f"  Harness: {harness_config.type.value}:{harness_config.model}")
+                    
+                    task_result = await self._run_task(
+                        run, harness_config, task_config, env
+                    )
+                    result.task_results.append(task_result)
+                    
+                    # Show result
+                    if task_result.success:
+                        status = "PASS" if task_result.overall_pass else "FAIL"
+                        self.log(f"  Result: {status}")
+                        if task_result.scores:
+                            for name, score in task_result.scores.items():
+                                self.log(f"    {name}: {score.score:.0f}%")
+                    else:
+                        self.log(f"  Result: ERROR - {task_result.error}")
+                    self.log("")
 
         except Exception as e:
             self.log(f"Error: {e}")
@@ -192,6 +263,28 @@ class Executor:
         })
 
         self.log(f"Evaluation completed in {duration:.1f}s")
+
+        # Log to Weave if configured
+        if self.weave_project:
+            self.log("")
+            self.log("Logging results to Weave...")
+            try:
+                from .reporter import WeaveConfig, log_to_weave
+                
+                weave_config = WeaveConfig(project=self.weave_project)
+                eval_urls = log_to_weave(
+                    result=result,
+                    config_name=self.config.name,
+                    weave_config=weave_config,
+                    artifacts_base_path=output_dir,
+                )
+                self.log(f"  Logged {len(eval_urls)} eval runs to Weave")
+                for harness_key, url in eval_urls.items():
+                    self.log(f"    {harness_key}: {url}")
+            except ImportError as e:
+                self.log(f"  Warning: Could not log to Weave - {e}")
+            except Exception as e:
+                self.log(f"  Error logging to Weave: {e}")
 
         return result
 
@@ -331,13 +424,24 @@ class Executor:
         )
         self.log(f"  Harness completed in {job_result.duration_seconds:.1f}s (exit code: {job_result.exit_code})")
 
-        # Update metadata
+        # Extract and save metrics
+        from .metrics import extract_metrics
+        metrics = extract_metrics(task_artifacts.path)
+        
+        # Update metadata with metrics
         task_artifacts.write_metadata({
             **task_artifacts.read_metadata(),
             "completed_at": datetime.now().isoformat(),
             "exit_code": job_result.exit_code,
             "duration_seconds": job_result.duration_seconds,
+            "metrics": metrics.to_dict(),
         })
+        
+        # Log key metrics
+        if metrics.total_tokens > 0:
+            self.log(f"  Tokens: {metrics.total_tokens} (in: {metrics.input_tokens}, out: {metrics.output_tokens})")
+        if metrics.command_count > 0:
+            self.log(f"  Commands executed: {metrics.command_count}")
 
         task_result = TaskResult(
             task_id=task_config.id,
@@ -378,8 +482,8 @@ class Executor:
 
         # LLM rubric scorer
         if self.config.scoring.rubric:
-            # TODO: Implement LLM rubric scorer
-            pass
+            scorer = LLMRubricScorer(self.config.scoring.rubric)
+            scores[scorer.name] = await scorer.score(task_artifacts.path)
 
         # Custom scorers
         for custom_config in self.config.scoring.custom:

@@ -4,9 +4,37 @@ This directory contains example evaluations demonstrating how to use `agent_eval
 
 ## Examples
 
+### hello-world (Recommended Starting Point)
+
+A minimal proof-of-concept demonstrating:
+- Multiple models (GPT-4o and Claude Sonnet)
+- Multiple tasks (2 file creation tasks)
+- Rule-based scoring (deterministic file checks)
+- LLM-based scoring (qualitative rubric evaluation)
+
+```bash
+python -m agent_eval.cli run agent_eval/examples/hello-world/eval.yaml
+```
+
+### minimal
+
+The absolute simplest example - a single task with deterministic scoring only.
+
+```bash
+python -m agent_eval.cli run agent_eval/examples/minimal/eval.yaml
+```
+
+### minimal-openai
+
+Demonstrates using the simple OpenAI API agent (no CLI, just direct API calls).
+
+```bash
+python -m agent_eval.cli run agent_eval/examples/minimal-openai/eval.yaml
+```
+
 ### setup-demo-app
 
-The primary example, based on the [OpenAI blog post on testing agent skills](https://developers.openai.com/blog/eval-skills/).
+The full example based on the [OpenAI blog post on testing agent skills](https://developers.openai.com/blog/eval-skills/).
 
 Evaluates a skill that scaffolds a Vite + React + Tailwind demo app with:
 - Explicit skill invocation tests
@@ -16,37 +44,34 @@ Evaluates a skill that scaffolds a Vite + React + Tailwind demo app with:
 - LLM rubric scoring for style
 
 ```bash
-agent-eval run setup-demo-app/eval.yaml
-```
-
-### minimal
-
-The simplest possible example to get started.
-
-```bash
-agent-eval run minimal/eval.yaml
+python -m agent_eval.cli run agent_eval/examples/setup-demo-app/eval.yaml
 ```
 
 ## Running Examples
 
-1. Ensure required environment variables are set:
+1. **Check required environment variables:**
    ```bash
-   agent-eval check-env setup-demo-app/eval.yaml
+   python -m agent_eval.cli check-env agent_eval/examples/hello-world/eval.yaml
    ```
 
-2. Run the evaluation:
+2. **Run the evaluation:**
    ```bash
-   agent-eval run setup-demo-app/eval.yaml
+   python -m agent_eval.cli run agent_eval/examples/hello-world/eval.yaml
    ```
 
-3. Run a single task for debugging:
+3. **Run with parallel execution:**
    ```bash
-   agent-eval run setup-demo-app/eval.yaml --task explicit-invoke --harness codex:gpt-4o
+   python -m agent_eval.cli run agent_eval/examples/hello-world/eval.yaml --parallel 4
    ```
 
-4. Dry run to see what would execute:
+4. **Run with Weave logging:**
    ```bash
-   agent-eval run setup-demo-app/eval.yaml --dry-run
+   python -m agent_eval.cli run agent_eval/examples/hello-world/eval.yaml --weave team/project
+   ```
+
+5. **View results from a previous run:**
+   ```bash
+   python -m agent_eval.cli show agent_eval/examples/hello-world/results/run_<ID>
    ```
 
 ## Creating Your Own Evaluation
@@ -55,6 +80,45 @@ agent-eval run minimal/eval.yaml
 2. Add a `skill/SKILL.md` file with your skill definition
 3. Create an `eval.yaml` config file
 4. Define tasks and scoring criteria
-5. Run with `agent-eval run your-eval/eval.yaml`
+5. Run with `python -m agent_eval.cli run your-eval/eval.yaml`
 
-See the examples for config file templates.
+### Example Config Structure
+
+```yaml
+version: "1.0"
+name: my-eval
+
+matrix:
+  harness:
+    - type: opencode
+      model: gpt-4o
+
+driver:
+  type: docker
+
+environment:
+  base_image: node:20-slim
+
+skill:
+  path: ./skill
+
+tasks:
+  - id: my-task
+    prompt: "Do the thing"
+    timeout: 60
+
+scoring:
+  deterministic:
+    checks:
+      - type: file_exists
+        path: output.txt
+
+network:
+  allowed_hosts:
+    - api.openai.com
+
+output:
+  directory: ./results
+```
+
+See the individual example directories for complete config file templates.

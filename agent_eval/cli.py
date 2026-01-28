@@ -27,7 +27,9 @@ def cli():
 @click.option("--harness", "-h", help="Run only this harness (format: type:model)")
 @click.option("--dry-run", is_flag=True, help="Show what would run without executing")
 @click.option("--output", "-o", type=click.Path(), help="Override output directory")
-def run(config_path: str, task: str | None, harness: str | None, dry_run: bool, output: str | None):
+@click.option("--parallel", "-p", default=4, help="Max parallel tasks (default: 4, use 1 for sequential)")
+@click.option("--weave", "-w", "weave_project", help="Log results to Weave project (e.g., 'team/project')")
+def run(config_path: str, task: str | None, harness: str | None, dry_run: bool, output: str | None, parallel: int, weave_project: str | None):
     """Run an evaluation from a config file.
 
     CONFIG_PATH is the path to the evaluation YAML config file.
@@ -85,8 +87,31 @@ def run(config_path: str, task: str | None, harness: str | None, dry_run: bool, 
             click.echo(f"  - {task_config.id} with {harness_config.type.value}:{harness_config.model}")
         return
 
+    # Check for Weave project in config if not specified on CLI
+    if not weave_project and config.output.weave:
+        weave_project = config.output.weave.project
+    
+    # Fail fast if Weave is requested but not installed
+    if weave_project:
+        try:
+            import weave  # noqa: F401
+            click.echo(f"Weave logging enabled: {weave_project}")
+        except ImportError:
+            click.echo(
+                "Error: Weave logging requested but 'weave' package is not installed.\n"
+                "Install with: pip install weave\n"
+                "Or remove the --weave flag / weave config to run without Weave logging.",
+                err=True
+            )
+            sys.exit(1)
+    
     # Run evaluation
-    executor = Executor(config, config_dir=config_path.parent)
+    executor = Executor(
+        config, 
+        config_dir=config_path.parent, 
+        max_parallel=parallel,
+        weave_project=weave_project,
+    )
     try:
         result = asyncio.run(executor.run())
     except EnvironmentError as e:
@@ -295,6 +320,21 @@ def _show_task_results(task_path: Path, show_logs: bool, show_files: bool, limit
         click.echo(f"  Prompt: {meta.get('prompt', 'unknown')[:80]}...")
         click.echo(f"  Exit code: {meta.get('exit_code', 'unknown')}")
         click.echo(f"  Duration: {meta.get('duration_seconds', 0):.1f}s")
+        
+        # Show metrics if available
+        metrics = meta.get("metrics", {})
+        if metrics:
+            click.echo()
+            click.echo("  Metrics:")
+            tokens = metrics.get("tokens", {})
+            if tokens.get("total", 0) > 0:
+                click.echo(f"    Tokens: {tokens.get('total', 0)} (in: {tokens.get('input', 0)}, out: {tokens.get('output', 0)})")
+            counts = metrics.get("counts", {})
+            if counts:
+                click.echo(f"    Commands: {counts.get('commands', 0)}")
+                click.echo(f"    Tool calls: {counts.get('tool_calls', 0)}")
+                click.echo(f"    File writes: {counts.get('file_writes', 0)}")
+                click.echo(f"    Turns: {counts.get('turns', 0)}")
     
     # Show scores if available
     scores_dir = task_path / "scores"

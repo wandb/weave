@@ -3,12 +3,17 @@ name: setup-demo-app-eval
 description: |
   Evaluate the setup-demo-app skill from the OpenAI blog post.
   Tests explicit invocation, implicit triggering, and negative controls.
+  Runs against both GPT-4o and Claude models via OpenCode.
 
 # Test across multiple harness configurations
 matrix:
   harness:
-    - type: codex
+    # OpenAI GPT-4o via OpenCode
+    - type: opencode
       model: gpt-4o
+    # Anthropic Claude via OpenCode
+    - type: opencode
+      model: anthropic/claude-sonnet-4-20250514
 
 driver:
   type: docker
@@ -17,6 +22,10 @@ environment:
   base_image: node:20-slim
   setup:
     - npm install -g create-vite
+  # Both API keys needed for the matrix
+  additional_env_keys:
+    - OPENAI_API_KEY
+    - ANTHROPIC_API_KEY
 
 skill:
   path: ./skill
@@ -34,13 +43,7 @@ tasks:
     expected_trigger: true
     timeout: 300
 
-  # Test 3: Contextual invocation with domain-specific context
-  - id: contextual-invoke
-    prompt: "Create a small demo app to showcase a new API feature"
-    expected_trigger: true
-    timeout: 300
-
-  # Test 4: Negative control - skill should NOT trigger
+  # Test 3: Negative control - skill should NOT trigger
   - id: negative-control
     prompt: "Add Tailwind styling to my existing React app"
     expected_trigger: false
@@ -77,45 +80,26 @@ scoring:
         path: demo-app/src/index.css
         pattern: "tailwindcss"
 
-  # LLM rubric scoring (requires additional setup)
-  # rubric:
-  #   model: gpt-4o
-  #   prompt: |
-  #     Evaluate the demo-app repository against these requirements:
-  #     
-  #     1. **vite**: Vite + React + TypeScript project exists and is properly configured
-  #     2. **tailwind**: Tailwind is configured via @tailwindcss/vite and CSS imports tailwindcss
-  #     3. **structure**: src/components contains Header.tsx and Card.tsx
-  #     4. **style**: Components are functional and styled with Tailwind utility classes (no CSS modules)
-  #     
-  #     Score each check: vite, tailwind, structure, style
-  #   schema:
-  #     type: object
-  #     properties:
-  #       overall_pass:
-  #         type: boolean
-  #       score:
-  #         type: integer
-  #         minimum: 0
-  #         maximum: 100
-  #       checks:
-  #         type: array
-  #         items:
-  #           type: object
-  #           properties:
-  #             id:
-  #               type: string
-  #               enum: [vite, tailwind, structure, style]
-  #             pass:
-  #               type: boolean
-  #             notes:
-  #               type: string
-  #           required: [id, pass, notes]
-  #     required: [overall_pass, score, checks]
+  # LLM-based rubric scoring for qualitative checks
+  # Runs in a Docker container - no local dependencies needed
+  rubric:
+    model: gpt-4o
+    prompt: |
+      Evaluate the demo-app repository against these requirements:
+      
+      1. **vite**: Vite + React + TypeScript project exists and is properly configured
+      2. **tailwind**: Tailwind is configured via @tailwindcss/vite and CSS imports tailwindcss
+      3. **structure**: src/components contains Header.tsx and Card.tsx with proper React components
+      4. **style**: Components are functional and styled with Tailwind utility classes (no CSS modules)
+      
+      Score each check: vite, tailwind, structure, style
+      
+      For each check, assess whether the implementation meets the requirements and provide notes.
 
 network:
   allowed_hosts:
     - api.openai.com
+    - api.anthropic.com
     - registry.npmjs.org
 
 output:

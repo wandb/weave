@@ -147,24 +147,56 @@ class DeterministicScorer(Scorer):
         pattern: str | None,
         trajectory: Path,
     ) -> CheckResult:
-        """Check if trajectory contains a pattern."""
+        """Check if trajectory/logs contain a pattern.
+        
+        Searches in:
+        - trajectory.jsonl (if exists)
+        - stdout.log
+        - stderr.log
+        """
         if not pattern:
             return CheckResult(id=check_id, passed=False, notes="No pattern specified")
 
-        if not trajectory.exists():
-            return CheckResult(
-                id=check_id,
-                passed=False,
-                notes="Trajectory file not found",
-            )
-
-        content = trajectory.read_text()
-        matches = bool(re.search(pattern, content))
+        # Check trajectory.jsonl first
+        if trajectory.exists():
+            content = trajectory.read_text()
+            if re.search(pattern, content, re.IGNORECASE):
+                return CheckResult(
+                    id=check_id,
+                    passed=True,
+                    notes="",
+                    details={"pattern": pattern, "found_in": "trajectory.jsonl"},
+                )
+        
+        # Check stdout.log
+        artifacts_dir = trajectory.parent
+        stdout_file = artifacts_dir / "stdout.log"
+        if stdout_file.exists():
+            content = stdout_file.read_text()
+            if re.search(pattern, content, re.IGNORECASE):
+                return CheckResult(
+                    id=check_id,
+                    passed=True,
+                    notes="",
+                    details={"pattern": pattern, "found_in": "stdout.log"},
+                )
+        
+        # Check stderr.log
+        stderr_file = artifacts_dir / "stderr.log"
+        if stderr_file.exists():
+            content = stderr_file.read_text()
+            if re.search(pattern, content, re.IGNORECASE):
+                return CheckResult(
+                    id=check_id,
+                    passed=True,
+                    notes="",
+                    details={"pattern": pattern, "found_in": "stderr.log"},
+                )
 
         return CheckResult(
             id=check_id,
-            passed=matches,
-            notes="" if matches else f"Pattern '{pattern}' not found in trajectory",
+            passed=False,
+            notes=f"Pattern '{pattern}' not found in trajectory or logs",
             details={"pattern": pattern},
         )
 

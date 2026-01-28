@@ -1,0 +1,72 @@
+version: "1.0"
+name: hello-world-eval
+description: |
+  Minimal proof-of-concept evaluation demonstrating:
+  - Multiple models (GPT-4o and Claude)
+  - Multiple tasks
+  - Rule-based scoring (deterministic)
+  - LLM-based scoring (rubric)
+
+# Test with two different models
+matrix:
+  harness:
+    - type: opencode
+      model: gpt-4o
+    - type: opencode
+      model: anthropic/claude-sonnet-4-20250514
+
+driver:
+  type: docker
+
+environment:
+  base_image: node:20-slim
+
+skill:
+  path: ./skill
+
+tasks:
+  # Task 1: Simple file creation
+  - id: create-greeting
+    prompt: "Create a hello.txt file with a friendly greeting that starts with 'Hello'"
+    timeout: 60
+
+  # Task 2: Slightly different prompt to test consistency  
+  - id: welcome-message
+    prompt: "Write a welcoming message to a file called hello.txt"
+    timeout: 60
+
+scoring:
+  # Rule-based checks (deterministic)
+  deterministic:
+    checks:
+      # File must exist
+      - type: file_exists
+        path: hello.txt
+      
+      # File must contain "Hello" (case-insensitive via regex)
+      - type: file_contains
+        path: hello.txt
+        pattern: "[Hh]ello"
+
+  # LLM-based evaluation (qualitative)
+  rubric:
+    model: gpt-4o
+    prompt: |
+      Evaluate the hello.txt file against these criteria:
+      
+      1. **greeting**: Does it contain a proper greeting starting with "Hello"?
+      2. **tone**: Is the tone friendly and welcoming?
+      3. **length**: Is it an appropriate length (1-3 sentences, not too short or verbose)?
+      
+      Score each criterion: greeting, tone, length
+
+network:
+  allowed_hosts:
+    - api.openai.com
+    - api.anthropic.com
+
+output:
+  directory: ./results
+  # Uncomment to log results to Weave
+  weave:
+    project: timssweeney/agent-eval

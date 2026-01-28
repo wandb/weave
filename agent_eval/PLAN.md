@@ -2,6 +2,15 @@
 
 A lightweight framework for evaluating agent skills systematically.
 
+## Implementation Status
+
+| Milestone | Status | Notes |
+|-----------|--------|-------|
+| M1: End-to-End with Codex (MVP) | COMPLETE | Core framework working |
+| M2: Full Scoring Pipeline | COMPLETE | Deterministic + LLM rubric scorers |
+| M3: Multi-Harness Support | COMPLETE | OpenCode, Codex, Claude, OpenAI Agent |
+| M4: Parallelization & Reporting | COMPLETE | Async execution + Weave integration |
+
 ## Overview
 
 `agent_eval` orchestrates running agent harnesses (Codex, Claude, OpenCode, etc.) against 
@@ -49,46 +58,51 @@ scorers for evaluation.
 ## Directory Structure
 
 ```
-weave/agent_eval/
-├── __init__.py              # Public API exports
-├── cli.py                   # Click CLI entry point
+agent_eval/                    # Standalone module (sibling to weave/)
+├── __init__.py                # Public API exports
+├── cli.py                     # Click CLI entry point (run, show, validate, check-env)
+├── executor.py                # Async job orchestration with parallel execution
+├── artifacts.py               # Artifact directory management
+├── metrics.py                 # Token usage, command counts, latency extraction
+├── reporter.py                # Weave EvaluationLogger integration
 ├── config/
 │   ├── __init__.py
-│   ├── schema.py            # Pydantic models
-│   └── loader.py            # YAML parsing
+│   ├── schema.py              # Pydantic models for eval config
+│   └── loader.py              # YAML parsing and validation
 ├── harnesses/
 │   ├── __init__.py
-│   ├── base.py              # HarnessAdapter protocol
-│   ├── registry.py          # Harness registration
-│   ├── codex.py             # OpenAI Codex
-│   ├── claude.py            # Anthropic Claude
-│   ├── opencode.py          # OpenCode
-│   └── generic.py           # Configurable generic
+│   ├── base.py                # HarnessAdapter protocol
+│   ├── registry.py            # Harness type -> adapter mapping
+│   ├── codex.py               # OpenAI Codex CLI adapter
+│   ├── claude.py              # Anthropic Claude CLI adapter
+│   ├── opencode.py            # OpenCode CLI adapter (default)
+│   ├── openai_agent.py        # Simple OpenAI API agent
+│   └── generic.py             # Configurable generic adapter
 ├── drivers/
 │   ├── __init__.py
-│   ├── base.py              # Driver protocol
-│   └── docker.py            # Docker/OrbStack
+│   ├── base.py                # Driver protocol (build_image, run_job, cleanup)
+│   └── docker.py              # Docker container execution
 ├── scorers/
 │   ├── __init__.py
-│   ├── base.py              # Scorer protocol
-│   ├── deterministic.py     # File/command checks
-│   └── llm_rubric.py        # LLM-based grading
-├── executor.py              # Job orchestration
-├── artifacts.py             # Artifact management
-└── reporter.py              # Weave integration
-
-weave/agent_eval_adapters/   # Shell scripts for harnesses
-├── codex-adapter.sh
-├── claude-adapter.sh
-└── opencode-adapter.sh
-
-weave/agent_eval_examples/   # Reference examples
-├── README.md
-├── setup-demo-app/          # Main example from OpenAI blog
-│   ├── eval.yaml
-│   ├── skill/SKILL.md
-│   └── scorers/
-└── minimal/                 # Simplest example
+│   ├── base.py                # Scorer protocol
+│   ├── deterministic.py       # File exists, file contains, trajectory contains
+│   └── llm_rubric.py          # LLM-based grading (runs in Docker container)
+├── adapters/                  # Shell/JS scripts injected into containers
+│   ├── codex-adapter.sh
+│   ├── claude-adapter.sh
+│   ├── opencode-adapter.sh
+│   └── openai-agent-adapter.js
+├── tests/                     # Unit tests
+│   ├── test_config.py
+│   ├── test_harnesses.py
+│   ├── test_artifacts.py
+│   └── test_scorers.py
+└── examples/                  # Reference examples
+    ├── README.md
+    ├── hello-world/           # Multi-model proof-of-concept (2 tasks x 2 models)
+    ├── minimal/               # Simplest single-task example
+    ├── minimal-openai/        # OpenAI agent example
+    └── setup-demo-app/        # Full example from OpenAI blog
 ```
 
 ## Execution Flow
@@ -123,48 +137,57 @@ weave/agent_eval_examples/   # Reference examples
 
 ## Implementation Milestones
 
-### Milestone 1: End-to-End with Codex (MVP)
+### Milestone 1: End-to-End with Codex (MVP) - COMPLETE
 
 **Goal**: `agent-eval run examples/setup-demo-app/eval.yaml` produces scores
 
-| File | Purpose |
-|------|---------|
-| `config/schema.py` | Pydantic models for EvalConfig, TaskConfig, HarnessConfig, etc. |
-| `config/loader.py` | YAML parsing and validation |
-| `drivers/base.py` | Driver protocol definition |
-| `drivers/docker.py` | Docker image building, job execution, artifact collection |
-| `harnesses/base.py` | HarnessAdapter protocol |
-| `harnesses/codex.py` | Codex CLI adapter |
-| `scorers/base.py` | Scorer protocol |
-| `scorers/deterministic.py` | File exists, file contains, trajectory contains |
-| `artifacts.py` | Artifact directory management |
-| `executor.py` | Single-threaded job orchestration |
-| `cli.py` | `run` and `validate` commands |
+| File | Purpose | Status |
+|------|---------|--------|
+| `config/schema.py` | Pydantic models for EvalConfig, TaskConfig, HarnessConfig, etc. | Done |
+| `config/loader.py` | YAML parsing and validation | Done |
+| `drivers/base.py` | Driver protocol definition | Done |
+| `drivers/docker.py` | Docker image building, job execution, artifact collection | Done |
+| `harnesses/base.py` | HarnessAdapter protocol | Done |
+| `harnesses/codex.py` | Codex CLI adapter | Done |
+| `scorers/base.py` | Scorer protocol | Done |
+| `scorers/deterministic.py` | File exists, file contains, trajectory contains | Done |
+| `artifacts.py` | Artifact directory management | Done |
+| `executor.py` | Single-threaded job orchestration | Done |
+| `cli.py` | `run` and `validate` commands | Done |
 
-### Milestone 2: Full Scoring Pipeline
+### Milestone 2: Full Scoring Pipeline - COMPLETE
 
-| File | Purpose |
-|------|---------|
-| `scorers/llm_rubric.py` | LLM-based grading with JSON schema output |
-| `scorers/custom.py` | User-provided scorer containers |
-| Score aggregation in `executor.py` | Combine multiple scorer outputs |
+| File | Purpose | Status |
+|------|---------|--------|
+| `scorers/llm_rubric.py` | LLM-based grading with JSON schema output | Done |
+| `scorers/custom.py` | User-provided scorer containers | Deferred |
+| Score aggregation in `executor.py` | Combine multiple scorer outputs | Done |
 
-### Milestone 3: Multi-Harness Support
+**Notes**: LLM rubric scorer runs in its own Docker container for isolation, respects .gitignore when collecting workspace context.
 
-| File | Purpose |
-|------|---------|
-| `harnesses/claude.py` | Claude CLI adapter |
-| `harnesses/opencode.py` | OpenCode CLI adapter |
-| `harnesses/generic.py` | Configurable generic adapter |
-| Matrix expansion in `executor.py` | Generate harness × task combinations |
+### Milestone 3: Multi-Harness Support - COMPLETE
 
-### Milestone 4: Parallelization & Reporting
+| File | Purpose | Status |
+|------|---------|--------|
+| `harnesses/claude.py` | Claude CLI adapter | Done |
+| `harnesses/opencode.py` | OpenCode CLI adapter | Done |
+| `harnesses/openai_agent.py` | Simple OpenAI API agent | Done |
+| `harnesses/generic.py` | Configurable generic adapter | Done |
+| Matrix expansion in `executor.py` | Generate harness x task combinations | Done |
 
-| File | Purpose |
-|------|---------|
-| Async execution in `executor.py` | Parallel container runs |
-| `reporter.py` | Weave integration for logging |
-| Summary generation | Aggregate metrics and reports |
+### Milestone 4: Parallelization & Reporting - COMPLETE
+
+| File | Purpose | Status |
+|------|---------|--------|
+| Async execution in `executor.py` | Parallel container runs with semaphore | Done |
+| `reporter.py` | Weave EvaluationLogger integration | Done |
+| `metrics.py` | Token usage, latency, command counts | Done |
+| Summary generation | Aggregate metrics and reports | Done |
+
+**Notes**: 
+- Parallel execution uses asyncio with configurable concurrency (`--parallel N`)
+- Weave integration logs each check as its own score for cleaner visualization
+- Metrics extracted from harness logs (supports OpenCode, Codex formats)
 
 ## Key Contracts
 
@@ -303,30 +326,52 @@ Implementation via Docker network policies or iptables rules.
 
 ## Future Work
 
-- **Modal driver** - Cloud execution for parallelization
-- **Trajectory normalization** - Convert vendor formats to common schema
-- **GitHub Action** - CI integration
-- **Web UI** - Results browsing and comparison
-- **Caching** - Skip unchanged harness runs
+| Feature | Priority | Notes |
+|---------|----------|-------|
+| **Modal driver** | High | Cloud execution for better parallelization |
+| **Caching** | High | Skip unchanged harness/task combinations |
+| **Cost tracking** | Medium | Track API costs per run |
+| **Trajectory normalization** | Medium | Convert vendor formats to common schema |
+| **GitHub Action** | Medium | CI integration for running evals on PRs |
+| **Custom scorers** | Low | User-provided scorer containers |
+| **Web UI** | Low | Results browsing and comparison |
+
+## Known Issues
+
+- Docker must be running for any evaluation to work
+- LLM rubric scorer requires network access to OpenAI API
+- Token metrics extraction only works for OpenCode and Codex harnesses currently
 
 ## Development Notes
 
 ### Running Tests
 
 ```bash
-# From repo root
-nox --no-install -e "tests-3.12(shard='trace')" -- tests/agent_eval/
+# Unit tests
+pytest agent_eval/tests/
+
+# Integration test (requires Docker)
+python -m agent_eval.cli run agent_eval/examples/minimal/eval.yaml
 ```
 
 ### Local Development
 
 ```bash
-# Install in editable mode
-pip install -e ".[agent_eval]"
+# Run CLI directly
+python -m agent_eval.cli --help
+python -m agent_eval.cli run agent_eval/examples/hello-world/eval.yaml
 
-# Run CLI
-agent-eval --help
-agent-eval run examples/setup-demo-app/eval.yaml
+# With parallel execution
+python -m agent_eval.cli run agent_eval/examples/hello-world/eval.yaml --parallel 4
+
+# With Weave logging
+python -m agent_eval.cli run agent_eval/examples/hello-world/eval.yaml --weave team/project
+
+# Check environment variables
+python -m agent_eval.cli check-env agent_eval/examples/hello-world/eval.yaml
+
+# View results
+python -m agent_eval.cli show agent_eval/examples/hello-world/results/run_<ID>
 ```
 
 ### Adding a New Harness

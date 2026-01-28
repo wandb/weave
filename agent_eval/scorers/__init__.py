@@ -1,6 +1,7 @@
 """Scorers for evaluating harness outputs."""
 
-from .base import Scorer, ScoreResult
+from .base import CheckResult, ScoreResult, Scorer
 from .deterministic import DeterministicScorer
+from .llm_rubric import LLMRubricScorer
 
-__all__ = ["Scorer", "ScoreResult", "DeterministicScorer"]
+__all__ = ["CheckResult", "ScoreResult", "Scorer", "DeterministicScorer", "LLMRubricScorer"]
