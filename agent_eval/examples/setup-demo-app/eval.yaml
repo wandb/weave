@@ -5,15 +5,20 @@ description: |
   Tests explicit invocation, implicit triggering, and negative controls.
   Runs against both GPT-4o and Claude models via OpenCode.
 
-# Test across multiple harness configurations
+# Test across multiple models for coverage
+# Using OpenCode harness which supports multiple providers
 matrix:
   harness:
-    # OpenAI GPT-4o via OpenCode
+    # OpenAI models
     - type: opencode
       model: gpt-4o
-    # Anthropic Claude via OpenCode
+    - type: opencode
+      model: gpt-4.1
+    # Anthropic models  
     - type: opencode
       model: anthropic/claude-sonnet-4-20250514
+    - type: opencode
+      model: anthropic/claude-opus-4-20250514
 
 driver:
   type: docker

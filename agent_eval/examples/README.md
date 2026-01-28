@@ -16,32 +16,17 @@ A minimal proof-of-concept demonstrating:
 python -m agent_eval.cli run agent_eval/examples/hello-world/eval.yaml
 ```
 
-### minimal
-
-The absolute simplest example - a single task with deterministic scoring only.
-
-```bash
-python -m agent_eval.cli run agent_eval/examples/minimal/eval.yaml
-```
-
-### minimal-openai
-
-Demonstrates using the simple OpenAI API agent (no CLI, just direct API calls).
-
-```bash
-python -m agent_eval.cli run agent_eval/examples/minimal-openai/eval.yaml
-```
-
 ### setup-demo-app
 
 The full example based on the [OpenAI blog post on testing agent skills](https://developers.openai.com/blog/eval-skills/).
 
 Evaluates a skill that scaffolds a Vite + React + Tailwind demo app with:
+- Multiple models (GPT-4o, GPT-4.1, Claude Sonnet, Claude Opus)
 - Explicit skill invocation tests
 - Implicit triggering tests
 - Negative control tests (skill should NOT trigger)
 - Deterministic file/command checks
-- LLM rubric scoring for style
+- LLM rubric scoring for code quality
 
 ```bash
 python -m agent_eval.cli run agent_eval/examples/setup-demo-app/eval.yaml

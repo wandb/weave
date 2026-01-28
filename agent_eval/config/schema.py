@@ -44,16 +44,6 @@ class HarnessConfig(BaseModel):
     model: str
     args: list[str] = Field(default_factory=list)
 
-    def required_env_keys(self) -> list[str]:
-        """Return environment variable names this harness requires."""
-        if self.type == HarnessType.CODEX:
-            return ["OPENAI_API_KEY"]
-        elif self.type == HarnessType.CLAUDE:
-            return ["ANTHROPIC_API_KEY"]
-        elif self.type == HarnessType.OPENCODE:
-            return ["OPENAI_API_KEY", "ANTHROPIC_API_KEY"]
-        return []
-
 
 # --- Driver Configuration ---
 
@@ -132,10 +122,6 @@ class LLMRubricConfig(BaseModel):
 
     model: str = "gpt-4o"
     prompt: str
-    schema_: dict[str, Any] | None = Field(default=None, alias="schema")
-
-    class Config:
-        populate_by_name = True
 
 
 class CustomScorerConfig(BaseModel):

@@ -179,14 +179,6 @@ def log_to_weave(
     return eval_urls
 
 
-def _calculate_pass_rate(task_results: list[TaskResult]) -> float:
-    """Calculate pass rate for a list of task results."""
-    if not task_results:
-        return 0.0
-    passed = sum(1 for r in task_results if r.overall_pass)
-    return passed / len(task_results) * 100
-
-
 def _find_task_artifacts(
     base_path: Path, 
     task_id: str, 
@@ -302,28 +294,6 @@ def _read_file_content(file_path: Path, max_size: int = 10000) -> str:
         
     except Exception as e:
         return f"[Error reading file: {e}]"
-
-
-def _list_workspace_files(workspace_path: Path) -> list[str]:
-    """List files in workspace directory (legacy flat list)."""
-    if not workspace_path.exists():
-        return []
-    
-    files = []
-    skip_dirs = {".git", "node_modules", "__pycache__", ".npm", ".cache"}
-    
-    for file_path in workspace_path.rglob("*"):
-        if file_path.is_file():
-            # Skip files in ignored directories
-            if any(skip in file_path.parts for skip in skip_dirs):
-                continue
-            try:
-                rel_path = file_path.relative_to(workspace_path)
-                files.append(str(rel_path))
-            except ValueError:
-                pass
-    
-    return sorted(files)[:100]  # Limit to 100 files
 
 
 def _aggregate_metrics(

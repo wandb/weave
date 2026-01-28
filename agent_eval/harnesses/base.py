@@ -74,16 +74,6 @@ class HarnessAdapter(ABC):
         """
         return None
 
-    def get_base_image(self) -> str:
-        """Return recommended base image for this harness.
-
-        Override this to specify a different default base image.
-
-        Returns:
-            Docker image name.
-        """
-        return "python:3.12-slim"
-
     def get_setup_commands(self) -> list[str]:
         """Return setup commands to run during image build.
 

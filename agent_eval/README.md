@@ -238,8 +238,6 @@ agent_eval/
 │   └── openai-agent-adapter.js
 └── examples/
     ├── hello-world/       # Multi-model proof-of-concept
-    ├── minimal/           # Simplest example
-    ├── minimal-openai/    # OpenAI agent example
     └── setup-demo-app/    # Full example from OpenAI blog
 ```
 

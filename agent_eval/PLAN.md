@@ -100,9 +100,7 @@ agent_eval/                    # Standalone module (sibling to weave/)
 └── examples/                  # Reference examples
     ├── README.md
     ├── hello-world/           # Multi-model proof-of-concept (2 tasks x 2 models)
-    ├── minimal/               # Simplest single-task example
-    ├── minimal-openai/        # OpenAI agent example
-    └── setup-demo-app/        # Full example from OpenAI blog
+    └── setup-demo-app/        # Full example from OpenAI blog (4 models)
 ```
 
 ## Execution Flow
