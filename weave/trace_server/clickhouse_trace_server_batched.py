@@ -32,7 +32,7 @@ from tenacity import (
 
 from weave.trace_server import clickhouse_trace_server_migrator as wf_migrator
 from weave.trace_server import clickhouse_trace_server_settings as ch_settings
-from weave.trace_server import constants, object_creation_utils
+from weave.trace_server import constants, object_creation_utils, usage_utils
 from weave.trace_server import environment as wf_env
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_common as tsc
@@ -768,7 +768,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             cluster_name=self.clickhouse_cluster_name,
         )
 
-        self.ch_client.command(query, parameters=pb.get_params())
+        self._command(query, parameters=pb.get_params())
 
     def call_read(self, req: tsi.CallReadReq) -> tsi.CallReadRes:
         res = self.calls_query_stream(
@@ -939,6 +939,30 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             usage_buckets=usage_buckets,
             call_buckets=call_buckets,
         )
+
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.trace_usage")
+    def trace_usage(self, req: tsi.TraceUsageReq) -> tsi.TraceUsageRes:
+        """Compute per-call usage for a trace, with descendant rollup.
+
+        Each call's usage = its own metrics + sum of all descendants' metrics.
+        Uses an iterative bottom-up approach to avoid recursion limits.
+        """
+        calls = self.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=req.project_id,
+                filter=req.filter,
+                query=req.query,
+                columns=["id", "parent_id", "summary"],
+                include_costs=req.include_costs,
+                limit=req.limit,
+            )
+        )
+
+        aggregated_usage = usage_utils.aggregate_usage_with_descendants(
+            calls, req.include_costs
+        )
+
+        return tsi.TraceUsageRes(call_usage=aggregated_usage)
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.calls_query_stream")
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
@@ -1226,7 +1250,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             call_ids_param,
             cluster_name=self.clickhouse_cluster_name,
         )
-        self._query(delete_query, pb.get_params())
+        self._command(delete_query, parameters=pb.get_params())
 
     def _ensure_valid_update_field(self, req: tsi.CallUpdateReq) -> None:
         valid_update_fields = ["display_name"]
@@ -1276,7 +1300,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             display_name_param,
             cluster_name=self.clickhouse_cluster_name,
         )
-        self._query(update_query, pb.get_params())
+        self._command(update_query, parameters=pb.get_params())
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.obj_create")
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
@@ -1943,7 +1967,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             pb=pb,
         )
 
-        self.ch_client.command(query, parameters=pb.get_params())
+        self._command(query, parameters=pb.get_params())
 
         return tsi.AnnotationQueueCreateRes(id=queue_id)
 
@@ -2302,7 +2326,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
               AND annotator_id = {annotator_id_param}
               AND deleted_at IS NULL
             """
-            self.ch_client.command(update_query, parameters=pb.get_params())
+            self._command(update_query, parameters=pb.get_params())
         else:
             # Create new record
             progress_id = generate_id()
@@ -2317,7 +2341,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                  {queue_id_param}, {annotator_id_param}, {new_state_param},
                  {now_param}, {now_param}, NULL)
             """
-            self.ch_client.command(insert_query, parameters=pb.get_params())
+            self._command(insert_query, parameters=pb.get_params())
 
         # Fetch and return the updated queue item
         # We need to re-query to get the aggregated annotation_state
@@ -5564,6 +5588,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             )
             # always raises, optionally with custom error class
             handle_clickhouse_query_error(e)
+            return None
 
         logger.info(
             "clickhouse_query",
@@ -5574,6 +5599,52 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             },
         )
         return res
+
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._command")
+    def _command(
+        self,
+        command: str,
+        parameters: dict[str, Any] | None = None,
+        settings: dict[str, Any] | None = None,
+    ) -> None:
+        """Execute a mutation command (INSERT, UPDATE, DELETE) that doesn't return results.
+
+        Args:
+            command: The SQL command to execute.
+            parameters: Optional dictionary of query parameters.
+            settings: Optional dictionary of ClickHouse settings.
+        """
+        if not settings:
+            settings = {}
+        settings.update(ch_settings.CLICKHOUSE_DEFAULT_QUERY_SETTINGS)
+
+        processed_params = _process_parameters(parameters) if parameters else None
+        try:
+            self.ch_client.command(
+                command,
+                parameters=processed_params,
+                settings=settings,
+            )
+        except Exception as e:
+            logger.exception(
+                "clickhouse_command_error",
+                extra={
+                    "error_str": str(e),
+                    "command": command,
+                    "parameters": processed_params,
+                },
+            )
+            handle_clickhouse_query_error(e)
+            return
+
+        logger.info(
+            "clickhouse_command",
+            extra={
+                "command": command,
+                "parameters": processed_params,
+            },
+        )
+        return
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert")
     def _insert(

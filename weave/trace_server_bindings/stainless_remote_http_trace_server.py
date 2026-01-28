@@ -577,6 +577,27 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
     @validate_call
+    def trace_usage(self, req: tsi.TraceUsageReq) -> tsi.TraceUsageRes:
+        """Compute per-call usage with descendant rollup.
+
+        Args:
+            req: Trace usage request.
+
+        Returns:
+            Trace usage response.
+
+        Examples:
+            >>> server = StainlessRemoteHTTPTraceServer("http://example.com")
+            >>> req = tsi.TraceUsageReq(project_id="entity/project")
+            >>> _ = server.trace_usage(req)  # doctest: +SKIP
+        """
+        return self._stainless_request(
+            req,
+            tsi.TraceUsageRes,
+            self._stainless_client.trace.usage,
+        )
+
+    @validate_call
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
         """Delete calls.
 
