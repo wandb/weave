@@ -9,6 +9,27 @@ from weave.trace import weave_client
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server import usage_utils
 
+_REQUIRED_COST_FIELDS = (
+    "prompt_tokens",
+    "input_tokens",
+    "completion_tokens",
+    "output_tokens",
+    "requests",
+    "total_tokens",
+    "prompt_tokens_total_cost",
+    "completion_tokens_total_cost",
+    "prompt_token_cost",
+    "completion_token_cost",
+    "prompt_token_cost_unit",
+    "completion_token_cost_unit",
+    "effective_date",
+    "provider_id",
+    "pricing_level",
+    "pricing_level_id",
+    "created_at",
+    "created_by",
+)
+
 
 def skip_if_sqlite(client: weave_client.WeaveClient) -> None:
     if client_is_sqlite(client):
@@ -21,8 +42,18 @@ def _usage_summary(
 ) -> dict[str, Any]:
     summary: dict[str, Any] = {"usage": usage}
     if costs is not None:
-        summary["weave"] = {"costs": costs}
+        summary["weave"] = {"costs": _normalize_costs(costs)}
     return summary
+
+
+def _normalize_costs(costs: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    normalized: dict[str, dict[str, Any]] = {}
+    for model_name, cost_entry in costs.items():
+        entry = dict(cost_entry) if isinstance(cost_entry, dict) else {}
+        merged = dict.fromkeys(_REQUIRED_COST_FIELDS)
+        merged.update(entry)
+        normalized[model_name] = merged
+    return normalized
 
 
 def _make_call(
@@ -225,9 +256,56 @@ def test_aggregate_usage_includes_costs_when_requested() -> None:
 @pytest.mark.parametrize(
     ("root_usage", "middle_usage", "leaf_usage"),
     [
-        (None, {"gpt-4": {"prompt_tokens": 2, "completion_tokens": 1, "total_tokens": 3, "requests": 1}}, {"gpt-4": {"prompt_tokens": 3, "completion_tokens": 2, "total_tokens": 5, "requests": 1}}),
-        ({"gpt-4": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2, "requests": 1}}, None, {"gpt-4": {"prompt_tokens": 3, "completion_tokens": 2, "total_tokens": 5, "requests": 1}}),
-        (None, None, {"gpt-4": {"prompt_tokens": 3, "completion_tokens": 2, "total_tokens": 5, "requests": 1}}),
+        (
+            None,
+            {
+                "gpt-4": {
+                    "prompt_tokens": 2,
+                    "completion_tokens": 1,
+                    "total_tokens": 3,
+                    "requests": 1,
+                }
+            },
+            {
+                "gpt-4": {
+                    "prompt_tokens": 3,
+                    "completion_tokens": 2,
+                    "total_tokens": 5,
+                    "requests": 1,
+                }
+            },
+        ),
+        (
+            {
+                "gpt-4": {
+                    "prompt_tokens": 1,
+                    "completion_tokens": 1,
+                    "total_tokens": 2,
+                    "requests": 1,
+                }
+            },
+            None,
+            {
+                "gpt-4": {
+                    "prompt_tokens": 3,
+                    "completion_tokens": 2,
+                    "total_tokens": 5,
+                    "requests": 1,
+                }
+            },
+        ),
+        (
+            None,
+            None,
+            {
+                "gpt-4": {
+                    "prompt_tokens": 3,
+                    "completion_tokens": 2,
+                    "total_tokens": 5,
+                    "requests": 1,
+                }
+            },
+        ),
         (None, None, None),
     ],
     ids=[
@@ -281,8 +359,10 @@ def test_aggregate_usage_handles_missing_summaries(
     middle_totals = totals(middle_usage)
     leaf_totals = totals(leaf_usage)
 
-    expected_root = tuple(map(sum, zip(root_totals, middle_totals, leaf_totals)))
-    expected_middle = tuple(map(sum, zip(middle_totals, leaf_totals)))
+    expected_root = tuple(
+        map(sum, zip(root_totals, middle_totals, leaf_totals, strict=False))
+    )
+    expected_middle = tuple(map(sum, zip(middle_totals, leaf_totals, strict=False)))
     expected_leaf = leaf_totals
 
     def assert_usage(call_id: str, expected: tuple[int, int, int, int]) -> None:
