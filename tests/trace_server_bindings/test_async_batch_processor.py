@@ -142,9 +142,7 @@ def test_processing_thread_exception_handling():
     def failing_processor_fn(batch):
         raise RuntimeError("Simulated processing error")
 
-    with patch(
-        "weave.trace_server_bindings.async_batch_processor.logger"
-    ) as mock_logger:
+    with patch("weave.telemetry.trace_sentry.logger") as mock_logger:
         processor = AsyncBatchProcessor(
             failing_processor_fn,
             max_batch_size=100,
@@ -397,9 +395,7 @@ def test_log_rotation_and_disk_fallback():
             # Test 3: Error handling in disk operations
             with (
                 patch("builtins.open", side_effect=PermissionError("No write access")),
-                patch(
-                    "weave.trace_server_bindings.async_batch_processor.logger"
-                ) as mock_logger,
+                patch("weave.telemetry.trace_sentry.logger") as mock_logger,
             ):
                 processor._write_item_to_disk("test_item", "Permission test")
 
@@ -427,9 +423,7 @@ def test_log_rotation_and_disk_fallback():
             # Mock pathlib.Path.rename at the class level to simulate a rename failure
             with (
                 patch("pathlib.Path.rename", side_effect=OSError("Rename failed")),
-                patch(
-                    "weave.trace_server_bindings.async_batch_processor.logger"
-                ) as mock_logger,
+                patch("weave.telemetry.trace_sentry.logger") as mock_logger,
             ):
                 processor._rotate_log_file_if_needed()
 
