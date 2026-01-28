@@ -136,10 +136,10 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
                     attr,
                     req,
                     stream=False,
-                        convert_refs=convert_refs,
-                        strict_project_match=strict_project_match,
-                        convert_user_ids=convert_user_ids,
-                    )
+                    convert_refs=convert_refs,
+                    strict_project_match=strict_project_match,
+                    convert_user_ids=convert_user_ids,
+                )
             # Non-standard signature: call the internal method directly.
             return attr(*args, **kwargs)
 
@@ -164,7 +164,9 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
                 elif field_name == "wb_run_id" and field_value is not None:
                     setattr(value, field_name, run_id_converter(field_value))
                     field_value = getattr(value, field_name)
-                elif field_name in self._USER_ID_FIELDS and isinstance(field_value, str):
+                elif field_name in self._USER_ID_FIELDS and isinstance(
+                    field_value, str
+                ):
                     setattr(value, field_name, user_id_converter(field_value))
                     field_value = getattr(value, field_name)
                 elif field_name == "wb_run_ids" and isinstance(field_value, list):
