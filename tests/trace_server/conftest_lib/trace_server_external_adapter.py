@@ -1,4 +1,8 @@
 import base64
+import functools
+import typing
+
+from pydantic import BaseModel
 
 from weave.trace_server import (
     external_to_internal_trace_server_adapter,
@@ -84,6 +88,8 @@ class DummyIdConverter(external_to_internal_trace_server_adapter.IdConverter):
 class TestOnlyUserInjectingExternalTraceServer(
     external_to_internal_trace_server_adapter.ExternalTraceServer
 ):
+    _ALLOW_NONE_USER_ID_REQUESTS = (tsi.AnnotatorQueueItemsProgressUpdateReq,)
+
     def __init__(
         self,
         internal_trace_server: tsi.TraceServerInterface,
@@ -93,68 +99,61 @@ class TestOnlyUserInjectingExternalTraceServer(
         super().__init__(internal_trace_server, id_converter)
         self._user_id = user_id
 
-    def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
-        req.start.wb_user_id = self._user_id
-        return super().call_start(req)
+    def __getattribute__(self, name: str) -> typing.Any:
+        # Test helper: wrap public callables so BaseModel requests get wb_user_id.
+        attr = super().__getattribute__(name)
+        if name.startswith("_") or not callable(attr):
+            return attr
 
-    def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
-        req.wb_user_id = self._user_id
-        return super().calls_delete(req)
+        def wrapper(*args: typing.Any, **kwargs: typing.Any) -> typing.Any:
+            # Detect the single BaseModel request argument for user injection.
+            req: BaseModel | None = None
+            if len(args) == 1 and not kwargs and isinstance(args[0], BaseModel):
+                req = args[0]
+            elif not args and len(kwargs) == 1:
+                sole_value = next(iter(kwargs.values()))
+                if isinstance(sole_value, BaseModel):
+                    req = sole_value
+            if req is not None:
+                # Test adapter: inject wb_user_id on all BaseModel requests so
+                # callers don't need per-method overrides.
+                self._inject_user_id(req)
+            return attr(*args, **kwargs)
 
-    def call_update(self, req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
-        req.wb_user_id = self._user_id
-        return super().call_update(req)
+        # Preserve method metadata/name so caches keyed by method name still work.
+        return functools.wraps(attr)(wrapper)
 
-    def feedback_create(self, req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
-        req.wb_user_id = self._user_id
-        return super().feedback_create(req)
-
-    def feedback_create_batch(
-        self, req: tsi.FeedbackCreateBatchReq
-    ) -> tsi.FeedbackCreateBatchRes:
-        for feedback_req in req.batch:
-            feedback_req.wb_user_id = self._user_id
-        return super().feedback_create_batch(req)
-
-    def cost_create(self, req: tsi.CostCreateReq) -> tsi.CostCreateRes:
-        req.wb_user_id = self._user_id
-        return super().cost_create(req)
-
-    def actions_execute_batch(
-        self, req: tsi.ActionsExecuteBatchReq
-    ) -> tsi.ActionsExecuteBatchRes:
-        req.wb_user_id = self._user_id
-        return super().actions_execute_batch(req)
-
-    def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
-        req.obj.wb_user_id = self._user_id
-        return super().obj_create(req)
-
-    def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
-        req.wb_user_id = self._user_id
-        return super().evaluate_model(req)
-
-    def evaluation_run_delete(
-        self, req: tsi.EvaluationRunDeleteReq
-    ) -> tsi.EvaluationRunDeleteRes:
-        req.wb_user_id = self._user_id
-        return super().evaluation_run_delete(req)
-
-    def evaluation_run_finish(
-        self, req: tsi.EvaluationRunFinishReq
-    ) -> tsi.EvaluationRunFinishRes:
-        req.wb_user_id = self._user_id
-        return super().evaluation_run_finish(req)
-
-    def prediction_delete(
-        self, req: tsi.PredictionDeleteReq
-    ) -> tsi.PredictionDeleteRes:
-        req.wb_user_id = self._user_id
-        return super().prediction_delete(req)
-
-    def score_delete(self, req: tsi.ScoreDeleteReq) -> tsi.ScoreDeleteRes:
-        req.wb_user_id = self._user_id
-        return super().score_delete(req)
+    def _inject_user_id(self, value: typing.Any) -> None:
+        # Walk the request tree and force wb_user_id for all BaseModel nodes.
+        if isinstance(value, BaseModel):
+            for field_name in value.model_fields:
+                field_value = getattr(value, field_name)
+                if field_name == "wb_user_id":
+                    if "wb_user_id" in value.model_fields_set:
+                        if field_value is None:
+                            if isinstance(value, self._ALLOW_NONE_USER_ID_REQUESTS):
+                                # Allow explicit None for requests that validate it.
+                                pass
+                            else:
+                                setattr(value, field_name, self._user_id)
+                        # Explicit non-None user id stays.
+                    else:
+                        setattr(value, field_name, self._user_id)
+                    field_value = getattr(value, field_name)
+                if isinstance(field_value, BaseModel):
+                    self._inject_user_id(field_value)
+                elif isinstance(field_value, dict):
+                    for item in field_value.values():
+                        if isinstance(item, BaseModel):
+                            self._inject_user_id(item)
+                elif isinstance(field_value, (list, tuple, set)):
+                    for item in field_value:
+                        if isinstance(item, BaseModel):
+                            self._inject_user_id(item)
+        elif isinstance(value, dict):
+            for item in value.values():
+                if isinstance(item, BaseModel):
+                    self._inject_user_id(item)
 
 
 def externalize_trace_server(
