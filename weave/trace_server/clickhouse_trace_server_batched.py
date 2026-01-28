@@ -962,6 +962,52 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         return tsi.TraceUsageRes(call_usage=aggregated_usage)
 
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.calls_usage")
+    def calls_usage(self, req: tsi.CallsUsageReq) -> tsi.CallsUsageRes:
+        """Compute aggregated usage for multiple root calls.
+
+        Each root call's usage = its own metrics + sum of all descendants' metrics.
+        """
+        if not req.call_ids:
+            return tsi.CallsUsageRes(call_usage={})
+
+        root_calls = list(
+            self.calls_query_stream(
+                tsi.CallsQueryReq(
+                    project_id=req.project_id,
+                    filter=tsi.CallsFilter(call_ids=req.call_ids),
+                    columns=["id", "trace_id"],
+                )
+            )
+        )
+
+        trace_ids = {call.trace_id for call in root_calls if call.trace_id}
+        if not trace_ids:
+            return tsi.CallsUsageRes(
+                call_usage={call_id: {} for call_id in req.call_ids}
+            )
+
+        calls = self.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=req.project_id,
+                filter=tsi.CallsFilter(trace_ids=list(trace_ids)),
+                query=None,
+                columns=["id", "parent_id", "summary"],
+                include_costs=req.include_costs,
+                limit=req.limit,
+            )
+        )
+
+        aggregated_usage = usage_utils.aggregate_usage_with_descendants(
+            calls, req.include_costs
+        )
+
+        root_usage = {
+            call_id: aggregated_usage.get(call_id, {}) for call_id in req.call_ids
+        }
+
+        return tsi.CallsUsageRes(call_usage=root_usage)
+
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.calls_query_stream")
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
         """Returns a stream of calls that match the given query."""
