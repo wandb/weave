@@ -60,8 +60,8 @@ from weave.trace_server.calls_query_builder.call_metrics_query_builder import (
     build_call_metrics_query,
 )
 from weave.trace_server.calls_query_builder.calls_query_builder import (
-    CallsQuery,
     CTE_ALL_CALLS,
+    CallsQuery,
     HardCodedFilter,
     OrderField,
     QueryBuilderDynamicField,
@@ -71,10 +71,10 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     combine_conditions,
 )
 from weave.trace_server.calls_query_builder.cte import CTECollection
-from weave.trace_server.calls_query_builder.utils import param_slot
 from weave.trace_server.calls_query_builder.usage_query_builder import (
     build_usage_query,
 )
+from weave.trace_server.calls_query_builder.utils import param_slot
 from weave.trace_server.clickhouse_schema import (
     ALL_CALL_COMPLETE_INSERT_COLUMNS,
     ALL_CALL_INSERT_COLUMNS,
@@ -997,7 +997,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             )
             query.add_condition(
                 tsi_query.NotOperation.model_validate(
-                    {"$not": [{"$eq": [{"$getField": "started_at"}, {"$literal": None}]}]}
+                    {
+                        "$not": [
+                            {"$eq": [{"$getField": "started_at"}, {"$literal": None}]}
+                        ]
+                    }
                 )
             )
 
@@ -1076,6 +1080,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         raw_res = self._query_stream(sql, pb.get_params())
         try:
+
             def iter_calls() -> Iterator[_UsageCall]:
                 for row in raw_res:
                     row_dict = dict(zip(columns, row, strict=False))
