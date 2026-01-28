@@ -338,17 +338,22 @@ class WeaveClient:
             # Set Client project name with updated project name
             self.project = resp.project_name
 
-        self._server_feedback_processor = None
+        self._server_call_processor: AsyncBatchProcessor | CallBatchProcessor | None = (
+            None
+        )
+        self._server_feedback_processor: AsyncBatchProcessor | None = None
+        # This is a short-term hack to get around the fact that we are reaching into
+        # the underlying implementation of the specific server to get the call processor.
+        # The `RemoteHTTPTraceServer` contains a call processor and we use that to control
+        # some client-side flushing mechanics. We should move this to the interface layer. However,
+        # we don't really want the server-side implementations to need to define no-ops as that is
+        # even uglier. So we are using this "hasattr" check to avoid forcing the server-side implementations
+        # to define no-ops.
+        if hasattr(self.server, "get_call_processor"):
+            self._server_call_processor = self.server.get_call_processor()
         if hasattr(self.server, "get_feedback_processor"):
             self._server_feedback_processor = self.server.get_feedback_processor()
         self.send_file_cache = WeaveClientSendFileCache()
-
-    @property
-    def _server_call_processor(self) -> AsyncBatchProcessor | CallBatchProcessor | None:
-        """Get the server's call processor (fetched fresh to handle runtime upgrades)."""
-        if hasattr(self.server, "get_call_processor"):
-            return self.server.get_call_processor()
-        return None
 
     ################ High Level Convenience Methods ################
 
@@ -998,16 +1003,9 @@ class WeaveClient:
 
         # For calls_complete path (non-eager CallBatchProcessor), print the call link
         # after finish_call, when the complete call is queued to the batch processor.
-        # Note: We fetch fresh from server instead of using cached _server_call_processor
-        # because the processor can be upgraded at runtime via _upgrade_to_calls_complete
         is_root_call = call.parent_id is None
-        call_processor = (
-            self.server.get_call_processor()
-            if hasattr(self.server, "get_call_processor")
-            else None
-        )
         uses_calls_complete_path = isinstance(
-            call_processor, CallBatchProcessor
+            self._server_call_processor, CallBatchProcessor
         ) and not (op is not None and op.eager_call_start)
 
         def on_end_complete(f: Future) -> None:
