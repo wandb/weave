@@ -1,15 +1,17 @@
 from __future__ import annotations
 
+import dataclasses
 from collections import deque
 from collections.abc import Iterable
-from typing import Any, Protocol
+from typing import Any
 
 import ddtrace
 
 from weave.trace_server import trace_server_interface as tsi
 
 
-class UsageCall(Protocol):
+@dataclasses.dataclass(frozen=True)
+class UsageCall:
     id: str
     parent_id: str | None
     summary: dict[str, Any] | None

@@ -960,8 +960,16 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             )
         )
 
+        def iter_usage_calls() -> Iterator[usage_utils.UsageCall]:
+            for call in calls:
+                yield usage_utils.UsageCall(
+                    id=call.id,
+                    parent_id=call.parent_id,
+                    summary=call.summary,
+                )
+
         aggregated_usage = usage_utils.aggregate_usage_with_descendants(
-            calls, req.include_costs
+            iter_usage_calls(), req.include_costs
         )
 
         return tsi.TraceUsageRes(call_usage=aggregated_usage)
@@ -982,12 +990,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
         if not req.call_ids:
             return tsi.CallsUsageRes(call_usage={})
-
-        @dataclasses.dataclass(frozen=True)
-        class _UsageCall:
-            id: str
-            parent_id: str | None
-            summary: dict[str, Any] | None
 
         def _add_default_call_filters(query: CallsQuery) -> None:
             query.add_condition(
@@ -1081,7 +1083,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         raw_res = self._query_stream(sql, pb.get_params())
         try:
 
-            def iter_calls() -> Iterator[_UsageCall]:
+            def iter_calls() -> Iterator[usage_utils.UsageCall]:
                 for row in raw_res:
                     row_dict = dict(zip(columns, row, strict=False))
                     summary = _nullable_any_dump_to_any(row_dict.get("summary_dump"))
@@ -1089,7 +1091,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     if call_id is None:
                         continue
                     parent_id = row_dict.get("parent_id")
-                    yield _UsageCall(
+                    yield usage_utils.UsageCall(
                         id=cast(str, call_id),
                         parent_id=(
                             cast(str, parent_id) if parent_id is not None else None
