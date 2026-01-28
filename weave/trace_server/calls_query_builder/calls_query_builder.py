@@ -28,7 +28,7 @@ Outstanding Optimizations/Work:
 import logging
 import re
 from collections.abc import Callable, KeysView
-from typing import Literal, cast
+from typing import Literal, NamedTuple, cast
 
 from pydantic import BaseModel, Field
 from typing_extensions import Self
@@ -75,6 +75,38 @@ logger = logging.getLogger(__name__)
 
 CTE_FILTERED_CALLS = "filtered_calls"
 CTE_ALL_CALLS = "all_calls"
+
+
+class FilterConditionsResult(NamedTuple):
+    """Result from building filter conditions.
+
+    Attributes:
+        filter_sql: SQL filter clause (HAVING for calls_merged, AND for calls_complete)
+        needs_feedback: Whether feedback table JOIN is needed
+        needs_queue_items: Whether annotation_queue_items JOIN is needed
+        queue_id_filter: Optional queue_id value for JOIN optimization
+    """
+
+    filter_sql: str
+    needs_feedback: bool
+    needs_queue_items: bool
+    queue_id_filter: str | None
+
+
+class OrderLimitOffsetResult(NamedTuple):
+    """Result from building ORDER BY, LIMIT, and OFFSET clauses.
+
+    Attributes:
+        order_by_sql: SQL ORDER BY clause
+        limit_sql: SQL LIMIT clause
+        offset_sql: SQL OFFSET clause
+        needs_feedback: Whether feedback table JOIN is needed for ordering
+    """
+
+    order_by_sql: str
+    limit_sql: str
+    offset_sql: str
+    needs_feedback: bool
 
 
 def maybe_agg(expr: str, use_agg_fn: bool) -> str:
@@ -297,6 +329,48 @@ class CallsMergedFeedbackPayloadField(CallsMergedField):
         )
 
 
+class CallsMergedQueueItemField(CallsMergedField):
+    """Field class for annotation queue item fields.
+
+    This field type handles queries against the annotation_queue_items table,
+    which tracks which calls belong to which annotation queues.
+    """
+
+    def is_heavy(self) -> bool:
+        return True
+
+    def as_sql(
+        self,
+        pb: ParamBuilder,
+        table_alias: str,
+        cast: tsi_query.CastTo | None = None,
+        use_agg_fn: bool = True,
+    ) -> str:
+        """Generate SQL for accessing queue item fields.
+
+        Args:
+            pb: Parameter builder for query parameterization
+            table_alias: The table alias (unused, always uses 'annotation_queue_items')
+            cast: Optional cast type for the result
+            use_agg_fn: Whether to use aggregate functions.
+                When True (calls_merged): uses any() to aggregate queue items per call
+                When False (calls_complete): directly references the field without aggregation
+
+        Returns:
+            SQL expression for the queue item field
+        """
+        inner = f"annotation_queue_items.{self.field}"
+        res = inner if not use_agg_fn else f"any({inner})"
+        return clickhouse_cast(res, cast)
+
+    def as_select_sql(
+        self, pb: ParamBuilder, table_alias: str, use_agg_fn: bool = True
+    ) -> str:
+        raise NotImplementedError(
+            "Queue item fields cannot be selected directly, yet - implement me!"
+        )
+
+
 class AggregatedDataSizeField(CallsMergedField):
     join_table_name: str
 
@@ -416,6 +490,7 @@ class QueryJoins(BaseModel):
     """Container for all JOIN clauses in the query."""
 
     feedback: str = ""
+    queue_items: str = ""
     storage_size: str = ""
     total_storage_size: str = ""
     object_ref: str = ""
@@ -427,6 +502,7 @@ class QueryJoins(BaseModel):
         """
         joins = [
             self.feedback,
+            self.queue_items,
             self.storage_size,
             self.total_storage_size,
             self.object_ref,
@@ -609,6 +685,12 @@ class Condition(BaseModel):
                 return True
         return False
 
+    def is_queue_item(self, table_alias: str = "calls_merged") -> bool:
+        for field in self._get_consumed_fields(table_alias):
+            if isinstance(field, CallsMergedQueueItemField):
+                return True
+        return False
+
     def get_object_ref_conditions(
         self, expand_columns: list[str] | None, table_alias: str
     ) -> list[ObjectRefCondition]:
@@ -752,6 +834,29 @@ class CallsQuery(BaseModel):
     def set_expand_columns(self, expand_columns: list[str]) -> "CallsQuery":
         self.expand_columns = expand_columns
         return self
+
+    def _extract_queue_id_from_operand(
+        self, operand: "tsi_query.Operand"
+    ) -> str | None:
+        """Recursively extract queue_id from an operand tree."""
+        if isinstance(operand, tsi_query.EqOperation):
+            # Check if this is annotation_queue_items.queue_id = <value>
+            if len(operand.eq_) == 2:
+                lhs, rhs = operand.eq_[0], operand.eq_[1]
+                if (
+                    isinstance(lhs, tsi_query.GetFieldOperator)
+                    and lhs.get_field_ == "annotation_queue_items.queue_id"
+                    and isinstance(rhs, tsi_query.LiteralOperation)
+                    and isinstance(rhs.literal_, str)
+                ):
+                    return rhs.literal_
+        elif isinstance(operand, tsi_query.AndOperation):
+            # Recursively check AND branches
+            for op in operand.and_:
+                queue_id = self._extract_queue_id_from_operand(op)
+                if queue_id:
+                    return queue_id
+        return None
 
     def _should_optimize(self) -> bool:
         """Determines if query optimization should be performed.
@@ -1110,6 +1215,8 @@ class CallsQuery(BaseModel):
         table_alias: str,
         project_param: str,
         needs_feedback: bool,
+        needs_queue_items: bool,
+        queue_id_filter: str | None,
         expand_columns: list[str] | None,
         field_to_object_join_alias_map: dict[str, str] | None,
     ) -> QueryJoins:
@@ -1120,6 +1227,8 @@ class CallsQuery(BaseModel):
             table_alias: The table alias to use in SQL
             project_param: The parameter name for project_id
             needs_feedback: Whether feedback JOIN is needed
+            needs_queue_items: Whether annotation_queue_items JOIN is needed
+            queue_id_filter: Optional queue_id value to filter the JOIN (optimization)
             expand_columns: List of columns that should be expanded for object refs
             field_to_object_join_alias_map: Mapping of field paths to CTE aliases
 
@@ -1134,6 +1243,30 @@ class CallsQuery(BaseModel):
                 SELECT * FROM feedback WHERE feedback.project_id = {param_slot(project_param, "String")}
             ) AS feedback ON (
                 feedback.weave_ref = concat('weave-trace-internal:///', {param_slot(project_param, "String")}, '/call/', {table_alias}.id))
+            """
+
+        # Queue items join
+        # Uses INNER JOIN because we only add this join when filtering by queue,
+        # and we always want to exclude calls not in the queue (no need for LEFT JOIN + HAVING)
+        queue_items_join = ""
+        if needs_queue_items:
+            # Build WHERE clause for the subquery
+            queue_where_clauses = [
+                f"annotation_queue_items.project_id = {param_slot(project_param, 'String')}",
+                "annotation_queue_items.deleted_at IS NULL",
+            ]
+            queue_id_param = pb.add_param(queue_id_filter)
+            queue_where_clauses.append(
+                f"annotation_queue_items.queue_id = {param_slot(queue_id_param, 'String')}"
+            )
+
+            queue_items_join = f"""
+            INNER JOIN (
+                SELECT * FROM annotation_queue_items
+                WHERE {" AND ".join(queue_where_clauses)}
+            ) AS annotation_queue_items ON (
+                annotation_queue_items.project_id = {table_alias}.project_id
+                AND annotation_queue_items.call_id = {table_alias}.id)
             """
 
         # Storage size join
@@ -1189,6 +1322,7 @@ class CallsQuery(BaseModel):
 
         return QueryJoins(
             feedback=feedback_join,
+            queue_items=queue_items_join,
             storage_size=storage_size_join,
             total_storage_size=total_storage_size_join,
             object_ref="".join(object_ref_joins_parts),
@@ -1200,7 +1334,7 @@ class CallsQuery(BaseModel):
         table_alias: str,
         expand_columns: list[str] | None,
         field_to_object_join_alias_map: dict[str, str] | None,
-    ) -> tuple[str, bool]:
+    ) -> FilterConditionsResult:
         """Build filter conditions for the query.
 
         For calls_merged (use_agg_fn=True), returns a HAVING clause for post-GROUP BY filtering.
@@ -1213,9 +1347,11 @@ class CallsQuery(BaseModel):
             field_to_object_join_alias_map: Mapping of field paths to CTE aliases
 
         Returns:
-            Tuple of (filter_clause_sql, needs_feedback_flag)
+            FilterConditionsResult with filter SQL and dependency flags
         """
         needs_feedback = False
+        needs_queue_items = False
+        queue_id_filter = None
         filter_conditions_sql: list[str] = []
 
         if len(self.query_conditions) > 0:
@@ -1230,6 +1366,13 @@ class CallsQuery(BaseModel):
                 filter_conditions_sql.append(query_condition_sql)
                 if query_condition.is_feedback(table_alias):
                     needs_feedback = True
+                if query_condition.is_queue_item(table_alias):
+                    needs_queue_items = True
+                    # Extract queue_id for JOIN optimization while we're here
+                    if queue_id_filter is None:
+                        queue_id_filter = self._extract_queue_id_from_operand(
+                            query_condition.operand
+                        )
 
         if self.hardcoded_filter is not None:
             filter_conditions_sql.append(
@@ -1245,7 +1388,12 @@ class CallsQuery(BaseModel):
             prefix = "HAVING " if self.use_agg_fn else "AND "
             filter_sql = prefix + combine_conditions(filter_conditions_sql, "AND")
 
-        return filter_sql, needs_feedback
+        return FilterConditionsResult(
+            filter_sql=filter_sql,
+            needs_feedback=needs_feedback,
+            needs_queue_items=needs_queue_items,
+            queue_id_filter=queue_id_filter,
+        )
 
     def _build_order_limit_offset(
         self,
@@ -1253,7 +1401,7 @@ class CallsQuery(BaseModel):
         table_alias: str,
         expand_columns: list[str] | None,
         field_to_object_join_alias_map: dict[str, str] | None,
-    ) -> tuple[str, str, str, bool]:
+    ) -> OrderLimitOffsetResult:
         """Build ORDER BY, LIMIT, and OFFSET clauses.
 
         Args:
@@ -1263,7 +1411,7 @@ class CallsQuery(BaseModel):
             field_to_object_join_alias_map: Mapping of field paths to CTE aliases
 
         Returns:
-            Tuple of (order_by_sql, limit_sql, offset_sql, needs_feedback_flag)
+            OrderLimitOffsetResult with ORDER BY, LIMIT, OFFSET SQL and feedback flag
         """
         needs_feedback = False
         order_by_sql = ""
@@ -1287,7 +1435,12 @@ class CallsQuery(BaseModel):
         limit_sql = f"LIMIT {self.limit}" if self.limit is not None else ""
         offset_sql = f"OFFSET {self.offset}" if self.offset is not None else ""
 
-        return order_by_sql, limit_sql, offset_sql, needs_feedback
+        return OrderLimitOffsetResult(
+            order_by_sql=order_by_sql,
+            limit_sql=limit_sql,
+            offset_sql=offset_sql,
+            needs_feedback=needs_feedback,
+        )
 
     def _as_sql_base_format(
         self,
@@ -1316,23 +1469,24 @@ class CallsQuery(BaseModel):
             field.as_select_sql(pb, table_alias, use_agg_fn=self.use_agg_fn)
             for field in self.select_fields
         )
-        filter_sql, needs_feedback_filter = self._build_filter_conditions(
+        filter_result = self._build_filter_conditions(
             pb, table_alias, expand_columns, field_to_object_join_alias_map
         )
         where_filters = self._build_where_clause_optimizations(
             pb, table_alias, expand_columns, id_subquery_name
         )
-        order_by_sql, limit_sql, offset_sql, needs_feedback_order = (
-            self._build_order_limit_offset(
-                pb, table_alias, expand_columns, field_to_object_join_alias_map
-            )
+        order_result = self._build_order_limit_offset(
+            pb, table_alias, expand_columns, field_to_object_join_alias_map
         )
         project_param = pb.add_param(self.project_id)
+
         joins = self._build_joins(
             pb,
             table_alias,
             project_param,
-            needs_feedback=needs_feedback_filter or needs_feedback_order,
+            needs_feedback=filter_result.needs_feedback or order_result.needs_feedback,
+            needs_queue_items=filter_result.needs_queue_items,
+            queue_id_filter=filter_result.queue_id_filter,
             expand_columns=expand_columns,
             field_to_object_join_alias_map=field_to_object_join_alias_map,
         )
@@ -1349,6 +1503,14 @@ class CallsQuery(BaseModel):
         where_clause = (
             f"WHERE {where_filters_stripped}" if where_filters_stripped else ""
         )
+
+        # Fix where_clause when empty but we have filter_sql
+        # For calls_complete (use_agg_fn=False), filter_sql starts with "AND "
+        # If where_clause is empty, set it to "WHERE 1" so filter_sql can append naturally
+        # TODO: optimize it further to make this condition builder smarter
+        if not where_clause and filter_result.filter_sql and not self.use_agg_fn:
+            where_clause = "WHERE 1"
+
         raw_sql = f"""
         SELECT {select_fields_sql}
         FROM {table_alias}
@@ -1356,10 +1518,10 @@ class CallsQuery(BaseModel):
         PREWHERE {table_alias}.project_id = {param_slot(project_param, "String")}
         {where_clause}
         {group_by_sql}
-        {filter_sql}
-        {order_by_sql}
-        {limit_sql}
-        {offset_sql}
+        {filter_result.filter_sql}
+        {order_result.order_by_sql}
+        {order_result.limit_sql}
+        {order_result.offset_sql}
         """
 
         return safely_format_sql(raw_sql, logger)
@@ -1416,6 +1578,15 @@ def get_field_by_name(name: str) -> CallsMergedField:
     if name not in ALLOWED_CALL_FIELDS:
         if name.startswith("feedback."):
             return CallsMergedFeedbackPayloadField.from_path(name[len("feedback.") :])
+        elif name.startswith("annotation_queue_items."):
+            # Handle annotation_queue_items.* fields
+            field_name = name[len("annotation_queue_items.") :]
+            # Only allow queue_id for now
+            if field_name == "queue_id":
+                return CallsMergedQueueItemField(field="queue_id")
+            raise InvalidFieldError(
+                f"Invalid annotation_queue_items field: {field_name}"
+            )
         elif name.startswith("summary.weave."):
             # Handle summary.weave.* fields
             summary_field = name[len("summary.weave.") :]
@@ -1633,6 +1804,7 @@ def process_query_to_conditions(
                     CallsMergedAggField,
                     CallsMergedFeedbackPayloadField,
                     CallsMergedSummaryField,
+                    CallsMergedQueueItemField,
                 ),
             ):
                 field = structured_field.as_sql(
