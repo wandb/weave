@@ -34,9 +34,11 @@ class TaskResult:
     task_id: str
     harness: str
     model: str
+    prompt: str  # The task prompt (input to the agent)
     job_result: JobResult
     scores: dict[str, ScoreResult] = field(default_factory=dict)
     error: str | None = None
+    timeout: int = 60  # Task timeout in seconds
 
     @property
     def success(self) -> bool:
@@ -216,6 +218,7 @@ class Executor:
                             task_id=task_config.id,
                             harness=harness_config.type.value,
                             model=harness_config.model,
+                            prompt=task_config.prompt,
                             job_result=JobResult(
                                 exit_code=-1,
                                 artifacts_path=Path("."),
@@ -223,6 +226,7 @@ class Executor:
                                 error=str(task_result),
                             ),
                             error=str(task_result),
+                            timeout=task_config.timeout,
                         ))
                     else:
                         result.task_results.append(task_result)
@@ -369,6 +373,7 @@ class Executor:
                 task_id=task_config.id,
                 harness=harness_config.type.value,
                 model=harness_config.model,
+                prompt=task_config.prompt,
                 job_result=JobResult(
                     exit_code=-1,
                     artifacts_path=task_artifacts.path,
@@ -376,6 +381,7 @@ class Executor:
                     error=f"Image build failed: {image_result.error}",
                 ),
                 error=image_result.error,
+                timeout=task_config.timeout,
             )
         
         self.log(f"  Image built in {build_duration:.1f}s")
@@ -447,7 +453,9 @@ class Executor:
             task_id=task_config.id,
             harness=harness_config.type.value,
             model=harness_config.model,
+            prompt=task_config.prompt,
             job_result=job_result,
+            timeout=task_config.timeout,
         )
 
         # Run scorers if job succeeded
