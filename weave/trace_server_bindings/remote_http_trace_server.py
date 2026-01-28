@@ -212,7 +212,7 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
 
         This is called when the server indicates a project requires calls_complete mode.
         The upgrade happens transparently: we replace the processor and re-enqueue
-        the current batch items.
+        the current batch items. No calls are dropped during this upgrade.
 
         Args:
             batch: The batch of items that failed to send (will be re-enqueued).
@@ -227,7 +227,7 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
             return
 
         logger.warning(
-            "Project requires 'calls_complete' mode. "
+            "Project has been previously written to with `use_calls_complete=True` and requires 'calls_complete' mode. "
             "Automatically upgrading SDK to use the more performant calls_complete processor. "
             f"Server message: {error_message}"
         )
@@ -250,9 +250,9 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
             cast(list[StartBatchItem | EndBatchItem | CompleteBatchItem], batch)
         )
 
-        # Stop the old processor gracefully (it will drain any remaining items)
-        # We do this in a non-blocking way since the old processor's items
-        # will fail anyway (server rejects legacy calls for this project)
+        # Stop the old processor gracefully - any remaining items in its queue
+        # will be caught by _flush_calls which will re-enqueue them to the
+        # new processor via this same method (the "already upgraded" path above)
         if old_processor is not None:
             old_processor.stop_accepting_work_event.set()
 
@@ -278,6 +278,9 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
                     self._send_call_start_v2(item.req.start)
                 elif isinstance(item, EndBatchItem):
                     self._send_call_end_v2(item.req.end)
+            except CallsCompleteModeRequired:
+                # Re-raise so caller can handle the upgrade to calls_complete mode
+                raise
             except Exception as e:
                 log_dropped_call_batch([item], e)
 
