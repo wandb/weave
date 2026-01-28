@@ -2654,7 +2654,7 @@ class CallsUsageReq(BaseModelStrict):
     root's metrics include the sum of its own usage plus all descendants' usage.
 
     Note: All matching calls are loaded into memory for aggregation. For very large
-    result sets (>100k calls), consider batching root call IDs or using narrower
+    result sets (>10k calls), consider batching root call IDs or using narrower
     filters at the application layer.
     """
 
@@ -2667,7 +2667,7 @@ class CallsUsageReq(BaseModelStrict):
         description="If true, include cost calculations in the usage.",
     )
     limit: int = Field(
-        default=100_000,
+        default=10_000,
         description="Maximum number of calls to process across all traces. Acts as a safety limit to prevent unbounded memory usage.",
     )
 
