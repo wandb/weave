@@ -32,7 +32,6 @@ from weave.trace.context import call_context
 from weave.trace.context.call_context import tracing_disabled
 from weave.trace.isinstance import weave_isinstance
 from weave.trace.op import is_op
-from weave.trace.wandb_run_context import WandbRunContext
 from weave.trace.refs import (
     DICT_KEY_EDGE_NAME,
     LIST_INDEX_EDGE_NAME,
@@ -45,6 +44,7 @@ from weave.trace.serialization.serializer import (
     get_serializer_for_obj,
     register_serializer,
 )
+from weave.trace.wandb_run_context import WandbRunContext
 from weave.trace_server.clickhouse_trace_server_batched import NotFoundError
 from weave.trace_server.common_interface import SortBy
 from weave.trace_server.constants import MAX_DISPLAY_NAME_LENGTH
