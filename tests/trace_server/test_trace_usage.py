@@ -472,3 +472,107 @@ def test_trace_usage_include_costs_flag(client: weave_client.WeaveClient) -> Non
     usage_with_costs = res_with_costs.call_usage[call_id]["gpt-4"]
     assert usage_with_costs.prompt_tokens_total_cost is not None
     assert usage_with_costs.completion_tokens_total_cost is not None
+
+
+def test_calls_usage_rolls_up_descendants(client: weave_client.WeaveClient) -> None:
+    skip_if_sqlite(client)
+
+    project_id = client._project_id()
+    trace_id = str(uuid.uuid4())
+    trace_id_two = str(uuid.uuid4())
+    now = datetime.datetime.now(datetime.timezone.utc)
+
+    root_id = str(uuid.uuid4())
+    child_id = str(uuid.uuid4())
+    grandchild_id = str(uuid.uuid4())
+    root_id_two = str(uuid.uuid4())
+
+    _create_call(
+        client,
+        root_id,
+        trace_id,
+        None,
+        now,
+        {"gpt-4": {"prompt_tokens": 5, "completion_tokens": 5, "total_tokens": 10}},
+    )
+    _create_call(
+        client,
+        child_id,
+        trace_id,
+        root_id,
+        now + datetime.timedelta(seconds=2),
+        {"gpt-4": {"input_tokens": 2, "output_tokens": 1}},
+    )
+    _create_call(
+        client,
+        grandchild_id,
+        trace_id,
+        child_id,
+        now + datetime.timedelta(seconds=4),
+        {"gpt-4": {"prompt_tokens": 3, "completion_tokens": 1, "total_tokens": 4}},
+    )
+    _create_call(
+        client,
+        root_id_two,
+        trace_id_two,
+        None,
+        now + datetime.timedelta(seconds=6),
+        {"gpt-4": {"prompt_tokens": 2, "completion_tokens": 1, "total_tokens": 3}},
+    )
+
+    res = client.server.calls_usage(
+        tsi.CallsUsageReq(
+            project_id=project_id,
+            call_ids=[root_id, root_id_two],
+        )
+    )
+
+    root_usage = res.call_usage[root_id]["gpt-4"]
+    assert root_usage.prompt_tokens == 10
+    assert root_usage.completion_tokens == 7
+    assert root_usage.total_tokens == 17
+
+    root_two_usage = res.call_usage[root_id_two]["gpt-4"]
+    assert root_two_usage.prompt_tokens == 2
+    assert root_two_usage.completion_tokens == 1
+    assert root_two_usage.total_tokens == 3
+
+
+def test_calls_usage_include_costs_flag(client: weave_client.WeaveClient) -> None:
+    skip_if_sqlite(client)
+
+    project_id = client._project_id()
+    trace_id = str(uuid.uuid4())
+    now = datetime.datetime.now(datetime.timezone.utc)
+
+    call_id = str(uuid.uuid4())
+    _create_call(
+        client,
+        call_id,
+        trace_id,
+        None,
+        now,
+        {"gpt-4": {"prompt_tokens": 2, "completion_tokens": 1, "total_tokens": 3}},
+    )
+
+    res_no_costs = client.server.calls_usage(
+        tsi.CallsUsageReq(
+            project_id=project_id,
+            call_ids=[call_id],
+            include_costs=False,
+        )
+    )
+    usage_no_costs = res_no_costs.call_usage[call_id]["gpt-4"]
+    assert usage_no_costs.prompt_tokens_total_cost is None
+    assert usage_no_costs.completion_tokens_total_cost is None
+
+    res_with_costs = client.server.calls_usage(
+        tsi.CallsUsageReq(
+            project_id=project_id,
+            call_ids=[call_id],
+            include_costs=True,
+        )
+    )
+    usage_with_costs = res_with_costs.call_usage[call_id]["gpt-4"]
+    assert usage_with_costs.prompt_tokens_total_cost is not None
+    assert usage_with_costs.completion_tokens_total_cost is not None
