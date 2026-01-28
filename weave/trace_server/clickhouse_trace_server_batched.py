@@ -1190,7 +1190,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             all_calls=all_calls,
         )
 
-        write_target = self.table_routing_resolver.resolve_v2_write_target(
+        write_target = self.table_routing_resolver.resolve_v1_write_target(
             req.project_id,
             self.ch_client,
         )
@@ -1243,7 +1243,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         assert_non_null_wb_user_id(req)
         self._ensure_valid_update_field(req)
 
-        write_target = self.table_routing_resolver.resolve_v2_write_target(
+        write_target = self.table_routing_resolver.resolve_v1_write_target(
             req.project_id,
             self.ch_client,
         )
