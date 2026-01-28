@@ -305,7 +305,8 @@ class ScoreLogger:
     """Interface for logging scores and managing prediction outputs.
 
     This class is returned by `EvaluationLogger.log_prediction()` and can be used
-    either directly or as a context manager.
+    either directly or as a context manager. Prediction-level metadata can be
+    attached via `EvaluationLogger.log_prediction(..., metadata=...)`.
 
     Direct usage - when output is known upfront:
 
@@ -413,7 +414,11 @@ class ScoreLogger:
 
         return scorer
 
-    def _create_score_call(self, scorer: Scorer | dict | str) -> tuple[Call, Scorer]:
+    def _create_score_call(
+        self,
+        scorer: Scorer | dict | str,
+        metadata: dict[str, Any] | None = None,
+    ) -> tuple[Call, Scorer]:
         """Create a score call but don't finish it yet."""
         scorer = self._prepare_scorer(scorer)
 
@@ -425,18 +430,23 @@ class ScoreLogger:
         scorer.__dict__["score"] = MethodType(score_method, scorer)
 
         # Create the score call with predict_and_score as parent
-        with attributes(IMPERATIVE_SCORE_MARKER):
-            wc = require_weave_client()
-            score_call = wc.create_call(
-                as_op(scorer.score),
-                inputs={
-                    "self": scorer,
-                    "output": self._predict_output,
-                    "inputs": self.predict_call.inputs,
-                },
-                parent=self.predict_and_score_call,
-                use_stack=False,
-            )
+        score_attributes = (
+            IMPERATIVE_SCORE_MARKER
+            if metadata is None
+            else metadata | IMPERATIVE_SCORE_MARKER
+        )
+        wc = require_weave_client()
+        score_call = wc.create_call(
+            as_op(scorer.score),
+            inputs={
+                "self": scorer,
+                "output": self._predict_output,
+                "inputs": self.predict_call.inputs,
+            },
+            parent=self.predict_and_score_call,
+            attributes=score_attributes,
+            use_stack=False,
+        )
 
         return score_call, scorer
 
@@ -458,6 +468,8 @@ class ScoreLogger:
         self,
         scorer: Scorer | dict | str,
         score: ScoreType,
+        *,
+        metadata: dict[str, Any] | None = None,
     ) -> None: ...
 
     @overload
@@ -465,14 +477,20 @@ class ScoreLogger:
         self,
         scorer: Scorer | dict | str,
         score: _NotSetType = NOT_SET,
+        *,
+        metadata: dict[str, Any] | None = None,
     ) -> _LogScoreContext: ...
 
     def log_score(
         self,
         scorer: Scorer | dict | str,
         score: ScoreType | _NotSetType = NOT_SET,
+        *,
+        metadata: dict[str, Any] | None = None,
     ) -> _LogScoreContext | None:
         """Log a score synchronously or return a context manager for deferred scoring.
+
+        Metadata can be attached to the score call via the ``metadata`` argument.
 
         Can be used in two ways:
 
@@ -484,14 +502,16 @@ class ScoreLogger:
 
         2. Context manager (deferred with automatic call stack):
         ```python
-        with pred.log_score("correctness") as score_ctx:
+        with pred.log_score("correctness", metadata={"source": "review"}) as score_ctx:
             result = calculate_score(...)
             score_ctx.value = result
         ```
         """
         # If no score provided, return a context manager for deferred scoring
         if score is NOT_SET:
-            score_call, prepared_scorer = self._create_score_call(scorer)
+            score_call, prepared_scorer = self._create_score_call(
+                scorer, metadata=metadata
+            )
             return _LogScoreContext(self, prepared_scorer, score_call)
 
         # Type narrowing: score is now guaranteed to be ScoreType
@@ -505,7 +525,9 @@ class ScoreLogger:
             loop = asyncio.get_running_loop()
             if asyncio.current_task() is None:
                 # We're not in an async context, but a loop exists
-                return loop.run_until_complete(self.alog_score(scorer, score_value))
+                return loop.run_until_complete(
+                    self.alog_score(scorer, score_value, metadata=metadata)
+                )
 
             # We're in an async context, we need to handle this differently
             result = None
@@ -519,7 +541,7 @@ class ScoreLogger:
                     asyncio.set_event_loop(new_loop)
                     try:
                         result = new_loop.run_until_complete(
-                            self.alog_score(scorer, score_value)
+                            self.alog_score(scorer, score_value, metadata=metadata)
                         )
                     finally:
                         new_loop.close()
@@ -536,12 +558,14 @@ class ScoreLogger:
                 return result
         except RuntimeError:
             # No event loop exists, create one with asyncio.run
-            return asyncio.run(self.alog_score(scorer, score_value))
+            return asyncio.run(self.alog_score(scorer, score_value, metadata=metadata))
 
     async def alog_score(
         self,
         scorer: Scorer | dict | str,
         score: ScoreType,
+        *,
+        metadata: dict[str, Any] | None = None,
     ) -> None:
         if self._has_finished:
             raise ValueError("Cannot log score after finish has been called")
@@ -561,7 +585,12 @@ class ScoreLogger:
             [self.evaluate_call, self.predict_and_score_call]
         ):
             with _set_current_score(score):
-                with attributes(IMPERATIVE_SCORE_MARKER):
+                score_attributes = (
+                    IMPERATIVE_SCORE_MARKER
+                    if metadata is None
+                    else metadata | IMPERATIVE_SCORE_MARKER
+                )
+                with attributes(score_attributes):
                     await self.predict_call.apply_scorer(scorer)
 
         # this is always true because of how the scorer is created in the validator
@@ -788,7 +817,12 @@ class EvaluationLogger:
 
         self._is_finalized = True
 
-    def log_prediction(self, inputs: dict[str, Any], output: Any = None) -> ScoreLogger:
+    def log_prediction(
+        self,
+        inputs: dict[str, Any],
+        output: Any = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> ScoreLogger:
         """Log a prediction to the Evaluation.
 
         Returns a ScoreLogger that can be used directly or as a context manager.
@@ -796,6 +830,7 @@ class EvaluationLogger:
         Args:
             inputs: The input data for the prediction
             output: The output value. Defaults to None. Can be set later using pred.output.
+            metadata: Optional metadata to attach to the prediction calls as attributes.
 
         Returns:
             ScoreLogger for logging scores and optionally finishing the prediction.
@@ -820,11 +855,17 @@ class EvaluationLogger:
         original_method = self.model.__dict__.get("predict")
         self.model.__dict__["predict"] = self._context_predict_method
 
+        prediction_attributes = (
+            IMPERATIVE_EVAL_MARKER
+            if metadata is None
+            else metadata | IMPERATIVE_EVAL_MARKER
+        )
+
         try:
             with call_context.set_call_stack([self._evaluate_call]):
                 # Make the prediction call
                 with _set_current_output(output):
-                    with attributes(IMPERATIVE_EVAL_MARKER):
+                    with attributes(prediction_attributes):
                         _, predict_and_score_call = (
                             self._pseudo_evaluation.predict_and_score.call(
                                 self._pseudo_evaluation,
@@ -861,7 +902,12 @@ class EvaluationLogger:
         return pred
 
     def log_example(
-        self, inputs: dict[str, Any], output: Any, scores: dict[str, ScoreType]
+        self,
+        inputs: dict[str, Any],
+        output: Any,
+        scores: dict[str, ScoreType],
+        *,
+        metadata: dict[str, Any] | None = None,
     ) -> None:
         """Log a complete example with inputs, output, and scores.
 
@@ -872,6 +918,7 @@ class EvaluationLogger:
             inputs: The input data for the prediction
             output: The output value
             scores: Dictionary mapping scorer names to score values
+            metadata: Optional metadata to attach to the prediction calls as attributes.
 
         Example:
         ```python
@@ -890,7 +937,7 @@ class EvaluationLogger:
             )
 
         # Log the prediction with the output
-        pred = self.log_prediction(inputs=inputs, output=output)
+        pred = self.log_prediction(inputs=inputs, output=output, metadata=metadata)
 
         # Log all the scores
         for scorer_name, score_value in scores.items():
