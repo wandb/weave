@@ -5582,16 +5582,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         command: str,
         parameters: dict[str, Any] | None = None,
         settings: dict[str, Any] | None = None,
-    ) -> str:
+    ) -> None:
         """Execute a mutation command (INSERT, UPDATE, DELETE) that doesn't return results.
 
         Args:
             command: The SQL command to execute.
             parameters: Optional dictionary of query parameters.
             settings: Optional dictionary of ClickHouse settings.
-
-        Returns:
-            str: The query_id from ClickHouse.
         """
         if not settings:
             settings = {}
@@ -5599,7 +5596,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         processed_params = _process_parameters(parameters) if parameters else None
         try:
-            result = self.ch_client.command(
+            self.ch_client.command(
                 command,
                 parameters=processed_params,
                 settings=settings,
@@ -5614,7 +5611,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 },
             )
             handle_clickhouse_query_error(e)
-            return ""
+            return
 
         logger.info(
             "clickhouse_command",
@@ -5623,7 +5620,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 "parameters": processed_params,
             },
         )
-        return result
+        return
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert")
     def _insert(
