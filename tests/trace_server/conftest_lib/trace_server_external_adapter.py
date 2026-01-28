@@ -88,6 +88,8 @@ class DummyIdConverter(external_to_internal_trace_server_adapter.IdConverter):
 class TestOnlyUserInjectingExternalTraceServer(
     external_to_internal_trace_server_adapter.ExternalTraceServer
 ):
+    _ALLOW_NONE_USER_ID_REQUESTS = (tsi.AnnotatorQueueItemsProgressUpdateReq,)
+
     def __init__(
         self,
         internal_trace_server: tsi.TraceServerInterface,
@@ -127,7 +129,15 @@ class TestOnlyUserInjectingExternalTraceServer(
             for field_name in value.model_fields:
                 field_value = getattr(value, field_name)
                 if field_name == "wb_user_id":
-                    if "wb_user_id" not in value.model_fields_set:
+                    if "wb_user_id" in value.model_fields_set:
+                        if field_value is None:
+                            if isinstance(value, self._ALLOW_NONE_USER_ID_REQUESTS):
+                                # Allow explicit None for requests that validate it.
+                                pass
+                            else:
+                                setattr(value, field_name, self._user_id)
+                        # Explicit non-None user id stays.
+                    else:
                         setattr(value, field_name, self._user_id)
                     field_value = getattr(value, field_name)
                 if isinstance(field_value, BaseModel):
