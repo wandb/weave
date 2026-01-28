@@ -18,11 +18,17 @@ import tenacity
 from pydantic import ValidationError
 
 from tests.trace_server_bindings.conftest import (
+    generate_end,
     generate_id,
     generate_start,
 )
 from weave.trace.display.term import configure_logger
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
+from weave.trace_server_bindings.call_batch_processor import CallBatchProcessor
+from weave.trace_server_bindings.http_utils import (
+    ERROR_CODE_CALLS_COMPLETE_MODE_REQUIRED,
+)
 from weave.trace_server_bindings.models import (
     CompleteBatchItem,
     EndBatchItem,
@@ -31,6 +37,18 @@ from weave.trace_server_bindings.models import (
 from weave.trace_server_bindings.remote_http_trace_server import (
     RemoteHTTPTraceServer,
 )
+
+
+def make_calls_complete_required_response() -> httpx.Response:
+    """Create a 400 response indicating the project requires calls_complete mode."""
+    return httpx.Response(
+        400,
+        json={
+            "error_code": ERROR_CODE_CALLS_COMPLETE_MODE_REQUIRED,
+            "message": "Project requires calls_complete mode",
+        },
+        request=httpx.Request("POST", "http://example.com/call/upsert_batch"),
+    )
 
 
 @pytest.fixture
@@ -375,3 +393,54 @@ def test_post_timeout(mock_post, success_response, fast_retrying_server, log_col
     response = new_server.call_start(start_req)
     assert response.id == "test_id"
     assert response.trace_id == "test_trace_id"
+
+
+@patch("weave.utils.http_requests.post")
+def test_auto_upgrade_to_calls_complete_on_error(mock_post, monkeypatch):
+    """Verify client switches to CallBatchProcessor when server returns CALLS_COMPLETE_MODE_REQUIRED."""
+    monkeypatch.setenv("WEAVE_USE_CALLS_COMPLETE", "false")
+    server = RemoteHTTPTraceServer("http://example.com", should_batch=True)
+
+    # Verify initial state: using legacy AsyncBatchProcessor
+    assert server.use_calls_complete is False
+    assert isinstance(server.call_processor, AsyncBatchProcessor)
+    assert not isinstance(server.call_processor, CallBatchProcessor)
+    old_processor = server.call_processor
+
+    # Mock: first call returns CALLS_COMPLETE_MODE_REQUIRED, subsequent calls succeed
+    mock_post.side_effect = [
+        make_calls_complete_required_response(),
+        httpx.Response(
+            200, json={}, request=httpx.Request("POST", "http://example.com")
+        ),
+        httpx.Response(
+            200, json={}, request=httpx.Request("POST", "http://example.com")
+        ),
+    ]
+
+    # Enqueue a start/end pair to trigger _flush_calls
+    call_id = generate_id()
+    start = StartBatchItem(
+        req=tsi.CallStartReq(start=generate_start(call_id, "entity/project"))
+    )
+    end = EndBatchItem(req=tsi.CallEndReq(end=generate_end(call_id, "entity/project")))
+
+    try:
+        server._flush_calls([start, end])
+
+        # Verify upgrade happened
+        assert server.use_calls_complete is True
+        assert isinstance(server.call_processor, CallBatchProcessor)
+        assert old_processor.stop_accepting_work_event.is_set()
+
+        # Flush the new processor to ensure async processing completes
+        server.call_processor.stop_accepting_new_work_and_flush_queue()
+
+        # Verify calls_complete endpoint was hit after upgrade
+        urls = [call[0][0] for call in mock_post.call_args_list]
+        assert any("/calls/complete" in url for url in urls)
+    finally:
+        if server.call_processor and server.call_processor.is_accepting_new_work():
+            server.call_processor.stop_accepting_new_work_and_flush_queue()
+        if server.feedback_processor:
+            server.feedback_processor.stop_accepting_new_work_and_flush_queue()

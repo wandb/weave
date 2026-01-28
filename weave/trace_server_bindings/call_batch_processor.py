@@ -2,6 +2,11 @@
 
 This module provides CallBatchProcessor, which extends AsyncBatchProcessor
 to maximize complete calls by pairing starts with ends at enqueue time.
+
+Error Policy:
+- Retryable batch-wide error on complete items → requeue items and raise SkipIndividualProcessingError
+- Non-retryable error on complete items → log warning and drop items, continue with eager items
+- Complete items depend on pairing so no item-by-item fallback is attempted
 """
 
 import logging
@@ -14,6 +19,7 @@ from cachetools import TTLCache
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings.async_batch_processor import (
     AsyncBatchProcessor,
+    SkipIndividualProcessingError,
     log_warning_with_sentry,
 )
 from weave.trace_server_bindings.models import (
@@ -21,6 +27,7 @@ from weave.trace_server_bindings.models import (
     EndBatchItem,
     StartBatchItem,
 )
+from weave.utils.retry import _is_retryable_exception
 
 logger = logging.getLogger(__name__)
 
@@ -331,7 +338,13 @@ class CallBatchProcessor(AsyncBatchProcessor[BatchItem]):
             self._write_item_to_disk(item, error_message)
 
     def _process_mixed_batch(self, batch: list[BatchItem]) -> None:
-        """Process a mixed batch by splitting into complete and eager items."""
+        """Process a mixed batch by splitting into complete and eager items.
+
+        Error Policy:
+        - Retryable error on complete items → requeue and raise SkipIndividualProcessingError
+        - Non-retryable error on complete items → log warning, drop items, continue with eager
+        - Complete items depend on pairing, so no item-by-item fallback is attempted
+        """
         complete_items: list[CompleteBatchItem] = []
         eager_items: list[StartBatchItem | EndBatchItem] = []
 
@@ -341,10 +354,37 @@ class CallBatchProcessor(AsyncBatchProcessor[BatchItem]):
             elif isinstance(item, (StartBatchItem, EndBatchItem)):
                 eager_items.append(item)
 
+        complete_error: Exception | None = None
+
         # Process complete items via the v2 complete endpoint
         if complete_items:
-            self.complete_processor_fn(complete_items)
+            try:
+                self.complete_processor_fn(complete_items)
+            except Exception as e:
+                complete_error = e
+                if _is_retryable_exception(e):
+                    # Requeue all complete items for later retry
+                    for item in complete_items:
+                        self._queue_item(item)
+                    # Skip eager processing only if there are no eager items
+                    if not eager_items:
+                        raise SkipIndividualProcessingError(
+                            "Complete batch failed with retryable error, items requeued"
+                        ) from e
+                else:
+                    # Non-retryable: log warning and drop complete items
+                    ids = [item.req.id for item in complete_items]
+                    log_warning_with_sentry(
+                        f"Dropping {len(complete_items)} complete calls due to non-retryable error: {e}. "
+                        f"Call IDs: {ids}"
+                    )
 
-        # Process eager items via the v2 start/end endpoints
+        # Process eager items via the v2 start/end endpoints (always attempt if present)
         if eager_items:
             self.eager_processor_fn(eager_items)
+
+        # If complete items failed with retryable error but we had eager items, raise after processing eager
+        if complete_error is not None and _is_retryable_exception(complete_error):
+            raise SkipIndividualProcessingError(
+                "Complete batch failed with retryable error, items requeued"
+            ) from complete_error

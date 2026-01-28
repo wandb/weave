@@ -4,6 +4,7 @@ import datetime
 import pathlib
 from unittest.mock import MagicMock, patch
 
+import httpx
 import pytest
 
 from weave.trace_server import trace_server_interface as tsi
@@ -257,3 +258,117 @@ def test_queue_full_writes_to_disk(tmp_path: pathlib.Path) -> None:
 
     assert log_path.exists()
     assert "Queue is full" in log_path.read_text()
+
+
+def test_retryable_error_requeues_complete_batch() -> None:
+    """Retryable error on complete_processor_fn requeues items and raises SkipIndividualProcessingError."""
+    from weave.trace_server_bindings.async_batch_processor import (
+        SkipIndividualProcessingError,
+    )
+
+    complete_fn = MagicMock(
+        side_effect=httpx.HTTPStatusError(
+            "503",
+            request=httpx.Request("POST", "http://example.com"),
+            response=httpx.Response(
+                503, request=httpx.Request("POST", "http://example.com")
+            ),
+        )
+    )
+    eager_fn = MagicMock()
+    processor = CallBatchProcessor(complete_fn, eager_fn, min_batch_interval=0.01)
+
+    # Stop background processing to test _process_mixed_batch in isolation
+    processor.stop_accepting_work_event.set()
+    processor.processing_thread.join(timeout=1)
+    processor.health_check_thread.join(timeout=1)
+
+    complete_items = [
+        _make_complete_item("call-1", "trace-1"),
+        _make_complete_item("call-2", "trace-2"),
+    ]
+
+    # Call _process_mixed_batch directly to test error handling
+    with pytest.raises(SkipIndividualProcessingError):
+        processor._process_mixed_batch(complete_items)
+
+    # Items should be requeued
+    assert processor.queue.qsize() == 2
+    eager_fn.assert_not_called()
+
+
+@pytest.mark.disable_logging_error_check
+def test_non_retryable_error_drops_complete_items_but_eager_succeeds(caplog) -> None:
+    """Non-retryable error drops complete items but eager items still process."""
+    import logging
+
+    complete_fn = MagicMock(
+        side_effect=httpx.HTTPStatusError(
+            "400 Bad Request",
+            request=httpx.Request("POST", "http://example.com"),
+            response=httpx.Response(
+                400, request=httpx.Request("POST", "http://example.com")
+            ),
+        )
+    )
+    eager_fn = MagicMock()
+    processor = CallBatchProcessor(complete_fn, eager_fn, min_batch_interval=0.01)
+
+    # Stop background processing to test _process_mixed_batch in isolation
+    processor.stop_accepting_work_event.set()
+    processor.processing_thread.join(timeout=1)
+    processor.health_check_thread.join(timeout=1)
+
+    complete_items = [_make_complete_item("call-1", "trace-1")]
+    eager_items = [_make_start_item("call-2", "trace-2")]
+
+    # Capture logs from weave.telemetry.trace_sentry (where log_warning_with_sentry logs)
+    caplog.set_level(logging.WARNING, logger="weave.telemetry.trace_sentry")
+
+    # Should not raise - logs warning and continues
+    processor._process_mixed_batch(complete_items + eager_items)
+
+    # Complete items not requeued (dropped)
+    assert processor.queue.qsize() == 0
+    # Eager items were still processed
+    eager_fn.assert_called_once()
+    assert len(eager_fn.call_args[0][0]) == 1
+    # Warning was logged
+    assert any("Dropping" in record.message for record in caplog.records)
+
+
+def test_mixed_batch_error_does_not_break_eager_processing() -> None:
+    """Complete path failure does not prevent eager items from being processed."""
+    from weave.trace_server_bindings.async_batch_processor import (
+        SkipIndividualProcessingError,
+    )
+
+    complete_fn = MagicMock(
+        side_effect=httpx.HTTPStatusError(
+            "503",
+            request=httpx.Request("POST", "http://example.com"),
+            response=httpx.Response(
+                503, request=httpx.Request("POST", "http://example.com")
+            ),
+        )
+    )
+    eager_fn = MagicMock()
+    processor = CallBatchProcessor(complete_fn, eager_fn, min_batch_interval=0.01)
+
+    # Stop background processing to test _process_mixed_batch in isolation
+    processor.stop_accepting_work_event.set()
+    processor.processing_thread.join(timeout=1)
+    processor.health_check_thread.join(timeout=1)
+
+    complete_items = [_make_complete_item("call-1", "trace-1")]
+    eager_items = [_make_start_item("call-2", "trace-2")]
+
+    # Should raise SkipIndividualProcessingError after processing eager items
+    with pytest.raises(SkipIndividualProcessingError):
+        processor._process_mixed_batch(complete_items + eager_items)
+
+    # Complete items should be requeued
+    assert processor.queue.qsize() == 1
+    # Eager items were still processed despite complete error
+    eager_fn.assert_called_once()
+    assert len(eager_fn.call_args[0][0]) == 1
