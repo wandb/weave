@@ -407,18 +407,13 @@ def test_auto_upgrade_to_calls_complete_on_error(mock_post, monkeypatch):
     assert not isinstance(server.call_processor, CallBatchProcessor)
     old_processor = server.call_processor
 
-    # Mock: first call returns CALLS_COMPLETE_MODE_REQUIRED, subsequent calls succeed
     mock_post.side_effect = [
         make_calls_complete_required_response(),
         httpx.Response(
             200, json={}, request=httpx.Request("POST", "http://example.com")
         ),
-        httpx.Response(
-            200, json={}, request=httpx.Request("POST", "http://example.com")
-        ),
     ]
 
-    # Enqueue a start/end pair to trigger _flush_calls
     call_id = generate_id()
     start = StartBatchItem(
         req=tsi.CallStartReq(start=generate_start(call_id, "entity/project"))
@@ -427,18 +422,36 @@ def test_auto_upgrade_to_calls_complete_on_error(mock_post, monkeypatch):
 
     try:
         server._flush_calls([start, end])
+        server.call_processor.stop_accepting_new_work_and_flush_queue()
 
         # Verify upgrade happened
         assert server.use_calls_complete is True
         assert isinstance(server.call_processor, CallBatchProcessor)
         assert old_processor.stop_accepting_work_event.is_set()
+        assert any("/calls/complete" in call[0][0] for call in mock_post.call_args_list)
+    finally:
+        if server.call_processor and server.call_processor.is_accepting_new_work():
+            server.call_processor.stop_accepting_new_work_and_flush_queue()
+        if server.feedback_processor:
+            server.feedback_processor.stop_accepting_new_work_and_flush_queue()
 
-        # Flush the new processor to ensure async processing completes
-        server.call_processor.stop_accepting_new_work_and_flush_queue()
 
-        # Verify calls_complete endpoint was hit after upgrade
-        urls = [call[0][0] for call in mock_post.call_args_list]
-        assert any("/calls/complete" in url for url in urls)
+@patch("weave.utils.http_requests.post")
+def test_eager_calls_complete_required_is_reraised(mock_post, monkeypatch):
+    """Verify CallsCompleteModeRequired in eager path is re-raised for caller to handle."""
+    from weave.trace_server_bindings.http_utils import CallsCompleteModeRequired
+
+    monkeypatch.setenv("WEAVE_USE_CALLS_COMPLETE", "true")
+    server = RemoteHTTPTraceServer("http://example.com", should_batch=True)
+    mock_post.side_effect = [make_calls_complete_required_response()]
+
+    start = StartBatchItem(
+        req=tsi.CallStartReq(start=generate_start("call-id", "entity/project"))
+    )
+
+    try:
+        with pytest.raises(CallsCompleteModeRequired):
+            server._flush_calls_eager([start])
     finally:
         if server.call_processor and server.call_processor.is_accepting_new_work():
             server.call_processor.stop_accepting_new_work_and_flush_queue()
