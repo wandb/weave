@@ -45,7 +45,9 @@ def make_evaluation():
                     ),
                 ),
                 scoring_prompt="Here are the inputs: {inputs}. Here is the output: {output}. Is the output correct?",
+                enable_image_input_scoring=True,
                 enable_audio_input_scoring=True,
+                enable_video_input_scoring=True,
                 media_scoring_json_paths=["$.messages[0].content[1].input_audio"],
             ),
         ],
@@ -73,9 +75,9 @@ def evaluation_equality_check(a, b):
 
 
 llm_as_a_judge_scorer_digest = (
-    "ZhXLVIxDVeNEZw7qdNNdb30niBJ9nrupinVFXAMY2ns"
+    "HxesePeWFYrAl1Z6nnAJUhAdtprHcbcFxulmD2qLKQY"
     if sys.version_info.major >= 3 and sys.version_info.minor >= 13
-    else "GuTiuaw9aciXWCWPU5cvWtQqs0lcBtJPfYRlYH3GUwk"
+    else "AXRohBn3cYglw60VufOjqS5WaPFQno5dKyFuZHzSC0g"
 )
 
 library_cases = [
@@ -157,7 +159,9 @@ library_cases = [
                     "description": None,
                     "column_map": None,
                     "model": "weave:///shawn/test-project/object/LLMStructuredCompletionModel:VUqRnYmuvNhu3zgfDb9hnZhLRFM1vKKI1WEpw3bsViE",
+                    "enable_image_input_scoring": True,
                     "enable_audio_input_scoring": True,
+                    "enable_video_input_scoring": True,
                     "media_scoring_json_paths": [
                         "$.messages[0].content[1].input_audio"
                     ],
