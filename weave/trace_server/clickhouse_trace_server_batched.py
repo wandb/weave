@@ -1047,6 +1047,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         calls_query.add_field("parent_id")
         calls_query.add_field("summary")
         _add_default_call_filters(calls_query)
+        if req.include_costs:
+            for field in ALL_CALL_SELECT_COLUMNS:
+                calls_query.add_field(field)
         if req.limit is not None:
             calls_query.set_limit(req.limit)
 
