@@ -5,7 +5,7 @@ from __future__ import annotations
 import contextlib
 import logging
 from collections.abc import Iterator
-from typing import Any, cast
+from typing import Any, cast, overload
 
 # TODO: type_handlers is imported here to trigger registration of the image serializer.
 # There is probably a better place for this, but including here for now to get the fix in.
@@ -40,9 +40,36 @@ _global_postprocess_output: PostprocessOutputFunc | None = None
 _global_attributes: dict[str, Any] = {}
 
 
+@overload
 def init(
     project_name: str,
     *,
+    settings: UserSettings | dict[str, Any] | None = None,
+    autopatch_settings: AutopatchSettings | None = None,
+    global_postprocess_inputs: PostprocessInputsFunc | None = None,
+    global_postprocess_output: PostprocessOutputFunc | None = None,
+    global_attributes: dict[str, Any] | None = None,
+) -> weave_client.WeaveClient: ...
+
+
+@overload
+def init(
+    *,
+    entity: str,
+    project: str,
+    settings: UserSettings | dict[str, Any] | None = None,
+    autopatch_settings: AutopatchSettings | None = None,
+    global_postprocess_inputs: PostprocessInputsFunc | None = None,
+    global_postprocess_output: PostprocessOutputFunc | None = None,
+    global_attributes: dict[str, Any] | None = None,
+) -> weave_client.WeaveClient: ...
+
+
+def init(
+    project_name: str | None = None,
+    *,
+    entity: str | None = None,
+    project: str | None = None,
     settings: UserSettings | dict[str, Any] | None = None,
     autopatch_settings: AutopatchSettings | None = None,
     global_postprocess_inputs: PostprocessInputsFunc | None = None,
@@ -59,8 +86,11 @@ def init(
 
     Args:
         project_name: The name of the Weights & Biases team and project to log to. If you don't
-            specify a team, your default entity is used.
+            specify a team, your default entity is used. Use the format
+            "<project_name>" or "<entity_name>/<project_name>".
             To find or update your default entity, refer to [User Settings](https://docs.wandb.ai/guides/models/app/settings-page/user-settings/#default-team) in the W&B Models documentation.
+        entity: Explicit W&B entity name to log to. Requires `project`.
+        project: Explicit W&B project name to log to. Requires `entity`.
         settings: Configuration for the Weave client generally.
         autopatch_settings: (Deprecated) Configuration for autopatch integrations. Use explicit patching instead.
         global_postprocess_inputs: A function that will be applied to all inputs of all ops.
@@ -75,7 +105,20 @@ def init(
     Returns:
         A Weave client.
     """
-    if not project_name or not project_name.strip():
+    if project_name is not None and (entity is not None or project is not None):
+        raise ValueError("Pass either project_name or entity/project, not both")
+
+    if project_name is None:
+        if entity is None and project is None:
+            raise ValueError("project_name must be non-empty")
+        if entity is None or project is None:
+            raise ValueError("Both entity and project must be provided together")
+        if not entity.strip():
+            raise ValueError("entity must be non-empty")
+        if not project.strip():
+            raise ValueError("project must be non-empty")
+        project_name = f"{entity}/{project}"
+    elif not project_name.strip():
         raise ValueError("project_name must be non-empty")
 
     configure_logger()
