@@ -97,7 +97,7 @@ class Executor:
         config: EvalConfig,
         config_dir: Path | None = None,
         log: Callable[[str], None] | None = None,
-        max_parallel: int = 4,
+        max_parallel: int = 8,
         weave_project: str | None = None,
     ):
         self.config = config
@@ -142,6 +142,17 @@ class Executor:
             started_at=started_at,
         )
 
+        # Initialize Weave logger if configured (outside try block for final summary)
+        weave_logger = None
+        if self.weave_project:
+            from .reporter import WeaveConfig, WeaveLogger
+            weave_config = WeaveConfig(project=self.weave_project)
+            weave_logger = WeaveLogger(
+                config_name=self.config.name,
+                weave_config=weave_config,
+                artifacts_base_path=output_dir,
+            )
+
         try:
             # Resolve environment variables
             self.log("Resolving environment variables...")
@@ -169,6 +180,14 @@ class Executor:
 
             self.log("")
 
+            # Group combinations by model for streaming Weave results
+            combinations_by_model: dict[str, list[tuple[int, HarnessConfig, TaskConfig]]] = {}
+            for i, (harness_config, task_config) in enumerate(combinations, 1):
+                model_key = f"{harness_config.type.value}:{harness_config.model}"
+                if model_key not in combinations_by_model:
+                    combinations_by_model[model_key] = []
+                combinations_by_model[model_key].append((i, harness_config, task_config))
+
             # Execute combinations in parallel with concurrency limit
             if self.max_parallel > 1 and len(combinations) > 1:
                 self.log(f"Running {len(combinations)} tasks in parallel (max {self.max_parallel} concurrent)...")
@@ -177,11 +196,15 @@ class Executor:
                 # Create semaphore to limit concurrency
                 semaphore = asyncio.Semaphore(self.max_parallel)
                 
+                # Track results per model for streaming Weave logs
+                results_by_model: dict[str, list[TaskResult]] = {k: [] for k in combinations_by_model}
+                pending_per_model: dict[str, int] = {k: len(v) for k, v in combinations_by_model.items()}
+                results_lock = asyncio.Lock()
+                
                 async def run_with_semaphore(idx: int, harness_config: HarnessConfig, task_config: TaskConfig) -> TaskResult:
                     async with semaphore:
-                        task_id = f"{task_config.id}_{harness_config.type.value}_{harness_config.model}"
-                        task_id = task_id.replace("/", "_")
-                        await self.log_async(f"[{idx}/{len(combinations)}] Starting: {task_config.id} ({harness_config.type.value}:{harness_config.model})")
+                        model_key = f"{harness_config.type.value}:{harness_config.model}"
+                        await self.log_async(f"[{idx}/{len(combinations)}] Starting: {task_config.id} ({model_key})")
                         
                         task_result = await self._run_task(
                             run, harness_config, task_config, env
@@ -194,16 +217,35 @@ class Executor:
                             if task_result.scores:
                                 scores_str = ", ".join(f"{n}: {s.score:.0f}%" for n, s in task_result.scores.items())
                                 score_info = f" [{scores_str}]"
-                            await self.log_async(f"[{idx}/{len(combinations)}] Completed: {task_config.id} ({harness_config.type.value}:{harness_config.model}) -> {status}{score_info}")
+                            await self.log_async(f"[{idx}/{len(combinations)}] Completed: {task_config.id} ({model_key}) -> {status}{score_info}")
                         else:
-                            await self.log_async(f"[{idx}/{len(combinations)}] Completed: {task_config.id} ({harness_config.type.value}:{harness_config.model}) -> ERROR: {task_result.error}")
+                            await self.log_async(f"[{idx}/{len(combinations)}] Completed: {task_config.id} ({model_key}) -> ERROR: {task_result.error}")
+                        
+                        # Track result and stream to Weave when model is complete
+                        async with results_lock:
+                            results_by_model[model_key].append(task_result)
+                            pending_per_model[model_key] -= 1
+                            
+                            # If all tasks for this model are done, log to Weave immediately
+                            if pending_per_model[model_key] == 0 and weave_logger:
+                                try:
+                                    url = weave_logger.log_model_results(
+                                        harness_type=harness_config.type.value,
+                                        model=harness_config.model,
+                                        task_results=results_by_model[model_key],
+                                    )
+                                    await self.log_async(f"  -> Logged {model_key} to Weave: {url}")
+                                except Exception as e:
+                                    await self.log_async(f"  -> Error logging {model_key} to Weave: {e}")
                         
                         return task_result
                 
                 # Launch all tasks
                 tasks = [
                     run_with_semaphore(i, harness_config, task_config)
-                    for i, (harness_config, task_config) in enumerate(combinations, 1)
+                    for i, harness_config, task_config in [
+                        item for items in combinations_by_model.values() for item in items
+                    ]
                 ]
                 
                 # Wait for all to complete
@@ -213,7 +255,8 @@ class Executor:
                 for i, task_result in enumerate(task_results):
                     if isinstance(task_result, Exception):
                         # Handle exceptions from individual tasks
-                        harness_config, task_config = combinations[i]
+                        flat_combinations = [item for items in combinations_by_model.values() for item in items]
+                        _, harness_config, task_config = flat_combinations[i]
                         result.task_results.append(TaskResult(
                             task_id=task_config.id,
                             harness=harness_config.type.value,
@@ -232,14 +275,22 @@ class Executor:
                         result.task_results.append(task_result)
             else:
                 # Sequential execution
+                results_by_model: dict[str, list[TaskResult]] = {}
+                
                 for i, (harness_config, task_config) in enumerate(combinations, 1):
+                    model_key = f"{harness_config.type.value}:{harness_config.model}"
                     self.log(f"[{i}/{len(combinations)}] Running task: {task_config.id}")
-                    self.log(f"  Harness: {harness_config.type.value}:{harness_config.model}")
+                    self.log(f"  Harness: {model_key}")
                     
                     task_result = await self._run_task(
                         run, harness_config, task_config, env
                     )
                     result.task_results.append(task_result)
+                    
+                    # Track for Weave
+                    if model_key not in results_by_model:
+                        results_by_model[model_key] = []
+                    results_by_model[model_key].append(task_result)
                     
                     # Show result
                     if task_result.success:
@@ -250,6 +301,20 @@ class Executor:
                                 self.log(f"    {name}: {score.score:.0f}%")
                     else:
                         self.log(f"  Result: ERROR - {task_result.error}")
+                    
+                    # Check if this model is now complete and log to Weave
+                    expected_tasks = len([c for c in combinations if f"{c[0].type.value}:{c[0].model}" == model_key])
+                    if len(results_by_model[model_key]) == expected_tasks and weave_logger:
+                        try:
+                            url = weave_logger.log_model_results(
+                                harness_type=harness_config.type.value,
+                                model=harness_config.model,
+                                task_results=results_by_model[model_key],
+                            )
+                            self.log(f"  -> Logged {model_key} to Weave: {url}")
+                        except Exception as e:
+                            self.log(f"  -> Error logging {model_key} to Weave: {e}")
+                    
                     self.log("")
 
         except Exception as e:
@@ -267,28 +332,10 @@ class Executor:
         })
 
         self.log(f"Evaluation completed in {duration:.1f}s")
-
-        # Log to Weave if configured
-        if self.weave_project:
-            self.log("")
-            self.log("Logging results to Weave...")
-            try:
-                from .reporter import WeaveConfig, log_to_weave
-                
-                weave_config = WeaveConfig(project=self.weave_project)
-                eval_urls = log_to_weave(
-                    result=result,
-                    config_name=self.config.name,
-                    weave_config=weave_config,
-                    artifacts_base_path=output_dir,
-                )
-                self.log(f"  Logged {len(eval_urls)} eval runs to Weave")
-                for harness_key, url in eval_urls.items():
-                    self.log(f"    {harness_key}: {url}")
-            except ImportError as e:
-                self.log(f"  Warning: Could not log to Weave - {e}")
-            except Exception as e:
-                self.log(f"  Error logging to Weave: {e}")
+        
+        # Show Weave summary if we logged anything
+        if weave_logger and weave_logger.eval_urls:
+            self.log(f"Weave: {len(weave_logger.eval_urls)} models logged")
 
         return result
 

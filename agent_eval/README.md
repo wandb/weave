@@ -266,6 +266,8 @@ Results can be logged to [Weave](https://wandb.ai/site/weave) for visualization 
 python -m agent_eval.cli run eval.yaml --weave wandb-team/my-project
 ```
 
+Results are streamed to Weave as each model completes, providing real-time feedback.
+
 Data model mapping:
 - **Weave Evaluation** = agent_eval config (dataset of tasks + scorers)
 - **Weave Eval Run** = one harness/model running against all tasks
@@ -276,7 +278,7 @@ Data model mapping:
 ```bash
 # Run an evaluation
 python -m agent_eval.cli run <config.yaml> [options]
-  --parallel N       Run N tasks concurrently (default: 1)
+  --parallel N       Run N tasks concurrently (default: 8)
   --weave PROJECT    Log results to Weave project
   --task ID          Run only specific task
   --harness TYPE     Use only specific harness type

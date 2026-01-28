@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from .executor import EvalResult, TaskResult
+    from .executor import TaskResult
 
 
 @dataclass
@@ -25,127 +25,113 @@ class WeaveConfig:
     
     project: str
     enabled: bool = True
+    _initialized: bool = False
 
 
-def log_to_weave(
-    result: EvalResult,
-    config_name: str,
-    weave_config: WeaveConfig,
-    artifacts_base_path: Path | None = None,
-) -> dict[str, str]:
-    """Log evaluation results to Weave.
+class WeaveLogger:
+    """Manages Weave logging for an evaluation run.
     
-    Creates one Weave evaluation per agent_eval config, with one eval run
-    per harness/model combination.
-    
-    Args:
-        result: The EvalResult from the executor
-        config_name: Name of the evaluation config
-        weave_config: Weave configuration (project name, etc.)
-        artifacts_base_path: Base path to artifacts for reading detailed results
-        
-    Returns:
-        Dict mapping harness names to their Weave eval run URLs
+    Supports streaming results - log each model's results as soon as they complete.
     """
-    try:
-        import weave
+    
+    def __init__(self, config_name: str, weave_config: WeaveConfig, artifacts_base_path: Path | None = None):
+        self.config_name = config_name
+        self.weave_config = weave_config
+        self.artifacts_base_path = artifacts_base_path
+        self.eval_urls: dict[str, str] = {}
+        self._weave_initialized = False
+    
+    def _ensure_initialized(self) -> None:
+        """Initialize Weave if not already done."""
+        if self._weave_initialized:
+            return
+        
+        try:
+            import weave
+            weave.init(self.weave_config.project)
+            self._weave_initialized = True
+        except ImportError:
+            raise ImportError(
+                "weave package required for Weave logging. "
+                "Install with: pip install weave"
+            )
+    
+    def log_model_results(
+        self,
+        harness_type: str,
+        model: str,
+        task_results: list[TaskResult],
+    ) -> str:
+        """Log results for a single model immediately.
+        
+        Call this as soon as all tasks for a model are complete.
+        
+        Args:
+            harness_type: The harness type (e.g., 'opencode')
+            model: The model identifier (e.g., 'gpt-4o')
+            task_results: List of TaskResult for this model
+            
+        Returns:
+            URL to the Weave eval
+        """
+        self._ensure_initialized()
+        
         from weave import EvaluationLogger
-    except ImportError:
-        raise ImportError(
-            "weave package required for Weave logging. "
-            "Install with: pip install weave"
-        )
-    
-    # Initialize Weave
-    weave.init(weave_config.project)
-    
-    # Group task results by harness (model)
-    # Each harness gets its own eval run
-    results_by_harness: dict[str, list[TaskResult]] = {}
-    for task_result in result.task_results:
-        harness_key = f"{task_result.harness}:{task_result.model}"
-        if harness_key not in results_by_harness:
-            results_by_harness[harness_key] = []
-        results_by_harness[harness_key].append(task_result)
-    
-    # Collect all scorer names from results
-    all_scorers: set[str] = set()
-    for task_result in result.task_results:
-        all_scorers.update(task_result.scores.keys())
-    
-    eval_urls: dict[str, str] = {}
-    
-    # Create one eval run per harness/model
-    for harness_key, task_results in results_by_harness.items():
-        harness_type, model = harness_key.split(":", 1)
+        
+        harness_key = f"{harness_type}:{model}"
         
         # Create a readable model name (e.g., "claude-sonnet" from "anthropic/claude-sonnet-4-20250514")
-        model_short = model.split("/")[-1]  # Remove provider prefix if present
+        model_short = model.split("/")[-1]
         
         # Create model metadata
         model_info = {
-            "name": f"{harness_type}:{model}",
+            "name": harness_key,
             "harness": harness_type,
             "model": model,
         }
         
+        # Collect scorer names from results
+        all_scorers: set[str] = set()
+        for task_result in task_results:
+            all_scorers.update(task_result.scores.keys())
+        
         # Initialize EvaluationLogger with combined name for easy identification
-        eval_name = f"{config_name} ({model_short})"
+        eval_name = f"{self.config_name} ({model_short})"
         eval_logger = EvaluationLogger(
             name=eval_name,
             model=model_info,
-            dataset=config_name,
+            dataset=self.config_name,
             scorers=list(all_scorers),
         )
         
         # Log each task as a prediction
         for task_result in task_results:
-            # Build inputs dict - these should be model-agnostic so results
-            # are comparable across different models/harnesses
+            # Build inputs dict - model-agnostic for comparability
             inputs = {
                 "task_id": task_result.task_id,
                 "prompt": task_result.prompt,
                 "timeout": task_result.timeout,
             }
             
-            # Build output dict with job results (model-specific)
-            output = {
-                "success": task_result.success,
-                "harness": task_result.harness,
-                "model": task_result.model,
-                "exit_code": task_result.job_result.exit_code,
-                "duration_seconds": task_result.job_result.duration_seconds,
-                "error": task_result.error,
-            }
-            
-            # Add metrics and workspace content from artifacts
-            if artifacts_base_path:
+            # Add workspace as nested tree with file contents
+            if self.artifacts_base_path:
                 task_artifacts_path = _find_task_artifacts(
-                    artifacts_base_path, 
+                    self.artifacts_base_path, 
                     task_result.task_id, 
                     harness_type, 
                     model
                 )
                 if task_artifacts_path:
-                    metadata = _read_task_metadata(task_artifacts_path)
-                    if metadata and "metrics" in metadata:
-                        output["metrics"] = metadata["metrics"]
-                    
-                    # Add workspace as nested tree with file contents
                     workspace_tree = _build_workspace_tree(task_artifacts_path / "workspace")
                     if workspace_tree:
-                        output["workspace"] = workspace_tree
+                        inputs["workspace"] = workspace_tree
             
-            # Log the prediction
-            pred_logger = eval_logger.log_prediction(
-                inputs=inputs,
-                output=output,
-            )
+            # Log the prediction (no output - just inputs and scores)
+            pred_logger = eval_logger.log_prediction(inputs=inputs)
             
-            # Log each individual check as its own score (no prefix)
+            # Log each individual check as its own score
             for scorer_name, score_result in task_result.scores.items():
                 for check in score_result.checks:
-                    # Use just the check id as the scorer name
                     pred_logger.log_score(
                         scorer=check.id,
                         score={
@@ -154,29 +140,29 @@ def log_to_weave(
                         }
                     )
             
-            # Finish this prediction
             pred_logger.finish()
         
-        # Log summary for this eval run
-        summary = {
-            # "pass_rate": _calculate_pass_rate(task_results),
-            # "total_tasks": len(task_results),
-            # "passed_tasks": sum(1 for r in task_results if r.overall_pass),
-            # "failed_tasks": sum(1 for r in task_results if not r.overall_pass),
-            # "total_duration_seconds": sum(r.job_result.duration_seconds for r in task_results),
-        }
-        
-        # Add aggregated metrics
-        metrics = _aggregate_metrics(task_results, artifacts_base_path)
-        if metrics:
-            summary["metrics"] = metrics
-        
+        # Log summary
+        summary = _build_summary(task_results, self.artifacts_base_path)
         eval_logger.log_summary(summary)
         
-        # Store URL (would need to get from Weave API)
-        eval_urls[harness_key] = f"https://wandb.ai/{weave_config.project}/weave/evals"
+        # Store URL
+        url = f"https://wandb.ai/{self.weave_config.project}/weave/evals"
+        self.eval_urls[harness_key] = url
+        
+        return url
+
+
+def _build_summary(task_results: list[TaskResult], artifacts_base_path: Path | None) -> dict[str, Any]:
+    """Build summary dict for an eval run."""
+    summary: dict[str, Any] = {}
     
-    return eval_urls
+    # Add aggregated metrics
+    metrics = _aggregate_metrics(task_results, artifacts_base_path)
+    if metrics:
+        summary["metrics"] = metrics
+    
+    return summary
 
 
 def _find_task_artifacts(

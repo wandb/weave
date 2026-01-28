@@ -27,7 +27,7 @@ def cli():
 @click.option("--harness", "-h", help="Run only this harness (format: type:model)")
 @click.option("--dry-run", is_flag=True, help="Show what would run without executing")
 @click.option("--output", "-o", type=click.Path(), help="Override output directory")
-@click.option("--parallel", "-p", default=4, help="Max parallel tasks (default: 4, use 1 for sequential)")
+@click.option("--parallel", "-p", default=8, help="Max parallel tasks (default: 8, use 1 for sequential)")
 @click.option("--weave", "-w", "weave_project", help="Log results to Weave project (e.g., 'team/project')")
 def run(config_path: str, task: str | None, harness: str | None, dry_run: bool, output: str | None, parallel: int, weave_project: str | None):
     """Run an evaluation from a config file.
