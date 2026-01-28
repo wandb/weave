@@ -7,7 +7,9 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     AggregatedDataSizeField,
     CallsQuery,
     HardCodedFilter,
+    build_calls_complete_delete_query,
     build_calls_complete_update_end_query,
+    build_calls_complete_update_query,
 )
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.orm import ParamBuilder
@@ -2913,3 +2915,91 @@ def test_query_with_summary_weave_status_filter_calls_complete() -> None:
             "pb_5": "project",
         },
     )
+
+
+def test_build_calls_complete_delete_query() -> None:
+    """Ensure the delete helper builds the expected query."""
+    query = build_calls_complete_delete_query(
+        table_name="calls_complete",
+        project_id_param="project_id",
+        call_ids_param="call_ids",
+    )
+
+    expected = sqlparse.format(
+        """
+        DELETE FROM calls_complete
+        WHERE project_id = {project_id:String} AND id IN {call_ids:Array(String)}
+        """,
+        reindent=True,
+    )
+
+    assert query == expected, f"\nExpected:\n{expected}\n\nGot:\n{query}"
+
+
+def test_build_calls_complete_delete_query_with_cluster() -> None:
+    """Ensure the delete helper builds the expected query with cluster name.
+
+    In distributed mode, mutations target the local table with ON CLUSTER clause.
+    """
+    query = build_calls_complete_delete_query(
+        table_name="calls_complete",
+        project_id_param="project_id",
+        call_ids_param="call_ids",
+        cluster_name="my_cluster",
+    )
+
+    expected = sqlparse.format(
+        """
+        DELETE FROM calls_complete_local ON CLUSTER my_cluster
+        WHERE project_id = {project_id:String} AND id IN {call_ids:Array(String)}
+        """,
+        reindent=True,
+    )
+
+    assert query == expected, f"\nExpected:\n{expected}\n\nGot:\n{query}"
+
+
+def test_build_calls_complete_update_query() -> None:
+    """Ensure the update helper builds the expected query."""
+    query = build_calls_complete_update_query(
+        table_name="calls_complete",
+        project_id_param="project_id",
+        id_param="id",
+        display_name_param="display_name",
+    )
+
+    expected = sqlparse.format(
+        """
+        UPDATE calls_complete
+        SET display_name = {display_name:String}
+        WHERE project_id = {project_id:String} AND id = {id:String}
+        """,
+        reindent=True,
+    )
+
+    assert query == expected, f"\nExpected:\n{expected}\n\nGot:\n{query}"
+
+
+def test_build_calls_complete_update_query_with_cluster() -> None:
+    """Ensure the update helper builds the expected query with cluster name.
+
+    In distributed mode, mutations target the local table with ON CLUSTER clause.
+    """
+    query = build_calls_complete_update_query(
+        table_name="calls_complete",
+        project_id_param="project_id",
+        id_param="id",
+        display_name_param="display_name",
+        cluster_name="my_cluster",
+    )
+
+    expected = sqlparse.format(
+        """
+        UPDATE calls_complete_local ON CLUSTER my_cluster
+        SET display_name = {display_name:String}
+        WHERE project_id = {project_id:String} AND id = {id:String}
+        """,
+        reindent=True,
+    )
+
+    assert query == expected, f"\nExpected:\n{expected}\n\nGot:\n{query}"
