@@ -972,6 +972,14 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         Each root call's usage = its own metrics + sum of all descendants' metrics.
         """
+        logger.info(
+            "calls_usage request project_id=%s call_ids=%d include_costs=%s limit=%s sample_ids=%s",
+            req.project_id,
+            len(req.call_ids) if req.call_ids else 0,
+            req.include_costs,
+            req.limit,
+            req.call_ids[:5] if req.call_ids else [],
+        )
         if not req.call_ids:
             return tsi.CallsUsageRes(call_usage={})
 
@@ -1000,6 +1008,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             project_id=req.project_id,
             read_table=read_table,
         ).table_name
+        logger.info(
+            "calls_usage routing read_table=%s table_alias=%s",
+            read_table.value,
+            table_alias,
+        )
 
         pb = ParamBuilder()
         ctes = CTECollection()
