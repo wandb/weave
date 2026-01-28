@@ -2266,3 +2266,35 @@ def build_calls_complete_update_end_query(
             updated_at = now64(3)
         WHERE {where_clause}
         """
+
+
+def build_calls_complete_delete_query(
+    table_name: str,
+    project_id_param: str,
+    call_ids_param: str,
+    cluster_name: str | None = None,
+) -> str:
+    """Build the calls_complete DELETE query for call end data."""
+    formatted_table = _format_table_name_with_cluster(table_name, cluster_name)
+    raw_sql = f"""
+        DELETE FROM {formatted_table}
+        WHERE project_id = {{{project_id_param}:String}} AND id IN {{{call_ids_param}:Array(String)}}
+        """
+    return safely_format_sql(raw_sql, logger)
+
+
+def build_calls_complete_update_query(
+    table_name: str,
+    project_id_param: str,
+    id_param: str,
+    display_name_param: str,
+    cluster_name: str | None = None,
+) -> str:
+    """Build the calls_complete UPDATE query for call end data."""
+    formatted_table = _format_table_name_with_cluster(table_name, cluster_name)
+    raw_sql = f"""
+        UPDATE {formatted_table}
+        SET display_name = {{{display_name_param}:String}}
+        WHERE project_id = {{{project_id_param}:String}} AND id = {{{id_param}:String}}
+        """
+    return safely_format_sql(raw_sql, logger)
