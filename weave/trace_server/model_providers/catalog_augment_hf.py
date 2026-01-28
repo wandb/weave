@@ -1,3 +1,9 @@
+# /// script
+# requires-python = ">=3.10"
+# dependencies = [
+#   "httpx",
+# ]
+# ///
 """This script generates modelsFinal.json from modelsBegin.json.
 It uses the Hugging Face ID for each model to augment each model
 with information such as number of likes and downloads and license.
@@ -76,7 +82,7 @@ def get_hf_info(model_name: str) -> dict[str, Any]:
         Dict[str, Any]: Dictionary containing filtered HuggingFace model information.
     """
     url = f"https://huggingface.co/api/models/{model_name}"
-    with httpx.Client() as client:
+    with httpx.Client(timeout=30.0) as client:
         response = client.get(url)
         d = response.json()
     filtered = pick_keys(d, HF_KEYS_TO_KEEP)
