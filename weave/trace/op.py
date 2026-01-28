@@ -1605,6 +1605,10 @@ class _IteratorWrapper(Generic[V]):
     ) -> None:
         if exc_type and isinstance(exc_value, Exception):
             self._call_on_error_once(exc_value)
+        if hasattr(self._iterator_or_ctx_manager, "__aexit__"):
+            await self._iterator_or_ctx_manager.__aexit__(
+                exc_type, exc_value, traceback
+            )
         self._call_on_close_once()
 
 
