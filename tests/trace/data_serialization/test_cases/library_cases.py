@@ -82,7 +82,7 @@ library_cases = [
     SerializationTestCase(
         id="Library Objects - Scorer, Evaluation, Dataset, LLMAsAJudgeScorer, LLMStructuredCompletionModel",
         runtime_object_factory=lambda: make_evaluation(),
-        inline_call_param=True,
+        inline_call_param=False,
         is_legacy=False,
         exp_json={
             "_type": "Evaluation",
@@ -292,7 +292,7 @@ library_cases = [
     SerializationTestCase(
         id="Library Objects - Scorer, Evaluation, Dataset, LLMAsAJudgeScorer, LLMStructuredCompletionModel (legacy v4)",
         runtime_object_factory=lambda: make_evaluation(),
-        inline_call_param=True,
+        inline_call_param=False,
         is_legacy=True,
         exp_json={
             "_type": "Evaluation",
