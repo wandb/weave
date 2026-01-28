@@ -69,6 +69,7 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     build_calls_stats_query,
     combine_conditions,
 )
+from weave.trace_server.calls_query_builder.utils import param_slot
 from weave.trace_server.calls_query_builder.usage_query_builder import (
     build_usage_query,
 )
@@ -843,6 +844,31 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             }
         return prices
 
+    def _apply_costs_to_aggregated_usage(
+        self,
+        aggregated_usage: dict[str, dict[str, tsi.LLMAggregatedUsage]],
+        project_id: str,
+    ) -> None:
+        """Populate cost fields on aggregated usage using current model prices."""
+        if not aggregated_usage:
+            return
+
+        models: set[str] = set()
+        for call_usage in aggregated_usage.values():
+            models.update(call_usage.keys())
+
+        prices = self._get_prices_for_models(models, project_id)
+
+        for call_usage in aggregated_usage.values():
+            for model_name, usage in call_usage.items():
+                model_prices = prices.get(model_name, {})
+                prompt_cost = model_prices.get("prompt_token_cost", 0.0)
+                completion_cost = model_prices.get("completion_token_cost", 0.0)
+                usage.prompt_tokens_total_cost = usage.prompt_tokens * prompt_cost
+                usage.completion_tokens_total_cost = (
+                    usage.completion_tokens * completion_cost
+                )
+
     def _compute_costs_for_buckets(
         self,
         usage_buckets: list[dict[str, Any]],
@@ -971,36 +997,79 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if not req.call_ids:
             return tsi.CallsUsageRes(call_usage={})
 
-        root_calls = list(
-            self.calls_query_stream(
-                tsi.CallsQueryReq(
-                    project_id=req.project_id,
-                    filter=tsi.CallsFilter(call_ids=req.call_ids),
-                    columns=["id", "trace_id"],
-                )
-            )
+        @dataclasses.dataclass(frozen=True)
+        class _UsageCall:
+            id: str
+            parent_id: str | None
+            summary: dict[str, Any] | None
+
+        read_table = self.table_routing_resolver.resolve_read_table(
+            req.project_id, self.ch_client
+        )
+        table_alias = CallsQuery(
+            project_id=req.project_id,
+            read_table=read_table,
+        ).table_name
+
+        pb = ParamBuilder()
+        project_param = pb.add_param(req.project_id)
+        call_ids_param = pb.add_param(req.call_ids)
+
+        root_traces_subquery = f"""
+        SELECT {table_alias}.trace_id
+        FROM {table_alias}
+        PREWHERE {table_alias}.project_id = {param_slot(project_param, "String")}
+        WHERE {table_alias}.id IN {param_slot(call_ids_param, "Array(String)")}
+        GROUP BY ({table_alias}.project_id, {table_alias}.id)
+        """
+
+        calls_ids_subquery = f"""
+        SELECT {table_alias}.id
+        FROM {table_alias}
+        PREWHERE {table_alias}.project_id = {param_slot(project_param, "String")}
+        WHERE {table_alias}.trace_id IN ({root_traces_subquery})
+        GROUP BY ({table_alias}.project_id, {table_alias}.id)
+        """
+
+        calls_query = CallsQuery(
+            project_id=req.project_id,
+            read_table=read_table,
+        )
+        calls_query.add_field("id")
+        calls_query.add_field("parent_id")
+        calls_query.add_field("summary")
+        calls_query.set_limit(req.limit)
+
+        base_sql = calls_query._as_sql_base_format(
+            pb,
+            table_alias,
+            id_subquery_name=f"({calls_ids_subquery})",
         )
 
-        trace_ids = {call.trace_id for call in root_calls if call.trace_id}
-        if not trace_ids:
-            return tsi.CallsUsageRes(
-                call_usage={call_id: {} for call_id in req.call_ids}
-            )
+        sql = base_sql
+        columns = [field.field for field in calls_query.select_fields]
 
-        calls = self.calls_query_stream(
-            tsi.CallsQueryReq(
-                project_id=req.project_id,
-                filter=tsi.CallsFilter(trace_ids=list(trace_ids)),
-                query=None,
-                columns=["id", "parent_id", "summary"],
-                include_costs=req.include_costs,
-                limit=req.limit,
-            )
-        )
+        raw_res = self._query_stream(sql, pb.get_params())
+        try:
+            def iter_calls() -> Iterator[_UsageCall]:
+                for row in raw_res:
+                    row_dict = dict(zip(columns, row, strict=False))
+                    summary = _nullable_any_dump_to_any(row_dict.get("summary_dump"))
+                    yield _UsageCall(
+                        id=row_dict.get("id"),
+                        parent_id=row_dict.get("parent_id"),
+                        summary=summary,
+                    )
 
-        aggregated_usage = usage_utils.aggregate_usage_with_descendants(
-            calls, req.include_costs
-        )
+            aggregated_usage = usage_utils.aggregate_usage_with_descendants(
+                iter_calls(), include_costs=False
+            )
+        finally:
+            if hasattr(raw_res, "close"):
+                raw_res.close()
+
+        if req.include_costs:
+            self._apply_costs_to_aggregated_usage(aggregated_usage, req.project_id)
 
         root_usage = {
             call_id: aggregated_usage.get(call_id, {}) for call_id in req.call_ids

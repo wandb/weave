@@ -2,16 +2,22 @@ from __future__ import annotations
 
 from collections import deque
 from collections.abc import Iterable
-from typing import Any
+from typing import Any, Protocol
 
 import ddtrace
 
 from weave.trace_server import trace_server_interface as tsi
 
 
+class UsageCall(Protocol):
+    id: str
+    parent_id: str | None
+    summary: dict[str, Any] | None
+
+
 @ddtrace.tracer.wrap(name="usage_utils.aggregate_usage_with_descendants")
 def aggregate_usage_with_descendants(
-    calls: Iterable[tsi.CallSchema],
+    calls: Iterable[UsageCall],
     include_costs: bool,
 ) -> dict[str, dict[str, tsi.LLMAggregatedUsage]]:
     """Aggregate usage per call, including all descendant usage.
