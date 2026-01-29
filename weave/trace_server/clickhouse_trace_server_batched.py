@@ -1942,6 +1942,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             )
 
     # Annotation Queue API
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.annotation_queue_create")
     def annotation_queue_create(
         self, req: tsi.AnnotationQueueCreateReq
     ) -> tsi.AnnotationQueueCreateRes:
@@ -1971,6 +1972,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         return tsi.AnnotationQueueCreateRes(id=queue_id)
 
+    @ddtrace.tracer.wrap(
+        name="clickhouse_trace_server_batched.annotation_queues_query_stream"
+    )
     def annotation_queues_query_stream(
         self, req: tsi.AnnotationQueuesQueryReq
     ) -> Iterator[tsi.AnnotationQueueSchema]:
@@ -2023,6 +2027,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 deleted_at=deleted_at_with_tz,
             )
 
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.annotation_queue_read")
     def annotation_queue_read(
         self, req: tsi.AnnotationQueueReadReq
     ) -> tsi.AnnotationQueueReadRes:
@@ -2056,12 +2061,20 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         return tsi.AnnotationQueueReadRes(queue=queue)
 
+    @ddtrace.tracer.wrap(
+        name="clickhouse_trace_server_batched.annotation_queue_add_calls"
+    )
     def annotation_queue_add_calls(
         self, req: tsi.AnnotationQueueAddCallsReq
     ) -> tsi.AnnotationQueueAddCallsRes:
         """Add calls to an annotation queue in batch with duplicate prevention."""
         assert_non_null_wb_user_id(req)
         pb = ParamBuilder()
+
+        # Step 0: Determine which table to query based on project data residence
+        read_table = self.table_routing_resolver.resolve_read_table(
+            req.project_id, self.ch_client
+        )
 
         # Step 1: Check for existing calls (duplicate prevention)
         dup_query = make_queue_add_calls_check_duplicates_query(
@@ -2071,7 +2084,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             pb=pb,
         )
 
-        dup_result = self.ch_client.query(dup_query, parameters=pb.get_params())
+        dup_result = self._query(dup_query, parameters=pb.get_params())
         existing_call_ids = {row[0] for row in dup_result.result_rows}
         new_call_ids = [cid for cid in req.call_ids if cid not in existing_call_ids]
 
@@ -2086,9 +2099,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             project_id=req.project_id,
             call_ids=new_call_ids,
             pb=pb2,
+            read_table=read_table,
         )
 
-        calls_result = self.ch_client.query(calls_query, parameters=pb2.get_params())
+        calls_result = self._query(calls_query, parameters=pb2.get_params())
         calls_data = list(calls_result.named_results())
 
         if not calls_data:
@@ -2122,7 +2136,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             )
 
         # Step 4: Batch insert queue items
-        self.ch_client.insert(
+        self._insert(
             "annotation_queue_items",
             queue_items_rows,
             column_names=[
@@ -2144,6 +2158,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             added_count=len(calls_data), duplicates=len(existing_call_ids)
         )
 
+    @ddtrace.tracer.wrap(
+        name="clickhouse_trace_server_batched.annotation_queue_items_query"
+    )
     def annotation_queue_items_query(
         self, req: tsi.AnnotationQueueItemsQueryReq
     ) -> tsi.AnnotationQueueItemsQueryRes:
@@ -2189,6 +2206,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         return tsi.AnnotationQueueItemsQueryRes(items=items)
 
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.annotation_queues_stats")
     def annotation_queues_stats(
         self, req: tsi.AnnotationQueuesStatsReq
     ) -> tsi.AnnotationQueuesStatsRes:
@@ -2221,6 +2239,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         return tsi.AnnotationQueuesStatsRes(stats=stats)
 
+    @ddtrace.tracer.wrap(
+        name="clickhouse_trace_server_batched.annotator_queue_items_progress_update"
+    )
     def annotator_queue_items_progress_update(
         self, req: tsi.AnnotatorQueueItemsProgressUpdateReq
     ) -> tsi.AnnotatorQueueItemsProgressUpdateRes:
