@@ -102,146 +102,18 @@ jobs:
 
   trace-tests:
     name: Trace nox tests
-    timeout-minutes: 15
-    runs-on: ${{ matrix.nox-shard == 'trace' && 'ubuntu-latest-8-cores' || 'ubuntu-latest' }}
-    strategy:
-      matrix:
-        python-version-major: ["3"]
-        python-version-minor: [
-            "10",
-            "11",
-            "13",
-            #
-          ]
-        nox-shard: [
-            "trace",
-            "flow",
-            "trace_server",
-            "trace_server_bindings",
-            "anthropic",
-            "bedrock",
-            "cerebras",
-            "cohere",
-            "crewai",
-            "dspy",
-            "groq",
-            "google_genai",
-            "instructor",
-            "langchain",
-            "litellm",
-            "llamaindex",
-            "mistral",
-            "notdiamond",
-            "openai",
-            "openai_agents",
-            "verifiers_test",
-            "vertexai",
-            "pandas_test",
-            "mcp",
-            "smolagents",
-            # "stainless",
-            "autogen_tests",
-          ]
-        exclude:
-          - python-version-minor: "10"
-            nox-shard: "notdiamond"
-          - python-version-minor: "10"
-            nox-shard: "verifiers_test"
-          - python-version-minor: "13"
-            nox-shard: "cohere"
-          - python-version-minor: "13"
-            nox-shard: "notdiamond"
-          - python-version-minor: "13"
-            nox-shard: "verifiers_test"
-      fail-fast: false
-    services:
-      wandbservice:
-        image: us-central1-docker.pkg.dev/wandb-production/images/local-testcontainer:master
-        credentials:
-          username: _json_key
-          password: ${{ secrets.gcp_wb_sa_key }}
-        env:
-          CI: 1
-          WANDB_ENABLE_TEST_CONTAINER: true
-          LOGGING_ENABLED: true
-        ports:
-          - "8080:8080"
-          - "8083:8083"
-          - "9015:9015"
-        options: >-
-          --health-cmd "wget -q -O /dev/null http://localhost:8080/healthz || exit 1"
-          --health-interval=5s
-          --health-timeout=3s
-          --health-start-period=10s
-      azurite:
-        image: mcr.microsoft.com/azure-storage/azurite
-        ports:
-          - "10000:10000"
-      weave_clickhouse:
-        image: clickhouse/clickhouse-server:25.11.2.24
-        env:
-          CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
-          CLICKHOUSE_USER: default
-          CLICKHOUSE_PASSWORD: ""
-          CLICKHOUSE_DB: default
-        ports:
-          - "8123:8123"
-        options: --health-cmd "wget -nv -O- 'http://localhost:8123/ping' || exit 1" --health-interval=5s --health-timeout=3s
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-      - name: Enable debug logging
-        run: echo "ACTIONS_STEP_DEBUG=true" >> $GITHUB_ENV
-      - name: Install SQLite dev package
-        run: sudo apt update && sudo apt install -y libsqlite3-dev
-      - name: Set up Python ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install nox uv
-      - name: Run nox (Sqlite Trace Server)
-        env:
-          WEAVE_SENTRY_ENV: ci
-          CI: 1
-          WB_SERVER_HOST: http://wandbservice
-          WF_CLICKHOUSE_HOST: weave_clickhouse
-          WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
-          # Use dummy API keys when secrets aren't available (e.g., Dependabot PRs)
-          # Tests use VCR recordings so real keys aren't needed
-          WANDB_API_KEY: ${{ secrets.WANDB_API_KEY || 'DUMMY_API_KEY' }}
-          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY || 'DUMMY_API_KEY' }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || 'DUMMY_API_KEY' }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY || 'DUMMY_API_KEY' }}
-          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY || 'DUMMY_API_KEY' }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY || 'DUMMY_API_KEY' }}
-          DD_TRACE_ENABLED: false
-        run: |
-          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- \
-            -m "trace_server" \
-            --trace-server=sqlite
-      - name: Run nox (Clickhouse Trace Server)
-        env:
-          WEAVE_SENTRY_ENV: ci
-          CI: 1
-          WB_SERVER_HOST: http://wandbservice
-          WF_CLICKHOUSE_HOST: localhost
-          WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
-          DD_TRACE_ENABLED: false
-          OPENAI_API_KEY: dummyapikey
-        run: |
-          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- \
-            -m "trace_server and not skip_clickhouse_client"
-      - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v5
-        with:
-          files: ./tests/coverage.xml
-          flags: trace-tests
-          name: trace-tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}-${{ matrix.nox-shard }}
-          fail_ci_if_error: false
-          token: ${{ secrets.CODECOV_TOKEN }}
+    uses: ./.github/workflows/nox-tests.yaml
+    secrets: inherit
+    with:
+      python_minors: '["10","11","13"]'
+      shards: >-
+        ["trace","flow","trace_server","trace_server_bindings","anthropic","bedrock","cerebras","cohere","crewai","dspy","groq","google_genai","instructor","langchain","litellm","llamaindex","mistral","notdiamond","openai","openai_agents","verifiers_test","vertexai","pandas_test","mcp","smolagents","autogen_tests"]
+      timeout_minutes: 15
+      use_large_runner_for_trace: true
+      use_dummy_keys: true
+      upload_coverage: true
+      coverage_flag: trace-tests
+      coverage_name_prefix: trace-tests
   trace-tests-matrix-check: # This job does nothing and is only used for the branch protection
     if: always()
 

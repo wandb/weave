@@ -1,0 +1,228 @@
+name: nox-tests
+
+on:
+  workflow_call:
+    inputs:
+      python_minors:
+        type: string
+        default: '["10","11","13"]'
+      shards:
+        type: string
+        required: true
+      filter_shards:
+        type: string
+        default: ""
+      timeout_minutes:
+        type: number
+        default: 15
+      use_large_runner_for_trace:
+        type: boolean
+        default: false
+      use_memray:
+        type: boolean
+        default: false
+      use_dummy_keys:
+        type: boolean
+        default: false
+      upload_coverage:
+        type: boolean
+        default: false
+      coverage_flag:
+        type: string
+        default: "trace-tests"
+      coverage_name_prefix:
+        type: string
+        default: "trace-tests"
+      clickhouse_image:
+        type: string
+        default: "clickhouse/clickhouse-server:25.11.2.24"
+    secrets:
+      gcp_wb_sa_key:
+        required: true
+      WANDB_API_KEY:
+        required: false
+      GOOGLE_API_KEY:
+        required: false
+      GEMINI_API_KEY:
+        required: false
+      ANTHROPIC_API_KEY:
+        required: false
+      MISTRAL_API_KEY:
+        required: false
+      OPENAI_API_KEY:
+        required: false
+      CODECOV_TOKEN:
+        required: false
+
+jobs:
+  nox-tests:
+    name: Nox Tests
+    timeout-minutes: ${{ inputs.timeout_minutes }}
+    runs-on: ${{ inputs.use_large_runner_for_trace && matrix.shard == 'trace' && 'ubuntu-latest-8-cores' || 'ubuntu-latest' }}
+    strategy:
+      matrix:
+        python-version-major: ["3"]
+        python-version-minor: ${{ fromJSON(inputs.python_minors) }}
+        shard: ${{ fromJSON(inputs.shards) }}
+        exclude:
+          - python-version-minor: "10"
+            shard: "notdiamond"
+          - python-version-minor: "10"
+            shard: "verifiers_test"
+          - python-version-minor: "13"
+            shard: "cohere"
+          - python-version-minor: "13"
+            shard: "notdiamond"
+          - python-version-minor: "13"
+            shard: "verifiers_test"
+      fail-fast: false
+    services:
+      wandbservice:
+        image: us-central1-docker.pkg.dev/wandb-production/images/local-testcontainer:master
+        credentials:
+          username: _json_key
+          password: ${{ secrets.gcp_wb_sa_key }}
+        env:
+          CI: 1
+          WANDB_ENABLE_TEST_CONTAINER: true
+          LOGGING_ENABLED: true
+        ports:
+          - "8080:8080"
+          - "8083:8083"
+          - "9015:9015"
+        options: >-
+          --health-cmd "wget -q -O /dev/null http://localhost:8080/healthz || exit 1"
+          --health-interval=5s
+          --health-timeout=3s
+          --health-start-period=10s
+      azurite:
+        image: mcr.microsoft.com/azure-storage/azurite
+        ports:
+          - "10000:10000"
+      weave_clickhouse:
+        image: ${{ inputs.clickhouse_image }}
+        env:
+          CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+          CLICKHOUSE_USER: default
+          CLICKHOUSE_PASSWORD: ""
+          CLICKHOUSE_DB: default
+        ports:
+          - "8123:8123"
+        options: --health-cmd "wget -nv -O- 'http://localhost:8123/ping' || exit 1" --health-interval=5s --health-timeout=3s
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Filter shards if specified
+        id: filter_shards
+        run: |
+          INPUT_SHARDS="${{ inputs.filter_shards }}"
+          if [ -n "$INPUT_SHARDS" ]; then
+            echo "Running specific shards: $INPUT_SHARDS"
+            if [[ ! ",$INPUT_SHARDS," == *",${{ matrix.shard }},"* ]]; then
+              echo "Skipping ${{ matrix.shard }} as it's not in the specified list"
+              echo "skip=true" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+          fi
+          echo "Running shard: ${{ matrix.shard }}"
+          echo "skip=false" >> $GITHUB_OUTPUT
+      - name: Enable debug logging
+        if: steps.filter_shards.outputs.skip != 'true'
+        run: echo "ACTIONS_STEP_DEBUG=true" >> $GITHUB_ENV
+      - name: Install SQLite dev package
+        if: steps.filter_shards.outputs.skip != 'true'
+        run: sudo apt update && sudo apt install -y libsqlite3-dev
+      - name: Set up Python ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
+        if: steps.filter_shards.outputs.skip != 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
+      - name: Install dependencies
+        if: steps.filter_shards.outputs.skip != 'true'
+        run: |
+          python -m pip install --upgrade pip
+          pip install nox uv
+      - name: Enable Memray
+        if: steps.filter_shards.outputs.skip != 'true' && inputs.use_memray
+        run: echo "WEAVE_USE_MEMRAY=1" >> $GITHUB_ENV
+      - name: Configure API keys
+        if: steps.filter_shards.outputs.skip != 'true'
+        env:
+          WANDB_API_KEY: ${{ secrets.WANDB_API_KEY }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          if [[ "${{ inputs.use_dummy_keys }}" == "true" ]]; then
+            echo "WANDB_API_KEY=${WANDB_API_KEY:-DUMMY_API_KEY}" >> $GITHUB_ENV
+            echo "GOOGLE_API_KEY=${GOOGLE_API_KEY:-DUMMY_API_KEY}" >> $GITHUB_ENV
+            echo "GEMINI_API_KEY=${GEMINI_API_KEY:-DUMMY_API_KEY}" >> $GITHUB_ENV
+            echo "ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-DUMMY_API_KEY}" >> $GITHUB_ENV
+            echo "MISTRAL_API_KEY=${MISTRAL_API_KEY:-DUMMY_API_KEY}" >> $GITHUB_ENV
+            echo "OPENAI_API_KEY=${OPENAI_API_KEY:-DUMMY_API_KEY}" >> $GITHUB_ENV
+          else
+            echo "WANDB_API_KEY=${WANDB_API_KEY}" >> $GITHUB_ENV
+            echo "GOOGLE_API_KEY=${GOOGLE_API_KEY}" >> $GITHUB_ENV
+            echo "GEMINI_API_KEY=${GEMINI_API_KEY}" >> $GITHUB_ENV
+            echo "ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}" >> $GITHUB_ENV
+            echo "MISTRAL_API_KEY=${MISTRAL_API_KEY}" >> $GITHUB_ENV
+            echo "OPENAI_API_KEY=${OPENAI_API_KEY}" >> $GITHUB_ENV
+          fi
+      - name: Check if shard needs trace_server markers
+        id: check_trace_markers
+        if: steps.filter_shards.outputs.skip != 'true'
+        run: |
+          TRACE_SERVER_SHARDS="flow trace_server trace_server_bindings anthropic cerebras cohere crewai dspy groq google_genai google_ai_studio instructor langchain litellm llamaindex mistral notdiamond openai openai_agents vertexai bedrock scorers pandas_test huggingface smolagents mcp autogen_tests trace trace_no_server"
+          if [[ " $TRACE_SERVER_SHARDS " =~ " ${{ matrix.shard }} " ]]; then
+            echo "needs_markers=true" >> $GITHUB_OUTPUT
+          else
+            echo "needs_markers=false" >> $GITHUB_OUTPUT
+          fi
+      - name: Run nox (Sqlite Trace Server)
+        if: steps.filter_shards.outputs.skip != 'true' && steps.check_trace_markers.outputs.needs_markers == 'true'
+        env:
+          WEAVE_SENTRY_ENV: ci
+          CI: 1
+          WB_SERVER_HOST: http://wandbservice
+          WF_CLICKHOUSE_HOST: weave_clickhouse
+          WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
+          DD_TRACE_ENABLED: false
+        run: |
+          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.shard }}')" -- \
+            -m "trace_server" \
+            --trace-server=sqlite
+      - name: Run nox (Clickhouse Trace Server)
+        if: steps.filter_shards.outputs.skip != 'true' && steps.check_trace_markers.outputs.needs_markers == 'true'
+        env:
+          WEAVE_SENTRY_ENV: ci
+          CI: 1
+          WB_SERVER_HOST: http://wandbservice
+          WF_CLICKHOUSE_HOST: localhost
+          WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
+          DD_TRACE_ENABLED: false
+          OPENAI_API_KEY: dummyapikey
+        run: |
+          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.shard }}')" -- \
+            -m "trace_server and not skip_clickhouse_client"
+      - name: Run nox (No marker filters for integration-only shards)
+        if: steps.filter_shards.outputs.skip != 'true' && steps.check_trace_markers.outputs.needs_markers == 'false'
+        env:
+          WEAVE_SENTRY_ENV: ci
+          CI: 1
+          WB_SERVER_HOST: http://wandbservice
+          WF_CLICKHOUSE_HOST: localhost
+          WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
+          DD_TRACE_ENABLED: false
+        run: |
+          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.shard }}')"
+      - name: Upload coverage reports to Codecov
+        if: inputs.upload_coverage && steps.filter_shards.outputs.skip != 'true'
+        uses: codecov/codecov-action@v5
+        with:
+          files: ./tests/coverage.xml
+          flags: ${{ inputs.coverage_flag }}
+          name: ${{ inputs.coverage_name_prefix }}-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}-${{ matrix.shard }}
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
