@@ -142,6 +142,17 @@ jobs:
             # "stainless",
             "autogen_tests",
           ]
+        exclude:
+          - python-version-minor: "10"
+            nox-shard: "notdiamond"
+          - python-version-minor: "10"
+            nox-shard: "verifiers_test"
+          - python-version-minor: "13"
+            nox-shard: "cohere"
+          - python-version-minor: "13"
+            nox-shard: "notdiamond"
+          - python-version-minor: "13"
+            nox-shard: "verifiers_test"
       fail-fast: false
     services:
       wandbservice:
@@ -326,6 +337,17 @@ jobs:
             # "stainless",
             "autogen_tests",
           ]
+        exclude:
+          - python-version-minor: "10"
+            nox-shard: "notdiamond"
+          - python-version-minor: "10"
+            nox-shard: "verifiers_test"
+          - python-version-minor: "13"
+            nox-shard: "cohere"
+          - python-version-minor: "13"
+            nox-shard: "notdiamond"
+          - python-version-minor: "13"
+            nox-shard: "verifiers_test"
       fail-fast: false
     steps:
       - name: Checkout

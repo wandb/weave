@@ -55,6 +55,17 @@ jobs:
             "smolagents",
             "autogen_tests",
           ]
+        exclude:
+          - python-version-minor: "10"
+            shard: "notdiamond"
+          - python-version-minor: "10"
+            shard: "verifiers_test"
+          - python-version-minor: "13"
+            shard: "cohere"
+          - python-version-minor: "13"
+            shard: "notdiamond"
+          - python-version-minor: "13"
+            shard: "verifiers_test"
       fail-fast: false
     services:
       wandbservice:
