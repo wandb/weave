@@ -127,6 +127,9 @@ class CallSchema(BaseModel):
     wb_run_step: int | None = None
     wb_run_step_end: int | None = None
 
+    # Reference to a CallViewSpec object containing view configurations
+    view_spec_ref: str | None = None
+
     deleted_at: datetime.datetime | None = None
 
     # Size of metadata storage for this call
@@ -197,6 +200,9 @@ class EndedCallSchemaForInsert(BaseModel):
     # WB Metadata
     wb_run_step_end: int | None = None
 
+    # Reference to a CallViewSpec object containing view configurations
+    view_spec_ref: str | None = None
+
     @field_serializer("summary")
     def serialize_typed_dicts(self, v: dict[str, Any]) -> dict[str, Any]:
         return dict(v)
@@ -251,6 +257,9 @@ class CompletedCallSchemaForInsert(BaseModel):
     wb_run_id: str | None = None
     wb_run_step: int | None = None
     wb_run_step_end: int | None = None
+
+    # Reference to a CallViewSpec object containing view configurations
+    view_spec_ref: str | None = None
 
     @field_serializer("attributes", "summary", when_used="unless-none")
     def serialize_typed_dicts(self, v: dict[str, Any]) -> dict[str, Any]:

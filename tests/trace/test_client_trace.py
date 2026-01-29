@@ -207,6 +207,7 @@ def test_trace_server_call_start_and_end(client):
         "total_storage_size_bytes": None,
         "thread_id": None,
         "turn_id": None,
+        "view_spec_ref": None,
     }
 
     end = tsi.EndedCallSchemaForInsert(
@@ -259,6 +260,7 @@ def test_trace_server_call_start_and_end(client):
         "total_storage_size_bytes": None,
         "thread_id": None,
         "turn_id": None,
+        "view_spec_ref": None,
     }
 
 
