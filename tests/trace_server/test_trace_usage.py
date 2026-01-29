@@ -30,6 +30,24 @@ _REQUIRED_COST_FIELDS = (
     "created_by",
 )
 
+_ROOT_USAGE = {
+    "gpt-4": {
+        "prompt_tokens": 5,
+        "completion_tokens": 5,
+        "total_tokens": 10,
+        "requests": 1,
+    }
+}
+_MIDDLE_USAGE = {"gpt-4": {"input_tokens": 2, "output_tokens": 1}}
+_LEAF_USAGE = {
+    "gpt-4": {
+        "prompt_tokens": 3,
+        "completion_tokens": 1,
+        "total_tokens": 4,
+        "requests": 1,
+    }
+}
+
 
 def skip_if_sqlite(client: weave_client.WeaveClient) -> None:
     if client_is_sqlite(client):
@@ -84,7 +102,7 @@ def _create_call(
     trace_id: str,
     parent_id: str | None,
     started_at: datetime.datetime,
-    usage: dict[str, dict[str, Any]],
+    usage: dict[str, dict[str, Any]] | None,
 ) -> None:
     project_id = client._project_id()
     client.server.call_start(
@@ -101,16 +119,36 @@ def _create_call(
             )
         )
     )
+    summary: dict[str, Any] = {"usage": usage} if usage is not None else {}
     client.server.call_end(
         tsi.CallEndReq(
             end=tsi.EndedCallSchemaForInsert(
                 project_id=project_id,
                 id=call_id,
                 ended_at=started_at + datetime.timedelta(seconds=1),
-                summary={"usage": usage},
+                summary=summary,
             )
         )
     )
+
+
+def _usage_totals(
+    usage: dict[str, dict[str, Any]] | None,
+) -> tuple[int, int, int, int]:
+    if not usage:
+        return (0, 0, 0, 0)
+    llm_usage = usage.get("gpt-4", {})
+    prompt_tokens = int(llm_usage.get("prompt_tokens") or 0) + int(
+        llm_usage.get("input_tokens") or 0
+    )
+    completion_tokens = int(llm_usage.get("completion_tokens") or 0) + int(
+        llm_usage.get("output_tokens") or 0
+    )
+    requests = int(llm_usage.get("requests") or 0)
+    total_tokens = int(llm_usage.get("total_tokens") or 0)
+    if total_tokens == 0:
+        total_tokens = prompt_tokens + completion_tokens
+    return (prompt_tokens, completion_tokens, total_tokens, requests)
 
 
 def test_aggregate_usage_with_descendants_rolls_up() -> None:
@@ -472,3 +510,181 @@ def test_trace_usage_include_costs_flag(client: weave_client.WeaveClient) -> Non
     usage_with_costs = res_with_costs.call_usage[call_id]["gpt-4"]
     assert usage_with_costs.prompt_tokens_total_cost is not None
     assert usage_with_costs.completion_tokens_total_cost is not None
+
+
+def test_calls_usage_rolls_up_descendants(client: weave_client.WeaveClient) -> None:
+    skip_if_sqlite(client)
+
+    project_id = client._project_id()
+    trace_id = str(uuid.uuid4())
+    trace_id_two = str(uuid.uuid4())
+    now = datetime.datetime.now(datetime.timezone.utc)
+
+    root_id = str(uuid.uuid4())
+    child_id = str(uuid.uuid4())
+    grandchild_id = str(uuid.uuid4())
+    root_id_two = str(uuid.uuid4())
+
+    _create_call(
+        client,
+        root_id,
+        trace_id,
+        None,
+        now,
+        {"gpt-4": {"prompt_tokens": 5, "completion_tokens": 5, "total_tokens": 10}},
+    )
+    _create_call(
+        client,
+        child_id,
+        trace_id,
+        root_id,
+        now + datetime.timedelta(seconds=2),
+        {"gpt-4": {"input_tokens": 2, "output_tokens": 1}},
+    )
+    _create_call(
+        client,
+        grandchild_id,
+        trace_id,
+        child_id,
+        now + datetime.timedelta(seconds=4),
+        {"gpt-4": {"prompt_tokens": 3, "completion_tokens": 1, "total_tokens": 4}},
+    )
+    _create_call(
+        client,
+        root_id_two,
+        trace_id_two,
+        None,
+        now + datetime.timedelta(seconds=6),
+        {"gpt-4": {"prompt_tokens": 2, "completion_tokens": 1, "total_tokens": 3}},
+    )
+
+    res = client.server.calls_usage(
+        tsi.CallsUsageReq(
+            project_id=project_id,
+            call_ids=[root_id, root_id_two],
+        )
+    )
+
+    root_usage = res.call_usage[root_id]["gpt-4"]
+    assert root_usage.prompt_tokens == 10
+    assert root_usage.completion_tokens == 7
+    assert root_usage.total_tokens == 17
+
+    root_two_usage = res.call_usage[root_id_two]["gpt-4"]
+    assert root_two_usage.prompt_tokens == 2
+    assert root_two_usage.completion_tokens == 1
+    assert root_two_usage.total_tokens == 3
+
+
+def test_calls_usage_include_costs_flag(client: weave_client.WeaveClient) -> None:
+    skip_if_sqlite(client)
+
+    project_id = client._project_id()
+    trace_id = str(uuid.uuid4())
+    now = datetime.datetime.now(datetime.timezone.utc)
+
+    call_id = str(uuid.uuid4())
+    _create_call(
+        client,
+        call_id,
+        trace_id,
+        None,
+        now,
+        {"gpt-4": {"prompt_tokens": 2, "completion_tokens": 1, "total_tokens": 3}},
+    )
+
+    res_no_costs = client.server.calls_usage(
+        tsi.CallsUsageReq(
+            project_id=project_id,
+            call_ids=[call_id],
+            include_costs=False,
+        )
+    )
+    usage_no_costs = res_no_costs.call_usage[call_id]["gpt-4"]
+    assert usage_no_costs.prompt_tokens_total_cost is None
+    assert usage_no_costs.completion_tokens_total_cost is None
+
+    res_with_costs = client.server.calls_usage(
+        tsi.CallsUsageReq(
+            project_id=project_id,
+            call_ids=[call_id],
+            include_costs=True,
+        )
+    )
+    usage_with_costs = res_with_costs.call_usage[call_id]["gpt-4"]
+    assert usage_with_costs.prompt_tokens_total_cost is not None
+    assert usage_with_costs.completion_tokens_total_cost is not None
+
+
+@pytest.mark.parametrize(
+    ("root_usage", "middle_usage", "leaf_usage"),
+    [
+        (None, _MIDDLE_USAGE, _LEAF_USAGE),
+        (_ROOT_USAGE, None, _LEAF_USAGE),
+        (None, None, _LEAF_USAGE),
+        (None, None, None),
+    ],
+    ids=[
+        "root_missing_usage",
+        "middle_missing_usage",
+        "root_and_middle_missing_usage",
+        "no_usage_anywhere",
+    ],
+)
+def test_calls_usage_handles_missing_usage(
+    client: weave_client.WeaveClient,
+    root_usage: dict[str, dict[str, Any]] | None,
+    middle_usage: dict[str, dict[str, Any]] | None,
+    leaf_usage: dict[str, dict[str, Any]] | None,
+) -> None:
+    skip_if_sqlite(client)
+
+    project_id = client._project_id()
+    trace_id = str(uuid.uuid4())
+    now = datetime.datetime.now(datetime.timezone.utc)
+
+    root_id = str(uuid.uuid4())
+    middle_id = str(uuid.uuid4())
+    leaf_id = str(uuid.uuid4())
+
+    _create_call(client, root_id, trace_id, None, now, root_usage)
+    _create_call(
+        client,
+        middle_id,
+        trace_id,
+        root_id,
+        now + datetime.timedelta(seconds=2),
+        middle_usage,
+    )
+    _create_call(
+        client,
+        leaf_id,
+        trace_id,
+        middle_id,
+        now + datetime.timedelta(seconds=4),
+        leaf_usage,
+    )
+
+    res = client.server.calls_usage(
+        tsi.CallsUsageReq(
+            project_id=project_id,
+            call_ids=[root_id],
+        )
+    )
+
+    root_totals = _usage_totals(root_usage)
+    middle_totals = _usage_totals(middle_usage)
+    leaf_totals = _usage_totals(leaf_usage)
+    expected_root = tuple(
+        map(sum, zip(root_totals, middle_totals, leaf_totals, strict=False))
+    )
+
+    if expected_root == (0, 0, 0, 0):
+        assert res.call_usage[root_id] == {}
+        return
+
+    usage = res.call_usage[root_id]["gpt-4"]
+    assert usage.prompt_tokens == expected_root[0]
+    assert usage.completion_tokens == expected_root[1]
+    assert usage.total_tokens == expected_root[2]
+    assert usage.requests == expected_root[3]

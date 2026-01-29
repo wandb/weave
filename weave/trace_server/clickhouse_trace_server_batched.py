@@ -958,11 +958,76 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             )
         )
 
+        def iter_usage_calls() -> Iterator[usage_utils.UsageCall]:
+            for call in calls:
+                yield usage_utils.UsageCall(
+                    id=call.id,
+                    parent_id=call.parent_id,
+                    summary=call.summary,
+                )
+
         aggregated_usage = usage_utils.aggregate_usage_with_descendants(
-            calls, req.include_costs
+            iter_usage_calls(), req.include_costs
         )
 
         return tsi.TraceUsageRes(call_usage=aggregated_usage)
+
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.calls_usage")
+    def calls_usage(self, req: tsi.CallsUsageReq) -> tsi.CallsUsageRes:
+        """Compute aggregated usage for multiple root calls.
+
+        Each root call's usage = its own metrics + sum of all descendants' metrics.
+        """
+        if not req.call_ids:
+            return tsi.CallsUsageRes(call_usage={})
+
+        # Resolve trace IDs for requested root calls.
+        root_calls = self.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=req.project_id,
+                filter=tsi.CallsFilter(call_ids=req.call_ids),
+                columns=["trace_id"],
+                limit=len(req.call_ids),
+            )
+        )
+        trace_ids = {call.trace_id for call in root_calls}
+        if not trace_ids:
+            root_usage: dict[str, dict[str, tsi.LLMAggregatedUsage]] = {
+                call_id: {} for call_id in req.call_ids
+            }
+            return tsi.CallsUsageRes(call_usage=root_usage)
+
+        # Stream all calls in those traces with minimal columns for aggregation.
+        calls = self.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=req.project_id,
+                filter=tsi.CallsFilter(trace_ids=list(trace_ids)),
+                columns=["id", "parent_id", "summary"],
+                include_costs=req.include_costs,
+                limit=req.limit,
+            )
+        )
+
+        # Convert CallSchema rows into lightweight usage calls.
+        def iter_calls() -> Iterator[usage_utils.UsageCall]:
+            for call in calls:
+                yield usage_utils.UsageCall(
+                    id=call.id,
+                    parent_id=call.parent_id,
+                    summary=call.summary,
+                )
+
+        # Aggregate usage bottom-up to include descendants.
+        aggregated_usage = usage_utils.aggregate_usage_with_descendants(
+            iter_calls(), req.include_costs
+        )
+
+        # Return only the requested root call IDs.
+        root_usage = {
+            call_id: aggregated_usage.get(call_id, {}) for call_id in req.call_ids
+        }
+
+        return tsi.CallsUsageRes(call_usage=root_usage)
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.calls_query_stream")
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:

@@ -598,6 +598,22 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
     @validate_call
+    def calls_usage(self, req: tsi.CallsUsageReq) -> tsi.CallsUsageRes:
+        """Compute aggregated usage for multiple root calls.
+
+        Args:
+            req: Calls usage request.
+
+        Returns:
+            Calls usage response.
+        """
+        return self._stainless_request(
+            req,
+            tsi.CallsUsageRes,
+            self._stainless_client.calls.usage,
+        )
+
+    @validate_call
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
         """Delete calls.
 

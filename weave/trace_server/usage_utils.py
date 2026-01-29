@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 from collections import deque
 from collections.abc import Iterable
 from typing import Any
@@ -9,9 +10,16 @@ import ddtrace
 from weave.trace_server import trace_server_interface as tsi
 
 
+@dataclasses.dataclass(frozen=True)
+class UsageCall:
+    id: str
+    parent_id: str | None
+    summary: dict[str, Any] | None
+
+
 @ddtrace.tracer.wrap(name="usage_utils.aggregate_usage_with_descendants")
 def aggregate_usage_with_descendants(
-    calls: Iterable[tsi.CallSchema],
+    calls: Iterable[UsageCall],
     include_costs: bool,
 ) -> dict[str, dict[str, tsi.LLMAggregatedUsage]]:
     """Aggregate usage per call, including all descendant usage.
@@ -64,7 +72,7 @@ def aggregate_usage_with_descendants(
 
 
 def _extract_call_usage(
-    call: tsi.CallSchema,
+    call: UsageCall,
     include_costs: bool,
 ) -> dict[str, tsi.LLMAggregatedUsage]:
     # Pull the usage map out of the call summary (if present).
