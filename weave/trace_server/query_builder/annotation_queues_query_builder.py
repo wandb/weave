@@ -4,6 +4,7 @@ This module provides query building functions for the queue-based call annotatio
 following the same patterns as threads_query_builder.py and other query builders in the codebase.
 """
 
+from weave.trace_server.calls_query_builder.calls_query_builder import ReadTable
 from weave.trace_server.common_interface import (
     AnnotationQueueItemsFilter,
     SortBy,
@@ -263,6 +264,7 @@ def make_queue_add_calls_fetch_calls_query(
     project_id: str,
     call_ids: list[str],
     pb: ParamBuilder,
+    read_table: ReadTable,
 ) -> str:
     """Generate a query to fetch call details for adding to queue.
 
@@ -272,6 +274,7 @@ def make_queue_add_calls_fetch_calls_query(
         project_id: The project ID
         call_ids: List of call IDs to fetch
         pb: Parameter builder for safe SQL parameter injection
+        read_table: Which table to query (calls_merged or calls_complete)
 
     Returns:
         SQL query string to fetch call details
@@ -279,19 +282,37 @@ def make_queue_add_calls_fetch_calls_query(
     project_id_param = pb.add_param(project_id)
     call_ids_param = pb.add_param(call_ids)
 
-    # Query the calls_merged table, using any() to handle SimpleAggregateFunction columns
-    query = f"""
-    SELECT
-        id,
-        any(started_at) as started_at,
-        any(ended_at) as ended_at,
-        any(op_name) as op_name,
-        any(trace_id) as trace_id
-    FROM calls_merged
-    WHERE project_id = {{{project_id_param}: String}}
-        AND id IN {{{call_ids_param}: Array(String)}}
-    GROUP BY (project_id, id)
-    """
+    table_name = (
+        "calls_merged" if read_table == ReadTable.CALLS_MERGED else "calls_complete"
+    )
+
+    if read_table == ReadTable.CALLS_MERGED:
+        # For calls_merged, use any() to handle SimpleAggregateFunction columns
+        query = f"""
+        SELECT
+            id,
+            any(started_at) as started_at,
+            any(ended_at) as ended_at,
+            any(op_name) as op_name,
+            any(trace_id) as trace_id
+        FROM {table_name}
+        WHERE project_id = {{{project_id_param}: String}}
+            AND id IN {{{call_ids_param}: Array(String)}}
+        GROUP BY (project_id, id)
+        """
+    else:
+        # For calls_complete, columns are already aggregated
+        query = f"""
+        SELECT
+            id,
+            started_at,
+            ended_at,
+            op_name,
+            trace_id
+        FROM {table_name}
+        WHERE project_id = {{{project_id_param}: String}}
+            AND id IN {{{call_ids_param}: Array(String)}}
+        """
 
     return query
 
