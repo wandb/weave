@@ -5,6 +5,9 @@ from weave.trace_server.interface.builtin_object_classes.annotation_spec import 
 from weave.trace_server.interface.builtin_object_classes.base_object_def import (
     BaseObject,
 )
+from weave.trace_server.interface.builtin_object_classes.call_view_spec import (
+    CallViewSpec,
+)
 from weave.trace_server.interface.builtin_object_classes.comparison_view import (
     ComparisonView,
 )
@@ -50,3 +53,4 @@ register_base_object(SavedView)
 register_base_object(ComparisonView)
 register_base_object(LLMStructuredCompletionModel)
 register_base_object(ChartConfig)
+register_base_object(CallViewSpec)

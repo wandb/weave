@@ -82,6 +82,9 @@ class Call:
     _children: list[Call] = dataclasses.field(default_factory=list)
     _feedback: RefFeedbackQuery | None = None
 
+    # Pending views to be saved as CallViewSpec object at call_end
+    _pending_views: dict[str, Any] = dataclasses.field(default_factory=dict)
+
     # Size of metadata storage for this call
     storage_size_bytes: int | None = None
 

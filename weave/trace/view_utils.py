@@ -2,16 +2,31 @@
 
 from __future__ import annotations
 
-from typing import Any
+import base64
+from typing import TYPE_CHECKING, Any
 
 from weave.trace.call import Call
+from weave.trace.refs import ObjectRef
 from weave.trace.serialization.serialize import to_json
 from weave.trace.table import Table
-from weave.trace.weave_client import WeaveClient
-from weave.trace.widgets import Widget
+from weave.trace.widgets import ChildPredictionsWidget, ScoreSummaryWidget, Widget
+from weave.trace_server.interface.builtin_object_classes.call_view_spec import (
+    CallViewSpec,
+    ChildPredictionsWidgetItem,
+    ContentViewItem,
+    ObjectRefViewItem,
+    ScoreSummaryWidgetItem,
+    TableRefViewItem,
+)
+from weave.trace_server.interface.builtin_object_classes.call_view_spec import (
+    ViewItem as CallViewSpecItem,
+)
 from weave.type_wrappers.Content.content import Content
 
-ViewItem = Content | str | Widget | Table
+if TYPE_CHECKING:
+    from weave.trace.weave_client import WeaveClient
+
+ViewItem = Content | str | Widget | Table | ObjectRef
 ViewSpec = ViewItem | list[ViewItem]
 
 
@@ -148,6 +163,101 @@ def serialize_view_spec(
         )
 
 
+def _sdk_view_item_to_call_view_spec_item(
+    item: ViewItem,
+    client: WeaveClient,
+    *,
+    extension: str | None = None,
+    mimetype: str | None = None,
+    metadata: dict[str, Any] | None = None,
+    encoding: str = "utf-8",
+) -> CallViewSpecItem:
+    """Convert an SDK view item to a CallViewSpec item for storage.
+
+    Args:
+        item: A Content, string, Widget, or Table to convert.
+        client: The WeaveClient for saving tables.
+        extension: Optional file extension for string content.
+        mimetype: Optional MIME type for string content.
+        metadata: Optional metadata for string content.
+        encoding: Encoding for string content.
+
+    Returns:
+        A CallViewSpec item (ContentViewItem, WidgetItem, or TableRefViewItem).
+    """
+    if isinstance(item, ScoreSummaryWidget):
+        return ScoreSummaryWidgetItem()
+    elif isinstance(item, ChildPredictionsWidget):
+        return ChildPredictionsWidgetItem()
+    elif isinstance(item, Widget):
+        # Future widgets - default to score_summary for now
+        return ScoreSummaryWidgetItem()
+    elif isinstance(item, Table):
+        # Publish the table and return its ref URI
+        table_ref = client._save_table(item)
+        return TableRefViewItem(uri=table_ref.uri())
+    elif isinstance(item, ObjectRef):
+        # Store object references (e.g., SavedView) as URI strings
+        return ObjectRefViewItem(uri=item.uri())
+    elif isinstance(item, (Content, str)):
+        content_obj = resolve_view_content(
+            item,
+            extension=extension,
+            mimetype=mimetype,
+            metadata=metadata,
+            encoding=encoding,
+        )
+        # Encode content data as base64
+        data_bytes = (
+            content_obj.data
+            if isinstance(content_obj.data, bytes)
+            else content_obj.data.encode(content_obj.encoding or "utf-8")
+        )
+        return ContentViewItem(
+            mimetype=content_obj.mimetype,
+            encoding=content_obj.encoding,
+            data=base64.b64encode(data_bytes).decode("ascii"),
+            metadata=content_obj.metadata,
+        )
+    else:
+        raise TypeError(f"Unsupported view item type: {type(item)}")
+
+
+def _sdk_view_spec_to_call_view_spec_item(
+    spec: ViewSpec,
+    client: WeaveClient,
+    *,
+    extension: str | None = None,
+    mimetype: str | None = None,
+    metadata: dict[str, Any] | None = None,
+    encoding: str = "utf-8",
+) -> CallViewSpecItem | list[CallViewSpecItem]:
+    """Convert an SDK view spec to CallViewSpec item(s).
+
+    Args:
+        spec: A single view item or list of view items.
+        client: The WeaveClient for saving tables.
+        extension: Optional file extension for string content.
+        mimetype: Optional MIME type for string content.
+        metadata: Optional metadata for string content.
+        encoding: Encoding for string content.
+
+    Returns:
+        A CallViewSpec item or list of items.
+    """
+    if isinstance(spec, list):
+        return [_sdk_view_item_to_call_view_spec_item(item, client) for item in spec]
+    else:
+        return _sdk_view_item_to_call_view_spec_item(
+            spec,
+            client,
+            extension=extension,
+            mimetype=mimetype,
+            metadata=metadata,
+            encoding=encoding,
+        )
+
+
 def set_call_view(
     *,
     call: Call,
@@ -159,12 +269,16 @@ def set_call_view(
     metadata: dict[str, Any] | None = None,
     encoding: str = "utf-8",
 ) -> None:
-    """Attach serialized content to the provided call's summary under `weave.views`.
+    """Attach a view to the call's pending views for later storage as CallViewSpec.
+
+    Views are stored in the call's _pending_views dict and will be converted to
+    a CallViewSpec object when the call is finished. This allows deduplication
+    of identical view configurations across calls.
 
     Args:
-        call: The call whose summary should receive the view entry.
+        call: The call whose pending views should receive the view entry.
         client: The active ``WeaveClient`` used for serialization.
-        name: Key to store the view under within ``summary.weave.views``.
+        name: Key to store the view under.
         content: A ``weave.Content``, raw text, ``Widget``, ``Table``, or list of these
             to serialize into the view.
         extension: Optional file extension used when converting text content.
@@ -189,35 +303,46 @@ def set_call_view(
         ...     extension="html",
         ... )
     """
-    if call.summary is None:
-        call.summary = {}
-
-    summary = call.summary
-
-    weave_bucket = summary.get("weave")
-    if not isinstance(weave_bucket, dict):
-        weave_bucket = {}
-        summary["weave"] = weave_bucket
-
-    legacy_views = summary.get("views")
-    if isinstance(legacy_views, dict):
-        summary.pop("views", None)
-    views = weave_bucket.get("views")
-
-    if not isinstance(views, dict):
-        views = {}
-        weave_bucket["views"] = views
-
-    if isinstance(legacy_views, dict):
-        views.update(legacy_views)
-
-    project_id = client._project_id()
-    views[name] = serialize_view_spec(
+    # Store the converted view item in _pending_views
+    call._pending_views[name] = _sdk_view_spec_to_call_view_spec_item(
         content,
-        project_id,
         client,
         extension=extension,
         mimetype=mimetype,
         metadata=metadata,
         encoding=encoding,
     )
+
+
+def build_and_save_call_view_spec(
+    call: Call,
+    client: WeaveClient,
+) -> str | None:
+    """Build a CallViewSpec from pending views and save it as an object.
+
+    This function collects all pending views from the call, creates a CallViewSpec
+    object, and saves it to the project. The returned ref URI can be used as the
+    view_spec_ref in the call_end request.
+
+    Args:
+        call: The call with pending views to save.
+        client: The WeaveClient for saving the object.
+
+    Returns:
+        The view_spec_ref URI string, or None if no views are pending.
+    """
+    if not call._pending_views:
+        return None
+
+    # Convert pending views dict values to the proper union type
+    views_dict: dict[str, CallViewSpecItem | list[CallViewSpecItem]] = {}
+    for name, item in call._pending_views.items():
+        views_dict[name] = item
+
+    # Create the CallViewSpec object
+    view_spec = CallViewSpec(views=views_dict)
+
+    # Save as a versioned object - content-addressed storage will deduplicate
+    ref: ObjectRef = client._save_object(view_spec, name="CallViewSpec")
+
+    return ref.uri()
