@@ -7,7 +7,7 @@ from datetime import datetime
 from itertools import chain, repeat
 from typing import Any, Literal
 
-from pydantic import PrivateAttr
+from pydantic import Field, PrivateAttr
 from typing_extensions import Self
 
 from weave.dataset.dataset import Dataset
@@ -119,13 +119,15 @@ class Evaluation(Object):
     # custom `call_display_name` to `weave.op` (see that for more details).
     evaluation_name: str | CallDisplayNameFunc | None = None
 
+    # internal attr to track whether to use the new `output` or old `model_output` key for outputs
+    _output_key: Literal["output", "model_output"] = PrivateAttr("output")
+
     # Callback invoked at the end of evaluate() with full context.
     # Runs inside the evaluate call context, so weave.set_view() will attach to the evaluation.
     # Signature: on_complete(evaluation, model, results, summary) -> None
-    on_complete: OnCompleteCallback | None = None
-
-    # internal attr to track whether to use the new `output` or old `model_output` key for outputs
-    _output_key: Literal["output", "model_output"] = PrivateAttr("output")
+    # Note: Must be excluded from Pydantic serialization (callables can't be serialized)
+    # We use Field(exclude=True) instead of PrivateAttr so it can be passed to __init__
+    on_complete: OnCompleteCallback | None = Field(default=None, exclude=True)
 
     @classmethod
     def from_obj(cls, obj: WeaveObject) -> Self:

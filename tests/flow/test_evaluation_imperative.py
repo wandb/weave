@@ -740,6 +740,7 @@ def test_evaluation_logger_set_view_string(client):
     assert view_spec.views["view"].type == "content"
     # Verify the content is base64 encoded HTML
     import base64
+
     content_bytes = base64.b64decode(view_spec.views["view"].data)
     assert b"<h1>Eval</h1>" in content_bytes
 
