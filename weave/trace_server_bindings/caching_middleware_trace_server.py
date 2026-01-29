@@ -448,6 +448,9 @@ class CachingMiddlewareTraceServer(TraceServerClientInterface):
     def call_stats(self, req: tsi.CallStatsReq) -> tsi.CallStatsRes:
         return self._next_trace_server.call_stats(req)
 
+    def trace_usage(self, req: tsi.TraceUsageReq) -> tsi.TraceUsageRes:
+        return self._next_trace_server.trace_usage(req)
+
     def call_update(self, req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
         return self._next_trace_server.call_update(req)
 
@@ -703,6 +706,18 @@ class CachingMiddlewareTraceServer(TraceServerClientInterface):
 
     def score_delete(self, req: tsi.ScoreDeleteReq) -> tsi.ScoreDeleteRes:
         return self._next_trace_server.score_delete(req)
+
+    # Calls V2 API
+    def calls_complete(
+        self, req: tsi.CallsUpsertCompleteReq
+    ) -> tsi.CallsUpsertCompleteRes:
+        return self._next_trace_server.calls_complete(req)
+
+    def call_start_v2(self, req: tsi.CallStartV2Req) -> tsi.CallStartV2Res:
+        return self._next_trace_server.call_start_v2(req)
+
+    def call_end_v2(self, req: tsi.CallEndV2Req) -> tsi.CallEndV2Res:
+        return self._next_trace_server.call_end_v2(req)
 
 
 def pydantic_bytes_safe_dump(obj: BaseModel) -> str:

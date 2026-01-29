@@ -103,7 +103,9 @@ jobs:
   trace-tests:
     name: Trace nox tests
     timeout-minutes: 15
-    runs-on: ${{ matrix.nox-shard == 'trace' && 'ubuntu-latest-8-cores' || 'ubuntu-latest' }}
+    # TODO: refactor to use matrix.include for runner selection
+    # Use 8-core runners for trace and trace_calls_complete_only shards (resource-intensive)
+    runs-on: ${{ (matrix.nox-shard == 'trace' || matrix.nox-shard == 'trace_calls_complete_only') && 'ubuntu-latest-8-cores' || 'ubuntu-latest' }}
     strategy:
       matrix:
         python-version-major: ["3"]
@@ -115,6 +117,7 @@ jobs:
           ]
         nox-shard: [
             "trace",
+            "trace_calls_complete_only",
             "flow",
             "trace_server",
             "trace_server_bindings",
@@ -192,6 +195,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install nox uv
       - name: Run nox (Sqlite Trace Server)
+        if: matrix.nox-shard != 'trace_calls_complete_only'
         env:
           WEAVE_SENTRY_ENV: ci
           CI: 1

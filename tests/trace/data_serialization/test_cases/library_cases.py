@@ -45,9 +45,7 @@ def make_evaluation():
                     ),
                 ),
                 scoring_prompt="Here are the inputs: {inputs}. Here is the output: {output}. Is the output correct?",
-                enable_image_input_scoring=True,
                 enable_audio_input_scoring=True,
-                enable_video_input_scoring=True,
                 media_scoring_json_paths=["$.messages[0].content[1].input_audio"],
             ),
         ],
@@ -74,11 +72,16 @@ def evaluation_equality_check(a, b):
     return True
 
 
+# Runtime serialization produces version-dependent digest (for non-legacy tests)
 llm_as_a_judge_scorer_digest = (
-    "HxesePeWFYrAl1Z6nnAJUhAdtprHcbcFxulmD2qLKQY"
+    "BDAXKzn8KFLjB653bFX2imLtdZJbkqz6obO6dYYR490"
     if sys.version_info.major >= 3 and sys.version_info.minor >= 13
-    else "AXRohBn3cYglw60VufOjqS5WaPFQno5dKyFuZHzSC0g"
+    else "GuTiuaw9aciXWCWPU5cvWtQqs0lcBtJPfYRlYH3GUwk"
 )
+
+# Legacy exp_val always produces this digest regardless of Python version (for legacy tests)
+# This is because the exp_val was captured from Python < 3.13 serialization
+llm_as_a_judge_scorer_legacy_digest = "hhCGYF6e9ybgkNGlFyXNxwAYArvjeCDXtEFUkcvgK3c"
 
 library_cases = [
     SerializationTestCase(
@@ -99,7 +102,7 @@ library_cases = [
             "trials": 1,
             "metadata": None,
             "evaluation_name": None,
-            "evaluate": "weave:///shawn/test-project/op/Evaluation.evaluate:XbyuZNBxQ90Ur9tjMI6Cj8CNXnisWemlzU8etRYeFsI",
+            "evaluate": "weave:///shawn/test-project/op/Evaluation.evaluate:MhnysYB5p95l4ojXbrIUQaZqXuLOOQhy8Gigl43svLU",
             "predict_and_score": "weave:///shawn/test-project/op/Evaluation.predict_and_score:NrwneWUrXaCdi9BUqmufH4dg1U1tvHFGPK5dZh2CcPQ",
             "summarize": "weave:///shawn/test-project/op/Evaluation.summarize:eq6QbaZJYKZlbaCR95PvaoLDomTryBhb5uajqpIX8u0",
             "_class_name": "Evaluation",
@@ -120,11 +123,12 @@ library_cases = [
             },
             {
                 "object_id": "Evaluation.evaluate",
-                "digest": "XbyuZNBxQ90Ur9tjMI6Cj8CNXnisWemlzU8etRYeFsI",
+                "digest": "MhnysYB5p95l4ojXbrIUQaZqXuLOOQhy8Gigl43svLU",
                 "exp_val": {
                     "_type": "CustomWeaveType",
                     "weave_type": {"type": "Op"},
-                    "files": {"obj.py": "MqFC4mjZWQVAB2AkQZ1g4uNUee9YhkUYXLYArWmTEcU"},
+                    # Updated with eager_call_start=True
+                    "files": {"obj.py": "fRY5WjYY6bLcWxTHn3ymVTCU1OUC4I19qKMwPdYp9k8"},
                 },
             },
             {
@@ -159,9 +163,7 @@ library_cases = [
                     "description": None,
                     "column_map": None,
                     "model": "weave:///shawn/test-project/object/LLMStructuredCompletionModel:VUqRnYmuvNhu3zgfDb9hnZhLRFM1vKKI1WEpw3bsViE",
-                    "enable_image_input_scoring": True,
                     "enable_audio_input_scoring": True,
-                    "enable_video_input_scoring": True,
                     "media_scoring_json_paths": [
                         "$.messages[0].content[1].input_audio"
                     ],
@@ -260,8 +262,8 @@ library_cases = [
         ],
         exp_files=[
             {
-                "digest": "MqFC4mjZWQVAB2AkQZ1g4uNUee9YhkUYXLYArWmTEcU",
-                "exp_content": b'import weave\nfrom weave.trace.op_protocol import Op\nfrom weave.flow.model import Model\nimport json\nfrom weave.trace.op import op\nfrom weave.trace.call import Call\nfrom datetime import datetime\nfrom weave.flow.util import make_memorable_name\n\ndef _safe_summarize_to_str(summary: dict) -> str:\n    summary_str = ""\n    try:\n        summary_str = json.dumps(summary, indent=2)\n    except Exception:\n        try:\n            summary_str = str(summary)\n        except Exception:\n            pass\n    return summary_str\n\nlogger = "<Logger weave.evaluation.eval (DEBUG)>"\n\ndef default_evaluation_display_name(call: Call) -> str:\n    date = datetime.now().strftime("%Y-%m-%d")\n    unique_name = make_memorable_name()\n    return f"eval-{date}-{unique_name}"\n\n@weave.op\n@op(call_display_name=default_evaluation_display_name)\nasync def evaluate(self, model: Op | Model) -> dict:\n    eval_results = await self.get_eval_results(model)\n    summary = await self.summarize(eval_results)\n\n    summary_str = _safe_summarize_to_str(summary)\n    if summary_str:\n        logger.info(f"Evaluation summary {summary_str}")\n\n    return summary\n',
+                "digest": "fRY5WjYY6bLcWxTHn3ymVTCU1OUC4I19qKMwPdYp9k8",
+                "exp_content": b'import weave\nfrom weave.trace.op_protocol import Op\nfrom weave.flow.model import Model\nimport json\nfrom weave.trace.op import op\nfrom weave.trace.call import Call\nfrom datetime import datetime\nfrom weave.flow.util import make_memorable_name\n\ndef _safe_summarize_to_str(summary: dict) -> str:\n    summary_str = ""\n    try:\n        summary_str = json.dumps(summary, indent=2)\n    except Exception:\n        try:\n            summary_str = str(summary)\n        except Exception:\n            pass\n    return summary_str\n\nlogger = "<Logger weave.evaluation.eval (DEBUG)>"\n\ndef default_evaluation_display_name(call: Call) -> str:\n    date = datetime.now().strftime("%Y-%m-%d")\n    unique_name = make_memorable_name()\n    return f"eval-{date}-{unique_name}"\n\n@weave.op\n@op(call_display_name=default_evaluation_display_name, eager_call_start=True)\nasync def evaluate(self, model: Op | Model) -> dict:\n    eval_results = await self.get_eval_results(model)\n    summary = await self.summarize(eval_results)\n\n    summary_str = _safe_summarize_to_str(summary)\n    if summary_str:\n        logger.info(f"Evaluation summary {summary_str}")\n\n    return summary\n',
             },
             {
                 "digest": "Y7lSNR7UXFYVtxWyD8GOE3CFXRWfdLX2n1mcYfbSErs",
@@ -293,8 +295,10 @@ library_cases = [
         equality_check=lambda a, b: True,
         python_version_code_capture=(3, 13),
     ),
+    # Legacy v3: Preserves backward compatibility for data written before eager_call_start was added
+    # Uses llm_as_a_judge_scorer_legacy_digest because the exp_val was captured from Python < 3.13
     SerializationTestCase(
-        id="Library Objects - Scorer, Evaluation, Dataset, LLMAsAJudgeScorer, LLMStructuredCompletionModel (legacy v4)",
+        id="Library Objects - Scorer, Evaluation, Dataset, LLMAsAJudgeScorer, LLMStructuredCompletionModel (legacy v3)",
         runtime_object_factory=lambda: make_evaluation(),
         inline_call_param=False,
         is_legacy=True,
@@ -305,7 +309,7 @@ library_cases = [
             "dataset": "weave:///shawn/test-project/object/Dataset:N0VKaX8wr9kF9QQzM7mSQz3yKrJJjTiJi4c9Bt7RSTA",
             "scorers": [
                 "weave:///shawn/test-project/object/MyScorer:ILpCvdAsCLLLt9wU28MU9ugSScTkg7L3XX6PlUgFvlg",
-                "weave:///shawn/test-project/object/LLMAsAJudgeScorer:GuTiuaw9aciXWCWPU5cvWtQqs0lcBtJPfYRlYH3GUwk",
+                f"weave:///shawn/test-project/object/LLMAsAJudgeScorer:{llm_as_a_judge_scorer_legacy_digest}",
             ],
             "preprocess_model_input": None,
             "trials": 1,
@@ -364,7 +368,7 @@ library_cases = [
             },
             {
                 "object_id": "LLMAsAJudgeScorer",
-                "digest": "GuTiuaw9aciXWCWPU5cvWtQqs0lcBtJPfYRlYH3GUwk",
+                "digest": llm_as_a_judge_scorer_legacy_digest,
                 "exp_val": {
                     "_type": "LLMAsAJudgeScorer",
                     "name": None,
@@ -372,7 +376,7 @@ library_cases = [
                     "column_map": None,
                     "model": "weave:///shawn/test-project/object/LLMStructuredCompletionModel:VUqRnYmuvNhu3zgfDb9hnZhLRFM1vKKI1WEpw3bsViE",
                     "enable_audio_input_scoring": True,
-                    "media_scoring_json_paths": [
+                    "audio_input_scoring_json_paths": [
                         "$.messages[0].content[1].input_audio"
                     ],
                     "scoring_prompt": "Here are the inputs: {inputs}. Here is the output: {output}. Is the output correct?",
