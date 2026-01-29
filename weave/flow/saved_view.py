@@ -257,7 +257,7 @@ def filter_to_clause(item: Filter) -> dict[str, Any]:
         return {"$not": [{"$gt": [field, {"$literal": value}]}]}
     elif item.operator == "(bool): is":
         return {
-            "$eq": [{"$getField": item.field}, {"$literal": str(item.value)}],
+            "$eq": [{"$getField": item.field}, {"$literal": item.value}],
         }
     elif item.operator == "(date): after":
         seconds = to_seconds(item.value)
