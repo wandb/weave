@@ -11,6 +11,7 @@ from typing import Any, TypeVar
 
 import ddtrace
 
+from weave.trace_server.datadog import set_current_span_dd_tags
 from weave.trace_server.trace_server_interface import (
     CallEndReq,
     CallEndV2Req,
@@ -62,22 +63,31 @@ def store_content_object(
     content_obj: Content,
     project_id: str,
     trace_server: TraceServerInterface,
+    source: str = "unknown",
 ) -> dict[str, Any]:
     """Create a proper Content object structure and store its files.
 
     Args:
-        data: Raw byte content
-        original_schema: The schema to restore the original base64 string
-        mimetype: MIME type of the content
-        project_id: Project ID for storage
-        trace_server: Trace server instance for file storage
+        content_obj: Content object to store.
+        project_id: Project ID for storage.
+        trace_server: Trace server instance for file storage.
+        source: Source of content ("data_uri" or "base64").
 
     Returns:
-        Dict representing the Content object in the proper format
+        Dict representing the Content object in the proper format.
     """
     content_data = content_obj.data
+    content_size = len(content_data)
     content_metadata = json.dumps(content_obj.model_dump(exclude={"data"})).encode(
         "utf-8"
+    )
+
+    set_current_span_dd_tags(
+        {
+            "content.source": source,
+            "content.mimetype": content_obj.mimetype or "unknown",
+            "content.size_bytes": content_size,
+        }
     )
 
     # Create files in storage
@@ -104,24 +114,30 @@ def store_content_object(
 T = TypeVar("T")
 
 
+@ddtrace.tracer.wrap(name="replace_base64_with_content_objects")
 def replace_base64_with_content_objects(
     vals: T,
     project_id: str,
     trace_server: TraceServerInterface,
-) -> T:
+) -> tuple[T, dict[str, int]]:
     """Recursively replace base64 content with Content objects.
 
     Follows the same pattern as extract_refs_from_values, visiting all values
     and replacing base64 content where found.
 
     Args:
-        vals: Value to process (can be dict, list, or primitive)
-        project_id: Project ID for storage
-        trace_server: Trace server instance for file storage
+        vals: Value to process (can be dict, list, or primitive).
+        project_id: Project ID for storage.
+        trace_server: Trace server instance for file storage.
 
     Returns:
-        Tuple of (processed_value, list_of_created_refs)
+        Tuple of (processed_value, stats_dict).
     """
+    stats = {
+        "strings_checked": 0,
+        "data_uri_converted": 0,
+        "base64_converted": 0,
+    }
 
     def _visit(val: Any) -> Any:
         if isinstance(val, dict):
@@ -132,19 +148,23 @@ def replace_base64_with_content_objects(
         elif isinstance(val, list):
             return [_visit(v) for v in val]
         elif isinstance(val, str) and len(val) > AUTO_CONVERSION_MIN_SIZE:
+            stats["strings_checked"] += 1
             # Check for data URI pattern first
             if is_data_uri(val):
                 try:
-                    # Create proper Content object structure
-                    return store_content_object(
+                    result = store_content_object(
                         Content.from_data_url(val),
                         project_id,
                         trace_server,
+                        source="data_uri",
                     )
                 except Exception as e:
                     logger.warning(
                         f"Failed to create and store content from data URI with error {e}"
                     )
+                else:
+                    stats["data_uri_converted"] += 1
+                    return result
 
             if is_base64(val):
                 try:
@@ -154,24 +174,38 @@ def replace_base64_with_content_objects(
                     # The uncovered scenario is if a user has encoded a plaintext document as Base64
                     # We don't handle text content objects in a special way on the clients, so this is acceptable.
                     content: Content[Any] = Content.from_base64(val)
-                    if content.mimetype not in (
-                        "text/plain",
-                        "application/octet-stream",
-                    ):
-                        return store_content_object(
-                            content,
-                            project_id,
-                            trace_server,
-                        )
                 except Exception as e:
                     logger.warning(
                         f"Failed to create content from standalone base64: {e}"
                     )
+                else:
+                    if content.mimetype not in (
+                        "text/plain",
+                        "application/octet-stream",
+                    ):
+                        result = store_content_object(
+                            content,
+                            project_id,
+                            trace_server,
+                            source="base64",
+                        )
+                        stats["base64_converted"] += 1
+                        return result
 
             return val
         return val
 
-    return _visit(vals)
+    result = _visit(vals)
+    set_current_span_dd_tags(
+        {
+            "traverse.strings_checked": stats["strings_checked"],
+            "traverse.data_uri_converted": stats["data_uri_converted"],
+            "traverse.base64_converted": stats["base64_converted"],
+            "traverse.total_converted": stats["data_uri_converted"]
+            + stats["base64_converted"],
+        }
+    )
+    return result, stats
 
 
 R = TypeVar("R", bound=CallStartReq | CallEndReq | CallEndV2Req)
@@ -187,18 +221,21 @@ def process_call_req_to_content(
     This is the main entry point for processing trace data before insertion.
 
     Args:
-        req: Call request (start, end, or end v2)
-        trace_server: Trace server instance
+        req: Call request (start, end, or end v2).
+        trace_server: Trace server instance.
 
     Returns:
         Request with base64 content replaced by Content objects.
     """
     if isinstance(req, CallStartReq):
-        req.start.inputs = replace_base64_with_content_objects(
+        set_current_span_dd_tags({"req_type": "call_start"})
+        req.start.inputs, _ = replace_base64_with_content_objects(
             req.start.inputs, req.start.project_id, trace_server
         )
     elif isinstance(req, (CallEndReq, CallEndV2Req)):
-        req.end.output = replace_base64_with_content_objects(
+        req_type = "call_end_v2" if isinstance(req, CallEndV2Req) else "call_end"
+        set_current_span_dd_tags({"req_type": req_type})
+        req.end.output, _ = replace_base64_with_content_objects(
             req.end.output, req.end.project_id, trace_server
         )
 
@@ -219,10 +256,23 @@ def process_complete_call_to_content(
     Returns:
         CompletedCallSchemaForInsert with base64 content replaced by Content objects.
     """
-    complete_call.inputs = replace_base64_with_content_objects(
+    set_current_span_dd_tags({"req_type": "complete_call"})
+    complete_call.inputs, input_stats = replace_base64_with_content_objects(
         complete_call.inputs, complete_call.project_id, trace_server
     )
-    complete_call.output = replace_base64_with_content_objects(
+    complete_call.output, output_stats = replace_base64_with_content_objects(
         complete_call.output, complete_call.project_id, trace_server
+    )
+    set_current_span_dd_tags(
+        {
+            "total.strings_checked": input_stats["strings_checked"]
+            + output_stats["strings_checked"],
+            "total.converted": (
+                input_stats["data_uri_converted"]
+                + input_stats["base64_converted"]
+                + output_stats["data_uri_converted"]
+                + output_stats["base64_converted"]
+            ),
+        }
     )
     return complete_call

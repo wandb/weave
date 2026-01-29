@@ -119,7 +119,7 @@ class TestBase64Replacement:
             "nested": {"field3": f"data:image/png;base64,{b64_data}"},
         }
 
-        result = replace_base64_with_content_objects(
+        result, stats = replace_base64_with_content_objects(
             input_data, "test_project", trace_server
         )
 
@@ -136,6 +136,11 @@ class TestBase64Replacement:
             "content",
             "metadata.json",
         }
+
+        # Verify stats
+        assert stats["data_uri_converted"] == 1
+        assert stats["base64_converted"] == 0
+        assert stats["strings_checked"] == 2
 
     def test_replace_data_uri_in_list_only(self):
         """Only base64 data URIs are replaced in lists; raw base64 is left untouched."""
@@ -159,7 +164,7 @@ class TestBase64Replacement:
             {"nested": f"data:text/plain;base64,{b64_data}"},
         ]
 
-        result = replace_base64_with_content_objects(
+        result, stats = replace_base64_with_content_objects(
             input_data, "test_project", trace_server
         )
 
@@ -170,6 +175,9 @@ class TestBase64Replacement:
         assert result[1] == b64_data
         assert isinstance(result[2]["nested"], dict)
         assert result[2]["nested"]["_type"] == "CustomWeaveType"
+
+        # Verify stats
+        assert stats["data_uri_converted"] == 1
 
     def test_process_call_req_to_content_start_and_end(self):
         """Test the main entry point for processing CallStartReq and CallEndReq."""
@@ -257,7 +265,7 @@ class TestStandaloneBase64Detection:
             assert is_base64(test_str), f"Expected {test_str} to match base64 pattern"
 
             input_data = {"field": test_str}
-            result = replace_base64_with_content_objects(
+            result, _ = replace_base64_with_content_objects(
                 input_data, "test_project", trace_server
             )
 
@@ -326,7 +334,7 @@ class TestStandaloneBase64Detection:
             "other_field": "normal string",
         }
 
-        result = replace_base64_with_content_objects(
+        result, stats = replace_base64_with_content_objects(
             input_data, "test_project", trace_server
         )
 
@@ -351,6 +359,10 @@ class TestStandaloneBase64Detection:
         metadata_call = trace_server.file_create.call_args_list[1][0][0]
         metadata = json.loads(metadata_call.content)
         assert metadata["mimetype"] in ["audio/wav", "audio/x-wav", "audio/wave"]
+
+        # Verify stats
+        assert stats["base64_converted"] == 1
+        assert stats["data_uri_converted"] == 0
 
 
 if __name__ == "__main__":
