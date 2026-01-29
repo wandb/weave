@@ -5,6 +5,7 @@ import platform
 import random
 import sys
 import time
+import uuid
 from collections import defaultdict, namedtuple
 from collections.abc import Callable
 from contextlib import contextmanager
@@ -4746,6 +4747,17 @@ def test_project_stats_clickhouse(client, clickhouse_client):
     object_size = 5678
     file_size = 4321
     table_size = 1234  # New test data for table storage size
+
+    # Insert a row into calls_merged to establish project data residence
+    # This ensures the table routing resolver routes to calls_merged_stats
+    clickhouse_client.command(
+        f"""
+        INSERT INTO calls_merged (project_id, id, op_name, started_at, trace_id,
+                                  parent_id, attributes_dump, inputs_dump, output_dump, summary_dump)
+        VALUES ('{internal_project_id}', '{uuid.uuid4()}', 'test_op', now(), '{uuid.uuid4()}',
+                '', '{{}}', '{{}}', 'null', '{{}}')
+        """
+    )
 
     # directly insert into stats tables to avoid materialized views's consistency issue
     # Insert into calls_merged_stats
