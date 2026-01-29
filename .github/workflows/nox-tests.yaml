@@ -38,7 +38,7 @@ on:
         default: "clickhouse/clickhouse-server:25.11.2.24"
     secrets:
       gcp_wb_sa_key:
-        required: true
+        required: false
       WANDB_API_KEY:
         required: false
       GOOGLE_API_KEY:

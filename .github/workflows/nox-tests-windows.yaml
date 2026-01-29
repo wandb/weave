@@ -1,0 +1,111 @@
+name: nox-tests-windows
+
+on:
+  workflow_call:
+    inputs:
+      python_minors:
+        type: string
+        default: '["10","11","13"]'
+      shards:
+        type: string
+        required: true
+      mode:
+        type: string
+        default: "trace_server"
+      timeout_minutes:
+        type: number
+        default: 15
+      upload_coverage:
+        type: boolean
+        default: false
+      coverage_flag:
+        type: string
+        default: "windows-trace-tests"
+      coverage_name_prefix:
+        type: string
+        default: "windows-trace-tests"
+      include_shard_in_coverage_name:
+        type: boolean
+        default: false
+    secrets:
+      WANDB_API_KEY:
+        required: false
+      GOOGLE_API_KEY:
+        required: false
+      GEMINI_API_KEY:
+        required: false
+      ANTHROPIC_API_KEY:
+        required: false
+      MISTRAL_API_KEY:
+        required: false
+      OPENAI_API_KEY:
+        required: false
+      CODECOV_TOKEN:
+        required: false
+
+jobs:
+  nox-tests-windows:
+    name: Nox Tests (Windows)
+    timeout-minutes: ${{ inputs.timeout_minutes }}
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        python-version-major: ["3"]
+        python-version-minor: ${{ fromJSON(inputs.python_minors) }}
+        shard: ${{ fromJSON(inputs.shards) }}
+        exclude:
+          - python-version-minor: "10"
+            shard: "notdiamond"
+          - python-version-minor: "10"
+            shard: "verifiers_test"
+          - python-version-minor: "13"
+            shard: "cohere"
+          - python-version-minor: "13"
+            shard: "notdiamond"
+          - python-version-minor: "13"
+            shard: "verifiers_test"
+      fail-fast: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Set up Python ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install nox uv
+      - name: Run nox (Sqlite Trace Server)
+        if: inputs.mode == 'trace_server'
+        env:
+          WEAVE_SENTRY_ENV: ci
+          CI: 1
+          WB_SERVER_HOST: http://localhost
+          WF_CLICKHOUSE_HOST: localhost
+          WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
+          # Use dummy API keys when secrets aren't available (e.g., Dependabot PRs)
+          # Tests use VCR recordings so real keys aren't needed
+          WANDB_API_KEY: ${{ secrets.WANDB_API_KEY || 'DUMMY_API_KEY' }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY || 'DUMMY_API_KEY' }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || 'DUMMY_API_KEY' }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY || 'DUMMY_API_KEY' }}
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY || 'DUMMY_API_KEY' }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY || 'DUMMY_API_KEY' }}
+          DD_TRACE_ENABLED: false
+        run: |
+          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.shard }}')" -- -m "trace_server" --trace-server=sqlite
+      - name: Run nox (Non Trace Server)
+        if: inputs.mode == 'trace_no_server'
+        run: |
+          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.shard }}')" -- -m "not trace_server"
+      - name: Upload coverage reports to Codecov
+        if: inputs.upload_coverage
+        uses: codecov/codecov-action@v5
+        with:
+          files: ./tests/coverage.xml
+          flags: ${{ inputs.coverage_flag }}
+          name: >-
+            ${{ inputs.coverage_name_prefix }}-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}${{ inputs.include_shard_in_coverage_name && format('-{0}', matrix.shard) || '' }}
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
