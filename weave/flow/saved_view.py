@@ -573,7 +573,43 @@ class SavedView:
             if all_none:
                 self.base.definition.filter = None
 
-    # TODO: Support other call filters such as parent_ids, call_ids, etc.
+    def filter_trace_ids(self, trace_ids: list[str] | None) -> SavedView:
+        """Filter calls to only those in the specified traces.
+
+        Args:
+            trace_ids: List of trace IDs to include, or None to clear the filter.
+
+        Returns:
+            Self for method chaining.
+        """
+        if trace_ids is None:
+            if self.base.definition.filter:
+                self.base.definition.filter.trace_ids = None
+                self._check_empty_call_filter()
+        else:
+            if not self.base.definition.filter:
+                self.base.definition.filter = tsi.CallsFilter()
+            self.base.definition.filter.trace_ids = trace_ids
+        return self
+
+    def filter_trace_roots_only(self, trace_roots_only: bool | None) -> SavedView:
+        """Filter to show only trace root calls (calls with no parent).
+
+        Args:
+            trace_roots_only: If True, only show root calls. None to clear.
+
+        Returns:
+            Self for method chaining.
+        """
+        if trace_roots_only is None:
+            if self.base.definition.filter:
+                self.base.definition.filter.trace_roots_only = None
+                self._check_empty_call_filter()
+        else:
+            if not self.base.definition.filter:
+                self.base.definition.filter = tsi.CallsFilter()
+            self.base.definition.filter.trace_roots_only = trace_roots_only
+        return self
 
     def filter_op(self, op_name: str | None) -> SavedView:
         if op_name is None:
@@ -842,7 +878,33 @@ class SavedView:
                 .replace(".", "-")[:-1]
             )
             name = f"{self.view_type}_{formatted_now}"
-        self.ref = weave_publish(self.base, name)
+
+        # Convert query to plain dict before saving to avoid Pydantic
+        # type metadata being added during Weave object serialization.
+        # The Query model uses Pydantic's discriminated unions which add
+        # _type fields when serialized through ObjectRecord conversion.
+        base_to_save = self.base
+        if self.base.definition.query is not None:
+            query_dict = self.base.definition.query.model_dump(
+                by_alias=True, exclude_none=True
+            )
+            # Copy all fields from definition, replacing query with plain dict.
+            # Use model_construct to bypass validation since query is typed
+            # as tsi.Query but we want to store a plain dict.
+            from weave.trace_server.interface.builtin_object_classes.saved_view import (
+                SavedViewDefinition,
+            )
+
+            definition_fields = {
+                field: getattr(self.base.definition, field)
+                for field in self.base.definition.model_fields
+                if field != "query"
+            }
+            definition_fields["query"] = query_dict
+            new_definition = SavedViewDefinition.model_construct(**definition_fields)
+            base_to_save = self.base.model_copy(update={"definition": new_definition})
+
+        self.ref = weave_publish(base_to_save, name)
         return self
 
     def get_calls(
