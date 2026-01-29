@@ -1,5 +1,5 @@
 from weave.trace_server.orm import ParamBuilder
-from weave.trace_server.project_version.types import ReadTable
+from weave.trace_server.project_version.types import ReadTable, TableConfig
 
 
 def make_project_stats_query(
@@ -39,11 +39,8 @@ def make_project_stats_query(
         )
     project_id_param = pb.add_param(project_id)
 
-    # Select stats table based on read_table
-    if read_table == ReadTable.CALLS_COMPLETE:
-        calls_stats_table = "calls_complete_stats"
-    else:
-        calls_stats_table = "calls_merged_stats"
+    table_config = TableConfig.from_read_table(read_table)
+    calls_stats_table = table_config.stats_table_name
 
     columns = []
     sub_sqls = []
