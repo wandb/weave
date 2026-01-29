@@ -239,6 +239,40 @@ class GteOperation(BaseModel):
     gte_: tuple["Operand", "Operand"] = Field(alias="$gte")
 
 
+# https://www.mongodb.com/docs/manual/reference/operator/aggregation/lt/
+class LtOperation(BaseModel):
+    """Less than comparison.
+
+    Example:
+        ```
+        {
+            "$lt": [{"$getField": "summary.usage.tokens"}, {"$literal": 100}]
+        }
+        ```
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    lt_: tuple["Operand", "Operand"] = Field(alias="$lt")
+
+
+# https://www.mongodb.com/docs/manual/reference/operator/aggregation/lte/
+class LteOperation(BaseModel):
+    """Less than or equal comparison.
+
+    Example:
+        ```
+        {
+            "$lte": [{"$getField": "summary.usage.tokens"}, {"$literal": 100}]
+        }
+        ```
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    lte_: tuple["Operand", "Operand"] = Field(alias="$lte")
+
+
 # https://www.mongodb.com/docs/manual/reference/operator/aggregation/in/
 class InOperation(BaseModel):
     """Membership check.
@@ -308,6 +342,8 @@ Operation = (
     | EqOperation
     | GtOperation
     | GteOperation
+    | LtOperation
+    | LteOperation
     | InOperation
     | ContainsOperation
 )
@@ -322,6 +358,8 @@ NotOperation.model_rebuild()
 EqOperation.model_rebuild()
 GtOperation.model_rebuild()
 GteOperation.model_rebuild()
+LtOperation.model_rebuild()
+LteOperation.model_rebuild()
 InOperation.model_rebuild()
 ContainsOperation.model_rebuild()
 

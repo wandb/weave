@@ -250,11 +250,11 @@ def filter_to_clause(item: Filter) -> dict[str, Any]:
     elif item.operator == "(number): <":
         value = float(item.value)
         field = get_field_expression(item.field)
-        return {"$not": [{"$gte": [field, {"$literal": value}]}]}
+        return {"$lt": [field, {"$literal": value}]}
     elif item.operator == "(number): <=":
         value = float(item.value)
         field = get_field_expression(item.field)
-        return {"$not": [{"$gt": [field, {"$literal": value}]}]}
+        return {"$lte": [field, {"$literal": value}]}
     elif item.operator == "(bool): is":
         return {
             "$eq": [{"$getField": item.field}, {"$literal": str(item.value)}],
@@ -271,11 +271,7 @@ def filter_to_clause(item: Filter) -> dict[str, Any]:
         if seconds is None:
             raise ValueError(f"Invalid date value: {item.value}")
         return {
-            "$not": [
-                {
-                    "$gt": [{"$getField": item.field}, {"$literal": seconds}],
-                },
-            ],
+            "$lte": [{"$getField": item.field}, {"$literal": seconds}],
         }
     else:
         raise ValueError(f"Unsupported operator: {item.operator}")
@@ -381,6 +377,54 @@ def operand_to_filter_gte(operand: tsi_query.GteOperation) -> Filter:
     raise QueryTranslationException(f"Could not parse {operand}")
 
 
+def operand_to_filter_lt(operand: tsi_query.LtOperation) -> Filter:
+    first = operand.lt_[0]
+    second = operand.lt_[1]
+    if isinstance(first, tsi_query.ConvertOperation) and first.convert_.to in (
+        "double",
+        "int",
+    ):
+        first = first.convert_.input
+    if isinstance(first, tsi_query.GetFieldOperator) and isinstance(
+        second, tsi_query.LiteralOperation
+    ):
+        value = second.literal_
+        if isinstance(value, (int, float)):
+            operator = "(number): <"
+        else:
+            raise QueryTranslationException(f"Could not parse {operand}")
+        field = first.get_field_
+        if field == "started_at":
+            operator = "(date): before"
+            value = datetime.fromtimestamp(value).isoformat()
+        return Filter(field=field, operator=operator, value=value)
+    raise QueryTranslationException(f"Could not parse {operand}")
+
+
+def operand_to_filter_lte(operand: tsi_query.LteOperation) -> Filter:
+    first = operand.lte_[0]
+    second = operand.lte_[1]
+    if isinstance(first, tsi_query.ConvertOperation) and first.convert_.to in (
+        "double",
+        "int",
+    ):
+        first = first.convert_.input
+    if isinstance(first, tsi_query.GetFieldOperator) and isinstance(
+        second, tsi_query.LiteralOperation
+    ):
+        value = second.literal_
+        if isinstance(value, (int, float)):
+            operator = "(number): <="
+        else:
+            raise QueryTranslationException(f"Could not parse {operand}")
+        field = first.get_field_
+        if field == "started_at":
+            operator = "(date): before"
+            value = datetime.fromtimestamp(value).isoformat()
+        return Filter(field=field, operator=operator, value=value)
+    raise QueryTranslationException(f"Could not parse {operand}")
+
+
 def operand_to_filter(operand: tsi_query.Operand) -> Filter:
     if isinstance(operand, tsi_query.EqOperation):
         return operand_to_filter_eq(operand)
@@ -390,12 +434,20 @@ def operand_to_filter(operand: tsi_query.Operand) -> Filter:
         return operand_to_filter_gt(operand)
     if isinstance(operand, tsi_query.GteOperation):
         return operand_to_filter_gte(operand)
+    if isinstance(operand, tsi_query.LtOperation):
+        return operand_to_filter_lt(operand)
+    if isinstance(operand, tsi_query.LteOperation):
+        return operand_to_filter_lte(operand)
     if isinstance(operand, tsi_query.NotOperation):
         filter = operand_to_filter(operand.not_[0])
         if filter.operator == "(number): >=":
             filter.operator = "(number): <"
         elif filter.operator == "(number): >":
             filter.operator = "(number): <="
+        elif filter.operator == "(number): <":
+            filter.operator = "(number): >="
+        elif filter.operator == "(number): <=":
+            filter.operator = "(number): >"
         elif filter.operator == "(number): =":
             filter.operator = "(number): !="
         elif filter.operator == "(string): equals":
@@ -443,6 +495,8 @@ def query_to_filters(query: tsi.Query | None) -> Filters | None:
         isinstance(query.expr_, tsi_query.EqOperation)
         or isinstance(query.expr_, tsi_query.GtOperation)
         or isinstance(query.expr_, tsi_query.GteOperation)
+        or isinstance(query.expr_, tsi_query.LtOperation)
+        or isinstance(query.expr_, tsi_query.LteOperation)
         or isinstance(query.expr_, tsi_query.NotOperation)
         or isinstance(query.expr_, tsi_query.ContainsOperation)
     ):

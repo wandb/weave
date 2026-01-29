@@ -85,6 +85,12 @@
                 "$ref": "#/$defs/GteOperation"
               },
               {
+                "$ref": "#/$defs/LtOperation"
+              },
+              {
+                "$ref": "#/$defs/LteOperation"
+              },
+              {
                 "$ref": "#/$defs/InOperation"
               },
               {
@@ -616,6 +622,12 @@
               "$ref": "#/$defs/GteOperation"
             },
             {
+              "$ref": "#/$defs/LtOperation"
+            },
+            {
+              "$ref": "#/$defs/LteOperation"
+            },
+            {
               "$ref": "#/$defs/InOperation"
             },
             {
@@ -652,6 +664,12 @@
             },
             {
               "$ref": "#/$defs/GteOperation"
+            },
+            {
+              "$ref": "#/$defs/LtOperation"
+            },
+            {
+              "$ref": "#/$defs/LteOperation"
             },
             {
               "$ref": "#/$defs/InOperation"
@@ -748,6 +766,12 @@
             },
             {
               "$ref": "#/$defs/GteOperation"
+            },
+            {
+              "$ref": "#/$defs/LtOperation"
+            },
+            {
+              "$ref": "#/$defs/LteOperation"
             },
             {
               "$ref": "#/$defs/InOperation"
@@ -946,6 +970,12 @@
                   "$ref": "#/$defs/GteOperation"
                 },
                 {
+                  "$ref": "#/$defs/LtOperation"
+                },
+                {
+                  "$ref": "#/$defs/LteOperation"
+                },
+                {
                   "$ref": "#/$defs/InOperation"
                 },
                 {
@@ -981,6 +1011,12 @@
                 },
                 {
                   "$ref": "#/$defs/GteOperation"
+                },
+                {
+                  "$ref": "#/$defs/LtOperation"
+                },
+                {
+                  "$ref": "#/$defs/LteOperation"
                 },
                 {
                   "$ref": "#/$defs/InOperation"
@@ -1052,6 +1088,12 @@
                   "$ref": "#/$defs/GteOperation"
                 },
                 {
+                  "$ref": "#/$defs/LtOperation"
+                },
+                {
+                  "$ref": "#/$defs/LteOperation"
+                },
+                {
                   "$ref": "#/$defs/InOperation"
                 },
                 {
@@ -1087,6 +1129,12 @@
                 },
                 {
                   "$ref": "#/$defs/GteOperation"
+                },
+                {
+                  "$ref": "#/$defs/LtOperation"
+                },
+                {
+                  "$ref": "#/$defs/LteOperation"
                 },
                 {
                   "$ref": "#/$defs/InOperation"
@@ -1144,6 +1192,12 @@
                   "$ref": "#/$defs/GteOperation"
                 },
                 {
+                  "$ref": "#/$defs/LtOperation"
+                },
+                {
+                  "$ref": "#/$defs/LteOperation"
+                },
+                {
                   "$ref": "#/$defs/InOperation"
                 },
                 {
@@ -1179,6 +1233,12 @@
                 },
                 {
                   "$ref": "#/$defs/GteOperation"
+                },
+                {
+                  "$ref": "#/$defs/LtOperation"
+                },
+                {
+                  "$ref": "#/$defs/LteOperation"
                 },
                 {
                   "$ref": "#/$defs/InOperation"
@@ -1236,6 +1296,12 @@
                   "$ref": "#/$defs/GteOperation"
                 },
                 {
+                  "$ref": "#/$defs/LtOperation"
+                },
+                {
+                  "$ref": "#/$defs/LteOperation"
+                },
+                {
                   "$ref": "#/$defs/InOperation"
                 },
                 {
@@ -1272,6 +1338,12 @@
                   },
                   {
                     "$ref": "#/$defs/GteOperation"
+                  },
+                  {
+                    "$ref": "#/$defs/LtOperation"
+                  },
+                  {
+                    "$ref": "#/$defs/LteOperation"
                   },
                   {
                     "$ref": "#/$defs/InOperation"
@@ -1758,6 +1830,12 @@
                   "$ref": "#/$defs/GteOperation"
                 },
                 {
+                  "$ref": "#/$defs/LtOperation"
+                },
+                {
+                  "$ref": "#/$defs/LteOperation"
+                },
+                {
                   "$ref": "#/$defs/InOperation"
                 },
                 {
@@ -1936,6 +2014,12 @@
                 "$ref": "#/$defs/GteOperation"
               },
               {
+                "$ref": "#/$defs/LtOperation"
+              },
+              {
+                "$ref": "#/$defs/LteOperation"
+              },
+              {
                 "$ref": "#/$defs/InOperation"
               },
               {
@@ -2101,6 +2185,12 @@
             },
             {
               "$ref": "#/$defs/GteOperation"
+            },
+            {
+              "$ref": "#/$defs/LtOperation"
+            },
+            {
+              "$ref": "#/$defs/LteOperation"
             },
             {
               "$ref": "#/$defs/InOperation"
@@ -2504,6 +2594,202 @@
         "b"
       ],
       "title": "TestOnlyNestedBaseObject",
+      "type": "object"
+    },
+    "LtOperation": {
+      "description": "Less than comparison.\n\nExample:\n    ```\n    {\n        \"$lt\": [{\"$getField\": \"summary.usage.tokens\"}, {\"$literal\": 100}]\n    }\n    ```",
+      "properties": {
+        "$lt": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/LiteralOperation"
+                },
+                {
+                  "$ref": "#/$defs/GetFieldOperator"
+                },
+                {
+                  "$ref": "#/$defs/ConvertOperation"
+                },
+                {
+                  "$ref": "#/$defs/AndOperation"
+                },
+                {
+                  "$ref": "#/$defs/OrOperation"
+                },
+                {
+                  "$ref": "#/$defs/NotOperation"
+                },
+                {
+                  "$ref": "#/$defs/EqOperation"
+                },
+                {
+                  "$ref": "#/$defs/LtOperation"
+                },
+                {
+                  "$ref": "#/$defs/GteOperation"
+                },
+                {
+                  "$ref": "#/$defs/LteOperation"
+                },
+                {
+                  "$ref": "#/$defs/InOperation"
+                },
+                {
+                  "$ref": "#/$defs/ContainsOperation"
+                }
+              ]
+            },
+            {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/LiteralOperation"
+                },
+                {
+                  "$ref": "#/$defs/GetFieldOperator"
+                },
+                {
+                  "$ref": "#/$defs/ConvertOperation"
+                },
+                {
+                  "$ref": "#/$defs/AndOperation"
+                },
+                {
+                  "$ref": "#/$defs/OrOperation"
+                },
+                {
+                  "$ref": "#/$defs/NotOperation"
+                },
+                {
+                  "$ref": "#/$defs/EqOperation"
+                },
+                {
+                  "$ref": "#/$defs/LtOperation"
+                },
+                {
+                  "$ref": "#/$defs/GteOperation"
+                },
+                {
+                  "$ref": "#/$defs/LteOperation"
+                },
+                {
+                  "$ref": "#/$defs/InOperation"
+                },
+                {
+                  "$ref": "#/$defs/ContainsOperation"
+                }
+              ]
+            }
+          ],
+          "title": "$Lt",
+          "type": "array"
+        }
+      },
+      "required": [
+        "$lt"
+      ],
+      "title": "LtOperation",
+      "type": "object"
+    },
+    "LteOperation": {
+      "description": "Less than or equal comparison.\n\nExample:\n    ```\n    {\n        \"$lte\": [{\"$getField\": \"summary.usage.tokens\"}, {\"$literal\": 100}]\n    }\n    ```",
+      "properties": {
+        "$lte": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/LiteralOperation"
+                },
+                {
+                  "$ref": "#/$defs/GetFieldOperator"
+                },
+                {
+                  "$ref": "#/$defs/ConvertOperation"
+                },
+                {
+                  "$ref": "#/$defs/AndOperation"
+                },
+                {
+                  "$ref": "#/$defs/OrOperation"
+                },
+                {
+                  "$ref": "#/$defs/NotOperation"
+                },
+                {
+                  "$ref": "#/$defs/EqOperation"
+                },
+                {
+                  "$ref": "#/$defs/GtOperation"
+                },
+                {
+                  "$ref": "#/$defs/LtOperation"
+                },
+                {
+                  "$ref": "#/$defs/LteOperation"
+                },
+                {
+                  "$ref": "#/$defs/InOperation"
+                },
+                {
+                  "$ref": "#/$defs/ContainsOperation"
+                }
+              ]
+            },
+            {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/LiteralOperation"
+                },
+                {
+                  "$ref": "#/$defs/GetFieldOperator"
+                },
+                {
+                  "$ref": "#/$defs/ConvertOperation"
+                },
+                {
+                  "$ref": "#/$defs/AndOperation"
+                },
+                {
+                  "$ref": "#/$defs/OrOperation"
+                },
+                {
+                  "$ref": "#/$defs/NotOperation"
+                },
+                {
+                  "$ref": "#/$defs/EqOperation"
+                },
+                {
+                  "$ref": "#/$defs/GtOperation"
+                },
+                {
+                  "$ref": "#/$defs/LtOperation"
+                },
+                {
+                  "$ref": "#/$defs/LteOperation"
+                },
+                {
+                  "$ref": "#/$defs/InOperation"
+                },
+                {
+                  "$ref": "#/$defs/ContainsOperation"
+                }
+              ]
+            }
+          ],
+          "title": "$Lte",
+          "type": "array"
+        }
+      },
+      "required": [
+        "$lte"
+      ],
+      "title": "LteOperation",
       "type": "object"
     }
   },
