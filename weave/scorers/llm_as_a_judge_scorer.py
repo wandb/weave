@@ -21,7 +21,9 @@ class LLMAsAJudgeScorer(Scorer):
         model: The LLM model to use for scoring.
         scoring_prompt: Either a string template with {variable} placeholders,
             or a MessagesPrompt object (can be passed via weave.ref()).
+        enable_image_input_scoring: Specifies whether the scorer should score image input.
         enable_audio_input_scoring: Specifies whether the scorer should score audio input.
+        enable_video_input_scoring: Specifies whether the scorer should score video input.
         media_scoring_json_paths: Specifies the JSON paths to use to extract media content from the input
     """
 
@@ -29,7 +31,9 @@ class LLMAsAJudgeScorer(Scorer):
 
     model: LLMStructuredCompletionModel
     scoring_prompt: str | MessagesPrompt
+    enable_image_input_scoring: bool = False
     enable_audio_input_scoring: bool = False
+    enable_video_input_scoring: bool = False
     media_scoring_json_paths: list[str] | None = Field(
         default=None,
         validation_alias=AliasChoices(
