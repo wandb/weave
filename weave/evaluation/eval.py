@@ -42,6 +42,12 @@ from weave.utils.project_id import from_project_id
 
 logger = logging.getLogger(__name__)
 
+# Type alias for on_complete callback
+# Signature: on_complete(evaluation, model, results, summary) -> None
+OnCompleteCallback = Callable[
+    ["Evaluation", Op | Model, "EvaluationResults", dict], None
+]
+
 INVALID_MODEL_ERROR = (
     "`Evaluation.evaluate` requires a `Model` or `Op` instance as the `model` argument. "
     + "If you are using a function, wrap it with `weave.op` to create an `Op` instance."
@@ -112,6 +118,11 @@ class Evaluation(Object):
     # Custom evaluation name for display in the UI.  This is the same API as passing a
     # custom `call_display_name` to `weave.op` (see that for more details).
     evaluation_name: str | CallDisplayNameFunc | None = None
+
+    # Callback invoked at the end of evaluate() with full context.
+    # Runs inside the evaluate call context, so weave.set_view() will attach to the evaluation.
+    # Signature: on_complete(evaluation, model, results, summary) -> None
+    on_complete: OnCompleteCallback | None = None
 
     # internal attr to track whether to use the new `output` or old `model_output` key for outputs
     _output_key: Literal["output", "model_output"] = PrivateAttr("output")
@@ -287,6 +298,10 @@ class Evaluation(Object):
         summary_str = _safe_summarize_to_str(summary)
         if summary_str:
             logger.info(f"Evaluation summary {summary_str}")
+
+        # Call on_complete hook if provided (inside evaluate context)
+        if self.on_complete is not None:
+            self.on_complete(self, model, eval_results, summary)
 
         return summary
 
