@@ -73,13 +73,13 @@ def test_call_summary_deep_merge(client):
 
 
 def test_set_view_inside_op(client):
-    """Verify weave.set_view stores serialized content on op call summary."""
+    """Verify weave.set_view creates a CallViewSpec object and sets view_spec_ref."""
     markdown_view = weave.Content.from_text("# Report", mimetype="text/markdown")
     html_view = weave.Content.from_text("<p>Hi</p>", mimetype="text/html")
 
     @weave.op
     def my_op_with_views() -> str:
-        """Op that attaches two views to its call summary.
+        """Op that attaches two views via CallViewSpec.
 
         Returns:
             str: Constant string to keep output simple.
@@ -98,20 +98,23 @@ def test_set_view_inside_op(client):
     calls = list(client.get_calls())
     assert len(calls) == 1
     call = calls[0]
-    assert call.summary["weave"] is not None
-    assert "views" in call.summary["weave"]
-    views = call.summary["weave"]["views"]
-    assert len(views) == 2
-    assert views["markdown"] == to_json(
-        markdown_view,
-        client._project_id(),
-        client,
-    )
-    assert views["html"] == to_json(
-        html_view,
-        client._project_id(),
-        client,
-    )
+
+    # Views are now stored in view_spec_ref, not summary
+    assert call.view_spec_ref is not None
+    assert "weave:///" in call.view_spec_ref
+    assert "CallViewSpec" in call.view_spec_ref
+
+    # Retrieve the CallViewSpec object
+    from weave.trace.refs import ObjectRef
+
+    ref = ObjectRef.parse_uri(call.view_spec_ref)
+    view_spec = ref.get()
+
+    # Verify the views are present
+    assert "markdown" in view_spec.views
+    assert "html" in view_spec.views
+    assert view_spec.views["markdown"].type == "content"
+    assert view_spec.views["html"].type == "content"
 
 
 def test_set_view_string_content(client):
@@ -125,10 +128,18 @@ def test_set_view_string_content(client):
     op_with_string_view()
 
     call = client.get_calls()[0]
-    assert call.summary["weave"] is not None
-    views = call.summary["weave"]["views"]
-    stored = dict(views["md"])
 
-    assert stored["_type"] == "CustomWeaveType"
-    assert stored["weave_type"]["type"] == "weave.type_wrappers.Content.content.Content"
-    assert stored["files"]["content"]
+    # Views are stored in view_spec_ref
+    assert call.view_spec_ref is not None
+
+    # Retrieve the CallViewSpec object
+    from weave.trace.refs import ObjectRef
+
+    ref = ObjectRef.parse_uri(call.view_spec_ref)
+    view_spec = ref.get()
+
+    # Verify the markdown view is present
+    assert "md" in view_spec.views
+    view_item = view_spec.views["md"]
+    assert view_item.type == "content"
+    assert view_item.mimetype == "text/markdown"

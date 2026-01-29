@@ -10,7 +10,6 @@ import weave
 from weave.evaluation.eval_imperative import EvaluationLogger, Model, Scorer
 from weave.integrations.integration_utilities import op_name_from_call
 from weave.trace.context import call_context
-from weave.trace.serialization.serialize import to_json
 from weave.trace_server.trace_server_interface import ObjectVersionFilter
 
 
@@ -703,7 +702,7 @@ def test_evaluation_logger_with_predefined_scorers(client, caplog):
 
 
 def test_evaluation_logger_set_view(client):
-    """Ensure set_view stores content metadata on evaluation summary."""
+    """Ensure set_view stores content in CallViewSpec via view_spec_ref."""
     ev = weave.EvaluationLogger()
     content = weave.Content.from_text("# hello", mimetype="text/markdown")
     content2 = weave.Content.from_text("<h1>hello world</h1>", mimetype="text/html")
@@ -714,12 +713,15 @@ def test_evaluation_logger_set_view(client):
     client.flush()
 
     evaluate_call = client.get_calls()[0]
-    assert evaluate_call.summary["weave"] is not None
-    assert "views" in evaluate_call.summary["weave"]
-    views = evaluate_call.summary["weave"]["views"]
-    assert len(views) == 2
-    assert views["report"] == to_json(content, client._project_id(), client)
-    assert views["report2"] == to_json(content2, client._project_id(), client)
+    # Views are now stored via view_spec_ref, not in summary
+    assert evaluate_call.view_spec_ref is not None
+    view_spec = weave.ref(evaluate_call.view_spec_ref).get()
+    assert len(view_spec.views) == 2
+    assert "report" in view_spec.views
+    assert "report2" in view_spec.views
+    # Verify the view items have content type
+    assert view_spec.views["report"].type == "content"
+    assert view_spec.views["report2"].type == "content"
 
 
 def test_evaluation_logger_set_view_string(client):
@@ -730,14 +732,16 @@ def test_evaluation_logger_set_view_string(client):
     client.flush()
 
     evaluate_call = client.get_calls()[0]
-    assert evaluate_call.summary
-    assert evaluate_call.summary["weave"] is not None
-    views = evaluate_call.summary["weave"]["views"]
-    stored = dict(views["view"])
-
-    assert stored["_type"] == "CustomWeaveType"
-    assert stored["weave_type"]["type"] == "weave.type_wrappers.Content.content.Content"
-    assert stored["files"]["content"]
+    # Views are now stored via view_spec_ref
+    assert evaluate_call.view_spec_ref is not None
+    view_spec = weave.ref(evaluate_call.view_spec_ref).get()
+    assert "view" in view_spec.views
+    # String content gets converted to ContentViewItem
+    assert view_spec.views["view"].type == "content"
+    # Verify the content is base64 encoded HTML
+    import base64
+    content_bytes = base64.b64decode(view_spec.views["view"].data)
+    assert b"<h1>Eval</h1>" in content_bytes
 
 
 def test_cost_propagation_with_child_calls(client):
