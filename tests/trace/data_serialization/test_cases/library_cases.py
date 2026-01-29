@@ -72,16 +72,22 @@ def evaluation_equality_check(a, b):
     return True
 
 
-# Runtime serialization produces version-dependent digest (for non-legacy tests)
-llm_as_a_judge_scorer_digest = (
+# Runtime serialization produces version-dependent digest (for tests not explicitly using legacy)
+# When following the directions in test_serialization_correctness.py, it will be necessary to set is_legacy=True.
+# When doing this, replace "llm_as_a_judge_scorer_digest" with the current value of llm_as_a_judge_scorer_digest_for_current_non_legacy_test_on_old_python
+# Do this, rather than creating a new variable, because each legacy test case will need a different value.
+llm_as_a_judge_scorer_digest_for_current_non_legacy_test_on_current_python = (
     "BDAXKzn8KFLjB653bFX2imLtdZJbkqz6obO6dYYR490"
+)
+llm_as_a_judge_scorer_digest_for_current_non_legacy_test_on_old_python = (
+    "GuTiuaw9aciXWCWPU5cvWtQqs0lcBtJPfYRlYH3GUwk"
+)
+llm_as_a_judge_scorer_digest = (
+    llm_as_a_judge_scorer_digest_for_current_non_legacy_test_on_current_python
     if sys.version_info.major >= 3 and sys.version_info.minor >= 13
-    else "GuTiuaw9aciXWCWPU5cvWtQqs0lcBtJPfYRlYH3GUwk"
+    else llm_as_a_judge_scorer_digest_for_current_non_legacy_test_on_old_python
 )
 
-# Legacy exp_val always produces this digest regardless of Python version (for legacy tests)
-# This is because the exp_val was captured from Python < 3.13 serialization
-llm_as_a_judge_scorer_legacy_digest = "hhCGYF6e9ybgkNGlFyXNxwAYArvjeCDXtEFUkcvgK3c"
 
 library_cases = [
     SerializationTestCase(
@@ -309,7 +315,7 @@ library_cases = [
             "dataset": "weave:///shawn/test-project/object/Dataset:N0VKaX8wr9kF9QQzM7mSQz3yKrJJjTiJi4c9Bt7RSTA",
             "scorers": [
                 "weave:///shawn/test-project/object/MyScorer:ILpCvdAsCLLLt9wU28MU9ugSScTkg7L3XX6PlUgFvlg",
-                f"weave:///shawn/test-project/object/LLMAsAJudgeScorer:{llm_as_a_judge_scorer_legacy_digest}",
+                "weave:///shawn/test-project/object/LLMAsAJudgeScorer:hhCGYF6e9ybgkNGlFyXNxwAYArvjeCDXtEFUkcvgK3c",
             ],
             "preprocess_model_input": None,
             "trials": 1,
@@ -368,7 +374,7 @@ library_cases = [
             },
             {
                 "object_id": "LLMAsAJudgeScorer",
-                "digest": llm_as_a_judge_scorer_legacy_digest,
+                "digest": "hhCGYF6e9ybgkNGlFyXNxwAYArvjeCDXtEFUkcvgK3c",
                 "exp_val": {
                     "_type": "LLMAsAJudgeScorer",
                     "name": None,
