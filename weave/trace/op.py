@@ -23,7 +23,6 @@ from types import MethodType
 from typing import (
     TYPE_CHECKING,
     Any,
-    Generic,
     TypedDict,
     TypeVar,
     cast,
@@ -41,6 +40,7 @@ from weave.trace.context.call_context import (
     tracing_disabled,
 )
 from weave.trace.context.tests_context import get_raise_on_captured_errors
+from weave.trace.op_iterators import _Accumulator, _IteratorWrapper
 from weave.trace.op_protocol import (
     CallDisplayNameFunc,
     OnFinishHandlerType,
@@ -53,7 +53,6 @@ from weave.trace.op_protocol import (
     PostprocessOutputFunc,
     ProcessedInputs,
 )
-from weave.trace.op_iterators import _Accumulator, _IteratorWrapper, _add_accumulator
 from weave.trace.util import log_once
 
 if TYPE_CHECKING:

@@ -136,4 +136,3 @@ async def test_resilience_to_output_handler_errors_async(client, log_collector):
     logs = log_collector.get_error_logs()
     assert len(logs) == 1
     assert logs[0].msg.startswith("Error capturing call output")
-
