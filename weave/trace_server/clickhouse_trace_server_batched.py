@@ -992,7 +992,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
         trace_ids = {call.trace_id for call in root_calls}
         if not trace_ids:
-            root_usage = {call_id: {} for call_id in req.call_ids}
+            root_usage: dict[str, dict[str, tsi.LLMAggregatedUsage]] = {
+                call_id: {} for call_id in req.call_ids
+            }
             return tsi.CallsUsageRes(call_usage=root_usage)
 
         # Stream all calls in those traces with minimal columns for aggregation.
