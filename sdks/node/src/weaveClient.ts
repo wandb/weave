@@ -23,6 +23,8 @@ import {
   Op,
   OpRef,
   ParameterNamesOption,
+  getOpColor,
+  getOpKind,
   getOpName,
   getOpWrappedFunction,
   isOp,
@@ -734,6 +736,11 @@ export class WeaveClient {
       thisArg,
       parameterNames
     );
+
+    // Extract kind and color from the op before converting to OpRef
+    const opKind = isOp(opRef) ? getOpKind(opRef) : undefined;
+    const opColor = isOp(opRef) ? getOpColor(opRef) : undefined;
+
     if (isOp(opRef)) {
       this.saveOp(opRef);
       opRef = await opRef.__savedRef;
@@ -749,6 +756,8 @@ export class WeaveClient {
       weave: {
         client_version: packageVersion,
         source: 'js-sdk',
+        ...(opKind && {kind: opKind}),
+        ...(opColor && {color: opColor}),
       },
       ...combinedAttributes,
     };
