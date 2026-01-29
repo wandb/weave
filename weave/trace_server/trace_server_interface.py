@@ -2254,6 +2254,8 @@ class TraceServerInterface(Protocol):
     def calls_delete(self, req: CallsDeleteReq) -> CallsDeleteRes: ...
     def calls_query_stats(self, req: CallsQueryStatsReq) -> CallsQueryStatsRes: ...
     def call_stats(self, req: "CallStatsReq") -> "CallStatsRes": ...
+    def trace_usage(self, req: "TraceUsageReq") -> "TraceUsageRes": ...
+    def calls_usage(self, req: "CallsUsageReq") -> "CallsUsageRes": ...
     def call_update(self, req: CallUpdateReq) -> CallUpdateRes: ...
     def call_start_batch(self, req: CallCreateBatchReq) -> CallCreateBatchRes: ...
 
@@ -2587,3 +2589,89 @@ class CallStatsRes(BaseModel):
         default=[],
         description="Call-level metrics. Each bucket contains 'timestamp' and aggregated metric values.",
     )
+class LLMAggregatedUsage(BaseModel):
+    """Aggregated usage metrics for a specific LLM."""
+
+    requests: int = 0
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    total_tokens: int = 0
+    # Cost fields - only populated when include_costs=True
+    prompt_tokens_total_cost: float | None = None
+    completion_tokens_total_cost: float | None = None
+
+
+# --- /trace/usage endpoint (per-call usage with descendant rollup) ---
+
+
+class TraceUsageReq(BaseModelStrict):
+    """Request to compute per-call usage for a trace, with descendant rollup.
+
+    This endpoint returns usage metrics for each call in the trace, where each
+    call's metrics include the sum of its own usage plus all descendants' usage.
+    Use this for trace view where you want to see rolled-up metrics per call.
+
+    Note: All matching calls are loaded into memory for aggregation. For very large
+    result sets (>10k calls), consider using more specific filters or pagination
+    at the application layer.
+    """
+
+    project_id: str
+    filter: CallsFilter | None = Field(
+        default=None,
+        description="Filter to select calls. Typically use trace_ids to get all calls in a trace.",
+    )
+    query: Query | None = Field(
+        default=None,
+        description="Additional query conditions for filtering calls.",
+    )
+    include_costs: bool = Field(
+        default=False,
+        description="If true, include cost calculations in the usage.",
+    )
+    limit: int = Field(
+        default=10_000,
+        description="Maximum number of calls to process. Acts as a safety limit to prevent unbounded memory usage.",
+    )
+
+
+class TraceUsageRes(BaseModel):
+    """Response with per-call usage metrics (each includes descendant contributions)."""
+
+    # Mapping from call_id to usage metrics (own + descendants)
+    call_usage: dict[str, dict[str, LLMAggregatedUsage]] = Field(default_factory=dict)
+
+
+# --- /calls/usage endpoint (root call usage across multiple traces) ---
+
+
+class CallsUsageReq(BaseModelStrict):
+    """Request to compute aggregated usage for multiple root calls.
+
+    This endpoint returns usage metrics for each requested root call, where each
+    root's metrics include the sum of its own usage plus all descendants' usage.
+
+    Note: All matching calls are loaded into memory for aggregation. For very large
+    result sets (>10k calls), consider batching root call IDs or using narrower
+    filters at the application layer.
+    """
+
+    project_id: str
+    call_ids: list[str] = Field(
+        description="Root call IDs to aggregate. Each result key corresponds to one input call ID.",
+    )
+    include_costs: bool = Field(
+        default=False,
+        description="If true, include cost calculations in the usage.",
+    )
+    limit: int = Field(
+        default=10_000,
+        description="Maximum number of calls to process across all traces. Acts as a safety limit to prevent unbounded memory usage.",
+    )
+
+
+class CallsUsageRes(BaseModel):
+    """Response with aggregated usage metrics per root call."""
+
+    # Mapping from root call_id to aggregated usage metrics (root + descendants)
+    call_usage: dict[str, dict[str, LLMAggregatedUsage]] = Field(default_factory=dict)

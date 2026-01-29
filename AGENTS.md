@@ -50,6 +50,8 @@ _Important:_ For OpenAI Codex agents (most likely you!), your environment does n
 - `weave/` - Core implementation
   - `weave/` - Python package implementation
   - `weave/trace_server` - Backend server implementation
+  - `weave/trace_server/query_builder` - Query builders for trace server subsystems (e.g., annotation queues)
+  - `weave/trace_server/usage_utils.py` - Helpers for aggregating per-call usage (trace/calls usage endpoints)
 
 
 ## Python Testing Guidelines
@@ -77,6 +79,7 @@ Focus on these primary test shards:
 1. Run all tests in a specific shard: `nox --no-install -e "tests-3.12(shard='trace')"`
 2. Run a specific test by appending `-- [test]` like so: `nox --no-install -e "tests-3.12(shard='trace')" -- tests/trace/test_client_trace.py::test_simple_op`
 3. Run linting: `nox --no-install -e lint` (Note: This will modify files)
+4. Query builder tests can be run faster by adding `--sq` after the test path(s)
 
 _Important:_ Since you don't have internet access, you must run `nox` with `--no-install`. We have pre-installed the requirements on the above shards.
 

@@ -619,6 +619,18 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
     @validate_call
+    def trace_usage(self, req: tsi.TraceUsageReq) -> tsi.TraceUsageRes:
+        return self._generic_request(
+            "/trace/usage", req, tsi.TraceUsageReq, tsi.TraceUsageRes
+        )
+
+    @validate_call
+    def calls_usage(self, req: tsi.CallsUsageReq) -> tsi.CallsUsageRes:
+        return self._generic_request(
+            "/calls/usage", req, tsi.CallsUsageReq, tsi.CallsUsageRes
+        )
+
+    @validate_call
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
         return self._generic_request(
             "/calls/delete", req, tsi.CallsDeleteReq, tsi.CallsDeleteRes
