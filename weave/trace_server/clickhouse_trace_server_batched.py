@@ -605,14 +605,14 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # the call does not already exist
         self._insert_call(ch_call)
 
-        if wf_env.wf_enable_online_eval() and publish:
-            # Strip large and optional fields, dont modify param
-            end_copy = req.end.model_copy()
-            end_copy.output = None
-            end_copy.summary = {}
-            end_copy.exception = None
-            # Don't flush immediately by default, rely on explicit flush
-            self.kafka_producer.produce_call_end(end_copy, flush_immediately)
+        if publish:
+            _maybe_enqueue_minimal_call_end(
+                self.kafka_producer,
+                req.end.project_id,
+                req.end.id,
+                req.end.ended_at,
+                flush_immediately,
+            )
 
         # Returns the id of the newly created call
         return tsi.CallEndRes()
@@ -654,6 +654,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     self._insert_call_complete(ch_call)
                 else:
                     self._insert_call_to_v1(ch_call)
+
+                _maybe_enqueue_minimal_call_end(
+                    self.kafka_producer,
+                    complete_call.project_id,
+                    complete_call.id,
+                    complete_call.ended_at,
+                )
 
         return tsi.CallsUpsertCompleteRes()
 
@@ -706,6 +713,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             self._insert_call(ch_end)
             if self._flush_immediately:
                 self._flush_calls()
+
+        _maybe_enqueue_minimal_call_end(
+            self.kafka_producer,
+            req.end.project_id,
+            req.end.id,
+            req.end.ended_at,
+        )
 
         return tsi.CallEndV2Res()
 
@@ -6268,6 +6282,39 @@ def _end_call_for_insert_to_ch_insertable_end_call(
         output_refs=output_refs,
         wb_run_step_end=end_call.wb_run_step_end,
     )
+
+
+def _maybe_enqueue_minimal_call_end(
+    kafka_producer: "KafkaProducer",
+    project_id: str,
+    id: str,
+    ended_at: datetime.datetime,
+    flush_immediately: bool = False,
+) -> None:
+    """Enqueue a minimal call end event to Kafka if online eval is enabled.
+
+    This is used for online eval triggers where we only need the call identity,
+    not the full payload. Large fields (output, summary, exception) are stripped.
+
+    Args:
+        kafka_producer: The Kafka producer to use.
+        project_id: The project ID.
+        id: The call ID.
+        ended_at: The call end timestamp.
+        flush_immediately: Whether to flush the producer immediately.
+    """
+    if not wf_env.wf_enable_online_eval():
+        return
+
+    minimal_end = tsi.EndedCallSchemaForInsert(
+        project_id=project_id,
+        id=id,
+        ended_at=ended_at,
+        output=None,
+        summary={},
+        exception=None,
+    )
+    kafka_producer.produce_call_end(minimal_end, flush_immediately)
 
 
 def _complete_call_to_ch_insertable(
