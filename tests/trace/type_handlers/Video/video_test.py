@@ -9,7 +9,11 @@ from moviepy.editor import ColorClip, VideoClip, VideoFileClip
 
 import weave
 from weave.trace.weave_client import WeaveClient
-from weave.type_handlers.Video.video import VideoFormat, write_video
+from weave.type_handlers.Video.video import (
+    VideoFormat,
+    get_format_from_filename,
+    write_video,
+)
 
 """When testing types, it is important to test:
 Objects:
@@ -21,6 +25,12 @@ Calls:
 4. Using as inputs, output, and output component (raw)
 5. Using as inputs, output, and output component (refs)
 """
+
+
+def _maybe_close(obj) -> None:
+    close = getattr(obj, "close", None)
+    if callable(close):
+        close()
 
 
 @pytest.fixture
@@ -84,12 +94,17 @@ def test_video_with_no_ext_converted(
     # Load the video without extension
     clip = VideoFileClip(test_path)
 
-    # Try to publish it - this should use DEFAULT_VIDEO_FORMAT (gif)
-    ref = weave.publish(clip)
+    recovered = None
+    try:
+        # Try to publish it - this should use DEFAULT_VIDEO_FORMAT (gif)
+        ref = weave.publish(clip)
 
-    # Check that we can get it back
-    recovered = weave.ref(ref.uri()).get()
-    assert isinstance(recovered, VideoClip)
+        # Check that we can get it back
+        recovered = weave.ref(ref.uri()).get()
+        assert isinstance(recovered, VideoClip)
+    finally:
+        _maybe_close(recovered)
+        _maybe_close(clip)
 
 
 def test_weave_op_video(tmp_path: Path, test_video: VideoClip):
@@ -115,21 +130,24 @@ def test_video_publish(client: WeaveClient, test_video: VideoClip) -> None:
     assert ref is not None
 
     gotten_video = weave.ref(ref.uri()).get()
-    assert isinstance(gotten_video, VideoClip)
+    try:
+        assert isinstance(gotten_video, VideoClip)
 
-    # Compare video dimensions - handle list vs tuple
-    gotten_size = gotten_video.size
-    test_size = test_video.size
+        # Compare video dimensions - handle list vs tuple
+        gotten_size = gotten_video.size
+        test_size = test_video.size
 
-    if isinstance(gotten_size, list) and isinstance(test_size, tuple):
-        assert tuple(gotten_size) == test_size
-    elif isinstance(gotten_size, tuple) and isinstance(test_size, list):
-        assert gotten_size == tuple(test_size)
-    else:
-        assert gotten_size == test_size
+        if isinstance(gotten_size, list) and isinstance(test_size, tuple):
+            assert tuple(gotten_size) == test_size
+        elif isinstance(gotten_size, tuple) and isinstance(test_size, list):
+            assert gotten_size == tuple(test_size)
+        else:
+            assert gotten_size == test_size
 
-    # Since we can't easily compare video contents, we'll just check that it's a valid video
-    assert gotten_video.duration == test_video.duration
+        # Since we can't easily compare video contents, we'll just check that it's a valid video
+        assert gotten_video.duration == test_video.duration
+    finally:
+        _maybe_close(gotten_video)
 
 
 class VideoWrapper(weave.Object):
@@ -146,20 +164,23 @@ def test_video_as_property(client: WeaveClient, test_video: VideoClip) -> None:
     assert ref is not None
 
     gotten_video_wrapper = weave.ref(ref.uri()).get()
-    assert isinstance(gotten_video_wrapper.video, VideoClip)
+    try:
+        assert isinstance(gotten_video_wrapper.video, VideoClip)
 
-    # Handle difference in size representation (list vs tuple)
-    gotten_size = gotten_video_wrapper.video.size
-    test_size = test_video.size
+        # Handle difference in size representation (list vs tuple)
+        gotten_size = gotten_video_wrapper.video.size
+        test_size = test_video.size
 
-    if isinstance(gotten_size, list) and isinstance(test_size, tuple):
-        assert tuple(gotten_size) == test_size
-    elif isinstance(gotten_size, tuple) and isinstance(test_size, list):
-        assert gotten_size == tuple(test_size)
-    else:
-        assert gotten_size == test_size
+        if isinstance(gotten_size, list) and isinstance(test_size, tuple):
+            assert tuple(gotten_size) == test_size
+        elif isinstance(gotten_size, tuple) and isinstance(test_size, list):
+            assert gotten_size == tuple(test_size)
+        else:
+            assert gotten_size == test_size
 
-    assert gotten_video_wrapper.video.duration == test_video.duration
+        assert gotten_video_wrapper.video.duration == test_video.duration
+    finally:
+        _maybe_close(gotten_video_wrapper.video)
 
 
 def test_video_as_dataset_cell(client: WeaveClient, test_video: VideoClip) -> None:
@@ -172,20 +193,23 @@ def test_video_as_dataset_cell(client: WeaveClient, test_video: VideoClip) -> No
     assert ref is not None
 
     gotten_dataset = weave.ref(ref.uri()).get()
-    assert isinstance(gotten_dataset.rows[0]["video"], VideoClip)
+    try:
+        assert isinstance(gotten_dataset.rows[0]["video"], VideoClip)
 
-    # Handle difference in size representation (list vs tuple)
-    gotten_size = gotten_dataset.rows[0]["video"].size
-    test_size = test_video.size
+        # Handle difference in size representation (list vs tuple)
+        gotten_size = gotten_dataset.rows[0]["video"].size
+        test_size = test_video.size
 
-    if isinstance(gotten_size, list) and isinstance(test_size, tuple):
-        assert tuple(gotten_size) == test_size
-    elif isinstance(gotten_size, tuple) and isinstance(test_size, list):
-        assert gotten_size == tuple(test_size)
-    else:
-        assert gotten_size == test_size
+        if isinstance(gotten_size, list) and isinstance(test_size, tuple):
+            assert tuple(gotten_size) == test_size
+        elif isinstance(gotten_size, tuple) and isinstance(test_size, list):
+            assert gotten_size == tuple(test_size)
+        else:
+            assert gotten_size == test_size
 
-    assert gotten_dataset.rows[0]["video"].duration == test_video.duration
+        assert gotten_dataset.rows[0]["video"].duration == test_video.duration
+    finally:
+        _maybe_close(gotten_dataset.rows[0]["video"])
 
 
 @weave.op
@@ -295,8 +319,12 @@ def test_video_as_file(client: WeaveClient, tmp_path: Path) -> None:
         width, height = val.size
         return f"Video size: {width}x{height}"
 
-    res = accept_video_mp4(return_video_mp4(str(fp)))
-    assert res.startswith("Video size: ")
+    clip = return_video_mp4(str(fp))
+    try:
+        res = accept_video_mp4(clip)
+        assert res.startswith("Video size: ")
+    finally:
+        _maybe_close(clip)
 
 
 def make_random_video(video_size: tuple[int, int] = (64, 64), duration: float = 1.0):
@@ -330,10 +358,14 @@ async def test_videos_in_dataset_for_evaluation(client, dataset_ref):
     # Expect that evaluation works for a ref-get'd dataset containing videos
     res = await evaluation.evaluate(model)
 
-    assert isinstance(res, dict)
-    assert "model_latency" in res
-    assert "mean" in res["model_latency"]
-    assert isinstance(res["model_latency"]["mean"], (int, float))
+    try:
+        assert isinstance(res, dict)
+        assert "model_latency" in res
+        assert "mean" in res["model_latency"]
+        assert isinstance(res["model_latency"]["mean"], (int, float))
+    finally:
+        for row in dataset.rows:
+            _maybe_close(row["video"])
 
 
 def test_videos_in_load_of_dataset(client):
@@ -350,33 +382,34 @@ def test_videos_in_load_of_dataset(client):
             f"Row {i} video is not a VideoClip"
         )
 
-        # Handle difference in size representation (list vs tuple)
-        gotten_size = gotten_row["video"].size
-        local_size = local_row["video"].size
+        try:
+            # Handle difference in size representation (list vs tuple)
+            gotten_size = gotten_row["video"].size
+            local_size = local_row["video"].size
 
-        if isinstance(gotten_size, list) and isinstance(local_size, tuple):
-            assert tuple(gotten_size) == local_size, (
-                f"Row {i} size mismatch: {gotten_size} != {local_size}"
-            )
-        elif isinstance(gotten_size, tuple) and isinstance(local_size, list):
-            assert gotten_size == tuple(local_size), (
-                f"Row {i} size mismatch: {gotten_size} != {local_size}"
-            )
-        else:
-            assert gotten_size == local_size, (
-                f"Row {i} size mismatch: {gotten_size} != {local_size}"
-            )
+            if isinstance(gotten_size, list) and isinstance(local_size, tuple):
+                assert tuple(gotten_size) == local_size, (
+                    f"Row {i} size mismatch: {gotten_size} != {local_size}"
+                )
+            elif isinstance(gotten_size, tuple) and isinstance(local_size, list):
+                assert gotten_size == tuple(local_size), (
+                    f"Row {i} size mismatch: {gotten_size} != {local_size}"
+                )
+            else:
+                assert gotten_size == local_size, (
+                    f"Row {i} size mismatch: {gotten_size} != {local_size}"
+                )
 
-        # Duration may be rounded due to encoding limitations, especially with small durations
-        # Allow some tolerance in comparison
-        assert abs(gotten_row["video"].duration - videos[i].duration) < 0.05, (
-            f"Row {i} duration too different: {gotten_row['video'].duration} != {videos[i].duration}"
-        )
+            # Duration may be rounded due to encoding limitations, especially with small durations
+            # Allow some tolerance in comparison
+            assert abs(gotten_row["video"].duration - videos[i].duration) < 0.05, (
+                f"Row {i} duration too different: {gotten_row['video'].duration} != {videos[i].duration}"
+            )
+        finally:
+            _maybe_close(gotten_row["video"])
 
 
 def test_video_format_from_filename():
-    from weave.type_handlers.Video.video import get_format_from_filename
-
     assert get_format_from_filename("test.mp4") == VideoFormat.MP4
     assert get_format_from_filename("test.webm") == VideoFormat.WEBM
     assert get_format_from_filename("test.gif") == VideoFormat.GIF
@@ -407,20 +440,31 @@ def test_multiple_video_formats(
     gif_clip = VideoFileClip(sample_gif_path)
     webm_clip = VideoFileClip(sample_webm_path)
 
-    # Publish all three
-    mp4_ref = weave.publish(mp4_clip)
-    gif_ref = weave.publish(gif_clip)
-    webm_ref = weave.publish(webm_clip)
+    mp4_recovered = None
+    gif_recovered = None
+    webm_recovered = None
+    try:
+        # Publish all three
+        mp4_ref = weave.publish(mp4_clip)
+        gif_ref = weave.publish(gif_clip)
+        webm_ref = weave.publish(webm_clip)
 
-    # Retrieve them all
-    mp4_recovered = weave.ref(mp4_ref.uri()).get()
-    gif_recovered = weave.ref(gif_ref.uri()).get()
-    webm_recovered = weave.ref(webm_ref.uri()).get()
+        # Retrieve them all
+        mp4_recovered = weave.ref(mp4_ref.uri()).get()
+        gif_recovered = weave.ref(gif_ref.uri()).get()
+        webm_recovered = weave.ref(webm_ref.uri()).get()
 
-    # Check they're all valid
-    assert isinstance(mp4_recovered, VideoClip)
-    assert isinstance(gif_recovered, VideoClip)
-    assert isinstance(webm_recovered, VideoClip)
+        # Check they're all valid
+        assert isinstance(mp4_recovered, VideoClip)
+        assert isinstance(gif_recovered, VideoClip)
+        assert isinstance(webm_recovered, VideoClip)
+    finally:
+        _maybe_close(mp4_recovered)
+        _maybe_close(gif_recovered)
+        _maybe_close(webm_recovered)
+        _maybe_close(mp4_clip)
+        _maybe_close(gif_clip)
+        _maybe_close(webm_clip)
 
 
 @pytest.mark.skip("Runs as a subprocess - skipped in regular test runs")
