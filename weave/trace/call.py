@@ -75,9 +75,15 @@ class Call:
     wb_run_step: int | None = None
     wb_run_step_end: int | None = None
 
+    # Reference to a CallViewSpec object containing view configurations
+    view_spec_ref: str | None = None
+
     # These are the live children during logging
     _children: list[Call] = dataclasses.field(default_factory=list)
     _feedback: RefFeedbackQuery | None = None
+
+    # Pending views to be saved as CallViewSpec object at call_end
+    _pending_views: dict[str, Any] = dataclasses.field(default_factory=dict)
 
     # Size of metadata storage for this call
     storage_size_bytes: int | None = None
@@ -432,6 +438,7 @@ def make_client_call(
         wb_run_id=server_call.wb_run_id,
         wb_run_step=server_call.wb_run_step,
         wb_run_step_end=server_call.wb_run_step_end,
+        view_spec_ref=server_call.view_spec_ref,
         storage_size_bytes=server_call.storage_size_bytes,
         total_storage_size_bytes=server_call.total_storage_size_bytes,
     )

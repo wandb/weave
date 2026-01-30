@@ -275,6 +275,7 @@ def build_evaluation_val(
     summarize_ref: str,
     class_name: str = "Evaluation",
     eval_attributes: dict[str, Any] | None = None,
+    on_complete: str | None = None,
 ) -> dict[str, Any]:
     """Build the value dictionary for an Evaluation object.
 
@@ -292,6 +293,7 @@ def build_evaluation_val(
         summarize_ref: Reference to the op implementing the summarize method
         class_name: The class name (defaults to "Evaluation" for base evaluations, or a custom name for subclasses)
         eval_attributes: Optional attributes for the evaluation
+        on_complete: Optional callback reference for post-evaluation actions
 
     Returns:
         Dictionary representing the evaluation object value
@@ -313,6 +315,7 @@ def build_evaluation_val(
         "evaluation_name": evaluation_name,
         "metadata": metadata,
         "preprocess_model_input": preprocess_model_input,
+        "on_complete": on_complete,
         "evaluate": evaluate_ref,
         "predict_and_score": predict_and_score_ref,
         "summarize": summarize_ref,

@@ -84,6 +84,7 @@ from weave.trace.table import Table
 from weave.trace.table_upload_chunking import ChunkingConfig, TableChunkManager
 from weave.trace.util import log_once
 from weave.trace.vals import WeaveObject, WeaveTable, make_trace_obj
+from weave.trace.view_utils import build_and_save_call_view_spec
 from weave.trace.wandb_run_context import (
     WandbRunContext,
     check_wandb_run_matches,
@@ -981,6 +982,9 @@ class WeaveClient:
                 wb_run_context_end.step if wb_run_context_end else None
             )
 
+            # Build and save CallViewSpec if there are pending views
+            view_spec_ref = build_and_save_call_view_spec(call, self)
+
             call_end_req = CallEndReq(
                 end=EndedCallSchemaForInsertWithStartedAt(
                     project_id=project_id,
@@ -991,6 +995,7 @@ class WeaveClient:
                     summary=merged_summary,
                     exception=exception_str,
                     wb_run_step_end=current_wb_run_step_end,
+                    view_spec_ref=view_spec_ref,
                 )
             )
             bytes_size = len(call_end_req.model_dump_json())

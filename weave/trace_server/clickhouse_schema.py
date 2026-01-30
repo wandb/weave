@@ -79,6 +79,7 @@ class CallEndCHInsertable(CallBaseCHInsertable):
     summary_dump: str
     output_dump: str
     wb_run_step_end: int | None = None
+    view_spec_ref: str | None = None
 
     _wb_run_step_end_v = field_validator("wb_run_step_end")(
         validation.wb_run_step_validator
@@ -122,6 +123,7 @@ class CallCompleteCHInsertable(
     summary_dump: str
     otel_dump: str | None = None
     wb_run_step_end: int | None = None
+    view_spec_ref: str | None = None
 
     _wb_run_step_end_v = field_validator("wb_run_step_end")(
         validation.wb_run_step_validator
@@ -163,6 +165,8 @@ class SelectableCHCallSchema(BaseModel):
     wb_run_id: str | None = None
     wb_run_step: int | None = None
     wb_run_step_end: int | None = None
+
+    view_spec_ref: str | None = None
 
     deleted_at: datetime.datetime | None = None
 
