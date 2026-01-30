@@ -1958,6 +1958,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         def _default_true(val: bool | None) -> bool:
             return True if val is None else val
 
+        # Resolve which table to read from based on project data residence
+        read_table = self.table_routing_resolver.resolve_read_table(
+            req.project_id, self.ch_client
+        )
+
         pb = ParamBuilder()
         query, columns = make_project_stats_query(
             req.project_id,
@@ -1966,6 +1971,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             include_objects_storage_size=_default_true(req.include_object_storage_size),
             include_tables_storage_size=_default_true(req.include_table_storage_size),
             include_files_storage_size=_default_true(req.include_file_storage_size),
+            read_table=read_table,
         )
         query_result = self.ch_client.query(query, parameters=pb.get_params())
 

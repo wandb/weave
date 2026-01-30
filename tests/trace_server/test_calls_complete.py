@@ -1384,3 +1384,159 @@ def test_calls_delete_cascade(trace_server, clickhouse_trace_server):
     )
     assert res.num_deleted == 4
     assert len(_fetch_calls_stream(trace_server, project3)) == 0
+
+
+def test_project_stats_with_calls_complete(trace_server, clickhouse_trace_server):
+    """Test project_stats uses calls_complete_stats when project uses calls_complete.
+
+    This test verifies that the project_stats endpoint correctly queries
+    from calls_complete_stats (not calls_merged_stats) when the project
+    has data in calls_complete table.
+    """
+    project_id = f"{TEST_ENTITY}/project_stats_calls_complete"
+    internal_project_id = b64(project_id)
+
+    # Define test data sizes
+    attr_size = 100
+    inputs_size = 200
+    output_size = 300
+    summary_size = 400
+    expected_trace_size = attr_size + inputs_size + output_size + summary_size
+
+    # Insert data directly into calls_complete_stats table
+    # This bypasses the materialized view to have predictable test data
+    clickhouse_trace_server.ch_client.command(
+        f"""
+        INSERT INTO calls_complete_stats (
+            project_id,
+            id,
+            attributes_size_bytes,
+            inputs_size_bytes,
+            output_size_bytes,
+            summary_size_bytes
+        )
+        VALUES (
+            '{internal_project_id}',
+            '{uuid.uuid4()}',
+            {attr_size},
+            {inputs_size},
+            {output_size},
+            {summary_size}
+        )
+        """
+    )
+
+    # Insert a row into calls_complete to establish project residence
+    _insert_complete_call(clickhouse_trace_server.ch_client, internal_project_id)
+
+    # Verify we're reading from calls_complete
+    read_table = clickhouse_trace_server.table_routing_resolver.resolve_read_table(
+        internal_project_id,
+        clickhouse_trace_server.ch_client,
+    )
+    assert read_table == ReadTable.CALLS_COMPLETE
+
+    # Query project stats - use defaults (all True) to get all fields
+    res = trace_server.project_stats(tsi.ProjectStatsReq(project_id=project_id))
+
+    # Should get the data from calls_complete_stats, not calls_merged_stats
+    # The expected_trace_size is the sum of all _size_bytes fields we inserted
+    # Plus any sizes from the _insert_complete_call (which inserts empty JSON)
+    assert res.trace_storage_size_bytes >= expected_trace_size
+
+
+def test_project_stats_uses_correct_stats_table_based_on_residence(
+    trace_server, clickhouse_trace_server
+):
+    """Test project_stats uses the correct stats table based on data residence.
+
+    This test creates two projects:
+    1. One with data only in calls_merged (should use calls_merged_stats)
+    2. One with data only in calls_complete (should use calls_complete_stats)
+
+    It verifies each project gets stats from its corresponding stats table.
+    """
+    # Project 1: calls_merged only
+    project1_id = f"{TEST_ENTITY}/stats_merged_only"
+    internal_project1_id = b64(project1_id)
+    merged_trace_size = 1000
+
+    # Insert into calls_merged_stats
+    clickhouse_trace_server.ch_client.command(
+        f"""
+        INSERT INTO calls_merged_stats (
+            project_id,
+            id,
+            attributes_size_bytes,
+            inputs_size_bytes,
+            output_size_bytes,
+            summary_size_bytes
+        )
+        VALUES (
+            '{internal_project1_id}',
+            '{uuid.uuid4()}',
+            {merged_trace_size},
+            0,
+            0,
+            0
+        )
+        """
+    )
+
+    # Insert call into calls_merged to establish residence
+    _insert_merged_call(clickhouse_trace_server.ch_client, internal_project1_id)
+
+    # Project 2: calls_complete only
+    project2_id = f"{TEST_ENTITY}/stats_complete_only"
+    internal_project2_id = b64(project2_id)
+    complete_trace_size = 2000
+
+    # Insert into calls_complete_stats
+    clickhouse_trace_server.ch_client.command(
+        f"""
+        INSERT INTO calls_complete_stats (
+            project_id,
+            id,
+            attributes_size_bytes,
+            inputs_size_bytes,
+            output_size_bytes,
+            summary_size_bytes
+        )
+        VALUES (
+            '{internal_project2_id}',
+            '{uuid.uuid4()}',
+            {complete_trace_size},
+            0,
+            0,
+            0
+        )
+        """
+    )
+
+    # Insert call into calls_complete to establish residence
+    _insert_complete_call(clickhouse_trace_server.ch_client, internal_project2_id)
+
+    # Verify project residences
+    read_table1 = clickhouse_trace_server.table_routing_resolver.resolve_read_table(
+        internal_project1_id, clickhouse_trace_server.ch_client
+    )
+    read_table2 = clickhouse_trace_server.table_routing_resolver.resolve_read_table(
+        internal_project2_id, clickhouse_trace_server.ch_client
+    )
+
+    assert read_table1 == ReadTable.CALLS_MERGED
+    assert read_table2 == ReadTable.CALLS_COMPLETE
+
+    # Query stats for both projects using defaults (all True)
+    res1 = trace_server.project_stats(tsi.ProjectStatsReq(project_id=project1_id))
+    res2 = trace_server.project_stats(tsi.ProjectStatsReq(project_id=project2_id))
+
+    # Each should get data from its respective stats table
+    # Use >= because _insert_*_call also adds some size data
+    assert res1.trace_storage_size_bytes >= merged_trace_size
+    assert res2.trace_storage_size_bytes >= complete_trace_size
+
+    # Critically: project1 should NOT have the complete_trace_size and vice versa
+    # This verifies we're reading from the correct table
+    # The values should be different because each project reads from different stats tables
+    assert res1.trace_storage_size_bytes != res2.trace_storage_size_bytes
