@@ -14,7 +14,7 @@ from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
     ExportTraceServiceRequest,
 )
 
-from weave.trace_server import constants, object_creation_utils
+from weave.trace_server import constants, object_creation_utils, usage_utils
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.common_interface import SortBy
@@ -528,7 +528,9 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         if req.columns:
             # TODO(gst): allow json fields to be selected
             simple_columns = list({x.split(".")[0] for x in req.columns})
-            if "summary" in simple_columns or req.include_costs:
+            if req.include_usage_rollup and "summary" not in simple_columns:
+                simple_columns.append("summary")
+            if "summary" in simple_columns or req.include_costs or req.include_usage_rollup:
                 simple_columns += ["ended_at", "exception", "display_name"]
 
             select_columns = [x for x in simple_columns if x in select_columns]
@@ -734,7 +736,61 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             feedback = self.feedback_query(feedback_query_req)
             hydrate_calls_with_feedback(calls, feedback)
 
+        if req.include_usage_rollup:
+            self._apply_usage_rollup_to_calls(req.project_id, calls)
+
         return tsi.CallsQueryRes(calls=[tsi.CallSchema(**call) for call in calls])
+
+    def _apply_usage_rollup_to_calls(
+        self,
+        project_id: str,
+        calls: list[dict[str, Any]],
+    ) -> None:
+        if not calls:
+            return
+
+        trace_ids = {call.get("trace_id") for call in calls if call.get("trace_id")}
+        if not trace_ids:
+            return
+
+        trace_id_list = list(trace_ids)
+        _conn, cursor = get_conn_cursor(self.db_path)
+        placeholders = ", ".join("?" for _ in trace_id_list)
+        query = f"""
+            SELECT id, parent_id, summary
+            FROM calls
+            WHERE deleted_at IS NULL
+            AND project_id = ?
+            AND trace_id IN ({placeholders})
+        """
+        params = [project_id, *trace_id_list]
+        cursor.execute(query, params)
+        usage_calls: list[usage_utils.UsageCall] = []
+        for call_id, parent_id, summary_json in cursor.fetchall():
+            summary = json.loads(summary_json) if summary_json else {}
+            usage_calls.append(
+                usage_utils.UsageCall(
+                    id=call_id,
+                    parent_id=parent_id,
+                    summary=summary,
+                )
+            )
+
+        aggregated_usage = usage_utils.aggregate_usage_with_descendants(
+            usage_calls, include_costs=False
+        )
+        for call in calls:
+            call_id = call.get("id")
+            if not call_id:
+                continue
+            usage = usage_utils.aggregated_usage_to_dict(
+                aggregated_usage.get(call_id, {})
+            )
+            if not usage:
+                continue
+            summary = call.get("summary") or {}
+            summary["usage"] = usage
+            call["summary"] = summary
 
     def _expand_refs(
         self, data: dict[str, Any], expand_columns: list[str]

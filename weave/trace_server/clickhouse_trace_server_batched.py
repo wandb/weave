@@ -1073,15 +1073,19 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             include_storage_size=req.include_storage_size or False,
             include_total_storage_size=req.include_total_storage_size or False,
         )
+        include_usage_rollup = req.include_usage_rollup or False
         columns = ALL_CALL_SELECT_COLUMNS
         if req.columns:
             # TODO: add support for json extract fields
             # Split out any nested column requests
             columns = [col.split(".")[0] for col in req.columns]
 
+            if include_usage_rollup and "summary" not in columns:
+                columns.append("summary")
+
             # If we are returning a summary object, make sure that all fields
             # required to compute the summary are in the columns
-            if "summary" in columns or req.include_costs:
+            if "summary" in columns or req.include_costs or include_usage_rollup:
                 columns += ["ended_at", "exception", "display_name"]
 
             # Set columns to user-requested columns, w/ required columns
@@ -1145,6 +1149,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             set_current_span_dd_tags({"include_feedback": "true"})
         if expand_columns:
             set_current_span_dd_tags({"expand_columns": "true"})
+        if include_usage_rollup:
+            set_current_span_dd_tags({"include_usage_rollup": "true"})
 
         def row_to_call_schema_dict(row: tuple[Any, ...]) -> dict[str, Any]:
             return _ch_call_dict_to_call_schema_dict(
@@ -1152,6 +1158,20 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             )
 
         try:
+            if include_usage_rollup:
+                call_dicts = [row_to_call_schema_dict(row) for row in raw_res]
+                if expand_columns and req.return_expanded_column_values:
+                    ref_cache = LRUCache(max_size=1000)
+                    self._expand_call_refs(
+                        req.project_id, call_dicts, expand_columns, ref_cache
+                    )
+                if include_feedback:
+                    self._add_feedback_to_calls(req.project_id, call_dicts)
+                self._apply_usage_rollup_to_calls(req.project_id, call_dicts)
+                for call in call_dicts:
+                    yield tsi.CallSchema.model_validate(call)
+                return
+
             if not expand_columns and not include_feedback:
                 for row in raw_res:
                     yield tsi.CallSchema.model_validate(row_to_call_schema_dict(row))
@@ -1179,6 +1199,39 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             # Ensure upstream _query_stream is closed on any exit
             if hasattr(raw_res, "close"):
                 raw_res.close()
+
+    def _apply_usage_rollup_to_calls(
+        self,
+        project_id: str,
+        calls: list[dict[str, Any]],
+    ) -> None:
+        if not calls:
+            return
+
+        call_ids = [call.get("id") for call in calls if call.get("id")]
+        if not call_ids:
+            return
+
+        unique_call_ids = list(dict.fromkeys(call_ids))
+        usage_res = self.calls_usage(
+            tsi.CallsUsageReq(
+                project_id=project_id,
+                call_ids=unique_call_ids,
+            )
+        )
+        usage_by_id = usage_res.call_usage
+        for call in calls:
+            call_id = call.get("id")
+            if not call_id:
+                continue
+            usage = usage_utils.aggregated_usage_to_dict(
+                usage_by_id.get(call_id, {})
+            )
+            if not usage:
+                continue
+            summary = call.get("summary") or {}
+            summary["usage"] = usage
+            call["summary"] = summary
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._add_feedback_to_calls")
     def _add_feedback_to_calls(

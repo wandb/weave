@@ -534,6 +534,7 @@ class WeaveClient:
         query: QueryLike | None = None,
         include_costs: bool = False,
         include_feedback: bool = False,
+        include_usage_rollup: bool = False,
         include_storage_size: bool = False,
         include_total_storage_size: bool = False,
         columns: list[str] | None = None,
@@ -558,6 +559,7 @@ class WeaveClient:
             `query`: A mongo-like expression for advanced filtering. Not all Mongo operators are supported.
             `include_costs`: If True, includes token/cost info in `summary.weave`.
             `include_feedback`: If True, includes feedback in `summary.weave.feedback`.
+            `include_usage_rollup`: If True, rolls up usage from descendants into `summary.usage`.
             `include_storage_size`: If True, includes the storage size for a call.
             `include_total_storage_size`: If True, includes the total storage size for a trace.
             `columns`: List of fields to return per call. Reducing this can significantly improve performance.
@@ -594,6 +596,7 @@ class WeaveClient:
             query=query,
             include_costs=include_costs,
             include_feedback=include_feedback,
+            include_usage_rollup=include_usage_rollup,
             include_storage_size=include_storage_size,
             include_total_storage_size=include_total_storage_size,
             columns=columns,
@@ -608,6 +611,7 @@ class WeaveClient:
         call_id: str,
         include_costs: bool = False,
         include_feedback: bool = False,
+        include_usage_rollup: bool = False,
         columns: list[str] | None = None,
     ) -> WeaveObject:
         """Get a single call by its ID.
@@ -616,6 +620,7 @@ class WeaveClient:
             call_id: The ID of the call to get.
             include_costs: If true, cost info is included at summary.weave
             include_feedback: If true, feedback info is included at summary.weave.feedback
+            include_usage_rollup: If true, rolls up usage from descendants into summary.usage
             columns: A list of columns to include in the response. If None,
                all columns are included. Specifying fewer columns may be more performant.
                Some columns are always included: id, project_id, trace_id, op_name, started_at
@@ -630,6 +635,7 @@ class WeaveClient:
                     filter=CallsFilter(call_ids=[call_id]),
                     include_costs=include_costs,
                     include_feedback=include_feedback,
+                    include_usage_rollup=include_usage_rollup,
                     columns=columns,
                 )
             )

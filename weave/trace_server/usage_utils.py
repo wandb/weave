@@ -188,3 +188,18 @@ def _has_usage(usage: tsi.LLMAggregatedUsage, include_costs: bool) -> bool:
             or (usage.completion_tokens_total_cost or 0.0)
         )
     return False
+
+
+def aggregated_usage_to_dict(
+    aggregated_usage: dict[str, tsi.LLMAggregatedUsage],
+    include_costs: bool = False,
+) -> dict[str, dict[str, Any]]:
+    """Serialize aggregated usage objects for JSON responses."""
+    serialized: dict[str, dict[str, Any]] = {}
+    for model_name, usage in aggregated_usage.items():
+        payload = usage.model_dump(exclude_none=True)
+        if not include_costs:
+            payload.pop("prompt_tokens_total_cost", None)
+            payload.pop("completion_tokens_total_cost", None)
+        serialized[model_name] = payload
+    return serialized

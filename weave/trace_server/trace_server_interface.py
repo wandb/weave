@@ -527,6 +527,12 @@ class CallsQueryReq(BaseModelStrict):
         description="Beta, subject to change. If true, the response will"
         " include feedback for each call.",
     )
+    include_usage_rollup: bool | None = Field(
+        default=False,
+        description="If true, compute usage rollups (own + descendants) for returned calls"
+        " and populate summary.usage. This may require loading all calls for affected"
+        " traces and can disable streaming performance.",
+    )
     include_storage_size: bool | None = Field(
         default=False,
         description="Beta, subject to change. If true, the response will"

@@ -616,6 +616,58 @@ def test_calls_usage_include_costs_flag(client: weave_client.WeaveClient) -> Non
     assert usage_with_costs.completion_tokens_total_cost is not None
 
 
+def test_calls_query_include_usage_rollup(client: weave_client.WeaveClient) -> None:
+    skip_if_sqlite(client)
+
+    project_id = client._project_id()
+    trace_id = str(uuid.uuid4())
+    now = datetime.datetime.now(datetime.timezone.utc)
+
+    root_id = str(uuid.uuid4())
+    child_id = str(uuid.uuid4())
+
+    _create_call(
+        client,
+        root_id,
+        trace_id,
+        None,
+        now,
+        {"gpt-4": {"prompt_tokens": 2, "completion_tokens": 1, "total_tokens": 3}},
+    )
+    _create_call(
+        client,
+        child_id,
+        trace_id,
+        root_id,
+        now + datetime.timedelta(seconds=2),
+        {"gpt-4": {"input_tokens": 4, "output_tokens": 2}},
+    )
+
+    calls = list(
+        client.server.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=project_id,
+                filter=tsi.CallsFilter(trace_ids=[trace_id]),
+                columns=["id", "parent_id", "summary"],
+                include_usage_rollup=True,
+            )
+        )
+    )
+
+    root_call = next(call for call in calls if call.id == root_id)
+    child_call = next(call for call in calls if call.id == child_id)
+
+    root_usage = root_call.summary["usage"]["gpt-4"]
+    assert root_usage["prompt_tokens"] == 6
+    assert root_usage["completion_tokens"] == 3
+    assert root_usage["total_tokens"] == 9
+
+    child_usage = child_call.summary["usage"]["gpt-4"]
+    assert child_usage["prompt_tokens"] == 4
+    assert child_usage["completion_tokens"] == 2
+    assert child_usage["total_tokens"] == 6
+
+
 @pytest.mark.parametrize(
     ("root_usage", "middle_usage", "leaf_usage"),
     [
