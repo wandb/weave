@@ -3,11 +3,14 @@ from collections.abc import Generator
 
 import pytest
 from anthropic import Anthropic, AsyncAnthropic
+from pydantic import BaseModel
 
 import weave
 from weave.integrations.anthropic.anthropic_sdk import get_anthropic_patcher
+from weave.integrations.integration_utilities import op_name_from_call
 
 model = "claude-3-haiku-20240307"
+parse_model = "claude-sonnet-4-5"
 # model = "claude-3-opus-20240229"
 
 
@@ -486,6 +489,52 @@ def test_beta_anthropic(
     assert model_usage["requests"] == 1
     assert output.usage.output_tokens == model_usage["output_tokens"] == 19
     assert output.usage.input_tokens == model_usage["input_tokens"] == 10
+
+
+@pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
+@pytest.mark.vcr(
+    filter_headers=["authorization", "x-api-key"],
+    allowed_hosts=["api.wandb.ai", "localhost"],
+)
+def test_beta_anthropic_parse(
+    client: weave.trace.weave_client.WeaveClient,
+) -> None:
+    class Greeting(BaseModel):
+        greeting: str
+
+    api_key = os.getenv("ANTHROPIC_API_KEY", "DUMMY_API_KEY")
+    anthropic_client = Anthropic(api_key=api_key)
+    message = anthropic_client.beta.messages.parse(
+        model=parse_model,
+        max_tokens=128,
+        messages=[
+            {
+                "role": "user",
+                "content": 'Return JSON: {"greeting":"hello"}',
+            }
+        ],
+        output_format=Greeting,
+        temperature=0,
+    )
+
+    all_content = message.content[0]
+    assert all_content.parsed_output == Greeting(greeting="hello")
+    calls = list(client.get_calls())
+    assert len(calls) == 1
+    call = calls[0]
+    assert op_name_from_call(call) == "anthropic.beta.Messages.parse"
+    assert call.exception is None
+    assert call.ended_at is not None
+    output = call.output
+    assert output.id == message.id
+    assert output.model == message.model
+    assert output.content[0].parsed_output == Greeting(greeting="hello")
+    summary = call.summary
+    assert summary is not None
+    model_usage = summary["usage"][output.model]
+    assert model_usage["requests"] == 1
+    assert output.usage.output_tokens == model_usage["output_tokens"]
+    assert output.usage.input_tokens == model_usage["input_tokens"]
 
 
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode

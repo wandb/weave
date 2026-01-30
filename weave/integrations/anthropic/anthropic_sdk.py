@@ -237,6 +237,18 @@ def get_anthropic_patcher(
             "kind": base.kind or "llm",
         }
     )
+    beta_messages_parse_settings = base.model_copy(
+        update={
+            "name": base.name or "anthropic.beta.Messages.parse",
+            "kind": base.kind or "llm",
+        }
+    )
+    beta_async_messages_parse_settings = base.model_copy(
+        update={
+            "name": base.name or "anthropic.beta.AsyncMessages.parse",
+            "kind": base.kind or "llm",
+        }
+    )
     beta_stream_settings = base.model_copy(
         update={
             "name": base.name or "anthropic.beta.Messages.stream",
@@ -282,6 +294,16 @@ def get_anthropic_patcher(
                 lambda: importlib.import_module("anthropic.resources.beta.messages"),
                 "AsyncMessages.create",
                 create_wrapper_async(beta_async_messages_create_settings),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("anthropic.resources.beta.messages"),
+                "Messages.parse",
+                create_wrapper_sync(beta_messages_parse_settings),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("anthropic.resources.beta.messages"),
+                "AsyncMessages.parse",
+                create_wrapper_async(beta_async_messages_parse_settings),
             ),
             SymbolPatcher(
                 lambda: importlib.import_module("anthropic.resources.beta.messages"),
