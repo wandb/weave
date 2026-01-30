@@ -5354,7 +5354,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         # If tracking not requested just return chunks directly
         if not req.track_llm_call or start_call is None:
-            return chunk_iter
+            return _create_closing_stream_wrapper(chunk_iter)
 
         # Otherwise, wrap the iterator with tracking
         return _create_tracked_stream_wrapper(
@@ -6626,6 +6626,10 @@ def _create_tracked_stream_wrapper(
                                 )
 
         finally:
+            close_iter = getattr(chunk_iter, "close", None)
+            if callable(close_iter):
+                close_iter()
+
             # Build final aggregated output with all choices
             if choice_contents or choice_tool_calls or choice_reasoning_content:
                 choices_array = _build_choices_array(
@@ -6656,6 +6660,22 @@ def _create_tracked_stream_wrapper(
             )
             end_call = _end_call_for_insert_to_ch_insertable_end_call(end)
             insert_call(end_call)
+
+    return _stream_wrapper()
+
+
+def _create_closing_stream_wrapper(
+    chunk_iter: Iterator[dict[str, Any]],
+) -> Iterator[dict[str, Any]]:
+    """Ensure streaming iterators release resources when the client stops early."""
+
+    def _stream_wrapper() -> Iterator[dict[str, Any]]:
+        try:
+            yield from chunk_iter
+        finally:
+            close_iter = getattr(chunk_iter, "close", None)
+            if callable(close_iter):
+                close_iter()
 
     return _stream_wrapper()
 
