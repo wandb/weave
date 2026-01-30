@@ -35,7 +35,10 @@ class DelegatingTraceServerMixin:
         delegated_methods = getattr(cls, "delegated_methods", _TRACE_SERVER_METHOD_NAMES)
         if name in delegated_methods:
             return getattr(self._delegated_server(), name)
-        return object.__getattribute__(self, name)
+        try:
+            return object.__getattribute__(self, name)
+        except AttributeError:
+            return getattr(self._delegated_server(), name)
 
     def __getattr__(self, name: str) -> Any:
         return getattr(self._delegated_server(), name)
