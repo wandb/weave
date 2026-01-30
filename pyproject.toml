@@ -52,6 +52,9 @@ dependencies = [
   "polyfile-weave>=0.5.9",
 ]
 
+[project.scripts]
+weave = "weave.cli.main:main"
+
 [project.optional-dependencies]
 wandb = ["wandb>=0.17.1"]
 rich = ["rich"]           # Optional dependency for enhanced console output
