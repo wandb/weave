@@ -473,7 +473,7 @@ def test_evaluation_no_auto_summarize(client):
     calls = client.get_calls()
     # assert len(calls) == 1
     summarize_call = calls[4]
-    assert summarize_call.output == {"output": {}}
+    assert summarize_call.output == {}
 
 
 def test_evaluation_fail_with_exception(client):
@@ -503,8 +503,6 @@ def test_evaluation_no_auto_summarize_with_custom_dict(client):
     # assert len(calls) == 1
     summarize_call = calls[4]
     assert summarize_call.output == {
-        "something": 1,
-        "else": 2,
         "output": {"something": 1, "else": 2},
     }
 
