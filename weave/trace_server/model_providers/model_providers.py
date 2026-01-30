@@ -29,9 +29,13 @@ PROVIDER_TO_API_KEY_NAME_MAP = {
 }
 
 
-class LLMModelProviderInfo(TypedDict):
+class LLMModelProviderInfo(TypedDict, total=False):
     litellm_provider: str
     api_key_name: str
+    # Deprecated fields - set by update_playground_llms.py script
+    deprecated: bool
+    deprecated_reason: str
+    deprecated_date: str
 
 
 logger = logging.getLogger(__name__)
@@ -113,6 +117,9 @@ def main(
 ) -> dict[str, LLMModelProviderInfo]:
     providers: dict[str, LLMModelProviderInfo] = {}
 
+    # Load existing providers to preserve deprecated tags
+    existing_providers = read_model_to_provider_info_map(file_name)
+
     # Start with information about CoreWeave hosted models
     full_path_hosted = os.path.join(os.path.dirname(__file__), HOSTED_MODEL_INFO_FILE)
     with open(full_path_hosted) as f:
@@ -124,9 +131,21 @@ def main(
         api_key_name = PROVIDER_TO_API_KEY_NAME_MAP.get(provider)
         if api_key_name is None:
             raise ValueError(f"No API key name found for provider: {provider}")
-        providers[model["idPlayground"]] = LLMModelProviderInfo(
-            litellm_provider=provider, api_key_name=api_key_name
-        )
+        model_id = model["idPlayground"]
+        # Create new provider info
+        provider_info: LLMModelProviderInfo = {
+            "litellm_provider": provider,
+            "api_key_name": api_key_name,
+        }
+        # Preserve deprecated fields from existing providers
+        existing_info = existing_providers.get(model_id, {})
+        if deprecated := existing_info.get("deprecated"):
+            provider_info["deprecated"] = deprecated
+        if deprecated_reason := existing_info.get("deprecated_reason"):
+            provider_info["deprecated_reason"] = deprecated_reason
+        if deprecated_date := existing_info.get("deprecated_date"):
+            provider_info["deprecated_date"] = deprecated_date
+        providers[model_id] = provider_info
 
     # Next add in information from the LiteLLM model provider info file
     try:
@@ -146,9 +165,20 @@ def main(
         provider = val.get("litellm_provider")
         api_key_name = PROVIDER_TO_API_KEY_NAME_MAP.get(provider)
         if api_key_name:
-            providers[k] = LLMModelProviderInfo(
-                litellm_provider=provider, api_key_name=api_key_name
-            )
+            # Create new provider info
+            litellm_info: LLMModelProviderInfo = {
+                "litellm_provider": provider,
+                "api_key_name": api_key_name,
+            }
+            # Preserve deprecated fields from existing providers
+            existing_info = existing_providers.get(k, {})
+            if deprecated := existing_info.get("deprecated"):
+                litellm_info["deprecated"] = deprecated
+            if deprecated_reason := existing_info.get("deprecated_reason"):
+                litellm_info["deprecated_reason"] = deprecated_reason
+            if deprecated_date := existing_info.get("deprecated_date"):
+                litellm_info["deprecated_date"] = deprecated_date
+            providers[k] = litellm_info
     full_path_output = os.path.join(os.path.dirname(__file__), file_name)
     os.makedirs(os.path.dirname(full_path_output), exist_ok=True)
     with open(full_path_output, "w") as f:
