@@ -27,6 +27,17 @@ logger = logging.getLogger(__name__)
 TReq = TypeVar("TReq", bound=BaseModel)
 TRes = TypeVar("TRes", bound=BaseModel)
 
+_TRACE_SERVER_METHOD_NAMES = frozenset(
+    {
+        name
+        for interface in (tsi.TraceServerInterface, tsi.ObjectInterface)
+        for name, value in vars(interface).items()
+        if callable(value) and not name.startswith("_")
+    }
+)
+
+_DELEGATED_METHOD_NAMES = _TRACE_SERVER_METHOD_NAMES | {"server_info"}
+
 
 class CacheRecorder(TypedDict):
     hits: int
@@ -102,6 +113,16 @@ class CachingMiddlewareTraceServer(TraceServerClientInterface):
             self._cache.close()
         except Exception:
             logger.exception("Error closing cache")
+
+    def __getattribute__(self, name: str) -> Any:
+        if name.startswith("_"):
+            return object.__getattribute__(self, name)
+        if name in type(self).__dict__:
+            return object.__getattribute__(self, name)
+        if name in _DELEGATED_METHOD_NAMES:
+            next_server = object.__getattribute__(self, "_next_trace_server")
+            return getattr(next_server, name)
+        return object.__getattribute__(self, name)
 
     def __getattr__(self, name: str) -> Any:
         return getattr(self._next_trace_server, name)
