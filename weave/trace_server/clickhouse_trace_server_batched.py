@@ -498,14 +498,14 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         # Convert calls to CH insertable format and then to rows for batch insertion
         batch_rows = []
-        event_cb_list = []
+        event_callback_list = []
         for start_call, end_call in calls:
             ch_start = _start_call_for_insert_to_ch_insertable_start_call(start_call)
             ch_end = _end_call_for_insert_to_ch_insertable_end_call(end_call)
             batch_rows.append(_ch_call_to_row(ch_start))
             batch_rows.append(_ch_call_to_row(ch_end))
             # We can't execute these until after they are inserted
-            event_cb_list.append(
+            event_callback_list.append(
                 partial(
                     _maybe_enqueue_minimal_call_end,
                     self.kafka_producer,
@@ -520,7 +520,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             # Insert directly without async_insert for OTEL calls
             self._insert_call_batch(batch_rows, settings=None, do_sync_insert=True)
             # Calls are inserted so run the callbacks and flush to wait for completion
-            for cb in event_cb_list:
+            for cb in event_callback_list:
                 cb()
             self._flush_kafka_producer()
 
