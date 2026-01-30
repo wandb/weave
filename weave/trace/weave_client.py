@@ -682,12 +682,16 @@ class WeaveClient:
         inputs_sensitive_keys_redacted = redact_sensitive_keys(inputs)
 
         if op.postprocess_inputs:
-            inputs_postprocessed = op.postprocess_inputs(inputs_sensitive_keys_redacted)
+            # Create a deep copy to prevent user's postprocess_inputs from mutating our data
+            inputs_copy = copy.deepcopy(inputs_sensitive_keys_redacted)
+            inputs_postprocessed = op.postprocess_inputs(inputs_copy)
         else:
             inputs_postprocessed = inputs_sensitive_keys_redacted
 
         if _global_postprocess_inputs:
-            inputs_postprocessed = _global_postprocess_inputs(inputs_postprocessed)
+            # Create a deep copy to prevent global postprocess_inputs from mutating our data
+            inputs_copy = copy.deepcopy(inputs_postprocessed)
+            inputs_postprocessed = _global_postprocess_inputs(inputs_copy)
 
         self._save_nested_objects(inputs_postprocessed)
         inputs_with_refs = map_to_refs(inputs_postprocessed)
@@ -885,12 +889,16 @@ class WeaveClient:
         original_output = output
 
         if op is not None and op.postprocess_output:
-            postprocessed_output = op.postprocess_output(original_output)
+            # Create a deep copy to prevent user's postprocess_output from mutating our data
+            output_copy = copy.deepcopy(original_output)
+            postprocessed_output = op.postprocess_output(output_copy)
         else:
             postprocessed_output = original_output
 
         if _global_postprocess_output:
-            postprocessed_output = _global_postprocess_output(postprocessed_output)
+            # Create a deep copy to prevent global postprocess_output from mutating our data
+            output_copy = copy.deepcopy(postprocessed_output)
+            postprocessed_output = _global_postprocess_output(output_copy)
 
         self._save_nested_objects(postprocessed_output)
         output_as_refs = map_to_refs(postprocessed_output)
