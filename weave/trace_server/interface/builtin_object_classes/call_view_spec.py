@@ -24,38 +24,6 @@ class ContentViewItem(BaseModel):
     metadata: dict[str, Any] | None = None
 
 
-class ScoreSummaryWidgetItem(BaseModel):
-    """Widget displaying score summary for the current evaluation call.
-
-    This widget displays the score summary from the call it's attached to.
-    No configuration needed - it automatically uses the current call's data.
-    """
-
-    type: Literal["score_summary"] = "score_summary"
-
-
-class ChildPredictionsWidgetItem(BaseModel):
-    """Widget displaying child predictions of the current evaluation call.
-
-    This widget displays the predictions from the call it's attached to.
-    No configuration needed - it automatically uses the current call's child calls.
-    """
-
-    type: Literal["child_predictions"] = "child_predictions"
-
-
-class TableRefViewItem(BaseModel):
-    """Reference to a Table object for display in call views.
-
-    Stores a URI reference to a saved Table that can be rendered
-    as a data table in the UI.
-    """
-
-    type: Literal["table_ref"] = "table_ref"
-    # Named 'uri' not 'ref' to avoid collision with ObjectRef 'ref' attribute pattern
-    uri: str  # Table URI (e.g., weave-trace-internal:///project/table/digest)
-
-
 class ObjectRefViewItem(BaseModel):
     """Reference to a Weave object for display in call views.
 
@@ -84,12 +52,7 @@ class SavedViewDefinitionItem(BaseModel):
 
 # Union of all view item types with discriminator for proper deserialization
 ViewItem = Annotated[
-    ContentViewItem
-    | ScoreSummaryWidgetItem
-    | ChildPredictionsWidgetItem
-    | TableRefViewItem
-    | ObjectRefViewItem
-    | SavedViewDefinitionItem,
+    ContentViewItem | ObjectRefViewItem | SavedViewDefinitionItem,
     Field(discriminator="type"),
 ]
 
@@ -110,7 +73,6 @@ class CallViewSpec(base_object_def.BaseObject):
         ...             mimetype="text/markdown",
         ...             data="IyBIZWxsbw==",  # base64 "# Hello"
         ...         ),
-        ...         "scores": ScoreSummaryWidgetItem(),
         ...     }
         ... )
     """
@@ -123,11 +85,8 @@ class CallViewSpec(base_object_def.BaseObject):
 
 __all__ = [
     "CallViewSpec",
-    "ChildPredictionsWidgetItem",
     "ContentViewItem",
     "ObjectRefViewItem",
     "SavedViewDefinitionItem",
-    "ScoreSummaryWidgetItem",
-    "TableRefViewItem",
     "ViewItem",
 ]

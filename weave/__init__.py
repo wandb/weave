@@ -35,11 +35,6 @@ from weave.trace.log_call import log_call
 from weave.trace.table import Table
 from weave.trace.util import Thread as Thread
 from weave.trace.util import ThreadPoolExecutor as ThreadPoolExecutor
-from weave.trace.widgets import (
-    ChildPredictionsWidget,
-    ScoreSummaryWidget,
-    Widget,
-)
 from weave.type_handlers.Audio.audio import Audio
 from weave.type_handlers.File.file import File
 from weave.type_handlers.Markdown.markdown import Markdown
@@ -53,7 +48,6 @@ __all__ = [
     "AgentState",
     "AnnotationSpec",
     "Audio",
-    "ChildPredictionsWidget",
     "Content",
     "Dataset",
     "EasyPrompt",
@@ -67,11 +61,9 @@ __all__ = [
     "Object",
     "Prompt",
     "SavedView",
-    "ScoreSummaryWidget",
     "Scorer",
     "StringPrompt",
     "Table",
-    "Widget",
     "attributes",
     "finish",
     "get",

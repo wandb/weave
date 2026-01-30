@@ -9,15 +9,11 @@ from weave.trace.call import Call
 from weave.trace.refs import ObjectRef
 from weave.trace.serialization.serialize import to_json
 from weave.trace.table import Table
-from weave.trace.widgets import ChildPredictionsWidget, ScoreSummaryWidget, Widget
 from weave.trace_server.interface.builtin_object_classes.call_view_spec import (
     CallViewSpec,
-    ChildPredictionsWidgetItem,
     ContentViewItem,
     ObjectRefViewItem,
     SavedViewDefinitionItem,
-    ScoreSummaryWidgetItem,
-    TableRefViewItem,
 )
 from weave.trace_server.interface.builtin_object_classes.call_view_spec import (
     ViewItem as CallViewSpecItem,
@@ -29,7 +25,7 @@ if TYPE_CHECKING:
     from weave.trace.weave_client import WeaveClient
 
     # Type aliases for type checking - includes SavedView
-    ViewItem = Content | str | Widget | Table | ObjectRef | SDKSavedView
+    ViewItem = Content | str | Table | ObjectRef | SDKSavedView
     ViewSpec = ViewItem | list[ViewItem]
 else:
     # At runtime, use Any since SDKSavedView causes circular import
@@ -102,7 +98,7 @@ def serialize_view_item(
     """Serialize a single view item to JSON.
 
     Args:
-        item: A Content, string, Widget, or Table to serialize.
+        item: A Content, string, or Table to serialize.
         project_id: The project ID for serialization context.
         client: The WeaveClient for serialization.
         extension: Optional file extension for string content.
@@ -113,9 +109,7 @@ def serialize_view_item(
     Returns:
         A JSON-serializable dictionary or string (for Table refs).
     """
-    if isinstance(item, Widget):
-        return item.model_dump()
-    elif isinstance(item, Table):
+    if isinstance(item, Table):
         # Publish the table and return its ref URI
         table_ref = client._save_table(item)
         return table_ref.uri()
@@ -182,7 +176,7 @@ def _sdk_view_item_to_call_view_spec_item(
     """Convert an SDK view item to a CallViewSpec item for storage.
 
     Args:
-        item: A Content, string, Widget, Table, or SavedView to convert.
+        item: A Content, string, Table, ObjectRef, or SavedView to convert.
         client: The WeaveClient for saving tables.
         extension: Optional file extension for string content.
         mimetype: Optional MIME type for string content.
@@ -190,23 +184,16 @@ def _sdk_view_item_to_call_view_spec_item(
         encoding: Encoding for string content.
 
     Returns:
-        A CallViewSpec item (ContentViewItem, WidgetItem, TableRefViewItem, or
+        A CallViewSpec item (ContentViewItem, ObjectRefViewItem, or
         SavedViewDefinitionItem).
     """
     # Import here to avoid circular imports
     from weave.flow.saved_view import SavedView as SDKSavedView
 
-    if isinstance(item, ScoreSummaryWidget):
-        return ScoreSummaryWidgetItem()
-    elif isinstance(item, ChildPredictionsWidget):
-        return ChildPredictionsWidgetItem()
-    elif isinstance(item, Widget):
-        # Future widgets - default to score_summary for now
-        return ScoreSummaryWidgetItem()
-    elif isinstance(item, Table):
-        # Publish the table and return its ref URI
+    if isinstance(item, Table):
+        # Publish the table and return its ref URI as an object ref
         table_ref = client._save_table(item)
-        return TableRefViewItem(uri=table_ref.uri())
+        return ObjectRefViewItem(uri=table_ref.uri())
     elif isinstance(item, SDKSavedView):
         # Embed the SavedView definition directly in the CallViewSpec
         # This avoids needing to save the SavedView as a separate object
@@ -215,7 +202,7 @@ def _sdk_view_item_to_call_view_spec_item(
             definition=item.base.definition,
         )
     elif isinstance(item, ObjectRef):
-        # Store object references (e.g., SavedView) as URI strings
+        # Store object references as URI strings
         return ObjectRefViewItem(uri=item.uri())
     elif isinstance(item, (Content, str)):
         content_obj = resolve_view_content(
@@ -297,8 +284,8 @@ def set_call_view(
         call: The call whose pending views should receive the view entry.
         client: The active ``WeaveClient`` used for serialization.
         name: Key to store the view under.
-        content: A ``weave.Content``, raw text, ``Widget``, ``Table``, or list of these
-            to serialize into the view.
+        content: A ``weave.Content``, raw text, ``Table``, ``ObjectRef``, or list of
+            these to serialize into the view.
         extension: Optional file extension used when converting text content.
         mimetype: Optional MIME type applied when converting text content.
         metadata: Optional metadata for newly created ``Content`` objects.
