@@ -15,6 +15,7 @@ from weave.trace_server.interface.builtin_object_classes.call_view_spec import (
     ChildPredictionsWidgetItem,
     ContentViewItem,
     ObjectRefViewItem,
+    SavedViewDefinitionItem,
     ScoreSummaryWidgetItem,
     TableRefViewItem,
 )
@@ -24,10 +25,16 @@ from weave.trace_server.interface.builtin_object_classes.call_view_spec import (
 from weave.type_wrappers.Content.content import Content
 
 if TYPE_CHECKING:
+    from weave.flow.saved_view import SavedView as SDKSavedView
     from weave.trace.weave_client import WeaveClient
 
-ViewItem = Content | str | Widget | Table | ObjectRef
-ViewSpec = ViewItem | list[ViewItem]
+    # Type aliases for type checking - includes SavedView
+    ViewItem = Content | str | Widget | Table | ObjectRef | SDKSavedView
+    ViewSpec = ViewItem | list[ViewItem]
+else:
+    # At runtime, use Any since SDKSavedView causes circular import
+    ViewItem = Any
+    ViewSpec = Any
 
 
 def resolve_view_content(
@@ -175,7 +182,7 @@ def _sdk_view_item_to_call_view_spec_item(
     """Convert an SDK view item to a CallViewSpec item for storage.
 
     Args:
-        item: A Content, string, Widget, or Table to convert.
+        item: A Content, string, Widget, Table, or SavedView to convert.
         client: The WeaveClient for saving tables.
         extension: Optional file extension for string content.
         mimetype: Optional MIME type for string content.
@@ -183,8 +190,12 @@ def _sdk_view_item_to_call_view_spec_item(
         encoding: Encoding for string content.
 
     Returns:
-        A CallViewSpec item (ContentViewItem, WidgetItem, or TableRefViewItem).
+        A CallViewSpec item (ContentViewItem, WidgetItem, TableRefViewItem, or
+        SavedViewDefinitionItem).
     """
+    # Import here to avoid circular imports
+    from weave.flow.saved_view import SavedView as SDKSavedView
+
     if isinstance(item, ScoreSummaryWidget):
         return ScoreSummaryWidgetItem()
     elif isinstance(item, ChildPredictionsWidget):
@@ -196,6 +207,13 @@ def _sdk_view_item_to_call_view_spec_item(
         # Publish the table and return its ref URI
         table_ref = client._save_table(item)
         return TableRefViewItem(uri=table_ref.uri())
+    elif isinstance(item, SDKSavedView):
+        # Embed the SavedView definition directly in the CallViewSpec
+        # This avoids needing to save the SavedView as a separate object
+        return SavedViewDefinitionItem(
+            label=item.base.label,
+            definition=item.base.definition,
+        )
     elif isinstance(item, ObjectRef):
         # Store object references (e.g., SavedView) as URI strings
         return ObjectRefViewItem(uri=item.uri())

@@ -5,6 +5,9 @@ from typing import Annotated, Any, Literal
 from pydantic import BaseModel, Field
 
 from weave.trace_server.interface.builtin_object_classes import base_object_def
+from weave.trace_server.interface.builtin_object_classes.saved_view import (
+    SavedViewDefinition,
+)
 
 
 class ContentViewItem(BaseModel):
@@ -65,13 +68,28 @@ class ObjectRefViewItem(BaseModel):
     uri: str  # Object URI (e.g., weave:///entity/project/object/SavedView:digest)
 
 
+class SavedViewDefinitionItem(BaseModel):
+    """Embedded SavedView definition for display in call views.
+
+    Stores the view definition directly in the CallViewSpec rather than
+    requiring a separate SavedView object to be saved and referenced.
+    This simplifies the user workflow by eliminating the need to save
+    a SavedView object before attaching it to a call.
+    """
+
+    type: Literal["saved_view_definition"] = "saved_view_definition"
+    label: str  # Display label for the view
+    definition: SavedViewDefinition
+
+
 # Union of all view item types with discriminator for proper deserialization
 ViewItem = Annotated[
     ContentViewItem
     | ScoreSummaryWidgetItem
     | ChildPredictionsWidgetItem
     | TableRefViewItem
-    | ObjectRefViewItem,
+    | ObjectRefViewItem
+    | SavedViewDefinitionItem,
     Field(discriminator="type"),
 ]
 
@@ -108,6 +126,7 @@ __all__ = [
     "ChildPredictionsWidgetItem",
     "ContentViewItem",
     "ObjectRefViewItem",
+    "SavedViewDefinitionItem",
     "ScoreSummaryWidgetItem",
     "TableRefViewItem",
     "ViewItem",
