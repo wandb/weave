@@ -171,6 +171,20 @@ class AnthropicIteratorWrapper(_IteratorWrapper):
     def text_stream(self) -> Iterator[str] | AsyncIterator[str]:
         return self.__stream_text__()
 
+    async def __aexit__(
+        self,
+        exc_type: Exception | None,
+        exc_value: BaseException | None,
+        traceback: Any,
+    ) -> None:
+        if exc_type and isinstance(exc_value, Exception):
+            self._call_on_error_once(exc_value)
+        if hasattr(self._iterator_or_ctx_manager, "__aexit__"):
+            await self._iterator_or_ctx_manager.__aexit__(
+                exc_type, exc_value, traceback
+            )
+        self._call_on_close_once()
+
 
 def create_stream_wrapper(settings: OpSettings) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
