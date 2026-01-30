@@ -179,6 +179,16 @@ class QueryOptimizationProcessor(ABC):
         """Process greater than or equal operation."""
         pass
 
+    @abstractmethod
+    def process_lt(self, operation: tsi_query.LtOperation) -> str | None:
+        """Process less than operation."""
+        pass
+
+    @abstractmethod
+    def process_lte(self, operation: tsi_query.LteOperation) -> str | None:
+        """Process less than or equal operation."""
+        pass
+
     def finalize_sql(self, result: str | None) -> str | None:
         """Final step to make valid SQL for the calls query.
 
@@ -235,6 +245,14 @@ class HeavyFieldOptimizationProcessor(QueryOptimizationProcessor):
         """Not implemented for heavy field optimization."""
         return None
 
+    def process_lt(self, operation: tsi_query.LtOperation) -> str | None:
+        """Not implemented for heavy field optimization."""
+        return None
+
+    def process_lte(self, operation: tsi_query.LteOperation) -> str | None:
+        """Not implemented for heavy field optimization."""
+        return None
+
 
 class SortableDatetimeOptimizationProcessor(QueryOptimizationProcessor):
     """Optimization processor for sortable_datetime operations.
@@ -277,6 +295,24 @@ class SortableDatetimeOptimizationProcessor(QueryOptimizationProcessor):
             operation, self.pb, self.table_alias, ">="
         )
 
+    def process_lt(self, operation: tsi_query.LtOperation) -> str | None:
+        """Process LT operation on sortable_datetime fields using sortable_datetime optimization.
+
+        Creates SQL condition that filters started_at with the sortable_datetime column.
+        """
+        return _create_datetime_optimization_sql(
+            operation, self.pb, self.table_alias, "<"
+        )
+
+    def process_lte(self, operation: tsi_query.LteOperation) -> str | None:
+        """Process LTE operation on sortable_datetime fields using sortable_datetime optimization.
+
+        Creates SQL condition that filters started_at with the sortable_datetime column.
+        """
+        return _create_datetime_optimization_sql(
+            operation, self.pb, self.table_alias, "<="
+        )
+
 
 def apply_processor(
     processor: QueryOptimizationProcessor, operation: tsi_query.Operation
@@ -297,6 +333,10 @@ def apply_processor(
         return processor.process_gt(operation)
     elif isinstance(operation, tsi_query.GteOperation):
         return processor.process_gte(operation)
+    elif isinstance(operation, tsi_query.LtOperation):
+        return processor.process_lt(operation)
+    elif isinstance(operation, tsi_query.LteOperation):
+        return processor.process_lte(operation)
     return None
 
 
@@ -400,17 +440,26 @@ def _create_like_condition(
 
 
 def _extract_field_and_literal(
-    operation: tsi_query.EqOperation | tsi_query.GtOperation | tsi_query.GteOperation,
+    operation: tsi_query.EqOperation
+    | tsi_query.GtOperation
+    | tsi_query.GteOperation
+    | tsi_query.LtOperation
+    | tsi_query.LteOperation,
 ) -> tuple[tsi_query.GetFieldOperator | None, tsi_query.LiteralOperation | None]:
     """Extract field and literal operands from a binary operation.
 
     Returns a tuple of (field_operand, literal_operand) or (None, None) if invalid.
     """
-    ops = (
-        operation.eq_
-        if hasattr(operation, "eq_")
-        else (operation.gt_ if hasattr(operation, "gt_") else operation.gte_)
-    )
+    if isinstance(operation, tsi_query.EqOperation):
+        ops = operation.eq_
+    elif isinstance(operation, tsi_query.GtOperation):
+        ops = operation.gt_
+    elif isinstance(operation, tsi_query.GteOperation):
+        ops = operation.gte_
+    elif isinstance(operation, tsi_query.LtOperation):
+        ops = operation.lt_
+    else:
+        ops = operation.lte_
 
     if len(ops) != 2:
         return None, None
@@ -563,7 +612,10 @@ def _timestamp_to_datetime_str(timestamp: int) -> str:
 
 
 def _create_datetime_optimization_sql(
-    operation: tsi_query.GtOperation | tsi_query.GteOperation,
+    operation: tsi_query.GtOperation
+    | tsi_query.GteOperation
+    | tsi_query.LtOperation
+    | tsi_query.LteOperation,
     pb: "ParamBuilder",
     table_alias: str,
     op_str: str,
@@ -571,8 +623,8 @@ def _create_datetime_optimization_sql(
     """Creates SQL for datetime optimization using indexed sortable_datetime column.
 
     Applies a buffer to the timestamp to make the filter more permissive:
-    - For normal context: Subtracts buffer from timestamp
-    - For NOT context: Adds buffer to timestamp
+    - Greater-than ops: subtract buffer in normal context, add in NOT context
+    - Less-than ops: add buffer in normal context, subtract in NOT context
     """
     field_operand, literal_operand = _extract_field_and_literal(operation)
     if field_operand is None or literal_operand is None:
@@ -590,14 +642,18 @@ def _create_datetime_optimization_sql(
     # convert timestamp to datetime_str
     timestamp = int(literal_value)
 
-    # Apply buffer in appropriate direction based on context
+    # Apply buffer in appropriate direction based on context and operator
     buffer_seconds = int(DATETIME_BUFFER_TIME_SECONDS)
+    is_less_than = op_str.startswith("<")
     if NotContext.is_in_not_context():
-        # For NOT context, add buffer to make filter more permissive
-        timestamp += buffer_seconds
+        # Reverse the buffer direction for NOT to stay permissive.
+        timestamp = (
+            timestamp - buffer_seconds if is_less_than else timestamp + buffer_seconds
+        )
     else:
-        # For normal context, subtract buffer to make filter more permissive
-        timestamp -= buffer_seconds
+        timestamp = (
+            timestamp + buffer_seconds if is_less_than else timestamp - buffer_seconds
+        )
 
     datetime_str = _timestamp_to_datetime_str(timestamp)
 

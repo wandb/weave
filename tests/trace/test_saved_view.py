@@ -57,6 +57,34 @@ def test_query_to_filters_one_filter():
     query = tsi.Query(
         **{
             "$expr": {
+                "$lt": [
+                    {"$getField": "completion_token_cost"},
+                    {"$literal": 10},
+                ],
+            }
+        }
+    )
+    assert query_to_filters(query) == [
+        Filter(field="completion_token_cost", operator="(number): <", value=10)
+    ]
+
+    query = tsi.Query(
+        **{
+            "$expr": {
+                "$lte": [
+                    {"$getField": "completion_token_cost"},
+                    {"$literal": 10},
+                ],
+            }
+        }
+    )
+    assert query_to_filters(query) == [
+        Filter(field="completion_token_cost", operator="(number): <=", value=10)
+    ]
+
+    query = tsi.Query(
+        **{
+            "$expr": {
                 "$eq": [{"$getField": "inputs.model"}, {"$literal": "gpt-4o-mini"}]
             }
         }
