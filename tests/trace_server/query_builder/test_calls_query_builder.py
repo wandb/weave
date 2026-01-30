@@ -7,7 +7,9 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     AggregatedDataSizeField,
     CallsQuery,
     HardCodedFilter,
+    build_calls_complete_delete_query,
     build_calls_complete_update_end_query,
+    build_calls_complete_update_query,
 )
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.orm import ParamBuilder
@@ -49,7 +51,8 @@ def test_query_baseline(read_table: ReadTable, expected_table: str) -> None:
             SELECT {expected_table}.id AS id
             FROM {expected_table}
             PREWHERE {expected_table}.project_id = {{pb_0:String}}
-            AND (
+            WHERE 1
+              AND (
                 ((
                     {expected_table}.deleted_at IS NULL
                 ))
@@ -644,6 +647,7 @@ def test_query_with_simple_feedback_filter_calls_complete() -> None:
             calls_complete.id))
         PREWHERE
             calls_complete.project_id = {pb_3:String}
+        WHERE 1
         AND
             (((coalesce(nullIf(JSON_VALUE(CASE WHEN feedback.feedback_type = {pb_0:String} THEN feedback.payload_dump END,
             {pb_1:String}), 'null'), '') > coalesce(nullIf(JSON_VALUE(CASE WHEN feedback.feedback_type = {pb_0:String} THEN feedback.payload_dump END,
@@ -2583,7 +2587,8 @@ def test_calls_complete_with_light_filter_and_order() -> None:
             calls_complete.op_name AS op_name
         FROM calls_complete
         PREWHERE calls_complete.project_id = {pb_2:String}
-        AND (
+        WHERE 1
+          AND (
             ((calls_complete.started_at > {pb_0:UInt64}))
             AND ((calls_complete.wb_user_id = {pb_1:String}))
             AND ((calls_complete.deleted_at IS NULL))
@@ -2722,7 +2727,8 @@ def test_query_with_simple_feedback_sort_calls_complete() -> None:
                 calls_complete.id))
             PREWHERE
                 calls_complete.project_id = {pb_4:String}
-            AND (
+            WHERE 1
+              AND (
                 ((calls_complete.deleted_at IS NULL))
                     AND ((NOT ((calls_complete.started_at IS NULL)))))
             ORDER BY
@@ -2834,7 +2840,8 @@ def test_calls_complete_with_feedback_filter() -> None:
             calls_complete.id))
         PREWHERE
             calls_complete.project_id = {pb_3:String}
-        AND (
+        WHERE 1
+          AND (
             ((coalesce(nullIf(JSON_VALUE(CASE WHEN feedback.feedback_type = {pb_0:String}
             THEN feedback.payload_dump END,
             {pb_1:String}), 'null'), '') > {pb_2:Float64}))
@@ -2887,7 +2894,8 @@ def test_query_with_summary_weave_status_filter_calls_complete() -> None:
         SELECT
             calls_complete.id AS id
         FROM calls_complete PREWHERE calls_complete.project_id = {pb_5:String}
-        AND (
+        WHERE 1
+          AND (
             (((CASE
                 WHEN calls_complete.exception IS NOT NULL THEN {pb_1:String}
                 WHEN IFNULL(toInt64OrNull(coalesce(nullIf(JSON_VALUE(calls_complete.summary_dump, {pb_0:String}), 'null'), '')), 0) > 0 THEN {pb_4:String}
@@ -2911,5 +2919,183 @@ def test_query_with_summary_weave_status_filter_calls_complete() -> None:
             "pb_3": "success",
             "pb_4": "descendant_error",
             "pb_5": "project",
+        },
+    )
+
+
+def test_build_calls_complete_delete_query() -> None:
+    """Ensure the delete helper builds the expected query."""
+    query = build_calls_complete_delete_query(
+        table_name="calls_complete",
+        project_id_param="project_id",
+        call_ids_param="call_ids",
+    )
+
+    expected = sqlparse.format(
+        """
+        DELETE FROM calls_complete
+        WHERE project_id = {project_id:String} AND id IN {call_ids:Array(String)}
+        """,
+        reindent=True,
+    )
+
+    assert query == expected, f"\nExpected:\n{expected}\n\nGot:\n{query}"
+
+
+def test_build_calls_complete_delete_query_with_cluster() -> None:
+    """Ensure the delete helper builds the expected query with cluster name.
+
+    In distributed mode, mutations target the local table with ON CLUSTER clause.
+    """
+    query = build_calls_complete_delete_query(
+        table_name="calls_complete",
+        project_id_param="project_id",
+        call_ids_param="call_ids",
+        cluster_name="my_cluster",
+    )
+
+    expected = sqlparse.format(
+        """
+        DELETE FROM calls_complete_local ON CLUSTER my_cluster
+        WHERE project_id = {project_id:String} AND id IN {call_ids:Array(String)}
+        """,
+        reindent=True,
+    )
+
+    assert query == expected, f"\nExpected:\n{expected}\n\nGot:\n{query}"
+
+
+def test_build_calls_complete_update_query() -> None:
+    """Ensure the update helper builds the expected query."""
+    query = build_calls_complete_update_query(
+        table_name="calls_complete",
+        project_id_param="project_id",
+        id_param="id",
+        display_name_param="display_name",
+    )
+
+    expected = sqlparse.format(
+        """
+        UPDATE calls_complete
+        SET display_name = {display_name:String}
+        WHERE project_id = {project_id:String} AND id = {id:String}
+        """,
+        reindent=True,
+    )
+
+    assert query == expected, f"\nExpected:\n{expected}\n\nGot:\n{query}"
+
+
+def test_build_calls_complete_update_query_with_cluster() -> None:
+    """Ensure the update helper builds the expected query with cluster name.
+
+    In distributed mode, mutations target the local table with ON CLUSTER clause.
+    """
+    query = build_calls_complete_update_query(
+        table_name="calls_complete",
+        project_id_param="project_id",
+        id_param="id",
+        display_name_param="display_name",
+        cluster_name="my_cluster",
+    )
+
+    expected = sqlparse.format(
+        """
+        UPDATE calls_complete_local ON CLUSTER my_cluster
+        SET display_name = {display_name:String}
+        WHERE project_id = {project_id:String} AND id = {id:String}
+        """,
+        reindent=True,
+    )
+
+    assert query == expected, f"\nExpected:\n{expected}\n\nGot:\n{query}"
+
+
+def test_query_with_queue_filter_calls_merged() -> None:
+    """Test queue filtering with calls_merged table - should use aggregate functions."""
+    cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_MERGED)
+    cq.add_field("id")
+    cq.add_condition(
+        tsi_query.EqOperation.model_validate(
+            {
+                "$eq": [
+                    {"$getField": "annotation_queue_items.queue_id"},
+                    {"$literal": "test_queue_id"},
+                ]
+            }
+        )
+    )
+
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id
+        FROM
+            calls_merged
+        INNER JOIN (
+            SELECT * FROM annotation_queue_items
+            WHERE annotation_queue_items.project_id = {pb_1:String}
+              AND annotation_queue_items.deleted_at IS NULL
+              AND annotation_queue_items.queue_id = {pb_0:String}
+        ) AS annotation_queue_items ON (
+            annotation_queue_items.project_id = calls_merged.project_id
+            AND annotation_queue_items.call_id = calls_merged.id)
+        PREWHERE
+            calls_merged.project_id = {pb_1:String}
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING (
+            ((any(annotation_queue_items.queue_id) = {pb_0:String}))
+            AND ((any(calls_merged.deleted_at) IS NULL))
+            AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+        """,
+        {
+            "pb_0": "test_queue_id",
+            "pb_1": "project",
+        },
+    )
+
+
+def test_query_with_queue_filter_calls_complete() -> None:
+    """Test queue filtering with calls_complete table - should NOT use aggregate functions."""
+    cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_COMPLETE)
+    cq.add_field("id")
+    cq.add_condition(
+        tsi_query.EqOperation.model_validate(
+            {
+                "$eq": [
+                    {"$getField": "annotation_queue_items.queue_id"},
+                    {"$literal": "test_queue_id"},
+                ]
+            }
+        )
+    )
+
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_complete.id AS id
+        FROM
+            calls_complete
+        INNER JOIN (
+            SELECT * FROM annotation_queue_items
+            WHERE annotation_queue_items.project_id = {pb_1:String}
+              AND annotation_queue_items.deleted_at IS NULL
+              AND annotation_queue_items.queue_id = {pb_0:String}
+        ) AS annotation_queue_items ON (
+            annotation_queue_items.project_id = calls_complete.project_id
+            AND annotation_queue_items.call_id = calls_complete.id)
+        PREWHERE
+            calls_complete.project_id = {pb_1:String}
+        WHERE 1
+          AND (
+            ((annotation_queue_items.queue_id = {pb_0:String}))
+            AND ((calls_complete.deleted_at IS NULL))
+            AND ((NOT ((calls_complete.started_at IS NULL)))))
+        """,
+        {
+            "pb_0": "test_queue_id",
+            "pb_1": "project",
         },
     )

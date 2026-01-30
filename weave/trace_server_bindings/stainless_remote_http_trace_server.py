@@ -60,8 +60,8 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
     ):
         self.trace_server_url = trace_server_url.rstrip("/")
         self.should_batch = should_batch
-        self.call_processor = None
-        self.feedback_processor = None
+        self.call_processor: AsyncBatchProcessor | None = None
+        self.feedback_processor: AsyncBatchProcessor | None = None
         self.remote_request_bytes_limit = remote_request_bytes_limit
         self._extra_headers: dict[str, str] = extra_headers or {}
         self._username: str = username
@@ -453,7 +453,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
                 raise ValueError(
                     "CallStartReq must have id and trace_id when batching."
                 )
-            self.call_processor.enqueue([StartBatchItem(req=req)])
+            self.call_processor.enqueue_start(StartBatchItem(req=req))
             return tsi.CallStartRes(id=req.start.id, trace_id=req.start.trace_id)
 
         return self._stainless_request(
@@ -574,6 +574,43 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             req,
             tsi.CallsQueryStatsRes,
             self._stainless_client.calls.query_stats,
+        )
+
+    @validate_call
+    def trace_usage(self, req: tsi.TraceUsageReq) -> tsi.TraceUsageRes:
+        """Compute per-call usage with descendant rollup.
+
+        Args:
+            req: Trace usage request.
+
+        Returns:
+            Trace usage response.
+
+        Examples:
+            >>> server = StainlessRemoteHTTPTraceServer("http://example.com")
+            >>> req = tsi.TraceUsageReq(project_id="entity/project")
+            >>> _ = server.trace_usage(req)  # doctest: +SKIP
+        """
+        return self._stainless_request(
+            req,
+            tsi.TraceUsageRes,
+            self._stainless_client.trace.usage,
+        )
+
+    @validate_call
+    def calls_usage(self, req: tsi.CallsUsageReq) -> tsi.CallsUsageRes:
+        """Compute aggregated usage for multiple root calls.
+
+        Args:
+            req: Calls usage request.
+
+        Returns:
+            Calls usage response.
+        """
+        return self._stainless_request(
+            req,
+            tsi.CallsUsageRes,
+            self._stainless_client.calls.usage,
         )
 
     @validate_call

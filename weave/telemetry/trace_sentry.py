@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import atexit
 import functools
+import logging
 import os
 import site
 import sys
@@ -34,6 +35,8 @@ if TYPE_CHECKING:
 SENTRY_DEFAULT_DSN = "https://99697cf8ca5158250d3dd6cb23cca9b0@o151352.ingest.us.sentry.io/4507019311251456"
 
 SessionStatus = Literal["ok", "exited", "crashed", "abnormal"]
+
+logger = logging.getLogger(__name__)
 
 
 def _safe_noop(func: Callable) -> Callable:
@@ -262,4 +265,27 @@ global_trace_sentry = Sentry()
 global_trace_sentry.setup()
 global_trace_sentry.configure_scope()
 
-__all__ = ("SENTRY_AVAILABLE", "Sentry", "sentry_sdk")
+
+def log_warning(message: str) -> None:
+    """Log a warning message and report to Sentry if available.
+
+    Args:
+        message: The warning message to log and report.
+    """
+    logger.warning(message)
+    if SENTRY_AVAILABLE:
+        sentry_sdk.capture_message(message, level="warning")
+
+
+def log_error(message: str) -> None:
+    """Log an error message with traceback and report to Sentry if available.
+
+    Args:
+        message: The error message to log and report.
+    """
+    logger.exception(message)
+    if SENTRY_AVAILABLE:
+        sentry_sdk.capture_message(message, level="error")
+
+
+__all__ = ("SENTRY_AVAILABLE", "Sentry", "log_error", "log_warning", "sentry_sdk")

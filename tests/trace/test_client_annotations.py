@@ -5,6 +5,7 @@ commit 7fd5bfd24bccce8f97449bee1676ac55e74fd993.
 """
 
 import base64
+import datetime
 import time
 from typing import NamedTuple
 
@@ -12,9 +13,11 @@ import pytest
 
 import weave
 from tests.trace.util import client_is_sqlite
+from tests.trace_server.conftest import TEST_ENTITY
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.common_interface import AnnotationQueueItemsFilter, SortBy
 from weave.trace_server.ids import generate_id
+from weave.trace_server.sqlite_trace_server import SqliteTraceServer
 
 
 class CallsFixture(NamedTuple):
@@ -1908,3 +1911,138 @@ def test_annotator_queue_items_progress_in_progress_workflow(client):
     assert stats_res.stats[0].total_items == 3
     # Completed count includes both 'completed' and 'skipped'
     assert stats_res.stats[0].completed_items == 2
+
+
+def test_annotation_queue_add_calls_with_calls_complete_table(trace_server):
+    """Test adding calls to annotation queue when using calls_complete table.
+
+    This test verifies that annotation_queue_add_calls correctly handles
+    the calls_complete table by using the right query (no GROUP BY, no aggregation)
+    when fetching call details to populate the annotation_queue_items table.
+
+    Steps:
+    1. Seed project with calls_complete data to establish COMPLETE_ONLY residence
+    2. Create annotation queue
+    3. Add calls to queue using annotation_queue_add_calls
+    4. Verify items are correctly added with proper display_data
+    5. Query items back to confirm correct data population
+    """
+    if isinstance(trace_server._internal_trace_server, SqliteTraceServer):
+        pytest.skip("ClickHouse-only test")
+
+    project_id = f"{TEST_ENTITY}/test_queue_add_calls_complete"
+
+    # Step 1: Seed project with calls_complete data
+    seed_calls = []
+    started_at = datetime.datetime.now()
+
+    for i in range(5):
+        call_id = generate_id()
+        seed_calls.append(
+            tsi.CompletedCallSchemaForInsert(
+                project_id=project_id,
+                id=call_id,
+                trace_id=generate_id(),
+                op_name="test_calls_complete_add_to_queue",
+                started_at=started_at,
+                ended_at=started_at + datetime.timedelta(seconds=1),
+                attributes={},
+                inputs={"x": i, "name": f"call_{i}"},
+                output={"result": i * 2},
+                summary={"usage": {}, "status_counts": {}},
+            )
+        )
+
+    call_ids = [call.id for call in seed_calls]
+    trace_server.calls_complete(tsi.CallsUpsertCompleteReq(batch=seed_calls))
+
+    # Step 2: Verify calls are queryable
+    all_calls = list(
+        trace_server.calls_query_stream(tsi.CallsQueryReq(project_id=project_id))
+    )
+    assert len(all_calls) == 5, f"Expected 5 calls, got {len(all_calls)}"
+
+    # Step 3: Create annotation queue
+    queue_res = trace_server.annotation_queue_create(
+        tsi.AnnotationQueueCreateReq(
+            project_id=project_id,
+            name="calls_complete_test_queue",
+            description="Test queue for calls_complete table",
+            scorer_refs=["weave:///entity/project/scorer/test:xyz"],
+            wb_user_id="test_user",
+        )
+    )
+    queue_id = queue_res.id
+
+    # Step 4: Add 3 of the 5 calls to the queue with display_fields
+    queue_call_ids = call_ids[:3]
+    add_res = trace_server.annotation_queue_add_calls(
+        tsi.AnnotationQueueAddCallsReq(
+            project_id=project_id,
+            queue_id=queue_id,
+            call_ids=queue_call_ids,
+            display_fields=["input.x", "input.name", "output.result"],
+            wb_user_id="test_user",
+        )
+    )
+
+    # Step 5: Verify add operation succeeded
+    assert add_res.added_count == 3, (
+        f"Expected 3 calls added, got {add_res.added_count}"
+    )
+    assert add_res.duplicates == 0, f"Expected 0 duplicates, got {add_res.duplicates}"
+
+    # Step 6: Query queue items to verify they were added correctly
+    items_res = trace_server.annotation_queue_items_query(
+        tsi.AnnotationQueueItemsQueryReq(
+            project_id=project_id,
+            queue_id=queue_id,
+        )
+    )
+
+    assert len(items_res.items) == 3, (
+        f"Expected 3 queue items, got {len(items_res.items)}"
+    )
+
+    # Step 7: Verify each item has correct call_id and attributes
+    items_by_call_id = {item.call_id: item for item in items_res.items}
+
+    for call_id in queue_call_ids:
+        assert call_id in items_by_call_id, f"Call {call_id} not found in queue items"
+        item = items_by_call_id[call_id]
+
+        # Verify the item has the correct queue_id
+        assert item.queue_id == queue_id
+
+        # Verify display_fields contains the requested fields
+        # These fields were specified when adding calls to the queue
+        assert item.display_fields == ["input.x", "input.name", "output.result"], (
+            f"Item {item.id} has wrong display_fields: {item.display_fields}"
+        )
+
+        # Verify call_op_name was populated correctly from calls_complete table
+        assert item.call_op_name == "test_calls_complete_add_to_queue", (
+            f"Item {item.id} has wrong call_op_name: {item.call_op_name}"
+        )
+
+        # Verify call_started_at and call_trace_id were populated
+        assert item.call_started_at is not None, (
+            f"Item {item.id} has no call_started_at"
+        )
+        assert item.call_trace_id is not None, f"Item {item.id} has no call_trace_id"
+
+    # Step 8: Verify stats reflect the added calls
+    stats_res = trace_server.annotation_queues_stats(
+        tsi.AnnotationQueuesStatsReq(
+            project_id=project_id,
+            queue_ids=[queue_id],
+        )
+    )
+
+    assert len(stats_res.stats) == 1
+    assert stats_res.stats[0].total_items == 3, (
+        f"Expected 3 total items in stats, got {stats_res.stats[0].total_items}"
+    )
+    assert stats_res.stats[0].completed_items == 0, (
+        f"Expected 0 completed items, got {stats_res.stats[0].completed_items}"
+    )
