@@ -29,7 +29,8 @@ function isModernDecorator(
     args.length === 2 &&
     args[1] &&
     typeof args[1] === 'object' &&
-    'kind' in args[1]
+    'kind' in args[1] &&
+    args[1].kind === 'method' // Must be the decorator context kind, not OpOptions.kind
   );
 }
 
@@ -244,6 +245,8 @@ function createOpWrapper<T extends (...args: any[]) => any>(
   opWrapper.__wrappedFunction = options?.originalFunction ?? fn;
   opWrapper.__boundThis = options?.bindThis;
   opWrapper.__parameterNames = options?.parameterNames;
+  opWrapper.__kind = options?.kind;
+  opWrapper.__color = options?.color;
 
   // We need to hook into modern decorators initializer to set the name
   if (opWrapper.__name === '__pending__' && context?.addInitializer) {
