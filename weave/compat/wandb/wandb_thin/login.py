@@ -80,6 +80,16 @@ def _clear_setting(key: str) -> None:
         logger.warning(f"Failed to clear setting {key}: {e}")
 
 
+def _normalize_host(host: str | None) -> str | None:
+    """Normalize a host or base URL to a hostname without scheme or trailing slash."""
+    if host is None:
+        return None
+    host = host.rstrip("/")
+    if host.startswith(("http://", "https://")):
+        host = host.split("://", 1)[1]
+    return host
+
+
 def login(
     anonymous: Literal["must", "allow", "never"] | None = None,
     key: str | None = None,
@@ -165,7 +175,8 @@ class _WandbLogin:
         self._force = force
         self._timeout = timeout
         self._key = key
-        self._host = host if host else _get_default_host()
+        resolved_host = host if host else _get_default_host()
+        self._host = _normalize_host(resolved_host) or resolved_host
         self.is_anonymous = anonymous == "must"
 
     def is_apikey_configured(self) -> bool:
