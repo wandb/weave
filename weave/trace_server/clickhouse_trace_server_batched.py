@@ -9,6 +9,7 @@ import threading
 from collections import defaultdict
 from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
+from functools import partial
 from re import sub
 from typing import Any, cast
 from zoneinfo import ZoneInfo
@@ -497,15 +498,31 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         # Convert calls to CH insertable format and then to rows for batch insertion
         batch_rows = []
+        event_callback_list = []
         for start_call, end_call in calls:
             ch_start = _start_call_for_insert_to_ch_insertable_start_call(start_call)
             ch_end = _end_call_for_insert_to_ch_insertable_end_call(end_call)
             batch_rows.append(_ch_call_to_row(ch_start))
             batch_rows.append(_ch_call_to_row(ch_end))
+            # We can't execute these until after they are inserted
+            event_callback_list.append(
+                partial(
+                    _maybe_enqueue_minimal_call_end,
+                    self.kafka_producer,
+                    end_call.project_id,
+                    end_call.id,
+                    end_call.ended_at,
+                    False,
+                )
+            )
 
         if write_target == WriteTarget.CALLS_MERGED:
             # Insert directly without async_insert for OTEL calls
             self._insert_call_batch(batch_rows, settings=None, do_sync_insert=True)
+            # Calls are inserted so run the callbacks and flush to wait for completion
+            for cb in event_callback_list:
+                cb()
+            self._flush_kafka_producer()
 
         if rejected_spans > 0:
             # Join the first 20 errors and return them delimited by ';'
