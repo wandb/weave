@@ -7,7 +7,7 @@ from datetime import datetime
 from itertools import chain, repeat
 from typing import Any, Literal
 
-from pydantic import PrivateAttr
+from pydantic import Field, PrivateAttr
 from typing_extensions import Self
 
 from weave.dataset.dataset import Dataset
@@ -41,6 +41,12 @@ from weave.trace_server.trace_server_interface import CallsFilter
 from weave.utils.project_id import from_project_id
 
 logger = logging.getLogger(__name__)
+
+# Type alias for on_complete callback
+# Signature: on_complete(evaluation, model, results, summary) -> None
+OnCompleteCallback = Callable[
+    ["Evaluation", Op | Model, "EvaluationResults", dict], None
+]
 
 INVALID_MODEL_ERROR = (
     "`Evaluation.evaluate` requires a `Model` or `Op` instance as the `model` argument. "
@@ -115,6 +121,13 @@ class Evaluation(Object):
 
     # internal attr to track whether to use the new `output` or old `model_output` key for outputs
     _output_key: Literal["output", "model_output"] = PrivateAttr("output")
+
+    # Callback invoked at the end of evaluate() with full context.
+    # Runs inside the evaluate call context, so weave.set_view() will attach to the evaluation.
+    # Signature: on_complete(evaluation, model, results, summary) -> None
+    # Note: Must be excluded from Pydantic serialization (callables can't be serialized)
+    # We use Field(exclude=True) instead of PrivateAttr so it can be passed to __init__
+    on_complete: OnCompleteCallback | None = Field(default=None, exclude=True)
 
     @classmethod
     def from_obj(cls, obj: WeaveObject) -> Self:
@@ -287,6 +300,10 @@ class Evaluation(Object):
         summary_str = _safe_summarize_to_str(summary)
         if summary_str:
             logger.info(f"Evaluation summary {summary_str}")
+
+        # Call on_complete hook if provided (inside evaluate context)
+        if self.on_complete is not None:
+            self.on_complete(self, model, eval_results, summary)
 
         return summary
 

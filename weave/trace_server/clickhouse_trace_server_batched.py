@@ -6150,6 +6150,7 @@ def _ch_call_dict_to_call_schema_dict(ch_call_dict: dict) -> dict:
         "display_name": display_name,
         "storage_size_bytes": ch_call_dict.get("storage_size_bytes"),
         "total_storage_size_bytes": ch_call_dict.get("total_storage_size_bytes"),
+        "view_spec_ref": ch_call_dict.get("view_spec_ref"),
     }
 
 
@@ -6298,6 +6299,7 @@ def _end_call_for_insert_to_ch_insertable_end_call(
         output_dump=_any_value_to_dump(output),
         output_refs=output_refs,
         wb_run_step_end=end_call.wb_run_step_end,
+        view_spec_ref=end_call.view_spec_ref,
     )
 
 
@@ -6378,6 +6380,7 @@ def _complete_call_to_ch_insertable(
         wb_run_id=complete_call.wb_run_id,
         wb_run_step=complete_call.wb_run_step,
         wb_run_step_end=complete_call.wb_run_step_end,
+        view_spec_ref=complete_call.view_spec_ref,
     )
 
 
