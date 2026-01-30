@@ -133,19 +133,19 @@ def main(
             raise ValueError(f"No API key name found for provider: {provider}")
         model_id = model["idPlayground"]
         # Create new provider info
-        new_info: LLMModelProviderInfo = {
+        provider_info: LLMModelProviderInfo = {
             "litellm_provider": provider,
             "api_key_name": api_key_name,
         }
         # Preserve deprecated fields from existing providers
         existing_info = existing_providers.get(model_id, {})
-        if existing_info.get("deprecated"):
-            new_info["deprecated"] = existing_info["deprecated"]
-        if existing_info.get("deprecated_reason"):
-            new_info["deprecated_reason"] = existing_info["deprecated_reason"]
-        if existing_info.get("deprecated_date"):
-            new_info["deprecated_date"] = existing_info["deprecated_date"]
-        providers[model_id] = new_info
+        if deprecated := existing_info.get("deprecated"):
+            provider_info["deprecated"] = deprecated
+        if deprecated_reason := existing_info.get("deprecated_reason"):
+            provider_info["deprecated_reason"] = deprecated_reason
+        if deprecated_date := existing_info.get("deprecated_date"):
+            provider_info["deprecated_date"] = deprecated_date
+        providers[model_id] = provider_info
 
     # Next add in information from the LiteLLM model provider info file
     try:
@@ -166,19 +166,19 @@ def main(
         api_key_name = PROVIDER_TO_API_KEY_NAME_MAP.get(provider)
         if api_key_name:
             # Create new provider info
-            new_info: LLMModelProviderInfo = {
+            litellm_info: LLMModelProviderInfo = {
                 "litellm_provider": provider,
                 "api_key_name": api_key_name,
             }
             # Preserve deprecated fields from existing providers
             existing_info = existing_providers.get(k, {})
-            if existing_info.get("deprecated"):
-                new_info["deprecated"] = existing_info["deprecated"]
-            if existing_info.get("deprecated_reason"):
-                new_info["deprecated_reason"] = existing_info["deprecated_reason"]
-            if existing_info.get("deprecated_date"):
-                new_info["deprecated_date"] = existing_info["deprecated_date"]
-            providers[k] = new_info
+            if deprecated := existing_info.get("deprecated"):
+                litellm_info["deprecated"] = deprecated
+            if deprecated_reason := existing_info.get("deprecated_reason"):
+                litellm_info["deprecated_reason"] = deprecated_reason
+            if deprecated_date := existing_info.get("deprecated_date"):
+                litellm_info["deprecated_date"] = deprecated_date
+            providers[k] = litellm_info
     full_path_output = os.path.join(os.path.dirname(__file__), file_name)
     os.makedirs(os.path.dirname(full_path_output), exist_ok=True)
     with open(full_path_output, "w") as f:
