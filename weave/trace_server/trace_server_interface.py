@@ -2642,6 +2642,11 @@ class TraceUsageRes(BaseModel):
 
     # Mapping from call_id to usage metrics (own + descendants)
     call_usage: dict[str, dict[str, LLMAggregatedUsage]] = Field(default_factory=dict)
+    # Call IDs that do not have an end time (still running or incomplete).
+    unfinished_call_ids: list[str] = Field(
+        default_factory=list,
+        description="Call IDs in the rollup that have not ended yet (ended_at is null).",
+    )
 
 
 # --- /calls/usage endpoint (root call usage across multiple traces) ---
@@ -2677,3 +2682,8 @@ class CallsUsageRes(BaseModel):
 
     # Mapping from root call_id to aggregated usage metrics (root + descendants)
     call_usage: dict[str, dict[str, LLMAggregatedUsage]] = Field(default_factory=dict)
+    # Call IDs that do not have an end time (still running or incomplete).
+    unfinished_call_ids: list[str] = Field(
+        default_factory=list,
+        description="Call IDs in the rollup that have not ended yet (ended_at is null).",
+    )
