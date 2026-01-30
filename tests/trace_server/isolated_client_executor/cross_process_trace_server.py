@@ -269,7 +269,7 @@ class CrossProcessTraceServerSender(tsi.TraceServerInterface):
         raise NotImplementedError("ensure_project_exists is not implemented")
 
     # Regular method implementations (reduced duplication)
-    def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
+    def otel_export(self, req: tsi.OTelExportReq) -> tsi.OTelExportRes:
         """Export OTEL traces."""
         return self._send_request("otel_export", req)
 

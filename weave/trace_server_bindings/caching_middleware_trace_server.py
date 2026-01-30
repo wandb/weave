@@ -458,7 +458,7 @@ class CachingMiddlewareTraceServer(TraceServerClientInterface):
         return self._next_trace_server.call_update(req)
 
     # OTEL API
-    def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
+    def otel_export(self, req: tsi.OTelExportReq) -> tsi.OTelExportRes:
         return self._next_trace_server.otel_export(req)
 
     # Cost API
