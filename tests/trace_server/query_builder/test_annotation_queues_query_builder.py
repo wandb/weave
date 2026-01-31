@@ -8,7 +8,9 @@ from weave.trace_server.query_builder.annotation_queues_query_builder import (
 )
 
 
-def assert_sql(expected_query: str, expected_params: dict, query: str, params: dict) -> None:
+def assert_sql(
+    expected_query: str, expected_params: dict, query: str, params: dict
+) -> None:
     expected_formatted = sqlparse.format(expected_query, reindent=True)
     found_formatted = sqlparse.format(query, reindent=True)
 
