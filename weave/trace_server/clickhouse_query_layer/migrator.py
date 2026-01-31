@@ -72,7 +72,7 @@ from re import Pattern
 
 from clickhouse_connect.driver.client import Client as CHClient
 
-from weave.trace_server import clickhouse_trace_server_settings as ch_settings
+from weave.trace_server.clickhouse_query_layer import settings as ch_settings
 from weave.trace_server.costs.insert_costs import insert_costs, should_insert_costs
 
 logger = logging.getLogger(__name__)

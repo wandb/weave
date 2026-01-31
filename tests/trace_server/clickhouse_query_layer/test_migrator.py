@@ -4,8 +4,8 @@ from unittest.mock import Mock, call, patch
 
 import pytest
 
-from weave.trace_server import clickhouse_trace_server_migrator as trace_server_migrator
-from weave.trace_server.clickhouse_trace_server_migrator import (
+from weave.trace_server.clickhouse_query_layer import migrator as trace_server_migrator
+from weave.trace_server.clickhouse_query_layer.migrator import (
     BaseClickHouseTraceServerMigrator,
     CloudClickHouseTraceServerMigrator,
     DistributedClickHouseTraceServerMigrator,
@@ -22,10 +22,10 @@ DEFAULT_MIGRATION_DIR = os.path.abspath(
 def mock_costs():
     with (
         patch(
-            "weave.trace_server.clickhouse_trace_server_migrator.should_insert_costs",
+            "weave.trace_server.clickhouse_query_layer.migrator.should_insert_costs",
             return_value=False,
         ),
-        patch("weave.trace_server.clickhouse_trace_server_migrator.insert_costs"),
+        patch("weave.trace_server.clickhouse_query_layer.migrator.insert_costs"),
     ):
         yield
 
@@ -162,10 +162,10 @@ def test_apply_migrations_costs_disabled_does_not_call_costs():
 
     with (
         patch(
-            "weave.trace_server.clickhouse_trace_server_migrator.should_insert_costs"
+            "weave.trace_server.clickhouse_query_layer.migrator.should_insert_costs"
         ) as mock_should_insert_costs,
         patch(
-            "weave.trace_server.clickhouse_trace_server_migrator.insert_costs"
+            "weave.trace_server.clickhouse_query_layer.migrator.insert_costs"
         ) as mock_insert_costs,
     ):
         migrator.apply_migrations("test_db")
@@ -347,7 +347,7 @@ def test_format_replicated_sql_distributed():
 )
 def test_extract_table_name(sql, expected_table):
     """Test extracting table name from SQL."""
-    from weave.trace_server.clickhouse_trace_server_migrator import SQLPatterns
+    from weave.trace_server.clickhouse_query_layer.migrator import SQLPatterns
 
     match = SQLPatterns.CREATE_TABLE.search(sql)
     result = match.group(1) if match else None

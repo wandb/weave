@@ -156,7 +156,7 @@ def test_clickhouse_distributed_mode_properties():
         # Test distributed mode property
         assert server.use_distributed_mode is True
         assert server.clickhouse_cluster_name == "test_cluster"
-        from weave.trace_server import clickhouse_trace_server_settings as ch_settings
+        from weave.trace_server.clickhouse_query_layer import settings as ch_settings
 
         expected_table = f"calls_complete{ch_settings.LOCAL_TABLE_SUFFIX}"
         assert server._get_calls_complete_table_name() == expected_table
