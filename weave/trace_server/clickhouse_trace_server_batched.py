@@ -602,7 +602,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self,
         req: tsi.CallEndReq,
         publish: bool = True,
-        flush_immediately: bool = False,
+        flush_immediately: bool = True,
     ) -> tsi.CallEndRes:
         # Converts the user-provided call details into a clickhouse schema.
         # This does validation and conversion of the input data as well
