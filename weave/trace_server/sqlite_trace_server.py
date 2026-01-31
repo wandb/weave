@@ -1767,6 +1767,9 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
     ) -> tsi.EvaluationStatusRes:
         return evaluation_status(self, req)
 
+    def calls_score(self, req: tsi.CallsScoreReq) -> tsi.CallsScoreRes:
+        raise NotImplementedError("Calls scoring is not supported in SQLite")
+
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
         """Create an op object by delegating to obj_create.
 
