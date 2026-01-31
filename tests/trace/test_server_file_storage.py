@@ -12,6 +12,7 @@ from unittest import mock
 import boto3
 import pytest
 from azure.storage.blob import BlobServiceClient
+from google.api_core import exceptions
 from google.auth.credentials import AnonymousCredentials
 from moto import mock_aws
 
@@ -188,8 +189,6 @@ class TestGCSStorage:
             blob_name = mock_blob.name
             # Simulate GCS if_generation_match=0 behavior (only write if not exists)
             if if_generation_match == 0 and blob_name in blob_data:
-                from google.api_core import exceptions
-
                 raise exceptions.PreconditionFailed("Object already exists")
             blob_data[blob_name] = data
 
@@ -249,8 +248,6 @@ class TestGCSStorage:
         This verifies the if_generation_match=0 conditional write works correctly
         to prevent GCS rate limiting when multiple pods write the same object.
         """
-        from tests.trace.util import client_is_sqlite
-
         if client_is_sqlite(client):
             pytest.skip("Not implemented in SQLite")
 
@@ -265,8 +262,6 @@ class TestGCSStorage:
 
             # Simulate GCS behavior: if_generation_match=0 means only write if not exists
             if if_generation_match == 0 and blob_name in blob_data:
-                from google.api_core import exceptions
-
                 raise exceptions.PreconditionFailed("Object already exists")
 
             upload_count += 1

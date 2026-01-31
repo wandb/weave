@@ -294,9 +294,7 @@ class GCSStorageClient(FileStorageClient):
     def store(self, uri: GCSFileStorageURI, data: bytes) -> None:
         """Store data in GCS bucket with automatic retries on failure.
 
-        Uses conditional write (if_generation_match=0) to skip writing if the object
-        already exists. This prevents hitting GCS rate limits (1 write/sec per object)
-        when multiple pods attempt to write the same content-addressed object.
+        Use if_generation_match=0 to skip writing if the object already exists.
         """
         assert isinstance(uri, GCSFileStorageURI)
         assert uri.to_uri_str().startswith(self.base_uri.to_uri_str())
@@ -313,8 +311,6 @@ class GCSStorageClient(FileStorageClient):
                 retry=None,
             )
         except gcp_exceptions.PreconditionFailed:
-            # Object already exists - this is expected for content-addressable storage
-            # where multiple clients may try to write the same content
             logger.debug("Object already exists at %s, skipping write", uri)
 
     @create_retry_decorator("gcs_read")
