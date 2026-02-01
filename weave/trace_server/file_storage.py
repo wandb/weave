@@ -135,8 +135,8 @@ def store_in_bucket(
     client: FileStorageClient, path: str, data: bytes
 ) -> FileStorageURI:
     """Store a file in a storage bucket."""
+    target_file_storage_uri = client.base_uri.with_path(path)
     try:
-        target_file_storage_uri = client.base_uri.with_path(path)
         client.store(target_file_storage_uri, data)
     except Exception as e:
         logger.exception("Failed to store file at %s", target_file_storage_uri)
@@ -418,15 +418,69 @@ def maybe_get_storage_client_from_env() -> FileStorageClient | None:
 # =============================================================================
 # Async Storage Clients
 # =============================================================================
+#
+# Async implementations use different strategies based on library support:
+# - S3: Native async via aiobotocore (best performance)
+# - GCS: Thread pool wrapper (no mature async library available)
+# - Azure: Native async via azure-storage-blob aio support
+
+
+def create_async_retry_decorator(operation_name: str) -> Callable[[Any], Any]:
+    """Creates an async retry decorator with consistent retry policy and special 429 handling.
+
+    Uses the same retry logic as the sync version to ensure consistent error handling.
+    """
+
+    def after_retry(retry_state: RetryCallState) -> None:
+        if retry_state.attempt_number > 1:
+            logger.info(
+                "%s: Attempt %d/%d after %.2f seconds",
+                operation_name,
+                retry_state.attempt_number,
+                RETRY_MAX_ATTEMPTS,
+                retry_state.seconds_since_start,
+            )
+
+    def create_wait_strategy(retry_state: RetryCallState) -> float:
+        """Create wait strategy that uses jitter for rate limit errors."""
+        if retry_state.outcome and retry_state.outcome.failed:
+            exception = retry_state.outcome.exception()
+            if exception and _is_rate_limit_error(exception):
+                # Use random exponential backoff with jitter for rate limiting
+                return wait_random_exponential(
+                    multiplier=RETRY_MIN_WAIT, max=RETRY_MAX_WAIT
+                )(retry_state)
+        # Use regular exponential backoff for other errors
+        return wait_exponential(multiplier=RETRY_MIN_WAIT, max=RETRY_MAX_WAIT)(
+            retry_state
+        )
+
+    return retry(
+        stop=stop_after_attempt(RETRY_MAX_ATTEMPTS),
+        wait=create_wait_strategy,
+        reraise=True,
+        before_sleep=before_sleep_log(logger, logging.DEBUG),
+        after=after_retry,
+    )
 
 
 class AsyncFileStorageClient:
-    """Abstract base class for async cloud storage operations."""
+    """Abstract base class for async cloud storage operations.
+
+    Follows the same pattern as FileStorageClient - uses @abstractmethod
+    without ABC inheritance for interface definition.
+    """
 
     base_uri: FileStorageURI
     _sync_client: FileStorageClient
 
     def __init__(self, base_uri: FileStorageURI, sync_client: FileStorageClient):
+        """Initialize async storage client.
+
+        Args:
+            base_uri: The base URI for storage operations.
+            sync_client: A sync client used for fallback or thread pool operations.
+        """
         self.base_uri = base_uri
         self._sync_client = sync_client
 
@@ -475,6 +529,7 @@ class AsyncS3StorageClient(AsyncFileStorageClient):
         ) as client:
             yield client
 
+    @create_async_retry_decorator("async_s3_storage")
     async def store_async(self, uri: FileStorageURI, data: bytes) -> None:
         """Store data in S3 bucket asynchronously using aiobotocore."""
         assert isinstance(uri, S3FileStorageURI)
@@ -492,6 +547,7 @@ class AsyncS3StorageClient(AsyncFileStorageClient):
 
             await client.put_object(**put_object_params)
 
+    @create_async_retry_decorator("async_s3_read")
     async def read_async(self, uri: FileStorageURI) -> bytes:
         """Read data from S3 bucket asynchronously."""
         assert isinstance(uri, S3FileStorageURI)
@@ -504,7 +560,11 @@ class AsyncS3StorageClient(AsyncFileStorageClient):
 
 
 class AsyncGCSStorageClient(AsyncFileStorageClient):
-    """Async Google Cloud Storage implementation using thread pool wrapper."""
+    """Async Google Cloud Storage implementation using thread pool wrapper.
+
+    GCS does not have a mature async library, so we wrap sync operations
+    in asyncio.to_thread. The sync client already has retry logic applied.
+    """
 
     def __init__(
         self,
@@ -517,13 +577,19 @@ class AsyncGCSStorageClient(AsyncFileStorageClient):
         self._credentials = credentials
 
     async def store_async(self, uri: FileStorageURI, data: bytes) -> None:
-        """Store data in GCS bucket asynchronously."""
+        """Store data in GCS bucket asynchronously.
+
+        Delegates to sync client which has retry logic applied.
+        """
         assert isinstance(uri, GCSFileStorageURI)
         assert uri.to_uri_str().startswith(self.base_uri.to_uri_str())
         await asyncio.to_thread(self._sync_client.store, uri, data)
 
     async def read_async(self, uri: FileStorageURI) -> bytes:
-        """Read data from GCS bucket asynchronously."""
+        """Read data from GCS bucket asynchronously.
+
+        Delegates to sync client which has retry logic applied.
+        """
         assert isinstance(uri, GCSFileStorageURI)
         assert uri.to_uri_str().startswith(self.base_uri.to_uri_str())
         return await asyncio.to_thread(self._sync_client.read, uri)
@@ -564,6 +630,7 @@ class AsyncAzureStorageClient(AsyncFileStorageClient):
                 read_timeout=DEFAULT_READ_TIMEOUT,
             )
 
+    @create_async_retry_decorator("async_azure_storage")
     async def store_async(self, uri: FileStorageURI, data: bytes) -> None:
         """Store data in Azure container asynchronously."""
         assert isinstance(uri, AzureFileStorageURI)
@@ -574,6 +641,7 @@ class AsyncAzureStorageClient(AsyncFileStorageClient):
             blob_client = container_client.get_blob_client(uri.path)
             await blob_client.upload_blob(data, overwrite=True)
 
+    @create_async_retry_decorator("async_azure_read")
     async def read_async(self, uri: FileStorageURI) -> bytes:
         """Read data from Azure container asynchronously."""
         assert isinstance(uri, AzureFileStorageURI)
@@ -590,8 +658,8 @@ async def store_in_bucket_async(
     client: AsyncFileStorageClient, path: str, data: bytes
 ) -> FileStorageURI:
     """Store a file in a storage bucket asynchronously."""
+    target_file_storage_uri = client.base_uri.with_path(path)
     try:
-        target_file_storage_uri = client.base_uri.with_path(path)
         await client.store_async(target_file_storage_uri, data)
     except Exception as e:
         logger.exception("Failed to store file at %s", target_file_storage_uri)
