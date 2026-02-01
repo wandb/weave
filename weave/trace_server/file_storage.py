@@ -408,3 +408,245 @@ def maybe_get_storage_client_from_env() -> FileStorageClient | None:
         raise NotImplementedError(
             f"Storage client for URI type {type(file_storage_uri)} not supported"
         )
+
+
+# =============================================================================
+# Async Storage Clients
+# =============================================================================
+
+
+class AsyncFileStorageClient:
+    """Abstract base class for async cloud storage operations."""
+
+    base_uri: FileStorageURI
+    _sync_client: FileStorageClient
+
+    def __init__(self, base_uri: FileStorageURI, sync_client: FileStorageClient):
+        self.base_uri = base_uri
+        self._sync_client = sync_client
+
+    @abstractmethod
+    async def store_async(self, uri: FileStorageURI, data: bytes) -> None:
+        """Store data at the specified URI location in cloud storage (async)."""
+        pass
+
+    @abstractmethod
+    async def read_async(self, uri: FileStorageURI) -> bytes:
+        """Read data from the specified URI location in cloud storage (async)."""
+        pass
+
+
+class AsyncS3StorageClient(AsyncFileStorageClient):
+    """Async AWS S3 storage implementation using aiobotocore."""
+
+    def __init__(
+        self,
+        base_uri: FileStorageURI,
+        credentials: AWSCredentials,
+        sync_client: S3StorageClient,
+    ):
+        super().__init__(base_uri, sync_client)
+        assert isinstance(base_uri, S3FileStorageURI)
+        self._credentials = credentials
+        self._kms_key = credentials.get("kms_key")
+
+    async def store_async(self, uri: FileStorageURI, data: bytes) -> None:
+        """Store data in S3 bucket asynchronously using aiobotocore."""
+        assert isinstance(uri, S3FileStorageURI)
+        assert uri.to_uri_str().startswith(self.base_uri.to_uri_str())
+
+        # Import aiobotocore lazily to avoid hard dependency
+        try:
+            from aiobotocore.session import get_session
+        except ImportError:
+            # Fallback to sync client in thread pool if aiobotocore not available
+            import asyncio
+
+            await asyncio.to_thread(self._sync_client.store, uri, data)
+            return
+
+        session = get_session()
+        async with session.create_client(
+            "s3",
+            region_name=self._credentials.get("region"),
+            aws_access_key_id=self._credentials.get("access_key_id"),
+            aws_secret_access_key=self._credentials.get("secret_access_key"),
+            aws_session_token=self._credentials.get("session_token"),
+        ) as client:
+            put_object_params: dict[str, Any] = {
+                "Bucket": uri.bucket,
+                "Key": uri.path,
+                "Body": data,
+            }
+            if self._kms_key:
+                put_object_params["ServerSideEncryption"] = "aws:kms"
+                put_object_params["SSEKMSKeyId"] = self._kms_key
+
+            await client.put_object(**put_object_params)
+
+    async def read_async(self, uri: FileStorageURI) -> bytes:
+        """Read data from S3 bucket asynchronously."""
+        assert isinstance(uri, S3FileStorageURI)
+        assert uri.to_uri_str().startswith(self.base_uri.to_uri_str())
+
+        try:
+            from aiobotocore.session import get_session
+        except ImportError:
+            import asyncio
+
+            return await asyncio.to_thread(self._sync_client.read, uri)
+
+        session = get_session()
+        async with session.create_client(
+            "s3",
+            region_name=self._credentials.get("region"),
+            aws_access_key_id=self._credentials.get("access_key_id"),
+            aws_secret_access_key=self._credentials.get("secret_access_key"),
+            aws_session_token=self._credentials.get("session_token"),
+        ) as client:
+            response = await client.get_object(Bucket=uri.bucket, Key=uri.path)
+            async with response["Body"] as stream:
+                return await stream.read()
+
+
+class AsyncGCSStorageClient(AsyncFileStorageClient):
+    """Async Google Cloud Storage implementation."""
+
+    def __init__(
+        self,
+        base_uri: FileStorageURI,
+        credentials: GCPCredentials | None,
+        sync_client: GCSStorageClient,
+    ):
+        super().__init__(base_uri, sync_client)
+        assert isinstance(base_uri, GCSFileStorageURI)
+        self._credentials = credentials
+
+    async def store_async(self, uri: FileStorageURI, data: bytes) -> None:
+        """Store data in GCS bucket asynchronously.
+
+        Falls back to sync client in thread pool since gcloud-aio-storage
+        is not a standard dependency.
+        """
+        assert isinstance(uri, GCSFileStorageURI)
+        assert uri.to_uri_str().startswith(self.base_uri.to_uri_str())
+
+        # GCS async requires gcloud-aio-storage; fall back to threaded sync
+        import asyncio
+
+        await asyncio.to_thread(self._sync_client.store, uri, data)
+
+    async def read_async(self, uri: FileStorageURI) -> bytes:
+        """Read data from GCS bucket asynchronously."""
+        assert isinstance(uri, GCSFileStorageURI)
+        assert uri.to_uri_str().startswith(self.base_uri.to_uri_str())
+
+        import asyncio
+
+        return await asyncio.to_thread(self._sync_client.read, uri)
+
+
+class AsyncAzureStorageClient(AsyncFileStorageClient):
+    """Async Azure Blob Storage implementation using built-in aio support."""
+
+    def __init__(
+        self,
+        base_uri: FileStorageURI,
+        credentials: AzureConnectionCredentials | AzureAccountCredentials,
+        sync_client: AzureStorageClient,
+    ):
+        super().__init__(base_uri, sync_client)
+        assert isinstance(base_uri, AzureFileStorageURI)
+        self._credentials = credentials
+
+    async def _get_async_client(self, account: str) -> Any:
+        """Create async Azure client based on available credentials."""
+        from azure.storage.blob.aio import BlobServiceClient as AsyncBlobServiceClient
+
+        if "connection_string" in self._credentials:
+            connection_creds = cast(AzureConnectionCredentials, self._credentials)
+            return AsyncBlobServiceClient.from_connection_string(
+                connection_creds["connection_string"],
+                connection_timeout=DEFAULT_CONNECT_TIMEOUT,
+                read_timeout=DEFAULT_READ_TIMEOUT,
+            )
+        else:
+            account_creds = cast(AzureAccountCredentials, self._credentials)
+            if "account_url" in account_creds and account_creds["account_url"]:
+                account_url = account_creds["account_url"]
+            else:
+                account_url = f"https://{account}.blob.core.windows.net/"
+            return AsyncBlobServiceClient(
+                account_url=account_url,
+                credential=account_creds["access_key"],
+                connection_timeout=DEFAULT_CONNECT_TIMEOUT,
+                read_timeout=DEFAULT_READ_TIMEOUT,
+            )
+
+    async def store_async(self, uri: FileStorageURI, data: bytes) -> None:
+        """Store data in Azure container asynchronously."""
+        assert isinstance(uri, AzureFileStorageURI)
+        assert uri.to_uri_str().startswith(self.base_uri.to_uri_str())
+
+        async with await self._get_async_client(uri.account) as client:
+            container_client = client.get_container_client(uri.container)
+            blob_client = container_client.get_blob_client(uri.path)
+            await blob_client.upload_blob(data, overwrite=True)
+
+    async def read_async(self, uri: FileStorageURI) -> bytes:
+        """Read data from Azure container asynchronously."""
+        assert isinstance(uri, AzureFileStorageURI)
+        assert uri.to_uri_str().startswith(self.base_uri.to_uri_str())
+
+        async with await self._get_async_client(uri.account) as client:
+            container_client = client.get_container_client(uri.container)
+            blob_client = container_client.get_blob_client(uri.path)
+            stream = await blob_client.download_blob()
+            return await stream.readall()
+
+
+async def store_in_bucket_async(
+    client: AsyncFileStorageClient, path: str, data: bytes
+) -> FileStorageURI:
+    """Store a file in a storage bucket asynchronously."""
+    try:
+        target_file_storage_uri = client.base_uri.with_path(path)
+        await client.store_async(target_file_storage_uri, data)
+    except Exception as e:
+        logger.exception("Failed to store file at %s", target_file_storage_uri)
+        raise FileStorageWriteError(f"Failed to store file at {path}: {e!s}") from e
+    return target_file_storage_uri
+
+
+def maybe_get_async_storage_client_from_env() -> AsyncFileStorageClient | None:
+    """Factory method that returns appropriate async storage client based on URI type."""
+    file_storage_uri = wf_file_storage_uri()
+    if not file_storage_uri:
+        return None
+    try:
+        parsed_uri = FileStorageURI.parse_uri_str(file_storage_uri)
+    except Exception as e:
+        logger.warning(f"Error parsing file storage URI: {e}")
+        return None
+    if parsed_uri.has_path():
+        logger.error(
+            f"Supplied file storage uri contains path components: {file_storage_uri}"
+        )
+        return None
+
+    if isinstance(parsed_uri, S3FileStorageURI):
+        credentials = get_aws_credentials()
+        sync_client = S3StorageClient(parsed_uri, credentials)
+        return AsyncS3StorageClient(parsed_uri, credentials, sync_client)
+    elif isinstance(parsed_uri, GCSFileStorageURI):
+        credentials = get_gcp_credentials()
+        sync_client = GCSStorageClient(parsed_uri, credentials)
+        return AsyncGCSStorageClient(parsed_uri, credentials, sync_client)
+    elif isinstance(parsed_uri, AzureFileStorageURI):
+        credentials = get_azure_credentials()
+        sync_client = AzureStorageClient(parsed_uri, credentials)
+        return AsyncAzureStorageClient(parsed_uri, credentials, sync_client)
+    else:
+        raise NotImplementedError(
+            f"Async storage client for URI type {type(file_storage_uri)} not supported"
+        )
