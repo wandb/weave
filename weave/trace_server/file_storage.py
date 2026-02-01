@@ -43,12 +43,16 @@ There are two ways to authenticate with Azure Blob Storage:
 import asyncio
 import logging
 from abc import abstractmethod
-from collections.abc import Callable
+from collections.abc import AsyncIterator, Callable
+from contextlib import asynccontextmanager
 from typing import Any, cast
 
 import boto3
+from aiobotocore.session import AioSession
+from aiobotocore.session import get_session as get_aio_session
 from azure.core.exceptions import HttpResponseError
 from azure.storage.blob import BlobServiceClient
+from azure.storage.blob.aio import BlobServiceClient as AsyncBlobServiceClient
 from botocore.config import Config
 from botocore.exceptions import ClientError
 from google.api_core import exceptions as gcp_exceptions
@@ -450,21 +454,18 @@ class AsyncS3StorageClient(AsyncFileStorageClient):
         assert isinstance(base_uri, S3FileStorageURI)
         self._credentials = credentials
         self._kms_key = credentials.get("kms_key")
+        self._session: AioSession | None = None
 
-    async def store_async(self, uri: FileStorageURI, data: bytes) -> None:
-        """Store data in S3 bucket asynchronously using aiobotocore."""
-        assert isinstance(uri, S3FileStorageURI)
-        assert uri.to_uri_str().startswith(self.base_uri.to_uri_str())
+    def _get_session(self) -> AioSession:
+        """Get or create an aiobotocore session (reused across calls)."""
+        if self._session is None:
+            self._session = get_aio_session()
+        return self._session
 
-        # Import aiobotocore lazily to avoid hard dependency
-        try:
-            from aiobotocore.session import get_session
-        except ImportError:
-            # Fallback to sync client in thread pool if aiobotocore not available
-            await asyncio.to_thread(self._sync_client.store, uri, data)
-            return
-
-        session = get_session()
+    @asynccontextmanager
+    async def _get_async_s3_client(self) -> AsyncIterator[Any]:
+        """Context manager that yields an async S3 client."""
+        session = self._get_session()
         async with session.create_client(
             "s3",
             region_name=self._credentials.get("region"),
@@ -472,6 +473,14 @@ class AsyncS3StorageClient(AsyncFileStorageClient):
             aws_secret_access_key=self._credentials.get("secret_access_key"),
             aws_session_token=self._credentials.get("session_token"),
         ) as client:
+            yield client
+
+    async def store_async(self, uri: FileStorageURI, data: bytes) -> None:
+        """Store data in S3 bucket asynchronously using aiobotocore."""
+        assert isinstance(uri, S3FileStorageURI)
+        assert uri.to_uri_str().startswith(self.base_uri.to_uri_str())
+
+        async with self._get_async_s3_client() as client:
             put_object_params: dict[str, Any] = {
                 "Bucket": uri.bucket,
                 "Key": uri.path,
@@ -488,26 +497,14 @@ class AsyncS3StorageClient(AsyncFileStorageClient):
         assert isinstance(uri, S3FileStorageURI)
         assert uri.to_uri_str().startswith(self.base_uri.to_uri_str())
 
-        try:
-            from aiobotocore.session import get_session
-        except ImportError:
-            return await asyncio.to_thread(self._sync_client.read, uri)
-
-        session = get_session()
-        async with session.create_client(
-            "s3",
-            region_name=self._credentials.get("region"),
-            aws_access_key_id=self._credentials.get("access_key_id"),
-            aws_secret_access_key=self._credentials.get("secret_access_key"),
-            aws_session_token=self._credentials.get("session_token"),
-        ) as client:
+        async with self._get_async_s3_client() as client:
             response = await client.get_object(Bucket=uri.bucket, Key=uri.path)
             async with response["Body"] as stream:
                 return await stream.read()
 
 
 class AsyncGCSStorageClient(AsyncFileStorageClient):
-    """Async Google Cloud Storage implementation."""
+    """Async Google Cloud Storage implementation using thread pool wrapper."""
 
     def __init__(
         self,
@@ -520,22 +517,15 @@ class AsyncGCSStorageClient(AsyncFileStorageClient):
         self._credentials = credentials
 
     async def store_async(self, uri: FileStorageURI, data: bytes) -> None:
-        """Store data in GCS bucket asynchronously.
-
-        Falls back to sync client in thread pool since gcloud-aio-storage
-        is not a standard dependency.
-        """
+        """Store data in GCS bucket asynchronously."""
         assert isinstance(uri, GCSFileStorageURI)
         assert uri.to_uri_str().startswith(self.base_uri.to_uri_str())
-
-        # GCS async requires gcloud-aio-storage; fall back to threaded sync
         await asyncio.to_thread(self._sync_client.store, uri, data)
 
     async def read_async(self, uri: FileStorageURI) -> bytes:
         """Read data from GCS bucket asynchronously."""
         assert isinstance(uri, GCSFileStorageURI)
         assert uri.to_uri_str().startswith(self.base_uri.to_uri_str())
-
         return await asyncio.to_thread(self._sync_client.read, uri)
 
 
@@ -552,10 +542,8 @@ class AsyncAzureStorageClient(AsyncFileStorageClient):
         assert isinstance(base_uri, AzureFileStorageURI)
         self._credentials = credentials
 
-    async def _get_async_client(self, account: str) -> Any:
+    async def _get_async_client(self, account: str) -> AsyncBlobServiceClient:
         """Create async Azure client based on available credentials."""
-        from azure.storage.blob.aio import BlobServiceClient as AsyncBlobServiceClient
-
         if "connection_string" in self._credentials:
             connection_creds = cast(AzureConnectionCredentials, self._credentials)
             return AsyncBlobServiceClient.from_connection_string(
@@ -641,5 +629,5 @@ def maybe_get_async_storage_client_from_env() -> AsyncFileStorageClient | None:
         return AsyncAzureStorageClient(parsed_uri, credentials, sync_client)
     else:
         raise NotImplementedError(
-            f"Async storage client for URI type {type(file_storage_uri)} not supported"
+            f"Async storage client for URI type {type(parsed_uri)} not supported"
         )
