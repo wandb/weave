@@ -1,3 +1,4 @@
+import asyncio
 import datetime
 import io
 import logging
@@ -761,6 +762,10 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         )
         handle_response_error(r, "/files/create")
         return tsi.FileCreateRes.model_validate(r.json())
+
+    async def file_create_async(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
+        """Async version - wraps sync HTTP call in thread pool."""
+        return await asyncio.to_thread(self.file_create, req)
 
     @with_retry
     def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:

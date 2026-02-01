@@ -1,6 +1,5 @@
-import asyncio
 import datetime
-from collections.abc import Coroutine, Iterator
+from collections.abc import Iterator
 from enum import Enum
 from typing import Any, Literal, Protocol
 
@@ -2290,12 +2289,7 @@ class TraceServerInterface(Protocol):
 
     # File API
     def file_create(self, req: FileCreateReq) -> FileCreateRes: ...
-
-    def file_create_async(
-        self, req: FileCreateReq
-    ) -> Coroutine[Any, Any, FileCreateRes]:
-        """Async version of file_create. Default wraps sync in thread pool."""
-        return asyncio.to_thread(self.file_create, req)
+    async def file_create_async(self, req: FileCreateReq) -> FileCreateRes: ...
 
     def file_content_read(self, req: FileContentReadReq) -> FileContentReadRes: ...
     def files_stats(self, req: FilesStatsReq) -> FilesStatsRes: ...

@@ -40,6 +40,7 @@ There are two ways to authenticate with Azure Blob Storage:
     - `WF_FILE_STORAGE_AZURE_ACCOUNT_URL`: (optional) the account url for the azure account - defaults to `https://<account>.blob.core.windows.net/`
 """
 
+import asyncio
 import logging
 from abc import abstractmethod
 from collections.abc import Callable
@@ -460,8 +461,6 @@ class AsyncS3StorageClient(AsyncFileStorageClient):
             from aiobotocore.session import get_session
         except ImportError:
             # Fallback to sync client in thread pool if aiobotocore not available
-            import asyncio
-
             await asyncio.to_thread(self._sync_client.store, uri, data)
             return
 
@@ -492,8 +491,6 @@ class AsyncS3StorageClient(AsyncFileStorageClient):
         try:
             from aiobotocore.session import get_session
         except ImportError:
-            import asyncio
-
             return await asyncio.to_thread(self._sync_client.read, uri)
 
         session = get_session()
@@ -532,16 +529,12 @@ class AsyncGCSStorageClient(AsyncFileStorageClient):
         assert uri.to_uri_str().startswith(self.base_uri.to_uri_str())
 
         # GCS async requires gcloud-aio-storage; fall back to threaded sync
-        import asyncio
-
         await asyncio.to_thread(self._sync_client.store, uri, data)
 
     async def read_async(self, uri: FileStorageURI) -> bytes:
         """Read data from GCS bucket asynchronously."""
         assert isinstance(uri, GCSFileStorageURI)
         assert uri.to_uri_str().startswith(self.base_uri.to_uri_str())
-
-        import asyncio
 
         return await asyncio.to_thread(self._sync_client.read, uri)
 
