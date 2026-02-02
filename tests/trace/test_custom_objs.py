@@ -6,13 +6,12 @@ import rich.markdown
 from PIL import Image
 
 import weave
+from tests.trace.test_utils import FailingSaveType
 from weave.trace.serialization.custom_objs import (
     KNOWN_TYPES,
     decode_custom_obj,
     encode_custom_obj,
 )
-
-from tests.trace.test_utils import FailingSaveType
 
 
 def test_encode_custom_obj_unknown_type(client):
@@ -97,8 +96,7 @@ def test_no_extra_calls_created(client):
 
 
 def test_encode_custom_obj_save_exception_returns_none(client, failing_serializer):
-    """
-    Requirement: Type handler save exceptions should not crash user code
+    """Requirement: Type handler save exceptions should not crash user code
     Interface: encode_custom_obj function
     Given: A serializer is registered whose save function raises an exception
     When: encode_custom_obj is called with an object of that type
@@ -113,9 +111,10 @@ def test_encode_custom_obj_save_exception_returns_none(client, failing_serialize
     assert result is None
 
 
-def test_encode_custom_obj_save_exception_does_not_propagate(client, failing_serializer):
-    """
-    Requirement: Type handler save exceptions must not propagate to user code
+def test_encode_custom_obj_save_exception_does_not_propagate(
+    client, failing_serializer
+):
+    """Requirement: Type handler save exceptions must not propagate to user code
     Interface: encode_custom_obj function
     Given: A serializer is registered whose save function raises RuntimeError
     When: encode_custom_obj is called
