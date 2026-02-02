@@ -387,6 +387,16 @@ def test_create_distributed_table_sql():
     assert sql.strip() == expected.strip()
 
 
+def test_create_distributed_table_sql_id_sharded():
+    """Test distributed table creation SQL for ID-sharded tables."""
+    distributed_migrator = DistributedClickHouseTraceServerMigrator(
+        Mock(), replicated_cluster="test_cluster", migration_dir=DEFAULT_MIGRATION_DIR
+    )
+    sql = distributed_migrator._create_distributed_table_sql("calls_complete")
+    expected = "CREATE TABLE IF NOT EXISTS calls_complete ON CLUSTER test_cluster\n        AS calls_complete_local\n        ENGINE = Distributed(test_cluster, currentDatabase(), calls_complete_local, sipHash64(id))"
+    assert sql.strip() == expected.strip()
+
+
 def test_format_distributed_sql():
     """Test distributed SQL formatting for CREATE TABLE and other DDL."""
     distributed_migrator = DistributedClickHouseTraceServerMigrator(
