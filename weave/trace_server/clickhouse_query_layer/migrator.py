@@ -942,7 +942,7 @@ def get_clickhouse_trace_server_migrator(
 
     if migration_dir is None:
         migration_dir = os.path.abspath(
-            os.path.join(os.path.dirname(__file__), "migrations")
+            os.path.join(os.path.dirname(__file__), "..", "migrations")
         )
 
     if use_distributed:

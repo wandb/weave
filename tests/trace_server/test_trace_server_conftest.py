@@ -4,7 +4,7 @@ from tests.trace_server.conftest import get_trace_server_flag
 from tests.trace_server.conftest_lib.trace_server_external_adapter import (
     TestOnlyUserInjectingExternalTraceServer,
 )
-from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
+from weave.trace_server.clickhouse_query_layer.trace_server import ClickHouseTraceServer
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer
 
 

@@ -72,7 +72,7 @@ class GetFieldOperator(BaseModel):
     # 2. As Jamie pointed out, the parsing of this field is not very robust and susceptible to issues when:
     #    - The field part name contains a dot
     #    - The field part name is a valid integer (currently interpreted as a list index)
-    #    - The field part name contains a double quote (will result in failed lookup - see `_quote_json_path` in `clickhouse_trace_server_batched.py`)
+    #    - The field part name contains a double quote (will result in failed lookup - see `_quote_json_path` in `clickhouse_query_layer/calls.py`)
     #    These issues could be resolved by using an alternative syntax (perhaps backticks, square brackets, etc.). However
     #    this would diverge from the current Mongo syntax.
     """Access a field on the traced call.

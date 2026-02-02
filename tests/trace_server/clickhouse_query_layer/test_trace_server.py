@@ -6,13 +6,13 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 from clickhouse_connect.driver.exceptions import DatabaseError
-from weave.trace_server.clickhouse_schema import (
-    CallEndCHInsertable,
-    CallStartCHInsertable,
-)
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.clickhouse_query_layer import trace_server as chts
+from weave.trace_server.clickhouse_query_layer.schema import (
+    CallEndCHInsertable,
+    CallStartCHInsertable,
+)
 from weave.trace_server.secret_fetcher_context import secret_fetcher_context
 
 

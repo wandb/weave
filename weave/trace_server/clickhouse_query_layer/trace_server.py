@@ -1,7 +1,7 @@
 # ClickHouse Trace Server - Main orchestration layer
 #
 # This is the main orchestration layer that composes all the domain repositories
-# together. It provides the same interface as the original clickhouse_trace_server_batched.py
+# together. It provides the TraceServerInterface implementation for ClickHouse.
 # but delegates to specialized repository classes.
 
 import datetime
@@ -101,6 +101,7 @@ class ClickHouseTraceServer(TraceServerInterface):
         password: str = "",
         database: str = "default",
         use_async_insert: bool = False,
+        evaluate_model_dispatcher: Any = None,
     ):
         """Initialize the ClickHouse trace server.
 
@@ -111,7 +112,10 @@ class ClickHouseTraceServer(TraceServerInterface):
             password: ClickHouse password
             database: ClickHouse database name
             use_async_insert: Whether to use async inserts
+            evaluate_model_dispatcher: Dispatcher for model evaluation jobs
         """
+        self._evaluate_model_dispatcher = evaluate_model_dispatcher
+
         # Core infrastructure
         self._ch_client = ClickHouseClient(
             host=host,
@@ -161,6 +165,15 @@ class ClickHouseTraceServer(TraceServerInterface):
             feedback_query_func=self.feedback_query,
             refs_read_batch_func=self._refs_read_batch_for_calls,
         )
+
+    @property
+    def ch_client(self) -> Any:
+        """Returns the underlying ClickHouse client for direct access.
+
+        This is exposed for backward compatibility and for use in tests/migrations.
+        Prefer using the repository methods for normal operations.
+        """
+        return self._ch_client.ch_client
 
         # Refs repository
         self._refs_repo = RefsRepository(
@@ -770,11 +783,27 @@ class ClickHouseTraceServer(TraceServerInterface):
 
     def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
         """Start an evaluation run asynchronously."""
+        from weave.trace_server.ids import generate_id
         from weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker import (
-            enqueue_evaluate_model,
+            EvaluateModelArgs,
         )
 
-        return enqueue_evaluate_model(req, self)
+        if self._evaluate_model_dispatcher is None:
+            raise ValueError("Evaluate model dispatcher is not set")
+        if req.wb_user_id is None:
+            raise ValueError("wb_user_id is required")
+        call_id = generate_id()
+
+        self._evaluate_model_dispatcher.dispatch(
+            EvaluateModelArgs(
+                project_id=req.project_id,
+                evaluation_ref=req.evaluation_ref,
+                model_ref=req.model_ref,
+                wb_user_id=req.wb_user_id,
+                evaluation_call_id=call_id,
+            )
+        )
+        return tsi.EvaluateModelRes(call_id=call_id)
 
     def evaluation_status(
         self, req: tsi.EvaluationStatusReq
