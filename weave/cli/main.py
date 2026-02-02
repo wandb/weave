@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from typing import cast
 
 import click
 
@@ -19,4 +20,5 @@ def main() -> None:
     _configure_logging()
 
 
+main = cast(click.Group, main)
 main.add_command(login_command)
