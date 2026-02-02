@@ -7,7 +7,9 @@ from typing import Literal
 import click
 
 from weave.compat import wandb
-from weave.compat.wandb.wandb_thin.login import _get_default_host as _compat_get_default_host
+from weave.compat.wandb.wandb_thin.login import (
+    _get_default_host as _compat_get_default_host,
+)
 
 
 def _get_default_host() -> str:
