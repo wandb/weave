@@ -12,7 +12,7 @@ from weave.trace.serialization.custom_objs import (
     encode_custom_obj,
 )
 
-from tests.trace.conftest import FailingSaveType
+from tests.trace.test_utils import FailingSaveType
 
 
 def test_encode_custom_obj_unknown_type(client):

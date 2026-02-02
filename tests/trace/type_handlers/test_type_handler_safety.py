@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import weave
 
-from tests.trace.conftest import FailingSaveType
+from tests.trace.test_utils import FailingSaveType
 
 
 def test_op_output_with_failing_serializer_returns_value(client, failing_serializer):
