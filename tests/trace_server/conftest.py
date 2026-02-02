@@ -177,7 +177,9 @@ def get_ch_trace_server(
 
             # Patch _run_migrations to use worker-specific management database
             def patched_run_migrations():
-                import weave.trace_server.clickhouse_trace_server_migrator as wf_migrator
+                from weave.trace_server.clickhouse_query_layer import (
+                    migrator as wf_migrator,
+                )
 
                 migrator = wf_migrator.get_clickhouse_trace_server_migrator(
                     ch_server._mint_client(), management_db=management_db

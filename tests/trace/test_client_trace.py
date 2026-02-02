@@ -3274,19 +3274,19 @@ def test_calls_stream_column_expansion(client):
     assert call_result.output == nested_ref.uri()
 
 
-# Batch size is dynamically increased from 10 to MAX_CALLS_STREAM_BATCH_SIZE (500)
-# in clickhouse_trace_server_settings.py, this test verifies that the dynamic
+# Batch size is dynamically increased from INITIAL_CALLS_STREAM_BATCH_SIZE to MAX_CALLS_STREAM_BATCH_SIZE (500)
+# in clickhouse_query_layer/settings.py, this test verifies that the dynamic
 # increase works as expected
 @pytest.mark.parametrize("batch_size", [1, 5, 6])
 def test_calls_stream_column_expansion_dynamic_batch_size(
     client, batch_size, monkeypatch
 ):
     monkeypatch.setattr(
-        "weave.trace_server.clickhouse_trace_server_settings.INITIAL_CALLS_STREAM_BATCH_SIZE",
+        "weave.trace_server.clickhouse_query_layer.settings.INITIAL_CALLS_STREAM_BATCH_SIZE",
         1,
     )
     monkeypatch.setattr(
-        "weave.trace_server.clickhouse_trace_server_settings.MAX_CALLS_STREAM_BATCH_SIZE",
+        "weave.trace_server.clickhouse_query_layer.settings.MAX_CALLS_STREAM_BATCH_SIZE",
         5,
     )
 

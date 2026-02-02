@@ -1,11 +1,11 @@
 import sqlparse
 
-from weave.trace_server.common_interface import AnnotationQueueItemsFilter, SortBy
-from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.clickhouse_query_layer.query_builders.annotation_queues import (
     make_queue_items_query,
     make_queues_query,
 )
+from weave.trace_server.common_interface import AnnotationQueueItemsFilter, SortBy
+from weave.trace_server.orm import ParamBuilder
 
 
 def assert_sql(
