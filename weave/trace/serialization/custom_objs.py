@@ -104,7 +104,18 @@ def encode_custom_obj(obj: Any) -> EncodedCustomObjDict | None:
     }
 
     art = MemTraceFilesArtifact()
-    val = serializer.save(obj, art, "obj")
+    try:
+        val = serializer.save(obj, art, "obj")
+    except Exception:
+        # Type handler save functions should never crash user code.
+        # If a serializer fails, we log a warning and return None,
+        # which will cause the caller to fall back to stringify().
+        logger.warning(
+            f"Failed to serialize object of type {type(obj).__name__}. "
+            "Falling back to string representation.",
+            exc_info=True,
+        )
+        return None
     if art.path_contents:
         encoded_path_contents = {
             k: (v.encode("utf-8") if isinstance(v, str) else v)  # type: ignore
