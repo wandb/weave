@@ -541,7 +541,10 @@ def test_resilience_to_postprocess_inputs_errors(client, log_collector):
     logs = log_collector.get_error_logs()
     assert len(logs) >= 1
     # Check that the error was logged
-    assert any("postprocess_inputs" in log.msg.lower() or "error" in log.msg.lower() for log in logs)
+    assert any(
+        "postprocess_inputs" in log.msg.lower() or "error" in log.msg.lower()
+        for log in logs
+    )
 
 
 @pytest.mark.asyncio
@@ -814,6 +817,83 @@ async def test_resilience_to_on_finish_handler_errors_async(client, log_collecto
             await do_test()
 
     # We should gracefully handle the error and return the value
+    res = await do_test()
+    assert res == "hello"
+
+    assert_no_current_call()
+
+
+# =============================================================================
+# Tests for code capture resilience
+# =============================================================================
+
+
+@pytest.mark.disable_logging_error_check
+def test_resilience_to_code_capture_errors(client, log_collector):
+    """Test that errors during code capture don't crash the user's program.
+
+    Code capture happens during op serialization when the op is first called.
+    If inspect.getsource fails (e.g., for dynamically created functions),
+    the op should still execute and return the correct value.
+    """
+    from unittest.mock import patch
+
+    def do_test():
+        @weave.op
+        def simple_op_code_capture():
+            return "hello"
+
+        # Patch inspect.getsource to raise an error for this specific op
+        import inspect
+
+        original_getsource = inspect.getsource
+
+        def bad_getsource(obj):
+            if hasattr(obj, "__name__") and "simple_op_code_capture" in str(
+                getattr(obj, "__name__", "")
+            ):
+                raise DummyTestException("FAILURE in code capture!")
+            return original_getsource(obj)
+
+        with patch("inspect.getsource", bad_getsource):
+            return simple_op_code_capture()
+
+    # Code capture errors are handled in background tasks, so they don't
+    # respect raise_on_captured_errors. The op should always succeed.
+    res = do_test()
+    assert res == "hello"
+
+    assert_no_current_call()
+
+
+@pytest.mark.asyncio
+@pytest.mark.disable_logging_error_check
+async def test_resilience_to_code_capture_errors_async(client, log_collector):
+    """Test that errors during code capture don't crash async ops."""
+    from unittest.mock import patch
+
+    async def do_test():
+        @weave.op
+        async def simple_op_code_capture_async():
+            return "hello"
+
+        # Patch inspect.getsource to raise an error for this specific op
+        import inspect
+
+        original_getsource = inspect.getsource
+
+        def bad_getsource(obj):
+            if hasattr(obj, "__name__") and "simple_op_code_capture_async" in str(
+                getattr(obj, "__name__", "")
+            ):
+                raise DummyTestException("FAILURE in code capture!")
+            return original_getsource(obj)
+
+        with patch("inspect.getsource", bad_getsource):
+            return await simple_op_code_capture_async()
+
+    # Code capture errors are handled in background tasks, so they don't
+    # respect raise_on_captured_errors. The op should always succeed.
     res = await do_test()
     assert res == "hello"
 
