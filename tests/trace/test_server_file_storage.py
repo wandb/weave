@@ -12,6 +12,7 @@ from unittest import mock
 import boto3
 import pytest
 from azure.storage.blob import BlobServiceClient
+from google.api_core import exceptions
 from google.auth.credentials import AnonymousCredentials
 from moto import mock_aws
 
@@ -183,9 +184,14 @@ class TestGCSStorage:
         # In-memory storage for all blobs
         blob_data = {}
 
-        def mock_upload_from_string(data, timeout=None, **kwargs):
+        def mock_upload_from_string(
+            data, timeout=None, if_generation_match=None, **kwargs
+        ):
             # Get the blob name from the mock's name attribute
             blob_name = mock_blob.name
+            # Simulate GCS if_generation_match=0 behavior (only write if not exists)
+            if if_generation_match == 0 and blob_name in blob_data:
+                raise exceptions.PreconditionFailed("Object already exists")
             blob_data[blob_name] = data
 
         def mock_download_as_bytes(timeout=None, **kwargs):
@@ -236,6 +242,77 @@ class TestGCSStorage:
         bucket = gcs.bucket(TEST_BUCKET)
         blob = bucket.blob(res.digest)
         assert blob.download_as_bytes() == TEST_CONTENT
+
+    @pytest.mark.usefixtures("gcp_storage_env", "mock_gcp_credentials")
+    def test_gcp_storage_skips_duplicate_write(self, client: WeaveClient):
+        """Test that writing the same content twice skips the second write.
+
+        This verifies the if_generation_match=0 conditional write works correctly
+        to prevent GCS rate limiting when multiple pods write the same object.
+        """
+        if client_is_sqlite(client):
+            pytest.skip("Not implemented in SQLite")
+
+        upload_count = 0
+        blob_data = {}
+
+        def mock_upload_from_string(
+            data, timeout=None, if_generation_match=None, **kwargs
+        ):
+            nonlocal upload_count
+            blob_name = mock_blob.name
+
+            # Simulate GCS behavior: if_generation_match=0 means only write if not exists
+            if if_generation_match == 0 and blob_name in blob_data:
+                raise exceptions.PreconditionFailed("Object already exists")
+
+            upload_count += 1
+            blob_data[blob_name] = data
+
+        def mock_download_as_bytes(timeout=None, **kwargs):
+            blob_name = mock_blob.name
+            return blob_data.get(blob_name, b"")
+
+        mock_storage_client = mock.MagicMock()
+        mock_bucket = mock.MagicMock()
+        mock_blob = mock.MagicMock()
+
+        mock_storage_client.bucket.return_value = mock_bucket
+        mock_bucket.blob.return_value = mock_blob
+        mock_blob.upload_from_string.side_effect = mock_upload_from_string
+        mock_blob.download_as_bytes.side_effect = mock_download_as_bytes
+
+        with mock.patch(
+            "google.cloud.storage.Client", return_value=mock_storage_client
+        ):
+            # First write should succeed
+            res1 = client.server.file_create(
+                FileCreateReq(
+                    project_id=client._project_id(),
+                    name="test.txt",
+                    content=TEST_CONTENT,
+                )
+            )
+            assert upload_count == 1
+
+            # Second write with same content should be skipped (no error, no upload)
+            res2 = client.server.file_create(
+                FileCreateReq(
+                    project_id=client._project_id(),
+                    name="test.txt",
+                    content=TEST_CONTENT,
+                )
+            )
+            # Should still be 1 - second write was skipped
+            assert upload_count == 1
+            # Both should return the same digest
+            assert res1.digest == res2.digest
+
+            # Verify we can still read the content
+            file = client.server.file_content_read(
+                FileContentReadReq(project_id=client._project_id(), digest=res1.digest)
+            )
+            assert file.content == TEST_CONTENT
 
 
 class TestAzureStorage:
