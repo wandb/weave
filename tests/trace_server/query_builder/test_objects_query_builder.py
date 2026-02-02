@@ -2,7 +2,7 @@ import pytest
 import sqlparse
 
 from weave.trace_server.common_interface import SortBy
-from weave.trace_server.objects_query_builder import (
+from weave.trace_server.query_builder.objects_query_builder import (
     ObjectMetadataQueryBuilder,
     _make_conditions_part,
     _make_limit_part,

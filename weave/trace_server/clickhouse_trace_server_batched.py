@@ -39,15 +39,6 @@ from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_common as tsc
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.actions_worker.dispatcher import execute_batch
-from weave.trace_server.annotation_queues_query_builder import (
-    make_queue_add_calls_check_duplicates_query,
-    make_queue_add_calls_fetch_calls_query,
-    make_queue_create_query,
-    make_queue_items_query,
-    make_queue_read_query,
-    make_queues_query,
-    make_queues_stats_query,
-)
 from weave.trace_server.base64_content_conversion import (
     process_call_req_to_content,
     process_complete_call_to_content,
@@ -151,19 +142,30 @@ from weave.trace_server.model_providers.model_providers import (
     read_model_to_provider_info_map,
 )
 from weave.trace_server.object_class_util import process_incoming_object_val
-from weave.trace_server.objects_query_builder import (
-    ObjectMetadataQueryBuilder,
-    format_metadata_objects_from_query_result,
-    make_objects_val_query_and_parameters,
-)
 from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
 from weave.trace_server.opentelemetry.python_spans import Resource, Span
 from weave.trace_server.orm import ParamBuilder, Row
-from weave.trace_server.project_query_builder import make_project_stats_query
 from weave.trace_server.project_version.project_version import (
     TableRoutingResolver,
 )
 from weave.trace_server.project_version.types import WriteTarget
+from weave.trace_server.query_builder.annotation_queues_query_builder import (
+    make_queue_add_calls_check_duplicates_query,
+    make_queue_add_calls_fetch_calls_query,
+    make_queue_create_query,
+    make_queue_items_query,
+    make_queue_read_query,
+    make_queues_query,
+    make_queues_stats_query,
+)
+from weave.trace_server.query_builder.objects_query_builder import (
+    ObjectMetadataQueryBuilder,
+    format_metadata_objects_from_query_result,
+    make_objects_val_query_and_parameters,
+)
+from weave.trace_server.query_builder.project_query_builder import (
+    make_project_stats_query,
+)
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 from weave.trace_server.table_query_builder import (
     ROW_ORDER_COLUMN_NAME,
@@ -5918,45 +5920,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 self._insert_call_complete_batch([row])
         finally:
             self._calls_complete_batch = []
-
-    @ddtrace.tracer.wrap(
-        name="clickhouse_trace_server_batched._analyze_call_batch_breakdown"
-    )
-    def _analyze_call_batch_breakdown(self) -> None:
-        """Analyze the batch to count calls with starts but no ends"""
-        if not self._call_batch:
-            return
-
-        try:
-            id_idx = ALL_CALL_INSERT_COLUMNS.index("id")
-            started_at_idx = ALL_CALL_INSERT_COLUMNS.index("started_at")
-            ended_at_idx = ALL_CALL_INSERT_COLUMNS.index("ended_at")
-
-            started_call_ids: set[str] = set()
-            ended_call_ids: set[str] = set()
-
-            for row in self._call_batch:
-                call_id = row[id_idx]
-                started_at = row[started_at_idx]
-                ended_at = row[ended_at_idx]
-
-                if started_at is not None:
-                    started_call_ids.add(call_id)
-                if ended_at is not None:
-                    ended_call_ids.add(call_id)
-
-            unmatched_starts = started_call_ids - ended_call_ids
-
-            set_current_span_dd_tags(
-                {
-                    "weave_trace_server._flush_calls.unmatched_starts": len(
-                        unmatched_starts
-                    ),
-                }
-            )
-        except Exception:
-            # Under no circumstances should we block ingest with an error
-            pass
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._strip_large_values")
     def _strip_large_values(self, batch: list[list[Any]]) -> list[list[Any]]:
