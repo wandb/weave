@@ -3,8 +3,6 @@
 We should never be breaking the user's program with an error.
 """
 
-# TODO: Test code capture resilience
-# TODO: Test postprocess input/output resilience
 from collections import Counter
 
 import pytest
@@ -508,3 +506,315 @@ async def test_resilience_to_accumulator_internal_errors_async(client):
         with pytest.raises(DummyTestException):
             res = await do_test()
             l = [item async for item in res]
+
+
+# =============================================================================
+# Tests for postprocess_inputs resilience
+# =============================================================================
+
+
+@pytest.mark.disable_logging_error_check
+def test_resilience_to_postprocess_inputs_errors(client, log_collector):
+    """Test that errors in postprocess_inputs don't crash the user's program."""
+
+    def do_test():
+        def bad_postprocess_inputs(inputs):
+            raise DummyTestException("FAILURE in postprocess_inputs!")
+
+        @weave.op(postprocess_inputs=bad_postprocess_inputs)
+        def simple_op():
+            return "hello"
+
+        return simple_op()
+
+    # The exception should be raised when capturing errors
+    with raise_on_captured_errors(True):
+        with pytest.raises(DummyTestException):
+            do_test()
+
+    # We should gracefully handle the error and return the value
+    res = do_test()
+    assert res == "hello"
+
+    assert_no_current_call()
+
+    logs = log_collector.get_error_logs()
+    assert len(logs) >= 1
+    # Check that the error was logged
+    assert any("postprocess_inputs" in log.msg.lower() or "error" in log.msg.lower() for log in logs)
+
+
+@pytest.mark.asyncio
+@pytest.mark.disable_logging_error_check
+async def test_resilience_to_postprocess_inputs_errors_async(client, log_collector):
+    """Test that errors in postprocess_inputs don't crash async ops."""
+
+    async def do_test():
+        def bad_postprocess_inputs(inputs):
+            raise DummyTestException("FAILURE in postprocess_inputs!")
+
+        @weave.op(postprocess_inputs=bad_postprocess_inputs)
+        async def simple_op():
+            return "hello"
+
+        return await simple_op()
+
+    # The exception should be raised when capturing errors
+    with raise_on_captured_errors(True):
+        with pytest.raises(DummyTestException):
+            await do_test()
+
+    # We should gracefully handle the error and return the value
+    res = await do_test()
+    assert res == "hello"
+
+    assert_no_current_call()
+
+
+# =============================================================================
+# Tests for postprocess_output resilience
+# =============================================================================
+
+
+@pytest.mark.disable_logging_error_check
+def test_resilience_to_postprocess_output_errors(client, log_collector):
+    """Test that errors in postprocess_output don't crash the user's program."""
+
+    def do_test():
+        def bad_postprocess_output(output):
+            raise DummyTestException("FAILURE in postprocess_output!")
+
+        @weave.op(postprocess_output=bad_postprocess_output)
+        def simple_op():
+            return "hello"
+
+        return simple_op()
+
+    # The exception should be raised when capturing errors
+    with raise_on_captured_errors(True):
+        with pytest.raises(DummyTestException):
+            do_test()
+
+    # We should gracefully handle the error and return the value
+    res = do_test()
+    assert res == "hello"
+
+    assert_no_current_call()
+
+    logs = log_collector.get_error_logs()
+    assert len(logs) >= 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.disable_logging_error_check
+async def test_resilience_to_postprocess_output_errors_async(client, log_collector):
+    """Test that errors in postprocess_output don't crash async ops."""
+
+    async def do_test():
+        def bad_postprocess_output(output):
+            raise DummyTestException("FAILURE in postprocess_output!")
+
+        @weave.op(postprocess_output=bad_postprocess_output)
+        async def simple_op():
+            return "hello"
+
+        return await simple_op()
+
+    # The exception should be raised when capturing errors
+    with raise_on_captured_errors(True):
+        with pytest.raises(DummyTestException):
+            await do_test()
+
+    # We should gracefully handle the error and return the value
+    res = await do_test()
+    assert res == "hello"
+
+    assert_no_current_call()
+
+
+# =============================================================================
+# Tests for call_display_name callable resilience
+# =============================================================================
+
+
+@pytest.mark.disable_logging_error_check
+def test_resilience_to_call_display_name_errors(client, log_collector):
+    """Test that errors in call_display_name callable don't crash the user's program."""
+
+    def do_test():
+        def bad_display_name(call):
+            raise DummyTestException("FAILURE in call_display_name!")
+
+        @weave.op(call_display_name=bad_display_name)
+        def simple_op():
+            return "hello"
+
+        return simple_op()
+
+    # The exception should be raised when capturing errors
+    with raise_on_captured_errors(True):
+        with pytest.raises(DummyTestException):
+            do_test()
+
+    # We should gracefully handle the error and return the value
+    res = do_test()
+    assert res == "hello"
+
+    assert_no_current_call()
+
+
+@pytest.mark.asyncio
+@pytest.mark.disable_logging_error_check
+async def test_resilience_to_call_display_name_errors_async(client, log_collector):
+    """Test that errors in call_display_name callable don't crash async ops."""
+
+    async def do_test():
+        def bad_display_name(call):
+            raise DummyTestException("FAILURE in call_display_name!")
+
+        @weave.op(call_display_name=bad_display_name)
+        async def simple_op():
+            return "hello"
+
+        return await simple_op()
+
+    # The exception should be raised when capturing errors
+    with raise_on_captured_errors(True):
+        with pytest.raises(DummyTestException):
+            await do_test()
+
+    # We should gracefully handle the error and return the value
+    res = await do_test()
+    assert res == "hello"
+
+    assert_no_current_call()
+
+
+# =============================================================================
+# Tests for _on_input_handler resilience
+# =============================================================================
+
+
+@pytest.mark.disable_logging_error_check
+def test_resilience_to_on_input_handler_errors(client, log_collector):
+    """Test that errors in _on_input_handler don't crash the user's program."""
+
+    def do_test():
+        @weave.op
+        def simple_op():
+            return "hello"
+
+        def bad_input_handler(op, args, kwargs):
+            raise DummyTestException("FAILURE in on_input_handler!")
+
+        simple_op._set_on_input_handler(bad_input_handler)
+
+        return simple_op()
+
+    # The exception should be raised when capturing errors
+    with raise_on_captured_errors(True):
+        with pytest.raises(DummyTestException):
+            do_test()
+
+    # We should gracefully handle the error and return the value
+    res = do_test()
+    assert res == "hello"
+
+    assert_no_current_call()
+
+    logs = log_collector.get_error_logs()
+    assert len(logs) >= 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.disable_logging_error_check
+async def test_resilience_to_on_input_handler_errors_async(client, log_collector):
+    """Test that errors in _on_input_handler don't crash async ops."""
+
+    async def do_test():
+        @weave.op
+        async def simple_op():
+            return "hello"
+
+        def bad_input_handler(op, args, kwargs):
+            raise DummyTestException("FAILURE in on_input_handler!")
+
+        simple_op._set_on_input_handler(bad_input_handler)
+
+        return await simple_op()
+
+    # The exception should be raised when capturing errors
+    with raise_on_captured_errors(True):
+        with pytest.raises(DummyTestException):
+            await do_test()
+
+    # We should gracefully handle the error and return the value
+    res = await do_test()
+    assert res == "hello"
+
+    assert_no_current_call()
+
+
+# =============================================================================
+# Tests for _on_finish_handler resilience
+# =============================================================================
+
+
+@pytest.mark.disable_logging_error_check
+def test_resilience_to_on_finish_handler_errors(client, log_collector):
+    """Test that errors in _on_finish_handler don't crash the user's program."""
+
+    def do_test():
+        @weave.op
+        def simple_op():
+            return "hello"
+
+        def bad_finish_handler(call, output, exception):
+            raise DummyTestException("FAILURE in on_finish_handler!")
+
+        simple_op._set_on_finish_handler(bad_finish_handler)
+
+        return simple_op()
+
+    # The exception should be raised when capturing errors
+    with raise_on_captured_errors(True):
+        with pytest.raises(DummyTestException):
+            do_test()
+
+    # We should gracefully handle the error and return the value
+    res = do_test()
+    assert res == "hello"
+
+    assert_no_current_call()
+
+    logs = log_collector.get_error_logs()
+    assert len(logs) >= 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.disable_logging_error_check
+async def test_resilience_to_on_finish_handler_errors_async(client, log_collector):
+    """Test that errors in _on_finish_handler don't crash async ops."""
+
+    async def do_test():
+        @weave.op
+        async def simple_op():
+            return "hello"
+
+        def bad_finish_handler(call, output, exception):
+            raise DummyTestException("FAILURE in on_finish_handler!")
+
+        simple_op._set_on_finish_handler(bad_finish_handler)
+
+        return await simple_op()
+
+    # The exception should be raised when capturing errors
+    with raise_on_captured_errors(True):
+        with pytest.raises(DummyTestException):
+            await do_test()
+
+    # We should gracefully handle the error and return the value
+    res = await do_test()
+    assert res == "hello"
+
+    assert_no_current_call()
