@@ -5919,45 +5919,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         finally:
             self._calls_complete_batch = []
 
-    @ddtrace.tracer.wrap(
-        name="clickhouse_trace_server_batched._analyze_call_batch_breakdown"
-    )
-    def _analyze_call_batch_breakdown(self) -> None:
-        """Analyze the batch to count calls with starts but no ends"""
-        if not self._call_batch:
-            return
-
-        try:
-            id_idx = ALL_CALL_INSERT_COLUMNS.index("id")
-            started_at_idx = ALL_CALL_INSERT_COLUMNS.index("started_at")
-            ended_at_idx = ALL_CALL_INSERT_COLUMNS.index("ended_at")
-
-            started_call_ids: set[str] = set()
-            ended_call_ids: set[str] = set()
-
-            for row in self._call_batch:
-                call_id = row[id_idx]
-                started_at = row[started_at_idx]
-                ended_at = row[ended_at_idx]
-
-                if started_at is not None:
-                    started_call_ids.add(call_id)
-                if ended_at is not None:
-                    ended_call_ids.add(call_id)
-
-            unmatched_starts = started_call_ids - ended_call_ids
-
-            set_current_span_dd_tags(
-                {
-                    "weave_trace_server._flush_calls.unmatched_starts": len(
-                        unmatched_starts
-                    ),
-                }
-            )
-        except Exception:
-            # Under no circumstances should we block ingest with an error
-            pass
-
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._strip_large_values")
     def _strip_large_values(self, batch: list[list[Any]]) -> list[list[Any]]:
         """Iterate through the batch and replace large JSON values with placeholders.
