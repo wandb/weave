@@ -9,6 +9,7 @@ from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
     ExportTraceServiceRequest,
 )
 
+from weave.trace_server import object_creation_utils
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.clickhouse_query_layer.batching import BatchManager
@@ -19,12 +20,11 @@ from weave.trace_server.clickhouse_query_layer.calls import (
     start_call_for_insert_to_ch_insertable,
 )
 from weave.trace_server.clickhouse_query_layer.client import ClickHouseClient
-from weave.trace_server.opentelemetry.helpers import Resource, Span
-from weave.trace_server.opentelemetry.python_spans import AttributePathConflictError
+from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
+from weave.trace_server.opentelemetry.python_spans import Resource, Span
 from weave.trace_server.project_version.project_version import TableRoutingResolver
 from weave.trace_server.project_version.types import WriteTarget
 from weave.trace_server.trace_server_interface_util import assert_non_null_wb_user_id
-from weave.trace_server import object_creation_utils
 
 if TYPE_CHECKING:
     from weave.trace_server.kafka import KafkaProducer

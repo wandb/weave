@@ -6,12 +6,12 @@ from typing import TYPE_CHECKING
 
 import ddtrace
 
-from weave.trace_server.clickhouse_query_layer import settings as ch_settings
 from weave.trace_server import environment as wf_env
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.clickhouse_query_layer import settings as ch_settings
 from weave.trace_server.clickhouse_query_layer.batching import BatchManager
 from weave.trace_server.clickhouse_query_layer.client import ClickHouseClient
-from weave.trace_server.clickhouse_schema import FileChunkCreateCHInsertable
+from weave.trace_server.clickhouse_query_layer.schema import FileChunkCreateCHInsertable
 from weave.trace_server.datadog import set_root_span_dd_tags
 from weave.trace_server.errors import NotFoundError
 from weave.trace_server.file_storage import (

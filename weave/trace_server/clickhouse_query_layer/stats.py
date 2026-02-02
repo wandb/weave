@@ -1,14 +1,12 @@
 # ClickHouse Stats - Project and call statistics
 
-from collections.abc import Iterator
-from typing import Any
-
-import ddtrace
 
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.clickhouse_query_layer.client import ClickHouseClient, ensure_datetimes_have_tz
+from weave.trace_server.clickhouse_query_layer.client import ClickHouseClient
+from weave.trace_server.clickhouse_query_layer.query_builders.project import (
+    make_project_stats_query,
+)
 from weave.trace_server.orm import ParamBuilder
-from weave.trace_server.project_query_builder import make_project_stats_query
 from weave.trace_server.project_version.project_version import TableRoutingResolver
 
 
@@ -44,7 +42,9 @@ class StatsRepository:
             include_files_storage_size=_default_true(req.include_file_storage_size),
             read_table=read_table,
         )
-        query_result = self._ch_client.ch_client.query(query, parameters=pb.get_params())
+        query_result = self._ch_client.ch_client.query(
+            query, parameters=pb.get_params()
+        )
 
         if len(query_result.result_rows) != 1:
             raise RuntimeError("Unexpected number of results", query_result)

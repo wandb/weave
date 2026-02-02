@@ -1,24 +1,22 @@
 # ClickHouse Annotation Queues - Annotation queue CRUD operations
 
 from collections.abc import Iterator
-from typing import Any
 
 import ddtrace
 
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.annotation_queues_query_builder import (
+from weave.trace_server.clickhouse_query_layer.client import (
+    ClickHouseClient,
+    ensure_datetimes_have_tz,
+)
+from weave.trace_server.clickhouse_query_layer.query_builders.annotation_queues import (
     make_queue_add_calls_check_duplicates_query,
     make_queue_add_calls_fetch_calls_query,
     make_queue_add_calls_insert_query,
-    make_queue_call_items_query,
     make_queue_create_query,
-    make_queue_delete_call_items_query,
-    make_queue_pop_calls_query,
     make_queue_read_query,
-    make_queue_update_query,
     make_queues_query,
 )
-from weave.trace_server.clickhouse_query_layer.client import ClickHouseClient, ensure_datetimes_have_tz
 from weave.trace_server.errors import NotFoundError
 from weave.trace_server.ids import generate_id
 from weave.trace_server.orm import ParamBuilder
@@ -213,102 +211,3 @@ class AnnotationQueuesRepository:
             added_count=len(calls_data),
             duplicates=len(req.call_ids) - len(new_call_ids),
         )
-
-    @ddtrace.tracer.wrap(name="annotation_queues.annotation_queue_pop_calls")
-    def annotation_queue_pop_calls(
-        self, req: tsi.AnnotationQueuePopCallsReq
-    ) -> tsi.AnnotationQueuePopCallsRes:
-        """Pop calls from an annotation queue for annotation."""
-        pb = ParamBuilder()
-
-        query = make_queue_pop_calls_query(
-            project_id=req.project_id,
-            queue_id=req.queue_id,
-            limit=req.limit,
-            pb=pb,
-        )
-
-        result = self._ch_client.query(query, parameters=pb.get_params())
-        call_ids = [row[0] for row in result.result_rows]
-
-        return tsi.AnnotationQueuePopCallsRes(call_ids=call_ids)
-
-    @ddtrace.tracer.wrap(name="annotation_queues.annotation_queue_call_items_query_stream")
-    def annotation_queue_call_items_query_stream(
-        self, req: tsi.AnnotationQueueCallItemsQueryReq
-    ) -> Iterator[tsi.AnnotationQueueCallItemSchema]:
-        """Stream call items in an annotation queue."""
-        pb = ParamBuilder()
-
-        query = make_queue_call_items_query(
-            project_id=req.project_id,
-            queue_id=req.queue_id,
-            pb=pb,
-            call_ids=req.call_ids,
-            sort_by=req.sort_by,
-            limit=req.limit,
-            offset=req.offset,
-        )
-
-        raw_res = self._ch_client.query_stream(query, pb.get_params())
-
-        for row in raw_res:
-            (
-                call_id,
-                queue_id,
-                added_at,
-                added_by,
-                op_name,
-                started_at,
-                inputs_dump,
-                output_dump,
-            ) = row
-
-            yield tsi.AnnotationQueueCallItemSchema(
-                call_id=call_id,
-                queue_id=str(queue_id),
-                added_at=ensure_datetimes_have_tz(added_at),
-                added_by=added_by,
-                op_name=op_name,
-                started_at=ensure_datetimes_have_tz(started_at),
-            )
-
-    @ddtrace.tracer.wrap(name="annotation_queues.annotation_queue_delete_call_items")
-    def annotation_queue_delete_call_items(
-        self, req: tsi.AnnotationQueueDeleteCallItemsReq
-    ) -> tsi.AnnotationQueueDeleteCallItemsRes:
-        """Delete call items from an annotation queue."""
-        assert_non_null_wb_user_id(req)
-        pb = ParamBuilder()
-
-        query = make_queue_delete_call_items_query(
-            project_id=req.project_id,
-            queue_id=req.queue_id,
-            call_ids=req.call_ids,
-            pb=pb,
-        )
-
-        self._ch_client.command(query, parameters=pb.get_params())
-
-        return tsi.AnnotationQueueDeleteCallItemsRes(deleted_count=len(req.call_ids))
-
-    @ddtrace.tracer.wrap(name="annotation_queues.annotation_queue_update")
-    def annotation_queue_update(
-        self, req: tsi.AnnotationQueueUpdateReq
-    ) -> tsi.AnnotationQueueUpdateRes:
-        """Update an annotation queue."""
-        assert_non_null_wb_user_id(req)
-        pb = ParamBuilder()
-
-        query = make_queue_update_query(
-            project_id=req.project_id,
-            queue_id=req.queue_id,
-            name=req.name,
-            description=req.description,
-            scorer_refs=req.scorer_refs,
-            pb=pb,
-        )
-
-        self._ch_client.command(query, parameters=pb.get_params())
-
-        return tsi.AnnotationQueueUpdateRes()

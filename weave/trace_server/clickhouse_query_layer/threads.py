@@ -5,8 +5,13 @@ from collections.abc import Iterator
 import ddtrace
 
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.annotation_queues_query_builder import make_threads_query
-from weave.trace_server.clickhouse_query_layer.client import ClickHouseClient, ensure_datetimes_have_tz
+from weave.trace_server.clickhouse_query_layer.client import (
+    ClickHouseClient,
+    ensure_datetimes_have_tz,
+)
+from weave.trace_server.clickhouse_query_layer.query_builders.threads import (
+    make_threads_query,
+)
 from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.project_version.project_version import TableRoutingResolver
 

@@ -8,35 +8,35 @@ import logging
 from collections.abc import Iterator
 from typing import TYPE_CHECKING, Any
 
-import ddtrace
-
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.clickhouse_query_layer.calls import (
     end_call_for_insert_to_ch_insertable,
     start_call_for_insert_to_ch_insertable,
 )
-from weave.trace_server.clickhouse_schema import (
+from weave.trace_server.clickhouse_query_layer.schema import (
     ALL_CALL_INSERT_COLUMNS,
     CallEndCHInsertable,
     CallStartCHInsertable,
 )
-from weave.trace_server.errors import MissingLLMApiKeyError
-from weave.trace_server.llm_completion import (
+from weave.trace_server.constants import (
     COMPLETIONS_CREATE_OP_NAME,
     IMAGE_GENERATION_CREATE_OP_NAME,
+)
+from weave.trace_server.errors import MissingLLMApiKeyError
+from weave.trace_server.image_completion import lite_llm_image_generation
+from weave.trace_server.llm_completion import (
     get_custom_provider_info,
     lite_llm_completion,
     lite_llm_completion_stream,
     resolve_and_apply_prompt,
 )
-from weave.trace_server.image_completion import lite_llm_image_generation
 from weave.trace_server.project_version.types import WriteTarget
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 
 if TYPE_CHECKING:
-    from weave.trace_server.project_version.project_version import TableRoutingResolver
-    from weave.trace_server.clickhouse_query_layer.client import ClickHouseClient
     from weave.trace_server.clickhouse_query_layer.batching import BatchManager
+    from weave.trace_server.clickhouse_query_layer.client import ClickHouseClient
+    from weave.trace_server.project_version.project_version import TableRoutingResolver
 
 logger = logging.getLogger(__name__)
 
@@ -200,6 +200,7 @@ class CompletionsRepository:
                 return_type,
             ) = _setup_completion_model_info(model_info, req, self._obj_read)
         except Exception as e:
+
             def _single_error_iter(err: Exception) -> Iterator[dict[str, str]]:
                 yield {"error": str(err)}
 
@@ -348,7 +349,7 @@ class CompletionsRepository:
         try:
             self._insert_call_batch(batch_data)
         except Exception as e:
-            logger.error(f"Error inserting call batch for image generation: {e}")
+            logger.exception("Error inserting call batch for image generation")
 
         return tsi.ImageGenerationCreateRes(
             response=res.response, weave_call_id=start_call.id
@@ -474,7 +475,9 @@ def _update_accumulated_response(
             if "delta" in choice:
                 delta = choice["delta"]
                 if "content" in delta and delta["content"]:
-                    accumulated["choices"][idx]["message"]["content"] += delta["content"]
+                    accumulated["choices"][idx]["message"]["content"] += delta[
+                        "content"
+                    ]
 
     if "usage" in chunk:
         accumulated["usage"] = chunk["usage"]

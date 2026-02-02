@@ -7,8 +7,10 @@ storage sizes from various stats tables.
 import pytest
 import sqlparse
 
+from weave.trace_server.clickhouse_query_layer.query_builders.project import (
+    make_project_stats_query,
+)
 from weave.trace_server.orm import ParamBuilder
-from weave.trace_server.project_query_builder import make_project_stats_query
 from weave.trace_server.project_version.types import ReadTable
 
 

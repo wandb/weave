@@ -6,13 +6,13 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 from clickhouse_connect.driver.exceptions import DatabaseError
-
-from weave.trace_server import clickhouse_trace_server_batched as chts
-from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.clickhouse_schema import (
     CallEndCHInsertable,
     CallStartCHInsertable,
 )
+
+from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.clickhouse_query_layer import trace_server as chts
 from weave.trace_server.secret_fetcher_context import secret_fetcher_context
 
 
@@ -28,7 +28,7 @@ def test_clickhouse_storage_size_query_generation():
     mock_ch_client = MagicMock()
     with (
         patch(
-            "weave.trace_server.clickhouse_trace_server_batched.CallsQuery",
+            "weave.trace_server.clickhouse_query_layer.query_builders.calls.calls_query_builder.CallsQuery",
             autospec=True,
         ) as mock_cq,
         patch.object(chts.ClickHouseTraceServer, "_query_stream") as mock_query_stream,
@@ -225,7 +225,7 @@ def test_completions_create_stream_custom_provider():
     with (
         secret_fetcher_context(mock_secret_fetcher),
         patch(
-            "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
+            "weave.trace_server.clickhouse_query_layer.trace_server.lite_llm_completion_stream"
         ) as mock_litellm,
         patch.object(chts.ClickHouseTraceServer, "obj_read") as mock_obj_read,
     ):
@@ -359,7 +359,7 @@ def test_completions_create_stream_custom_provider_with_tracking():
     with (
         secret_fetcher_context(mock_secret_fetcher),
         patch(
-            "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
+            "weave.trace_server.clickhouse_query_layer.trace_server.lite_llm_completion_stream"
         ) as mock_litellm,
         patch.object(chts.ClickHouseTraceServer, "obj_read") as mock_obj_read,
         patch.object(chts.ClickHouseTraceServer, "_insert_call") as mock_insert_call,
@@ -533,7 +533,7 @@ def test_completions_create_stream_multiple_choices():
     with (
         secret_fetcher_context(mock_secret_fetcher),
         patch(
-            "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
+            "weave.trace_server.clickhouse_query_layer.trace_server.lite_llm_completion_stream"
         ) as mock_litellm,
         patch.object(chts.ClickHouseTraceServer, "_insert_call") as mock_insert_call,
         patch.object(
@@ -672,7 +672,7 @@ def test_completions_create_stream_single_choice_unified_wrapper():
     with (
         secret_fetcher_context(mock_secret_fetcher),
         patch(
-            "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
+            "weave.trace_server.clickhouse_query_layer.trace_server.lite_llm_completion_stream"
         ) as mock_litellm,
         patch.object(chts.ClickHouseTraceServer, "_insert_call") as mock_insert_call,
         patch.object(
@@ -815,7 +815,7 @@ def test_completions_create_stream_with_prompt_and_template_vars():
     with (
         secret_fetcher_context(mock_secret_fetcher),
         patch(
-            "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
+            "weave.trace_server.clickhouse_query_layer.trace_server.lite_llm_completion_stream"
         ) as mock_litellm,
         patch.object(chts.ClickHouseTraceServer, "obj_read") as mock_obj_read,
     ):

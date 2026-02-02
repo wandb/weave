@@ -12,7 +12,12 @@ from weave.trace_server.clickhouse_query_layer.client import (
     ensure_datetimes_have_tz,
     ensure_datetimes_have_tz_strict,
 )
-from weave.trace_server.clickhouse_schema import (
+from weave.trace_server.clickhouse_query_layer.query_builders.objects import (
+    ObjectMetadataQueryBuilder,
+    format_metadata_objects_from_query_result,
+    make_objects_val_query_and_parameters,
+)
+from weave.trace_server.clickhouse_query_layer.schema import (
     ALL_OBJ_INSERT_COLUMNS,
     ObjCHInsertable,
     ObjDeleteCHInsertable,
@@ -21,11 +26,6 @@ from weave.trace_server.clickhouse_schema import (
 from weave.trace_server.datadog import set_current_span_dd_tags
 from weave.trace_server.errors import InvalidRequest, NotFoundError, ObjectDeletedError
 from weave.trace_server.object_class_util import process_incoming_object_val
-from weave.trace_server.objects_query_builder import (
-    ObjectMetadataQueryBuilder,
-    format_metadata_objects_from_query_result,
-    make_objects_val_query_and_parameters,
-)
 from weave.trace_server.trace_server_interface_util import (
     extract_refs_from_values,
     str_digest,

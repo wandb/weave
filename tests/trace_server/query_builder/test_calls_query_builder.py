@@ -3,7 +3,7 @@ import sqlparse
 
 from tests.trace_server.query_builder.utils import assert_sql
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.calls_query_builder.calls_query_builder import (
+from weave.trace_server.clickhouse_query_layer.query_builders.calls.calls_query_builder import (
     AggregatedDataSizeField,
     CallsQuery,
     HardCodedFilter,

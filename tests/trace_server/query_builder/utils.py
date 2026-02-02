@@ -5,18 +5,20 @@ from typing import Any
 
 import sqlparse
 
-from weave.trace_server.calls_query_builder.call_metrics_query_builder import (
+from weave.trace_server.clickhouse_query_layer.query_builders.calls.call_metrics_query_builder import (
     build_call_metrics_query,
 )
-from weave.trace_server.calls_query_builder.calls_query_builder import CallsQuery
-from weave.trace_server.calls_query_builder.usage_query_builder import (
+from weave.trace_server.clickhouse_query_layer.query_builders.calls.calls_query_builder import (
+    CallsQuery,
+)
+from weave.trace_server.clickhouse_query_layer.query_builders.calls.usage_query_builder import (
     build_usage_query,
 )
-from weave.trace_server.orm import ParamBuilder
-from weave.trace_server.threads_query_builder import (
+from weave.trace_server.clickhouse_query_layer.query_builders.threads import (
     make_threads_query,
     make_threads_query_sqlite,
 )
+from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.trace_server_interface import (
     CallMetricSpec,
     CallStatsReq,

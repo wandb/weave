@@ -5,14 +5,10 @@
 # but delegates to specialized repository classes.
 
 import datetime
-import functools
-import json
 import logging
 import time
 from collections.abc import Iterator
 from typing import TYPE_CHECKING, Any
-
-import ddtrace
 
 from weave.trace_server import environment as wf_env
 from weave.trace_server import refs_internal as ri
@@ -32,6 +28,9 @@ from weave.trace_server.clickhouse_query_layer.feedback import FeedbackRepositor
 from weave.trace_server.clickhouse_query_layer.files import FilesRepository
 from weave.trace_server.clickhouse_query_layer.objects import ObjectsRepository
 from weave.trace_server.clickhouse_query_layer.otel import OtelRepository
+from weave.trace_server.clickhouse_query_layer.query_builders.objects import (
+    ObjectMetadataQueryBuilder,
+)
 from weave.trace_server.clickhouse_query_layer.refs import RefsRepository
 from weave.trace_server.clickhouse_query_layer.stats import StatsRepository
 from weave.trace_server.clickhouse_query_layer.tables import TablesRepository
@@ -45,17 +44,14 @@ from weave.trace_server.model_providers.model_providers import (
 from weave.trace_server.object_creation_utils import (
     OP_SOURCE_FILE_NAME,
     PLACEHOLDER_OP_SOURCE,
-    build_op_val,
-    make_safe_name,
 )
-from weave.trace_server.objects_query_builder import ObjectMetadataQueryBuilder
 from weave.trace_server.project_version.project_version import TableRoutingResolver
 from weave.trace_server.trace_server_common import LRUCache
 from weave.trace_server.trace_server_interface import TraceServerInterface
 from weave.trace_server.trace_server_interface_util import bytes_digest
 
 if TYPE_CHECKING:
-    from weave.trace_server.clickhouse_schema import SelectableCHObjSchema
+    from weave.trace_server.clickhouse_query_layer.schema import SelectableCHObjSchema
 
 logger = logging.getLogger(__name__)
 
@@ -329,10 +325,10 @@ class ClickHouseTraceServer(TraceServerInterface):
     def call_stats(self, req: tsi.CallStatsReq) -> tsi.CallStatsRes:
         """Get aggregated call statistics over a time range."""
         # Import here to avoid circular dependency
-        from weave.trace_server.calls_query_builder.call_metrics_query_builder import (
+        from weave.trace_server.clickhouse_query_layer.query_builders.calls.call_metrics_query_builder import (
             build_call_stats_query,
         )
-        from weave.trace_server.calls_query_builder.usage_query_builder import (
+        from weave.trace_server.clickhouse_query_layer.query_builders.calls.usage_query_builder import (
             build_usage_stats_query,
         )
 
@@ -569,9 +565,7 @@ class ClickHouseTraceServer(TraceServerInterface):
             FROM files
             WHERE project_id = {project_id:String}
         """
-        result = self._ch_client.query(
-            query, {"project_id": req.project_id}
-        )
+        result = self._ch_client.query(query, {"project_id": req.project_id})
         total_bytes = result.result_rows[0][0] if result.result_rows else 0
         return tsi.FilesStatsRes(total_bytes=total_bytes or 0)
 
@@ -685,7 +679,7 @@ class ClickHouseTraceServer(TraceServerInterface):
         self, req: tsi.AnnotationQueuesStatsReq
     ) -> tsi.AnnotationQueuesStatsRes:
         """Get stats for annotation queues."""
-        from weave.trace_server.annotation_queues_query_builder import (
+        from weave.trace_server.clickhouse_query_layer.query_builders.annotation_queues import (
             make_queues_stats_query,
         )
         from weave.trace_server.orm import ParamBuilder
@@ -1045,7 +1039,9 @@ class ClickHouseTraceServer(TraceServerInterface):
         model_id = object_creation_utils.make_object_id(req.name, "Model")
 
         # Create the source file
-        source_code = req.source_code or object_creation_utils.PLACEHOLDER_MODEL_PREDICT_OP_SOURCE
+        source_code = (
+            req.source_code or object_creation_utils.PLACEHOLDER_MODEL_PREDICT_OP_SOURCE
+        )
         source_file_req = tsi.FileCreateReq(
             project_id=req.project_id,
             name=OP_SOURCE_FILE_NAME,
@@ -1212,7 +1208,9 @@ class ClickHouseTraceServer(TraceServerInterface):
                         ]
                     }
                 }
-            ) if not req.evaluation else None,
+            )
+            if not req.evaluation
+            else None,
             limit=req.limit,
             offset=req.offset,
         )
@@ -1326,7 +1324,9 @@ class ClickHouseTraceServer(TraceServerInterface):
                         ]
                     }
                 }
-            ) if req.evaluation_run_id else tsi.Query(
+            )
+            if req.evaluation_run_id
+            else tsi.Query(
                 **{
                     "$expr": {
                         "$eq": [
@@ -1587,9 +1587,7 @@ class ClickHouseTraceServer(TraceServerInterface):
 
         return self._objects_repo._select_objs_query(object_query_builder, True)
 
-    def _create_placeholder_ops_digest(
-        self, project_id: str, create: bool
-    ) -> str:
+    def _create_placeholder_ops_digest(self, project_id: str, create: bool) -> str:
         """Create or get the placeholder ops file digest."""
         if create:
             file_req = tsi.FileCreateReq(

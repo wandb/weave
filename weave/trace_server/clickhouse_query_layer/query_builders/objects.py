@@ -1,7 +1,7 @@
 from collections.abc import Iterator
 from typing import Any
 
-from weave.trace_server.clickhouse_schema import SelectableCHObjSchema
+from weave.trace_server.clickhouse_query_layer.schema import SelectableCHObjSchema
 from weave.trace_server.common_interface import SortBy
 from weave.trace_server.orm import combine_conditions
 from weave.trace_server.trace_server_common import digest_is_version_like

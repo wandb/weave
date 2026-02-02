@@ -7,10 +7,11 @@ from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any
 
 import ddtrace
+
 from weave.trace_server import environment as wf_env
 from weave.trace_server.clickhouse_query_layer import settings as ch_settings
 from weave.trace_server.clickhouse_query_layer.client import ClickHouseClient, num_bytes
-from weave.trace_server.clickhouse_schema import (
+from weave.trace_server.clickhouse_query_layer.schema import (
     ALL_CALL_COMPLETE_INSERT_COLUMNS,
     ALL_CALL_INSERT_COLUMNS,
     ALL_CALL_JSON_COLUMNS,
@@ -297,9 +298,7 @@ class BatchManager:
 
         for item in batch:
             # Calculate only JSON dump bytes
-            json_idx_size_pairs = [
-                (i, num_bytes(item[i])) for i in json_column_indices
-            ]
+            json_idx_size_pairs = [(i, num_bytes(item[i])) for i in json_column_indices]
             total_json_bytes = sum(size for _, size in json_idx_size_pairs)
 
             # If over limit, try to optimize by selectively stripping largest JSON values

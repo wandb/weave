@@ -7,21 +7,13 @@ from typing import TYPE_CHECKING, Any
 
 import ddtrace
 
-from weave.trace_server.clickhouse_query_layer import settings as ch_settings
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.base64_content_conversion import (
     process_call_req_to_content,
     process_complete_call_to_content,
 )
-from weave.trace_server.calls_query_builder.calls_query_builder import (
-    CallsQuery,
-    HardCodedFilter,
-    build_calls_complete_delete_query,
-    build_calls_complete_update_end_query,
-    build_calls_complete_update_query,
-    build_calls_stats_query,
-)
+from weave.trace_server.clickhouse_query_layer import settings as ch_settings
 from weave.trace_server.clickhouse_query_layer.batching import BatchManager
 from weave.trace_server.clickhouse_query_layer.client import (
     ClickHouseClient,
@@ -33,17 +25,25 @@ from weave.trace_server.clickhouse_query_layer.client import (
     ensure_datetimes_have_tz,
     nullable_any_dump_to_any,
 )
-from weave.trace_server.clickhouse_schema import (
+from weave.trace_server.clickhouse_query_layer.query_builders.calls.calls_query_builder import (
+    CallsQuery,
+    HardCodedFilter,
+    build_calls_complete_delete_query,
+    build_calls_complete_update_end_query,
+    build_calls_complete_update_query,
+    build_calls_stats_query,
+)
+from weave.trace_server.clickhouse_query_layer.schema import (
     ALL_CALL_COMPLETE_INSERT_COLUMNS,
     ALL_CALL_INSERT_COLUMNS,
     ALL_CALL_SELECT_COLUMNS,
+    REQUIRED_CALL_COLUMNS,
     CallCHInsertable,
     CallCompleteCHInsertable,
     CallDeleteCHInsertable,
     CallEndCHInsertable,
     CallStartCHInsertable,
     CallUpdateCHInsertable,
-    REQUIRED_CALL_COLUMNS,
 )
 from weave.trace_server.datadog import set_current_span_dd_tags
 from weave.trace_server.errors import CallsCompleteModeRequired, RequestTooLarge
@@ -66,7 +66,6 @@ from weave.trace_server.trace_server_interface_util import (
 )
 
 if TYPE_CHECKING:
-    from weave.trace_server import environment as wf_env
     from weave.trace_server.kafka import KafkaProducer
 
 
@@ -93,9 +92,7 @@ class CallsRepository:
     # V1 API
     # =========================================================================
 
-    def call_start(
-        self, req: tsi.CallStartReq, trace_server: Any
-    ) -> tsi.CallStartRes:
+    def call_start(self, req: tsi.CallStartReq, trace_server: Any) -> tsi.CallStartRes:
         """Start a call (v1 API)."""
         req = process_call_req_to_content(req, trace_server)
         ch_call = start_call_for_insert_to_ch_insertable(req.start)
@@ -219,9 +216,7 @@ class CallsRepository:
 
         return tsi.CallStartV2Res(id=ch_start.id, trace_id=ch_start.trace_id)
 
-    def call_end_v2(
-        self, req: tsi.CallEndV2Req, trace_server: Any
-    ) -> tsi.CallEndV2Res:
+    def call_end_v2(self, req: tsi.CallEndV2Req, trace_server: Any) -> tsi.CallEndV2Res:
         """End a single call (v2 API)."""
         req = process_call_req_to_content(req, trace_server)
 

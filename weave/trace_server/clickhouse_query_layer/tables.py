@@ -9,15 +9,13 @@ from typing import Any, cast
 import ddtrace
 
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.calls_query_builder.calls_query_builder import (
+from weave.trace_server.clickhouse_query_layer.client import ClickHouseClient
+from weave.trace_server.clickhouse_query_layer.query_builders.calls.calls_query_builder import (
     OrderField,
     QueryBuilderDynamicField,
     QueryBuilderField,
 )
-from weave.trace_server.clickhouse_query_layer.client import ClickHouseClient
-from weave.trace_server.errors import InvalidRequest, NotFoundError
-from weave.trace_server.orm import ParamBuilder
-from weave.trace_server.table_query_builder import (
+from weave.trace_server.clickhouse_query_layer.query_builders.tables import (
     ROW_ORDER_COLUMN_NAME,
     TABLE_ROWS_ALIAS,
     VAL_DUMP_COLUMN_NAME,
@@ -25,6 +23,8 @@ from weave.trace_server.table_query_builder import (
     make_standard_table_query,
     make_table_stats_query_with_storage_size,
 )
+from weave.trace_server.errors import InvalidRequest, NotFoundError
+from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.trace_server_interface_util import (
     extract_refs_from_values,
     str_digest,

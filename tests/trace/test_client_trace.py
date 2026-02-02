@@ -42,7 +42,7 @@ from weave.trace.refs import TableRef
 from weave.trace.vals import MissingSelfInstanceError
 from weave.trace.weave_client import sanitize_object_name
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.clickhouse_trace_server_settings import ENTITY_TOO_LARGE_PAYLOAD
+from weave.trace_server.clickhouse_query_layer.settings import ENTITY_TOO_LARGE_PAYLOAD
 from weave.trace_server.common_interface import SortBy
 from weave.trace_server.errors import InsertTooLarge, InvalidFieldError, InvalidRequest
 from weave.trace_server.ids import generate_id
@@ -3589,12 +3589,17 @@ def test_inline_pydantic_basemodel_generates_no_refs_in_object(client):
 
 
 def test_large_keys_are_stripped_call(client, caplog, monkeypatch):
+    from weave.trace_server.clickhouse_query_layer import settings as ch_settings
+    from weave.trace_server.clickhouse_query_layer.trace_server import (
+        ClickHouseTraceServer,
+    )
+
     is_sqlite = client_is_sqlite(client)
     if is_sqlite:
         # no need to strip in sqlite
         return
 
-    original_insert_call_batch = weave.trace_server.clickhouse_trace_server_batched.ClickHouseTraceServer._insert_call_batch
+    original_insert_call_batch = ClickHouseTraceServer._insert_call_batch
     max_size = 10 * 1024
 
     # Patch _insert_call_batch to raise InsertTooLarge
@@ -3609,12 +3614,12 @@ def test_large_keys_are_stripped_call(client, caplog, monkeypatch):
         original_insert_call_batch(self, batch)
 
     monkeypatch.setattr(
-        weave.trace_server.clickhouse_trace_server_settings,
+        ch_settings,
         "CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT",
         max_size,
     )
     monkeypatch.setattr(
-        weave.trace_server.clickhouse_trace_server_batched.ClickHouseTraceServer,
+        ClickHouseTraceServer,
         "_insert_call_batch",
         mock_insert_call_batch,
     )

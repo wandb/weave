@@ -15,7 +15,9 @@ from tests.trace_server.conftest_lib.trace_server_external_adapter import (
 from tests.trace_server.workers.evaluate_model_test_worker import (
     EvaluateModelTestDispatcher,
 )
-from weave.trace_server import clickhouse_trace_server_batched
+from weave.trace_server.clickhouse_query_layer import (
+    trace_server as clickhouse_trace_server_batched,
+)
 from weave.trace_server.project_version import project_version
 from weave.trace_server.secret_fetcher_context import secret_fetcher_context
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer

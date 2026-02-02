@@ -4,27 +4,22 @@
 # CRUD operations (calls, objects, tables, files). These are higher-level
 # domain-specific operations.
 
-import datetime
 import json
 import logging
 from collections.abc import Iterator
 from typing import TYPE_CHECKING, Any
 
-import ddtrace
-
+from weave.trace_server import object_creation_utils
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server import trace_server_interface_util as tsi_util
 from weave.trace_server.clickhouse_query_layer.client import ensure_datetimes_have_tz
+from weave.trace_server.clickhouse_query_layer.query_builders.objects import (
+    ObjectMetadataQueryBuilder,
+)
 from weave.trace_server.errors import NotFoundError, ObjectDeletedError
-from weave.trace_server.object_class_util import process_incoming_object_val
-from weave.trace_server.objects_query_builder import ObjectMetadataQueryBuilder
-from weave.trace_server import object_creation_utils
-from weave.trace_server.opentelemetry import constants as otel_constants
-from weave.trace_server import trace_server_common as tsc
 
 if TYPE_CHECKING:
-    from weave.trace_server.clickhouse_schema import SelectableCHObjSchema
+    pass
 
 logger = logging.getLogger(__name__)
 

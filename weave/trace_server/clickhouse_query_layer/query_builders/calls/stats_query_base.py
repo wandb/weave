@@ -10,7 +10,9 @@ from __future__ import annotations
 import datetime
 from typing import TYPE_CHECKING
 
-from weave.trace_server.calls_query_builder.utils import param_slot
+from weave.trace_server.clickhouse_query_layer.query_builders.calls.utils import (
+    param_slot,
+)
 from weave.trace_server.orm import ParamBuilder, combine_conditions
 from weave.trace_server.trace_server_interface import (
     AggregationType,

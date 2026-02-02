@@ -10,7 +10,9 @@ from tests.trace_server.conftest import TEST_ENTITY
 from tests.trace_server.conftest_lib.trace_server_external_adapter import b64
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.base64_content_conversion import AUTO_CONVERSION_MIN_SIZE
-from weave.trace_server.calls_query_builder.utils import param_slot
+from weave.trace_server.clickhouse_query_layer.query_builders.calls.utils import (
+    param_slot,
+)
 from weave.trace_server.errors import CallsCompleteModeRequired
 from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.project_version.project_version import (

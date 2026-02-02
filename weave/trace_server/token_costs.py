@@ -4,8 +4,8 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.calls_query_builder.cte import CTE
-from weave.trace_server.clickhouse_schema import SelectableCHCallSchema
+from weave.trace_server.clickhouse_query_layer.query_builders.calls.cte import CTE
+from weave.trace_server.clickhouse_query_layer.schema import SelectableCHCallSchema
 from weave.trace_server.errors import InvalidRequest
 from weave.trace_server.orm import (
     Column,
@@ -20,7 +20,9 @@ from weave.trace_server.validation import (
 )
 
 if TYPE_CHECKING:
-    from weave.trace_server.calls_query_builder.calls_query_builder import OrderField
+    from weave.trace_server.clickhouse_query_layer.query_builders.calls.calls_query_builder import (
+        OrderField,
+    )
 
 DUMMY_LLM_ID = "weave_dummy_llm_id"
 DUMMY_LLM_USAGE = (
@@ -463,7 +465,7 @@ def _prepare_final_select_fields(
     Returns:
         Final list of field names to select
     """
-    from weave.trace_server.calls_query_builder.calls_query_builder import (
+    from weave.trace_server.clickhouse_query_layer.query_builders.calls.calls_query_builder import (
         CallsMergedFeedbackPayloadField,
     )
 
@@ -490,7 +492,7 @@ def _needs_feedback_join(order_fields: list["OrderField"]) -> bool:
     Returns:
         True if feedback JOIN is needed
     """
-    from weave.trace_server.calls_query_builder.calls_query_builder import (
+    from weave.trace_server.clickhouse_query_layer.query_builders.calls.calls_query_builder import (
         CallsMergedFeedbackPayloadField,
     )
 

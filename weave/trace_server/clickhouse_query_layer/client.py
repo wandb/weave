@@ -10,13 +10,14 @@ from typing import Any
 
 import clickhouse_connect
 from clickhouse_connect.driver.client import Client as CHClient
+from clickhouse_connect.driver.exceptions import DatabaseError
 from clickhouse_connect.driver.httputil import get_pool_manager
 from clickhouse_connect.driver.query import QueryResult
 from clickhouse_connect.driver.summary import QuerySummary
 
+from weave.trace_server import environment as wf_env
 from weave.trace_server.clickhouse_query_layer import migrator as wf_migrator
 from weave.trace_server.clickhouse_query_layer import settings as ch_settings
-from weave.trace_server import environment as wf_env
 from weave.trace_server.datadog import set_current_span_dd_tags
 from weave.trace_server.errors import handle_clickhouse_query_error
 
@@ -325,8 +326,6 @@ class ClickHouseClient:
                 _log_and_raise_insert_error(converted, table, data)
 
             # Empty query error: RETRY (generator was consumed during HTTP retry)
-            from clickhouse_connect.driver.exceptions import DatabaseError
-
             except DatabaseError as e:
                 if _should_retry_empty_query(e, table, attempt):
                     continue
@@ -492,8 +491,6 @@ def _should_retry_empty_query(e: Exception, table: str, attempt: int) -> bool:
     internal serialization generator gets exhausted during an HTTP connection
     retry (after CH Cloud's keep-alive timeout causes a connection reset).
     """
-    from clickhouse_connect.driver.exceptions import DatabaseError
-
     is_empty_query = isinstance(e, DatabaseError) and "Empty query" in str(e)
     should_retry = is_empty_query and attempt < ch_settings.INSERT_MAX_RETRIES - 1
     if should_retry:

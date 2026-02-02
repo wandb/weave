@@ -6,7 +6,9 @@ import pytest
 
 import weave
 from tests.trace.util import client_is_sqlite
-from tests.trace_server.clickhouse_query_layer.completions.util import with_simple_mock_litellm_completion
+from tests.trace_server.clickhouse_query_layer.completions.util import (
+    with_simple_mock_litellm_completion,
+)
 from weave.trace.refs import ObjectRef
 from weave.trace.weave_client import WeaveClient, generate_id
 from weave.trace_server.trace_server_interface import (

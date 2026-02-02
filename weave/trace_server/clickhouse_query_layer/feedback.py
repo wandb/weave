@@ -81,7 +81,9 @@ class FeedbackRepository:
         query = query.order_by(req.sort_by)
         query = query.limit(req.limit).offset(req.offset)
         prepared = query.prepare(database_type="clickhouse")
-        query_result = self._ch_client.ch_client.query(prepared.sql, prepared.parameters)
+        query_result = self._ch_client.ch_client.query(
+            prepared.sql, prepared.parameters
+        )
         result = TABLE_FEEDBACK.tuples_to_rows(
             query_result.result_rows, prepared.fields
         )
