@@ -173,6 +173,7 @@ verdict = [
 ]
 autogen = ["autogen-agentchat>=0.5.7; python_version >= '3.10'"]
 verifiers = ["verifiers>=0.1.3.post0,<0.1.4; python_version >= '3.11'"]
+stainless = ["weave_server_sdk @ git+https://github.com/wandb/weave-stainless.git@2b754455dfbfec0326e8a00af025e1ae356c4246"]
 
 
 [project.urls]
