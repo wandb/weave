@@ -371,6 +371,85 @@ def bedrock_stream_accumulator(
     return acc
 
 
+def bedrock_invoke_stream_accumulator(
+    acc: dict | None,
+    value: dict,
+) -> dict:
+    """Accumulates streaming events from invoke_model_with_response_stream.
+
+    Handles Anthropic Claude streaming format via Bedrock where each chunk
+    contains JSON-encoded events like message_start, content_block_delta,
+    message_delta, and message_stop.
+    """
+    if acc is None:
+        acc = {
+            "role": None,
+            "content": "",
+            "stop_reason": None,
+            "usage": {
+                "inputTokens": 0,
+                "outputTokens": 0,
+                "totalTokens": 0,
+            },
+        }
+
+    # Extract JSON from chunk bytes
+    if "chunk" in value and "bytes" in value["chunk"]:
+        try:
+            chunk_data = json.loads(value["chunk"]["bytes"].decode("utf-8"))
+            event_type = chunk_data.get("type")
+
+            # Handle 'message_start' event - contains input tokens
+            if event_type == "message_start":
+                message = chunk_data.get("message", {})
+                acc["role"] = message.get("role")
+                usage = message.get("usage", {})
+                acc["usage"]["inputTokens"] = usage.get("input_tokens", 0)
+
+            # Handle 'content_block_delta' event - contains text chunks
+            elif event_type == "content_block_delta":
+                delta = chunk_data.get("delta", {})
+                if delta.get("type") == "text_delta":
+                    acc["content"] += delta.get("text", "")
+
+            # Handle 'message_delta' event - contains output tokens and stop reason
+            elif event_type == "message_delta":
+                delta = chunk_data.get("delta", {})
+                acc["stop_reason"] = delta.get("stop_reason")
+                usage = chunk_data.get("usage", {})
+                acc["usage"]["outputTokens"] = usage.get("output_tokens", 0)
+                # Calculate total tokens
+                acc["usage"]["totalTokens"] = (
+                    acc["usage"]["inputTokens"] + acc["usage"]["outputTokens"]
+                )
+
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            # Skip chunks that can't be parsed
+            pass
+
+    return acc
+
+
+def bedrock_on_finish_invoke_stream(
+    call: Call, output: Any, exception: BaseException | None
+) -> None:
+    """Handle on_finish for invoke_model_with_response_stream to record token usage."""
+    model_name = str(call.inputs["modelId"])
+    usage = {model_name: {"requests": 1}}
+    summary_update = {"usage": usage}
+
+    if output and isinstance(output, dict) and "usage" in output:
+        tokens_metrics = {
+            "prompt_tokens": output["usage"].get("inputTokens", 0),
+            "completion_tokens": output["usage"].get("outputTokens", 0),
+            "total_tokens": output["usage"].get("totalTokens", 0),
+        }
+        usage[model_name].update(tokens_metrics)
+
+    if call.summary is not None:
+        call.summary.update(summary_update)
+
+
 def create_stream_wrapper(
     name: str,
 ) -> Callable[[Callable], Callable]:
@@ -411,6 +490,48 @@ def _patch_converse_stream(bedrock_client: "BaseClient") -> None:
     bedrock_client.converse_stream = op
 
 
+def create_invoke_stream_wrapper(
+    name: str,
+) -> Callable[[Callable], Callable]:
+    """Create a wrapper for invoke_model_with_response_stream."""
+
+    def wrapper(fn: Callable) -> Callable:
+        op = weave.op(postprocess_inputs=postprocess_inputs_invoke, kind="llm")(fn)
+        op.name = name  # type: ignore
+        op._set_on_finish_handler(bedrock_on_finish_invoke_stream)
+
+        class BedrockInvokeStreamIteratorWrapper(_IteratorWrapper):
+            def get(self, key: str, default: Any = None) -> Any:
+                """Delegate 'get' method to the response object."""
+                if key == "body":
+                    if hasattr(self._iterator_or_ctx_manager, "get"):
+                        self._iterator_or_ctx_manager = (
+                            self._iterator_or_ctx_manager.get("body")
+                        )
+                    return self
+
+            def __getitem__(self, key: str) -> Any:
+                """Make the wrapper subscriptable by delegating to get method."""
+                return self.get(key)
+
+        return _add_accumulator(
+            op,
+            make_accumulator=lambda _: bedrock_invoke_stream_accumulator,
+            should_accumulate=lambda _: True,
+            iterator_wrapper=BedrockInvokeStreamIteratorWrapper,
+        )
+
+    return wrapper
+
+
+def _patch_invoke_stream(bedrock_client: "BaseClient") -> None:
+    """Patches the invoke_model_with_response_stream method to handle streaming."""
+    op = create_invoke_stream_wrapper("BedrockRuntime.invoke_stream")(
+        bedrock_client.invoke_model_with_response_stream
+    )
+    bedrock_client.invoke_model_with_response_stream = op
+
+
 def patch_client(bedrock_client: "BaseClient") -> None:
     if hasattr(bedrock_client, "invoke_agent"):
         # Check if this is a bedrock-agent-runtime client
@@ -420,6 +541,7 @@ def patch_client(bedrock_client: "BaseClient") -> None:
         _patch_converse(bedrock_client)
         _patch_converse_stream(bedrock_client)
         _patch_invoke(bedrock_client)
+        _patch_invoke_stream(bedrock_client)
     elif hasattr(bedrock_client, "apply_guardrail"):
         # This is a standard bedrock-runtime client
         _patch_apply_guardrail(bedrock_client)
