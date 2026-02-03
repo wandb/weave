@@ -19,6 +19,7 @@ from weave.trace_server.clickhouse_query_layer.query_builders.threads import (
     make_threads_query_sqlite,
 )
 from weave.trace_server.orm import ParamBuilder
+from weave.trace_server.project_version.types import ReadTable
 from weave.trace_server.trace_server_interface import (
     CallMetricSpec,
     CallStatsReq,
@@ -102,6 +103,7 @@ def assert_usage_sql(
     exp_granularity_seconds: int,
     exp_start: datetime.datetime | None = None,
     exp_end: datetime.datetime | None = None,
+    read_table: ReadTable = ReadTable.CALLS_MERGED,
 ) -> None:
     """Assert that the CallStatsReq generates the expected usage SQL and parameters.
 
@@ -114,10 +116,11 @@ def assert_usage_sql(
         exp_granularity_seconds: The expected granularity in seconds
         exp_start: The expected start datetime (if None, not checked)
         exp_end: The expected end datetime (if None, not checked)
+        read_table: Which table to query (calls_merged or calls_complete)
     """
     pb = ParamBuilder("pb")
     sql, cols, params, granularity_seconds, start, end = build_usage_query(
-        req, metrics, pb
+        req, metrics, pb, read_table
     )
 
     exp_formatted = sqlparse.format(exp_query, reindent=True)
@@ -148,6 +151,7 @@ def assert_call_metrics_sql(
     exp_granularity_seconds: int,
     exp_start: datetime.datetime | None = None,
     exp_end: datetime.datetime | None = None,
+    read_table: ReadTable = ReadTable.CALLS_MERGED,
 ) -> None:
     """Assert that the CallStatsReq generates the expected call metrics SQL and parameters.
 
@@ -160,10 +164,11 @@ def assert_call_metrics_sql(
         exp_granularity_seconds: The expected granularity in seconds
         exp_start: The expected start datetime (if None, not checked)
         exp_end: The expected end datetime (if None, not checked)
+        read_table: Which table to query (calls_merged or calls_complete)
     """
     pb = ParamBuilder("pb")
     sql, cols, params, granularity_seconds, start, end = build_call_metrics_query(
-        req, metrics, pb
+        req, metrics, pb, read_table
     )
 
     exp_formatted = sqlparse.format(exp_query, reindent=True)

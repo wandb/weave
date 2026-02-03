@@ -21,6 +21,7 @@ from weave.trace_server.clickhouse_query_layer.query_builders.calls.utils import
     safely_format_sql,
 )
 from weave.trace_server.orm import ParamBuilder
+from weave.trace_server.project_version.types import ReadTable, TableConfig
 from weave.trace_server.trace_server_interface import (
     AggregationType,
     CallMetricSpec,
@@ -67,6 +68,7 @@ def build_call_metrics_query(
     req: CallStatsReq,
     metrics: list[CallMetricSpec],
     pb: ParamBuilder,
+    read_table: ReadTable = ReadTable.CALLS_MERGED,
 ) -> tuple[
     str,
     list[str],
@@ -77,9 +79,18 @@ def build_call_metrics_query(
 ]:
     """Generate parameterized ClickHouse SQL for call-level metrics (not grouped by model).
 
-    Returns (sql, output_columns, parameters, granularity_seconds, start, end).
+    Args:
+        req: The CallStatsReq containing time range and filter settings.
+        metrics: Call metrics to compute (latency_ms, call_count, error_count).
+        pb: ParamBuilder for parameterized queries.
+        read_table: Which table to query (calls_merged or calls_complete).
+
+    Returns:
+        (sql, output_columns, parameters, granularity_seconds, start, end).
     """
-    granularity_seconds, start, end, bucket_expr = determine_bounds_and_bucket(req)
+    granularity_seconds, start, end, bucket_expr = determine_bounds_and_bucket(
+        req, read_table
+    )
 
     project_param = pb.add_param(req.project_id)
     start_epoch = start.replace(tzinfo=datetime.timezone.utc).timestamp()
@@ -128,13 +139,18 @@ def build_call_metrics_query(
     outer_select_sql = ",\n  ".join(outer_selects)
 
     all_buckets_interval = f"INTERVAL {granularity_seconds} SECOND"
+
+    # Select the appropriate datetime field based on the table
+    table_config = TableConfig.from_read_table(read_table)
+    datetime_field = table_config.datetime_filter_field
     grouped_calls_sql = build_grouped_calls_subquery(
         project_param=project_param,
         start_param=start_param,
         end_param=end_param,
         tz_param=tz_param,
         where_filter_sql=where_filter_sql,
-        select_columns=["sortable_datetime", "started_at", "ended_at", "exception"],
+        select_columns=[datetime_field, "started_at", "ended_at", "exception"],
+        read_table=read_table,
     )
 
     raw_sql = f"""
