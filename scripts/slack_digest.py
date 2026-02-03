@@ -128,8 +128,9 @@ CATEGORIES = [
         name="Python SDK",
         column_header="Py",
         emoji="🐍",
-        matcher=lambda path: path.startswith("weave/")
-        and not path.startswith("weave/trace_server/"),
+        matcher=lambda path: (
+            path.startswith("weave/") and not path.startswith("weave/trace_server/")
+        ),
     ),
 ]
 
