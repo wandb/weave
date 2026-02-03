@@ -119,3 +119,128 @@ def test_make_queue_items_query_with_filter_and_annotation_states() -> None:
     }
 
     assert_sql(expected_query, expected_params, query, params)
+
+
+def test_annotation_queue_items_filter_accepts_id_field() -> None:
+    """Requirement: AnnotationQueueItemsFilter must support filtering by queue item ID
+    Interface: AnnotationQueueItemsFilter class constructor
+    Given: An id value "item-123"
+    When: AnnotationQueueItemsFilter is instantiated with id="item-123"
+    Then: filter.id equals "item-123"
+    """
+    filter = AnnotationQueueItemsFilter(id="item-123")
+    assert filter.id == "item-123"
+
+
+def test_make_queue_items_query_with_id_filter() -> None:
+    """Requirement: make_queue_items_query must generate SQL filtering by queue item ID
+    Interface: make_queue_items_query function output (SQL string and params)
+    Given: An AnnotationQueueItemsFilter with id="item-id"
+    When: make_queue_items_query is called with the filter
+    Then: Generated SQL contains qi.id = {param} and params include the id value
+    """
+    pb = ParamBuilder("pb")
+    query = make_queue_items_query(
+        project_id="project",
+        queue_id="queue-id",
+        pb=pb,
+        filter=AnnotationQueueItemsFilter(id="item-id"),
+    )
+    params = pb.get_params()
+
+    expected_query = """
+    SELECT
+        qi.id,
+        any(qi.project_id) as project_id,
+        any(qi.queue_id) as queue_id,
+        any(qi.call_id) as call_id,
+        any(qi.call_started_at) as call_started_at,
+        any(qi.call_ended_at) as call_ended_at,
+        any(qi.call_op_name) as call_op_name,
+        any(qi.call_trace_id) as call_trace_id,
+        any(qi.display_fields) as display_fields,
+        any(qi.added_by) as added_by,
+        any(qi.created_at) as created_at,
+        any(qi.created_by) as created_by,
+        any(qi.updated_at) as updated_at,
+        any(qi.deleted_at) as deleted_at,
+        toString(argMax(p.annotation_state, p.updated_at)) as annotation_state,
+        argMax(p.annotator_id, p.updated_at) as annotator_user_id
+    FROM annotation_queue_items qi
+    LEFT JOIN annotator_queue_items_progress p
+        ON p.queue_item_id = qi.id
+        AND p.project_id = qi.project_id
+        AND p.deleted_at IS NULL
+    WHERE qi.project_id = {pb_0: String}
+        AND qi.queue_id = {pb_1: String}
+        AND qi.deleted_at IS NULL
+        AND qi.id = {pb_2:String}
+    GROUP BY qi.id
+    ORDER BY created_at ASC, id ASC
+    """
+
+    expected_params = {
+        "pb_0": "project",
+        "pb_1": "queue-id",
+        "pb_2": "item-id",
+    }
+
+    assert_sql(expected_query, expected_params, query, params)
+
+
+def test_make_queue_items_query_with_id_and_call_id_filter() -> None:
+    """Requirement: id filter can be combined with other filters like call_id
+    Interface: make_queue_items_query function output (SQL string and params)
+    Given: An AnnotationQueueItemsFilter with id="item-id" and call_id="call-id"
+    When: make_queue_items_query is called with the filter
+    Then: Generated SQL contains both qi.id and qi.call_id conditions
+    """
+    pb = ParamBuilder("pb")
+    query = make_queue_items_query(
+        project_id="project",
+        queue_id="queue-id",
+        pb=pb,
+        filter=AnnotationQueueItemsFilter(id="item-id", call_id="call-id"),
+    )
+    params = pb.get_params()
+
+    expected_query = """
+    SELECT
+        qi.id,
+        any(qi.project_id) as project_id,
+        any(qi.queue_id) as queue_id,
+        any(qi.call_id) as call_id,
+        any(qi.call_started_at) as call_started_at,
+        any(qi.call_ended_at) as call_ended_at,
+        any(qi.call_op_name) as call_op_name,
+        any(qi.call_trace_id) as call_trace_id,
+        any(qi.display_fields) as display_fields,
+        any(qi.added_by) as added_by,
+        any(qi.created_at) as created_at,
+        any(qi.created_by) as created_by,
+        any(qi.updated_at) as updated_at,
+        any(qi.deleted_at) as deleted_at,
+        toString(argMax(p.annotation_state, p.updated_at)) as annotation_state,
+        argMax(p.annotator_id, p.updated_at) as annotator_user_id
+    FROM annotation_queue_items qi
+    LEFT JOIN annotator_queue_items_progress p
+        ON p.queue_item_id = qi.id
+        AND p.project_id = qi.project_id
+        AND p.deleted_at IS NULL
+    WHERE qi.project_id = {pb_0: String}
+        AND qi.queue_id = {pb_1: String}
+        AND qi.deleted_at IS NULL
+        AND qi.id = {pb_2:String}
+        AND qi.call_id = {pb_3:String}
+    GROUP BY qi.id
+    ORDER BY created_at ASC, id ASC
+    """
+
+    expected_params = {
+        "pb_0": "project",
+        "pb_1": "queue-id",
+        "pb_2": "item-id",
+        "pb_3": "call-id",
+    }
+
+    assert_sql(expected_query, expected_params, query, params)
