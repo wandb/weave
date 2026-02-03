@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 
 from weave.trace_server.calls_query_builder.utils import param_slot
 from weave.trace_server.orm import ParamBuilder, combine_conditions
+from weave.trace_server.project_version.types import ReadTable, TableConfig
 from weave.trace_server.trace_server_interface import (
     AggregationType,
     CallsFilter,
@@ -53,8 +54,13 @@ def ensure_max_buckets(granularity_seconds: int, time_range_seconds: float) -> i
 
 def determine_bounds_and_bucket(
     req: CallStatsReq,
+    read_table: ReadTable = ReadTable.CALLS_MERGED,
 ) -> tuple[int, datetime.datetime, datetime.datetime, str]:
     """Resolve request parameters to concrete time bounds and bucket configuration.
+
+    Args:
+        req: The CallStatsReq containing time range and granularity settings.
+        read_table: Which table to query (calls_merged or calls_complete).
 
     Returns:
         - granularity_seconds: bucket size in seconds
@@ -78,8 +84,11 @@ def determine_bounds_and_bucket(
     # Ensure we don't exceed MAX_BUCKETS
     granularity_seconds = ensure_max_buckets(granularity_seconds, time_range_seconds)
 
-    # Build bucket expression using sortable_datetime (always present, unlike started_at on unmerged rows)
-    bucket_expr = f"toStartOfInterval(sortable_datetime, INTERVAL {granularity_seconds} SECOND, {{tz}})"
+    # Build bucket expression using the appropriate datetime field
+    # calls_merged uses sortable_datetime, calls_complete uses started_at
+    table_config = TableConfig.from_read_table(read_table)
+    datetime_field = table_config.datetime_filter_field
+    bucket_expr = f"toStartOfInterval({datetime_field}, INTERVAL {granularity_seconds} SECOND, {{tz}})"
 
     return granularity_seconds, start, end, bucket_expr
 
@@ -194,6 +203,7 @@ def build_grouped_calls_subquery(
     tz_param: str,
     where_filter_sql: str,
     select_columns: list[str],
+    read_table: ReadTable = ReadTable.CALLS_MERGED,
 ) -> str:
     """Build SQL for a grouped calls subquery that collapses unmerged call parts.
 
@@ -204,6 +214,7 @@ def build_grouped_calls_subquery(
         tz_param: Parameter name for the timezone string.
         where_filter_sql: Additional WHERE filters (should include leading AND).
         select_columns: Column names to aggregate using anyIf for non-null selection.
+        read_table: Which table to query (calls_merged or calls_complete).
 
     Returns:
         SQL string for the grouped calls subquery.
@@ -223,20 +234,33 @@ def build_grouped_calls_subquery(
     if not select_columns:
         raise ValueError("select_columns must include at least one column")
 
+    table_config = TableConfig.from_read_table(read_table)
+    table_name = table_config.table_name
+    datetime_field = table_config.datetime_filter_field
+    use_aggregation = table_config.use_aggregation
     table_alias = "cm"
-    select_sql = ",\n              ".join(
-        f"anyIf({table_alias}.{column}, {table_alias}.{column} IS NOT NULL) AS {column}"
-        for column in select_columns
-    )
+
+    if use_aggregation:
+        # calls_merged: use anyIf to aggregate multiple rows per call
+        select_sql = ",\n              ".join(
+            f"anyIf({table_alias}.{column}, {table_alias}.{column} IS NOT NULL) AS {column}"
+            for column in select_columns
+        )
+        group_by_clause = "\n        GROUP BY project_id, id"
+    else:
+        # calls_complete: single row per call, no aggregation needed
+        select_sql = ",\n              ".join(
+            f"{table_alias}.{column} AS {column}" for column in select_columns
+        )
+        group_by_clause = ""
 
     return f"""
         SELECT
               {select_sql}
-        FROM calls_merged AS {table_alias}
+        FROM {table_name} AS {table_alias}
         WHERE
               {table_alias}.project_id = {param_slot(project_param, "String")}
-              AND {table_alias}.sortable_datetime >= toDateTime({param_slot(start_param, "Float64")}, {param_slot(tz_param, "String")})
-              AND {table_alias}.sortable_datetime < toDateTime({param_slot(end_param, "Float64")}, {param_slot(tz_param, "String")})
-              AND {table_alias}.deleted_at IS NULL{where_filter_sql}
-        GROUP BY project_id, id
+              AND {table_alias}.{datetime_field} >= toDateTime({param_slot(start_param, "Float64")}, {param_slot(tz_param, "String")})
+              AND {table_alias}.{datetime_field} < toDateTime({param_slot(end_param, "Float64")}, {param_slot(tz_param, "String")})
+              AND {table_alias}.deleted_at IS NULL{where_filter_sql}{group_by_clause}
         """
