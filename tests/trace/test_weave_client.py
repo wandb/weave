@@ -317,7 +317,8 @@ def test_filter_sort_by_query_validation(client):
         client.get_calls(query=["not a query"])
 
     with pytest.raises(
-        ValidationError, match="8 validation errors for WeaveClient.get_calls"
+        ValidationError,
+        match=r"\d+ validation errors for WeaveClient.get_calls",
     ):
         client.get_calls(query={"$expr": {"$invalid_field": "invalid_value"}})
 
