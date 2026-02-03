@@ -163,7 +163,7 @@ jobs:
           WF_CLICKHOUSE_HOST: localhost
           WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
           DD_TRACE_ENABLED: false
-          OPENAI_API_KEY: dummyapikey
+          OPENAI_API_KEY: sk-1234567890abcdef1234567890abcdef
         run: |
           nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.shard }}')" -- \
             -m "trace_server and not skip_clickhouse_client"
