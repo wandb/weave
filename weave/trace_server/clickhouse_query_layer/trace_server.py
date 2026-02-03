@@ -614,9 +614,9 @@ class ClickHouseTraceServer(TraceServerInterface):
         self, req: tsi.EvaluationStatusReq
     ) -> tsi.EvaluationStatusRes:
         """Get the status of an evaluation run."""
-        from weave.trace_server.methods.evaluation_status import get_evaluation_status
+        from weave.trace_server.methods.evaluation_status import evaluation_status
 
-        return get_evaluation_status(req, self)
+        return evaluation_status(self, req)
 
     # =========================================================================
     # V2 Object API - Ops

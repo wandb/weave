@@ -1,6 +1,7 @@
 # ClickHouse OTel - OpenTelemetry export operations
 
 from collections import defaultdict
+from collections.abc import Callable
 from functools import partial
 from typing import TYPE_CHECKING, Any
 
@@ -38,11 +39,13 @@ class OtelRepository:
         ch_client: ClickHouseClient,
         batch_manager: BatchManager,
         table_routing_resolver: TableRoutingResolver,
-        kafka_producer_getter: "callable[[], KafkaProducer]",
-        obj_create_batch_func: "callable[[list[tsi.ObjSchemaForInsert]], list[tsi.ObjCreateRes]]",
-        get_existing_ops_func: "callable[[set[str], str, int], list[Any]]",
-        create_placeholder_ops_digest_func: "callable[[str, bool], str]",
-        file_create_func: "callable[[tsi.FileCreateReq], tsi.FileCreateRes]",
+        kafka_producer_getter: Callable[[], "KafkaProducer"],
+        obj_create_batch_func: Callable[
+            [list[tsi.ObjSchemaForInsert]], list[tsi.ObjCreateRes]
+        ],
+        get_existing_ops_func: Callable[[set[str], str, int], list[Any]],
+        create_placeholder_ops_digest_func: Callable[[str, bool], str],
+        file_create_func: Callable[[tsi.FileCreateReq], tsi.FileCreateRes],
     ):
         self._ch_client = ch_client
         self._batch_manager = batch_manager

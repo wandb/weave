@@ -5,7 +5,7 @@
 
 import datetime
 import logging
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from typing import TYPE_CHECKING, Any
 
 from weave.trace_server import trace_server_interface as tsi
@@ -49,9 +49,9 @@ class CompletionsRepository:
         ch_client: "ClickHouseClient",
         batch_manager: "BatchManager",
         table_routing_resolver: "TableRoutingResolver",
-        obj_read_func: "callable[[tsi.ObjReadReq], tsi.ObjReadRes]",
-        insert_call_func: "callable[[Any], None]",
-        insert_call_batch_func: "callable[[list], None]",
+        obj_read_func: Callable[[tsi.ObjReadReq], tsi.ObjReadRes],
+        insert_call_func: Callable[[Any], None],
+        insert_call_batch_func: Callable[[list], None],
         model_to_provider_info_map: dict[str, Any],
     ):
         self._ch_client = ch_client
@@ -278,7 +278,7 @@ class CompletionsRepository:
                 response={"error": "Secret fetcher context not set"}
             )
 
-        secrets = secret_fetcher.fetch(req.project_id, ["OPENAI_API_KEY"])
+        secrets = secret_fetcher.fetch("OPENAI_API_KEY")
         api_key = secrets.get("secrets", {}).get("OPENAI_API_KEY")
 
         if api_key is None:
@@ -364,7 +364,7 @@ class CompletionsRepository:
 def _setup_completion_model_info(
     model_info: Any,
     req: tsi.CompletionsCreateReq,
-    obj_read_func: "callable[[tsi.ObjReadReq], tsi.ObjReadRes]",
+    obj_read_func: Callable[[tsi.ObjReadReq], tsi.ObjReadRes],
 ) -> tuple[str, str | None, str | None, str | None, dict | None, str | None]:
     """Setup model info for completion.
 
@@ -373,7 +373,9 @@ def _setup_completion_model_info(
     """
     secret_fetcher = _secret_fetcher_context.get()
     if secret_fetcher is None:
-        raise MissingLLMApiKeyError("Secret fetcher context not set")
+        raise MissingLLMApiKeyError(
+            "Secret fetcher context not set", api_key_name="N/A"
+        )
 
     # Default values
     model_name = req.inputs.model
@@ -389,12 +391,15 @@ def _setup_completion_model_info(
         provider = model_info.get("provider")
         api_key_name = model_info.get("api_key_name")
         if api_key_name:
-            secrets = secret_fetcher.fetch(req.project_id, [api_key_name])
+            secrets = secret_fetcher.fetch(api_key_name)
             api_key = secrets.get("secrets", {}).get(api_key_name)
     else:
         # Check if it's a custom provider model
         custom_provider_info = get_custom_provider_info(
-            req.inputs.model, req.project_id, obj_read_func
+            project_id=req.project_id,
+            provider_name="",  # Empty for digest lookup
+            model_name=req.inputs.model,
+            obj_read_func=obj_read_func,
         )
 
         if custom_provider_info:
@@ -405,13 +410,13 @@ def _setup_completion_model_info(
             return_type = custom_provider_info.get("return_type")
             api_key_name = custom_provider_info.get("api_key_name")
             if api_key_name:
-                secrets = secret_fetcher.fetch(req.project_id, [api_key_name])
+                secrets = secret_fetcher.fetch(api_key_name)
                 api_key = secrets.get("secrets", {}).get(api_key_name)
         else:
             # Unknown model, try to get API key from common providers
             common_keys = ["OPENAI_API_KEY", "ANTHROPIC_API_KEY"]
-            secrets = secret_fetcher.fetch(req.project_id, common_keys)
             for key in common_keys:
+                secrets = secret_fetcher.fetch(key)
                 if secrets.get("secrets", {}).get(key):
                     api_key = secrets["secrets"][key]
                     break
@@ -420,7 +425,7 @@ def _setup_completion_model_info(
 
 
 def _create_tracked_stream_wrapper(
-    insert_call_func: "callable[[Any], None]",
+    insert_call_func: Callable[[Any], None],
     chunk_iter: Iterator[dict[str, Any]],
     start_call: CallStartCHInsertable,
     model_name: str,

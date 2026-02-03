@@ -2,7 +2,7 @@
 
 import logging
 import threading
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any
 
@@ -37,7 +37,7 @@ class BatchManager:
     def __init__(
         self,
         ch_client: ClickHouseClient,
-        kafka_producer_getter: "callable[[], KafkaProducer]",
+        kafka_producer_getter: Callable[[], "KafkaProducer"],
     ):
         self._ch_client = ch_client
         self._thread_local = threading.local()

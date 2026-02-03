@@ -6,7 +6,7 @@
 
 import json
 import logging
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from typing import TYPE_CHECKING, Any
 
 from weave.trace_server import object_creation_utils
@@ -40,20 +40,24 @@ class V2ApiRepository:
     def __init__(
         self,
         # Core operation functions from trace server
-        obj_create_func: "callable[[tsi.ObjCreateReq], tsi.ObjCreateRes]",
-        obj_read_func: "callable[[tsi.ObjReadReq], tsi.ObjReadRes]",
-        objs_query_func: "callable[[tsi.ObjQueryReq], tsi.ObjQueryRes]",
-        obj_delete_func: "callable[[tsi.ObjDeleteReq], tsi.ObjDeleteRes]",
-        file_create_func: "callable[[tsi.FileCreateReq], tsi.FileCreateRes]",
-        file_content_read_func: "callable[[tsi.FileContentReadReq], tsi.FileContentReadRes]",
-        table_create_func: "callable[[tsi.TableCreateReq], tsi.TableCreateRes]",
-        call_start_func: "callable[[tsi.CallStartReq], tsi.CallStartRes]",
-        call_end_func: "callable[[tsi.CallEndReq], tsi.CallEndRes]",
-        call_read_func: "callable[[tsi.CallReadReq], tsi.CallReadRes]",
-        calls_query_stream_func: "callable[[tsi.CallsQueryReq], Iterator[tsi.CallSchema]]",
-        feedback_create_func: "callable[[tsi.FeedbackCreateReq], tsi.FeedbackCreateRes]",
-        select_objs_query_func: "callable[[ObjectMetadataQueryBuilder, bool], list[Any]]",
-        obj_read_with_retry_func: "callable[[tsi.ObjReadReq], tsi.ObjReadRes]",
+        obj_create_func: Callable[[tsi.ObjCreateReq], tsi.ObjCreateRes],
+        obj_read_func: Callable[[tsi.ObjReadReq], tsi.ObjReadRes],
+        objs_query_func: Callable[[tsi.ObjQueryReq], tsi.ObjQueryRes],
+        obj_delete_func: Callable[[tsi.ObjDeleteReq], tsi.ObjDeleteRes],
+        file_create_func: Callable[[tsi.FileCreateReq], tsi.FileCreateRes],
+        file_content_read_func: Callable[
+            [tsi.FileContentReadReq], tsi.FileContentReadRes
+        ],
+        table_create_func: Callable[[tsi.TableCreateReq], tsi.TableCreateRes],
+        call_start_func: Callable[[tsi.CallStartReq], tsi.CallStartRes],
+        call_end_func: Callable[[tsi.CallEndReq], tsi.CallEndRes],
+        call_read_func: Callable[[tsi.CallReadReq], tsi.CallReadRes],
+        calls_query_stream_func: Callable[
+            [tsi.CallsQueryReq], Iterator[tsi.CallSchema]
+        ],
+        feedback_create_func: Callable[[tsi.FeedbackCreateReq], tsi.FeedbackCreateRes],
+        select_objs_query_func: Callable[[ObjectMetadataQueryBuilder, bool], list[Any]],
+        obj_read_with_retry_func: Callable[[tsi.ObjReadReq], tsi.ObjReadRes],
     ):
         self._obj_create = obj_create_func
         self._obj_read = obj_read_func

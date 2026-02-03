@@ -1,6 +1,7 @@
 # ClickHouse Costs - Cost CRUD operations
 
 import datetime
+from typing import Any
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.clickhouse_query_layer.client import ClickHouseClient
@@ -25,7 +26,7 @@ class CostsRepository:
         costs = []
         for llm_id, cost in req.costs.items():
             cost_id = generate_id()
-            row = {
+            row: dict[str, Any] = {
                 "id": cost_id,
                 "created_at": created_at,
                 "created_by": req.wb_user_id,

@@ -2,7 +2,7 @@
 
 import datetime
 from collections import defaultdict
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from typing import TYPE_CHECKING, Any
 
 import ddtrace
@@ -77,9 +77,11 @@ class CallsRepository:
         ch_client: ClickHouseClient,
         batch_manager: BatchManager,
         table_routing_resolver: TableRoutingResolver,
-        kafka_producer_getter: "callable[[], KafkaProducer]",
-        feedback_query_func: "callable[[tsi.FeedbackQueryReq], tsi.FeedbackQueryRes]",
-        refs_read_batch_func: "callable[[str, list[ri.InternalObjectRef], LRUCache], list[Any]]",
+        kafka_producer_getter: Callable[[], "KafkaProducer"],
+        feedback_query_func: Callable[[tsi.FeedbackQueryReq], tsi.FeedbackQueryRes],
+        refs_read_batch_func: Callable[
+            [str, list[ri.InternalObjectRef], LRUCache], list[Any]
+        ],
     ):
         self._ch_client = ch_client
         self._batch_manager = batch_manager
