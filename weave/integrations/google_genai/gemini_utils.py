@@ -1,8 +1,6 @@
-from __future__ import annotations
-
 from collections.abc import Callable
 from functools import wraps
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Optional
 
 import weave
 from weave.trace.autopatch import OpSettings
@@ -76,61 +74,42 @@ def google_genai_gemini_on_finish(
 
 
 def google_genai_gemini_accumulator(
-    acc: GenerateContentResponse | None, value: GenerateContentResponse
-) -> GenerateContentResponse:
+    acc: Optional["GenerateContentResponse"], value: "GenerateContentResponse"
+) -> "GenerateContentResponse":
     if acc is None:
         return value
 
-    value_candidates = value.candidates or []
-    acc_candidates = acc.candidates or []
-    for i, value_candidate in enumerate(value_candidates):
-        if i >= len(acc_candidates):
+    for i, value_candidate in enumerate(value.candidates):
+        if i >= len(acc.candidates):
             break
+        for j, value_part in enumerate(value_candidate.content.parts):
+            if j >= len(acc.candidates[i].content.parts):
+                break
+            if value_part.text is not None:
+                acc.candidates[i].content.parts[j].text += value_part.text
 
-        value_parts = value_candidate.content.parts or []
-        for value_part in value_parts:
-            if value_part.text is None:
-                continue
+    if acc.usage_metadata.prompt_token_count is None:
+        acc.usage_metadata.prompt_token_count = 0
+    elif value.usage_metadata.prompt_token_count is not None:
+        acc.usage_metadata.prompt_token_count += value.usage_metadata.prompt_token_count
 
-            # Check if this part is thinking content (thought=True)
-            value_part_is_thought = getattr(value_part, "thought", False)
-
-            # Find matching part by type (thought vs non-thought), not by index
-            matched = False
-            for acc_part in acc.candidates[i].content.parts:
-                acc_part_is_thought = getattr(acc_part, "thought", False)
-                if acc_part_is_thought == value_part_is_thought:
-                    acc_part.text += value_part.text
-                    matched = True
-                    break
-
-            # If no matching part found, append as new part
-            if not matched:
-                acc.candidates[i].content.parts.append(value_part)
-
-    # Replace token counts with latest non-None values (Gemini returns cumulative counts)
-    # Per Google docs: "When streaming output, the usageMetadata attribute only appears
-    # on the last chunk of the stream."
-    if value.usage_metadata.prompt_token_count is not None:
-        acc.usage_metadata.prompt_token_count = value.usage_metadata.prompt_token_count
-
-    if value.usage_metadata.candidates_token_count is not None:
-        acc.usage_metadata.candidates_token_count = (
+    if acc.usage_metadata.candidates_token_count is None:
+        acc.usage_metadata.candidates_token_count = 0
+    elif value.usage_metadata.candidates_token_count is not None:
+        acc.usage_metadata.candidates_token_count += (
             value.usage_metadata.candidates_token_count
         )
 
-    if value.usage_metadata.total_token_count is not None:
-        acc.usage_metadata.total_token_count = value.usage_metadata.total_token_count
+    if acc.usage_metadata.total_token_count is None:
+        acc.usage_metadata.total_token_count = 0
+    elif value.usage_metadata.total_token_count is not None:
+        acc.usage_metadata.total_token_count += value.usage_metadata.total_token_count
 
-    if value.usage_metadata.cached_content_token_count is not None:
-        acc.usage_metadata.cached_content_token_count = (
+    if acc.usage_metadata.cached_content_token_count is None:
+        acc.usage_metadata.cached_content_token_count = 0
+    elif value.usage_metadata.cached_content_token_count is not None:
+        acc.usage_metadata.cached_content_token_count += (
             value.usage_metadata.cached_content_token_count
-        )
-
-    # Also handle thoughts_token_count for thinking models
-    if getattr(value.usage_metadata, "thoughts_token_count", None) is not None:
-        acc.usage_metadata.thoughts_token_count = (
-            value.usage_metadata.thoughts_token_count
         )
 
     return acc

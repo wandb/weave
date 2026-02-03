@@ -202,10 +202,8 @@ media_cases = [
                 "exp_content": b'import weave\nfrom typing import Any\nfrom rich.markdown import Markdown\n\n@weave.op\ndef load(artifact: "MemTraceFilesArtifact", name: str, val: Any) -> Markdown:\n    """Load markdown from file and metadata."""\n    if "markup" in val:\n        markup = val["markup"]\n    else:\n        with artifact.open("markup.md", binary=False) as f:\n            markup = f.read()\n\n    kwargs = {}\n    if val and isinstance(val, dict) and "code_theme" in val:\n        kwargs["code_theme"] = val["code_theme"]\n\n    return Markdown(markup=markup, **kwargs)\n',
             },
         ],
-        equality_check=lambda a, b: (
-            markdown_equality_check(a["inline"], b["inline"])
-            and markdown_equality_check(a["file"], b["file"])
-        ),
+        equality_check=lambda a, b: markdown_equality_check(a["inline"], b["inline"])
+        and markdown_equality_check(a["file"], b["file"]),
         python_version_code_capture=(3, 13),
     ),
     # Video
@@ -241,9 +239,8 @@ media_cases = [
                 "exp_content": VIDEO_BYTES,
             },
         ],
-        equality_check=lambda a, b: (
-            a.duration == b.duration
-        ),  # could do better, but this is a good start
+        equality_check=lambda a, b: a.duration
+        == b.duration,  # could do better, but this is a good start
         python_version_code_capture=(3, 13),
     ),
     # Content
@@ -466,9 +463,8 @@ media_cases = [
                 "exp_content": VIDEO_BYTES,
             },
         ],
-        equality_check=lambda a, b: (
-            a.duration == b.duration
-        ),  # could do better, but this is a good start
+        equality_check=lambda a, b: a.duration
+        == b.duration,  # could do better, but this is a good start
         python_version_code_capture=(3, 13),
     ),
     SerializationTestCase(
