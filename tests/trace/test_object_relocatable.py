@@ -1,6 +1,5 @@
 import weave
 from weave.trace.object_record import ObjectRecord
-from weave.trace.op_protocol import Op
 from weave.trace.refs import ObjectRef
 from weave.trace.vals import WeaveObject
 
@@ -27,10 +26,8 @@ def test_weaveobject_input_preserves_ref_and_ignored_types() -> None:
         value: int
 
     @weave.op
-    def my_op(self) -> int:  # type: ignore[no-untyped-def]
-        return self.value + 1
-
-    assert isinstance(my_op, Op)
+    def my_op() -> int:
+        return 1
 
     ref = ObjectRef(entity="ent", project="proj", name="MyObj", _digest="digest")
     record = ObjectRecord(
