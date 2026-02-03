@@ -13,6 +13,9 @@ import requests
 import tenacity
 from pydantic import ValidationError
 
+weave_server_sdk = pytest.importorskip("weave_server_sdk")
+APIStatusError = weave_server_sdk.APIStatusError
+
 from tests.trace_server_bindings.conftest import generate_id, generate_start
 from weave.trace.display.term import configure_logger
 from weave.trace_server import trace_server_interface as tsi
@@ -51,8 +54,6 @@ def test_call_start_ok(unbatched_server):
 
 def test_400_no_retry(unbatched_server):
     """Test that 400 errors are not retried."""
-    from weave_server_sdk import APIStatusError
-
     call_id = generate_id()
     error_response = MagicMock()
     error_response.status_code = 400

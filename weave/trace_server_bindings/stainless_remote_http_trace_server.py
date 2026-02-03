@@ -9,7 +9,14 @@ from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, validate_call
 from typing_extensions import Self
-from weave_server_sdk import Client as StainlessClient
+
+try:
+    from weave_server_sdk import Client as StainlessClient
+except ImportError as exc:  # Optional dependency
+    StainlessClient = None  # type: ignore[assignment]
+    _STAINLESS_IMPORT_ERROR: Exception | None = exc
+else:
+    _STAINLESS_IMPORT_ERROR = None
 
 from weave.trace.env import weave_trace_server_url
 from weave.trace.settings import max_calls_queue_size, should_enable_disk_fallback
@@ -67,11 +74,20 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         self._username: str = username
         self._password: str = password
 
+        if StainlessClient is None:
+            raise ImportError(
+                "The `weave_server_sdk` package is required to use "
+                "StainlessRemoteHTTPTraceServer. Install it with "
+                "`pip install \"weave[stainless]\"`, or unset "
+                "`WEAVE_USE_STAINLESS_SERVER`."
+            ) from _STAINLESS_IMPORT_ERROR
+
         # Initialize stainless client
         default_headers = self._extra_headers.copy()
         if retry_id := get_current_retry_id():
             default_headers["X-Weave-Retry-Id"] = retry_id
 
+        assert StainlessClient is not None
         self._stainless_client = StainlessClient(
             base_url=trace_server_url,
             username=username,
@@ -117,6 +133,15 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         if retry_id := get_current_retry_id():
             default_headers["X-Weave-Retry-Id"] = retry_id
 
+        if StainlessClient is None:
+            raise ImportError(
+                "The `weave_server_sdk` package is required to use "
+                "StainlessRemoteHTTPTraceServer. Install it with "
+                "`pip install \"weave[stainless]\"`, or unset "
+                "`WEAVE_USE_STAINLESS_SERVER`."
+            ) from _STAINLESS_IMPORT_ERROR
+
+        assert StainlessClient is not None
         self._stainless_client = StainlessClient(
             base_url=self.trace_server_url,
             username=self._username,

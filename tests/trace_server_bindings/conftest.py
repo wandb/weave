@@ -1,4 +1,5 @@
 import datetime
+from importlib.util import find_spec
 from types import MethodType
 from unittest.mock import MagicMock
 
@@ -10,6 +11,11 @@ from weave.trace_server.ids import generate_id
 from weave.trace_server_bindings.remote_http_trace_server import (
     RemoteHTTPTraceServer,
 )
+from weave.trace_server_bindings.stainless_remote_http_trace_server import (
+    StainlessRemoteHTTPTraceServer,
+)
+
+HAS_STAINLESS = find_spec("weave_server_sdk") is not None
 
 # =============================================================================
 # Test Data Generators
@@ -78,10 +84,11 @@ def server_class(request):
     """Returns the appropriate server class based on --remote-http-trace-server flag."""
     flag = request.config.getoption("--remote-http-trace-server", default="remote")
     if flag == "stainless":
-        from weave.trace_server_bindings.stainless_remote_http_trace_server import (
-            StainlessRemoteHTTPTraceServer,
-        )
-
+        if not HAS_STAINLESS:
+            pytest.skip(
+                "weave_server_sdk is required for stainless trace server tests. "
+                "Install it with `pip install \"weave[stainless]\"`."
+            )
         return StainlessRemoteHTTPTraceServer
     return RemoteHTTPTraceServer
 
