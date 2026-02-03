@@ -2,9 +2,14 @@ from __future__ import annotations
 
 import importlib
 from collections.abc import Callable
+from functools import wraps
 from typing import TYPE_CHECKING, Any
 
 import weave
+from weave.integrations.openai.openai_sdk import (
+    responses_accumulator,
+    responses_on_finish_post_processor,
+)
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
 from weave.trace.op import _add_accumulator
@@ -83,9 +88,13 @@ def litellm_on_finish_post_processor(value: Any) -> Any:
     return value_to_finish
 
 
-# Unlike other integrations, streaming is based on input flag, not
+# Unlike other integrations, streaming is based on input flag, not response type
 def should_use_accumulator(inputs: dict) -> bool:
     return isinstance(inputs, dict) and bool(inputs.get("stream"))
+
+
+def should_use_responses_accumulator(inputs: dict) -> bool:
+    return isinstance(inputs, dict) and inputs.get("stream") is True
 
 
 def make_wrapper(settings: OpSettings) -> Callable:
@@ -100,6 +109,52 @@ def make_wrapper(settings: OpSettings) -> Callable:
         )
 
     return litellm_wrapper
+
+
+def make_responses_wrapper_sync(settings: OpSettings) -> Callable:
+    """Create a wrapper for litellm.responses (sync)."""
+
+    def wrapper(fn: Callable) -> Callable:
+        op_kwargs = settings.model_dump()
+
+        @wraps(fn)
+        def _inner(*args: Any, **kwargs: Any) -> Any:
+            return fn(*args, **kwargs)
+
+        op = weave.op(_inner, **op_kwargs)
+        return _add_accumulator(
+            op,  # type: ignore
+            make_accumulator=lambda inputs: lambda acc, value: responses_accumulator(
+                acc, value
+            ),
+            should_accumulate=should_use_responses_accumulator,
+            on_finish_post_processor=responses_on_finish_post_processor,
+        )
+
+    return wrapper
+
+
+def make_responses_wrapper_async(settings: OpSettings) -> Callable:
+    """Create a wrapper for litellm.aresponses (async)."""
+
+    def wrapper(fn: Callable) -> Callable:
+        op_kwargs = settings.model_dump()
+
+        @wraps(fn)
+        async def _inner(*args: Any, **kwargs: Any) -> Any:
+            return await fn(*args, **kwargs)
+
+        op = weave.op(_inner, **op_kwargs)
+        return _add_accumulator(
+            op,  # type: ignore
+            make_accumulator=lambda inputs: lambda acc, value: responses_accumulator(
+                acc, value
+            ),
+            should_accumulate=should_use_responses_accumulator,
+            on_finish_post_processor=responses_on_finish_post_processor,
+        )
+
+    return wrapper
 
 
 def get_litellm_patcher(
@@ -129,6 +184,18 @@ def get_litellm_patcher(
             "kind": base.kind or "llm",
         }
     )
+    responses_settings = base.model_copy(
+        update={
+            "name": base.name or "litellm.responses",
+            "kind": base.kind or "llm",
+        }
+    )
+    aresponses_settings = base.model_copy(
+        update={
+            "name": base.name or "litellm.aresponses",
+            "kind": base.kind or "llm",
+        }
+    )
 
     _litellm_patcher = MultiPatcher(
         [
@@ -141,6 +208,16 @@ def get_litellm_patcher(
                 lambda: importlib.import_module("litellm"),
                 "acompletion",
                 make_wrapper(acompletion_settings),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("litellm"),
+                "responses",
+                make_responses_wrapper_sync(responses_settings),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("litellm"),
+                "aresponses",
+                make_responses_wrapper_async(aresponses_settings),
             ),
         ]
     )
