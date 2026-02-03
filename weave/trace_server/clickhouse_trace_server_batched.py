@@ -21,9 +21,7 @@ from clickhouse_connect.driver.exceptions import DatabaseError
 from clickhouse_connect.driver.httputil import get_pool_manager
 from clickhouse_connect.driver.query import QueryResult
 from clickhouse_connect.driver.summary import QuerySummary
-from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
-    ExportTraceServiceRequest,
-)
+from opentelemetry.proto.trace.v1.trace_pb2 import ResourceSpans
 from tenacity import (
     retry,
     retry_if_exception_type,
@@ -382,20 +380,23 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         return self.file_create(source_file_req).digest
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.otel_export")
-    def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
+    def otel_export(self, req: tsi.OTelExportReq) -> tsi.OTelExportRes:
         assert_non_null_wb_user_id(req)
-
-        if not isinstance(req.traces, ExportTraceServiceRequest):
-            raise TypeError(
-                "Expected traces as ExportTraceServiceRequest, got {type(req.traces)}"
-            )
         calls: list[
             tuple[tsi.StartedCallSchemaForInsert, tsi.EndedCallSchemaForInsert]
         ] = []
         rejected_spans = 0
         error_messages: list[str] = []
+        for processed_span in req.processed_spans:
+            # Extract wb_run_id from the processed span
+            wb_run_id = processed_span.run_id
 
-        for proto_resource_spans in req.traces.resource_spans:
+            if not isinstance(processed_span.resource_spans, ResourceSpans):
+                raise TypeError(
+                    f"Expected resource_spans as ResourceSpans, got {type(processed_span.resource_spans)}"
+                )
+
+            proto_resource_spans = processed_span.resource_spans
             resource = Resource.from_proto(proto_resource_spans.resource)
             for proto_scope_spans in proto_resource_spans.scope_spans:
                 for proto_span in proto_scope_spans.spans:
@@ -423,69 +424,69 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                         span.to_call(
                             req.project_id,
                             wb_user_id=req.wb_user_id,
-                            wb_run_id=req.wb_run_id,
+                            wb_run_id=wb_run_id,
                         )
                     )
 
-        obj_id_idx_map = defaultdict(list)
-        for idx, (start_call, _) in enumerate(calls):
-            op_name = object_creation_utils.make_safe_name(start_call.op_name)
-            obj_id_idx_map[op_name].append(idx)
+            obj_id_idx_map = defaultdict(list)
+            for idx, (start_call, _) in enumerate(calls):
+                op_name = object_creation_utils.make_safe_name(start_call.op_name)
+                obj_id_idx_map[op_name].append(idx)
 
-        existing_objects = self._get_existing_ops_from_spans(
-            seen_ids=set(obj_id_idx_map.keys()),
-            project_id=req.project_id,
-            limit=len(calls),
-        )
-        # We know that OTel will always use the placeholder source.
-        # We can instead just reuse the existing file if we know it is present
-        # and create it just once if we are not sure.
-        if len(existing_objects) == 0:
-            digest = self._create_or_get_placeholder_ops_digest(
-                project_id=req.project_id, create=True
-            )
-        else:
-            digest = self._create_or_get_placeholder_ops_digest(
-                project_id=req.project_id, create=False
-            )
-
-        for obj in existing_objects:
-            op_ref_uri = ri.InternalOpRef(
+            existing_objects = self._get_existing_ops_from_spans(
+                seen_ids=set(obj_id_idx_map.keys()),
                 project_id=req.project_id,
-                name=obj.object_id,
-                version=obj.digest,
-            ).uri()
-
-            # Modify each of the matched start calls in place
-            for idx in obj_id_idx_map[obj.object_id]:
-                calls[idx][0].op_name = op_ref_uri
-            # Remove this ID from the mapping so that once the for loop is done we are left with only new objects
-            obj_id_idx_map.pop(obj.object_id)
-
-        obj_creation_batch = []
-        for op_obj_id in obj_id_idx_map.keys():
-            op_val = object_creation_utils.build_op_val(digest)
-            obj_creation_batch.append(
-                tsi.ObjSchemaForInsert(
-                    project_id=req.project_id,
-                    object_id=op_obj_id,
-                    val=op_val,
-                    wb_user_id=req.wb_user_id,
+                limit=len(calls),
+            )
+            # We know that OTel will always use the placeholder source.
+            # We can instead just reuse the existing file if we know it is present
+            # and create it just once if we are not sure.
+            if len(existing_objects) == 0:
+                digest = self._create_or_get_placeholder_ops_digest(
+                    project_id=req.project_id, create=True
                 )
-            )
-        res = self.obj_create_batch(obj_creation_batch)
+            else:
+                digest = self._create_or_get_placeholder_ops_digest(
+                    project_id=req.project_id, create=False
+                )
 
-        for result in res:
-            if result.object_id is None:
-                raise RuntimeError("Otel Export - Expected object_id but got None")
+            for obj in existing_objects:
+                op_ref_uri = ri.InternalOpRef(
+                    project_id=req.project_id,
+                    name=obj.object_id,
+                    version=obj.digest,
+                ).uri()
 
-            op_ref_uri = ri.InternalOpRef(
-                project_id=req.project_id,
-                name=result.object_id,
-                version=result.digest,
-            ).uri()
-            for idx in obj_id_idx_map[result.object_id]:
-                calls[idx][0].op_name = op_ref_uri
+                # Modify each of the matched start calls in place
+                for idx in obj_id_idx_map[obj.object_id]:
+                    calls[idx][0].op_name = op_ref_uri
+                # Remove this ID from the mapping so that once the for loop is done we are left with only new objects
+                obj_id_idx_map.pop(obj.object_id)
+
+            obj_creation_batch = []
+            for op_obj_id in obj_id_idx_map.keys():
+                op_val = object_creation_utils.build_op_val(digest)
+                obj_creation_batch.append(
+                    tsi.ObjSchemaForInsert(
+                        project_id=req.project_id,
+                        object_id=op_obj_id,
+                        val=op_val,
+                        wb_user_id=req.wb_user_id,
+                    )
+                )
+            res = self.obj_create_batch(obj_creation_batch)
+
+            for result in res:
+                if result.object_id is None:
+                    raise RuntimeError("Otel Export - Expected object_id but got None")
+
+                op_ref_uri = ri.InternalOpRef(
+                    project_id=req.project_id,
+                    name=result.object_id,
+                    version=result.digest,
+                ).uri()
+                for idx in obj_id_idx_map[result.object_id]:
+                    calls[idx][0].op_name = op_ref_uri
 
         write_target = self.table_routing_resolver.resolve_v2_write_target(
             req.project_id,
@@ -531,13 +532,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             joined_errors = "; ".join(error_messages[:20]) + (
                 "; ..." if len(error_messages) > 20 else ""
             )
-            return tsi.OtelExportRes(
+            return tsi.OTelExportRes(
                 partial_success=tsi.ExportTracePartialSuccess(
                     rejected_spans=rejected_spans,
                     error_message=joined_errors,
                 )
             )
-        return tsi.OtelExportRes()
+        return tsi.OTelExportRes()
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.kafka_producer.flush")
     def _flush_kafka_producer(self) -> None:
