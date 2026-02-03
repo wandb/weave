@@ -3101,21 +3101,16 @@ def test_calls_iter_cached(client):
 
     calls = func.calls()
 
-    elapsed_times = []
-    for _ in range(3):
-        start_time = time.time()
-        c = calls[0]
-        end_time = time.time()
-        elapsed_times.append(end_time - start_time)
+    cache_info_start = calls._fetch_page.cache_info()
+    calls[0]
+    cache_info_after_first = calls._fetch_page.cache_info()
+    calls[0]
+    calls[0]
+    cache_info_after = calls._fetch_page.cache_info()
 
-    # cached lookup should be way faster!
-    if sys.platform == "win32":  # Test on windows is slower...
-        assert elapsed_times[0] > elapsed_times[1]
-        assert elapsed_times[0] > elapsed_times[2]
-    else:
-        # Use 3x threshold instead of 10x to reduce flakiness while still verifying caching
-        assert elapsed_times[0] > elapsed_times[1] * 3
-        assert elapsed_times[0] > elapsed_times[2] * 3
+    # Verify paging cache usage with deterministic cache stats.
+    assert cache_info_after_first.misses - cache_info_start.misses == 1
+    assert cache_info_after.hits - cache_info_after_first.hits == 2
 
 
 def test_calls_iter_different_value_same_page_cached(client):
@@ -3128,26 +3123,18 @@ def test_calls_iter_different_value_same_page_cached(client):
 
     calls = func.calls()
 
-    start_time1 = time.time()
-    c1 = calls[0]
-    end_time1 = time.time()
-    elapsed_time1 = end_time1 - start_time1
+    cache_info_start = calls._fetch_page.cache_info()
+    calls[0]
+    cache_info_after_first = calls._fetch_page.cache_info()
 
     # default page size is 1000, so these lookups should be cached too
-    start_time2 = time.time()
-    c2 = calls[1]
-    end_time2 = time.time()
-    elapsed_time2 = end_time2 - start_time2
+    calls[1]
+    calls[2]
+    cache_info_after = calls._fetch_page.cache_info()
 
-    start_time3 = time.time()
-    c3 = calls[2]
-    end_time3 = time.time()
-    elapsed_time3 = end_time3 - start_time3
-
-    # cached lookup should be way faster!
-    # Use 3x threshold instead of 10x to reduce flakiness while still verifying caching
-    assert elapsed_time1 > elapsed_time2 * 3
-    assert elapsed_time1 > elapsed_time3 * 3
+    # Verify paging cache usage with deterministic cache stats.
+    assert cache_info_after_first.misses - cache_info_start.misses == 1
+    assert cache_info_after.hits - cache_info_after_first.hits == 2
 
 
 class BasicModel(weave.Model):
