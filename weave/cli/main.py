@@ -20,5 +20,5 @@ def main() -> None:
     _configure_logging()
 
 
-main = cast(click.Group, main)
-main.add_command(login_command)
+cli = cast(click.Group, main)
+cli.add_command(login_command)

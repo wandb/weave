@@ -70,7 +70,6 @@ def login(
             force=relogin,
             timeout=timeout,
             verify=verify,
-            referrer="cli",
         )
     except Exception as exc:
         raise click.ClickException(str(exc)) from exc
