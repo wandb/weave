@@ -1540,3 +1540,142 @@ def test_project_stats_uses_correct_stats_table_based_on_residence(
     # This verifies we're reading from the correct table
     # The values should be different because each project reads from different stats tables
     assert res1.trace_storage_size_bytes != res2.trace_storage_size_bytes
+
+
+def test_call_stats_with_calls_complete(trace_server, clickhouse_trace_server):
+    """Test call_stats endpoint works correctly with calls_complete table.
+
+    This test verifies that the analytics endpoint properly queries from
+    calls_complete when that's the project's data residence.
+    """
+    project_id = f"{TEST_ENTITY}/call_stats_complete_test"
+    internal_project_id = b64(project_id)
+    model_name = "gpt-4o-complete-test"
+
+    now = datetime.datetime.now(datetime.timezone.utc)
+    start_time = now - datetime.timedelta(minutes=30)
+
+    # Insert calls directly into calls_complete with usage data
+    call_id_1 = str(uuid.uuid4())
+    trace_id_1 = str(uuid.uuid4())
+    usage_data_1 = json.dumps(
+        {"usage": {model_name: {"prompt_tokens": 100, "completion_tokens": 50}}}
+    )
+
+    clickhouse_trace_server.ch_client.command(
+        f"""
+        INSERT INTO calls_complete (
+            project_id,
+            id,
+            op_name,
+            started_at,
+            ended_at,
+            trace_id,
+            parent_id,
+            attributes_dump,
+            inputs_dump,
+            output_dump,
+            summary_dump
+        )
+        VALUES (
+            '{internal_project_id}',
+            '{call_id_1}',
+            'test_op',
+            '{start_time.strftime("%Y-%m-%d %H:%M:%S")}',
+            '{(start_time + datetime.timedelta(milliseconds=100)).strftime("%Y-%m-%d %H:%M:%S")}',
+            '{trace_id_1}',
+            '',
+            '{{}}',
+            '{{}}',
+            'null',
+            '{usage_data_1}'
+        )
+        """
+    )
+
+    call_id_2 = str(uuid.uuid4())
+    trace_id_2 = str(uuid.uuid4())
+    usage_data_2 = json.dumps(
+        {"usage": {model_name: {"prompt_tokens": 200, "completion_tokens": 100}}}
+    )
+
+    clickhouse_trace_server.ch_client.command(
+        f"""
+        INSERT INTO calls_complete (
+            project_id,
+            id,
+            op_name,
+            started_at,
+            ended_at,
+            trace_id,
+            parent_id,
+            attributes_dump,
+            inputs_dump,
+            output_dump,
+            summary_dump,
+            exception
+        )
+        VALUES (
+            '{internal_project_id}',
+            '{call_id_2}',
+            'test_op',
+            '{(start_time + datetime.timedelta(minutes=1)).strftime("%Y-%m-%d %H:%M:%S")}',
+            '{(start_time + datetime.timedelta(minutes=1, milliseconds=200)).strftime("%Y-%m-%d %H:%M:%S")}',
+            '{trace_id_2}',
+            '',
+            '{{}}',
+            '{{}}',
+            'null',
+            '{usage_data_2}',
+            'Test error'
+        )
+        """
+    )
+
+    # Verify we're reading from calls_complete
+    read_table = clickhouse_trace_server.table_routing_resolver.resolve_read_table(
+        internal_project_id,
+        clickhouse_trace_server.ch_client,
+    )
+    assert read_table == ReadTable.CALLS_COMPLETE
+
+    # Query call_stats endpoint
+    result = trace_server.call_stats(
+        tsi.CallStatsReq(
+            project_id=project_id,
+            start=start_time - datetime.timedelta(minutes=1),
+            end=now + datetime.timedelta(minutes=1),
+            granularity=3600,
+            usage_metrics=[
+                tsi.UsageMetricSpec(
+                    metric="input_tokens",
+                    aggregations=[tsi.AggregationType.SUM],
+                ),
+            ],
+            call_metrics=[
+                tsi.CallMetricSpec(
+                    metric="call_count",
+                    aggregations=[tsi.AggregationType.SUM],
+                ),
+                tsi.CallMetricSpec(
+                    metric="error_count",
+                    aggregations=[tsi.AggregationType.SUM],
+                ),
+            ],
+        )
+    )
+
+    # Verify usage metrics
+    model_buckets = [b for b in result.usage_buckets if b.get("model") == model_name]
+    assert len(model_buckets) > 0, f"Expected buckets for model {model_name}"
+    total_input_tokens = sum(b.get("sum_input_tokens", 0) for b in model_buckets)
+    assert total_input_tokens == 300, (
+        f"Expected 300 input tokens (100 + 200), got {total_input_tokens}"
+    )
+
+    # Verify call metrics
+    assert len(result.call_buckets) > 0, "Expected call buckets"
+    total_call_count = sum(b.get("sum_call_count", 0) for b in result.call_buckets)
+    total_error_count = sum(b.get("sum_error_count", 0) for b in result.call_buckets)
+    assert total_call_count == 2, f"Expected 2 calls, got {total_call_count}"
+    assert total_error_count == 1, f"Expected 1 error, got {total_error_count}"

@@ -938,13 +938,18 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         end = req.end or datetime.datetime.now(datetime.timezone.utc)
         validate_call_stats_range(start, end)
 
+        # Resolve which table to read from based on project data residence
+        read_table = self.table_routing_resolver.resolve_read_table(
+            req.project_id, self.ch_client
+        )
+
         token_metrics, requested_cost_metrics = split_usage_metrics(req.usage_metrics)
 
         # Process token metrics (grouped by model)
         if token_metrics:
             pb = ParamBuilder()
             sql, columns, parameters, granularity, start, end = build_usage_query(
-                req, token_metrics, pb
+                req, token_metrics, pb, read_table
             )
             query_result = self._query(sql, parameters)
             usage_buckets = rows_to_bucket_dicts(columns, query_result.result_rows)
@@ -959,7 +964,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if req.call_metrics:
             pb = ParamBuilder()
             sql, columns, parameters, granularity, start, end = (
-                build_call_metrics_query(req, req.call_metrics, pb)
+                build_call_metrics_query(req, req.call_metrics, pb, read_table)
             )
             query_result = self._query(sql, parameters)
             call_buckets = rows_to_bucket_dicts(columns, query_result.result_rows)
