@@ -300,6 +300,38 @@ class TablesRepository:
                 digest=row[0], val=json.loads(row[1]), original_index=row[2]
             )
 
+    def table_row_read(self, project_id: str, row_digest: str) -> tsi.TableRowSchema:
+        """Read a single table row by digest.
+
+        Args:
+            project_id: The project ID.
+            row_digest: The digest of the row to read.
+
+        Returns:
+            The table row schema.
+
+        Raises:
+            NotFoundError: If the row is not found.
+        """
+        query = """
+            SELECT digest, val_dump
+            FROM table_rows
+            WHERE project_id = {project_id:String} AND digest = {row_digest:String}
+            LIMIT 1
+        """
+        result = self._ch_client.ch_client.query(
+            query,
+            parameters={
+                "project_id": project_id,
+                "row_digest": row_digest,
+            },
+        )
+        if len(result.result_rows) == 0:
+            raise NotFoundError(f"Row {row_digest} not found")
+
+        row = result.result_rows[0]
+        return tsi.TableRowSchema(digest=row[0], val=json.loads(row[1]))
+
     def table_query_stats(self, req: tsi.TableQueryStatsReq) -> tsi.TableQueryStatsRes:
         """Get stats for a single table (legacy endpoint)."""
         batch_req = tsi.TableQueryStatsBatchReq(

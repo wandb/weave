@@ -1,5 +1,4 @@
-# ClickHouse Stats - Project and call statistics
-
+# ClickHouse Project - Project-level operations and stats
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.clickhouse_query_layer.client import ClickHouseClient
@@ -10,8 +9,8 @@ from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.project_version.project_version import TableRoutingResolver
 
 
-class StatsRepository:
-    """Repository for project and call statistics."""
+class ProjectRepository:
+    """Repository for project-level operations."""
 
     def __init__(
         self,

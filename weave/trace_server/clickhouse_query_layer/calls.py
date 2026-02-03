@@ -294,6 +294,122 @@ class CallsRepository:
         return "calls_complete"
 
     # =========================================================================
+    # Stats Operations
+    # =========================================================================
+
+    def call_stats(self, req: tsi.CallStatsReq) -> tsi.CallStatsRes:
+        """Get aggregated call statistics over a time range."""
+        from weave.trace_server.clickhouse_query_layer.query_builders.calls.call_metrics_query_builder import (
+            build_call_metrics_query,
+        )
+        from weave.trace_server.clickhouse_query_layer.query_builders.calls.usage_query_builder import (
+            build_usage_query,
+        )
+
+        usage_buckets: list[dict[str, Any]] = []
+        call_buckets: list[dict[str, Any]] = []
+        granularity = req.granularity
+        end = req.end or datetime.datetime.now(datetime.timezone.utc)
+
+        # Build usage stats query if requested
+        if req.usage_metrics:
+            pb = ParamBuilder()
+            query, columns, params, granularity, start, end = build_usage_query(
+                req, req.usage_metrics, pb
+            )
+            result = self._ch_client.query(query, params)
+            for row in result.result_rows:
+                bucket = dict(zip(columns, row, strict=False))
+                usage_buckets.append(bucket)
+
+        # Build call metrics query if requested
+        if req.call_metrics:
+            pb = ParamBuilder()
+            query, columns, params, granularity, start, end = build_call_metrics_query(
+                req, req.call_metrics, pb
+            )
+            result = self._ch_client.query(query, params)
+            for row in result.result_rows:
+                bucket = dict(zip(columns, row, strict=False))
+                call_buckets.append(bucket)
+
+        return tsi.CallStatsRes(
+            start=req.start,
+            end=end,
+            granularity=granularity,
+            timezone=req.timezone,
+            usage_buckets=usage_buckets,
+            call_buckets=call_buckets,
+        )
+
+    def trace_usage(self, req: tsi.TraceUsageReq) -> tsi.TraceUsageRes:
+        """Compute per-call usage for a trace, with descendant rollup."""
+        from weave.trace_server.usage_utils import aggregate_usage_with_descendants
+
+        # Query all matching calls
+        calls_req = tsi.CallsQueryReq(
+            project_id=req.project_id,
+            filter=req.filter,
+            query=req.query,
+            include_costs=req.include_costs,
+            limit=req.limit,
+            columns=["id", "parent_id", "summary"],
+        )
+        calls = list(self.calls_query_stream(calls_req))
+
+        # Compute rolled-up usage
+        call_usage = aggregate_usage_with_descendants(
+            calls, include_costs=req.include_costs
+        )
+
+        return tsi.TraceUsageRes(call_usage=call_usage)
+
+    def calls_usage(self, req: tsi.CallsUsageReq) -> tsi.CallsUsageRes:
+        """Compute aggregated usage for multiple root calls."""
+        from weave.trace_server.usage_utils import aggregate_usage_with_descendants
+
+        # Get all calls for the specified root call IDs
+        calls_req = tsi.CallsQueryReq(
+            project_id=req.project_id,
+            filter=tsi.CallsFilter(call_ids=req.call_ids),
+            include_costs=req.include_costs,
+            limit=req.limit,
+            columns=["id", "parent_id", "trace_id", "summary"],
+        )
+        root_calls = list(self.calls_query_stream(calls_req))
+
+        # Get trace IDs for all root calls
+        trace_ids = list({c.trace_id for c in root_calls if c.trace_id})
+
+        if not trace_ids:
+            return tsi.CallsUsageRes(call_usage={})
+
+        # Get all calls in those traces
+        all_calls_req = tsi.CallsQueryReq(
+            project_id=req.project_id,
+            filter=tsi.CallsFilter(trace_ids=trace_ids),
+            include_costs=req.include_costs,
+            limit=req.limit,
+            columns=["id", "parent_id", "trace_id", "summary"],
+        )
+        all_calls = list(self.calls_query_stream(all_calls_req))
+
+        # Compute rolled-up usage for each root call
+        # First get usage for all calls, then extract just the root calls
+        all_usage = aggregate_usage_with_descendants(
+            all_calls, include_costs=req.include_costs
+        )
+
+        # Filter to just the requested root call IDs
+        call_usage = {
+            call_id: usage
+            for call_id, usage in all_usage.items()
+            if call_id in req.call_ids
+        }
+
+        return tsi.CallsUsageRes(call_usage=call_usage)
+
+    # =========================================================================
     # Query Operations
     # =========================================================================
 

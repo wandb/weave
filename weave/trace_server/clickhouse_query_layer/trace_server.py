@@ -31,8 +31,8 @@ from weave.trace_server.clickhouse_query_layer.otel import OtelRepository
 from weave.trace_server.clickhouse_query_layer.query_builders.objects import (
     ObjectMetadataQueryBuilder,
 )
+from weave.trace_server.clickhouse_query_layer.project import ProjectRepository
 from weave.trace_server.clickhouse_query_layer.refs import RefsRepository
-from weave.trace_server.clickhouse_query_layer.stats import StatsRepository
 from weave.trace_server.clickhouse_query_layer.tables import TablesRepository
 from weave.trace_server.clickhouse_query_layer.threads import ThreadsRepository
 from weave.trace_server.clickhouse_query_layer.v2_api import V2ApiRepository
@@ -146,7 +146,7 @@ class ClickHouseTraceServer(TraceServerInterface):
         self._files_repo = FilesRepository(self._ch_client, self._batch_manager)
         self._feedback_repo = FeedbackRepository(self._ch_client, self)
         self._costs_repo = CostsRepository(self._ch_client)
-        self._stats_repo = StatsRepository(
+        self._project_repo = ProjectRepository(
             self._ch_client, self._table_routing_resolver
         )
         self._threads_repo = ThreadsRepository(
@@ -168,7 +168,10 @@ class ClickHouseTraceServer(TraceServerInterface):
 
         # Refs repository
         self._refs_repo = RefsRepository(
-            parsed_refs_read_batch_func=self._parsed_refs_read_batch,
+            obj_read_func=lambda req: self.obj_read(req),
+            table_row_read_func=lambda project_id, row_digest: self._tables_repo.table_row_read(
+                project_id, row_digest
+            ),
         )
 
         # OTel repository
@@ -337,144 +340,15 @@ class ClickHouseTraceServer(TraceServerInterface):
 
     def call_stats(self, req: tsi.CallStatsReq) -> tsi.CallStatsRes:
         """Get aggregated call statistics over a time range."""
-        # Import here to avoid circular dependency
-        from weave.trace_server.clickhouse_query_layer.query_builders.calls.call_metrics_query_builder import (
-            build_call_stats_query,
-        )
-        from weave.trace_server.clickhouse_query_layer.query_builders.calls.usage_query_builder import (
-            build_usage_stats_query,
-        )
-
-        read_table = self._table_routing_resolver.resolve_read_table(
-            req.project_id, self._ch_client.ch_client
-        )
-
-        # Resolve end time
-        end = req.end or datetime.datetime.now(datetime.timezone.utc)
-
-        # Auto-select granularity if not provided
-        granularity = req.granularity
-        if granularity is None:
-            range_seconds = int((end - req.start).total_seconds())
-            # Target ~100 buckets
-            granularity = max(60, range_seconds // 100)
-
-        # Ensure we don't exceed 10,000 buckets
-        range_seconds = int((end - req.start).total_seconds())
-        max_buckets = 10000
-        if range_seconds // granularity > max_buckets:
-            granularity = range_seconds // max_buckets
-
-        usage_buckets: list[dict[str, Any]] = []
-        call_buckets: list[dict[str, Any]] = []
-
-        from weave.trace_server.orm import ParamBuilder
-
-        # Build usage stats query if requested
-        if req.usage_metrics:
-            pb = ParamBuilder()
-            query = build_usage_stats_query(
-                project_id=req.project_id,
-                start=req.start,
-                end=end,
-                granularity=granularity,
-                metrics=req.usage_metrics,
-                filter=req.filter,
-                timezone=req.timezone,
-                pb=pb,
-                read_table=read_table,
-            )
-            result = self._ch_client.query(query, pb.get_params())
-            for row in result.result_rows:
-                bucket = dict(zip(result.column_names, row, strict=False))
-                usage_buckets.append(bucket)
-
-        # Build call metrics query if requested
-        if req.call_metrics:
-            pb = ParamBuilder()
-            query = build_call_stats_query(
-                project_id=req.project_id,
-                start=req.start,
-                end=end,
-                granularity=granularity,
-                metrics=req.call_metrics,
-                filter=req.filter,
-                timezone=req.timezone,
-                pb=pb,
-                read_table=read_table,
-            )
-            result = self._ch_client.query(query, pb.get_params())
-            for row in result.result_rows:
-                bucket = dict(zip(result.column_names, row, strict=False))
-                call_buckets.append(bucket)
-
-        return tsi.CallStatsRes(
-            start=req.start,
-            end=end,
-            granularity=granularity,
-            timezone=req.timezone,
-            usage_buckets=usage_buckets,
-            call_buckets=call_buckets,
-        )
+        return self._calls_repo.call_stats(req)
 
     def trace_usage(self, req: tsi.TraceUsageReq) -> tsi.TraceUsageRes:
         """Compute per-call usage for a trace, with descendant rollup."""
-        from weave.trace_server.usage_utils import compute_trace_usage
-
-        # Query all matching calls
-        calls_req = tsi.CallsQueryReq(
-            project_id=req.project_id,
-            filter=req.filter,
-            query=req.query,
-            include_costs=req.include_costs,
-            limit=req.limit,
-            columns=["id", "parent_id", "summary"],
-        )
-        calls = list(self.calls_query_stream(calls_req))
-
-        # Compute rolled-up usage
-        call_usage = compute_trace_usage(calls, include_costs=req.include_costs)
-
-        return tsi.TraceUsageRes(call_usage=call_usage)
+        return self._calls_repo.trace_usage(req)
 
     def calls_usage(self, req: tsi.CallsUsageReq) -> tsi.CallsUsageRes:
         """Compute aggregated usage for multiple root calls."""
-        from weave.trace_server.usage_utils import compute_calls_usage
-
-        # Get all calls for the specified root call IDs
-        calls_req = tsi.CallsQueryReq(
-            project_id=req.project_id,
-            filter=tsi.CallsFilter(call_ids=req.call_ids),
-            include_costs=req.include_costs,
-            limit=req.limit,
-            columns=["id", "parent_id", "trace_id", "summary"],
-        )
-        root_calls = list(self.calls_query_stream(calls_req))
-
-        # Get trace IDs for all root calls
-        trace_ids = list({c.trace_id for c in root_calls if c.trace_id})
-
-        if not trace_ids:
-            return tsi.CallsUsageRes(call_usage={})
-
-        # Get all calls in those traces
-        all_calls_req = tsi.CallsQueryReq(
-            project_id=req.project_id,
-            filter=tsi.CallsFilter(trace_ids=trace_ids),
-            include_costs=req.include_costs,
-            limit=req.limit,
-            columns=["id", "parent_id", "trace_id", "summary"],
-        )
-        all_calls = list(self.calls_query_stream(all_calls_req))
-
-        # Compute rolled-up usage for each root call
-        call_usage = compute_calls_usage(
-            root_call_ids=req.call_ids,
-            all_calls=all_calls,
-            include_costs=req.include_costs,
-        )
-
-        return tsi.CallsUsageRes(call_usage=call_usage)
+        return self._calls_repo.calls_usage(req)
 
     # =========================================================================
     # Cost API
@@ -572,15 +446,7 @@ class ClickHouseTraceServer(TraceServerInterface):
 
     def files_stats(self, req: tsi.FilesStatsReq) -> tsi.FilesStatsRes:
         """Get file storage statistics for a project."""
-        query = """
-            SELECT
-                sum(bytes_stored) as total_bytes
-            FROM files
-            WHERE project_id = {project_id:String}
-        """
-        result = self._ch_client.query(query, {"project_id": req.project_id})
-        total_bytes = result.result_rows[0][0] if result.result_rows else 0
-        return tsi.FilesStatsRes(total_bytes=total_bytes or 0)
+        return self._files_repo.files_stats(req)
 
     # =========================================================================
     # Feedback API
@@ -649,7 +515,7 @@ class ClickHouseTraceServer(TraceServerInterface):
 
     def project_stats(self, req: tsi.ProjectStatsReq) -> tsi.ProjectStatsRes:
         """Get storage and count statistics for a project."""
-        return self._stats_repo.project_stats(req)
+        return self._project_repo.project_stats(req)
 
     # =========================================================================
     # Thread API
@@ -693,32 +559,7 @@ class ClickHouseTraceServer(TraceServerInterface):
         self, req: tsi.AnnotationQueuesStatsReq
     ) -> tsi.AnnotationQueuesStatsRes:
         """Get stats for annotation queues."""
-        from weave.trace_server.clickhouse_query_layer.query_builders.annotation_queues import (
-            make_queues_stats_query,
-        )
-        from weave.trace_server.orm import ParamBuilder
-
-        pb = ParamBuilder()
-        query = make_queues_stats_query(
-            project_id=req.project_id,
-            queue_ids=req.queue_ids,
-            pb=pb,
-        )
-        result = self._ch_client.query(query, pb.get_params())
-
-        stats: list[tsi.AnnotationQueueStatsSchema] = []
-        for row in result.result_rows:
-            # Query returns: queue_id, total_items, completed_items
-            queue_id, total_items, completed_items = row
-            stats.append(
-                tsi.AnnotationQueueStatsSchema(
-                    queue_id=str(queue_id),
-                    total_items=total_items,
-                    completed_items=completed_items,
-                )
-            )
-
-        return tsi.AnnotationQueuesStatsRes(stats=stats)
+        return self._annotation_queues_repo.annotation_queues_stats(req)
 
     def annotation_queue_items_query(
         self, req: tsi.AnnotationQueueItemsQueryReq
@@ -732,40 +573,14 @@ class ClickHouseTraceServer(TraceServerInterface):
     def annotator_queue_items_progress_update(
         self, req: tsi.AnnotatorQueueItemsProgressUpdateReq
     ) -> tsi.AnnotatorQueueItemsProgressUpdateRes:
-        """Update progress on annotation queue items."""
-        from weave.trace_server.orm import ParamBuilder
+        """Update annotation state for a queue item using ClickHouse lightweight update.
 
-        pb = ParamBuilder()
-        project_id_param = pb.add_param(req.project_id)
-        queue_id_param = pb.add_param(req.queue_id)
-        annotator_id_param = pb.add_param(req.annotator_id)
-        status_param = pb.add_param(req.status)
-
-        # Build INSERT query for each call_id
-        values_parts = []
-        for call_id in req.call_ids:
-            call_id_param = pb.add_param(call_id)
-            values_parts.append(
-                f"({{{project_id_param}: String}}, "
-                f"{{{queue_id_param}: String}}, "
-                f"{{{call_id_param}: String}}, "
-                f"{{{annotator_id_param}: String}}, "
-                f"{{{status_param}: String}})"
-            )
-
-        if values_parts:
-            query = f"""
-            INSERT INTO annotator_queue_items_progress (
-                project_id,
-                queue_id,
-                queue_item_id,
-                annotator_id,
-                annotation_state
-            ) VALUES {", ".join(values_parts)}
-            """
-            self._ch_client.command(query, pb.get_params())
-
-        return tsi.AnnotatorQueueItemsProgressUpdateRes()
+        Validates state transitions:
+        - Allowed: (absence) -> 'in_progress', 'completed' or 'skipped'
+        - Allowed: 'in_progress' -> 'completed' or 'skipped'
+        - Rejected: any other transition (including updating to 'in_progress' when record exists)
+        """
+        return self._annotation_queues_repo.annotator_queue_items_progress_update(req)
 
     # =========================================================================
     # Evaluation API
@@ -853,50 +668,11 @@ class ClickHouseTraceServer(TraceServerInterface):
 
     def scorer_read(self, req: tsi.ScorerReadReq) -> tsi.ScorerReadRes:
         """Read a scorer object."""
-        obj_req = tsi.ObjReadReq(
-            project_id=req.project_id,
-            object_id=req.object_id,
-            digest=req.digest,
-        )
-        result = self._obj_read_with_retry(obj_req)
-        val = result.obj.val
-        return tsi.ScorerReadRes(
-            object_id=result.obj.object_id,
-            digest=result.obj.digest,
-            version_index=result.obj.version_index,
-            created_at=result.obj.created_at,
-            name=val.get("name"),
-            description=val.get("description"),
-        )
+        return self._v2_api_repo.scorer_read(req)
 
     def scorer_list(self, req: tsi.ScorerListReq) -> Iterator[tsi.ScorerReadRes]:
         """List scorer objects."""
-        scorer_filter = tsi.ObjectVersionFilter(
-            base_object_classes=["Scorer"], is_op=False
-        )
-        obj_query_req = tsi.ObjQueryReq(
-            project_id=req.project_id,
-            filter=scorer_filter,
-            limit=req.limit,
-            offset=req.offset,
-        )
-        obj_res = self.objs_query(obj_query_req)
-
-        for obj in obj_res.objs:
-            if not hasattr(obj, "val") or not obj.val:
-                continue
-            val = obj.val
-            if not isinstance(val, dict):
-                continue
-
-            yield tsi.ScorerReadRes(
-                object_id=obj.object_id,
-                digest=obj.digest,
-                version_index=obj.version_index,
-                created_at=obj.created_at,
-                name=val.get("name"),
-                description=val.get("description"),
-            )
+        return self._v2_api_repo.scorer_list(req)
 
     def scorer_delete(self, req: tsi.ScorerDeleteReq) -> tsi.ScorerDeleteRes:
         """Delete scorer objects."""
@@ -1541,52 +1317,9 @@ class ClickHouseTraceServer(TraceServerInterface):
     ) -> list[Any]:
         """Read parsed refs in batch.
 
-        This is the core ref resolution logic that handles object refs.
+        Delegates to the RefsRepository.
         """
-        if not refs:
-            return []
-
-        results = []
-        cache = cache or {}
-
-        for ref in refs:
-            # Check cache first
-            cache_key = ref.uri()
-            if cache_key in cache:
-                results.append(cache[cache_key])
-                continue
-
-            # Read the object
-            try:
-                obj_req = tsi.ObjReadReq(
-                    project_id=ref.project_id,
-                    object_id=ref.name,
-                    digest=ref.version,
-                )
-                obj_res = self.obj_read(obj_req)
-                val = obj_res.obj.val
-
-                # Handle extra path if present
-                if ref.extra:
-                    for key in ref.extra:
-                        if isinstance(val, dict):
-                            val = val.get(key)
-                        elif isinstance(val, list):
-                            try:
-                                val = val[int(key)]
-                            except (ValueError, IndexError):
-                                val = None
-                        else:
-                            val = None
-                        if val is None:
-                            break
-
-                cache[cache_key] = val
-                results.append(val)
-            except NotFoundError:
-                results.append(None)
-
-        return results
+        return self._refs_repo.parsed_refs_read_batch(refs, cache)
 
     def _get_existing_ops(
         self,

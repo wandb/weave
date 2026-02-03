@@ -384,6 +384,53 @@ class V2ApiRepository:
             version_index=obj_read_res.obj.version_index,
         )
 
+    def scorer_read(self, req: tsi.ScorerReadReq) -> tsi.ScorerReadRes:
+        """Read a scorer object."""
+        obj_req = tsi.ObjReadReq(
+            project_id=req.project_id,
+            object_id=req.object_id,
+            digest=req.digest,
+        )
+        result = self._obj_read_with_retry(obj_req)
+        val = result.obj.val
+        return tsi.ScorerReadRes(
+            object_id=result.obj.object_id,
+            digest=result.obj.digest,
+            version_index=result.obj.version_index,
+            created_at=result.obj.created_at,
+            name=val.get("name"),
+            description=val.get("description"),
+        )
+
+    def scorer_list(self, req: tsi.ScorerListReq) -> Iterator[tsi.ScorerReadRes]:
+        """List scorer objects."""
+        scorer_filter = tsi.ObjectVersionFilter(
+            base_object_classes=["Scorer"], is_op=False
+        )
+        obj_query_req = tsi.ObjQueryReq(
+            project_id=req.project_id,
+            filter=scorer_filter,
+            limit=req.limit,
+            offset=req.offset,
+        )
+        obj_res = self._objs_query(obj_query_req)
+
+        for obj in obj_res.objs:
+            if not hasattr(obj, "val") or not obj.val:
+                continue
+            val = obj.val
+            if not isinstance(val, dict):
+                continue
+
+            yield tsi.ScorerReadRes(
+                object_id=obj.object_id,
+                digest=obj.digest,
+                version_index=obj.version_index,
+                created_at=obj.created_at,
+                name=val.get("name"),
+                description=val.get("description"),
+            )
+
     # =========================================================================
     # Helper Methods
     # =========================================================================

@@ -198,6 +198,18 @@ class FilesRepository:
             raise FileStorageReadError("File storage client is not configured")
         return read_from_bucket(client, file_storage_uri)
 
+    def files_stats(self, req: tsi.FilesStatsReq) -> tsi.FilesStatsRes:
+        """Get file storage statistics for a project."""
+        query = """
+            SELECT
+                sum(bytes_stored) as total_bytes
+            FROM files
+            WHERE project_id = {project_id:String}
+        """
+        result = self._ch_client.query(query, {"project_id": req.project_id})
+        total_bytes = result.result_rows[0][0] if result.result_rows else 0
+        return tsi.FilesStatsRes(total_bytes=total_bytes or 0)
+
 
 def _string_to_int_in_range(input_string: str, range_max: int) -> int:
     """Convert a string to a deterministic integer within a specified range.

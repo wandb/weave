@@ -23,7 +23,10 @@ from weave.trace_server.ids import generate_id
 from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.project_version.project_version import TableRoutingResolver
 from weave.trace_server.trace_server_interface_util import assert_non_null_wb_user_id
+import datetime
 
+from weave.trace_server.common_interface import AnnotationQueueItemsFilter
+from weave.trace_server.ids import generate_id
 
 class AnnotationQueuesRepository:
     """Repository for annotation queue CRUD operations."""
@@ -202,6 +205,7 @@ class AnnotationQueuesRepository:
             queue_id=req.queue_id,
             calls_data=calls_data,
             added_by=req.wb_user_id,
+            display_fields=req.display_fields,
             pb=pb3,
         )
 
@@ -305,3 +309,199 @@ class AnnotationQueuesRepository:
                 deleted_at=ensure_datetimes_have_tz(deleted_at),
                 position_in_queue=position_in_queue,
             )
+
+    @ddtrace.tracer.wrap(name="annotation_queues.annotator_queue_items_progress_update")
+    def annotator_queue_items_progress_update(
+        self, req: tsi.AnnotatorQueueItemsProgressUpdateReq
+    ) -> tsi.AnnotatorQueueItemsProgressUpdateRes:
+        """Update annotation state for a queue item using ClickHouse lightweight update.
+
+        Validates state transitions:
+        - Allowed: (absence) -> 'in_progress', 'completed' or 'skipped'
+        - Allowed: 'in_progress' -> 'completed' or 'skipped'
+        - Rejected: any other transition (including updating to 'in_progress' when record exists)
+        """
+        # Validate annotation_state
+        allowed_states = {"completed", "skipped", "in_progress"}
+        if req.annotation_state not in allowed_states:
+            raise ValueError(
+                f"Invalid annotation_state '{req.annotation_state}'. "
+                f"Must be one of: {', '.join(sorted(allowed_states))}"
+            )
+
+        # Get the annotator ID from the session
+        annotator_id = req.wb_user_id
+        if not annotator_id:
+            raise ValueError("wb_user_id is required")
+
+        pb = ParamBuilder()
+        project_id_param = pb.add(req.project_id)
+        queue_id_param = pb.add(req.queue_id)
+        item_id_param = pb.add(req.item_id)
+        annotator_id_param = pb.add(annotator_id)
+
+        # First, check current state and validate the queue item exists
+        check_query = f"""
+        SELECT
+            annotation_state,
+            COUNT(*) as record_exists
+        FROM annotator_queue_items_progress
+        WHERE project_id = {project_id_param}
+          AND queue_item_id = {item_id_param}
+          AND annotator_id = {annotator_id_param}
+          AND deleted_at IS NULL
+        GROUP BY annotation_state
+        """
+
+        check_result = self._ch_client.query(check_query, parameters=pb.get_params())
+        current_state = None
+        has_record = False
+
+        for row in check_result.named_results():
+            current_state = row["annotation_state"]
+            has_record = row["record_exists"] > 0
+            break
+
+        # Special handling for 'in_progress': only allow when no record exists
+        if req.annotation_state == "in_progress" and has_record:
+            raise ValueError(
+                "Cannot transition to 'in_progress' when a record already exists. "
+                "'in_progress' can only be set on new items."
+            )
+
+        # Validate state transition for other states
+        # Record exists - only allow transition from 'in_progress' or 'unstarted'
+        if (
+            current_state is not None
+            and req.annotation_state != "in_progress"
+            and current_state not in ("in_progress", "unstarted")
+        ):
+            raise ValueError(
+                f"Invalid state transition from '{current_state}' to '{req.annotation_state}'. "
+                f"Only transitions from 'in_progress' or 'unstarted' are allowed."
+            )
+
+        # Also verify the queue item exists in annotation_queue_items
+        item_check_query = f"""
+        SELECT id
+        FROM annotation_queue_items
+        WHERE id = {item_id_param}
+          AND project_id = {project_id_param}
+          AND queue_id = {queue_id_param}
+          AND deleted_at IS NULL
+        LIMIT 1
+        """
+
+        item_check_result = self._ch_client.query(
+            item_check_query, parameters=pb.get_params()
+        )
+        if not list(item_check_result.named_results()):
+            raise ValueError(
+                f"Queue item '{req.item_id}' not found in queue '{req.queue_id}'"
+            )
+
+        new_state_param = pb.add(req.annotation_state)
+        now = datetime.datetime.now(datetime.timezone.utc)
+        now_param = pb.add(now)
+
+        if has_record:
+            # Use ClickHouse lightweight UPDATE for existing record
+            update_query = f"""
+            UPDATE annotator_queue_items_progress
+            SET
+                annotation_state = {new_state_param},
+                updated_at = {now_param}
+            WHERE project_id = {project_id_param}
+              AND queue_item_id = {item_id_param}
+              AND annotator_id = {annotator_id_param}
+              AND deleted_at IS NULL
+            """
+            self._ch_client.command(update_query, parameters=pb.get_params())
+        else:
+            # Create new record
+            progress_id = generate_id()
+            progress_id_param = pb.add(progress_id)
+
+            insert_query = f"""
+            INSERT INTO annotator_queue_items_progress
+                (id, project_id, queue_item_id, queue_id, annotator_id,
+                 annotation_state, created_at, updated_at, deleted_at)
+            VALUES
+                ({progress_id_param}, {project_id_param}, {item_id_param},
+                 {queue_id_param}, {annotator_id_param}, {new_state_param},
+                 {now_param}, {now_param}, NULL)
+            """
+            self._ch_client.command(insert_query, parameters=pb.get_params())
+
+        # Fetch and return the updated queue item
+        # We need to re-query to get the aggregated annotation_state
+        pb_fetch = ParamBuilder()
+        fetch_query = make_queue_items_query(
+            project_id=req.project_id,
+            queue_id=req.queue_id,
+            pb=pb_fetch,
+            filter=AnnotationQueueItemsFilter(id=req.item_id),
+            sort_by=None,
+            limit=1,
+            offset=None,
+            include_position=False,
+        )
+
+        fetch_result = self._ch_client.query(
+            fetch_query, parameters=pb_fetch.get_params()
+        )
+
+        for row in fetch_result.named_results():
+            item = tsi.AnnotationQueueItemSchema(
+                id=row["id"],
+                project_id=row["project_id"],
+                queue_id=row["queue_id"],
+                call_id=row["call_id"],
+                call_started_at=row["call_started_at"],
+                call_ended_at=row["call_ended_at"],
+                call_op_name=row["call_op_name"],
+                call_trace_id=row["call_trace_id"],
+                display_fields=row["display_fields"],
+                added_by=row["added_by"],
+                annotation_state=row["annotation_state"],
+                created_at=row["created_at"],
+                created_by=row["created_by"],
+                updated_at=row["updated_at"],
+                deleted_at=row["deleted_at"],
+                position_in_queue=None,
+                annotator_user_id=row.get("annotator_user_id"),
+            )
+            return tsi.AnnotatorQueueItemsProgressUpdateRes(item=item)
+
+        # This shouldn't happen if our logic is correct
+        raise ValueError(f"Failed to fetch updated item '{req.item_id}'")
+
+    def annotation_queues_stats(
+        self, req: tsi.AnnotationQueuesStatsReq
+    ) -> tsi.AnnotationQueuesStatsRes:
+        """Get stats for annotation queues."""
+        from weave.trace_server.clickhouse_query_layer.query_builders.annotation_queues import (
+            make_queues_stats_query,
+        )
+
+        pb = ParamBuilder()
+        query = make_queues_stats_query(
+            project_id=req.project_id,
+            queue_ids=req.queue_ids,
+            pb=pb,
+        )
+        result = self._ch_client.query(query, pb.get_params())
+
+        stats: list[tsi.AnnotationQueueStatsSchema] = []
+        for row in result.result_rows:
+            # Query returns: queue_id, total_items, completed_items
+            queue_id, total_items, completed_items = row
+            stats.append(
+                tsi.AnnotationQueueStatsSchema(
+                    queue_id=str(queue_id),
+                    total_items=total_items,
+                    completed_items=completed_items,
+                )
+            )
+
+        return tsi.AnnotationQueuesStatsRes(stats=stats)

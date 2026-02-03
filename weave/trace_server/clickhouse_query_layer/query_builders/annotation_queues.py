@@ -324,6 +324,7 @@ def make_queue_add_calls_insert_query(
     queue_id: str,
     calls_data: list[dict],
     added_by: str | None,
+    display_fields: list[str],
     pb: ParamBuilder,
 ) -> str | None:
     """Generate an INSERT query to add calls to a queue.
@@ -333,6 +334,7 @@ def make_queue_add_calls_insert_query(
         queue_id: The queue ID
         calls_data: List of call data dicts with id, started_at, ended_at, op_name, trace_id
         added_by: W&B user ID of who added the calls
+        display_fields: List of JSON paths to display to annotators
         pb: Parameter builder for safe SQL parameter injection
 
     Returns:
@@ -344,6 +346,7 @@ def make_queue_add_calls_insert_query(
     project_id_param = pb.add_param(project_id)
     queue_id_param = pb.add_param(queue_id)
     added_by_param = pb.add_param(added_by)
+    display_fields_param = pb.add_param(display_fields or [])
 
     values_parts = []
     for call in calls_data:
@@ -354,18 +357,21 @@ def make_queue_add_calls_insert_query(
         trace_id_param = pb.add_param(call.get("trace_id"))
 
         values_parts.append(
-            f"({{{project_id_param}: String}}, "
+            f"(generateUUIDv7(), "
+            f"{{{project_id_param}: String}}, "
             f"{{{queue_id_param}: String}}, "
             f"{{{call_id_param}: String}}, "
             f"{{{started_at_param}: Nullable(DateTime64(6))}}, "
             f"{{{ended_at_param}: Nullable(DateTime64(6))}}, "
             f"{{{op_name_param}: Nullable(String)}}, "
             f"{{{trace_id_param}: Nullable(String)}}, "
+            f"{{{display_fields_param}: Array(String)}}, "
             f"{{{added_by_param}: Nullable(String)}})"
         )
 
     query = f"""
     INSERT INTO annotation_queue_items (
+        id,
         project_id,
         queue_id,
         call_id,
@@ -373,6 +379,7 @@ def make_queue_add_calls_insert_query(
         call_ended_at,
         call_op_name,
         call_trace_id,
+        display_fields,
         added_by
     ) VALUES {", ".join(values_parts)}
     """
@@ -768,6 +775,10 @@ def make_queue_items_query(
 
     # Add filters that can be applied directly on queue_items table
     if filter is not None:
+        if filter.id is not None:
+            param = pb.add(filter.id, None, "String")
+            where_clauses.append(f"qi.id = {param}")
+
         if filter.call_id is not None:
             param = pb.add(filter.call_id, None, "String")
             where_clauses.append(f"qi.call_id = {param}")
