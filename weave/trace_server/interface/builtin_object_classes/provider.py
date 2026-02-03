@@ -7,6 +7,7 @@ from weave.trace_server.interface.builtin_object_classes import base_object_def
 
 class ProviderReturnType(str, Enum):
     OPENAI = "openai"
+    OLLAMA = "ollama"
 
 
 class Provider(base_object_def.BaseObject):

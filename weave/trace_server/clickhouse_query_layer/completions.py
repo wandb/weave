@@ -437,7 +437,7 @@ def _setup_completion_model_info(
 
         if custom_provider_info:
             # CustomProviderInfo is a Pydantic BaseModel - use attribute access
-            model_name = custom_provider_info.actual_model_name
+            actual_model_name = custom_provider_info.actual_model_name
             base_url = custom_provider_info.base_url
             extra_headers = custom_provider_info.extra_headers
             return_type = custom_provider_info.return_type
@@ -445,6 +445,12 @@ def _setup_completion_model_info(
                 custom_provider_info.api_key
             )  # Already fetched by get_custom_provider_info
             provider = "custom"
+            # Transform model name to litellm format: {return_type}/{actual_model_name}
+            litellm_model = f"{return_type}/{actual_model_name}"
+            # Update req.inputs.model for the litellm call and logging
+            req.inputs.model = litellm_model
+            # Use provider_name/actual_model_name for usage tracking
+            model_name = f"{provider_name}/{actual_model_name}"
         else:
             # Unknown model, try to get API key from common providers
             common_keys = ["OPENAI_API_KEY", "ANTHROPIC_API_KEY"]

@@ -416,6 +416,7 @@ def test_custom_provider_ollama_model(client):
         base_url="http://localhost:11434",
         api_key_name="OLLAMA_API_KEY",
         extra_headers={},
+        return_type="ollama",
     )
 
     # Create a ProviderModel object with Ollama-specific configuration
