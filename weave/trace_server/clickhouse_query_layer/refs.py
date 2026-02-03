@@ -5,7 +5,7 @@ from typing import Any, Protocol, cast
 
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.errors import NotFoundError
+from weave.trace_server.errors import NotFoundError, ObjectDeletedError
 
 # Type alias for object ref list
 ObjRefListType = list[ri.InternalObjectRef]
@@ -157,7 +157,13 @@ class RefsRepository:
 
                 cache[cache_key] = val
                 results.append(val)
-            except (NotFoundError, KeyError, IndexError, ValueError):
+            except (
+                NotFoundError,
+                ObjectDeletedError,
+                KeyError,
+                IndexError,
+                ValueError,
+            ):
                 results.append(None)
 
         return results

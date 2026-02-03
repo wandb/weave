@@ -39,10 +39,15 @@ class ThreadsRepository:
             req.project_id, self._ch_client.ch_client
         )
 
+        # Extract thread_ids from filter if present
+        thread_ids = None
+        if req.filter is not None:
+            thread_ids = req.filter.thread_ids
+
         query = make_threads_query(
             project_id=req.project_id,
             pb=pb,
-            thread_ids=req.filter.thread_ids,
+            thread_ids=thread_ids,
             sort_by=req.sort_by,
             limit=req.limit,
             offset=req.offset,
