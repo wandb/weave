@@ -9,6 +9,10 @@ from clickhouse_connect.driver.exceptions import DatabaseError
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.clickhouse_query_layer import trace_server as chts
+from weave.trace_server.clickhouse_query_layer.calls import (
+    ch_call_dict_to_call_schema_dict,
+)
+from weave.trace_server.clickhouse_query_layer.client import ClickHouseClient
 from weave.trace_server.clickhouse_query_layer.schema import (
     CallEndCHInsertable,
     CallStartCHInsertable,
@@ -25,16 +29,14 @@ class MockObjectReadError(Exception):
 def test_clickhouse_storage_size_query_generation():
     """Test that ClickHouse storage size query generation works correctly."""
     # Mock the query builder and query stream
-    mock_ch_client = MagicMock()
+    mock_raw_client = MagicMock()
     with (
         patch(
             "weave.trace_server.clickhouse_query_layer.query_builders.calls.calls_query_builder.CallsQuery",
             autospec=True,
         ) as mock_cq,
-        patch.object(chts.ClickHouseTraceServer, "_query_stream") as mock_query_stream,
-        patch.object(
-            chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
-        ),
+        patch.object(ClickHouseClient, "query_stream") as mock_query_stream,
+        patch.object(ClickHouseClient, "_mint_client", return_value=mock_raw_client),
     ):
         # Create a mock CallsQuery instance
         mock_calls_query = Mock()
@@ -100,7 +102,7 @@ def test_clickhouse_storage_size_schema_conversion():
     }
 
     # Test ClickHouse conversion
-    ch_schema = chts._ch_call_dict_to_call_schema_dict(test_data)
+    ch_schema = ch_call_dict_to_call_schema_dict(test_data)
     assert ch_schema["storage_size_bytes"] == 1000
     assert ch_schema["total_storage_size_bytes"] == 2000
 
@@ -132,7 +134,7 @@ def test_clickhouse_storage_size_null_handling():
     }
 
     # Test ClickHouse conversion
-    ch_schema = chts._ch_call_dict_to_call_schema_dict(test_data)
+    ch_schema = ch_call_dict_to_call_schema_dict(test_data)
     assert ch_schema["storage_size_bytes"] is None
     assert ch_schema["total_storage_size_bytes"] is None
 
@@ -153,13 +155,12 @@ def test_clickhouse_distributed_mode_properties():
 
         server = chts.ClickHouseTraceServer(host="test_host")
 
-        # Test distributed mode property
-        assert server.use_distributed_mode is True
-        assert server.clickhouse_cluster_name == "test_cluster"
+        assert server._ch_client.use_distributed_mode is True
+        assert server._ch_client.clickhouse_cluster_name == "test_cluster"
         from weave.trace_server.clickhouse_query_layer import settings as ch_settings
 
         expected_table = f"calls_complete{ch_settings.LOCAL_TABLE_SUFFIX}"
-        assert server._get_calls_complete_table_name() == expected_table
+        assert server._calls_repo._get_calls_complete_table_name() == expected_table
 
     # Test with distributed mode disabled
     with (
@@ -175,10 +176,9 @@ def test_clickhouse_distributed_mode_properties():
 
         server = chts.ClickHouseTraceServer(host="test_host")
 
-        # Test distributed mode property
-        assert server.use_distributed_mode is False
-        assert server.clickhouse_cluster_name is None
-        assert server._get_calls_complete_table_name() == "calls_complete"
+        assert server._ch_client.use_distributed_mode is False
+        assert server._ch_client.clickhouse_cluster_name is None
+        assert server._calls_repo._get_calls_complete_table_name() == "calls_complete"
 
 
 def test_completions_create_stream_custom_provider():
@@ -225,7 +225,7 @@ def test_completions_create_stream_custom_provider():
     with (
         secret_fetcher_context(mock_secret_fetcher),
         patch(
-            "weave.trace_server.clickhouse_query_layer.trace_server.lite_llm_completion_stream"
+            "weave.trace_server.clickhouse_query_layer.completions.lite_llm_completion_stream"
         ) as mock_litellm,
         patch.object(chts.ClickHouseTraceServer, "obj_read") as mock_obj_read,
     ):
@@ -354,18 +354,16 @@ def test_completions_create_stream_custom_provider_with_tracking():
     }
 
     # Mock ClickHouse client to prevent real connection
-    mock_ch_client = MagicMock()
+    mock_raw_client = MagicMock()
 
     with (
         secret_fetcher_context(mock_secret_fetcher),
         patch(
-            "weave.trace_server.clickhouse_query_layer.trace_server.lite_llm_completion_stream"
+            "weave.trace_server.clickhouse_query_layer.completions.lite_llm_completion_stream"
         ) as mock_litellm,
         patch.object(chts.ClickHouseTraceServer, "obj_read") as mock_obj_read,
         patch.object(chts.ClickHouseTraceServer, "_insert_call") as mock_insert_call,
-        patch.object(
-            chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
-        ),
+        patch.object(ClickHouseClient, "_mint_client", return_value=mock_raw_client),
     ):
         # Mock the litellm completion stream
         mock_stream = MagicMock()
@@ -533,12 +531,10 @@ def test_completions_create_stream_multiple_choices():
     with (
         secret_fetcher_context(mock_secret_fetcher),
         patch(
-            "weave.trace_server.clickhouse_query_layer.trace_server.lite_llm_completion_stream"
+            "weave.trace_server.clickhouse_query_layer.completions.lite_llm_completion_stream"
         ) as mock_litellm,
         patch.object(chts.ClickHouseTraceServer, "_insert_call") as mock_insert_call,
-        patch.object(
-            chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
-        ),
+        patch.object(ClickHouseClient, "_mint_client", return_value=mock_ch_client),
     ):
         # Mock the litellm completion stream
         mock_stream = MagicMock()
@@ -672,12 +668,10 @@ def test_completions_create_stream_single_choice_unified_wrapper():
     with (
         secret_fetcher_context(mock_secret_fetcher),
         patch(
-            "weave.trace_server.clickhouse_query_layer.trace_server.lite_llm_completion_stream"
+            "weave.trace_server.clickhouse_query_layer.completions.lite_llm_completion_stream"
         ) as mock_litellm,
         patch.object(chts.ClickHouseTraceServer, "_insert_call") as mock_insert_call,
-        patch.object(
-            chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
-        ),
+        patch.object(ClickHouseClient, "_mint_client", return_value=mock_ch_client),
     ):
         # Mock the litellm completion stream
         mock_stream = MagicMock()
@@ -815,7 +809,7 @@ def test_completions_create_stream_with_prompt_and_template_vars():
     with (
         secret_fetcher_context(mock_secret_fetcher),
         patch(
-            "weave.trace_server.clickhouse_query_layer.trace_server.lite_llm_completion_stream"
+            "weave.trace_server.clickhouse_query_layer.completions.lite_llm_completion_stream"
         ) as mock_litellm,
         patch.object(chts.ClickHouseTraceServer, "obj_read") as mock_obj_read,
     ):
@@ -914,23 +908,20 @@ class _MockInsertError(Exception):
 
 def test_insert_retries_empty_query_error():
     """Verify 'Empty query' errors are retried (generator exhaustion during HTTP retry)."""
-    mock_ch_client = MagicMock()
-    mock_ch_client.command.return_value = None
+    mock_raw_client = MagicMock()
     mock_summary = MagicMock()
     # First call fails with empty query, second succeeds
-    mock_ch_client.insert.side_effect = [
+    mock_raw_client.insert.side_effect = [
         DatabaseError("Empty query. (SYNTAX_ERROR)"),
         mock_summary,
     ]
 
-    with patch.object(
-        chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
-    ):
-        server = chts.ClickHouseTraceServer(host="test_host")
-        result = server._insert("t", data=[[1]], column_names=["a"])
+    with patch.object(ClickHouseClient, "_mint_client", return_value=mock_raw_client):
+        ch_client = ClickHouseClient(host="test_host")
+        result = ch_client.insert("t", data=[[1]], column_names=["a"])
 
         assert result == mock_summary
-        assert mock_ch_client.insert.call_count == 2  # Retried once
+        assert mock_raw_client.insert.call_count == 2  # Retried once
 
 
 @pytest.mark.disable_logging_error_check
@@ -950,42 +941,38 @@ def test_insert_retries_empty_query_error():
 )
 def test_insert_error_handling(error, expected_calls):
     """Verify only 'Empty query' errors are retried; others fail immediately."""
-    mock_ch_client = MagicMock()
-    mock_ch_client.command.return_value = None
+    mock_raw_client = MagicMock()
 
     if error == "empty_query":
-        mock_ch_client.insert.side_effect = DatabaseError("Empty query. (SYNTAX_ERROR)")
+        mock_raw_client.insert.side_effect = DatabaseError(
+            "Empty query. (SYNTAX_ERROR)"
+        )
         expected_exception = DatabaseError
     else:
-        mock_ch_client.insert.side_effect = error
+        mock_raw_client.insert.side_effect = error
         expected_exception = type(error)
 
-    with patch.object(
-        chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
-    ):
-        server = chts.ClickHouseTraceServer(host="test_host")
+    with patch.object(ClickHouseClient, "_mint_client", return_value=mock_raw_client):
+        ch_client = ClickHouseClient(host="test_host")
         with pytest.raises(expected_exception):
-            server._insert("t", data=[[1]], column_names=["a"])
+            ch_client.insert("t", data=[[1]], column_names=["a"])
 
-        assert mock_ch_client.insert.call_count == expected_calls
+        assert mock_raw_client.insert.call_count == expected_calls
 
 
 @pytest.mark.disable_logging_error_check
 def test_call_batch_clears_on_insert_failure():
     """Verify _call_batch is cleared even when insert fails."""
-    mock_ch_client = MagicMock()
-    mock_ch_client.command.return_value = None
-    mock_ch_client.insert.side_effect = _MockInsertError("Connection refused")
+    mock_raw_client = MagicMock()
+    mock_raw_client.insert.side_effect = _MockInsertError("Connection refused")
     # Mock query to return empty project (no data in calls_complete or calls_merged)
     mock_query_result = MagicMock()
     mock_query_result.result_rows = [(None, None)]
-    mock_ch_client.query.return_value = mock_query_result
+    mock_raw_client.query.return_value = mock_query_result
 
     project_id = base64.b64encode(b"test_entity/test_project").decode("utf-8")
 
-    with patch.object(
-        chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
-    ):
+    with patch.object(ClickHouseClient, "_mint_client", return_value=mock_raw_client):
         server = chts.ClickHouseTraceServer(host="test_host")
 
         for i in range(5):
@@ -1003,8 +990,8 @@ def test_call_batch_clears_on_insert_failure():
             except _MockInsertError:
                 pass
 
-        assert len(server._call_batch) == 0, (
-            f"Memory leak: _call_batch retained {len(server._call_batch)} rows "
+        assert len(server._batch_manager._call_batch) == 0, (
+            f"Memory leak: _call_batch retained {len(server._batch_manager._call_batch)} rows "
             f"after failed inserts. Batch should be cleared on any exception."
         )
 
@@ -1012,13 +999,10 @@ def test_call_batch_clears_on_insert_failure():
 @pytest.mark.disable_logging_error_check
 def test_file_batch_clears_on_insert_failure():
     """Verify _file_batch is cleared even when insert fails."""
-    mock_ch_client = MagicMock()
-    mock_ch_client.command.return_value = None
-    mock_ch_client.insert.side_effect = _MockInsertError("Connection refused")
+    mock_raw_client = MagicMock()
+    mock_raw_client.insert.side_effect = _MockInsertError("Connection refused")
 
-    with patch.object(
-        chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
-    ):
+    with patch.object(ClickHouseClient, "_mint_client", return_value=mock_raw_client):
         server = chts.ClickHouseTraceServer(host="test_host")
 
         file_chunk = MagicMock()
@@ -1029,14 +1013,14 @@ def test_file_batch_clears_on_insert_failure():
             "chunk_index": 0,
             "b64_data": "dGVzdA==",
         }
-        server._file_batch.append(file_chunk)
+        server._batch_manager._file_batch.append(file_chunk)
 
         try:
-            server._flush_file_chunks()
+            server._batch_manager._flush_file_chunks()
         except _MockInsertError:
             pass
 
-        assert len(server._file_batch) == 0, (
-            f"Memory leak: _file_batch retained {len(server._file_batch)} items "
+        assert len(server._batch_manager._file_batch) == 0, (
+            f"Memory leak: _file_batch retained {len(server._batch_manager._file_batch)} items "
             f"after failed insert. Batch should be cleared on any exception."
         )

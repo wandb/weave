@@ -293,7 +293,7 @@ class TestLLMCompletionStreaming(unittest.TestCase):
         self.server = chts.ClickHouseTraceServer(host="test_host")
         mock_ch_client = MagicMock()
         mock_ch_client.query.return_value = MagicMock(result_rows=[[0, 0]])
-        self.server._thread_local.ch_client = mock_ch_client
+        self.server._ch_client._thread_local.ch_client = mock_ch_client
         self.mock_secret_fetcher = MagicMock()
         self.mock_secret_fetcher.fetch.return_value = {
             "secrets": {

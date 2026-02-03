@@ -208,7 +208,7 @@ class FilesRepository:
         """
         result = self._ch_client.query(query, {"project_id": req.project_id})
         total_bytes = result.result_rows[0][0] if result.result_rows else 0
-        return tsi.FilesStatsRes(total_bytes=total_bytes or 0)
+        return tsi.FilesStatsRes(total_size_bytes=total_bytes or 0)
 
 
 def _string_to_int_in_range(input_string: str, range_max: int) -> int:

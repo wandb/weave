@@ -13,8 +13,9 @@ from weave.trace_server.clickhouse_query_layer.migrator import (
     ReplicatedClickHouseTraceServerMigrator,
 )
 
+# Migrations are in weave/trace_server/migrations/, not in clickhouse_query_layer/migrations/
 DEFAULT_MIGRATION_DIR = os.path.abspath(
-    os.path.join(os.path.dirname(trace_server_migrator.__file__), "migrations")
+    os.path.join(os.path.dirname(trace_server_migrator.__file__), "..", "migrations")
 )
 
 

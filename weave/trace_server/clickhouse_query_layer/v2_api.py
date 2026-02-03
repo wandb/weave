@@ -382,10 +382,14 @@ class V2ApiRepository:
         )
         obj_read_res = self._obj_read_with_retry(obj_read_req)
 
+        # Build the scorer reference
+        scorer_ref = f"weave:///{req.project_id}/object/{scorer_id}:{obj_result.digest}"
+
         return tsi.ScorerCreateRes(
             digest=obj_result.digest,
             object_id=scorer_id,
             version_index=obj_read_res.obj.version_index,
+            scorer=scorer_ref,
         )
 
     def scorer_read(self, req: tsi.ScorerReadReq) -> tsi.ScorerReadRes:

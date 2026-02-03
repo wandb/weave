@@ -109,20 +109,16 @@ class OtelRepository:
             obj_id_idx_map[op_name].append(idx)
 
         existing_objects = self._get_existing_ops(
-            seen_ids=set(obj_id_idx_map.keys()),
-            project_id=req.project_id,
-            limit=len(calls),
+            set(obj_id_idx_map.keys()),
+            req.project_id,
+            len(calls),
         )
 
         # Reuse existing placeholder file or create it once
         if len(existing_objects) == 0:
-            digest = self._create_placeholder_ops_digest(
-                project_id=req.project_id, create=True
-            )
+            digest = self._create_placeholder_ops_digest(req.project_id, True)
         else:
-            digest = self._create_placeholder_ops_digest(
-                project_id=req.project_id, create=False
-            )
+            digest = self._create_placeholder_ops_digest(req.project_id, False)
 
         for obj in existing_objects:
             op_ref_uri = ri.InternalOpRef(

@@ -870,10 +870,14 @@ class ClickHouseTraceServer(TraceServerInterface):
             )
         )
 
+        # Build the model reference
+        model_ref = f"weave:///{req.project_id}/object/{model_id}:{obj_result.digest}"
+
         return tsi.ModelCreateRes(
             digest=obj_result.digest,
             object_id=model_id,
             version_index=obj_read_res.obj.version_index,
+            model_ref=model_ref,
         )
 
     def model_read(self, req: tsi.ModelReadReq) -> tsi.ModelReadRes:
