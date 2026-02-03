@@ -30,8 +30,9 @@ def test_video() -> VideoClip:
     return clip
 
 
-def test_save_mp4_clip(tmp_path: Path, test_video: VideoClip):
-    fp = str(tmp_path / "test.mp4")
+@pytest.mark.parametrize("extension", ["mp4", "webm", "gif"])
+def test_save_clip(tmp_path: Path, test_video: VideoClip, extension: str):
+    fp = str(tmp_path / f"test.{extension}")
     write_video(fp, test_video)
     # Check if the file was created
     assert os.path.exists(fp)
@@ -39,33 +40,9 @@ def test_save_mp4_clip(tmp_path: Path, test_video: VideoClip):
     assert os.path.getsize(fp) > 0
 
 
-def test_save_webm_clip(tmp_path: Path, test_video: VideoClip):
-    fp = str(tmp_path / "test.webm")
-    write_video(fp, test_video)
-    # Check if the file was created
-    assert os.path.exists(fp)
-    # Check if the video was written
-    assert os.path.getsize(fp) > 0
-
-
-def test_save_gif_clip(tmp_path: Path, test_video: VideoClip):
-    fp = str(tmp_path / "test.gif")
-    write_video(fp, test_video)
-    # Check if the file was created
-    assert os.path.exists(fp)
-    # Check if the video was written
-    assert os.path.getsize(fp) > 0
-
-
-def test_save_no_ext_clip(tmp_path: Path, test_video: VideoClip):
-    fp = str(tmp_path / "test")
-    # Write video should throw exception if it recieves no format
-    with pytest.raises(ValueError):
-        write_video(fp, test_video)
-
-
-def test_save_invalid_ext_clip(tmp_path: Path, test_video: VideoClip):
-    fp = str(tmp_path / "test.invalid")
+@pytest.mark.parametrize("filename", ["test", "test.invalid"])
+def test_save_invalid_clip(tmp_path: Path, test_video: VideoClip, filename: str):
+    fp = str(tmp_path / filename)
     # Write video should throw exception if it recieves invalid format
     with pytest.raises(ValueError):
         write_video(fp, test_video)
