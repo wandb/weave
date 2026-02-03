@@ -54,7 +54,7 @@ class CallsCompleteModeRequired(InvalidRequest):
 
     error_code: str = ErrorCode.CALLS_COMPLETE_MODE_REQUIRED
 
-    def __init__(self, project_id: str, min_sdk_version: str = "0.52.24"):
+    def __init__(self, project_id: str, min_sdk_version: str = "0.52.26"):
         """Initialize the exception.
 
         Args:

@@ -121,10 +121,16 @@ class TestUpdateCosts(unittest.TestCase):
 
     @patch("builtins.open", new_callable=mock_open)
     @patch("os.path.exists")
+    @patch("weave.trace_server.costs.update_costs.fetch_models_begin_costs")
     @patch("weave.trace_server.costs.update_costs.fetch_new_costs")
     @patch("weave.trace_server.costs.update_costs.get_current_costs")
     def test_main(
-        self, mock_get_current_costs, mock_fetch_new_costs, mock_exists, mock_file
+        self,
+        mock_get_current_costs,
+        mock_fetch_new_costs,
+        mock_fetch_models_begin_costs,
+        mock_exists,
+        mock_file,
     ):
         """Test main function with no cost changes."""
         mock_exists.return_value = True
@@ -153,6 +159,7 @@ class TestUpdateCosts(unittest.TestCase):
                 "created_at": current_time,
             },
         }
+        mock_fetch_models_begin_costs.return_value = {}
         main()
         mock_file.assert_called_with(ANY, "w")
         args, kwargs = mock_file.call_args
@@ -184,10 +191,16 @@ class TestUpdateCosts(unittest.TestCase):
 
     @patch("builtins.open", new_callable=mock_open)
     @patch("os.path.exists")
+    @patch("weave.trace_server.costs.update_costs.fetch_models_begin_costs")
     @patch("weave.trace_server.costs.update_costs.fetch_new_costs")
     @patch("weave.trace_server.costs.update_costs.get_current_costs")
     def test_main_cost_change(
-        self, mock_get_current_costs, mock_fetch_new_costs, mock_exists, mock_file
+        self,
+        mock_get_current_costs,
+        mock_fetch_new_costs,
+        mock_fetch_models_begin_costs,
+        mock_exists,
+        mock_file,
     ):
         """Test main function when cost changes for a model."""
         mock_exists.return_value = True
@@ -210,6 +223,7 @@ class TestUpdateCosts(unittest.TestCase):
                 "created_at": current_time,
             }
         }
+        mock_fetch_models_begin_costs.return_value = {}
         main()
         mock_file.assert_called_with(ANY, "w")
         args, kwargs = mock_file.call_args
@@ -239,10 +253,16 @@ class TestUpdateCosts(unittest.TestCase):
 
     @patch("builtins.open", new_callable=mock_open)
     @patch("os.path.exists")
+    @patch("weave.trace_server.costs.update_costs.fetch_models_begin_costs")
     @patch("weave.trace_server.costs.update_costs.fetch_new_costs")
     @patch("weave.trace_server.costs.update_costs.get_current_costs")
     def test_main_historical_costs_limit(
-        self, mock_get_current_costs, mock_fetch_new_costs, mock_exists, mock_file
+        self,
+        mock_get_current_costs,
+        mock_fetch_new_costs,
+        mock_fetch_models_begin_costs,
+        mock_exists,
+        mock_file,
     ):
         """Test main function when historical cost limit is reached."""
         mock_exists.return_value = True
@@ -277,6 +297,7 @@ class TestUpdateCosts(unittest.TestCase):
                 "created_at": current_time,
             }
         }
+        mock_fetch_models_begin_costs.return_value = {}
         main()
         mock_file.assert_called_with(ANY, "w")
         args, kwargs = mock_file.call_args
