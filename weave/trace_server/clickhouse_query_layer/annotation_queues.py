@@ -14,6 +14,7 @@ from weave.trace_server.clickhouse_query_layer.query_builders.annotation_queues 
     make_queue_add_calls_fetch_calls_query,
     make_queue_add_calls_insert_query,
     make_queue_create_query,
+    make_queue_items_query,
     make_queue_read_query,
     make_queues_query,
 )
@@ -211,3 +212,96 @@ class AnnotationQueuesRepository:
             added_count=len(calls_data),
             duplicates=len(req.call_ids) - len(new_call_ids),
         )
+
+    @ddtrace.tracer.wrap(
+        name="annotation_queues.annotation_queue_call_items_query_stream"
+    )
+    def annotation_queue_call_items_query_stream(
+        self, req: tsi.AnnotationQueueItemsQueryReq
+    ) -> Iterator[tsi.AnnotationQueueItemSchema]:
+        """Stream items in an annotation queue.
+
+        Args:
+            req: Query request with project_id, queue_id, and optional filters
+
+        Yields:
+            AnnotationQueueItemSchema objects for each item in the queue
+        """
+        pb = ParamBuilder()
+
+        query = make_queue_items_query(
+            project_id=req.project_id,
+            queue_id=req.queue_id,
+            pb=pb,
+            filter=req.filter,
+            sort_by=req.sort_by,
+            limit=req.limit,
+            offset=req.offset,
+            include_position=getattr(req, "include_position", False),
+        )
+
+        raw_res = self._ch_client.query_stream(query, pb.get_params())
+
+        for row in raw_res:
+            # The query returns different numbers of columns depending on include_position
+            # Handle both cases
+            if getattr(req, "include_position", False):
+                (
+                    item_id,
+                    project_id,
+                    queue_id,
+                    call_id,
+                    call_started_at,
+                    call_ended_at,
+                    call_op_name,
+                    call_trace_id,
+                    display_fields,
+                    added_by,
+                    created_at,
+                    created_by,
+                    updated_at,
+                    deleted_at,
+                    annotation_state,
+                    annotator_user_id,
+                    position_in_queue,
+                ) = row
+            else:
+                (
+                    item_id,
+                    project_id,
+                    queue_id,
+                    call_id,
+                    call_started_at,
+                    call_ended_at,
+                    call_op_name,
+                    call_trace_id,
+                    display_fields,
+                    added_by,
+                    created_at,
+                    created_by,
+                    updated_at,
+                    deleted_at,
+                    annotation_state,
+                    annotator_user_id,
+                ) = row
+                position_in_queue = None
+
+            yield tsi.AnnotationQueueItemSchema(
+                id=str(item_id),
+                project_id=project_id,
+                queue_id=str(queue_id),
+                call_id=call_id,
+                call_started_at=ensure_datetimes_have_tz(call_started_at),
+                call_ended_at=ensure_datetimes_have_tz(call_ended_at),
+                call_op_name=call_op_name or "",
+                call_trace_id=call_trace_id or "",
+                display_fields=display_fields if display_fields else [],
+                added_by=added_by,
+                annotation_state=annotation_state or "unstarted",
+                annotator_user_id=annotator_user_id,
+                created_at=ensure_datetimes_have_tz(created_at),
+                created_by=created_by or "",
+                updated_at=ensure_datetimes_have_tz(updated_at),
+                deleted_at=ensure_datetimes_have_tz(deleted_at),
+                position_in_queue=position_in_queue,
+            )

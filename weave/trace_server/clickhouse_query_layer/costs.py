@@ -23,24 +23,23 @@ class CostsRepository:
         assert_non_null_wb_user_id(req)
         created_at = datetime.datetime.now(tz=datetime.timezone.utc)
         costs = []
-        for cost in req.costs:
+        for llm_id, cost in req.costs.items():
             cost_id = generate_id()
-            llm_id = cost.llm_id
             row = {
                 "id": cost_id,
                 "created_at": created_at,
                 "created_by": req.wb_user_id,
                 "pricing_level": "project",
                 "pricing_level_id": req.project_id,
-                "provider_id": cost.provider_id,
+                "provider_id": cost.provider_id or "default",
                 "llm_id": llm_id,
                 "effective_date": (
                     cost.effective_date if cost.effective_date else created_at
                 ),
                 "prompt_token_cost": cost.prompt_token_cost,
                 "completion_token_cost": cost.completion_token_cost,
-                "prompt_token_cost_unit": cost.prompt_token_cost_unit,
-                "completion_token_cost_unit": cost.completion_token_cost_unit,
+                "prompt_token_cost_unit": cost.prompt_token_cost_unit or "USD",
+                "completion_token_cost_unit": cost.completion_token_cost_unit or "USD",
             }
 
             costs.append((cost_id, llm_id))

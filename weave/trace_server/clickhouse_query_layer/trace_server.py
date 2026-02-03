@@ -166,15 +166,6 @@ class ClickHouseTraceServer(TraceServerInterface):
             refs_read_batch_func=self._refs_read_batch_for_calls,
         )
 
-    @property
-    def ch_client(self) -> Any:
-        """Returns the underlying ClickHouse client for direct access.
-
-        This is exposed for backward compatibility and for use in tests/migrations.
-        Prefer using the repository methods for normal operations.
-        """
-        return self._ch_client.ch_client
-
         # Refs repository
         self._refs_repo = RefsRepository(
             parsed_refs_read_batch_func=self._parsed_refs_read_batch,
@@ -212,6 +203,15 @@ class ClickHouseTraceServer(TraceServerInterface):
 
         # Completions repository (lazy initialized due to model info dependency)
         self._completions_repo: CompletionsRepository | None = None
+
+    @property
+    def ch_client(self) -> Any:
+        """Returns the underlying ClickHouse client for direct access.
+
+        This is exposed for backward compatibility and for use in tests/migrations.
+        Prefer using the repository methods for normal operations.
+        """
+        return self._ch_client.ch_client
 
     @classmethod
     def from_env(cls, use_async_insert: bool = False) -> "ClickHouseTraceServer":
@@ -616,9 +616,10 @@ class ClickHouseTraceServer(TraceServerInterface):
         self, req: tsi.ActionsExecuteBatchReq
     ) -> tsi.ActionsExecuteBatchRes:
         """Execute a batch of actions."""
-        from weave.trace_server.actions_worker.dispatcher import dispatch_actions
+        from weave.trace_server.actions_worker.dispatcher import execute_batch
 
-        return dispatch_actions(req, self)
+        execute_batch(req, self)
+        return tsi.ActionsExecuteBatchRes()
 
     # =========================================================================
     # Completions API
@@ -705,37 +706,26 @@ class ClickHouseTraceServer(TraceServerInterface):
         )
         result = self._ch_client.query(query, pb.get_params())
 
-        queues: list[tsi.AnnotationQueueStatsSchema] = []
+        stats: list[tsi.AnnotationQueueStatsSchema] = []
         for row in result.result_rows:
             # Query returns: queue_id, total_items, completed_items
             queue_id, total_items, completed_items = row
-            # remaining_count = total_items - completed_items
-            remaining_count = total_items - completed_items
-            queues.append(
+            stats.append(
                 tsi.AnnotationQueueStatsSchema(
                     queue_id=str(queue_id),
-                    total_count=total_items,
-                    remaining_count=remaining_count,
+                    total_items=total_items,
+                    completed_items=completed_items,
                 )
             )
 
-        return tsi.AnnotationQueuesStatsRes(queues=queues)
+        return tsi.AnnotationQueuesStatsRes(stats=stats)
 
     def annotation_queue_items_query(
         self, req: tsi.AnnotationQueueItemsQueryReq
     ) -> tsi.AnnotationQueueItemsQueryRes:
         """Query items in an annotation queue."""
         items = list(
-            self._annotation_queues_repo.annotation_queue_call_items_query_stream(
-                tsi.AnnotationQueueCallItemsQueryReq(
-                    project_id=req.project_id,
-                    queue_id=req.queue_id,
-                    call_ids=req.call_ids,
-                    sort_by=req.sort_by,
-                    limit=req.limit,
-                    offset=req.offset,
-                )
-            )
+            self._annotation_queues_repo.annotation_queue_call_items_query_stream(req)
         )
         return tsi.AnnotationQueueItemsQueryRes(items=items)
 

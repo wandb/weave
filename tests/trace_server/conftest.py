@@ -175,19 +175,19 @@ def get_ch_trace_server(
             ch_server.ch_client.command(f"DROP DATABASE IF EXISTS {management_db}")
             ch_server.ch_client.command(f"DROP DATABASE IF EXISTS {unique_db}")
 
-            # Patch _run_migrations to use worker-specific management database
+            # Patch run_migrations to use worker-specific management database
             def patched_run_migrations():
                 from weave.trace_server.clickhouse_query_layer import (
                     migrator as wf_migrator,
                 )
 
                 migrator = wf_migrator.get_clickhouse_trace_server_migrator(
-                    ch_server._mint_client(), management_db=management_db
+                    ch_server._ch_client._mint_client(), management_db=management_db
                 )
-                migrator.apply_migrations(ch_server._database)
+                migrator.apply_migrations(ch_server._ch_client._database)
 
-            ch_server._run_migrations = patched_run_migrations  # type: ignore[assignment]
-            ch_server._run_migrations()
+            ch_server._ch_client.run_migrations = patched_run_migrations  # type: ignore[assignment]
+            ch_server._ch_client.run_migrations()
 
             result = externalize_trace_server(
                 ch_server, TEST_ENTITY, id_converter=id_converter
