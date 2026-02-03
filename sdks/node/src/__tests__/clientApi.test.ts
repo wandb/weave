@@ -15,6 +15,7 @@ describe('Client API', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     process.env = {...originalEnv};
+    delete process.env.WEAVE_USE_STAINLESS_API;
 
     // Mock getWandbConfigs
     (getWandbConfigs as jest.Mock).mockReturnValue({

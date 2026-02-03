@@ -9,7 +9,6 @@ import {
   CallsFilter,
   EndedCallSchemaForInsert,
   StartedCallSchemaForInsert,
-  Api as TraceServerApi,
 } from './generated/traceServerApi';
 import {
   AudioType,
@@ -34,6 +33,7 @@ import {WandbServerApi} from './wandb/wandbServerApi';
 import {ObjectRef, WeaveObject, getClassChain} from './weaveObject';
 import {Call, CallState, InternalCall} from './call';
 import {CallRef} from './refs';
+import {TraceServerApiLike} from './traceServerApiFactory';
 
 const WEAVE_ERRORS_LOG_FNAME = 'weaveErrors.log';
 
@@ -91,7 +91,7 @@ export class WeaveClient {
   private readonly MAX_ERRORS = 10;
 
   constructor(
-    public traceServerApi: TraceServerApi<any>,
+    public traceServerApi: TraceServerApiLike,
     private wandbServerApi: WandbServerApi,
     public projectId: string,
     public settings: Settings = new Settings()
