@@ -12,7 +12,7 @@ describe('login', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     console.log = jest.fn(); // Mock console.log
-    delete process.env.WEAVE_USE_STAINLESS_API;
+    delete process.env.WEAVE_USE_STAINLESS_SERVER;
   });
 
   it('should successfully log in and save credentials', async () => {

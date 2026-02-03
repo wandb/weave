@@ -150,10 +150,10 @@ Weave can use the Stainless-generated trace API client when enabled. Install the
 
 ```bash
 npm install weave-server-sdk
-export WEAVE_USE_STAINLESS_API=true
+export WEAVE_USE_STAINLESS_SERVER=true
 ```
 
-When `WEAVE_USE_STAINLESS_API` is set, trace server calls are routed through `weave-server-sdk`. Otherwise the bundled trace client is used.
+When `WEAVE_USE_STAINLESS_SERVER` is set, trace server calls are routed through `weave-server-sdk`. Otherwise the bundled trace client is used.
 
 ### Evaluations
 

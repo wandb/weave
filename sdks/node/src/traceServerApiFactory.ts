@@ -1,6 +1,6 @@
 import {Api as TraceServerApi} from './generated/traceServerApi';
 
-const STAINLESS_ENV_VAR = 'WEAVE_USE_STAINLESS_API';
+const STAINLESS_ENV_VAR = 'WEAVE_USE_STAINLESS_SERVER';
 
 export type TraceServerApiLike = {
   health: {
