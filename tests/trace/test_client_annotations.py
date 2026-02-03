@@ -1913,6 +1913,47 @@ def test_annotator_queue_items_progress_in_progress_workflow(client):
     assert stats_res.stats[0].completed_items == 2
 
 
+def test_annotator_queue_items_progress_update_returns_correct_item(client):
+    """Test that progress update returns the specific item that was updated."""
+    if client_is_sqlite(client):
+        pytest.skip("Annotation queues not supported in SQLite")
+
+    # Create queue with 3 items - we need multiple items to expose the bug
+    fixture = create_queue_with_calls(
+        client, num_calls=3, queue_name="Returns Correct Item Queue"
+    )
+
+    # Get all queue items
+    query_req = tsi.AnnotationQueueItemsQueryReq(
+        project_id=client._project_id(),
+        queue_id=fixture.queue_id,
+    )
+    query_res = client.server.annotation_queue_items_query(query_req)
+    assert len(query_res.items) == 3
+
+    items = query_res.items
+    target_item = items[2]  # Update the last item, not the first
+    first_item = items[0]
+
+    assert target_item.id != first_item.id, "Test requires items to have different IDs"
+
+    # Update the last item to completed
+    update_req = tsi.AnnotatorQueueItemsProgressUpdateReq(
+        project_id=client._project_id(),
+        queue_id=fixture.queue_id,
+        item_id=target_item.id,
+        annotation_state="completed",
+        wb_user_id="test_annotator",
+    )
+    update_res = client.server.annotator_queue_items_progress_update(update_req)
+
+    # Verify the returned item is the one we updated
+    assert update_res.item.id == target_item.id
+
+    # Also verify the state was updated correctly
+    assert update_res.item.annotation_state == "completed"
+
+
 def test_annotation_queue_add_calls_with_calls_complete_table(trace_server):
     """Test adding calls to annotation queue when using calls_complete table.
 
