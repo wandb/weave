@@ -86,6 +86,11 @@ class SavedViewDefinition(BaseModel):
     # columns is specifying exactly which columns to include
     # including order.
     columns: list[Column] | None = Field(default=None)
+
+    # column_order is a simple ordered list of column field names.
+    # Used by the frontend to persist user-defined column ordering.
+    column_order: list[str] | None = Field(default=None)
+
     header_depth: int | None = Field(default=None)
 
     pin: Pin | None = Field(default=None)

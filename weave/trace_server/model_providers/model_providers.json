@@ -155,7 +155,15 @@
     "litellm_provider": "bedrock_converse",
     "api_key_name": "BEDROCK_API_KEY"
   },
+  "amazon.nova-2-pro-preview-20251202-v1:0": {
+    "litellm_provider": "bedrock_converse",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
   "apac.amazon.nova-2-lite-v1:0": {
+    "litellm_provider": "bedrock_converse",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
+  "apac.amazon.nova-2-pro-preview-20251202-v1:0": {
     "litellm_provider": "bedrock_converse",
     "api_key_name": "BEDROCK_API_KEY"
   },
@@ -163,7 +171,15 @@
     "litellm_provider": "bedrock_converse",
     "api_key_name": "BEDROCK_API_KEY"
   },
+  "eu.amazon.nova-2-pro-preview-20251202-v1:0": {
+    "litellm_provider": "bedrock_converse",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
   "us.amazon.nova-2-lite-v1:0": {
+    "litellm_provider": "bedrock_converse",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
+  "us.amazon.nova-2-pro-preview-20251202-v1:0": {
     "litellm_provider": "bedrock_converse",
     "api_key_name": "BEDROCK_API_KEY"
   },
@@ -1713,15 +1729,24 @@
   },
   "claude-3-5-sonnet-20240620": {
     "litellm_provider": "anthropic",
-    "api_key_name": "ANTHROPIC_API_KEY"
+    "api_key_name": "ANTHROPIC_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.NotFoundError: AnthropicException - {\"type\":\"error\",\"error\":{\"type\":\"not_found_error\",\"message\":\"model: claude-3-5-sonnet-20240620\"},}",
+    "deprecated_date": "2026-01-29T18:20:24.388476"
   },
   "claude-3-5-sonnet-20241022": {
     "litellm_provider": "anthropic",
-    "api_key_name": "ANTHROPIC_API_KEY"
+    "api_key_name": "ANTHROPIC_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.NotFoundError: AnthropicException - {\"type\":\"error\",\"error\":{\"type\":\"not_found_error\",\"message\":\"model: claude-3-5-sonnet-20241022\"}}",
+    "deprecated_date": "2026-01-29T18:20:24.388917"
   },
   "claude-3-5-sonnet-latest": {
     "litellm_provider": "anthropic",
-    "api_key_name": "ANTHROPIC_API_KEY"
+    "api_key_name": "ANTHROPIC_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.NotFoundError: AnthropicException - {\"type\":\"error\",\"error\":{\"type\":\"not_found_error\",\"message\":\"model: claude-3-5-sonnet-latest\"}}",
+    "deprecated_date": "2026-01-29T18:20:24.389069"
   },
   "claude-3-7-sonnet-20250219": {
     "litellm_provider": "anthropic",
@@ -1737,11 +1762,17 @@
   },
   "claude-3-opus-20240229": {
     "litellm_provider": "anthropic",
-    "api_key_name": "ANTHROPIC_API_KEY"
+    "api_key_name": "ANTHROPIC_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.NotFoundError: AnthropicException - {\"type\":\"error\",\"error\":{\"type\":\"not_found_error\",\"message\":\"model: claude-3-opus-20240229\"}}",
+    "deprecated_date": "2026-01-29T18:20:24.389173"
   },
   "claude-3-opus-latest": {
     "litellm_provider": "anthropic",
-    "api_key_name": "ANTHROPIC_API_KEY"
+    "api_key_name": "ANTHROPIC_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.NotFoundError: AnthropicException - {\"type\":\"error\",\"error\":{\"type\":\"not_found_error\",\"message\":\"model: claude-3-opus-latest\"}}",
+    "deprecated_date": "2026-01-29T18:20:24.389261"
   },
   "claude-4-opus-20250514": {
     "litellm_provider": "anthropic",
@@ -1993,11 +2024,17 @@
   },
   "gemini/gemini-live-2.5-flash-preview-native-audio-09-2025": {
     "litellm_provider": "gemini",
-    "api_key_name": "GEMINI_API_KEY"
+    "api_key_name": "GEMINI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.NotFoundError: GeminiException - {\n  \"error\": {\n    \"code\": 404,\n    \"message\": \"models/gemini-live-2.5-flash-preview-native-audio-09-2025 is not found for API version v1beta, or is not suppor",
+    "deprecated_date": "2026-01-29T21:44:57.320603"
   },
   "gemini/gemini-robotics-er-1.5-preview": {
     "litellm_provider": "gemini",
-    "api_key_name": "GEMINI_API_KEY"
+    "api_key_name": "GEMINI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "'NoneType' object is not subscriptable",
+    "deprecated_date": "2026-01-29T21:44:57.321191"
   },
   "gemini/gemini-embedding-001": {
     "litellm_provider": "gemini",
@@ -2005,59 +2042,101 @@
   },
   "gemini/gemini-1.5-flash": {
     "litellm_provider": "gemini",
-    "api_key_name": "GEMINI_API_KEY"
+    "api_key_name": "GEMINI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.NotFoundError: GeminiException - {\n  \"error\": {\n    \"code\": 404,\n    \"message\": \"models/gemini-1.5-flash is not found for API version v1beta, or is not supported for generateContent. Call List",
+    "deprecated_date": "2026-01-29T21:44:57.321492"
   },
   "gemini/gemini-1.5-flash-001": {
     "litellm_provider": "gemini",
-    "api_key_name": "GEMINI_API_KEY"
+    "api_key_name": "GEMINI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.NotFoundError: GeminiException - {\n  \"error\": {\n    \"code\": 404,\n    \"message\": \"models/gemini-1.5-flash-001 is not found for API version v1beta, or is not supported for generateContent. Call ",
+    "deprecated_date": "2026-01-29T21:44:57.321601"
   },
   "gemini/gemini-1.5-flash-002": {
     "litellm_provider": "gemini",
-    "api_key_name": "GEMINI_API_KEY"
+    "api_key_name": "GEMINI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.NotFoundError: GeminiException - {\n  \"error\": {\n    \"code\": 404,\n    \"message\": \"models/gemini-1.5-flash-002 is not found for API version v1beta, or is not supported for generateContent. Call ",
+    "deprecated_date": "2026-01-29T21:44:57.321704"
   },
   "gemini/gemini-1.5-flash-8b": {
     "litellm_provider": "gemini",
-    "api_key_name": "GEMINI_API_KEY"
+    "api_key_name": "GEMINI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.NotFoundError: GeminiException - {\n  \"error\": {\n    \"code\": 404,\n    \"message\": \"models/gemini-1.5-flash-8b is not found for API version v1beta, or is not supported for generateContent. Call L",
+    "deprecated_date": "2026-01-29T21:44:57.321804"
   },
   "gemini/gemini-1.5-flash-8b-exp-0827": {
     "litellm_provider": "gemini",
-    "api_key_name": "GEMINI_API_KEY"
+    "api_key_name": "GEMINI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.NotFoundError: GeminiException - {\n  \"error\": {\n    \"code\": 404,\n    \"message\": \"models/gemini-1.5-flash-8b-exp-0827 is not found for API version v1beta, or is not supported for generateConten",
+    "deprecated_date": "2026-01-29T21:44:57.321904"
   },
   "gemini/gemini-1.5-flash-8b-exp-0924": {
     "litellm_provider": "gemini",
-    "api_key_name": "GEMINI_API_KEY"
+    "api_key_name": "GEMINI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.NotFoundError: GeminiException - {\n  \"error\": {\n    \"code\": 404,\n    \"message\": \"models/gemini-1.5-flash-8b-exp-0924 is not found for API version v1beta, or is not supported for generateConten",
+    "deprecated_date": "2026-01-29T21:44:57.322163"
   },
   "gemini/gemini-1.5-flash-exp-0827": {
     "litellm_provider": "gemini",
-    "api_key_name": "GEMINI_API_KEY"
+    "api_key_name": "GEMINI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.NotFoundError: GeminiException - {\n  \"error\": {\n    \"code\": 404,\n    \"message\": \"models/gemini-1.5-flash-exp-0827 is not found for API version v1beta, or is not supported for generateContent. ",
+    "deprecated_date": "2026-01-29T21:44:57.322537"
   },
   "gemini/gemini-1.5-flash-latest": {
     "litellm_provider": "gemini",
-    "api_key_name": "GEMINI_API_KEY"
+    "api_key_name": "GEMINI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.NotFoundError: GeminiException - {\n  \"error\": {\n    \"code\": 404,\n    \"message\": \"models/gemini-1.5-flash-latest is not found for API version v1beta, or is not supported for generateContent. Ca",
+    "deprecated_date": "2026-01-29T21:44:57.322645"
   },
   "gemini/gemini-1.5-pro": {
     "litellm_provider": "gemini",
-    "api_key_name": "GEMINI_API_KEY"
+    "api_key_name": "GEMINI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.NotFoundError: GeminiException - {\n  \"error\": {\n    \"code\": 404,\n    \"message\": \"models/gemini-1.5-pro is not found for API version v1beta, or is not supported for generateContent. Call ListMo",
+    "deprecated_date": "2026-01-29T21:44:57.322729"
   },
   "gemini/gemini-1.5-pro-001": {
     "litellm_provider": "gemini",
-    "api_key_name": "GEMINI_API_KEY"
+    "api_key_name": "GEMINI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.NotFoundError: GeminiException - {\n  \"error\": {\n    \"code\": 404,\n    \"message\": \"models/gemini-1.5-pro-001 is not found for API version v1beta, or is not supported for generateContent. Call Li",
+    "deprecated_date": "2026-01-29T21:44:57.322801"
   },
   "gemini/gemini-1.5-pro-002": {
     "litellm_provider": "gemini",
-    "api_key_name": "GEMINI_API_KEY"
+    "api_key_name": "GEMINI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.NotFoundError: GeminiException - {\n  \"error\": {\n    \"code\": 404,\n    \"message\": \"models/gemini-1.5-pro-002 is not found for API version v1beta, or is not supported for generateContent. Call Li",
+    "deprecated_date": "2026-01-29T21:44:57.322869"
   },
   "gemini/gemini-1.5-pro-exp-0801": {
     "litellm_provider": "gemini",
-    "api_key_name": "GEMINI_API_KEY"
+    "api_key_name": "GEMINI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.NotFoundError: GeminiException - {\n  \"error\": {\n    \"code\": 404,\n    \"message\": \"models/gemini-1.5-pro-exp-0801 is not found for API version v1beta, or is not supported for generateContent. Ca",
+    "deprecated_date": "2026-01-29T21:44:57.323185"
   },
   "gemini/gemini-1.5-pro-exp-0827": {
     "litellm_provider": "gemini",
-    "api_key_name": "GEMINI_API_KEY"
+    "api_key_name": "GEMINI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.NotFoundError: GeminiException - {\n  \"error\": {\n    \"code\": 404,\n    \"message\": \"models/gemini-1.5-pro-exp-0827 is not found for API version v1beta, or is not supported for generateContent. Ca",
+    "deprecated_date": "2026-01-29T21:44:57.323377"
   },
   "gemini/gemini-1.5-pro-latest": {
     "litellm_provider": "gemini",
-    "api_key_name": "GEMINI_API_KEY"
+    "api_key_name": "GEMINI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.NotFoundError: GeminiException - {\n  \"error\": {\n    \"code\": 404,\n    \"message\": \"models/gemini-1.5-pro-latest is not found for API version v1beta, or is not supported for generateContent. Call",
+    "deprecated_date": "2026-01-29T21:44:57.323475"
   },
   "gemini/gemini-2.0-flash": {
     "litellm_provider": "gemini",
@@ -2069,7 +2148,10 @@
   },
   "gemini/gemini-2.0-flash-exp": {
     "litellm_provider": "gemini",
-    "api_key_name": "GEMINI_API_KEY"
+    "api_key_name": "GEMINI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.NotFoundError: GeminiException - {\n  \"error\": {\n    \"code\": 404,\n    \"message\": \"models/gemini-2.0-flash-exp is not found for API version v1beta, or is not supported for generateContent. Call ",
+    "deprecated_date": "2026-01-29T21:44:57.323555"
   },
   "gemini/gemini-2.0-flash-lite": {
     "litellm_provider": "gemini",
@@ -2077,11 +2159,17 @@
   },
   "gemini/gemini-2.0-flash-lite-preview-02-05": {
     "litellm_provider": "gemini",
-    "api_key_name": "GEMINI_API_KEY"
+    "api_key_name": "GEMINI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.NotFoundError: GeminiException - {\n  \"error\": {\n    \"code\": 404,\n    \"message\": \"models/gemini-2.0-flash-lite-preview-02-05 is not found for API version v1beta, or is not supported for generat",
+    "deprecated_date": "2026-01-29T21:44:57.323626"
   },
   "gemini/gemini-2.0-flash-live-001": {
     "litellm_provider": "gemini",
-    "api_key_name": "GEMINI_API_KEY"
+    "api_key_name": "GEMINI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.NotFoundError: GeminiException - {\n  \"error\": {\n    \"code\": 404,\n    \"message\": \"models/gemini-2.0-flash-live-001 is not found for API version v1beta, or is not supported for generateContent. ",
+    "deprecated_date": "2026-01-29T21:44:57.323695"
   },
   "gemini/gemini-2.0-flash-preview-image-generation": {
     "litellm_provider": "gemini",
@@ -2089,19 +2177,31 @@
   },
   "gemini/gemini-2.0-flash-thinking-exp": {
     "litellm_provider": "gemini",
-    "api_key_name": "GEMINI_API_KEY"
+    "api_key_name": "GEMINI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.NotFoundError: GeminiException - {\n  \"error\": {\n    \"code\": 404,\n    \"message\": \"models/gemini-2.0-flash-thinking-exp is not found for API version v1beta, or is not supported for generateConte",
+    "deprecated_date": "2026-01-29T21:44:57.323763"
   },
   "gemini/gemini-2.0-flash-thinking-exp-01-21": {
     "litellm_provider": "gemini",
-    "api_key_name": "GEMINI_API_KEY"
+    "api_key_name": "GEMINI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.NotFoundError: GeminiException - {\n  \"error\": {\n    \"code\": 404,\n    \"message\": \"models/gemini-2.0-flash-thinking-exp-01-21 is not found for API version v1beta, or is not supported for generat",
+    "deprecated_date": "2026-01-29T21:44:57.323831"
   },
   "gemini/gemini-2.0-pro-exp-02-05": {
     "litellm_provider": "gemini",
-    "api_key_name": "GEMINI_API_KEY"
+    "api_key_name": "GEMINI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.NotFoundError: GeminiException - {\n  \"error\": {\n    \"code\": 404,\n    \"message\": \"models/gemini-2.0-pro-exp-02-05 is not found for API version v1beta, or is not supported for generateContent. C",
+    "deprecated_date": "2026-01-29T21:44:57.323897"
   },
   "gemini/gemini-2.5-flash": {
     "litellm_provider": "gemini",
-    "api_key_name": "GEMINI_API_KEY"
+    "api_key_name": "GEMINI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "'NoneType' object is not subscriptable",
+    "deprecated_date": "2026-01-29T21:44:57.323963"
   },
   "gemini/gemini-2.5-flash-image-preview": {
     "litellm_provider": "gemini",
@@ -2121,11 +2221,17 @@
   },
   "gemini/gemini-2.5-flash-preview-09-2025": {
     "litellm_provider": "gemini",
-    "api_key_name": "GEMINI_API_KEY"
+    "api_key_name": "GEMINI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "'NoneType' object is not subscriptable",
+    "deprecated_date": "2026-01-29T21:44:57.324043"
   },
   "gemini/gemini-flash-latest": {
     "litellm_provider": "gemini",
-    "api_key_name": "GEMINI_API_KEY"
+    "api_key_name": "GEMINI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "'NoneType' object is not subscriptable",
+    "deprecated_date": "2026-01-29T21:44:57.324108"
   },
   "gemini/gemini-flash-lite-latest": {
     "litellm_provider": "gemini",
@@ -2133,15 +2239,24 @@
   },
   "gemini/gemini-2.5-flash-lite-preview-06-17": {
     "litellm_provider": "gemini",
-    "api_key_name": "GEMINI_API_KEY"
+    "api_key_name": "GEMINI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.NotFoundError: GeminiException - {\n  \"error\": {\n    \"code\": 404,\n    \"message\": \"models/gemini-2.5-flash-lite-preview-06-17 is not found for API version v1beta, or is not supported for generat",
+    "deprecated_date": "2026-01-29T21:44:57.324184"
   },
   "gemini/gemini-2.5-flash-preview-04-17": {
     "litellm_provider": "gemini",
-    "api_key_name": "GEMINI_API_KEY"
+    "api_key_name": "GEMINI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.NotFoundError: GeminiException - {\n  \"error\": {\n    \"code\": 404,\n    \"message\": \"models/gemini-2.5-flash-preview-04-17 is not found for API version v1beta, or is not supported for generateCont",
+    "deprecated_date": "2026-01-29T21:44:57.324254"
   },
   "gemini/gemini-2.5-flash-preview-05-20": {
     "litellm_provider": "gemini",
-    "api_key_name": "GEMINI_API_KEY"
+    "api_key_name": "GEMINI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.NotFoundError: GeminiException - {\n  \"error\": {\n    \"code\": 404,\n    \"message\": \"models/gemini-2.5-flash-preview-05-20 is not found for API version v1beta, or is not supported for generateCont",
+    "deprecated_date": "2026-01-29T21:44:57.324319"
   },
   "gemini/gemini-2.5-flash-preview-tts": {
     "litellm_provider": "gemini",
@@ -2149,11 +2264,17 @@
   },
   "gemini/gemini-2.5-pro": {
     "litellm_provider": "gemini",
-    "api_key_name": "GEMINI_API_KEY"
+    "api_key_name": "GEMINI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "'NoneType' object is not subscriptable",
+    "deprecated_date": "2026-01-29T21:44:57.324381"
   },
   "gemini/gemini-2.5-computer-use-preview-10-2025": {
     "litellm_provider": "gemini",
-    "api_key_name": "GEMINI_API_KEY"
+    "api_key_name": "GEMINI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.BadRequestError: GeminiException BadRequestError - {\n  \"error\": {\n    \"code\": 400,\n    \"message\": \"This model requires the use of the Computer Use tool. See https://ai.google.dev/gemini-api/do",
+    "deprecated_date": "2026-01-29T21:44:57.324444"
   },
   "gemini/gemini-3-pro-preview": {
     "litellm_provider": "gemini",
@@ -2165,19 +2286,31 @@
   },
   "gemini/gemini-2.5-pro-exp-03-25": {
     "litellm_provider": "gemini",
-    "api_key_name": "GEMINI_API_KEY"
+    "api_key_name": "GEMINI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.NotFoundError: GeminiException - {\n  \"error\": {\n    \"code\": 404,\n    \"message\": \"models/gemini-2.5-pro-exp-03-25 is not found for API version v1beta, or is not supported for generateContent. C",
+    "deprecated_date": "2026-01-29T21:44:57.324506"
   },
   "gemini/gemini-2.5-pro-preview-03-25": {
     "litellm_provider": "gemini",
-    "api_key_name": "GEMINI_API_KEY"
+    "api_key_name": "GEMINI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.NotFoundError: GeminiException - {\n  \"error\": {\n    \"code\": 404,\n    \"message\": \"models/gemini-2.5-pro-preview-03-25 is not found for API version v1beta, or is not supported for generateConten",
+    "deprecated_date": "2026-01-29T21:44:57.324568"
   },
   "gemini/gemini-2.5-pro-preview-05-06": {
     "litellm_provider": "gemini",
-    "api_key_name": "GEMINI_API_KEY"
+    "api_key_name": "GEMINI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.NotFoundError: GeminiException - {\n  \"error\": {\n    \"code\": 404,\n    \"message\": \"models/gemini-2.5-pro-preview-05-06 is not found for API version v1beta, or is not supported for generateConten",
+    "deprecated_date": "2026-01-29T21:44:57.324629"
   },
   "gemini/gemini-2.5-pro-preview-06-05": {
     "litellm_provider": "gemini",
-    "api_key_name": "GEMINI_API_KEY"
+    "api_key_name": "GEMINI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.NotFoundError: GeminiException - {\n  \"error\": {\n    \"code\": 404,\n    \"message\": \"models/gemini-2.5-pro-preview-06-05 is not found for API version v1beta, or is not supported for generateConten",
+    "deprecated_date": "2026-01-29T21:44:57.324691"
   },
   "gemini/gemini-2.5-pro-preview-tts": {
     "litellm_provider": "gemini",
@@ -2185,27 +2318,45 @@
   },
   "gemini/gemini-exp-1114": {
     "litellm_provider": "gemini",
-    "api_key_name": "GEMINI_API_KEY"
+    "api_key_name": "GEMINI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.NotFoundError: GeminiException - {\n  \"error\": {\n    \"code\": 404,\n    \"message\": \"models/gemini-exp-1114 is not found for API version v1beta, or is not supported for generateContent. Call ListM",
+    "deprecated_date": "2026-01-29T21:44:57.324753"
   },
   "gemini/gemini-exp-1206": {
     "litellm_provider": "gemini",
-    "api_key_name": "GEMINI_API_KEY"
+    "api_key_name": "GEMINI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.RateLimitError: litellm.RateLimitError: GeminiException - {\n  \"error\": {\n    \"code\": 429,\n    \"message\": \"You exceeded your current quota. Please migrate to Gemini 2.5 Pro (models/gemini-2.5-p",
+    "deprecated_date": "2026-01-29T21:44:57.324814"
   },
   "gemini/gemini-gemma-2-27b-it": {
     "litellm_provider": "gemini",
-    "api_key_name": "GEMINI_API_KEY"
+    "api_key_name": "GEMINI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.NotFoundError: GeminiException - {\n  \"error\": {\n    \"code\": 404,\n    \"message\": \"models/gemini-gemma-2-27b-it is not found for API version v1beta, or is not supported for generateContent. Call",
+    "deprecated_date": "2026-01-29T21:44:57.324875"
   },
   "gemini/gemini-gemma-2-9b-it": {
     "litellm_provider": "gemini",
-    "api_key_name": "GEMINI_API_KEY"
+    "api_key_name": "GEMINI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.NotFoundError: GeminiException - {\n  \"error\": {\n    \"code\": 404,\n    \"message\": \"models/gemini-gemma-2-9b-it is not found for API version v1beta, or is not supported for generateContent. Call ",
+    "deprecated_date": "2026-01-29T21:44:57.324937"
   },
   "gemini/gemini-pro": {
     "litellm_provider": "gemini",
-    "api_key_name": "GEMINI_API_KEY"
+    "api_key_name": "GEMINI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.NotFoundError: GeminiException - {\n  \"error\": {\n    \"code\": 404,\n    \"message\": \"models/gemini-pro is not found for API version v1beta, or is not supported for generateContent. Call ListModels",
+    "deprecated_date": "2026-01-29T21:44:57.324997"
   },
   "gemini/gemini-pro-vision": {
     "litellm_provider": "gemini",
-    "api_key_name": "GEMINI_API_KEY"
+    "api_key_name": "GEMINI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.NotFoundError: GeminiException - {\n  \"error\": {\n    \"code\": 404,\n    \"message\": \"models/gemini-pro-vision is not found for API version v1beta, or is not supported for generateContent. Call Lis",
+    "deprecated_date": "2026-01-29T21:44:57.325057"
   },
   "gemini/gemma-3-27b-it": {
     "litellm_provider": "gemini",
@@ -2237,35 +2388,59 @@
   },
   "gemini/learnlm-1.5-pro-experimental": {
     "litellm_provider": "gemini",
-    "api_key_name": "GEMINI_API_KEY"
+    "api_key_name": "GEMINI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.NotFoundError: GeminiException - {\n  \"error\": {\n    \"code\": 404,\n    \"message\": \"models/learnlm-1.5-pro-experimental is not found for API version v1beta, or is not supported for generateConten",
+    "deprecated_date": "2026-01-29T21:44:57.325120"
   },
   "gemini/veo-2.0-generate-001": {
     "litellm_provider": "gemini",
-    "api_key_name": "GEMINI_API_KEY"
+    "api_key_name": "GEMINI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.NotFoundError: GeminiException - {\n  \"error\": {\n    \"code\": 404,\n    \"message\": \"models/veo-2.0-generate-001 is not found for API version v1beta, or is not supported for generateContent. Call ",
+    "deprecated_date": "2026-01-29T21:44:57.325181"
   },
   "gemini/veo-3.0-fast-generate-preview": {
     "litellm_provider": "gemini",
-    "api_key_name": "GEMINI_API_KEY"
+    "api_key_name": "GEMINI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.NotFoundError: GeminiException - {\n  \"error\": {\n    \"code\": 404,\n    \"message\": \"models/veo-3.0-fast-generate-preview is not found for API version v1beta, or is not supported for generateConte",
+    "deprecated_date": "2026-01-29T21:44:57.325241"
   },
   "gemini/veo-3.0-generate-preview": {
     "litellm_provider": "gemini",
-    "api_key_name": "GEMINI_API_KEY"
+    "api_key_name": "GEMINI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.NotFoundError: GeminiException - {\n  \"error\": {\n    \"code\": 404,\n    \"message\": \"models/veo-3.0-generate-preview is not found for API version v1beta, or is not supported for generateContent. C",
+    "deprecated_date": "2026-01-29T21:44:57.325300"
   },
   "gemini/veo-3.1-fast-generate-preview": {
     "litellm_provider": "gemini",
-    "api_key_name": "GEMINI_API_KEY"
+    "api_key_name": "GEMINI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.NotFoundError: GeminiException - {\n  \"error\": {\n    \"code\": 404,\n    \"message\": \"models/veo-3.1-fast-generate-preview is not found for API version v1beta, or is not supported for generateConte",
+    "deprecated_date": "2026-01-29T21:44:57.325360"
   },
   "gemini/veo-3.1-generate-preview": {
     "litellm_provider": "gemini",
-    "api_key_name": "GEMINI_API_KEY"
+    "api_key_name": "GEMINI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.NotFoundError: GeminiException - {\n  \"error\": {\n    \"code\": 404,\n    \"message\": \"models/veo-3.1-generate-preview is not found for API version v1beta, or is not supported for generateContent. C",
+    "deprecated_date": "2026-01-29T21:44:57.325421"
   },
   "gemini/veo-3.1-fast-generate-001": {
     "litellm_provider": "gemini",
-    "api_key_name": "GEMINI_API_KEY"
+    "api_key_name": "GEMINI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.NotFoundError: GeminiException - {\n  \"error\": {\n    \"code\": 404,\n    \"message\": \"models/veo-3.1-fast-generate-001 is not found for API version v1beta, or is not supported for generateContent. ",
+    "deprecated_date": "2026-01-29T21:44:57.325484"
   },
   "gemini/veo-3.1-generate-001": {
     "litellm_provider": "gemini",
-    "api_key_name": "GEMINI_API_KEY"
+    "api_key_name": "GEMINI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.NotFoundError: GeminiException - {\n  \"error\": {\n    \"code\": 404,\n    \"message\": \"models/veo-3.1-generate-001 is not found for API version v1beta, or is not supported for generateContent. Call ",
+    "deprecated_date": "2026-01-29T21:44:57.325545"
   },
   "google.gemma-3-12b-it": {
     "litellm_provider": "bedrock_converse",
@@ -2305,11 +2480,17 @@
   },
   "gpt-3.5-turbo-0301": {
     "litellm_provider": "openai",
-    "api_key_name": "OPENAI_API_KEY"
+    "api_key_name": "OPENAI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.NotFoundError: OpenAIException - The model `gpt-3.5-turbo-0301` has been deprecated, learn more here: https://platform.openai.com/docs/deprecations",
+    "deprecated_date": "2026-01-29T17:58:16.717705"
   },
   "gpt-3.5-turbo-0613": {
     "litellm_provider": "openai",
-    "api_key_name": "OPENAI_API_KEY"
+    "api_key_name": "OPENAI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.NotFoundError: OpenAIException - The model `gpt-3.5-turbo-0613` has been deprecated, learn more here: https://platform.openai.com/docs/deprecations",
+    "deprecated_date": "2026-01-29T17:58:16.717832"
   },
   "gpt-3.5-turbo-1106": {
     "litellm_provider": "openai",
@@ -2321,7 +2502,10 @@
   },
   "gpt-3.5-turbo-16k-0613": {
     "litellm_provider": "openai",
-    "api_key_name": "OPENAI_API_KEY"
+    "api_key_name": "OPENAI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.NotFoundError: OpenAIException - The model `gpt-3.5-turbo-16k-0613` has been deprecated, learn more here: https://platform.openai.com/docs/deprecations",
+    "deprecated_date": "2026-01-29T17:58:16.717923"
   },
   "gpt-4": {
     "litellm_provider": "openai",
@@ -2345,19 +2529,31 @@
   },
   "gpt-4-1106-vision-preview": {
     "litellm_provider": "openai",
-    "api_key_name": "OPENAI_API_KEY"
+    "api_key_name": "OPENAI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.NotFoundError: OpenAIException - The model `gpt-4-1106-vision-preview` has been deprecated, learn more here: https://platform.openai.com/docs/deprecations",
+    "deprecated_date": "2026-01-29T17:58:16.718005"
   },
   "gpt-4-32k": {
     "litellm_provider": "openai",
-    "api_key_name": "OPENAI_API_KEY"
+    "api_key_name": "OPENAI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.NotFoundError: OpenAIException - The model `gpt-4-32k` does not exist or you do not have access to it.",
+    "deprecated_date": "2026-01-29T17:58:16.718080"
   },
   "gpt-4-32k-0314": {
     "litellm_provider": "openai",
-    "api_key_name": "OPENAI_API_KEY"
+    "api_key_name": "OPENAI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.NotFoundError: OpenAIException - The model `gpt-4-32k-0314` does not exist or you do not have access to it.",
+    "deprecated_date": "2026-01-29T17:58:16.718153"
   },
   "gpt-4-32k-0613": {
     "litellm_provider": "openai",
-    "api_key_name": "OPENAI_API_KEY"
+    "api_key_name": "OPENAI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.NotFoundError: OpenAIException - The model `gpt-4-32k-0613` does not exist or you do not have access to it.",
+    "deprecated_date": "2026-01-29T17:58:16.718223"
   },
   "gpt-4-turbo": {
     "litellm_provider": "openai",
@@ -2373,7 +2569,10 @@
   },
   "gpt-4-vision-preview": {
     "litellm_provider": "openai",
-    "api_key_name": "OPENAI_API_KEY"
+    "api_key_name": "OPENAI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.NotFoundError: OpenAIException - The model `gpt-4-vision-preview` has been deprecated, learn more here: https://platform.openai.com/docs/deprecations",
+    "deprecated_date": "2026-01-29T17:58:16.718291"
   },
   "gpt-4.1": {
     "litellm_provider": "openai",
@@ -2401,11 +2600,17 @@
   },
   "gpt-4.5-preview": {
     "litellm_provider": "openai",
-    "api_key_name": "OPENAI_API_KEY"
+    "api_key_name": "OPENAI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.NotFoundError: OpenAIException - The model `gpt-4.5-preview` does not exist or you do not have access to it.",
+    "deprecated_date": "2026-01-29T17:58:16.718362"
   },
   "gpt-4.5-preview-2025-02-27": {
     "litellm_provider": "openai",
-    "api_key_name": "OPENAI_API_KEY"
+    "api_key_name": "OPENAI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.NotFoundError: OpenAIException - The model `gpt-4.5-preview-2025-02-27` does not exist or you do not have access to it.",
+    "deprecated_date": "2026-01-29T17:58:16.718429"
   },
   "gpt-4o": {
     "litellm_provider": "openai",
@@ -2685,19 +2890,31 @@
   },
   "gpt-5.2-pro": {
     "litellm_provider": "openai",
-    "api_key_name": "OPENAI_API_KEY"
+    "api_key_name": "OPENAI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.APIConnectionError: APIConnectionError: OpenAIException - argument of type 'NoneType' is not iterable",
+    "deprecated_date": "2026-01-29T17:58:16.718535"
   },
   "gpt-5.2-pro-2025-12-11": {
     "litellm_provider": "openai",
-    "api_key_name": "OPENAI_API_KEY"
+    "api_key_name": "OPENAI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.APIConnectionError: APIConnectionError: OpenAIException - argument of type 'NoneType' is not iterable",
+    "deprecated_date": "2026-01-29T17:58:16.718606"
   },
   "gpt-5-pro": {
     "litellm_provider": "openai",
-    "api_key_name": "OPENAI_API_KEY"
+    "api_key_name": "OPENAI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.APIConnectionError: APIConnectionError: OpenAIException - argument of type 'NoneType' is not iterable",
+    "deprecated_date": "2026-01-29T17:58:16.718672"
   },
   "gpt-5-pro-2025-10-06": {
     "litellm_provider": "openai",
-    "api_key_name": "OPENAI_API_KEY"
+    "api_key_name": "OPENAI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.APIConnectionError: APIConnectionError: OpenAIException - argument of type 'NoneType' is not iterable",
+    "deprecated_date": "2026-01-29T17:58:16.718739"
   },
   "gpt-5-2025-08-07": {
     "litellm_provider": "openai",
@@ -2705,7 +2922,10 @@
   },
   "gpt-5-chat": {
     "litellm_provider": "openai",
-    "api_key_name": "OPENAI_API_KEY"
+    "api_key_name": "OPENAI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.NotFoundError: OpenAIException - The model `gpt-5-chat` does not exist or you do not have access to it.",
+    "deprecated_date": "2026-01-29T17:58:16.718807"
   },
   "gpt-5-chat-latest": {
     "litellm_provider": "openai",
@@ -3197,27 +3417,45 @@
   },
   "o1-mini": {
     "litellm_provider": "openai",
-    "api_key_name": "OPENAI_API_KEY"
+    "api_key_name": "OPENAI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.NotFoundError: OpenAIException - The model `o1-mini` does not exist or you do not have access to it.",
+    "deprecated_date": "2026-01-29T17:58:16.718930"
   },
   "o1-mini-2024-09-12": {
     "litellm_provider": "openai",
-    "api_key_name": "OPENAI_API_KEY"
+    "api_key_name": "OPENAI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.NotFoundError: OpenAIException - The model `o1-mini-2024-09-12` does not exist or you do not have access to it.",
+    "deprecated_date": "2026-01-29T17:58:16.719002"
   },
   "o1-preview": {
     "litellm_provider": "openai",
-    "api_key_name": "OPENAI_API_KEY"
+    "api_key_name": "OPENAI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.NotFoundError: OpenAIException - The model `o1-preview` does not exist or you do not have access to it.",
+    "deprecated_date": "2026-01-29T17:58:16.719068"
   },
   "o1-preview-2024-09-12": {
     "litellm_provider": "openai",
-    "api_key_name": "OPENAI_API_KEY"
+    "api_key_name": "OPENAI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.NotFoundError: OpenAIException - The model `o1-preview-2024-09-12` does not exist or you do not have access to it.",
+    "deprecated_date": "2026-01-29T17:58:16.719137"
   },
   "o1-pro": {
     "litellm_provider": "openai",
-    "api_key_name": "OPENAI_API_KEY"
+    "api_key_name": "OPENAI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.APIConnectionError: APIConnectionError: OpenAIException - argument of type 'NoneType' is not iterable",
+    "deprecated_date": "2026-01-29T17:58:16.719204"
   },
   "o1-pro-2025-03-19": {
     "litellm_provider": "openai",
-    "api_key_name": "OPENAI_API_KEY"
+    "api_key_name": "OPENAI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.APIConnectionError: APIConnectionError: OpenAIException - argument of type 'NoneType' is not iterable",
+    "deprecated_date": "2026-01-29T17:58:16.719269"
   },
   "o3": {
     "litellm_provider": "openai",
@@ -3245,11 +3483,17 @@
   },
   "o3-pro": {
     "litellm_provider": "openai",
-    "api_key_name": "OPENAI_API_KEY"
+    "api_key_name": "OPENAI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.APIConnectionError: APIConnectionError: OpenAIException - argument of type 'NoneType' is not iterable",
+    "deprecated_date": "2026-01-29T17:58:16.719338"
   },
   "o3-pro-2025-06-10": {
     "litellm_provider": "openai",
-    "api_key_name": "OPENAI_API_KEY"
+    "api_key_name": "OPENAI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.APIConnectionError: APIConnectionError: OpenAIException - argument of type 'NoneType' is not iterable",
+    "deprecated_date": "2026-01-29T17:58:16.719405"
   },
   "o4-mini": {
     "litellm_provider": "openai",
@@ -3577,15 +3821,24 @@
   },
   "xai/grok-2": {
     "litellm_provider": "xai",
-    "api_key_name": "XAI_API_KEY"
+    "api_key_name": "XAI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.NotFoundError: NotFoundError: XaiException - {\"code\":\"Some requested entity was not found\",\"error\":\"The model grok-2 does not exist or your teams",
+    "deprecated_date": "2026-01-29T18:47:19.050059"
   },
   "xai/grok-2-1212": {
     "litellm_provider": "xai",
-    "api_key_name": "XAI_API_KEY"
+    "api_key_name": "XAI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.NotFoundError: NotFoundError: XaiException - {\"code\":\"Some requested entity was not found\",\"error\":\"The model grok-2-1212 was deprecated on 2025-09-15 and is no longer accessible via the API. ",
+    "deprecated_date": "2026-01-29T18:47:19.050127"
   },
   "xai/grok-2-latest": {
     "litellm_provider": "xai",
-    "api_key_name": "XAI_API_KEY"
+    "api_key_name": "XAI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.NotFoundError: NotFoundError: XaiException - {\"code\":\"Some requested entity was not found\",\"error\":\"The model grok-2-latest does not exist or your team",
+    "deprecated_date": "2026-01-29T18:47:19.050157"
   },
   "xai/grok-2-vision": {
     "litellm_provider": "xai",
@@ -3685,7 +3938,10 @@
   },
   "xai/grok-beta": {
     "litellm_provider": "xai",
-    "api_key_name": "XAI_API_KEY"
+    "api_key_name": "XAI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.NotFoundError: NotFoundError: XaiException - {\"code\":\"Some requested entity was not found\",\"error\":\"The model grok-beta was deprecated on 2025-09-15 and is no longer accessible via the API. Pl",
+    "deprecated_date": "2026-01-29T18:47:19.050191"
   },
   "xai/grok-code-fast": {
     "litellm_provider": "xai",
@@ -3701,7 +3957,10 @@
   },
   "xai/grok-vision-beta": {
     "litellm_provider": "xai",
-    "api_key_name": "XAI_API_KEY"
+    "api_key_name": "XAI_API_KEY",
+    "deprecated": true,
+    "deprecated_reason": "litellm.NotFoundError: NotFoundError: XaiException - {\"code\":\"Some requested entity was not found\",\"error\":\"The model grok-vision-beta does not exist or your team",
+    "deprecated_date": "2026-01-29T18:47:19.050217"
   },
   "openai/container": {
     "litellm_provider": "openai",
