@@ -423,6 +423,10 @@ def make_queue_items_query(
 
     # Add filters that can be applied directly on queue_items table
     if filter is not None:
+        if filter.id is not None:
+            param = pb.add(filter.id, None, "String")
+            where_clauses.append(f"qi.id = {param}")
+
         if filter.call_id is not None:
             param = pb.add(filter.call_id, None, "String")
             where_clauses.append(f"qi.call_id = {param}")
