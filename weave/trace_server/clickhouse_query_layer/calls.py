@@ -308,6 +308,11 @@ class CallsRepository:
             build_usage_query,
         )
 
+        # Resolve which table to read from based on project data residency
+        read_table = self._table_routing_resolver.resolve_read_table(
+            req.project_id, self._ch_client.ch_client
+        )
+
         usage_buckets: list[dict[str, Any]] = []
         call_buckets: list[dict[str, Any]] = []
         granularity = req.granularity
@@ -317,7 +322,7 @@ class CallsRepository:
         if req.usage_metrics:
             pb = ParamBuilder()
             query, columns, params, granularity, start, end = build_usage_query(
-                req, req.usage_metrics, pb
+                req, req.usage_metrics, pb, read_table
             )
             result = self._ch_client.query(query, params)
             for row in result.result_rows:
@@ -328,7 +333,7 @@ class CallsRepository:
         if req.call_metrics:
             pb = ParamBuilder()
             query, columns, params, granularity, start, end = build_call_metrics_query(
-                req, req.call_metrics, pb
+                req, req.call_metrics, pb, read_table
             )
             result = self._ch_client.query(query, params)
             for row in result.result_rows:

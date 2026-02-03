@@ -386,6 +386,12 @@ class ClickHouseTraceServer(TraceServerInterface):
         """Delete object versions by digest."""
         return self._objects_repo.obj_delete(req)
 
+    def obj_create_batch(
+        self, batch: list[tsi.ObjSchemaForInsert]
+    ) -> list[tsi.ObjCreateRes]:
+        """Create multiple objects in a batch."""
+        return self._objects_repo.obj_create_batch(batch)
+
     # =========================================================================
     # Table API
     # =========================================================================

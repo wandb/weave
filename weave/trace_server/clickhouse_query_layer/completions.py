@@ -23,7 +23,7 @@ from weave.trace_server.constants import (
     COMPLETIONS_CREATE_OP_NAME,
     IMAGE_GENERATION_CREATE_OP_NAME,
 )
-from weave.trace_server.errors import MissingLLMApiKeyError
+from weave.trace_server.errors import InvalidRequest, MissingLLMApiKeyError
 from weave.trace_server.image_completion import lite_llm_image_generation
 from weave.trace_server.llm_completion import (
     get_custom_provider_info,
@@ -404,6 +404,12 @@ def _setup_completion_model_info(
         # Custom provider path - model_name format: custom::<provider>::<model>
         # Parse provider and model names, create sanitized object_id for lookup
         raw_model = req.inputs.model
+
+        # Validate that the model starts with custom:: if we're going to treat it as custom
+        if not raw_model.startswith("custom::"):
+            # This is not a custom provider and not in our known list
+            raise InvalidRequest("LLM Provider NOT provided")
+
         name_part = raw_model.replace("custom::", "")
 
         if "::" in name_part:
@@ -438,6 +444,7 @@ def _setup_completion_model_info(
             api_key = (
                 custom_provider_info.api_key
             )  # Already fetched by get_custom_provider_info
+            provider = "custom"
         else:
             # Unknown model, try to get API key from common providers
             common_keys = ["OPENAI_API_KEY", "ANTHROPIC_API_KEY"]

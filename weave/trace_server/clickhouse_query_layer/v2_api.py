@@ -382,8 +382,12 @@ class V2ApiRepository:
         )
         obj_read_res = self._obj_read_with_retry(obj_read_req)
 
-        # Build the scorer reference
-        scorer_ref = f"weave:///{req.project_id}/object/{scorer_id}:{obj_result.digest}"
+        # Build the scorer reference using InternalObjectRef
+        scorer_ref = ri.InternalObjectRef(
+            project_id=req.project_id,
+            name=scorer_id,
+            version=obj_result.digest,
+        ).uri()
 
         return tsi.ScorerCreateRes(
             digest=obj_result.digest,
@@ -401,13 +405,19 @@ class V2ApiRepository:
         )
         result = self._obj_read_with_retry(obj_req)
         val = result.obj.val
+
+        # Extract name and description from val data
+        name = val.get("name", result.obj.object_id)
+        description = val.get("description")
+
         return tsi.ScorerReadRes(
             object_id=result.obj.object_id,
             digest=result.obj.digest,
             version_index=result.obj.version_index,
             created_at=result.obj.created_at,
-            name=val.get("name"),
-            description=val.get("description"),
+            name=name,
+            description=description,
+            score_op=val.get("score", ""),
         )
 
     def scorer_list(self, req: tsi.ScorerListReq) -> Iterator[tsi.ScorerReadRes]:
@@ -430,13 +440,19 @@ class V2ApiRepository:
             if not isinstance(val, dict):
                 continue
 
+            # Extract name, description, and score_op from val data
+            name = val.get("name", obj.object_id)
+            description = val.get("description")
+            score_op = val.get("score", "")
+
             yield tsi.ScorerReadRes(
                 object_id=obj.object_id,
                 digest=obj.digest,
                 version_index=obj.version_index,
                 created_at=obj.created_at,
-                name=val.get("name"),
-                description=val.get("description"),
+                name=name,
+                description=description,
+                score_op=score_op,
             )
 
     # =========================================================================
