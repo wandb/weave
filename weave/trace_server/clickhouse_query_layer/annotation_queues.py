@@ -1,5 +1,6 @@
 # ClickHouse Annotation Queues - Annotation queue CRUD operations
 
+import datetime
 from collections.abc import Iterator
 
 import ddtrace
@@ -17,16 +18,15 @@ from weave.trace_server.clickhouse_query_layer.query_builders.annotation_queues 
     make_queue_items_query,
     make_queue_read_query,
     make_queues_query,
+    make_queues_stats_query,
 )
+from weave.trace_server.common_interface import AnnotationQueueItemsFilter
 from weave.trace_server.errors import NotFoundError
 from weave.trace_server.ids import generate_id
 from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.project_version.project_version import TableRoutingResolver
 from weave.trace_server.trace_server_interface_util import assert_non_null_wb_user_id
-import datetime
 
-from weave.trace_server.common_interface import AnnotationQueueItemsFilter
-from weave.trace_server.ids import generate_id
 
 class AnnotationQueuesRepository:
     """Repository for annotation queue CRUD operations."""
@@ -480,10 +480,6 @@ class AnnotationQueuesRepository:
         self, req: tsi.AnnotationQueuesStatsReq
     ) -> tsi.AnnotationQueuesStatsRes:
         """Get stats for annotation queues."""
-        from weave.trace_server.clickhouse_query_layer.query_builders.annotation_queues import (
-            make_queues_stats_query,
-        )
-
         pb = ParamBuilder()
         query = make_queues_stats_query(
             project_id=req.project_id,

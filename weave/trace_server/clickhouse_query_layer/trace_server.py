@@ -28,10 +28,10 @@ from weave.trace_server.clickhouse_query_layer.feedback import FeedbackRepositor
 from weave.trace_server.clickhouse_query_layer.files import FilesRepository
 from weave.trace_server.clickhouse_query_layer.objects import ObjectsRepository
 from weave.trace_server.clickhouse_query_layer.otel import OtelRepository
+from weave.trace_server.clickhouse_query_layer.project import ProjectRepository
 from weave.trace_server.clickhouse_query_layer.query_builders.objects import (
     ObjectMetadataQueryBuilder,
 )
-from weave.trace_server.clickhouse_query_layer.project import ProjectRepository
 from weave.trace_server.clickhouse_query_layer.refs import RefsRepository
 from weave.trace_server.clickhouse_query_layer.tables import TablesRepository
 from weave.trace_server.clickhouse_query_layer.threads import ThreadsRepository
@@ -169,9 +169,8 @@ class ClickHouseTraceServer(TraceServerInterface):
         # Refs repository
         self._refs_repo = RefsRepository(
             obj_read_func=lambda req: self.obj_read(req),
-            table_row_read_func=lambda project_id, row_digest: self._tables_repo.table_row_read(
-                project_id, row_digest
-            ),
+            table_row_read_func=lambda project_id,
+            row_digest: self._tables_repo.table_row_read(project_id, row_digest),
         )
 
         # OTel repository
