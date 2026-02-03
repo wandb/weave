@@ -3155,6 +3155,22 @@ def test_calls_query_datetime_optimization_with_gt_operation(client):
     mid_call_ids = {call.id for call in mid_calls}
     assert mid_call_ids == {call3.id, call4.id}
 
+    # Test LT operation on started_at
+    lt_query = tsi.Query(
+        **{
+            "$expr": {
+                "$and": [
+                    {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]},
+                    {"$lt": [{"$getField": "started_at"}, {"$literal": call3_ts}]},
+                ]
+            }
+        }
+    )
+    lt_calls = list(client.get_calls(query=lt_query))
+    assert len(lt_calls) == 2  # Should get call1 and call2
+    lt_call_ids = {call.id for call in lt_calls}
+    assert lt_call_ids == {call1.id, call2.id}
+
     # Test GT operation with a timestamp after all calls
     future_timestamp = call4_ts + 1000  # 1000 seconds after the last call
     future_query = tsi.Query(
@@ -3183,13 +3199,9 @@ def test_calls_query_datetime_optimization_with_gt_operation(client):
                     {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]},
                     {"$gt": [{"$getField": "started_at"}, {"$literal": call2_ts}]},
                     {
-                        "$not": [
-                            {
-                                "$gt": [
-                                    {"$getField": "started_at"},
-                                    {"$literal": call4_ts},
-                                ]
-                            }
+                        "$lte": [
+                            {"$getField": "started_at"},
+                            {"$literal": call4_ts},
                         ]
                     },
                 ]
@@ -3209,8 +3221,9 @@ def test_calls_query_datetime_optimization_with_gt_operation(client):
                     {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]},
                     {"$gt": [{"$getField": "ended_at"}, {"$literal": call2_ts}]},
                     {
-                        "$not": [
-                            {"$gt": [{"$getField": "ended_at"}, {"$literal": call4_ts}]}
+                        "$lte": [
+                            {"$getField": "ended_at"},
+                            {"$literal": call4_ts},
                         ]
                     },
                 ]

@@ -604,6 +604,15 @@ def test_trace_call_wb_run_step_query(client):
     )
     assert len(res.calls) == count
 
+    lt_query = tsi.Query(
+        **{"$expr": {"$lt": [{"$getField": "wb_run_step"}, {"$literal": compare_step}]}}
+    )
+    res = server.calls_query(
+        tsi.CallsQueryReq(project_id=get_client_project_id(client), query=lt_query)
+    )
+    exp_lt_count = len([step for step in exp_start_steps if step < compare_step])
+    assert len(res.calls) == exp_lt_count
+
     count = 4
     compare_step = exp_end_steps[-count]
     range_query = tsi.Query(
