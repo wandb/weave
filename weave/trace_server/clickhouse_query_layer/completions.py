@@ -6,6 +6,7 @@
 import datetime
 import logging
 from collections.abc import Callable, Iterator
+from re import sub
 from typing import TYPE_CHECKING, Any
 
 from weave.trace_server import trace_server_interface as tsi
@@ -361,6 +362,11 @@ class CompletionsRepository:
 # =============================================================================
 
 
+def _sanitize_name_for_object_id(name: str) -> str:
+    """Sanitize a name to be used as part of an object_id."""
+    return sub(r"[^a-zA-Z0-9_-]", "_", name)
+
+
 def _setup_completion_model_info(
     model_info: Any,
     req: tsi.CompletionsCreateReq,
@@ -395,23 +401,43 @@ def _setup_completion_model_info(
             api_key = secrets.get("secrets", {}).get(api_key_name)
     else:
         # Check if it's a custom provider model
+        # Custom provider path - model_name format: custom::<provider>::<model>
+        # Parse provider and model names, create sanitized object_id for lookup
+        raw_model = req.inputs.model
+        name_part = raw_model.replace("custom::", "")
+
+        if "::" in name_part:
+            # Format: custom::<provider>::<model>
+            provider_name, model_name_part = name_part.split("::", 1)
+
+            # Create sanitized object_id to match what was created during provider setup
+            sanitized_provider = _sanitize_name_for_object_id(provider_name)
+            sanitized_model = _sanitize_name_for_object_id(model_name_part)
+            sanitized_object_id = f"{sanitized_provider}-{sanitized_model}"
+        else:
+            # Fallback: assume it's already in object_id format
+            # Extract names from object_id (this is a fallback case)
+            parts = name_part.split("-", 1) if "-" in name_part else [name_part, ""]
+            provider_name = parts[0]  # May be sanitized
+            sanitized_provider = provider_name  # Already sanitized
+            sanitized_object_id = name_part
+
         custom_provider_info = get_custom_provider_info(
             project_id=req.project_id,
-            provider_name="",  # Empty for digest lookup
-            model_name=req.inputs.model,
+            provider_name=sanitized_provider,
+            model_name=sanitized_object_id,
             obj_read_func=obj_read_func,
         )
 
         if custom_provider_info:
-            model_name = custom_provider_info.get("model", model_name)
-            provider = custom_provider_info.get("provider")
-            base_url = custom_provider_info.get("base_url")
-            extra_headers = custom_provider_info.get("extra_headers")
-            return_type = custom_provider_info.get("return_type")
-            api_key_name = custom_provider_info.get("api_key_name")
-            if api_key_name:
-                secrets = secret_fetcher.fetch(api_key_name)
-                api_key = secrets.get("secrets", {}).get(api_key_name)
+            # CustomProviderInfo is a Pydantic BaseModel - use attribute access
+            model_name = custom_provider_info.actual_model_name
+            base_url = custom_provider_info.base_url
+            extra_headers = custom_provider_info.extra_headers
+            return_type = custom_provider_info.return_type
+            api_key = (
+                custom_provider_info.api_key
+            )  # Already fetched by get_custom_provider_info
         else:
             # Unknown model, try to get API key from common providers
             common_keys = ["OPENAI_API_KEY", "ANTHROPIC_API_KEY"]
@@ -432,6 +458,9 @@ def _create_tracked_stream_wrapper(
     project_id: str,
 ) -> Iterator[dict[str, Any]]:
     """Create a wrapper that tracks streaming completion chunks."""
+    # Yield meta chunk with call ID first
+    yield {"_meta": {"weave_call_id": start_call.id}}
+
     # Track state across chunks
     accumulated_response: dict[str, Any] = {}
     error_occurred: str | None = None
@@ -476,13 +505,18 @@ def _update_accumulated_response(
         for choice in chunk["choices"]:
             idx = choice.get("index", 0)
             while len(accumulated["choices"]) <= idx:
-                accumulated["choices"].append({"message": {"content": ""}})
+                accumulated["choices"].append(
+                    {"index": len(accumulated["choices"]), "message": {"content": ""}}
+                )
             if "delta" in choice:
                 delta = choice["delta"]
                 if "content" in delta and delta["content"]:
                     accumulated["choices"][idx]["message"]["content"] += delta[
                         "content"
                     ]
+            # Preserve finish_reason
+            if "finish_reason" in choice and choice["finish_reason"]:
+                accumulated["choices"][idx]["finish_reason"] = choice["finish_reason"]
 
     if "usage" in chunk:
         accumulated["usage"] = chunk["usage"]

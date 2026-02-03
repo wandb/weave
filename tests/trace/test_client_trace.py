@@ -3590,20 +3590,18 @@ def test_inline_pydantic_basemodel_generates_no_refs_in_object(client):
 
 def test_large_keys_are_stripped_call(client, caplog, monkeypatch):
     from weave.trace_server.clickhouse_query_layer import settings as ch_settings
-    from weave.trace_server.clickhouse_query_layer.trace_server import (
-        ClickHouseTraceServer,
-    )
+    from weave.trace_server.clickhouse_query_layer.batching import BatchManager
 
     is_sqlite = client_is_sqlite(client)
     if is_sqlite:
         # no need to strip in sqlite
         return
 
-    original_insert_call_batch = ClickHouseTraceServer._insert_call_batch
+    original_insert_call_batch = BatchManager.insert_call_batch
     max_size = 10 * 1024
 
-    # Patch _insert_call_batch to raise InsertTooLarge
-    def mock_insert_call_batch(self, batch):
+    # Patch insert_call_batch to raise InsertTooLarge
+    def mock_insert_call_batch(self, batch, settings=None, do_sync_insert=False):
         # mock raise insert error
         if len(str(batch)) > max_size:
             raise InsertTooLarge(
@@ -3611,7 +3609,7 @@ def test_large_keys_are_stripped_call(client, caplog, monkeypatch):
                 "A likely cause is that a single row or cell exceeded "
                 "the limit. If logging images, save them as `Image.PIL`."
             )
-        original_insert_call_batch(self, batch)
+        original_insert_call_batch(self, batch, settings, do_sync_insert)
 
     monkeypatch.setattr(
         ch_settings,
@@ -3619,8 +3617,8 @@ def test_large_keys_are_stripped_call(client, caplog, monkeypatch):
         max_size,
     )
     monkeypatch.setattr(
-        ClickHouseTraceServer,
-        "_insert_call_batch",
+        BatchManager,
+        "insert_call_batch",
         mock_insert_call_batch,
     )
 

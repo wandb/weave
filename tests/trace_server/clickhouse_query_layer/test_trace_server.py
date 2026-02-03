@@ -10,6 +10,7 @@ from clickhouse_connect.driver.exceptions import DatabaseError
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.clickhouse_query_layer import trace_server as chts
 from weave.trace_server.clickhouse_query_layer.calls import (
+    CallsRepository,
     ch_call_dict_to_call_schema_dict,
 )
 from weave.trace_server.clickhouse_query_layer.client import ClickHouseClient
@@ -32,7 +33,7 @@ def test_clickhouse_storage_size_query_generation():
     mock_raw_client = MagicMock()
     with (
         patch(
-            "weave.trace_server.clickhouse_query_layer.query_builders.calls.calls_query_builder.CallsQuery",
+            "weave.trace_server.clickhouse_query_layer.calls.CallsQuery",
             autospec=True,
         ) as mock_cq,
         patch.object(ClickHouseClient, "query_stream") as mock_query_stream,
@@ -362,7 +363,7 @@ def test_completions_create_stream_custom_provider_with_tracking():
             "weave.trace_server.clickhouse_query_layer.completions.lite_llm_completion_stream"
         ) as mock_litellm,
         patch.object(chts.ClickHouseTraceServer, "obj_read") as mock_obj_read,
-        patch.object(chts.ClickHouseTraceServer, "_insert_call") as mock_insert_call,
+        patch.object(CallsRepository, "_insert_call") as mock_insert_call,
         patch.object(ClickHouseClient, "_mint_client", return_value=mock_raw_client),
     ):
         # Mock the litellm completion stream
@@ -533,7 +534,7 @@ def test_completions_create_stream_multiple_choices():
         patch(
             "weave.trace_server.clickhouse_query_layer.completions.lite_llm_completion_stream"
         ) as mock_litellm,
-        patch.object(chts.ClickHouseTraceServer, "_insert_call") as mock_insert_call,
+        patch.object(CallsRepository, "_insert_call") as mock_insert_call,
         patch.object(ClickHouseClient, "_mint_client", return_value=mock_ch_client),
     ):
         # Mock the litellm completion stream
@@ -670,7 +671,7 @@ def test_completions_create_stream_single_choice_unified_wrapper():
         patch(
             "weave.trace_server.clickhouse_query_layer.completions.lite_llm_completion_stream"
         ) as mock_litellm,
-        patch.object(chts.ClickHouseTraceServer, "_insert_call") as mock_insert_call,
+        patch.object(CallsRepository, "_insert_call") as mock_insert_call,
         patch.object(ClickHouseClient, "_mint_client", return_value=mock_ch_client),
     ):
         # Mock the litellm completion stream
@@ -1016,7 +1017,7 @@ def test_file_batch_clears_on_insert_failure():
         server._batch_manager._file_batch.append(file_chunk)
 
         try:
-            server._batch_manager._flush_file_chunks()
+            server._batch_manager.flush_file_chunks()
         except _MockInsertError:
             pass
 

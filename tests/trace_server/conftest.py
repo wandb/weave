@@ -16,6 +16,9 @@ from tests.trace_server.workers.evaluate_model_test_worker import (
     EvaluateModelTestDispatcher,
 )
 from weave.trace_server.clickhouse_query_layer import (
+    migrator as wf_migrator,
+)
+from weave.trace_server.clickhouse_query_layer import (
     trace_server as clickhouse_trace_server_batched,
 )
 from weave.trace_server.project_version import project_version
@@ -177,10 +180,6 @@ def get_ch_trace_server(
 
             # Patch run_migrations to use worker-specific management database
             def patched_run_migrations():
-                from weave.trace_server.clickhouse_query_layer import (
-                    migrator as wf_migrator,
-                )
-
                 migrator = wf_migrator.get_clickhouse_trace_server_migrator(
                     ch_server._ch_client._mint_client(), management_db=management_db
                 )

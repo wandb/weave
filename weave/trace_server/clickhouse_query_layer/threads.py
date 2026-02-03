@@ -42,7 +42,7 @@ class ThreadsRepository:
         query = make_threads_query(
             project_id=req.project_id,
             pb=pb,
-            thread_ids=req.thread_ids,
+            thread_ids=req.filter.thread_ids,
             sort_by=req.sort_by,
             limit=req.limit,
             offset=req.offset,
