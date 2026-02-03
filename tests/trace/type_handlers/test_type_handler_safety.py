@@ -11,7 +11,7 @@ import weave
 from tests.trace.test_utils import FailingSaveType
 
 
-def test_op_output_with_failing_serializer_returns_value(client, failing_serializer):
+def test_op_output_with_failing_serializer_does_not_raise(client, failing_serializer):
     """Requirement: Op functions must return their values even when serialization fails
     Interface: @weave.op decorated function returning an object with failing type handler
     Given: An @weave.op function returns an object whose type handler save raises an exception
@@ -31,7 +31,7 @@ def test_op_output_with_failing_serializer_returns_value(client, failing_seriali
     assert result.value == "hello"
 
 
-def test_op_input_with_failing_serializer_executes_normally(client, failing_serializer):
+def test_op_input_with_failing_serializer_does_not_raise(client, failing_serializer):
     """Requirement: Op functions must execute normally even when input serialization fails
     Interface: @weave.op decorated function accepting an object with failing type handler
     Given: An @weave.op function accepts an object whose type handler save raises an exception
@@ -50,6 +50,38 @@ def test_op_input_with_failing_serializer_executes_normally(client, failing_seri
 
     # The function must return its computed result
     assert result == "processed: test_input"
+
+
+def test_op_with_multiple_args_one_failing_serializer_does_not_raise(
+    client, failing_serializer
+):
+    """Requirement: A failing serializer for one argument should not affect other arguments
+    Interface: @weave.op decorated function with multiple arguments
+    Given: An @weave.op function has multiple args, one with a failing type handler
+    When: The function is called
+    Then: The function executes normally and non-failing arguments are serialized properly
+    """
+
+    @weave.op
+    def mixed_args(normal_arg: str, failing_arg: FailingSaveType) -> str:
+        return f"{normal_arg}: {failing_arg.value}"
+
+    failing_obj = FailingSaveType("failing_value")
+
+    # This should NOT raise
+    result = mixed_args("normal", failing_obj)
+
+    # Function should execute normally
+    assert result == "normal: failing_value"
+
+    # Verify call was recorded
+    client.flush()
+    calls = mixed_args.calls()
+    assert len(calls) == 1
+
+    call = calls[0]
+    # The normal_arg should be serialized properly
+    assert call.inputs["normal_arg"] == "normal"
 
 
 def test_op_with_failing_serializer_call_is_recorded(client, failing_serializer):
@@ -90,33 +122,3 @@ def test_op_with_failing_serializer_call_is_recorded(client, failing_serializer)
     # Either way, the call should be recorded
     output_str = str(call.output)
     assert "record_test" in output_str or "FailingSaveType" in output_str
-
-
-def test_op_with_multiple_args_one_failing_serializer(client, failing_serializer):
-    """Requirement: A failing serializer for one argument should not affect other arguments
-    Interface: @weave.op decorated function with multiple arguments
-    Given: An @weave.op function has multiple args, one with a failing type handler
-    When: The function is called
-    Then: The function executes normally and non-failing arguments are serialized properly
-    """
-
-    @weave.op
-    def mixed_args(normal_arg: str, failing_arg: FailingSaveType) -> str:
-        return f"{normal_arg}: {failing_arg.value}"
-
-    failing_obj = FailingSaveType("failing_value")
-
-    # This should NOT raise
-    result = mixed_args("normal", failing_obj)
-
-    # Function should execute normally
-    assert result == "normal: failing_value"
-
-    # Verify call was recorded
-    client.flush()
-    calls = mixed_args.calls()
-    assert len(calls) == 1
-
-    call = calls[0]
-    # The normal_arg should be serialized properly
-    assert call.inputs["normal_arg"] == "normal"

@@ -106,6 +106,9 @@ def encode_custom_obj(obj: Any) -> EncodedCustomObjDict | None:
     art = MemTraceFilesArtifact()
     try:
         val = serializer.save(obj, art, "obj")
+    # TODO: In future, this should raise a specific WeaveException that can be caught
+    # and managed.  A higher level handler will then catch that exception and ignore
+    # it by default, leading to the current behaviour.
     except Exception:
         # Type handler save functions should never crash user code.
         # If a serializer fails, we log a warning and return None,
