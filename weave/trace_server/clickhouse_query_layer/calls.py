@@ -25,6 +25,9 @@ from weave.trace_server.clickhouse_query_layer.client import (
     ensure_datetimes_have_tz,
     nullable_any_dump_to_any,
 )
+from weave.trace_server.clickhouse_query_layer.query_builders.calls.call_metrics_query_builder import (
+    build_call_metrics_query,
+)
 from weave.trace_server.clickhouse_query_layer.query_builders.calls.calls_query_builder import (
     CallsQuery,
     HardCodedFilter,
@@ -32,6 +35,9 @@ from weave.trace_server.clickhouse_query_layer.query_builders.calls.calls_query_
     build_calls_complete_update_end_query,
     build_calls_complete_update_query,
     build_calls_stats_query,
+)
+from weave.trace_server.clickhouse_query_layer.query_builders.calls.usage_query_builder import (
+    build_usage_query,
 )
 from weave.trace_server.clickhouse_query_layer.schema import (
     ALL_CALL_COMPLETE_INSERT_COLUMNS,
@@ -64,6 +70,7 @@ from weave.trace_server.trace_server_interface_util import (
     assert_non_null_wb_user_id,
     extract_refs_from_values,
 )
+from weave.trace_server.usage_utils import aggregate_usage_with_descendants
 
 if TYPE_CHECKING:
     from weave.trace_server.kafka import KafkaProducer
@@ -301,13 +308,6 @@ class CallsRepository:
 
     def call_stats(self, req: tsi.CallStatsReq) -> tsi.CallStatsRes:
         """Get aggregated call statistics over a time range."""
-        from weave.trace_server.clickhouse_query_layer.query_builders.calls.call_metrics_query_builder import (
-            build_call_metrics_query,
-        )
-        from weave.trace_server.clickhouse_query_layer.query_builders.calls.usage_query_builder import (
-            build_usage_query,
-        )
-
         # Resolve which table to read from based on project data residency
         read_table = self._table_routing_resolver.resolve_read_table(
             req.project_id, self._ch_client.ch_client
@@ -351,8 +351,6 @@ class CallsRepository:
 
     def trace_usage(self, req: tsi.TraceUsageReq) -> tsi.TraceUsageRes:
         """Compute per-call usage for a trace, with descendant rollup."""
-        from weave.trace_server.usage_utils import aggregate_usage_with_descendants
-
         # Query all matching calls
         calls_req = tsi.CallsQueryReq(
             project_id=req.project_id,
@@ -373,8 +371,6 @@ class CallsRepository:
 
     def calls_usage(self, req: tsi.CallsUsageReq) -> tsi.CallsUsageRes:
         """Compute aggregated usage for multiple root calls."""
-        from weave.trace_server.usage_utils import aggregate_usage_with_descendants
-
         # Get all calls for the specified root call IDs
         calls_req = tsi.CallsQueryReq(
             project_id=req.project_id,
