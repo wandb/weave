@@ -4704,7 +4704,14 @@ def test_calls_query_stats_with_limit(client):
     assert result.total_storage_size_bytes is not None
 
 
-def test_calls_query_stats_thread_ids_filter_not_minimal(client):
+@pytest.mark.parametrize(
+    "thread_ids",
+    [
+        ["thread_with_zero_calls_xyz"],  # single thread id that does not match
+        [],  # empty list -> no threads -> 0 calls
+    ],
+)
+def test_calls_query_stats_thread_ids_filter_not_minimal(client, thread_ids):
     """Ensure that we do not optimize away the thread_ids filter when it is present."""
     client.set_wandb_run_context(run_id="stats-thread-run", step=0)
 
@@ -4717,8 +4724,7 @@ def test_calls_query_stats_thread_ids_filter_not_minimal(client):
         stats_thread_op()
         stats_thread_op()
 
-    # Query a different thread that has zero calls. Full path -> 0. Buggy optimized path -> 1.
-    thread_id_with_no_calls = "thread_with_zero_calls_xyz"
+    # Query with thread_ids that match zero calls. Full path -> 0. Buggy optimized path -> 1.
     wb_run_id_not_null_query = tsi.Query(
         **{
             "$expr": {
@@ -4731,7 +4737,7 @@ def test_calls_query_stats_thread_ids_filter_not_minimal(client):
             project_id=get_client_project_id(client),
             limit=1,
             query=wb_run_id_not_null_query,
-            filter=tsi.CallsFilter(thread_ids=[thread_id_with_no_calls]),
+            filter=tsi.CallsFilter(thread_ids=thread_ids),
         )
     )
     assert res.count == 0

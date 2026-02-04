@@ -3232,6 +3232,11 @@ def test_is_minimal_filter_wb_user_ids_not_minimal() -> None:
     assert _is_minimal_filter(tsi.CallsFilter(wb_user_ids=["user_1"])) is False
 
 
-def test_is_minimal_filter_empty_thread_ids_still_minimal() -> None:
-    """Empty thread_ids list is treated as unset."""
-    assert _is_minimal_filter(tsi.CallsFilter(thread_ids=[])) is True
+def test_is_minimal_filter_empty_thread_ids_not_minimal() -> None:
+    """thread_ids=[] is still a set filter (not None), so not minimal."""
+    assert _is_minimal_filter(tsi.CallsFilter(thread_ids=[])) is False
+
+
+def test_is_minimal_filter_empty_turn_ids_not_minimal() -> None:
+    """turn_ids=[] is still a set filter (not None), so not minimal."""
+    assert _is_minimal_filter(tsi.CallsFilter(turn_ids=[])) is False

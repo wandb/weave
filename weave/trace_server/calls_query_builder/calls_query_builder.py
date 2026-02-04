@@ -2365,8 +2365,8 @@ def _is_minimal_filter(filter: tsi.CallsFilter | None) -> bool:
         and filter.trace_roots_only is None
         and filter.input_refs is None
         and filter.output_refs is None
-        and (filter.thread_ids is None or len(filter.thread_ids) == 0)
-        and (filter.turn_ids is None or len(filter.turn_ids) == 0)
+        and filter.thread_ids is None
+        and filter.turn_ids is None
     )
 
 
