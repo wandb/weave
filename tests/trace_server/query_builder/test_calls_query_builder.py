@@ -7,6 +7,7 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     AggregatedDataSizeField,
     CallsQuery,
     HardCodedFilter,
+    _is_minimal_filter,
     build_calls_complete_delete_query,
     build_calls_complete_update_end_query,
     build_calls_complete_update_query,
@@ -3203,3 +3204,39 @@ def test_hardcoded_filter_set_hardcoded_filter_with_thread_ids_only() -> None:
     cq.set_hardcoded_filter(HardCodedFilter(filter=tsi.CallsFilter(thread_ids=["t1"])))
     assert cq.hardcoded_filter is not None
     assert cq.hardcoded_filter.filter.thread_ids == ["t1"]
+
+
+# -----------------------------------------------------------------------------
+# _is_minimal_filter()
+# -----------------------------------------------------------------------------
+
+
+def test_is_minimal_filter_none() -> None:
+    assert _is_minimal_filter(None) is True
+
+
+def test_is_minimal_filter_empty() -> None:
+    assert _is_minimal_filter(tsi.CallsFilter()) is True
+
+
+def test_is_minimal_filter_thread_ids_not_minimal() -> None:
+    """Filter with thread_ids set must not be considered minimal (optimized path must not apply)."""
+    assert _is_minimal_filter(tsi.CallsFilter(thread_ids=["thread_1"])) is False
+
+
+def test_is_minimal_filter_turn_ids_not_minimal() -> None:
+    assert _is_minimal_filter(tsi.CallsFilter(turn_ids=["turn_1"])) is False
+
+
+def test_is_minimal_filter_wb_user_ids_not_minimal() -> None:
+    assert _is_minimal_filter(tsi.CallsFilter(wb_user_ids=["user_1"])) is False
+
+
+def test_is_minimal_filter_empty_thread_ids_not_minimal() -> None:
+    """thread_ids=[] is still a set filter (not None), so not minimal."""
+    assert _is_minimal_filter(tsi.CallsFilter(thread_ids=[])) is False
+
+
+def test_is_minimal_filter_empty_turn_ids_not_minimal() -> None:
+    """turn_ids=[] is still a set filter (not None), so not minimal."""
+    assert _is_minimal_filter(tsi.CallsFilter(turn_ids=[])) is False
