@@ -4707,7 +4707,8 @@ def test_calls_query_stats_with_limit(client):
 @pytest.mark.parametrize(
     "thread_ids",
     [
-        ["thread_with_zero_calls_xyz"],  # single thread id that does not match
+        ["thread_does_not_exist"],  # single thread id that does not match
+        ["thread_exists_no_calls"],  # thread exists but has zero calls
         [],  # empty list -> no threads -> 0 calls
     ],
 )
@@ -4723,6 +4724,10 @@ def test_calls_query_stats_thread_ids_filter_not_minimal(client, thread_ids):
     with weave.thread("thread_with_calls"):
         stats_thread_op()
         stats_thread_op()
+
+    # Thread that exists but has zero calls (ensures we test this distinct case)
+    with weave.thread("thread_exists_no_calls"):
+        pass
 
     # A query is required to exercise the "Pattern 2" check in _try_optimized_stats_query.
     # Use a query that matches the created calls (wb_run_id not null).
