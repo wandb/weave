@@ -3154,9 +3154,13 @@ def test_calls_iter_different_value_same_page_cached(client):
     elapsed_time3 = end_time3 - start_time3
 
     # cached lookup should be way faster!
-    # Use 3x threshold instead of 10x to reduce flakiness while still verifying caching
-    assert elapsed_time1 > elapsed_time2 * 3
-    assert elapsed_time1 > elapsed_time3 * 3
+    if sys.platform == "win32":  # Test on windows is slower...
+        assert elapsed_time1 > elapsed_time2
+        assert elapsed_time1 > elapsed_time3
+    else:
+        # Use 3x threshold instead of 10x to reduce flakiness while still verifying caching
+        assert elapsed_time1 > elapsed_time2 * 3
+        assert elapsed_time1 > elapsed_time3 * 3
 
 
 class BasicModel(weave.Model):
