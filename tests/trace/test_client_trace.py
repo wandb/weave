@@ -604,6 +604,15 @@ def test_trace_call_wb_run_step_query(client):
     )
     assert len(res.calls) == count
 
+    lt_query = tsi.Query(
+        **{"$expr": {"$lt": [{"$getField": "wb_run_step"}, {"$literal": compare_step}]}}
+    )
+    res = server.calls_query(
+        tsi.CallsQueryReq(project_id=get_client_project_id(client), query=lt_query)
+    )
+    exp_lt_count = len([step for step in exp_start_steps if step < compare_step])
+    assert len(res.calls) == exp_lt_count
+
     count = 4
     compare_step = exp_end_steps[-count]
     range_query = tsi.Query(
@@ -3145,9 +3154,13 @@ def test_calls_iter_different_value_same_page_cached(client):
     elapsed_time3 = end_time3 - start_time3
 
     # cached lookup should be way faster!
-    # Use 3x threshold instead of 10x to reduce flakiness while still verifying caching
-    assert elapsed_time1 > elapsed_time2 * 3
-    assert elapsed_time1 > elapsed_time3 * 3
+    if sys.platform == "win32":  # Test on windows is slower...
+        assert elapsed_time1 > elapsed_time2
+        assert elapsed_time1 > elapsed_time3
+    else:
+        # Use 3x threshold instead of 10x to reduce flakiness while still verifying caching
+        assert elapsed_time1 > elapsed_time2 * 3
+        assert elapsed_time1 > elapsed_time3 * 3
 
 
 class BasicModel(weave.Model):

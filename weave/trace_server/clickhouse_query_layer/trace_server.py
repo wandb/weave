@@ -276,7 +276,7 @@ class ClickHouseTraceServer(TraceServerInterface):
     # OTEL API
     # =========================================================================
 
-    def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
+    def otel_export(self, req: tsi.OTelExportReq) -> tsi.OTelExportRes:
         """Export OpenTelemetry traces to Weave."""
         return self._otel_repo.otel_export(req)
 

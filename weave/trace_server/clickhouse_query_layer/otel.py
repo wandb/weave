@@ -6,9 +6,7 @@ from functools import partial
 from typing import TYPE_CHECKING, Any
 
 import ddtrace
-from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
-    ExportTraceServiceRequest,
-)
+from opentelemetry.proto.trace.v1.trace_pb2 import ResourceSpans
 
 from weave.trace_server import object_creation_utils
 from weave.trace_server import refs_internal as ri
@@ -57,14 +55,9 @@ class OtelRepository:
         self._file_create = file_create_func
 
     @ddtrace.tracer.wrap(name="otel_repository.otel_export")
-    def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
+    def otel_export(self, req: tsi.OTelExportReq) -> tsi.OTelExportRes:
         """Export OpenTelemetry traces to Weave."""
         assert_non_null_wb_user_id(req)
-
-        if not isinstance(req.traces, ExportTraceServiceRequest):
-            raise TypeError(
-                f"Expected traces as ExportTraceServiceRequest, got {type(req.traces)}"
-            )
 
         calls: list[
             tuple[tsi.StartedCallSchemaForInsert, tsi.EndedCallSchemaForInsert]
@@ -72,7 +65,16 @@ class OtelRepository:
         rejected_spans = 0
         error_messages: list[str] = []
 
-        for proto_resource_spans in req.traces.resource_spans:
+        for processed_span in req.processed_spans:
+            # Extract wb_run_id from the processed span
+            wb_run_id = processed_span.run_id
+
+            if not isinstance(processed_span.resource_spans, ResourceSpans):
+                raise TypeError(
+                    f"Expected resource_spans as ResourceSpans, got {type(processed_span.resource_spans)}"
+                )
+
+            proto_resource_spans = processed_span.resource_spans
             resource = Resource.from_proto(proto_resource_spans.resource)
             for proto_scope_spans in proto_resource_spans.scope_spans:
                 for proto_span in proto_scope_spans.spans:
@@ -99,62 +101,62 @@ class OtelRepository:
                         span.to_call(
                             req.project_id,
                             wb_user_id=req.wb_user_id,
-                            wb_run_id=req.wb_run_id,
+                            wb_run_id=wb_run_id,
                         )
                     )
 
-        obj_id_idx_map = defaultdict(list)
-        for idx, (start_call, _) in enumerate(calls):
-            op_name = object_creation_utils.make_safe_name(start_call.op_name)
-            obj_id_idx_map[op_name].append(idx)
+            obj_id_idx_map = defaultdict(list)
+            for idx, (start_call, _) in enumerate(calls):
+                op_name = object_creation_utils.make_safe_name(start_call.op_name)
+                obj_id_idx_map[op_name].append(idx)
 
-        existing_objects = self._get_existing_ops(
-            set(obj_id_idx_map.keys()),
-            req.project_id,
-            len(calls),
-        )
-
-        # Reuse existing placeholder file or create it once
-        if len(existing_objects) == 0:
-            digest = self._create_placeholder_ops_digest(req.project_id, True)
-        else:
-            digest = self._create_placeholder_ops_digest(req.project_id, False)
-
-        for obj in existing_objects:
-            op_ref_uri = ri.InternalOpRef(
-                project_id=req.project_id,
-                name=obj.object_id,
-                version=obj.digest,
-            ).uri()
-
-            for idx in obj_id_idx_map[obj.object_id]:
-                calls[idx][0].op_name = op_ref_uri
-            obj_id_idx_map.pop(obj.object_id)
-
-        obj_creation_batch = []
-        for op_obj_id in obj_id_idx_map.keys():
-            op_val = object_creation_utils.build_op_val(digest)
-            obj_creation_batch.append(
-                tsi.ObjSchemaForInsert(
-                    project_id=req.project_id,
-                    object_id=op_obj_id,
-                    val=op_val,
-                    wb_user_id=req.wb_user_id,
-                )
+            existing_objects = self._get_existing_ops(
+                set(obj_id_idx_map.keys()),
+                req.project_id,
+                len(calls),
             )
-        res = self._obj_create_batch(obj_creation_batch)
 
-        for result in res:
-            if result.object_id is None:
-                raise RuntimeError("Otel Export - Expected object_id but got None")
+            # Reuse existing placeholder file or create it once
+            if len(existing_objects) == 0:
+                digest = self._create_placeholder_ops_digest(req.project_id, True)
+            else:
+                digest = self._create_placeholder_ops_digest(req.project_id, False)
 
-            op_ref_uri = ri.InternalOpRef(
-                project_id=req.project_id,
-                name=result.object_id,
-                version=result.digest,
-            ).uri()
-            for idx in obj_id_idx_map[result.object_id]:
-                calls[idx][0].op_name = op_ref_uri
+            for obj in existing_objects:
+                op_ref_uri = ri.InternalOpRef(
+                    project_id=req.project_id,
+                    name=obj.object_id,
+                    version=obj.digest,
+                ).uri()
+
+                for idx in obj_id_idx_map[obj.object_id]:
+                    calls[idx][0].op_name = op_ref_uri
+                obj_id_idx_map.pop(obj.object_id)
+
+            obj_creation_batch = []
+            for op_obj_id in obj_id_idx_map.keys():
+                op_val = object_creation_utils.build_op_val(digest)
+                obj_creation_batch.append(
+                    tsi.ObjSchemaForInsert(
+                        project_id=req.project_id,
+                        object_id=op_obj_id,
+                        val=op_val,
+                        wb_user_id=req.wb_user_id,
+                    )
+                )
+            res = self._obj_create_batch(obj_creation_batch)
+
+            for result in res:
+                if result.object_id is None:
+                    raise RuntimeError("Otel Export - Expected object_id but got None")
+
+                op_ref_uri = ri.InternalOpRef(
+                    project_id=req.project_id,
+                    name=result.object_id,
+                    version=result.digest,
+                ).uri()
+                for idx in obj_id_idx_map[result.object_id]:
+                    calls[idx][0].op_name = op_ref_uri
 
         write_target = self._table_routing_resolver.resolve_v2_write_target(
             req.project_id,
@@ -196,13 +198,13 @@ class OtelRepository:
             joined_errors = "; ".join(error_messages[:20]) + (
                 "; ..." if len(error_messages) > 20 else ""
             )
-            return tsi.OtelExportRes(
+            return tsi.OTelExportRes(
                 partial_success=tsi.ExportTracePartialSuccess(
                     rejected_spans=rejected_spans,
                     error_message=joined_errors,
                 )
             )
-        return tsi.OtelExportRes()
+        return tsi.OTelExportRes()
 
     def _flush_kafka_producer(self) -> None:
         """Flush Kafka producer if online eval is enabled."""

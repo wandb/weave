@@ -10,9 +10,7 @@ from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import Any, cast
 
-from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
-    ExportTraceServiceRequest,
-)
+from opentelemetry.proto.trace.v1.trace_pb2 import ResourceSpans
 
 from weave.trace_server import constants, object_creation_utils
 from weave.trace_server import refs_internal as ri
@@ -458,10 +456,18 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                     lhs_part = process_operand(operation.gt_[0])
                     rhs_part = process_operand(operation.gt_[1])
                     cond = f"({lhs_part} > {rhs_part})"
+                elif isinstance(operation, tsi_query.LtOperation):
+                    lhs_part = process_operand(operation.lt_[0])
+                    rhs_part = process_operand(operation.lt_[1])
+                    cond = f"({lhs_part} < {rhs_part})"
                 elif isinstance(operation, tsi_query.GteOperation):
                     lhs_part = process_operand(operation.gte_[0])
                     rhs_part = process_operand(operation.gte_[1])
                     cond = f"({lhs_part} >= {rhs_part})"
+                elif isinstance(operation, tsi_query.LteOperation):
+                    lhs_part = process_operand(operation.lte_[0])
+                    rhs_part = process_operand(operation.lte_[1])
+                    cond = f"({lhs_part} <= {rhs_part})"
                 elif isinstance(operation, tsi_query.InOperation):
                     lhs_part = process_operand(operation.in_[0])
                     rhs_part = ",".join(process_operand(op) for op in operation.in_[1])
@@ -508,7 +514,9 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                         tsi_query.NotOperation,
                         tsi_query.EqOperation,
                         tsi_query.GtOperation,
+                        tsi_query.LtOperation,
                         tsi_query.GteOperation,
+                        tsi_query.LteOperation,
                         tsi_query.InOperation,
                         tsi_query.ContainsOperation,
                     ),
@@ -1576,31 +1584,25 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         # Currently, this will only be called from the weave file, so we return an empty dict for now
         return tsi.ImageGenerationCreateRes(response={})
 
-    def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
-        if not isinstance(req.traces, ExportTraceServiceRequest):
-            raise TypeError(
-                "Expected traces as ExportTraceServiceRequest, got {type(req.traces)}"
-            )
-
+    def otel_export(self, req: tsi.OTelExportReq) -> tsi.OTelExportRes:
         calls: list[dict[str, object]] = []
         rejected_spans = 0
         error_messages: list[str] = []
-        for proto_resource_spans in req.traces.resource_spans:
+        for processed_span in req.processed_spans:
+            # Extract wb_run_id from the processed span
+            wb_run_id = processed_span.run_id
+
+            if not isinstance(processed_span.resource_spans, ResourceSpans):
+                raise TypeError(
+                    f"Expected resource_spans as ResourceSpans, got {type(processed_span.resource_spans)}"
+                )
+
+            proto_resource_spans = processed_span.resource_spans
             resource = Resource.from_proto(proto_resource_spans.resource)
             for proto_scope_spans in proto_resource_spans.scope_spans:
                 for proto_span in proto_scope_spans.spans:
                     try:
                         span = Span.from_proto(proto_span, resource)
-                        start_call, end_call = span.to_call(req.project_id)
-                        calls.extend(
-                            [
-                                {
-                                    "mode": "start",
-                                    "req": tsi.CallStartReq(start=start_call),
-                                },
-                                {"mode": "end", "req": tsi.CallEndReq(end=end_call)},
-                            ]
-                        )
                     except AttributePathConflictError as e:
                         rejected_spans += 1
                         try:
@@ -1615,10 +1617,26 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                             f"name='{name}' trace_id='{trace_id}' span_id='{span_id}'"
                         )
                         error_messages.append(f"Rejected span ({span_ident}): {e!s}")
+                        continue
+
+                    start_call, end_call = span.to_call(
+                        req.project_id,
+                        wb_user_id=req.wb_user_id,
+                        wb_run_id=wb_run_id,
+                    )
+                    calls.extend(
+                        [
+                            {
+                                "mode": "start",
+                                "req": tsi.CallStartReq(start=start_call),
+                            },
+                            {"mode": "end", "req": tsi.CallEndReq(end=end_call)},
+                        ]
+                    )
         res = self.call_start_batch(tsi.CallCreateBatchReq(batch=calls))
         # Return spec-compliant response; include partial_success if needed
         if rejected_spans > 0:
-            return tsi.OtelExportRes(
+            return tsi.OTelExportRes(
                 partial_success=tsi.ExportTracePartialSuccess(
                     rejected_spans=rejected_spans,
                     error_message=(
@@ -1627,7 +1645,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                     ),
                 )
             )
-        return tsi.OtelExportRes()
+        return tsi.OTelExportRes()
 
     def project_stats(self, req: tsi.ProjectStatsReq) -> tsi.ProjectStatsRes:
         raise NotImplementedError(

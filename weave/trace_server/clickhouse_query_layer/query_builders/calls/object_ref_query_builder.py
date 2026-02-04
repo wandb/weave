@@ -380,11 +380,11 @@ class ObjectRefConditionHandler:
     def handle_comparison_operation(
         self, condition: ObjectRefFilterCondition, operator: str
     ) -> str:
-        """Handle simple binary operations (=, >, >=) for object references.
+        """Handle simple binary operations (=, >, >=, <, <=) for object references.
 
         Args:
             condition: The object reference filter condition
-            operator: The SQL operator to use ("=", ">", ">=")
+            operator: The SQL operator to use ("=", ">", ">=", "<", "<=")
 
         Returns:
             str: SQL condition for the operation
@@ -558,11 +558,11 @@ class ObjectRefFilterToCTEProcessor(QueryOptimizationProcessor):
         operation_type: str,
         **kwargs: Any,
     ) -> str | None:
-        """Process binary operations (eq, gt, gte) with common logic.
+        """Process binary operations (eq, gt, gte, lt, lte) with common logic.
 
         Args:
             operands: Tuple of operands from the operation
-            operation_type: Type of operation ("eq", "gt", "gte")
+            operation_type: Type of operation ("eq", "gt", "gte", "lt", "lte")
             **kwargs: Additional arguments for ObjectRefCondition
 
         Returns:
@@ -630,6 +630,16 @@ class ObjectRefFilterToCTEProcessor(QueryOptimizationProcessor):
     def process_gte(self, operation: tsi_query.GteOperation) -> str | None:
         """Process greater than or equal operation for object refs."""
         self._process_binary_operation(operation.gte_, "gte")
+        return None
+
+    def process_lt(self, operation: tsi_query.LtOperation) -> str | None:
+        """Process less than operation for object refs."""
+        self._process_binary_operation(operation.lt_, "lt")
+        return None
+
+    def process_lte(self, operation: tsi_query.LteOperation) -> str | None:
+        """Process less than or equal operation for object refs."""
+        self._process_binary_operation(operation.lte_, "lte")
         return None
 
     def process_in(self, operation: tsi_query.InOperation) -> str | None:
@@ -742,6 +752,10 @@ def build_object_ref_ctes(
                 val_condition = handler.handle_comparison_operation(condition, ">")
             elif condition.operation_type == "gte":
                 val_condition = handler.handle_comparison_operation(condition, ">=")
+            elif condition.operation_type == "lt":
+                val_condition = handler.handle_comparison_operation(condition, "<")
+            elif condition.operation_type == "lte":
+                val_condition = handler.handle_comparison_operation(condition, "<=")
             elif condition.operation_type == "in":
                 val_condition = handler.handle_in_operation(condition)
         val_condition_sql = f"AND {val_condition}" if val_condition else ""
@@ -891,8 +905,12 @@ def is_object_ref_operand(
             return any(check_operand_recursive(sub_op) for sub_op in op.eq_)
         elif isinstance(op, tsi_query.GtOperation):
             return any(check_operand_recursive(sub_op) for sub_op in op.gt_)
+        elif isinstance(op, tsi_query.LtOperation):
+            return any(check_operand_recursive(sub_op) for sub_op in op.lt_)
         elif isinstance(op, tsi_query.GteOperation):
             return any(check_operand_recursive(sub_op) for sub_op in op.gte_)
+        elif isinstance(op, tsi_query.LteOperation):
+            return any(check_operand_recursive(sub_op) for sub_op in op.lte_)
         elif isinstance(op, tsi_query.InOperation):
             return check_operand_recursive(
                 op.in_[0]
