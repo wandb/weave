@@ -4724,7 +4724,7 @@ def test_calls_query_stats_thread_ids_filter_not_minimal(client, thread_ids):
         stats_thread_op()
         stats_thread_op()
 
-    # A query is required to exercise "Pattern 2" in _try_optimized_stats_query.
+    # A query is required to exercise the "Pattern 2" check in _try_optimized_stats_query.
     # Use a query that matches the created calls (wb_run_id not null).
     wb_run_id_not_null_query = tsi.Query(
         **{
@@ -4754,6 +4754,42 @@ def test_calls_query_stats_thread_ids_filter_not_minimal(client, thread_ids):
         )
     )
     assert res.count == 0
+
+
+def test_calls_query_thread_ids_filter_returns_matching_thread(client):
+    """Create 3 threads, request the second one, assert the returned call has the correct thread_id."""
+    client.set_wandb_run_context(run_id="thread-filter-run", step=0)
+
+    @weave.op
+    def thread_op() -> int:
+        return 1
+
+    thread_1, thread_2, thread_3 = "thread_first", "thread_second", "thread_third"
+    with weave.thread(thread_1):
+        thread_op()
+    with weave.thread(thread_2):
+        thread_op()
+    with weave.thread(thread_3):
+        thread_op()
+
+    # Use a query that matches the created calls (wb_run_id not null).
+    wb_run_id_not_null_query = tsi.Query(
+        **{
+            "$expr": {
+                "$not": [{"$eq": [{"$getField": "wb_run_id"}, {"$literal": None}]}]
+            }
+        }
+    )
+    res = client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=get_client_project_id(client),
+            limit=1,
+            query=wb_run_id_not_null_query,
+            filter=tsi.CallsFilter(thread_ids=[thread_2]),
+        )
+    )
+    assert len(res.calls) == 1
+    assert res.calls[0].thread_id == thread_2
 
 
 def test_calls_query_stats_total_storage_size_clickhouse(client, clickhouse_client):
