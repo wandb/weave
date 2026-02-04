@@ -417,6 +417,12 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             if filter.wb_user_ids:
                 in_expr = ", ".join(f"'{x}'" for x in filter.wb_user_ids)
                 conds += [f"wb_user_id IN ({in_expr})"]
+            if filter.thread_ids:
+                assert_parameter_length_less_than_max(
+                    "thread_ids", len(filter.thread_ids)
+                )
+                in_expr = ", ".join(f"'{x}'" for x in filter.thread_ids)
+                conds += [f"thread_id IN ({in_expr})"]
 
         if req.query:
             # This is the mongo-style query

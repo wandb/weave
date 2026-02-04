@@ -5176,9 +5176,7 @@ def test_get_calls_filter_by_thread_ids_only(client):
 
     This exercises the path where thread_ids is the sole filter (HardCodedFilter.is_useful()
     """
-    import uuid
-
-    unique = str(uuid.uuid4())[:8]
+    unique = uuid.uuid4().hex
 
     @weave.op
     def thread_filter_op(value: str) -> str:
