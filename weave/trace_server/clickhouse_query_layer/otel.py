@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 import ddtrace
 from opentelemetry.proto.trace.v1.trace_pb2 import ResourceSpans
 
+from weave.trace_server import environment as wf_env
 from weave.trace_server import object_creation_utils
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
@@ -208,7 +209,5 @@ class OtelRepository:
 
     def _flush_kafka_producer(self) -> None:
         """Flush Kafka producer if online eval is enabled."""
-        from weave.trace_server import environment as wf_env
-
         if wf_env.wf_enable_online_eval():
             self._kafka_producer_getter().flush()

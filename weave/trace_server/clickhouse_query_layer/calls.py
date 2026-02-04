@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any
 
 import ddtrace
 
+from weave.trace_server import environment as wf_env
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.base64_content_conversion import (
@@ -989,8 +990,6 @@ def maybe_enqueue_minimal_call_end(
     flush_immediately: bool = False,
 ) -> None:
     """Enqueue a minimal call end event to Kafka if online eval is enabled."""
-    from weave.trace_server import environment as wf_env
-
     if not wf_env.wf_enable_online_eval():
         return
 

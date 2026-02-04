@@ -494,6 +494,7 @@ def _create_like_optimized_eq_condition(
     if not isinstance(literal_operand.literal_, (str, int, float, bool)):
         return None
 
+    # Circular import avoidance: calls_query_builder imports from optimization_builder
     from weave.trace_server.clickhouse_query_layer.query_builders.calls.calls_query_builder import (
         get_field_by_name,
     )
@@ -531,6 +532,7 @@ def _create_like_optimized_contains_condition(
     ) or not isinstance(operation.contains_.substr.literal_, str):
         return None
 
+    # Circular import avoidance: calls_query_builder imports from optimization_builder
     from weave.trace_server.clickhouse_query_layer.query_builders.calls.calls_query_builder import (
         get_field_by_name,
     )
@@ -572,6 +574,7 @@ def _create_like_optimized_in_condition(
     ):
         return None
 
+    # Circular import avoidance: calls_query_builder imports from optimization_builder
     from weave.trace_server.clickhouse_query_layer.query_builders.calls.calls_query_builder import (
         get_field_by_name,
     )

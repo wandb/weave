@@ -492,6 +492,7 @@ class ClickHouseTraceServer(TraceServerInterface):
         self, req: tsi.ActionsExecuteBatchReq
     ) -> tsi.ActionsExecuteBatchRes:
         """Execute a batch of actions."""
+        # Circular import avoidance: dispatcher imports trace_server_interface
         from weave.trace_server.actions_worker.dispatcher import execute_batch
 
         execute_batch(req, self)
@@ -598,6 +599,7 @@ class ClickHouseTraceServer(TraceServerInterface):
 
     def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
         """Start an evaluation run asynchronously."""
+        # Circular import avoidance: evaluate_model_worker imports trace_server_interface
         from weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker import (
             EvaluateModelArgs,
         )
@@ -623,6 +625,7 @@ class ClickHouseTraceServer(TraceServerInterface):
         self, req: tsi.EvaluationStatusReq
     ) -> tsi.EvaluationStatusRes:
         """Get the status of an evaluation run."""
+        # Circular import avoidance: evaluation_status module imports trace_server_interface
         from weave.trace_server.methods.evaluation_status import evaluation_status
 
         return evaluation_status(self, req)
