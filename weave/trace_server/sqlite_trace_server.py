@@ -417,6 +417,12 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             if filter.wb_user_ids:
                 in_expr = ", ".join(f"'{x}'" for x in filter.wb_user_ids)
                 conds += [f"wb_user_id IN ({in_expr})"]
+            if filter.thread_ids is not None:
+                assert_parameter_length_less_than_max(
+                    "thread_ids", len(filter.thread_ids)
+                )
+                in_expr = ", ".join(f"'{x}'" for x in filter.thread_ids)
+                conds += [f"thread_id IN ({in_expr})"]
 
         if req.query:
             # This is the mongo-style query
@@ -454,10 +460,18 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                     lhs_part = process_operand(operation.gt_[0])
                     rhs_part = process_operand(operation.gt_[1])
                     cond = f"({lhs_part} > {rhs_part})"
+                elif isinstance(operation, tsi_query.LtOperation):
+                    lhs_part = process_operand(operation.lt_[0])
+                    rhs_part = process_operand(operation.lt_[1])
+                    cond = f"({lhs_part} < {rhs_part})"
                 elif isinstance(operation, tsi_query.GteOperation):
                     lhs_part = process_operand(operation.gte_[0])
                     rhs_part = process_operand(operation.gte_[1])
                     cond = f"({lhs_part} >= {rhs_part})"
+                elif isinstance(operation, tsi_query.LteOperation):
+                    lhs_part = process_operand(operation.lte_[0])
+                    rhs_part = process_operand(operation.lte_[1])
+                    cond = f"({lhs_part} <= {rhs_part})"
                 elif isinstance(operation, tsi_query.InOperation):
                     lhs_part = process_operand(operation.in_[0])
                     rhs_part = ",".join(process_operand(op) for op in operation.in_[1])
@@ -504,7 +518,9 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                         tsi_query.NotOperation,
                         tsi_query.EqOperation,
                         tsi_query.GtOperation,
+                        tsi_query.LtOperation,
                         tsi_query.GteOperation,
+                        tsi_query.LteOperation,
                         tsi_query.InOperation,
                         tsi_query.ContainsOperation,
                     ),

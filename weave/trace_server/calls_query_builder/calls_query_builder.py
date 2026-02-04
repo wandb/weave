@@ -725,6 +725,7 @@ class HardCodedFilter(BaseModel):
                 self.filter.wb_user_ids,
                 self.filter.wb_run_ids,
                 self.filter.turn_ids,
+                self.filter.thread_ids is not None,
             ]
         )
 
@@ -1765,10 +1766,18 @@ def process_query_to_conditions(
             lhs_part = process_operand(operation.gt_[0])
             rhs_part = process_operand(operation.gt_[1])
             cond = f"({lhs_part} > {rhs_part})"
+        elif isinstance(operation, tsi_query.LtOperation):
+            lhs_part = process_operand(operation.lt_[0])
+            rhs_part = process_operand(operation.lt_[1])
+            cond = f"({lhs_part} < {rhs_part})"
         elif isinstance(operation, tsi_query.GteOperation):
             lhs_part = process_operand(operation.gte_[0])
             rhs_part = process_operand(operation.gte_[1])
             cond = f"({lhs_part} >= {rhs_part})"
+        elif isinstance(operation, tsi_query.LteOperation):
+            lhs_part = process_operand(operation.lte_[0])
+            rhs_part = process_operand(operation.lte_[1])
+            cond = f"({lhs_part} <= {rhs_part})"
         elif isinstance(operation, tsi_query.InOperation):
             lhs_part = process_operand(operation.in_[0])
             rhs_part = ",".join(process_operand(op) for op in operation.in_[1])
@@ -1825,7 +1834,9 @@ def process_query_to_conditions(
                 tsi_query.NotOperation,
                 tsi_query.EqOperation,
                 tsi_query.GtOperation,
+                tsi_query.LtOperation,
                 tsi_query.GteOperation,
+                tsi_query.LteOperation,
                 tsi_query.InOperation,
                 tsi_query.ContainsOperation,
             ),
@@ -2346,6 +2357,7 @@ def _is_minimal_filter(filter: tsi.CallsFilter | None) -> bool:
         return True
     return (
         filter.wb_run_ids is None
+        and filter.wb_user_ids is None
         and filter.op_names is None
         and filter.call_ids is None
         and filter.trace_ids is None
@@ -2353,6 +2365,8 @@ def _is_minimal_filter(filter: tsi.CallsFilter | None) -> bool:
         and filter.trace_roots_only is None
         and filter.input_refs is None
         and filter.output_refs is None
+        and filter.thread_ids is None
+        and filter.turn_ids is None
     )
 
 

@@ -7,6 +7,7 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     AggregatedDataSizeField,
     CallsQuery,
     HardCodedFilter,
+    _is_minimal_filter,
     build_calls_complete_delete_query,
     build_calls_complete_update_end_query,
     build_calls_complete_update_query,
@@ -1706,6 +1707,44 @@ def test_datetime_optimization_simple() -> None:
     )
 
 
+def test_datetime_optimization_lt_simple() -> None:
+    """Test basic datetime optimization with a single LT timestamp condition."""
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_condition(
+        tsi_query.LtOperation.model_validate(
+            {
+                "$lt": [
+                    {"$getField": "started_at"},
+                    {"$literal": 1709251200},  # 2024-03-01 00:00:00 UTC
+                ]
+            }
+        )
+    )
+
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id
+        FROM calls_merged
+        PREWHERE calls_merged.project_id = {pb_2:String}
+        WHERE (calls_merged.sortable_datetime < {pb_1:String})
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING (
+            ((any(calls_merged.started_at) < {pb_0:UInt64}))
+            AND ((any(calls_merged.deleted_at) IS NULL))
+            AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+        )
+        """,
+        {
+            "pb_0": 1709251200,
+            "pb_2": "project",
+            "pb_1": "2024-03-01 00:05:00.000000",
+        },
+    )
+
+
 def test_datetime_optimization_not_operation() -> None:
     """Test datetime optimization with a NOT operation."""
     cq = CallsQuery(project_id="project")
@@ -2302,6 +2341,34 @@ def test_disallowed_fields():
             tsi_query.GteOperation.model_validate(
                 {
                     "$gte": [
+                        {"$getField": "total_storage_size_bytes"},
+                        {"$literal": 1},
+                    ]
+                }
+            )
+        )
+        cq.as_sql(ParamBuilder())
+
+    cq = CallsQuery(project_id="test/project")  # reset
+    with pytest.raises(ValueError):
+        cq.add_condition(
+            tsi_query.LtOperation.model_validate(
+                {
+                    "$lt": [
+                        {"$getField": "storage_size_bytes"},
+                        {"$literal": 1},
+                    ]
+                }
+            )
+        )
+        cq.as_sql(ParamBuilder())
+
+    cq = CallsQuery(project_id="test/project")  # reset
+    with pytest.raises(ValueError):
+        cq.add_condition(
+            tsi_query.LteOperation.model_validate(
+                {
+                    "$lte": [
                         {"$getField": "total_storage_size_bytes"},
                         {"$literal": 1},
                     ]
@@ -3099,3 +3166,77 @@ def test_query_with_queue_filter_calls_complete() -> None:
             "pb_1": "project",
         },
     )
+
+
+# -----------------------------------------------------------------------------
+# HardCodedFilter.is_useful()
+# -----------------------------------------------------------------------------
+
+
+def test_hardcoded_filter_is_useful_thread_ids_only() -> None:
+    """Filter with only thread_ids must be considered useful so set_hardcoded_filter applies it."""
+    hcf = HardCodedFilter(filter=tsi.CallsFilter(thread_ids=["thread_1"]))
+    assert hcf.is_useful() is True
+
+
+def test_hardcoded_filter_is_useful_empty_thread_ids_only() -> None:
+    """Filter with only thread_ids must be considered useful, even when the list is empty."""
+    hcf = HardCodedFilter(filter=tsi.CallsFilter(thread_ids=[]))
+    assert hcf.is_useful() is True
+
+
+def test_hardcoded_filter_is_useful_turn_ids_only() -> None:
+    """Filter with only turn_ids must be considered useful."""
+    hcf = HardCodedFilter(filter=tsi.CallsFilter(turn_ids=["turn_1"]))
+    assert hcf.is_useful() is True
+
+
+def test_hardcoded_filter_is_useful_empty_not_useful() -> None:
+    """Filter with no fields set is not useful."""
+    hcf = HardCodedFilter(filter=tsi.CallsFilter())
+    assert hcf.is_useful() is False
+
+
+def test_hardcoded_filter_set_hardcoded_filter_with_thread_ids_only() -> None:
+    """set_hardcoded_filter must accept a filter that only has thread_ids (is_useful True)."""
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.set_hardcoded_filter(HardCodedFilter(filter=tsi.CallsFilter(thread_ids=["t1"])))
+    assert cq.hardcoded_filter is not None
+    assert cq.hardcoded_filter.filter.thread_ids == ["t1"]
+
+
+# -----------------------------------------------------------------------------
+# _is_minimal_filter()
+# -----------------------------------------------------------------------------
+
+
+def test_is_minimal_filter_none() -> None:
+    assert _is_minimal_filter(None) is True
+
+
+def test_is_minimal_filter_empty() -> None:
+    assert _is_minimal_filter(tsi.CallsFilter()) is True
+
+
+def test_is_minimal_filter_thread_ids_not_minimal() -> None:
+    """Filter with thread_ids set must not be considered minimal (optimized path must not apply)."""
+    assert _is_minimal_filter(tsi.CallsFilter(thread_ids=["thread_1"])) is False
+
+
+def test_is_minimal_filter_turn_ids_not_minimal() -> None:
+    assert _is_minimal_filter(tsi.CallsFilter(turn_ids=["turn_1"])) is False
+
+
+def test_is_minimal_filter_wb_user_ids_not_minimal() -> None:
+    assert _is_minimal_filter(tsi.CallsFilter(wb_user_ids=["user_1"])) is False
+
+
+def test_is_minimal_filter_empty_thread_ids_not_minimal() -> None:
+    """thread_ids=[] is still a set filter (not None), so not minimal."""
+    assert _is_minimal_filter(tsi.CallsFilter(thread_ids=[])) is False
+
+
+def test_is_minimal_filter_empty_turn_ids_not_minimal() -> None:
+    """turn_ids=[] is still a set filter (not None), so not minimal."""
+    assert _is_minimal_filter(tsi.CallsFilter(turn_ids=[])) is False
