@@ -10,7 +10,9 @@ from tests.trace_server.conftest import TEST_ENTITY
 from tests.trace_server.conftest_lib.trace_server_external_adapter import b64
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.base64_content_conversion import AUTO_CONVERSION_MIN_SIZE
-from weave.trace_server.calls_query_builder.utils import param_slot
+from weave.trace_server.clickhouse_query_layer.query_builders.calls.utils import (
+    param_slot,
+)
 from weave.trace_server.errors import CallsCompleteModeRequired
 from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.project_version.project_version import (
@@ -41,7 +43,7 @@ def clickhouse_trace_server(trace_server):
     internal_server = trace_server._internal_trace_server
     if isinstance(internal_server, SqliteTraceServer):
         pytest.skip("ClickHouse-only test")
-    internal_server.table_routing_resolver._mode = CallsStorageServerMode.AUTO
+    internal_server._table_routing_resolver._mode = CallsStorageServerMode.AUTO
     return internal_server
 
 
@@ -302,7 +304,7 @@ def test_calls_complete_routing_by_residence(
         )
         == expected_merged
     )
-    read_table = clickhouse_trace_server.table_routing_resolver.resolve_read_table(
+    read_table = clickhouse_trace_server._table_routing_resolver.resolve_read_table(
         internal_project_id,
         clickhouse_trace_server.ch_client,
     )
@@ -397,7 +399,7 @@ def test_calls_complete_routing_both_residence_state(
     )
 
     # Verify resolver detects BOTH residence
-    resolver = clickhouse_trace_server.table_routing_resolver
+    resolver = clickhouse_trace_server._table_routing_resolver
     residence = resolver._get_residence(
         internal_project_id, clickhouse_trace_server.ch_client
     )
@@ -758,7 +760,7 @@ def test_call_start_end_v2_writes_calls_complete_for_empty_project(
     assert fetched_ended_at is not None
 
     # Verify read-side returns the call with correct data
-    read_table = clickhouse_trace_server.table_routing_resolver.resolve_read_table(
+    read_table = clickhouse_trace_server._table_routing_resolver.resolve_read_table(
         internal_project_id,
         clickhouse_trace_server.ch_client,
     )
@@ -996,7 +998,7 @@ def test_calls_query_routing_by_residence(
         )
         trace_server.calls_complete(tsi.CallsUpsertCompleteReq(batch=[call]))
 
-    read_table = clickhouse_trace_server.table_routing_resolver.resolve_read_table(
+    read_table = clickhouse_trace_server._table_routing_resolver.resolve_read_table(
         internal_project_id,
         clickhouse_trace_server.ch_client,
     )
@@ -1137,7 +1139,7 @@ def test_calls_complete_query_with_status_filter(trace_server, clickhouse_trace_
     )
 
     # Verify we're reading from calls_complete
-    read_table = clickhouse_trace_server.table_routing_resolver.resolve_read_table(
+    read_table = clickhouse_trace_server._table_routing_resolver.resolve_read_table(
         internal_project_id,
         clickhouse_trace_server.ch_client,
     )
@@ -1430,7 +1432,7 @@ def test_project_stats_with_calls_complete(trace_server, clickhouse_trace_server
     _insert_complete_call(clickhouse_trace_server.ch_client, internal_project_id)
 
     # Verify we're reading from calls_complete
-    read_table = clickhouse_trace_server.table_routing_resolver.resolve_read_table(
+    read_table = clickhouse_trace_server._table_routing_resolver.resolve_read_table(
         internal_project_id,
         clickhouse_trace_server.ch_client,
     )
@@ -1517,10 +1519,10 @@ def test_project_stats_uses_correct_stats_table_based_on_residence(
     _insert_complete_call(clickhouse_trace_server.ch_client, internal_project2_id)
 
     # Verify project residences
-    read_table1 = clickhouse_trace_server.table_routing_resolver.resolve_read_table(
+    read_table1 = clickhouse_trace_server._table_routing_resolver.resolve_read_table(
         internal_project1_id, clickhouse_trace_server.ch_client
     )
-    read_table2 = clickhouse_trace_server.table_routing_resolver.resolve_read_table(
+    read_table2 = clickhouse_trace_server._table_routing_resolver.resolve_read_table(
         internal_project2_id, clickhouse_trace_server.ch_client
     )
 
@@ -1633,7 +1635,7 @@ def test_call_stats_with_calls_complete(trace_server, clickhouse_trace_server):
     )
 
     # Verify we're reading from calls_complete
-    read_table = clickhouse_trace_server.table_routing_resolver.resolve_read_table(
+    read_table = clickhouse_trace_server._table_routing_resolver.resolve_read_table(
         internal_project_id,
         clickhouse_trace_server.ch_client,
     )

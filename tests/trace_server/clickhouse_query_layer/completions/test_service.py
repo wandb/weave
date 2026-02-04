@@ -4,8 +4,10 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from weave.trace_server import clickhouse_trace_server_batched as chts
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.clickhouse_query_layer import trace_server as chts
+from weave.trace_server.clickhouse_query_layer.calls import CallsRepository
+from weave.trace_server.clickhouse_query_layer.client import ClickHouseClient
 from weave.trace_server.errors import (
     InvalidRequest,
     MissingLLMApiKeyError,
@@ -290,10 +292,15 @@ class TestLLMCompletionStreaming(unittest.TestCase):
 
     def setUp(self):
         """Set up test fixtures before each test."""
+        # Mock the ClickHouse client to prevent real connections
+        self.mock_ch_client = MagicMock()
+        self.mock_ch_client.command.return_value = None
+        self.mock_ch_client.query.return_value = MagicMock(result_rows=[[0, 0]])
+        self.patcher = patch.object(
+            ClickHouseClient, "_mint_client", return_value=self.mock_ch_client
+        )
+        self.patcher.start()
         self.server = chts.ClickHouseTraceServer(host="test_host")
-        mock_ch_client = MagicMock()
-        mock_ch_client.query.return_value = MagicMock(result_rows=[[0, 0]])
-        self.server._thread_local.ch_client = mock_ch_client
         self.mock_secret_fetcher = MagicMock()
         self.mock_secret_fetcher.fetch.return_value = {
             "secrets": {
@@ -306,6 +313,7 @@ class TestLLMCompletionStreaming(unittest.TestCase):
 
     def tearDown(self):
         _secret_fetcher_context.reset(self.token)
+        self.patcher.stop()
 
     def test_basic_streaming_completion(self):
         """Test basic streaming completion functionality."""
@@ -355,7 +363,7 @@ class TestLLMCompletionStreaming(unittest.TestCase):
         ]
 
         with patch(
-            "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
+            "weave.trace_server.clickhouse_query_layer.completions.lite_llm_completion_stream"
         ) as mock_litellm:
             # Mock the litellm completion stream
             mock_stream = MagicMock()
@@ -391,7 +399,7 @@ class TestLLMCompletionStreaming(unittest.TestCase):
         class StreamingException(Exception): ...
 
         with patch(
-            "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
+            "weave.trace_server.clickhouse_query_layer.completions.lite_llm_completion_stream"
         ) as mock_litellm:
             # Mock litellm to raise an exception
             mock_litellm.side_effect = StreamingException("Test error")
@@ -447,11 +455,9 @@ class TestLLMCompletionStreaming(unittest.TestCase):
 
         with (
             patch(
-                "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
+                "weave.trace_server.clickhouse_query_layer.completions.lite_llm_completion_stream"
             ) as mock_litellm,
-            patch.object(
-                chts.ClickHouseTraceServer, "_insert_call"
-            ) as mock_insert_call,
+            patch.object(CallsRepository, "_insert_call") as mock_insert_call,
         ):
             # Mock the litellm completion stream
             mock_stream = MagicMock()
@@ -526,7 +532,7 @@ class TestLLMCompletionStreaming(unittest.TestCase):
 
         with (
             patch(
-                "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
+                "weave.trace_server.clickhouse_query_layer.completions.lite_llm_completion_stream"
             ) as mock_litellm,
             patch.object(chts.ClickHouseTraceServer, "obj_read") as mock_obj_read,
         ):
@@ -617,7 +623,7 @@ class TestLLMCompletionStreaming(unittest.TestCase):
     def test_missing_api_key(self):
         """Test handling of missing API key in streaming completion."""
         with patch(
-            "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
+            "weave.trace_server.clickhouse_query_layer.completions.lite_llm_completion_stream"
         ) as mock_litellm:
             # Mock litellm to raise MissingLLMApiKeyError
             mock_litellm.side_effect = MissingLLMApiKeyError(
@@ -809,7 +815,7 @@ class TestStreamingWithPrompts(unittest.TestCase):
 
         with (
             patch(
-                "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
+                "weave.trace_server.clickhouse_query_layer.completions.lite_llm_completion_stream"
             ) as mock_litellm,
             patch.object(chts.ClickHouseTraceServer, "obj_read") as mock_obj_read,
         ):
@@ -907,7 +913,7 @@ class TestStreamingWithPrompts(unittest.TestCase):
 
         with (
             patch(
-                "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
+                "weave.trace_server.clickhouse_query_layer.completions.lite_llm_completion_stream"
             ) as mock_litellm,
             patch.object(chts.ClickHouseTraceServer, "obj_read") as mock_obj_read,
         ):

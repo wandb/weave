@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING
 
 from pydantic import BaseModel
 
-from weave.trace_server.calls_query_builder.utils import (
+from weave.trace_server.clickhouse_query_layer.query_builders.calls.utils import (
     NotContext,
     param_slot,
 )
@@ -27,7 +27,7 @@ from weave.trace_server.orm import clickhouse_cast
 from weave.trace_server.project_version.types import ReadTable, TableConfig
 
 if TYPE_CHECKING:
-    from weave.trace_server.calls_query_builder.calls_query_builder import (
+    from weave.trace_server.clickhouse_query_layer.query_builders.calls.calls_query_builder import (
         Condition,
         ParamBuilder,
     )
@@ -494,7 +494,8 @@ def _create_like_optimized_eq_condition(
     if not isinstance(literal_operand.literal_, (str, int, float, bool)):
         return None
 
-    from weave.trace_server.calls_query_builder.calls_query_builder import (
+    # Circular import avoidance: calls_query_builder imports from optimization_builder
+    from weave.trace_server.clickhouse_query_layer.query_builders.calls.calls_query_builder import (
         get_field_by_name,
     )
 
@@ -531,7 +532,8 @@ def _create_like_optimized_contains_condition(
     ) or not isinstance(operation.contains_.substr.literal_, str):
         return None
 
-    from weave.trace_server.calls_query_builder.calls_query_builder import (
+    # Circular import avoidance: calls_query_builder imports from optimization_builder
+    from weave.trace_server.clickhouse_query_layer.query_builders.calls.calls_query_builder import (
         get_field_by_name,
     )
 
@@ -572,7 +574,8 @@ def _create_like_optimized_in_condition(
     ):
         return None
 
-    from weave.trace_server.calls_query_builder.calls_query_builder import (
+    # Circular import avoidance: calls_query_builder imports from optimization_builder
+    from weave.trace_server.clickhouse_query_layer.query_builders.calls.calls_query_builder import (
         get_field_by_name,
     )
 

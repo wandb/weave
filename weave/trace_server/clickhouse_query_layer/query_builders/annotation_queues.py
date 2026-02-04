@@ -4,7 +4,9 @@ This module provides query building functions for the queue-based call annotatio
 following the same patterns as threads_query_builder.py and other query builders in the codebase.
 """
 
-from weave.trace_server.calls_query_builder.calls_query_builder import ReadTable
+from weave.trace_server.clickhouse_query_layer.query_builders.calls.calls_query_builder import (
+    ReadTable,
+)
 from weave.trace_server.common_interface import (
     AnnotationQueueItemsFilter,
     SortBy,
@@ -313,6 +315,356 @@ def make_queue_add_calls_fetch_calls_query(
         WHERE project_id = {{{project_id_param}: String}}
             AND id IN {{{call_ids_param}: Array(String)}}
         """
+
+    return query
+
+
+def make_queue_add_calls_insert_query(
+    project_id: str,
+    queue_id: str,
+    calls_data: list[dict],
+    added_by: str | None,
+    display_fields: list[str],
+    pb: ParamBuilder,
+) -> str | None:
+    """Generate an INSERT query to add calls to a queue.
+
+    Args:
+        project_id: The project ID
+        queue_id: The queue ID
+        calls_data: List of call data dicts with id, started_at, ended_at, op_name, trace_id
+        added_by: W&B user ID of who added the calls
+        display_fields: List of JSON paths to display to annotators
+        pb: Parameter builder for safe SQL parameter injection
+
+    Returns:
+        SQL query string for inserting queue items, or None if no calls
+    """
+    if not calls_data:
+        return None
+
+    project_id_param = pb.add_param(project_id)
+    queue_id_param = pb.add_param(queue_id)
+    added_by_param = pb.add_param(added_by)
+    display_fields_param = pb.add_param(display_fields or [])
+
+    values_parts = []
+    for call in calls_data:
+        call_id_param = pb.add_param(call["id"])
+        started_at_param = pb.add_param(call.get("started_at"))
+        ended_at_param = pb.add_param(call.get("ended_at"))
+        op_name_param = pb.add_param(call.get("op_name"))
+        trace_id_param = pb.add_param(call.get("trace_id"))
+
+        values_parts.append(
+            f"(generateUUIDv7(), "
+            f"{{{project_id_param}: String}}, "
+            f"{{{queue_id_param}: String}}, "
+            f"{{{call_id_param}: String}}, "
+            f"{{{started_at_param}: Nullable(DateTime64(6))}}, "
+            f"{{{ended_at_param}: Nullable(DateTime64(6))}}, "
+            f"{{{op_name_param}: Nullable(String)}}, "
+            f"{{{trace_id_param}: Nullable(String)}}, "
+            f"{{{display_fields_param}: Array(String)}}, "
+            f"{{{added_by_param}: Nullable(String)}})"
+        )
+
+    query = f"""
+    INSERT INTO annotation_queue_items (
+        id,
+        project_id,
+        queue_id,
+        call_id,
+        call_started_at,
+        call_ended_at,
+        call_op_name,
+        call_trace_id,
+        display_fields,
+        added_by
+    ) VALUES {", ".join(values_parts)}
+    """
+
+    return query
+
+
+def make_queue_pop_calls_query(
+    project_id: str,
+    queue_id: str,
+    limit: int,
+    pb: ParamBuilder,
+) -> str:
+    """Generate a query to pop calls from a queue (get unstarted items).
+
+    Args:
+        project_id: The project ID
+        queue_id: The queue ID
+        limit: Maximum number of calls to return
+        pb: Parameter builder for safe SQL parameter injection
+
+    Returns:
+        SQL query string for fetching queue items to annotate
+    """
+    project_id_param = pb.add_param(project_id)
+    queue_id_param = pb.add_param(queue_id)
+    limit_param = pb.add_param(limit)
+
+    # Get items that haven't been started by any annotator
+    query = f"""
+    SELECT qi.call_id
+    FROM annotation_queue_items qi
+    LEFT JOIN annotator_queue_items_progress p
+        ON p.queue_item_id = qi.id
+        AND p.project_id = qi.project_id
+        AND p.deleted_at IS NULL
+    WHERE qi.project_id = {{{project_id_param}: String}}
+        AND qi.queue_id = {{{queue_id_param}: String}}
+        AND qi.deleted_at IS NULL
+    GROUP BY qi.id, qi.call_id, qi.created_at
+    HAVING count(p.id) = 0
+    ORDER BY qi.created_at ASC
+    LIMIT {{{limit_param}: Int64}}
+    """
+
+    return query
+
+
+def make_queue_call_items_query(
+    project_id: str,
+    queue_id: str,
+    pb: ParamBuilder,
+    *,
+    call_ids: list[str] | None = None,
+    sort_by: list[SortBy] | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
+) -> str:
+    """Generate a query to fetch call items in a queue.
+
+    Args:
+        project_id: The project ID
+        queue_id: The queue ID
+        pb: Parameter builder for safe SQL parameter injection
+        call_ids: Optional list of specific call IDs to fetch
+        sort_by: Optional list of sort specifications
+        limit: Maximum number of items to return
+        offset: Number of items to skip
+
+    Returns:
+        SQL query string for fetching queue call items
+    """
+    project_id_param = pb.add_param(project_id)
+    queue_id_param = pb.add_param(queue_id)
+
+    where_clauses = [
+        f"project_id = {{{project_id_param}: String}}",
+        f"queue_id = {{{queue_id_param}: String}}",
+        "deleted_at IS NULL",
+    ]
+
+    if call_ids:
+        call_ids_param = pb.add_param(call_ids)
+        where_clauses.append(f"call_id IN {{{call_ids_param}: Array(String)}}")
+
+    where_clause = " AND ".join(where_clauses)
+
+    sort_fields = _make_sort_clause(
+        sort_by, VALID_QUEUE_ITEM_SORT_FIELDS, "created_at ASC, id ASC"
+    )
+
+    query = f"""
+    SELECT
+        call_id,
+        queue_id,
+        created_at as added_at,
+        added_by,
+        call_op_name as op_name,
+        call_started_at as started_at,
+        '{{}}' as inputs_dump,
+        '{{}}' as output_dump
+    FROM annotation_queue_items
+    WHERE {where_clause}
+    ORDER BY {sort_fields}
+    """
+
+    if limit is not None:
+        limit_param = pb.add_param(limit)
+        query += f" LIMIT {{{limit_param}: Int64}}"
+
+    if offset is not None:
+        offset_param = pb.add_param(offset)
+        query += f" OFFSET {{{offset_param}: Int64}}"
+
+    return query
+
+
+def make_queue_delete_call_items_query(
+    project_id: str,
+    queue_id: str,
+    call_ids: list[str],
+    pb: ParamBuilder,
+) -> str:
+    """Generate a query to soft-delete call items from a queue.
+
+    Args:
+        project_id: The project ID
+        queue_id: The queue ID
+        call_ids: List of call IDs to delete
+        pb: Parameter builder for safe SQL parameter injection
+
+    Returns:
+        SQL query string for deleting queue items
+    """
+    project_id_param = pb.add_param(project_id)
+    queue_id_param = pb.add_param(queue_id)
+    call_ids_param = pb.add_param(call_ids)
+
+    # Use ALTER TABLE UPDATE for soft delete
+    query = f"""
+    ALTER TABLE annotation_queue_items
+    UPDATE deleted_at = now()
+    WHERE project_id = {{{project_id_param}: String}}
+        AND queue_id = {{{queue_id_param}: String}}
+        AND call_id IN {{{call_ids_param}: Array(String)}}
+        AND deleted_at IS NULL
+    """
+
+    return query
+
+
+def make_queue_update_query(
+    project_id: str,
+    queue_id: str,
+    name: str | None,
+    description: str | None,
+    scorer_refs: list[str] | None,
+    pb: ParamBuilder,
+) -> str:
+    """Generate a query to update a queue.
+
+    Args:
+        project_id: The project ID
+        queue_id: The queue ID
+        name: Optional new name
+        description: Optional new description
+        scorer_refs: Optional new scorer refs
+        pb: Parameter builder for safe SQL parameter injection
+
+    Returns:
+        SQL query string for updating the queue
+    """
+    project_id_param = pb.add_param(project_id)
+    queue_id_param = pb.add_param(queue_id)
+
+    set_clauses = ["updated_at = now()"]
+
+    if name is not None:
+        name_param = pb.add_param(name)
+        set_clauses.append(f"name = {{{name_param}: String}}")
+
+    if description is not None:
+        description_param = pb.add_param(description)
+        set_clauses.append(f"description = {{{description_param}: String}}")
+
+    if scorer_refs is not None:
+        scorer_refs_param = pb.add_param(scorer_refs)
+        set_clauses.append(f"scorer_refs = {{{scorer_refs_param}: Array(String)}}")
+
+    set_clause = ", ".join(set_clauses)
+
+    query = f"""
+    ALTER TABLE annotation_queues
+    UPDATE {set_clause}
+    WHERE project_id = {{{project_id_param}: String}}
+        AND id = {{{queue_id_param}: String}}
+        AND deleted_at IS NULL
+    """
+
+    return query
+
+
+def make_threads_query(
+    project_id: str,
+    pb: ParamBuilder,
+    *,
+    thread_ids: list[str] | None = None,
+    sort_by: list[SortBy] | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
+    read_table: ReadTable = ReadTable.CALLS_MERGED,
+) -> str:
+    """Generate a query to fetch threads with aggregated statistics.
+
+    Args:
+        project_id: The project ID
+        pb: Parameter builder for safe SQL parameter injection
+        thread_ids: Optional list of thread IDs to filter by
+        sort_by: Optional list of sort specifications
+        limit: Maximum number of threads to return
+        offset: Number of threads to skip
+        read_table: Which table to query
+
+    Returns:
+        SQL query string for threads query
+    """
+    project_id_param = pb.add_param(project_id)
+
+    table_name = (
+        "calls_merged" if read_table == ReadTable.CALLS_MERGED else "calls_complete"
+    )
+
+    where_clauses = [
+        f"project_id = {{{project_id_param}: String}}",
+        "thread_id IS NOT NULL",
+        "thread_id != ''",
+    ]
+
+    if thread_ids:
+        thread_ids_param = pb.add_param(thread_ids)
+        where_clauses.append(f"thread_id IN {{{thread_ids_param}: Array(String)}}")
+
+    where_clause = " AND ".join(where_clauses)
+
+    # Build query for threads with aggregated stats
+    if read_table == ReadTable.CALLS_MERGED:
+        query = f"""
+        SELECT
+            thread_id,
+            count(DISTINCT turn_id) as turn_count,
+            min(any(started_at)) as start_time,
+            max(any(started_at)) as last_updated,
+            argMin(any(turn_id), any(started_at)) as first_turn_id,
+            argMax(any(turn_id), any(started_at)) as last_turn_id,
+            quantile(0.5)(dateDiff('millisecond', any(started_at), any(ended_at))) as p50_turn_duration_ms,
+            quantile(0.99)(dateDiff('millisecond', any(started_at), any(ended_at))) as p99_turn_duration_ms
+        FROM {table_name}
+        WHERE {where_clause}
+        GROUP BY project_id, thread_id
+        ORDER BY last_updated DESC
+        """
+    else:
+        query = f"""
+        SELECT
+            thread_id,
+            count(DISTINCT turn_id) as turn_count,
+            min(started_at) as start_time,
+            max(started_at) as last_updated,
+            argMin(turn_id, started_at) as first_turn_id,
+            argMax(turn_id, started_at) as last_turn_id,
+            quantile(0.5)(dateDiff('millisecond', started_at, ended_at)) as p50_turn_duration_ms,
+            quantile(0.99)(dateDiff('millisecond', started_at, ended_at)) as p99_turn_duration_ms
+        FROM {table_name}
+        WHERE {where_clause}
+        GROUP BY thread_id
+        ORDER BY last_updated DESC
+        """
+
+    if limit is not None:
+        limit_param = pb.add_param(limit)
+        query += f" LIMIT {{{limit_param}: Int64}}"
+
+    if offset is not None:
+        offset_param = pb.add_param(offset)
+        query += f" OFFSET {{{offset_param}: Int64}}"
 
     return query
 

@@ -34,8 +34,10 @@ from pydantic import BaseModel, Field
 from typing_extensions import Self
 
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.calls_query_builder.cte import CTECollection
-from weave.trace_server.calls_query_builder.object_ref_query_builder import (
+from weave.trace_server.clickhouse_query_layer.query_builders.calls.cte import (
+    CTECollection,
+)
+from weave.trace_server.clickhouse_query_layer.query_builders.calls.object_ref_query_builder import (
     ObjectRefCondition,
     ObjectRefOrderCondition,
     ObjectRefQueryProcessor,
@@ -45,15 +47,15 @@ from weave.trace_server.calls_query_builder.object_ref_query_builder import (
     is_object_ref_operand,
     process_query_for_object_refs,
 )
-from weave.trace_server.calls_query_builder.optimization_builder import (
+from weave.trace_server.clickhouse_query_layer.query_builders.calls.optimization_builder import (
     process_query_to_optimization_sql,
 )
-from weave.trace_server.calls_query_builder.utils import (
+from weave.trace_server.clickhouse_query_layer.query_builders.calls.utils import (
     json_dump_field_as_sql,
     param_slot,
     safely_format_sql,
 )
-from weave.trace_server.clickhouse_trace_server_settings import LOCAL_TABLE_SUFFIX
+from weave.trace_server.clickhouse_query_layer.settings import LOCAL_TABLE_SUFFIX
 from weave.trace_server.common_interface import SortBy
 from weave.trace_server.errors import InvalidFieldError
 from weave.trace_server.interface import query as tsi_query

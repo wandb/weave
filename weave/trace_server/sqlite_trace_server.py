@@ -15,6 +15,9 @@ from opentelemetry.proto.trace.v1.trace_pb2 import ResourceSpans
 from weave.trace_server import constants, object_creation_utils
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.clickhouse_query_layer.query_builders.threads import (
+    make_threads_query_sqlite,
+)
 from weave.trace_server.common_interface import SortBy
 from weave.trace_server.errors import (
     InvalidRequest,
@@ -37,7 +40,6 @@ from weave.trace_server.object_class_util import process_incoming_object_val
 from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
 from weave.trace_server.opentelemetry.python_spans import Resource, Span
 from weave.trace_server.orm import quote_json_path
-from weave.trace_server.threads_query_builder import make_threads_query_sqlite
 from weave.trace_server.trace_server_common import (
     assert_parameter_length_less_than_max,
     determine_call_status,

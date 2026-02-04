@@ -42,7 +42,7 @@ from weave.trace.refs import TableRef
 from weave.trace.vals import MissingSelfInstanceError
 from weave.trace.weave_client import sanitize_object_name
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.clickhouse_trace_server_settings import ENTITY_TOO_LARGE_PAYLOAD
+from weave.trace_server.clickhouse_query_layer.settings import ENTITY_TOO_LARGE_PAYLOAD
 from weave.trace_server.common_interface import SortBy
 from weave.trace_server.errors import InsertTooLarge, InvalidFieldError, InvalidRequest
 from weave.trace_server.ids import generate_id
@@ -3287,19 +3287,19 @@ def test_calls_stream_column_expansion(client):
     assert call_result.output == nested_ref.uri()
 
 
-# Batch size is dynamically increased from 10 to MAX_CALLS_STREAM_BATCH_SIZE (500)
-# in clickhouse_trace_server_settings.py, this test verifies that the dynamic
+# Batch size is dynamically increased from INITIAL_CALLS_STREAM_BATCH_SIZE to MAX_CALLS_STREAM_BATCH_SIZE (500)
+# in clickhouse_query_layer/settings.py, this test verifies that the dynamic
 # increase works as expected
 @pytest.mark.parametrize("batch_size", [1, 5, 6])
 def test_calls_stream_column_expansion_dynamic_batch_size(
     client, batch_size, monkeypatch
 ):
     monkeypatch.setattr(
-        "weave.trace_server.clickhouse_trace_server_settings.INITIAL_CALLS_STREAM_BATCH_SIZE",
+        "weave.trace_server.clickhouse_query_layer.settings.INITIAL_CALLS_STREAM_BATCH_SIZE",
         1,
     )
     monkeypatch.setattr(
-        "weave.trace_server.clickhouse_trace_server_settings.MAX_CALLS_STREAM_BATCH_SIZE",
+        "weave.trace_server.clickhouse_query_layer.settings.MAX_CALLS_STREAM_BATCH_SIZE",
         5,
     )
 
@@ -3602,16 +3602,19 @@ def test_inline_pydantic_basemodel_generates_no_refs_in_object(client):
 
 
 def test_large_keys_are_stripped_call(client, caplog, monkeypatch):
+    from weave.trace_server.clickhouse_query_layer import settings as ch_settings
+    from weave.trace_server.clickhouse_query_layer.batching import BatchManager
+
     is_sqlite = client_is_sqlite(client)
     if is_sqlite:
         # no need to strip in sqlite
         return
 
-    original_insert_call_batch = weave.trace_server.clickhouse_trace_server_batched.ClickHouseTraceServer._insert_call_batch
+    original_insert_call_batch = BatchManager.insert_call_batch
     max_size = 10 * 1024
 
-    # Patch _insert_call_batch to raise InsertTooLarge
-    def mock_insert_call_batch(self, batch):
+    # Patch insert_call_batch to raise InsertTooLarge
+    def mock_insert_call_batch(self, batch, settings=None, do_sync_insert=False):
         # mock raise insert error
         if len(str(batch)) > max_size:
             raise InsertTooLarge(
@@ -3619,16 +3622,16 @@ def test_large_keys_are_stripped_call(client, caplog, monkeypatch):
                 "A likely cause is that a single row or cell exceeded "
                 "the limit. If logging images, save them as `Image.PIL`."
             )
-        original_insert_call_batch(self, batch)
+        original_insert_call_batch(self, batch, settings, do_sync_insert)
 
     monkeypatch.setattr(
-        weave.trace_server.clickhouse_trace_server_settings,
+        ch_settings,
         "CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT",
         max_size,
     )
     monkeypatch.setattr(
-        weave.trace_server.clickhouse_trace_server_batched.ClickHouseTraceServer,
-        "_insert_call_batch",
+        BatchManager,
+        "insert_call_batch",
         mock_insert_call_batch,
     )
 

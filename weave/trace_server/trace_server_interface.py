@@ -1782,6 +1782,13 @@ class EvaluationCreateBody(BaseModel):
     eval_attributes: dict[str, Any] | None = Field(
         None, description="Optional attributes for the evaluation"
     )
+    metadata: dict[str, Any] | None = Field(
+        None, description="Optional metadata for the evaluation"
+    )
+    preprocess_model_input: str | None = Field(
+        None,
+        description="Optional reference to a function that preprocesses model inputs",
+    )
 
 
 class EvaluationCreateReq(EvaluationCreateBody):

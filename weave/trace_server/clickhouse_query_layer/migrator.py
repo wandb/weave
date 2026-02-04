@@ -72,7 +72,7 @@ from re import Pattern
 
 from clickhouse_connect.driver.client import Client as CHClient
 
-from weave.trace_server import clickhouse_trace_server_settings as ch_settings
+from weave.trace_server.clickhouse_query_layer import settings as ch_settings
 from weave.trace_server.costs.insert_costs import insert_costs, should_insert_costs
 
 logger = logging.getLogger(__name__)
@@ -510,28 +510,36 @@ class ReplicatedClickHouseTraceServerMigrator(BaseClickHouseTraceServerMigrator)
         # ALTER TABLE
         if SQLPatterns.ALTER_TABLE_STMT.search(sql_query):
             return SQLPatterns.ALTER_TABLE_NAME_PATTERN.sub(
-                lambda m: f"{m.group(1)}{m.group(2)} ON CLUSTER {self.replicated_cluster}{m.group(3)}",
+                lambda m: (
+                    f"{m.group(1)}{m.group(2)} ON CLUSTER {self.replicated_cluster}{m.group(3)}"
+                ),
                 sql_query,
             )
 
         # CREATE TABLE
         if SQLPatterns.CREATE_TABLE_STMT.search(sql_query):
             return SQLPatterns.CREATE_TABLE_NAME_PATTERN.sub(
-                lambda m: f"{m.group(1)}{m.group(2)} ON CLUSTER {self.replicated_cluster}{m.group(3)}",
+                lambda m: (
+                    f"{m.group(1)}{m.group(2)} ON CLUSTER {self.replicated_cluster}{m.group(3)}"
+                ),
                 sql_query,
             )
 
         # DROP VIEW
         if SQLPatterns.DROP_VIEW_STMT.search(sql_query):
             return SQLPatterns.DROP_VIEW_NAME_PATTERN.sub(
-                lambda m: f"{m.group(1)}{m.group(2)} ON CLUSTER {self.replicated_cluster}{m.group(3)}",
+                lambda m: (
+                    f"{m.group(1)}{m.group(2)} ON CLUSTER {self.replicated_cluster}{m.group(3)}"
+                ),
                 sql_query,
             )
 
         # CREATE VIEW / CREATE MATERIALIZED VIEW
         if SQLPatterns.CREATE_VIEW_STMT.search(sql_query):
             return SQLPatterns.CREATE_VIEW_NAME_PATTERN.sub(
-                lambda m: f"{m.group(1)}{m.group(2)} ON CLUSTER {self.replicated_cluster}{m.group(3)}",
+                lambda m: (
+                    f"{m.group(1)}{m.group(2)} ON CLUSTER {self.replicated_cluster}{m.group(3)}"
+                ),
                 sql_query,
             )
 
@@ -942,7 +950,7 @@ def get_clickhouse_trace_server_migrator(
 
     if migration_dir is None:
         migration_dir = os.path.abspath(
-            os.path.join(os.path.dirname(__file__), "migrations")
+            os.path.join(os.path.dirname(__file__), "..", "migrations")
         )
 
     if use_distributed:

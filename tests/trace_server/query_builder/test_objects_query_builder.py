@@ -1,8 +1,7 @@
 import pytest
 import sqlparse
 
-from weave.trace_server.common_interface import SortBy
-from weave.trace_server.query_builder.objects_query_builder import (
+from weave.trace_server.clickhouse_query_layer.query_builders.objects import (
     ObjectMetadataQueryBuilder,
     _make_conditions_part,
     _make_limit_part,
@@ -11,6 +10,7 @@ from weave.trace_server.query_builder.objects_query_builder import (
     _make_sort_part,
     make_objects_val_query_and_parameters,
 )
+from weave.trace_server.common_interface import SortBy
 
 
 def test_make_limit_part():

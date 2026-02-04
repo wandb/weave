@@ -1,6 +1,8 @@
 import pytest
 
-from weave.trace_server.calls_query_builder.calls_query_builder import Condition
+from weave.trace_server.clickhouse_query_layer.query_builders.calls.calls_query_builder import (
+    Condition,
+)
 from weave.trace_server.interface import query as tsi_query
 
 

@@ -5,7 +5,9 @@ import logging
 import ddtrace
 from clickhouse_connect.driver.client import Client as CHClient
 
-from weave.trace_server.calls_query_builder.utils import param_slot
+from weave.trace_server.clickhouse_query_layer.query_builders.calls.utils import (
+    param_slot,
+)
 from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.project_version.types import ProjectDataResidence
 

@@ -106,7 +106,7 @@ def test_version_resolution_by_table_contents(
         pytest.skip("ClickHouse-only test")
 
     ch_server = trace_server._internal_trace_server
-    resolver = ch_server.table_routing_resolver
+    resolver = ch_server._table_routing_resolver
     # manually set this to auto so we can test the switching
     resolver._mode = CallsStorageServerMode.AUTO
 
@@ -147,7 +147,7 @@ def test_caching_behavior(client, trace_server):
         pytest.skip("ClickHouse-only test")
 
     ch_server = trace_server._internal_trace_server
-    resolver = ch_server.table_routing_resolver
+    resolver = ch_server._table_routing_resolver
     resolver._mode = CallsStorageServerMode.AUTO
 
     cached_proj = make_project_id("cached_project")
@@ -178,7 +178,7 @@ def test_mode_off_and_force_legacy(client, trace_server):
         pytest.skip("ClickHouse-only test")
 
     ch_server = trace_server._internal_trace_server
-    resolver = ch_server.table_routing_resolver
+    resolver = ch_server._table_routing_resolver
 
     project_id = make_project_id("mode_test")
     insert_call(ch_server.ch_client, "calls_complete", project_id)
@@ -221,12 +221,11 @@ def test_resolver_as_trace_server_member(client, trace_server):
 
     ch_server = trace_server._internal_trace_server
 
-    # Test that the resolver is lazily initialized
-    assert ch_server._table_routing_resolver is None
-    resolver1 = ch_server.table_routing_resolver
+    # Test that the resolver is eagerly initialized
+    resolver1 = ch_server._table_routing_resolver
     assert resolver1 is not None
 
-    resolver2 = ch_server.table_routing_resolver
+    resolver2 = ch_server._table_routing_resolver
     assert resolver1 is resolver2
 
     project_id = make_project_id("trace_server_member")

@@ -6,14 +6,14 @@ from tests.trace_server.query_builder.utils import (
     assert_clickhouse_sql,
     assert_sqlite_sql,
 )
-from weave.trace_server.common_interface import SortBy
-from weave.trace_server.orm import ParamBuilder
-from weave.trace_server.project_version.types import ReadTable
-from weave.trace_server.threads_query_builder import (
+from weave.trace_server.clickhouse_query_layer.query_builders.threads import (
     _validate_and_map_sort_field,
     make_threads_query,
     make_threads_query_sqlite,
 )
+from weave.trace_server.common_interface import SortBy
+from weave.trace_server.orm import ParamBuilder
+from weave.trace_server.project_version.types import ReadTable
 
 # Basic Functionality Tests
 

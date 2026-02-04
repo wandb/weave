@@ -44,9 +44,9 @@ from weave.trace.serialization.serializer import (
     get_serializer_for_obj,
     register_serializer,
 )
-from weave.trace_server.clickhouse_trace_server_batched import NotFoundError
 from weave.trace_server.common_interface import SortBy
 from weave.trace_server.constants import MAX_DISPLAY_NAME_LENGTH
+from weave.trace_server.errors import NotFoundError
 from weave.trace_server.ids import generate_id
 from weave.trace_server.interface.builtin_object_classes.llm_structured_model import (
     LLMStructuredCompletionModel,

@@ -320,7 +320,7 @@ def test_custom_provider_completions_create(client):
         mock_secret_fetcher, token = setup_test_environment()
         try:
             with patch(
-                "weave.trace_server.clickhouse_trace_server_batched.ClickHouseTraceServer.obj_read"
+                "weave.trace_server.clickhouse_query_layer.trace_server.ClickHouseTraceServer.obj_read"
             ) as mock_read:
                 mock_read.side_effect = mock_obj_read
                 with patch("litellm.completion") as mock_completion:
@@ -416,6 +416,7 @@ def test_custom_provider_ollama_model(client):
         base_url="http://localhost:11434",
         api_key_name="OLLAMA_API_KEY",
         extra_headers={},
+        return_type="ollama",
     )
 
     # Create a ProviderModel object with Ollama-specific configuration
@@ -448,7 +449,7 @@ def test_custom_provider_ollama_model(client):
         mock_secret_fetcher, token = setup_test_environment()
         try:
             with patch(
-                "weave.trace_server.clickhouse_trace_server_batched.ClickHouseTraceServer.obj_read"
+                "weave.trace_server.clickhouse_query_layer.trace_server.ClickHouseTraceServer.obj_read"
             ) as mock_read:
                 mock_read.side_effect = mock_obj_read
                 with patch("litellm.completion") as mock_completion:
@@ -546,7 +547,7 @@ def test_error_handling_custom_provider(client):
         mock_secret_fetcher, token = setup_test_environment()
         try:
             with patch(
-                "weave.trace_server.clickhouse_trace_server_batched.ClickHouseTraceServer.obj_read"
+                "weave.trace_server.clickhouse_query_layer.trace_server.ClickHouseTraceServer.obj_read"
             ) as mock_read:
                 mock_read.side_effect = mock_obj_read
                 res = client.server.completions_create(

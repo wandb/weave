@@ -52,12 +52,14 @@ from typing import TYPE_CHECKING, Any, Optional, get_args
 
 from pydantic import BaseModel
 
-from weave.trace_server.calls_query_builder.cte import CTECollection
-from weave.trace_server.calls_query_builder.optimization_builder import (
+from weave.trace_server.clickhouse_query_layer.query_builders.calls.cte import (
+    CTECollection,
+)
+from weave.trace_server.clickhouse_query_layer.query_builders.calls.optimization_builder import (
     QueryOptimizationProcessor,
     apply_processor,
 )
-from weave.trace_server.calls_query_builder.utils import (
+from weave.trace_server.clickhouse_query_layer.query_builders.calls.utils import (
     json_dump_field_as_sql,
     param_slot,
 )
@@ -71,7 +73,7 @@ from weave.trace_server.orm import (
 )
 
 if TYPE_CHECKING:
-    from weave.trace_server.calls_query_builder.calls_query_builder import (
+    from weave.trace_server.clickhouse_query_layer.query_builders.calls.calls_query_builder import (
         Condition,
         OrderField,
         ParamBuilder,
@@ -500,7 +502,7 @@ class ObjectRefQueryProcessor:
             )
         else:
             # Handle as normal condition
-            from weave.trace_server.calls_query_builder.calls_query_builder import (
+            from weave.trace_server.clickhouse_query_layer.query_builders.calls.calls_query_builder import (
                 process_query_to_conditions,
             )
 
