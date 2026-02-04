@@ -725,7 +725,7 @@ class HardCodedFilter(BaseModel):
                 self.filter.wb_user_ids,
                 self.filter.wb_run_ids,
                 self.filter.turn_ids,
-                self.filter.thread_ids is not None and len(self.filter.thread_ids) > 0,
+                self.filter.thread_ids is not None,
             ]
         )
 

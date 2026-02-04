@@ -3168,13 +3168,19 @@ def test_query_with_queue_filter_calls_complete() -> None:
 
 
 # -----------------------------------------------------------------------------
-# HardCodedFilter.is_useful() and _is_minimal_filter()
+# HardCodedFilter.is_useful()
 # -----------------------------------------------------------------------------
 
 
 def test_hardcoded_filter_is_useful_thread_ids_only() -> None:
     """Filter with only thread_ids must be considered useful so set_hardcoded_filter applies it."""
     hcf = HardCodedFilter(filter=tsi.CallsFilter(thread_ids=["thread_1"]))
+    assert hcf.is_useful() is True
+
+
+def test_hardcoded_filter_is_useful_empty_thread_ids_only() -> None:
+    """Filter with only thread_ids must be considered useful, even when the list is empty."""
+    hcf = HardCodedFilter(filter=tsi.CallsFilter(thread_ids=[]))
     assert hcf.is_useful() is True
 
 
