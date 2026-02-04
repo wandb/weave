@@ -4700,6 +4700,39 @@ def test_calls_query_stats_with_limit(client):
     assert result.total_storage_size_bytes is not None
 
 
+def test_calls_query_stats_thread_ids_filter_not_minimal(client):
+    """Ensure that we do not optimize away the thread_ids filter when it is present."""
+    client.set_wandb_run_context(run_id="stats-thread-run", step=0)
+
+    @weave.op
+    def stats_thread_op() -> int:
+        return 1
+
+    # Create calls in one thread (so project has calls with wb_run_id; optimized path would return 1)
+    with weave.thread("thread_with_calls"):
+        stats_thread_op()
+        stats_thread_op()
+
+    # Query a different thread that has zero calls. Full path -> 0. Buggy optimized path -> 1.
+    thread_id_with_no_calls = "thread_with_zero_calls_xyz"
+    wb_run_id_not_null_query = tsi.Query(
+        **{
+            "$expr": {
+                "$not": [{"$eq": [{"$getField": "wb_run_id"}, {"$literal": None}]}]
+            }
+        }
+    )
+    res = client.server.calls_query_stats(
+        tsi.CallsQueryStatsReq(
+            project_id=get_client_project_id(client),
+            limit=1,
+            query=wb_run_id_not_null_query,
+            filter=tsi.CallsFilter(thread_ids=[thread_id_with_no_calls]),
+        )
+    )
+    assert res.count == 0
+
+
 def test_calls_query_stats_total_storage_size_clickhouse(client, clickhouse_client):
     """Test querying calls with total storage size."""
     if client_is_sqlite(client):
