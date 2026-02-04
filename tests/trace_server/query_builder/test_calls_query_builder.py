@@ -3165,3 +3165,41 @@ def test_query_with_queue_filter_calls_complete() -> None:
             "pb_1": "project",
         },
     )
+
+
+# -----------------------------------------------------------------------------
+# HardCodedFilter.is_useful()
+# -----------------------------------------------------------------------------
+
+
+def test_hardcoded_filter_is_useful_thread_ids_only() -> None:
+    """Filter with only thread_ids must be considered useful so set_hardcoded_filter applies it."""
+    hcf = HardCodedFilter(filter=tsi.CallsFilter(thread_ids=["thread_1"]))
+    assert hcf.is_useful() is True
+
+
+def test_hardcoded_filter_is_useful_empty_thread_ids_only() -> None:
+    """Filter with only thread_ids must be considered useful, even when the list is empty."""
+    hcf = HardCodedFilter(filter=tsi.CallsFilter(thread_ids=[]))
+    assert hcf.is_useful() is True
+
+
+def test_hardcoded_filter_is_useful_turn_ids_only() -> None:
+    """Filter with only turn_ids must be considered useful."""
+    hcf = HardCodedFilter(filter=tsi.CallsFilter(turn_ids=["turn_1"]))
+    assert hcf.is_useful() is True
+
+
+def test_hardcoded_filter_is_useful_empty_not_useful() -> None:
+    """Filter with no fields set is not useful."""
+    hcf = HardCodedFilter(filter=tsi.CallsFilter())
+    assert hcf.is_useful() is False
+
+
+def test_hardcoded_filter_set_hardcoded_filter_with_thread_ids_only() -> None:
+    """set_hardcoded_filter must accept a filter that only has thread_ids (is_useful True)."""
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.set_hardcoded_filter(HardCodedFilter(filter=tsi.CallsFilter(thread_ids=["t1"])))
+    assert cq.hardcoded_filter is not None
+    assert cq.hardcoded_filter.filter.thread_ids == ["t1"]
