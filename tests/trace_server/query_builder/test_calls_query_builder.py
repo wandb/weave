@@ -1706,6 +1706,44 @@ def test_datetime_optimization_simple() -> None:
     )
 
 
+def test_datetime_optimization_lt_simple() -> None:
+    """Test basic datetime optimization with a single LT timestamp condition."""
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_condition(
+        tsi_query.LtOperation.model_validate(
+            {
+                "$lt": [
+                    {"$getField": "started_at"},
+                    {"$literal": 1709251200},  # 2024-03-01 00:00:00 UTC
+                ]
+            }
+        )
+    )
+
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id
+        FROM calls_merged
+        PREWHERE calls_merged.project_id = {pb_2:String}
+        WHERE (calls_merged.sortable_datetime < {pb_1:String})
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING (
+            ((any(calls_merged.started_at) < {pb_0:UInt64}))
+            AND ((any(calls_merged.deleted_at) IS NULL))
+            AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+        )
+        """,
+        {
+            "pb_0": 1709251200,
+            "pb_2": "project",
+            "pb_1": "2024-03-01 00:05:00.000000",
+        },
+    )
+
+
 def test_datetime_optimization_not_operation() -> None:
     """Test datetime optimization with a NOT operation."""
     cq = CallsQuery(project_id="project")
@@ -2302,6 +2340,34 @@ def test_disallowed_fields():
             tsi_query.GteOperation.model_validate(
                 {
                     "$gte": [
+                        {"$getField": "total_storage_size_bytes"},
+                        {"$literal": 1},
+                    ]
+                }
+            )
+        )
+        cq.as_sql(ParamBuilder())
+
+    cq = CallsQuery(project_id="test/project")  # reset
+    with pytest.raises(ValueError):
+        cq.add_condition(
+            tsi_query.LtOperation.model_validate(
+                {
+                    "$lt": [
+                        {"$getField": "storage_size_bytes"},
+                        {"$literal": 1},
+                    ]
+                }
+            )
+        )
+        cq.as_sql(ParamBuilder())
+
+    cq = CallsQuery(project_id="test/project")  # reset
+    with pytest.raises(ValueError):
+        cq.add_condition(
+            tsi_query.LteOperation.model_validate(
+                {
+                    "$lte": [
                         {"$getField": "total_storage_size_bytes"},
                         {"$literal": 1},
                     ]
