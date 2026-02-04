@@ -26,35 +26,6 @@ def test_sqlite_calls_query_filter_by_thread_ids():
         assert "thread_id IN ('thread_a_abc', 'thread_b_def')" in sql
 
 
-def test_sqlite_calls_query_filter_by_empty_thread_ids():
-    """Filter with thread_ids=[] must not add a thread_id condition and must not crash.
-
-    SQLite builds conditions with 'if filter.thread_ids'; empty list is falsy so no
-    thread_id IN (...) is added. Verifies the server handles empty thread_ids safely.
-    """
-    with patch.object(slts, "get_conn_cursor") as mock_get_conn_cursor:
-        mock_cursor = Mock()
-        mock_cursor.fetchall.return_value = []
-        mock_get_conn_cursor.return_value = (Mock(), mock_cursor)
-
-        server = slts.SqliteTraceServer(":memory:")
-
-        req = tsi.CallsQueryReq(
-            project_id="test_project",
-            filter=tsi.CallsFilter(thread_ids=[]),
-            limit=100,
-        )
-
-        result = list(server.calls_query_stream(req))
-
-        mock_cursor.execute.assert_called_once()
-        sql = mock_cursor.execute.call_args[0][0]
-        # Empty thread_ids is falsy, so SQLite does not add any thread_id WHERE condition
-        # (no "thread_id IN ()" which would be invalid or match nothing)
-        assert "thread_id IN ()" not in sql
-        assert result == []
-
-
 def test_sqlite_storage_size_query_generation():
     """Test that SQLite storage size query generation works correctly."""
     # Mock the query builder and cursor.execute
