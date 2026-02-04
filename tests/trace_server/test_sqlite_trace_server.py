@@ -4,6 +4,28 @@ from weave.trace_server import sqlite_trace_server as slts
 from weave.trace_server import trace_server_interface as tsi
 
 
+def test_sqlite_calls_query_filter_by_thread_ids():
+    """Test that calls_query applies thread_ids filter in the SQL WHERE clause."""
+    with patch.object(slts, "get_conn_cursor") as mock_get_conn_cursor:
+        mock_cursor = Mock()
+        mock_cursor.fetchall.return_value = []
+        mock_get_conn_cursor.return_value = (Mock(), mock_cursor)
+
+        server = slts.SqliteTraceServer(":memory:")
+
+        req = tsi.CallsQueryReq(
+            project_id="test_project",
+            filter=tsi.CallsFilter(thread_ids=["thread_a_abc", "thread_b_def"]),
+            limit=100,
+        )
+
+        list(server.calls_query_stream(req))
+
+        mock_cursor.execute.assert_called_once()
+        sql = mock_cursor.execute.call_args[0][0]
+        assert "thread_id IN ('thread_a_abc', 'thread_b_def')" in sql
+
+
 def test_sqlite_storage_size_query_generation():
     """Test that SQLite storage size query generation works correctly."""
     # Mock the query builder and cursor.execute
