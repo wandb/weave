@@ -5138,6 +5138,38 @@ def test_thread_id_query_filtering(client):
         )
 
 
+def test_get_calls_filter_by_thread_ids_only(client):
+    """Test that get_calls with only CallsFilter(thread_ids=[...]) returns just that thread's calls.
+
+    This exercises the path where thread_ids is the sole filter (HardCodedFilter.is_useful()
+    """
+    import uuid
+
+    unique = str(uuid.uuid4())[:8]
+
+    @weave.op
+    def thread_filter_op(value: str) -> str:
+        return f"out_{value}"
+
+    with weave.thread(f"thread_a_{unique}"):
+        thread_filter_op("a1")
+        thread_filter_op("a2")
+
+    with weave.thread(f"thread_b_{unique}"):
+        thread_filter_op("b1")
+
+    # Filter using only thread_ids (no op_names, trace_ids, etc.)
+    calls_thread_a = list(
+        client.get_calls(
+            filter=tsi.CallsFilter(thread_ids=[f"thread_a_{unique}"]),
+            limit=100,
+        )
+    )
+
+    assert len(calls_thread_a) == 2
+    assert all(call.thread_id == f"thread_a_{unique}" for call in calls_thread_a)
+
+
 def test_thread_context_error_handling(client):
     """Test that ThreadContext is properly managed even when exceptions occur."""
     import weave
