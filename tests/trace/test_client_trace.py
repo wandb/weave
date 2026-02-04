@@ -4724,7 +4724,8 @@ def test_calls_query_stats_thread_ids_filter_not_minimal(client, thread_ids):
         stats_thread_op()
         stats_thread_op()
 
-    # Query with thread_ids that match zero calls. Full path -> 0. Buggy optimized path -> 1.
+    # A query is required to exercise "Pattern 2" in _try_optimized_stats_query.
+    # Use a query that matches the created calls (wb_run_id not null).
     wb_run_id_not_null_query = tsi.Query(
         **{
             "$expr": {
@@ -4732,6 +4733,18 @@ def test_calls_query_stats_thread_ids_filter_not_minimal(client, thread_ids):
             }
         }
     )
+    # Confirm that this query returns results, so we can test filtering with the second query below.
+    res_with_matching_thread = client.server.calls_query_stats(
+        tsi.CallsQueryStatsReq(
+            project_id=get_client_project_id(client),
+            limit=1,
+            query=wb_run_id_not_null_query,
+            filter=tsi.CallsFilter(thread_ids=["thread_with_calls"]),
+        )
+    )
+    assert res_with_matching_thread.count == 1
+
+    # Query with thread_ids that match zero calls. Full path -> 0. Incorrectly choosing the optimized path -> 1.
     res = client.server.calls_query_stats(
         tsi.CallsQueryStatsReq(
             project_id=get_client_project_id(client),
