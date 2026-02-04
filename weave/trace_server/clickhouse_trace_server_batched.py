@@ -2349,6 +2349,47 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         return tsi.AnnotationQueuesStatsRes(stats=stats)
 
+    def _fetch_queue_item_for_progress_update(
+        self, project_id: str, queue_id: str, item_id: str
+    ) -> tsi.AnnotatorQueueItemsProgressUpdateRes:
+        """Fetch a queue item and return it wrapped in progress update response."""
+        pb = ParamBuilder()
+        fetch_query = make_queue_items_query(
+            project_id=project_id,
+            queue_id=queue_id,
+            pb=pb,
+            filter=AnnotationQueueItemsFilter(id=item_id),
+            sort_by=None,
+            limit=1,
+            offset=None,
+            include_position=False,
+        )
+        fetch_result = self.ch_client.query(fetch_query, parameters=pb.get_params())
+
+        for row in fetch_result.named_results():
+            item = tsi.AnnotationQueueItemSchema(
+                id=row["id"],
+                project_id=row["project_id"],
+                queue_id=row["queue_id"],
+                call_id=row["call_id"],
+                call_started_at=row["call_started_at"],
+                call_ended_at=row["call_ended_at"],
+                call_op_name=row["call_op_name"],
+                call_trace_id=row["call_trace_id"],
+                display_fields=row["display_fields"],
+                added_by=row["added_by"],
+                annotation_state=row["annotation_state"],
+                created_at=row["created_at"],
+                created_by=row["created_by"],
+                updated_at=row["updated_at"],
+                deleted_at=row["deleted_at"],
+                position_in_queue=None,
+                annotator_user_id=row.get("annotator_user_id"),
+            )
+            return tsi.AnnotatorQueueItemsProgressUpdateRes(item=item)
+
+        raise ValueError(f"Failed to fetch queue item '{item_id}'")
+
     @ddtrace.tracer.wrap(
         name="clickhouse_trace_server_batched.annotator_queue_items_progress_update"
     )
@@ -2359,7 +2400,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         Validates state transitions:
         - Allowed: (absence) -> 'in_progress', 'completed' or 'skipped'
-        - Allowed: 'in_progress' -> 'completed' or 'skipped'
+        - Allowed: 'in_progress' or 'unstarted' -> 'completed' or 'skipped'
+        - Idempotent: same_state -> same_state (no-op, returns existing item)
         - Rejected: any other transition (including updating to 'in_progress' when record exists)
         """
         # Validate annotation_state
@@ -2402,6 +2444,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             current_state = row["annotation_state"]
             has_record = row["record_exists"] > 0
             break
+
+        # Idempotent: if already in the requested state, skip the update
+        if current_state == req.annotation_state:
+            return self._fetch_queue_item_for_progress_update(
+                req.project_id, req.queue_id, req.item_id
+            )
 
         # Special handling for 'in_progress': only allow when no record exists
         if req.annotation_state == "in_progress" and has_record:
@@ -2474,48 +2522,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             """
             self._command(insert_query, parameters=pb.get_params())
 
-        # Fetch and return the updated queue item
-        # We need to re-query to get the aggregated annotation_state
-        pb_fetch = ParamBuilder()
-        fetch_query = make_queue_items_query(
-            project_id=req.project_id,
-            queue_id=req.queue_id,
-            pb=pb_fetch,
-            filter=AnnotationQueueItemsFilter(id=req.item_id),
-            sort_by=None,
-            limit=1,
-            offset=None,
-            include_position=False,
+        return self._fetch_queue_item_for_progress_update(
+            req.project_id, req.queue_id, req.item_id
         )
-
-        fetch_result = self.ch_client.query(
-            fetch_query, parameters=pb_fetch.get_params()
-        )
-
-        for row in fetch_result.named_results():
-            item = tsi.AnnotationQueueItemSchema(
-                id=row["id"],
-                project_id=row["project_id"],
-                queue_id=row["queue_id"],
-                call_id=row["call_id"],
-                call_started_at=row["call_started_at"],
-                call_ended_at=row["call_ended_at"],
-                call_op_name=row["call_op_name"],
-                call_trace_id=row["call_trace_id"],
-                display_fields=row["display_fields"],
-                added_by=row["added_by"],
-                annotation_state=row["annotation_state"],
-                created_at=row["created_at"],
-                created_by=row["created_by"],
-                updated_at=row["updated_at"],
-                deleted_at=row["deleted_at"],
-                position_in_queue=None,
-                annotator_user_id=row.get("annotator_user_id"),
-            )
-            return tsi.AnnotatorQueueItemsProgressUpdateRes(item=item)
-
-        # This shouldn't happen if our logic is correct
-        raise ValueError(f"Failed to fetch updated item '{req.item_id}'")
 
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
         """Create an op object by delegating to obj_create.
