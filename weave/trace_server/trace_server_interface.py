@@ -1377,6 +1377,7 @@ class AnnotatorQueueItemsProgressUpdateReq(BaseModelStrict):
     - (absence) -> 'in_progress': Mark item as in progress (only when no record exists)
     - (absence) -> 'completed' or 'skipped': Directly complete/skip item
     - 'in_progress' or 'unstarted' -> 'completed' or 'skipped': Complete/skip started item
+    - same_state -> same_state: Idempotent no-op (returns existing item unchanged)
     """
 
     project_id: str = Field(examples=["entity/project"])
