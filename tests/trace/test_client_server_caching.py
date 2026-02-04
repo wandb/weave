@@ -180,14 +180,11 @@ def test_server_cache_size_limit(client):
             )
 
 
-def test_server_cache_latency(caching_client_isolation):
+def test_server_cache_latency(client):
     count = 500
 
     base_server = MockServer("a" * 1000)
-    caching_server = CachingMiddlewareTraceServer(
-        next_trace_server=base_server,
-        cache_dir=str(caching_client_isolation),
-    )
+    caching_server = CachingMiddlewareTraceServer(next_trace_server=base_server)
 
     def get_latency_for_server(server: TraceServerInterface, count: int):
         start = time.time()
