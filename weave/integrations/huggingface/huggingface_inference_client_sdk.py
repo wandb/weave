@@ -83,9 +83,8 @@ def huggingface_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Calla
         return _add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: huggingface_accumulator,
-            should_accumulate=lambda inputs: (
-                isinstance(inputs, dict) and bool(inputs.get("stream"))
-            ),
+            should_accumulate=lambda inputs: isinstance(inputs, dict)
+            and bool(inputs.get("stream")),
         )
 
     return wrapper
@@ -108,9 +107,8 @@ def huggingface_wrapper_async(settings: OpSettings) -> Callable[[Callable], Call
         return _add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: huggingface_accumulator,
-            should_accumulate=lambda inputs: (
-                isinstance(inputs, dict) and bool(inputs.get("stream"))
-            ),
+            should_accumulate=lambda inputs: isinstance(inputs, dict)
+            and bool(inputs.get("stream")),
         )
 
     return wrapper

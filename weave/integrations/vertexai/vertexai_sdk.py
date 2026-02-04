@@ -99,9 +99,8 @@ def vertexai_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable
         return _add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: vertexai_accumulator,
-            should_accumulate=lambda inputs: (
-                isinstance(inputs, dict) and bool(inputs.get("stream"))
-            ),
+            should_accumulate=lambda inputs: isinstance(inputs, dict)
+            and bool(inputs.get("stream")),
         )
 
     return wrapper
@@ -125,9 +124,8 @@ def vertexai_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callabl
         return _add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: vertexai_accumulator,
-            should_accumulate=lambda inputs: (
-                isinstance(inputs, dict) and bool(inputs.get("stream"))
-            ),
+            should_accumulate=lambda inputs: isinstance(inputs, dict)
+            and bool(inputs.get("stream")),
         )
 
     return wrapper
