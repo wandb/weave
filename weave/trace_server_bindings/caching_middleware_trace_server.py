@@ -96,16 +96,11 @@ class CachingMiddlewareTraceServer(
 
         Args:
             next_trace_server: The trace server to wrap with caching
-            cache_dir: Directory to store the disk cache. If None, reads from
-                WEAVE_SERVER_CACHE_DIR env var, then falls back to system temp dir.
+            cache_dir: Directory to store the disk cache. If None, uses system temp dir
             size_limit: Maximum size in bytes for the cache (default 1GB)
         """
         self._next_trace_server = next_trace_server
-        cache_dir = (
-            cache_dir
-            or server_cache_dir()
-            or os.path.join(tempfile.gettempdir(), CACHE_DIR_PREFIX)
-        )
+        cache_dir = cache_dir or os.path.join(tempfile.gettempdir(), CACHE_DIR_PREFIX)
         self._cache = create_memory_disk_cache(cache_dir, size_limit)
         self._cache_recorder: CacheRecorder = {
             "hits": 0,
