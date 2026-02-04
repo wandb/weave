@@ -2357,6 +2357,7 @@ def _is_minimal_filter(filter: tsi.CallsFilter | None) -> bool:
         return True
     return (
         filter.wb_run_ids is None
+        and filter.wb_user_ids is None
         and filter.op_names is None
         and filter.call_ids is None
         and filter.trace_ids is None
@@ -2364,6 +2365,8 @@ def _is_minimal_filter(filter: tsi.CallsFilter | None) -> bool:
         and filter.trace_roots_only is None
         and filter.input_refs is None
         and filter.output_refs is None
+        and (filter.thread_ids is None or len(filter.thread_ids) == 0)
+        and (filter.turn_ids is None or len(filter.turn_ids) == 0)
     )
 
 
