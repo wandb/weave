@@ -73,6 +73,30 @@ def test_clickhouse_storage_size_query_generation():
         assert call_args[1] == {}  # Second argument should be project_id
 
 
+def test_clickhouse_calls_query_stream_empty_thread_ids_against_real_clickhouse(
+    trace_server,
+):
+    """Filter with thread_ids=[] against real ClickHouse: query runs and returns 0 rows.
+
+    When run with --trace-server=clickhouse (and ClickHouse available), uses the real
+    server. The query builder emits thread_id IN ([]) which ClickHouse accepts and
+    returns no rows. Skips when trace_server is SQLite.
+    """
+    server = trace_server._internal_trace_server
+    if not isinstance(server, chts.ClickHouseTraceServer):
+        pytest.skip("ClickHouse-only test: run with --trace-server=clickhouse")
+
+    req = tsi.CallsQueryReq(
+        project_id="test_project",
+        filter=tsi.CallsFilter(thread_ids=[]),
+        limit=100,
+    )
+    result = list(server.calls_query_stream(req))
+
+    # Empty thread_ids -> IN [] -> no rows from ClickHouse
+    assert result == []
+
+
 def test_clickhouse_storage_size_schema_conversion():
     """Test that storage size fields are correctly converted in ClickHouse schema."""
     # Test data with proper datetime structures
