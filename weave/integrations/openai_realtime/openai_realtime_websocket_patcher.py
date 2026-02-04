@@ -180,9 +180,9 @@ def get_openai_realtime_websocket_patcher(
                 make_new_value=make_new_async_value,
             ),
             SymbolPatcher(
-                get_base_symbol=lambda: importlib.import_module(
-                    "aiohttp"
-                ).ClientSession,
+                get_base_symbol=lambda: (
+                    importlib.import_module("aiohttp").ClientSession
+                ),
                 attribute_name="ws_connect",
                 make_new_value=make_aiohttp_ws_connect,
             ),
