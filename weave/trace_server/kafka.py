@@ -4,6 +4,7 @@ from typing import Any
 
 from confluent_kafka import Consumer as ConfluentKafkaConsumer
 from confluent_kafka import Producer as ConfluentKafkaProducer
+from confluent_kafka import TopicPartition
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.datadog import set_root_span_dd_tags
@@ -148,24 +149,67 @@ class KafkaConsumer(ConfluentKafkaConsumer):
             "enable.auto.commit": False,
             # Connection health: detect dead sockets in 10s instead of the
             # 60s default.  Without this, a dropped connection blocks heartbeats
-            # for up to a minute, which exceeds the session timeout and triggers
-            # an unnecessary consumer-group rebalance.
+            # for up to a minute, which can exceed the session timeout and
+            # trigger an unnecessary consumer-group rebalance.
             "socket.timeout.ms": 10_000,
-            # Session / heartbeat: the broker will declare the consumer dead if
-            # it misses heartbeats for this long.  10s is the Kafka-recommended
-            # minimum for production; heartbeat.interval.ms must be < 1/3 of
-            # this value.
-            "session.timeout.ms": 10_000,
+            # Session / heartbeat: keep session.timeout high enough to ride out
+            # transient coordinator slowness (commit backlogs, broker GC pauses)
+            # without falsely declaring the consumer dead.  The key invariant is
+            #   socket.timeout.ms  <  session.timeout.ms
+            # so dead-socket detection fires before the session expires.
+            "session.timeout.ms": 45_000,
             "heartbeat.interval.ms": 3_000,
             # Reconnection: back off quickly but cap at 5s so we rejoin the
             # group fast after a transient failure.
             "reconnect.backoff.ms": 100,
             "reconnect.backoff.max.ms": 5_000,
+            # Rebalance strategy: cooperative-sticky avoids the "stop the world"
+            # revoke-all-then-reassign cycle.  Partitions migrate incrementally,
+            # so healthy consumers keep processing during rebalances.
+            "partition.assignment.strategy": "cooperative-sticky",
+            # Static membership: if a consumer disconnects briefly and reconnects
+            # with the same instance id, the broker can skip a full rebalance.
+            # Using the hostname works well with k8s StatefulSets / stable pod
+            # names; for Deployments the pod name is unique enough per replica.
+            "group.instance.id": socket.gethostname(),
             **_make_auth_config(),
             **additional_kafka_config,
         }
 
         return cls(config)
+
+    def commit_batch_async(self, messages: list[Any]) -> None:
+        """Commit the highest offset per partition in a single async call.
+
+        Replaces N synchronous per-message commits with one non-blocking call,
+        which keeps the coordinator connection free for heartbeats.
+
+        Args:
+            messages: Raw confluent-kafka Message objects to commit.
+        """
+        if not messages:
+            return
+
+        # Keep only the highest offset per (topic, partition).
+        max_offsets: dict[tuple[str, int], int] = {}
+        for msg in messages:
+            key = (msg.topic(), msg.partition())
+            offset = msg.offset()
+            if key not in max_offsets or offset > max_offsets[key]:
+                max_offsets[key] = offset
+
+        # commit position = next offset the consumer should read
+        offsets = [
+            TopicPartition(topic, partition, offset + 1)
+            for (topic, partition), offset in max_offsets.items()
+        ]
+
+        try:
+            self.commit(offsets=offsets, asynchronous=True)
+        except Exception:
+            # Async commit failure is non-fatal: the messages will be
+            # redelivered on the next rebalance and reprocessed.
+            logger.warning("Async batch commit failed", exc_info=True)
 
 
 def _make_broker_host() -> str:
