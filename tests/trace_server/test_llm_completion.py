@@ -1394,7 +1394,7 @@ def test_completions_write_target_routing(
         mock_resolve.return_value = target
 
         req = tsi.CompletionsCreateReq(
-            project_id="test_project",
+            project_id="dGVzdF9wcm9qZWN0",  # base64 of "test_project"
             inputs=tsi.CompletionsCreateRequestInputs(
                 model="gpt-3.5-turbo",
                 messages=[{"role": "user", "content": "Say hello"}],
@@ -1450,7 +1450,7 @@ def test_completions_handles_error_response(
         mock_resolve.return_value = target
 
         req = tsi.CompletionsCreateReq(
-            project_id="test_project",
+            project_id="dGVzdF9wcm9qZWN0",  # base64 of "test_project"
             inputs=tsi.CompletionsCreateRequestInputs(
                 model="gpt-3.5-turbo",
                 messages=[{"role": "user", "content": "Say hello"}],
@@ -1489,7 +1489,7 @@ def test_completions_usage_captured_in_summary(
         mock_resolve.return_value = WriteTarget.CALLS_COMPLETE
 
         req = tsi.CompletionsCreateReq(
-            project_id="test_project",
+            project_id="dGVzdF9wcm9qZWN0",  # base64 of "test_project"
             inputs=tsi.CompletionsCreateRequestInputs(
                 model="gpt-3.5-turbo",
                 messages=[{"role": "user", "content": "Say hello"}],
