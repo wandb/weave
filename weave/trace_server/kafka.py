@@ -146,6 +146,21 @@ class KafkaConsumer(ConfluentKafkaConsumer):
             "group.id": group_id,
             "auto.offset.reset": "earliest",
             "enable.auto.commit": False,
+            # Connection health: detect dead sockets in 10s instead of the
+            # 60s default.  Without this, a dropped connection blocks heartbeats
+            # for up to a minute, which exceeds the session timeout and triggers
+            # an unnecessary consumer-group rebalance.
+            "socket.timeout.ms": 10_000,
+            # Session / heartbeat: the broker will declare the consumer dead if
+            # it misses heartbeats for this long.  10s is the Kafka-recommended
+            # minimum for production; heartbeat.interval.ms must be < 1/3 of
+            # this value.
+            "session.timeout.ms": 10_000,
+            "heartbeat.interval.ms": 3_000,
+            # Reconnection: back off quickly but cap at 5s so we rejoin the
+            # group fast after a transient failure.
+            "reconnect.backoff.ms": 100,
+            "reconnect.backoff.max.ms": 5_000,
             **_make_auth_config(),
             **additional_kafka_config,
         }
