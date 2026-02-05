@@ -78,12 +78,13 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
     def _stream_ref_apply(
         self, method: Callable[[A], Iterator[B]], req: A
     ) -> Iterator[B]:
+        """Stream results while converting internal refs to external refs."""
         req_conv = universal_ext_to_int_ref_converter(
             req, self._idc.ext_to_int_project_id
         )
         res = method(req_conv)
 
-        int_to_ext_project_cache = {}
+        int_to_ext_project_cache: dict[str, str | None] = {}
 
         def cached_int_to_ext_project_id(project_id: str) -> str | None:
             if project_id not in int_to_ext_project_cache:
@@ -92,8 +93,15 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
                 )
             return int_to_ext_project_cache[project_id]
 
-        for item in res:
-            yield universal_int_to_ext_ref_converter(item, cached_int_to_ext_project_id)
+        try:
+            for item in res:
+                yield universal_int_to_ext_ref_converter(
+                    item, cached_int_to_ext_project_id
+                )
+        finally:
+            int_to_ext_project_cache.clear()
+            if hasattr(res, "close"):
+                res.close()
 
     # Standard API Below:
     def ensure_project_exists(
