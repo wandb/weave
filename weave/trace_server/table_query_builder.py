@@ -85,12 +85,30 @@ def make_standard_table_query(
     # using the `sql_safe_*` prefix is a way to signal to the caller
     # that these strings should have been sanitized by the caller.
     sql_safe_conditions: list[str] | None = None,
+    sql_safe_digest_filter: str | None = None,
     sql_safe_sort_clause: str | None = None,
     limit: int | None = None,
     offset: int | None = None,
 ) -> str:
     """Generate a standard query for table rows with custom sorting and filtering.
+
     This query is more flexible but may be less performant than the natural sort query.
+
+    Args:
+        project_id: The project ID.
+        digest: The table digest.
+        pb: ParamBuilder for query parameters.
+        sql_safe_conditions: Additional filter conditions (applied in outer query).
+        sql_safe_digest_filter: Digest filter to push down into table_rows subquery.
+            Should be of the form "digest IN {param_name: Array(String)}" (without
+            table alias). This enables efficient PK seeks on the small user-provided
+            digest list before intersecting with the full table's digests array.
+        sql_safe_sort_clause: ORDER BY clause.
+        limit: Maximum number of rows to return.
+        offset: Number of rows to skip.
+
+    Returns:
+        The generated SQL query string.
     """
     project_id_name = pb.add_param(project_id)
     digest_name = pb.add_param(digest)
@@ -100,6 +118,12 @@ def make_standard_table_query(
         f"AND {' AND '.join(sql_safe_conditions)}" if sql_safe_conditions else ""
     )
 
+    # Pushdown digest filter into table_rows subquery for efficient PK seeks.
+    # When users filter by specific row digests, we want ClickHouse to seek on
+    # the small user list first, then intersect with the table's digests array.
+    sql_safe_digest_pushdown = (
+        f"AND {sql_safe_digest_filter}" if sql_safe_digest_filter else ""
+    )
     sql_safe_limit = (
         f"LIMIT {{{pb.add_param(limit)}: Int64}}" if limit is not None else ""
     )
@@ -135,6 +159,7 @@ def make_standard_table_query(
             SELECT digest, val_dump
             FROM table_rows
             WHERE project_id = {{{project_id_name}: String}}
+              {sql_safe_digest_pushdown}
               AND digest IN (SELECT arrayJoin(arr) FROM digests_arr)
         ) AS tr ON tr.digest = t.row_digest
         {sql_safe_filter_clause}
