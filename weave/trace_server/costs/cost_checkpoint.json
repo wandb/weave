@@ -18604,5 +18604,29 @@
       "output": 1.2e-05,
       "created_at": "2026-02-05 10:46:00"
     }
+  ],
+  "azure_ai/claude-opus-4-6": [
+    {
+      "provider": "azure_ai",
+      "input": 5e-06,
+      "output": 2.5e-05,
+      "created_at": "2026-02-05 11:17:43"
+    }
+  ],
+  "claude-opus-4-6": [
+    {
+      "provider": "anthropic",
+      "input": 5e-06,
+      "output": 2.5e-05,
+      "created_at": "2026-02-05 11:17:43"
+    }
+  ],
+  "claude-opus-4-6-20260205": [
+    {
+      "provider": "anthropic",
+      "input": 5e-06,
+      "output": 2.5e-05,
+      "created_at": "2026-02-05 11:17:43"
+    }
   ]
 }
