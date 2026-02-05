@@ -110,7 +110,6 @@ def handle_post_tool_use(data: dict[str, Any], config: Config) -> None:
     tool_name = data.get("tool_name", "unknown")
     tool_use_id = data.get("tool_use_id", "unknown")
     tool_output = data.get("tool_response")
-    error = None  # PostToolUse only fires on success
 
     state_manager = StateManager(session_id)
     state = state_manager.load()
@@ -125,15 +124,13 @@ def handle_post_tool_use(data: dict[str, Any], config: Config) -> None:
         state=state,
         tool_use_id=tool_use_id,
         output=tool_output,
-        error=error,
     )
 
     # Remove from tracking
     state.tool_calls.pop(tool_use_id, None)
     state_manager.save(state)
 
-    status = "error" if error else "ok"
-    log_debug(config, f"Tool finished: {tool_name} ({status})")
+    log_debug(config, f"Tool finished: {tool_name}")
 
 
 def handle_subagent_start(data: dict[str, Any], config: Config) -> None:
@@ -202,18 +199,9 @@ def handle_user_prompt_submit(data: dict[str, Any], config: Config) -> None:
 
     log_debug(config, f"UserPromptSubmit data keys: {list(data.keys())}")
     if config.debug:
-        # Log full data for debugging
-        import json
         log_debug(config, f"UserPromptSubmit data: {json.dumps(data, default=str)[:1000]}")
 
-    # Try multiple possible field names for user prompt
-    user_prompt = (
-        data.get("user_prompt") or
-        data.get("prompt") or
-        data.get("content") or
-        data.get("message") or
-        ""
-    )
+    user_prompt = data.get("prompt", "")
 
     state_manager = StateManager(session_id)
     state = state_manager.load()
@@ -243,6 +231,58 @@ def handle_user_prompt_submit(data: dict[str, Any], config: Config) -> None:
     log_debug(config, f"Turn {state.turn_count} started")
 
 
+def _extract_usage_from_transcript(transcript_path: str | None, config: Config) -> dict[str, Any]:
+    """Extract total token usage from transcript by summing all API calls."""
+    if not transcript_path:
+        return {}
+
+    try:
+        with open(transcript_path) as f:
+            content = f.read()
+
+        lines = content.strip().split('\n')
+
+        total_input = 0
+        total_output = 0
+        total_cache_read = 0
+        total_cache_create = 0
+        requests = 0
+        model = "unknown"
+
+        for line in lines:
+            try:
+                entry = json.loads(line)
+                # Look for usage data in various formats
+                usage = entry.get("usage") or entry.get("message", {}).get("usage") or {}
+                if usage:
+                    total_input += usage.get("input_tokens", 0)
+                    total_output += usage.get("output_tokens", 0)
+                    total_cache_read += usage.get("cache_read_input_tokens", 0) or usage.get("cacheRead", 0)
+                    total_cache_create += usage.get("cache_creation_input_tokens", 0) or usage.get("cacheCreate", 0)
+                    requests += 1
+
+                # Try to get model from entries
+                if entry.get("model"):
+                    model = entry["model"]
+            except json.JSONDecodeError:
+                continue
+
+        if requests > 0:
+            return {
+                "model": model,
+                "input_tokens": total_input,
+                "output_tokens": total_output,
+                "cache_read_input_tokens": total_cache_read,
+                "cache_creation_input_tokens": total_cache_create,
+                "total_tokens": total_input + total_output,
+                "requests": requests,
+            }
+    except Exception as e:
+        log_debug(config, f"Error extracting usage from transcript: {e}")
+
+    return {}
+
+
 def _read_last_assistant_message(transcript_path: str | None, config: Config) -> str:
     """Try to read the last assistant message from the transcript."""
     if not transcript_path:
@@ -258,7 +298,6 @@ def _read_last_assistant_message(transcript_path: str | None, config: Config) ->
         log_debug(config, f"Transcript size: {len(content)} bytes")
 
         # The transcript is JSONL format
-        import json
         lines = content.strip().split('\n')
         log_debug(config, f"Transcript has {len(lines)} lines")
 
@@ -310,24 +349,13 @@ def handle_stop(data: dict[str, Any], config: Config) -> None:
 
     log_debug(config, f"Stop data keys: {list(data.keys())}")
     if config.debug:
-        import json
         log_debug(config, f"Stop data: {json.dumps(data, default=str)[:1000]}")
 
-    # Try multiple possible field names for agent response
-    stop_response = (
-        data.get("stop_response") or
-        data.get("response") or
-        data.get("content") or
-        data.get("message") or
-        ""
-    )
-
-    # If no direct response, try reading from transcript
-    if not stop_response:
-        transcript_path = data.get("transcript_path")
-        stop_response = _read_last_assistant_message(transcript_path, config)
-        if stop_response:
-            log_debug(config, f"Got response from transcript ({len(stop_response)} chars)")
+    # Stop event doesn't include the response directly; read from transcript
+    transcript_path = data.get("transcript_path")
+    stop_response = _read_last_assistant_message(transcript_path, config)
+    if stop_response:
+        log_debug(config, f"Got response from transcript ({len(stop_response)} chars)")
 
     state_manager = StateManager(session_id)
     state = state_manager.load()
@@ -355,8 +383,10 @@ def handle_session_end(data: dict[str, Any], config: Config) -> None:
     """Handle SessionEnd event - finish root trace and cleanup."""
     session_id = data.get("session_id", "unknown")
     reason = data.get("reason", "unknown")
-    summary = {"end_reason": reason}
-    error = None
+
+    log_debug(config, f"SessionEnd data keys: {list(data.keys())}")
+    if config.debug:
+        log_debug(config, f"SessionEnd data: {json.dumps(data, default=str)[:2000]}")
 
     state_manager = StateManager(session_id)
     state = state_manager.load()
@@ -373,10 +403,38 @@ def handle_session_end(data: dict[str, Any], config: Config) -> None:
         tracer.finish_turn(state=state, agent_response="(session ended)")
         state.current_turn_call_id = None
 
+    # SessionEnd doesn't include usage directly; try extracting from transcript
+    usage: dict[str, Any] = {}
+    model = "unknown"
+    transcript_path = data.get("transcript_path")
+    transcript_usage = _extract_usage_from_transcript(transcript_path, config)
+    if transcript_usage:
+        usage = transcript_usage
+        model = transcript_usage.get("model", model)
+        log_debug(config, f"Extracted usage from transcript: {usage}")
+
+    # Build summary with usage in Weave LLM format
+    summary: dict[str, Any] = {"end_reason": reason}
+    if usage:
+        # Format: {usage: {model_name: {input_tokens, output_tokens, ...}}}
+        usage_entry: dict[str, Any] = {
+            "input_tokens": usage.get("input_tokens") or usage.get("prompt_tokens"),
+            "output_tokens": usage.get("output_tokens") or usage.get("completion_tokens"),
+            "total_tokens": usage.get("total_tokens"),
+            "requests": usage.get("requests", 1),
+        }
+        # Add cache tokens if present
+        if usage.get("cache_read_input_tokens"):
+            usage_entry["cache_read_input_tokens"] = usage["cache_read_input_tokens"]
+        if usage.get("cache_creation_input_tokens"):
+            usage_entry["cache_creation_input_tokens"] = usage["cache_creation_input_tokens"]
+
+        summary["usage"] = {model: usage_entry}
+
     tracer.finish_session(
         state=state,
         summary=summary,
-        error=error,
+        error=None,
     )
 
     # Build trace URL
@@ -408,6 +466,7 @@ EVENT_HANDLERS = {
 
 def main() -> None:
     """Main entry point - read event from stdin and dispatch."""
+    config = None
     try:
         config = Config.from_env()
 
@@ -439,7 +498,7 @@ def main() -> None:
     except Exception as e:
         # Log errors but don't fail the hook
         print(f"[weave-exporter] Error: {e}", file=sys.stderr)
-        if config.debug:
+        if config and config.debug:
             import traceback
             traceback.print_exc()
 

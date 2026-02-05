@@ -6,6 +6,7 @@ import sys
 from typing import Any
 
 import weave
+from weave.trace.context import call_context
 from weave.trace.weave_client import WeaveClient
 
 from state_manager import SessionState
@@ -112,15 +113,20 @@ class WeaveTracer:
                 parent_id=None,
                 inputs={},
                 id=parent_id,
+                thread_id=state.session_id,
             )
 
-        call = client.create_call(
-            op=f"tool:{tool_name}",
-            inputs=inputs,
-            parent=parent,
-            display_name=tool_name,
-            use_stack=False,  # Don't use context stack, we manage manually
-        )
+        # Set thread_id and turn_id context so the call inherits them.
+        # Parent has matching thread_id, so create_call inherits turn_id from context.
+        with call_context.set_thread_id(state.session_id):
+            call_context.set_turn_id(state.current_turn_call_id)
+            call = client.create_call(
+                op=f"tool:{tool_name}",
+                inputs=inputs,
+                parent=parent,
+                display_name=tool_name,
+                use_stack=False,
+            )
 
         return call.id
 
@@ -181,15 +187,19 @@ class WeaveTracer:
                 parent_id=None,
                 inputs={},
                 id=parent_id,
+                thread_id=state.session_id,
             )
 
-        call = client.create_call(
-            op=f"subagent:{subagent_type}",
-            inputs=inputs,
-            parent=parent,
-            display_name=f"Subagent: {subagent_type}",
-            use_stack=False,
-        )
+        # Set thread_id and turn_id context so the call inherits them.
+        with call_context.set_thread_id(state.session_id):
+            call_context.set_turn_id(state.current_turn_call_id)
+            call = client.create_call(
+                op=f"subagent:{subagent_type}",
+                inputs=inputs,
+                parent=parent,
+                display_name=f"Subagent: {subagent_type}",
+                use_stack=False,
+            )
 
         return call.id
 
@@ -258,13 +268,23 @@ class WeaveTracer:
                 id=state.session_call_id,
             )
 
-        call = client.create_call(
-            op="turn",
-            inputs={"user_message": user_message},
-            parent=parent,
-            display_name=f"Turn #{turn_index}",
-            use_stack=False,
-        )
+        # Create a nice display name with truncated prompt
+        prompt_preview = user_message[:50].replace('\n', ' ').strip()
+        if len(user_message) > 50:
+            prompt_preview += "..."
+        display_name = f"Turn {turn_index}: {prompt_preview}" if prompt_preview else f"Turn {turn_index}"
+
+        # Set thread_id context so this call is recognized as a turn.
+        # Parent (session) has no thread_id, so parent.thread_id != thread_id,
+        # which makes create_call assign turn_id = call.id (this IS a turn).
+        with call_context.set_thread_id(state.session_id):
+            call = client.create_call(
+                op="turn",
+                inputs={"user_message": user_message},
+                parent=parent,
+                display_name=display_name,
+                use_stack=False,
+            )
 
         return call.id
 
