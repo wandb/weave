@@ -14017,6 +14017,12 @@
       "input": 2.5e-07,
       "output": 6.9e-07,
       "created_at": "2025-11-25 09:36:24"
+    },
+    {
+      "provider": "cerebras",
+      "input": 3.5e-07,
+      "output": 7.5e-07,
+      "created_at": "2026-02-05 11:09:59"
     }
   ],
   "claude-sonnet-4-5-20250929-v1:0": [
@@ -18453,6 +18459,174 @@
       "input": 1e-07,
       "output": 3e-07,
       "created_at": "2026-01-28 10:01:14"
+    }
+  ],
+  "amazon.nova-2-pro-preview-20251202-v1:0": [
+    {
+      "provider": "bedrock_converse",
+      "input": 2.1875e-06,
+      "output": 1.75e-05,
+      "created_at": "2026-02-05 11:09:59"
+    }
+  ],
+  "apac.amazon.nova-2-pro-preview-20251202-v1:0": [
+    {
+      "provider": "bedrock_converse",
+      "input": 2.1875e-06,
+      "output": 1.75e-05,
+      "created_at": "2026-02-05 11:09:59"
+    }
+  ],
+  "eu.amazon.nova-2-pro-preview-20251202-v1:0": [
+    {
+      "provider": "bedrock_converse",
+      "input": 2.1875e-06,
+      "output": 1.75e-05,
+      "created_at": "2026-02-05 11:09:59"
+    }
+  ],
+  "us.amazon.nova-2-pro-preview-20251202-v1:0": [
+    {
+      "provider": "bedrock_converse",
+      "input": 2.1875e-06,
+      "output": 1.75e-05,
+      "created_at": "2026-02-05 11:09:59"
+    }
+  ],
+  "azure_ai/claude-opus-4-6": [
+    {
+      "provider": "azure_ai",
+      "input": 5e-06,
+      "output": 2.5e-05,
+      "created_at": "2026-02-05 11:09:59"
+    }
+  ],
+  "azure_ai/model_router": [
+    {
+      "provider": "azure_ai",
+      "input": 1.4e-07,
+      "output": 0.0,
+      "created_at": "2026-02-05 11:09:59"
+    }
+  ],
+  "claude-opus-4-6": [
+    {
+      "provider": "anthropic",
+      "input": 5e-06,
+      "output": 2.5e-05,
+      "created_at": "2026-02-05 11:09:59"
+    }
+  ],
+  "claude-opus-4-6-20260205": [
+    {
+      "provider": "anthropic",
+      "input": 5e-06,
+      "output": 2.5e-05,
+      "created_at": "2026-02-05 11:09:59"
+    }
+  ],
+  "deep-research-pro-preview-12-2025": [
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 2e-06,
+      "output": 1.2e-05,
+      "created_at": "2026-02-05 11:09:59"
+    }
+  ],
+  "gemini/deep-research-pro-preview-12-2025": [
+    {
+      "provider": "gemini",
+      "input": 2e-06,
+      "output": 1.2e-05,
+      "created_at": "2026-02-05 11:09:59"
+    }
+  ],
+  "moonshot/kimi-k2.5": [
+    {
+      "provider": "moonshot",
+      "input": 6e-07,
+      "output": 3e-06,
+      "created_at": "2026-02-05 11:09:59"
+    }
+  ],
+  "openrouter/moonshotai/kimi-k2.5": [
+    {
+      "provider": "openrouter",
+      "input": 6e-07,
+      "output": 3e-06,
+      "created_at": "2026-02-05 11:09:59"
+    }
+  ],
+  "openrouter/qwen/qwen3-235b-a22b-2507": [
+    {
+      "provider": "openrouter",
+      "input": 7.1e-08,
+      "output": 1e-07,
+      "created_at": "2026-02-05 11:09:59"
+    }
+  ],
+  "openrouter/qwen/qwen3-235b-a22b-thinking-2507": [
+    {
+      "provider": "openrouter",
+      "input": 1.1e-07,
+      "output": 6e-07,
+      "created_at": "2026-02-05 11:09:59"
+    }
+  ],
+  "openrouter/xiaomi/mimo-v2-flash": [
+    {
+      "provider": "openrouter",
+      "input": 9e-08,
+      "output": 2.9e-07,
+      "created_at": "2026-02-05 11:09:59"
+    }
+  ],
+  "openrouter/z-ai/glm-4.7": [
+    {
+      "provider": "openrouter",
+      "input": 4e-07,
+      "output": 1.5e-06,
+      "created_at": "2026-02-05 11:09:59"
+    }
+  ],
+  "openrouter/z-ai/glm-4.7-flash": [
+    {
+      "provider": "openrouter",
+      "input": 7e-08,
+      "output": 4e-07,
+      "created_at": "2026-02-05 11:09:59"
+    }
+  ],
+  "openrouter/minimax/minimax-m2.1": [
+    {
+      "provider": "openrouter",
+      "input": 2.7e-07,
+      "output": 1.2e-06,
+      "created_at": "2026-02-05 11:09:59"
+    }
+  ],
+  "together_ai/zai-org/GLM-4.7": [
+    {
+      "provider": "together_ai",
+      "input": 4.5e-07,
+      "output": 2e-06,
+      "created_at": "2026-02-05 11:09:59"
+    }
+  ],
+  "together_ai/moonshotai/Kimi-K2.5": [
+    {
+      "provider": "together_ai",
+      "input": 5e-07,
+      "output": 2.8e-06,
+      "created_at": "2026-02-05 11:09:59"
+    }
+  ],
+  "vertex_ai/deep-research-pro-preview-12-2025": [
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 2e-06,
+      "output": 1.2e-05,
+      "created_at": "2026-02-05 11:09:59"
     }
   ]
 }
