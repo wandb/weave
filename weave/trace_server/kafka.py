@@ -2,8 +2,15 @@ import logging
 import socket
 from typing import Any
 
-from confluent_kafka import Consumer as ConfluentKafkaConsumer
-from confluent_kafka import Producer as ConfluentKafkaProducer
+from confluent_kafka import (
+    Consumer as ConfluentKafkaConsumer,
+)
+from confluent_kafka import (
+    Producer as ConfluentKafkaProducer,
+)
+from confluent_kafka import (
+    TopicPartition,
+)
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.datadog import set_root_span_dd_tags
@@ -151,6 +158,39 @@ class KafkaConsumer(ConfluentKafkaConsumer):
         }
 
         return cls(config)
+
+    def commit_batch_async(self, messages: list[Any]) -> None:
+        """Commit the highest offset per partition in a single async call.
+
+        Replaces N synchronous per-message commits with one non-blocking call,
+        which keeps the coordinator connection free for heartbeats.
+
+        Args:
+            messages: Raw confluent-kafka Message objects to commit.
+        """
+        if not messages:
+            return
+
+        # Keep only the highest offset per (topic, partition).
+        max_offsets: dict[tuple[str, int], int] = {}
+        for msg in messages:
+            key = (msg.topic(), msg.partition())
+            offset = msg.offset()
+            if key not in max_offsets or offset > max_offsets[key]:
+                max_offsets[key] = offset
+
+        # commit position = next offset the consumer should read
+        offsets = [
+            TopicPartition(topic, partition, offset + 1)
+            for (topic, partition), offset in max_offsets.items()
+        ]
+
+        try:
+            self.commit(offsets=offsets, asynchronous=True)
+        except Exception:
+            # Async commit failure is non-fatal: the messages will be
+            # redelivered on the next rebalance and reprocessed.
+            logger.warning("Async batch commit failed", exc_info=True)
 
 
 def _make_broker_host() -> str:
