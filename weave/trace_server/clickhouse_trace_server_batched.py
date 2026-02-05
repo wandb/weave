@@ -492,40 +492,46 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             req.project_id,
             self.ch_client,
         )
-        if write_target == WriteTarget.CALLS_COMPLETE:
-            # TODO: Once the SDK ships calls_complete support for OTel, write to
-            # calls_complete instead of call_parts/calls_merged.
-            # Example future path:
-            # self._insert_call_complete(_complete_call_to_ch_insertable(completed))
-            write_target = WriteTarget.CALLS_MERGED
 
-        # Convert calls to CH insertable format and then to rows for batch insertion
-        batch_rows = []
-        event_callback_list = []
-        for start_call, end_call in calls:
-            ch_start = _start_call_for_insert_to_ch_insertable_start_call(start_call)
-            ch_end = _end_call_for_insert_to_ch_insertable_end_call(end_call)
-            batch_rows.append(_ch_call_to_row(ch_start))
-            batch_rows.append(_ch_call_to_row(ch_end))
-            # We can't execute these until after they are inserted
-            event_callback_list.append(
-                partial(
-                    _maybe_enqueue_minimal_call_end,
-                    self.kafka_producer,
-                    end_call.project_id,
-                    end_call.id,
-                    end_call.ended_at,
-                    False,
-                )
+        # Build event callbacks (same for both write targets)
+        event_callbacks = [
+            partial(
+                _maybe_enqueue_minimal_call_end,
+                self.kafka_producer,
+                end_call.project_id,
+                end_call.id,
+                end_call.ended_at,
+                False,
             )
+            for _, end_call in calls
+        ]
 
-        if write_target == WriteTarget.CALLS_MERGED:
-            # Insert directly without async_insert for OTEL calls
-            self._insert_call_batch(batch_rows, settings=None, do_sync_insert=True)
-            # Calls are inserted so run the callbacks and flush to wait for completion
-            for cb in event_callback_list:
-                cb()
-            self._flush_kafka_producer()
+        # Convert and insert based on write target
+        if write_target == WriteTarget.CALLS_COMPLETE:
+            rows = [
+                _ch_complete_call_to_row(
+                    _start_end_calls_to_ch_complete_insertable(start, end)
+                )
+                for start, end in calls
+            ]
+            self._insert_call_complete_batch(rows, settings=None, do_sync_insert=True)
+        else:
+            rows = []
+            for start, end in calls:
+                rows.append(
+                    _ch_call_to_row(
+                        _start_call_for_insert_to_ch_insertable_start_call(start)
+                    )
+                )
+                rows.append(
+                    _ch_call_to_row(_end_call_for_insert_to_ch_insertable_end_call(end))
+                )
+            self._insert_call_batch(rows, settings=None, do_sync_insert=True)
+
+        # Run callbacks and flush
+        for cb in event_callbacks:
+            cb()
+        self._flush_kafka_producer()
 
         if rejected_spans > 0:
             # Join the first 20 errors and return them delimited by ';'
@@ -6283,6 +6289,66 @@ def _end_call_for_insert_to_ch_insertable_end_call(
         output_refs=output_refs,
         wb_run_step_end=end_call.wb_run_step_end,
     )
+
+
+def _start_end_calls_to_ch_complete_insertable(
+    start_call: tsi.StartedCallSchemaForInsert,
+    end_call: tsi.EndedCallSchemaForInsert,
+) -> CallCompleteCHInsertable:
+    """Combine start and end call data into a CallCompleteCHInsertable.
+
+    Used by OTel export when writing to the calls_complete table.
+
+    Args:
+        start_call: The start call data.
+        end_call: The end call data.
+
+    Returns:
+        CallCompleteCHInsertable: A complete call ready for insertion.
+    """
+    call_id = start_call.id or generate_id()
+    trace_id = start_call.trace_id or generate_id()
+
+    inputs = start_call.inputs
+    input_refs = extract_refs_from_values(inputs)
+
+    output = end_call.output
+    output_refs = extract_refs_from_values(output)
+
+    otel_dump_str = None
+    if start_call.otel_dump is not None:
+        otel_dump_str = _dict_value_to_dump(start_call.otel_dump)
+
+    return CallCompleteCHInsertable(
+        project_id=start_call.project_id,
+        id=call_id,
+        trace_id=trace_id,
+        parent_id=start_call.parent_id,
+        thread_id=start_call.thread_id,
+        turn_id=start_call.turn_id,
+        op_name=start_call.op_name,
+        display_name=start_call.display_name,
+        started_at=start_call.started_at,
+        ended_at=end_call.ended_at,
+        exception=end_call.exception,
+        attributes_dump=_dict_value_to_dump(start_call.attributes),
+        inputs_dump=_dict_value_to_dump(inputs),
+        input_refs=input_refs,
+        output_dump=_any_value_to_dump(output),
+        summary_dump=_dict_value_to_dump(dict(end_call.summary)),
+        otel_dump=otel_dump_str,
+        output_refs=output_refs,
+        wb_user_id=start_call.wb_user_id,
+        wb_run_id=start_call.wb_run_id,
+        wb_run_step=start_call.wb_run_step,
+        wb_run_step_end=end_call.wb_run_step_end,
+    )
+
+
+def _ch_complete_call_to_row(ch_call: CallCompleteCHInsertable) -> list[Any]:
+    """Convert a CallCompleteCHInsertable to a row for batch insertion."""
+    call_dict = ch_call.model_dump()
+    return [call_dict.get(col) for col in ALL_CALL_COMPLETE_INSERT_COLUMNS]
 
 
 def _maybe_enqueue_minimal_call_end(
