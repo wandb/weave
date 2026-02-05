@@ -492,40 +492,46 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             req.project_id,
             self.ch_client,
         )
-        if write_target == WriteTarget.CALLS_COMPLETE:
-            # TODO: Once the SDK ships calls_complete support for OTel, write to
-            # calls_complete instead of call_parts/calls_merged.
-            # Example future path:
-            # self._insert_call_complete(_complete_call_to_ch_insertable(completed))
-            write_target = WriteTarget.CALLS_MERGED
 
-        # Convert calls to CH insertable format and then to rows for batch insertion
-        batch_rows = []
-        event_callback_list = []
-        for start_call, end_call in calls:
-            ch_start = _start_call_for_insert_to_ch_insertable_start_call(start_call)
-            ch_end = _end_call_for_insert_to_ch_insertable_end_call(end_call)
-            batch_rows.append(_ch_call_to_row(ch_start))
-            batch_rows.append(_ch_call_to_row(ch_end))
-            # We can't execute these until after they are inserted
-            event_callback_list.append(
-                partial(
-                    _maybe_enqueue_minimal_call_end,
-                    self.kafka_producer,
-                    end_call.project_id,
-                    end_call.id,
-                    end_call.ended_at,
-                    False,
-                )
+        # Build event callbacks (same for both write targets)
+        event_callbacks = [
+            partial(
+                _maybe_enqueue_minimal_call_end,
+                self.kafka_producer,
+                end_call.project_id,
+                end_call.id,
+                end_call.ended_at,
+                False,
             )
+            for _, end_call in calls
+        ]
 
-        if write_target == WriteTarget.CALLS_MERGED:
-            # Insert directly without async_insert for OTEL calls
-            self._insert_call_batch(batch_rows, settings=None, do_sync_insert=True)
-            # Calls are inserted so run the callbacks and flush to wait for completion
-            for cb in event_callback_list:
-                cb()
-            self._flush_kafka_producer()
+        # Convert and insert based on write target
+        if write_target == WriteTarget.CALLS_COMPLETE:
+            rows = [
+                _ch_complete_call_to_row(
+                    _start_end_calls_to_ch_complete_insertable(start, end)
+                )
+                for start, end in calls
+            ]
+            self._insert_call_complete_batch(rows, settings=None, do_sync_insert=True)
+        else:
+            rows = []
+            for start, end in calls:
+                rows.append(
+                    _ch_call_to_row(
+                        _start_call_for_insert_to_ch_insertable_start_call(start)
+                    )
+                )
+                rows.append(
+                    _ch_call_to_row(_end_call_for_insert_to_ch_insertable_end_call(end))
+                )
+            self._insert_call_batch(rows, settings=None, do_sync_insert=True)
+
+        # Run callbacks and flush
+        for cb in event_callbacks:
+            cb()
+        self._flush_kafka_producer()
 
         if rejected_spans > 0:
             # Join the first 20 errors and return them delimited by ';'
@@ -2349,6 +2355,47 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         return tsi.AnnotationQueuesStatsRes(stats=stats)
 
+    def _fetch_queue_item_for_progress_update(
+        self, project_id: str, queue_id: str, item_id: str
+    ) -> tsi.AnnotatorQueueItemsProgressUpdateRes:
+        """Fetch a queue item and return it wrapped in progress update response."""
+        pb = ParamBuilder()
+        fetch_query = make_queue_items_query(
+            project_id=project_id,
+            queue_id=queue_id,
+            pb=pb,
+            filter=AnnotationQueueItemsFilter(id=item_id),
+            sort_by=None,
+            limit=1,
+            offset=None,
+            include_position=False,
+        )
+        fetch_result = self.ch_client.query(fetch_query, parameters=pb.get_params())
+
+        for row in fetch_result.named_results():
+            item = tsi.AnnotationQueueItemSchema(
+                id=row["id"],
+                project_id=row["project_id"],
+                queue_id=row["queue_id"],
+                call_id=row["call_id"],
+                call_started_at=row["call_started_at"],
+                call_ended_at=row["call_ended_at"],
+                call_op_name=row["call_op_name"],
+                call_trace_id=row["call_trace_id"],
+                display_fields=row["display_fields"],
+                added_by=row["added_by"],
+                annotation_state=row["annotation_state"],
+                created_at=row["created_at"],
+                created_by=row["created_by"],
+                updated_at=row["updated_at"],
+                deleted_at=row["deleted_at"],
+                position_in_queue=None,
+                annotator_user_id=row.get("annotator_user_id"),
+            )
+            return tsi.AnnotatorQueueItemsProgressUpdateRes(item=item)
+
+        raise ValueError(f"Failed to fetch queue item '{item_id}'")
+
     @ddtrace.tracer.wrap(
         name="clickhouse_trace_server_batched.annotator_queue_items_progress_update"
     )
@@ -2359,7 +2406,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         Validates state transitions:
         - Allowed: (absence) -> 'in_progress', 'completed' or 'skipped'
-        - Allowed: 'in_progress' -> 'completed' or 'skipped'
+        - Allowed: 'in_progress' or 'unstarted' -> 'completed' or 'skipped'
+        - Idempotent: same_state -> same_state (no-op, returns existing item)
         - Rejected: any other transition (including updating to 'in_progress' when record exists)
         """
         # Validate annotation_state
@@ -2402,6 +2450,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             current_state = row["annotation_state"]
             has_record = row["record_exists"] > 0
             break
+
+        # Idempotent: if already in the requested state, skip the update
+        if current_state == req.annotation_state:
+            return self._fetch_queue_item_for_progress_update(
+                req.project_id, req.queue_id, req.item_id
+            )
 
         # Special handling for 'in_progress': only allow when no record exists
         if req.annotation_state == "in_progress" and has_record:
@@ -2474,48 +2528,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             """
             self._command(insert_query, parameters=pb.get_params())
 
-        # Fetch and return the updated queue item
-        # We need to re-query to get the aggregated annotation_state
-        pb_fetch = ParamBuilder()
-        fetch_query = make_queue_items_query(
-            project_id=req.project_id,
-            queue_id=req.queue_id,
-            pb=pb_fetch,
-            filter=AnnotationQueueItemsFilter(id=req.item_id),
-            sort_by=None,
-            limit=1,
-            offset=None,
-            include_position=False,
+        return self._fetch_queue_item_for_progress_update(
+            req.project_id, req.queue_id, req.item_id
         )
-
-        fetch_result = self.ch_client.query(
-            fetch_query, parameters=pb_fetch.get_params()
-        )
-
-        for row in fetch_result.named_results():
-            item = tsi.AnnotationQueueItemSchema(
-                id=row["id"],
-                project_id=row["project_id"],
-                queue_id=row["queue_id"],
-                call_id=row["call_id"],
-                call_started_at=row["call_started_at"],
-                call_ended_at=row["call_ended_at"],
-                call_op_name=row["call_op_name"],
-                call_trace_id=row["call_trace_id"],
-                display_fields=row["display_fields"],
-                added_by=row["added_by"],
-                annotation_state=row["annotation_state"],
-                created_at=row["created_at"],
-                created_by=row["created_by"],
-                updated_at=row["updated_at"],
-                deleted_at=row["deleted_at"],
-                position_in_queue=None,
-                annotator_user_id=row.get("annotator_user_id"),
-            )
-            return tsi.AnnotatorQueueItemsProgressUpdateRes(item=item)
-
-        # This shouldn't happen if our logic is correct
-        raise ValueError(f"Failed to fetch updated item '{req.item_id}'")
 
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
         """Create an op object by delegating to obj_create.
@@ -6274,6 +6289,66 @@ def _end_call_for_insert_to_ch_insertable_end_call(
         output_refs=output_refs,
         wb_run_step_end=end_call.wb_run_step_end,
     )
+
+
+def _start_end_calls_to_ch_complete_insertable(
+    start_call: tsi.StartedCallSchemaForInsert,
+    end_call: tsi.EndedCallSchemaForInsert,
+) -> CallCompleteCHInsertable:
+    """Combine start and end call data into a CallCompleteCHInsertable.
+
+    Used by OTel export when writing to the calls_complete table.
+
+    Args:
+        start_call: The start call data.
+        end_call: The end call data.
+
+    Returns:
+        CallCompleteCHInsertable: A complete call ready for insertion.
+    """
+    call_id = start_call.id or generate_id()
+    trace_id = start_call.trace_id or generate_id()
+
+    inputs = start_call.inputs
+    input_refs = extract_refs_from_values(inputs)
+
+    output = end_call.output
+    output_refs = extract_refs_from_values(output)
+
+    otel_dump_str = None
+    if start_call.otel_dump is not None:
+        otel_dump_str = _dict_value_to_dump(start_call.otel_dump)
+
+    return CallCompleteCHInsertable(
+        project_id=start_call.project_id,
+        id=call_id,
+        trace_id=trace_id,
+        parent_id=start_call.parent_id,
+        thread_id=start_call.thread_id,
+        turn_id=start_call.turn_id,
+        op_name=start_call.op_name,
+        display_name=start_call.display_name,
+        started_at=start_call.started_at,
+        ended_at=end_call.ended_at,
+        exception=end_call.exception,
+        attributes_dump=_dict_value_to_dump(start_call.attributes),
+        inputs_dump=_dict_value_to_dump(inputs),
+        input_refs=input_refs,
+        output_dump=_any_value_to_dump(output),
+        summary_dump=_dict_value_to_dump(dict(end_call.summary)),
+        otel_dump=otel_dump_str,
+        output_refs=output_refs,
+        wb_user_id=start_call.wb_user_id,
+        wb_run_id=start_call.wb_run_id,
+        wb_run_step=start_call.wb_run_step,
+        wb_run_step_end=end_call.wb_run_step_end,
+    )
+
+
+def _ch_complete_call_to_row(ch_call: CallCompleteCHInsertable) -> list[Any]:
+    """Convert a CallCompleteCHInsertable to a row for batch insertion."""
+    call_dict = ch_call.model_dump()
+    return [call_dict.get(col) for col in ALL_CALL_COMPLETE_INSERT_COLUMNS]
 
 
 def _maybe_enqueue_minimal_call_end(

@@ -1599,6 +1599,56 @@ def test_annotator_queue_items_progress_update_invalid_transition_from_completed
         client.server.annotator_queue_items_progress_update(update_req2)
 
 
+@pytest.mark.parametrize("state", ["completed", "skipped"])
+def test_annotator_queue_items_progress_update_idempotent(client, state):
+    """Test that setting the same state twice is idempotent (no error, no-op).
+
+    This simulates retry scenarios where the first request succeeded but the
+    response was lost (e.g., network timeout).
+    """
+    if client_is_sqlite(client):
+        pytest.skip("Annotation queues not supported in SQLite")
+
+    # Create queue with 1 call - use unique queue name without state name
+    # to avoid any potential name-based issues
+    fixture = create_queue_with_calls(
+        client, num_calls=1, queue_name="State Idempotency Test Queue"
+    )
+
+    # Get the queue item
+    query_req = tsi.AnnotationQueueItemsQueryReq(
+        project_id=client._project_id(),
+        queue_id=fixture.queue_id,
+    )
+    query_res = client.server.annotation_queue_items_query(query_req)
+    assert len(query_res.items) == 1
+    item = query_res.items[0]
+
+    # First call sets the state
+    update_req1 = tsi.AnnotatorQueueItemsProgressUpdateReq(
+        project_id=client._project_id(),
+        queue_id=fixture.queue_id,
+        item_id=item.id,
+        annotation_state=state,
+        wb_user_id="test_annotator",
+    )
+    update_res1 = client.server.annotator_queue_items_progress_update(update_req1)
+    assert update_res1.item.annotation_state == state
+
+    # Second call with same state should succeed (idempotent)
+    # Note: Must create a new request object because the adapter mutates
+    # req.project_id in place (external -> internal conversion)
+    update_req2 = tsi.AnnotatorQueueItemsProgressUpdateReq(
+        project_id=client._project_id(),
+        queue_id=fixture.queue_id,
+        item_id=item.id,
+        annotation_state=state,
+        wb_user_id="test_annotator",
+    )
+    update_res2 = client.server.annotator_queue_items_progress_update(update_req2)
+    assert update_res2.item.annotation_state == state
+
+
 def test_annotator_queue_items_progress_update_stats_integration(client):
     """Test that progress updates correctly affect queue stats."""
     if client_is_sqlite(client):
@@ -1707,7 +1757,7 @@ def test_annotator_queue_items_progress_update_in_progress_new(client):
 
 
 def test_annotator_queue_items_progress_update_in_progress_existing(client):
-    """Test that updating to 'in_progress' fails when a record already exists."""
+    """Test that in_progress -> in_progress is idempotent (no-op, succeeds)."""
     if client_is_sqlite(client):
         pytest.skip("Annotation queues not supported in SQLite")
 
@@ -1726,19 +1776,62 @@ def test_annotator_queue_items_progress_update_in_progress_existing(client):
     item = query_res.items[0]
 
     # First, mark it as in_progress
-    update_req = tsi.AnnotatorQueueItemsProgressUpdateReq(
+    update_req1 = tsi.AnnotatorQueueItemsProgressUpdateReq(
         project_id=client._project_id(),
         queue_id=fixture.queue_id,
         item_id=item.id,
         annotation_state="in_progress",
         wb_user_id="test_annotator",
     )
-    update_res = client.server.annotator_queue_items_progress_update(update_req)
+    update_res = client.server.annotator_queue_items_progress_update(update_req1)
     assert update_res.item.annotation_state == "in_progress"
 
-    # Now try to update to in_progress again (should fail)
-    # Create new update_req to avoid mutation issues
+    # Update to in_progress again - should be idempotent (succeed as no-op)
+    # Note: Must create a new request object because the adapter mutates
+    # req.project_id in place (external -> internal conversion)
+    update_req2 = tsi.AnnotatorQueueItemsProgressUpdateReq(
+        project_id=client._project_id(),
+        queue_id=fixture.queue_id,
+        item_id=item.id,
+        annotation_state="in_progress",
+        wb_user_id="test_annotator",
+    )
+    update_res2 = client.server.annotator_queue_items_progress_update(update_req2)
+    assert update_res2.item.annotation_state == "in_progress"
+
+
+def test_annotator_queue_items_progress_update_in_progress_from_completed(client):
+    """Test that completed -> in_progress fails (can't restart a finished item)."""
+    if client_is_sqlite(client):
+        pytest.skip("Annotation queues not supported in SQLite")
+
+    # Create queue with 1 call
+    fixture = create_queue_with_calls(
+        client, num_calls=1, queue_name="In Progress From Completed Queue"
+    )
+
+    # Get the queue item
+    query_req = tsi.AnnotationQueueItemsQueryReq(
+        project_id=client._project_id(),
+        queue_id=fixture.queue_id,
+    )
+    query_res = client.server.annotation_queue_items_query(query_req)
+    assert len(query_res.items) == 1
+    item = query_res.items[0]
+
+    # First, mark it as completed
     update_req = tsi.AnnotatorQueueItemsProgressUpdateReq(
+        project_id=client._project_id(),
+        queue_id=fixture.queue_id,
+        item_id=item.id,
+        annotation_state="completed",
+        wb_user_id="test_annotator",
+    )
+    update_res = client.server.annotator_queue_items_progress_update(update_req)
+    assert update_res.item.annotation_state == "completed"
+
+    # Try to transition from completed to in_progress (should fail)
+    update_req2 = tsi.AnnotatorQueueItemsProgressUpdateReq(
         project_id=client._project_id(),
         queue_id=fixture.queue_id,
         item_id=item.id,
@@ -1746,7 +1839,7 @@ def test_annotator_queue_items_progress_update_in_progress_existing(client):
         wb_user_id="test_annotator",
     )
     with pytest.raises(Exception) as exc_info:
-        client.server.annotator_queue_items_progress_update(update_req)
+        client.server.annotator_queue_items_progress_update(update_req2)
 
     assert "Cannot transition to 'in_progress' when a record already exists" in str(
         exc_info.value
