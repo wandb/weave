@@ -1,0 +1,8 @@
+{
+  "name": "claude-code-weave-exporter",
+  "version": "0.1.0",
+  "description": "Export Claude Code session traces to W&B Weave for observability",
+  "author": "Weights & Biases",
+  "repository": "https://github.com/wandb/weave",
+  "license": "Apache-2.0"
+}
