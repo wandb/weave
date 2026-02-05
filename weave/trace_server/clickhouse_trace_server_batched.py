@@ -1785,7 +1785,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def table_query_stream(
         self, req: tsi.TableQueryReq
     ) -> Iterator[tsi.TableRowSchema]:
-        conds = []
+        conds: list[str] = []
         pb = ParamBuilder()
         # Build digest filter for pushdown into table_rows subquery.
         digest_filter: str | None = None
