@@ -5,33 +5,11 @@ import threading
 from collections.abc import Callable
 from queue import Empty, Queue
 from threading import Lock
-from typing import TypeVar, cast
 
 logger = logging.getLogger(__name__)
-from weave.integrations.openai_realtime import models
 from weave.integrations.openai_realtime.state_exporter import StateExporter
 
-T_specific = TypeVar("T_specific", bound=models.MessageType)
-
-# Use a uniform handler type for registry storage. We adapt
-# specific handlers (expecting concrete message classes) into this.
-Handler = Callable[[models.MessageType], None]
-
-
-def adapt_handler(cls: type[T_specific], func: Callable[[T_specific], None]) -> Handler:
-    """Adapt a concrete-typed handler into a generic registry handler.
-    # This preserves runtime safety (checks isinstance before calling) and
-    side-steps contravariance issues that Pyright flagged for a heterogeneous
-    handler map.
-    """
-
-    def _wrapped(msg: models.MessageType) -> None:
-        if isinstance(msg, cls):
-            func(cast(T_specific, msg))
-        else:
-            return
-
-    return _wrapped
+Handler = Callable[[dict], None]
 
 
 class EventHandlerRegistry:
@@ -60,67 +38,31 @@ class ConversationManager:
         self.state: StateExporter = StateExporter()
         self._registry = EventHandlerRegistry()
         # Worker-thread based event queue + lifecycle
-        self._queue: Queue[models.MessageType] = Queue()
+        self._queue: Queue[dict] = Queue()
         self._stop_event = threading.Event()
         self._worker_thread: threading.Thread | None = None
         self._lock = Lock()
 
         handlers: dict[str, Handler] = {
             # Session lifecycle
-            "session.created": adapt_handler(
-                models.SessionCreatedMessage, self.state.handle_session_created
-            ),
-            "session.update": adapt_handler(
-                models.SessionUpdateMessage, self.state.handle_session_update
-            ),
-            "session.updated": adapt_handler(
-                models.SessionUpdatedMessage, self.state.handle_session_updated
-            ),
+            "session.created": self.state.handle_session_created,
+            "session.update": self.state.handle_session_update,
+            "session.updated": self.state.handle_session_updated,
             # Input audio buffer lifecycle
-            "input_audio_buffer.append": adapt_handler(
-                models.InputAudioBufferAppendMessage,
-                self.state.handle_input_audio_append,
-            ),
-            "input_audio_buffer.cleared": adapt_handler(
-                models.InputAudioBufferClearedMessage,
-                self.state.handle_input_audio_cleared,
-            ),
-            "input_audio_buffer.committed": adapt_handler(
-                models.InputAudioBufferCommittedMessage,
-                self.state.handle_input_audio_committed,
-            ),
-            "input_audio_buffer.speech_started": adapt_handler(
-                models.InputAudioBufferSpeechStartedMessage,
-                self.state.handle_speech_started,
-            ),
-            "input_audio_buffer.speech_stopped": adapt_handler(
-                models.InputAudioBufferSpeechStoppedMessage,
-                self.state.handle_speech_stopped,
-            ),
+            "input_audio_buffer.append": self.state.handle_input_audio_append,
+            "input_audio_buffer.cleared": self.state.handle_input_audio_cleared,
+            "input_audio_buffer.committed": self.state.handle_input_audio_committed,
+            "input_audio_buffer.speech_started": self.state.handle_speech_started,
+            "input_audio_buffer.speech_stopped": self.state.handle_speech_stopped,
             # Conversation item changes
-            "conversation.item.created": adapt_handler(
-                models.ItemCreatedMessage, self.state.handle_item_created
-            ),
-            "conversation.item.deleted": adapt_handler(
-                models.ItemDeletedMessage, self.state.handle_item_deleted
-            ),
-            "conversation.item.input_audio_transcription.completed": adapt_handler(
-                models.ItemInputAudioTranscriptionCompletedMessage,
-                self.state.handle_item_input_audio_transcription_completed,
-            ),
+            "conversation.item.created": self.state.handle_item_created,
+            "conversation.item.deleted": self.state.handle_item_deleted,
+            "conversation.item.input_audio_transcription.completed": self.state.handle_item_input_audio_transcription_completed,
             # Response lifecycle and parts
-            "response.created": adapt_handler(
-                models.ResponseCreatedMessage, self.state.handle_response_created
-            ),
-            "response.done": adapt_handler(
-                models.ResponseDoneMessage, self.state.handle_response_done
-            ),
-            "response.audio.delta": adapt_handler(
-                models.ResponseAudioDeltaMessage, self.state.handle_response_audio_delta
-            ),
-            "response.audio.done": adapt_handler(
-                models.ResponseAudioDoneMessage, self.state.handle_response_audio_done
-            ),
+            "response.created": self.state.handle_response_created,
+            "response.done": self.state.handle_response_done,
+            "response.audio.delta": self.state.handle_response_audio_delta,
+            "response.audio.done": self.state.handle_response_audio_done,
         }
 
         self._registry.update(handlers)
@@ -150,7 +92,7 @@ class ConversationManager:
             return
         self._stop_event.set()
         # Wake the thread if it's blocked waiting for an item
-        self._queue.put_nowait(cast(models.MessageType, None))  # type: ignore[arg-type]
+        self._queue.put_nowait(None)
         # Don't block indefinitely; thread is daemon and will also exit on main-thread exit
         self._worker_thread.join(timeout=1.0)
         self._worker_thread = None
@@ -181,14 +123,13 @@ class ConversationManager:
                     # If task_done called more times than items; guard against misuse
                     pass
 
-    async def submit_event(self, event: models.MessageType) -> None:
+    async def submit_event(self, event: dict) -> None:
         """Async-compatible enqueue; places the event onto the worker queue."""
         self._queue.put(event)
 
-    def process_event(self, event: models.MessageType) -> None:
+    def process_event(self, event: dict) -> None:
         """Process an event synchronously"""
-        # Event objects have a 'type' field in pydantic models.
-        event_type = getattr(event, "type", None)
+        event_type = event.get("type")
         if not event_type:
             return
 
