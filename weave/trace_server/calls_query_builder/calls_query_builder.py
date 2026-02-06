@@ -1220,6 +1220,7 @@ class CallsQuery(BaseModel):
         queue_id_filter: str | None,
         expand_columns: list[str] | None,
         field_to_object_join_alias_map: dict[str, str] | None,
+        id_subquery_name: str | None = None,
     ) -> QueryJoins:
         """Build all JOIN clauses for the query.
 
@@ -1232,6 +1233,10 @@ class CallsQuery(BaseModel):
             queue_id_filter: Optional queue_id value to filter the JOIN (optimization)
             expand_columns: List of columns that should be expanded for object refs
             field_to_object_join_alias_map: Mapping of field paths to CTE aliases
+            id_subquery_name: Optional CTE name containing filtered call IDs.
+                When provided, used to push down filters into stats subqueries
+                so they can leverage the primary key (project_id, id) instead
+                of scanning the entire project's stats data.
 
         Returns:
             QueryJoins object containing all join SQL strings
@@ -1274,6 +1279,11 @@ class CallsQuery(BaseModel):
         storage_size_join = ""
         config = TableConfig.from_read_table(self.read_table)
         if self.include_storage_size:
+            # When we have a filtered set of call IDs, push down the id filter
+            # to avoid scanning the entire project's stats data.
+            id_filter = ""
+            if id_subquery_name:
+                id_filter = f"AND id IN {id_subquery_name}"
             storage_size_join = f"""
             LEFT JOIN (
                 SELECT
@@ -1281,6 +1291,7 @@ class CallsQuery(BaseModel):
                     sum(COALESCE(attributes_size_bytes,0) + COALESCE(inputs_size_bytes,0) + COALESCE(output_size_bytes,0) + COALESCE(summary_size_bytes,0)) AS storage_size_bytes
                 FROM {config.stats_table_name}
                 WHERE project_id = {param_slot(project_param, "String")}
+                    {id_filter}
                 GROUP BY id
             ) AS {STORAGE_SIZE_TABLE_NAME}
             ON {table_alias}.id = {STORAGE_SIZE_TABLE_NAME}.id
@@ -1289,6 +1300,19 @@ class CallsQuery(BaseModel):
         # Total storage size join
         total_storage_size_join = ""
         if self.include_total_storage_size:
+            # When we have a filtered set of call IDs, push down the trace_id
+            # filter to avoid scanning the entire project's stats data.
+            # First find the trace_ids for our filtered calls using the stats
+            # table's primary key (project_id, id), then filter the outer
+            # aggregation to only those trace_ids.
+            trace_id_filter = ""
+            if id_subquery_name:
+                trace_id_filter = f"""AND trace_id IN (
+                        SELECT trace_id FROM {config.stats_table_name}
+                        WHERE project_id = {param_slot(project_param, "String")}
+                            AND id IN {id_subquery_name}
+                        GROUP BY trace_id
+                    )"""
             total_storage_size_join = f"""
             LEFT JOIN (
                 SELECT
@@ -1296,6 +1320,7 @@ class CallsQuery(BaseModel):
                     sum(COALESCE(attributes_size_bytes,0) + COALESCE(inputs_size_bytes,0) + COALESCE(output_size_bytes,0) + COALESCE(summary_size_bytes,0)) AS total_storage_size_bytes
                 FROM {config.stats_table_name}
                 WHERE project_id = {param_slot(project_param, "String")}
+                    {trace_id_filter}
                 GROUP BY trace_id
             ) AS {ROLLED_UP_CALL_MERGED_STATS_TABLE_NAME}
             ON {table_alias}.trace_id = {ROLLED_UP_CALL_MERGED_STATS_TABLE_NAME}.trace_id
@@ -1490,6 +1515,7 @@ class CallsQuery(BaseModel):
             queue_id_filter=filter_result.queue_id_filter,
             expand_columns=expand_columns,
             field_to_object_join_alias_map=field_to_object_join_alias_map,
+            id_subquery_name=id_subquery_name,
         )
         group_by_sql = ""
         if self.use_agg_fn:

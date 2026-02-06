@@ -1773,6 +1773,71 @@ def test_total_storage_size():
     )
 
 
+def test_total_storage_size_with_filter_pushdown():
+    """Test that total storage size pushes down trace_id filter when CTE optimization is active.
+
+    When a heavy field (inputs) triggers the CTE optimization path, the stats
+    subquery should include a trace_id IN (...) filter that uses the primary key
+    (project_id, id) to avoid scanning the entire project's stats data.
+    """
+    cq = CallsQuery(project_id="test/project", include_total_storage_size=True)
+    cq.add_field("id")
+    cq.add_field("inputs")
+    cq.add_field("total_storage_size_bytes")
+    cq.set_hardcoded_filter(
+        HardCodedFilter(
+            filter=tsi.CallsFilter(
+                op_names=["my_op"],
+            )
+        )
+    )
+
+    assert_sql(
+        cq,
+        """
+        WITH filtered_calls AS (
+            SELECT
+                calls_merged.id AS id
+            FROM calls_merged
+            PREWHERE calls_merged.project_id = {pb_1:String}
+            WHERE ((calls_merged.op_name IN {pb_0:Array(String)})
+                    OR (calls_merged.op_name IS NULL))
+            GROUP BY (calls_merged.project_id, calls_merged.id)
+            HAVING (
+                ((any(calls_merged.deleted_at) IS NULL))
+                AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+            )
+        )
+        SELECT
+            calls_merged.id AS id,
+            any(calls_merged.inputs_dump) AS inputs_dump,
+            CASE
+                WHEN any(calls_merged.parent_id) IS NULL
+                THEN any(rolled_up_cms.total_storage_size_bytes)
+                ELSE NULL
+            END AS total_storage_size_bytes
+        FROM calls_merged
+        LEFT JOIN (SELECT
+            trace_id,
+            sum(COALESCE(attributes_size_bytes,0) + COALESCE(inputs_size_bytes,0) + COALESCE(output_size_bytes,0) + COALESCE(summary_size_bytes,0)) AS total_storage_size_bytes
+        FROM calls_merged_stats
+        WHERE project_id = {pb_1:String}
+            AND trace_id IN (
+                SELECT trace_id FROM calls_merged_stats
+                WHERE project_id = {pb_1:String}
+                    AND id IN filtered_calls
+                GROUP BY trace_id
+            )
+        GROUP BY trace_id) AS rolled_up_cms
+        ON calls_merged.trace_id = rolled_up_cms.trace_id
+        PREWHERE calls_merged.project_id = {pb_1:String}
+        WHERE (calls_merged.id IN filtered_calls)
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        """,
+        {"pb_0": ["my_op"], "pb_1": "test/project"},
+    )
+
+
 def test_aggregated_data_size_field():
     """Test the AggregatedDataSizeField class."""
     field = AggregatedDataSizeField(
