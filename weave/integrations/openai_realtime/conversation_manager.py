@@ -54,15 +54,23 @@ class ConversationManager:
             "input_audio_buffer.committed": self.state.handle_input_audio_committed,
             "input_audio_buffer.speech_started": self.state.handle_speech_started,
             "input_audio_buffer.speech_stopped": self.state.handle_speech_stopped,
-            # Conversation item changes
+            # Conversation item changes (GA: .added/.done, Beta: .created)
             "conversation.item.created": self.state.handle_item_created,
+            "conversation.item.added": self.state.handle_item_created,
+            "conversation.item.done": self.state.handle_item_created,
             "conversation.item.deleted": self.state.handle_item_deleted,
             "conversation.item.input_audio_transcription.completed": self.state.handle_item_input_audio_transcription_completed,
             # Response lifecycle and parts
             "response.created": self.state.handle_response_created,
             "response.done": self.state.handle_response_done,
+            # GA event names (output_audio, output_text)
+            "response.output_audio.delta": self.state.handle_response_audio_delta,
+            "response.output_audio.done": self.state.handle_response_audio_done,
+            "response.output_text.delta": self.state.handle_response_audio_delta,
+            # Beta compatibility (audio)
             "response.audio.delta": self.state.handle_response_audio_delta,
             "response.audio.done": self.state.handle_response_audio_done,
+            "response.text.delta": self.state.handle_response_audio_delta,
         }
 
         self._registry.update(handlers)

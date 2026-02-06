@@ -265,7 +265,8 @@ class StateExporter(BaseModel):
                 continue
             content_list = output.get("content", [])
             for content_idx, content in enumerate(content_list):
-                if content.get("type") == "audio":
+                content_type = content.get("type")
+                if content_type in ("audio", "output_audio"):
                     output_id = output.get("id")
                     audio = self.response_audio.get(output_id) if output_id else None
                     if not audio:
@@ -331,7 +332,7 @@ class StateExporter(BaseModel):
             content_type = content.get("type")
             if content_type == "input_audio":
                 audio = self._get_item_audio(item_id) if item_id else None
-            elif content_type == "audio":
+            elif content_type in ("audio", "output_audio"):
                 audio = self.response_audio.get(item_id) if item_id else None
 
             if not audio:
@@ -425,7 +426,8 @@ class StateExporter(BaseModel):
                 content_list = output.get("content", [])
                 for content_idx, content in enumerate(content_list):
                     content_dict = dict(content)
-                    if content.get("type") == "audio":
+                    content_type = content.get("type")
+                    if content_type in ("audio", "output_audio"):
                         audio_bytes = self.response_audio.get(item_id) if item_id else None
                         if not audio_bytes:
                             logger.error("failed to fetch audio bytes")
