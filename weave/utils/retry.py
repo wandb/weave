@@ -10,6 +10,7 @@ import httpx
 import tenacity
 from pydantic import ValidationError
 
+from weave.telemetry.trace_sentry import SENTRY_AVAILABLE, sentry_sdk
 from weave.trace.settings import retry_max_attempts, retry_max_interval
 from weave.trace_server.ids import generate_id
 
@@ -99,13 +100,21 @@ def _log_retry(retry_state: tenacity.RetryCallState) -> None:
 
 
 def _log_failure(retry_state: tenacity.RetryCallState) -> Any:
-    logger.info(
+    exc = retry_state.outcome.exception()
+    logger.warning(
         "retry_failed",
         extra={
             "fn": retry_state.fn,
             "retry_id": get_current_retry_id(),
             "attempt_number": retry_state.attempt_number,
-            "exception": str(retry_state.outcome.exception()),
+            "exception": str(exc),
         },
     )
+    if SENTRY_AVAILABLE and exc is not None:
+        with sentry_sdk.push_scope() as scope:
+            scope.set_tag("retry_id", get_current_retry_id())
+            scope.set_tag("attempt_number", retry_state.attempt_number)
+            scope.set_tag("fn", getattr(retry_state.fn, "__name__", str(retry_state.fn)))
+            scope.set_level("warning")
+            sentry_sdk.capture_exception(exc)
     return retry_state.outcome.result()
