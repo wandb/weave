@@ -1218,6 +1218,125 @@ def test_query_with_json_value_in_condition() -> None:
     )
 
 
+def test_calls_query_with_like_optimization_calls_complete() -> None:
+    """Test that LIKE optimization on calls_complete does NOT include null checks.
+
+    For calls_complete, every row is a complete call, so there are no unmerged
+    call parts with NULL fields. The LIKE condition should be tighter without
+    the OR IS NULL clause.
+    """
+    cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_COMPLETE)
+    cq.add_field("id")
+    cq.add_condition(
+        tsi_query.EqOperation.model_validate(
+            {
+                "$eq": [
+                    {"$getField": "inputs.param"},
+                    {"$literal": "hello"},
+                ]
+            }
+        )
+    )
+
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_complete.id AS id
+        FROM calls_complete
+        PREWHERE calls_complete.project_id = {pb_3:String}
+        WHERE (calls_complete.inputs_dump LIKE {pb_2:String})
+        AND
+            (((coalesce(nullIf(JSON_VALUE(calls_complete.inputs_dump, {pb_0:String}), 'null'), '') = {pb_1:String}))
+                AND ((calls_complete.deleted_at IS NULL))
+                    AND ((NOT ((calls_complete.started_at IS NULL)))))
+        """,
+        {
+            "pb_3": "project",
+            "pb_2": '%"hello"%',
+            "pb_1": "hello",
+            "pb_0": '$."param"',
+        },
+    )
+
+
+def test_calls_query_with_like_optimization_contains_calls_complete() -> None:
+    """Test that contains LIKE optimization on calls_complete does NOT include null checks."""
+    cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_COMPLETE)
+    cq.add_field("id")
+    cq.add_condition(
+        tsi_query.ContainsOperation.model_validate(
+            {
+                "$contains": {
+                    "input": {"$getField": "inputs.param"},
+                    "substr": {"$literal": "hello"},
+                    "case_insensitive": True,
+                }
+            }
+        )
+    )
+
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_complete.id AS id
+        FROM calls_complete
+        PREWHERE calls_complete.project_id = {pb_3:String}
+        WHERE (lower(calls_complete.inputs_dump) LIKE {pb_2:String})
+        AND
+            ((positionCaseInsensitive(coalesce(nullIf(JSON_VALUE(calls_complete.inputs_dump, {pb_0:String}), 'null'), ''), {pb_1:String}) > 0)
+                AND ((calls_complete.deleted_at IS NULL))
+                    AND ((NOT ((calls_complete.started_at IS NULL)))))
+        """,
+        {
+            "pb_0": '$."param"',
+            "pb_3": "project",
+            "pb_2": '%"%hello%"%',
+            "pb_1": "hello",
+        },
+    )
+
+
+def test_calls_query_with_like_optimization_in_calls_complete() -> None:
+    """Test that IN LIKE optimization on calls_complete does NOT include null checks."""
+    cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_COMPLETE)
+    cq.add_field("id")
+    cq.add_condition(
+        tsi_query.InOperation.model_validate(
+            {
+                "$in": [
+                    {"$getField": "inputs.param"},
+                    [{"$literal": "hello"}, {"$literal": "world"}],
+                ]
+            }
+        )
+    )
+
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_complete.id AS id
+        FROM calls_complete
+        PREWHERE calls_complete.project_id = {pb_5:String}
+        WHERE ((calls_complete.inputs_dump LIKE {pb_3:String} OR calls_complete.inputs_dump LIKE {pb_4:String}))
+        AND
+            (((coalesce(nullIf(JSON_VALUE(calls_complete.inputs_dump, {pb_0:String}), 'null'), '') IN ({pb_1:String},{pb_2:String})))
+                AND ((calls_complete.deleted_at IS NULL))
+                    AND ((NOT ((calls_complete.started_at IS NULL)))))
+        """,
+        {
+            "pb_0": '$."param"',
+            "pb_1": "hello",
+            "pb_2": "world",
+            "pb_5": "project",
+            "pb_3": '%"hello"%',
+            "pb_4": '%"world"%',
+        },
+    )
+
+
 def test_calls_query_with_combined_like_optimizations_and_op_filter() -> None:
     """Test combining multiple LIKE optimizations with different operators and fields."""
     cq = CallsQuery(project_id="project")

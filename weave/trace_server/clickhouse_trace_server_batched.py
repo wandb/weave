@@ -827,6 +827,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             call = next(res)
         except StopIteration:
             call = None
+        finally:
+            res.close()
         return tsi.CallReadRes(call=call)
 
     def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
@@ -1785,12 +1787,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def table_query_stream(
         self, req: tsi.TableQueryReq
     ) -> Iterator[tsi.TableRowSchema]:
-        conds = []
+        conds: list[str] = []
         pb = ParamBuilder()
+        # Build digest filter for pushdown into table_rows subquery.
+        digest_filter: str | None = None
         if req.filter and req.filter.row_digests:
-            conds.append(
-                f"tr.digest IN {{{pb.add_param(req.filter.row_digests)}: Array(String)}}"
-            )
+            digest_param = pb.add_param(req.filter.row_digests)
+            digest_filter = f"digest IN {{{digest_param}: Array(String)}}"
 
         sort_fields = []
         if req.sort_by:
@@ -1831,6 +1834,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             req.digest,
             pb,
             sql_safe_conditions=conds,
+            sql_safe_digest_filter=digest_filter,
             sort_fields=sort_fields,
             limit=req.limit,
             offset=req.offset,
@@ -1847,6 +1851,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # using the `sql_safe_*` prefix is a way to signal to the caller
         # that these strings should have been sanitized by the caller.
         sql_safe_conditions: list[str] | None = None,
+        sql_safe_digest_filter: str | None = None,
         sort_fields: list[OrderField] | None = None,
         limit: int | None = None,
         offset: int | None = None,
@@ -1863,6 +1868,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             len(sort_fields) == 1
             and sort_fields[0].field.field == ROW_ORDER_COLUMN_NAME
             and not sql_safe_conditions
+            and not sql_safe_digest_filter
         ):
             query = make_natural_sort_table_query(
                 project_id,
@@ -1882,6 +1888,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 digest,
                 pb,
                 sql_safe_conditions=sql_safe_conditions,
+                sql_safe_digest_filter=sql_safe_digest_filter,
                 sql_safe_sort_clause=sql_safe_sort_clause,
                 limit=limit,
                 offset=offset,
