@@ -169,15 +169,9 @@ class KafkaConsumer(ConfluentKafkaConsumer):
             # group fast after a transient failure.
             "reconnect.backoff.ms": 100,
             "reconnect.backoff.max.ms": 5_000,
-            # Rebalance strategy: cooperative-sticky avoids the "stop the world"
-            # revoke-all-then-reassign cycle.  Partitions migrate incrementally,
-            # so healthy consumers keep processing during rebalances.
-            "partition.assignment.strategy": "cooperative-sticky",
-            # Static membership: if a consumer disconnects briefly and reconnects
-            # with the same instance id, the broker can skip a full rebalance.
-            # Using the hostname works well with k8s StatefulSets / stable pod
-            # names; for Deployments the pod name is unique enough per replica.
-            "group.instance.id": socket.gethostname(),
+            # TODO: Re-enable once prod Bufstream supports Kafka >= 2.4.0 protocol.
+            # "partition.assignment.strategy": "cooperative-sticky",  # KIP-429, requires >= 2.4.0
+            # "group.instance.id": socket.gethostname(),  # KIP-345, requires >= 2.3.0
             **_make_auth_config(),
             **additional_kafka_config,
         }
