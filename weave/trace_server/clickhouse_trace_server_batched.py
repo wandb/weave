@@ -5219,52 +5219,73 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             req.project_id,
             self.ch_client,
         )
-        if write_target == WriteTarget.CALLS_COMPLETE:
-            # TODO: Once the SDK ships calls_complete support for completions,
-            # write a single complete row instead of call_parts/calls_merged.
-            # Future path:
-            # self._insert_call_complete(_complete_call_to_ch_insertable(completed))
-            write_target = WriteTarget.CALLS_MERGED
 
         req.inputs.messages = initial_messages
-        start = tsi.StartedCallSchemaForInsert(
-            project_id=req.project_id,
-            wb_user_id=req.wb_user_id,
-            op_name=COMPLETIONS_CREATE_OP_NAME,
-            started_at=start_time,
-            inputs={**req.inputs.model_dump(exclude_none=True)},
-            attributes={},
-        )
-        start_call = _start_call_for_insert_to_ch_insertable_start_call(start)
-        end = tsi.EndedCallSchemaForInsert(
-            project_id=req.project_id,
-            id=start_call.id,
-            ended_at=end_time,
-            output=res.response,
-            summary={},
-        )
+        call_id = generate_id()
+        trace_id = generate_id()
+
+        # Build summary with usage info if available
+        summary: tsi.SummaryInsertMap = {}
         if "usage" in res.response:
-            end.summary["usage"] = {model_name: res.response["usage"]}
+            summary["usage"] = {model_name: res.response["usage"]}
 
-        if "error" in res.response:
-            end.exception = res.response["error"]
-        end_call = _end_call_for_insert_to_ch_insertable_end_call(end)
-        calls: list[CallStartCHInsertable | CallEndCHInsertable] = [
-            start_call,
-            end_call,
-        ]
-        batch_data = []
-        for call in calls:
-            call_dict = call.model_dump()
-            values = [call_dict.get(col) for col in ALL_CALL_INSERT_COLUMNS]
-            batch_data.append(values)
+        # Check for exception
+        exception = res.response.get("error")
 
-        if write_target == WriteTarget.CALLS_MERGED:
+        if write_target == WriteTarget.CALLS_COMPLETE:
+            # Write directly to calls_complete table
+            completed = tsi.CompletedCallSchemaForInsert(
+                project_id=req.project_id,
+                id=call_id,
+                trace_id=trace_id,
+                op_name=COMPLETIONS_CREATE_OP_NAME,
+                started_at=start_time,
+                ended_at=end_time,
+                attributes={},
+                inputs={**req.inputs.model_dump(exclude_none=True)},
+                output=res.response,
+                summary=summary,
+                exception=exception,
+                wb_user_id=req.wb_user_id,
+            )
+            ch_call = _complete_call_to_ch_insertable(completed)
+            self._insert_call_complete(ch_call)
+        else:
+            # Write to call_parts/calls_merged via start/end pattern
+            start = tsi.StartedCallSchemaForInsert(
+                project_id=req.project_id,
+                id=call_id,
+                trace_id=trace_id,
+                wb_user_id=req.wb_user_id,
+                op_name=COMPLETIONS_CREATE_OP_NAME,
+                started_at=start_time,
+                inputs={**req.inputs.model_dump(exclude_none=True)},
+                attributes={},
+            )
+            start_call = _start_call_for_insert_to_ch_insertable_start_call(start)
+            end = tsi.EndedCallSchemaForInsert(
+                project_id=req.project_id,
+                id=start_call.id,
+                ended_at=end_time,
+                output=res.response,
+                summary=summary,
+            )
+            if exception:
+                end.exception = exception
+            end_call = _end_call_for_insert_to_ch_insertable_end_call(end)
+            calls: list[CallStartCHInsertable | CallEndCHInsertable] = [
+                start_call,
+                end_call,
+            ]
+            batch_data = []
+            for call in calls:
+                call_dict = call.model_dump()
+                values = [call_dict.get(col) for col in ALL_CALL_INSERT_COLUMNS]
+                batch_data.append(values)
+
             self._insert_call_batch(batch_data)
 
-        return tsi.CompletionsCreateRes(
-            response=res.response, weave_call_id=start_call.id
-        )
+        return tsi.CompletionsCreateRes(response=res.response, weave_call_id=call_id)
 
     # -------------------------------------------------------------------
     # Streaming variant
