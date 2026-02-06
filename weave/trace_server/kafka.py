@@ -146,6 +146,31 @@ class KafkaConsumer(ConfluentKafkaConsumer):
             "group.id": group_id,
             "auto.offset.reset": "earliest",
             "enable.auto.commit": False,
+            # Connection health: detect dead sockets in 10s instead of the
+            # 60s default.  Without this, a dropped connection blocks heartbeats
+            # for up to a minute, which can exceed the session timeout and
+            # trigger an unnecessary consumer-group rebalance.
+            "socket.timeout.ms": 10_000,
+            # Session / heartbeat: keep session.timeout high enough to ride out
+            # transient coordinator slowness (commit backlogs, broker GC pauses)
+            # without falsely declaring the consumer dead.  The key invariant is
+            #   socket.timeout.ms  <  session.timeout.ms
+            # so dead-socket detection fires before the session expires.
+            "session.timeout.ms": 45_000,
+            "heartbeat.interval.ms": 3_000,
+            # Reconnection: back off quickly but cap at 5s so we rejoin the
+            # group fast after a transient failure.
+            "reconnect.backoff.ms": 100,
+            "reconnect.backoff.max.ms": 5_000,
+            # Rebalance strategy: cooperative-sticky avoids the "stop the world"
+            # revoke-all-then-reassign cycle.  Partitions migrate incrementally,
+            # so healthy consumers keep processing during rebalances.
+            "partition.assignment.strategy": "cooperative-sticky",
+            # Static membership: if a consumer disconnects briefly and reconnects
+            # with the same instance id, the broker can skip a full rebalance.
+            # Using the hostname works well with k8s StatefulSets / stable pod
+            # names; for Deployments the pod name is unique enough per replica.
+            "group.instance.id": socket.gethostname(),
             **_make_auth_config(),
             **additional_kafka_config,
         }
