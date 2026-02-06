@@ -18,6 +18,7 @@ from weave.trace.serialization import (
 
 class MemTraceFilesArtifact:
     temp_read_dir: tempfile.TemporaryDirectory | None
+    _temp_read_dirs: list[tempfile.TemporaryDirectory]
     path_contents: dict[str, bytes]
 
     def __init__(
@@ -32,6 +33,7 @@ class MemTraceFilesArtifact:
             metadata = {}
         self._metadata = metadata
         self.temp_read_dir = None
+        self._temp_read_dirs = []
 
     @overload
     @contextlib.contextmanager
@@ -81,8 +83,10 @@ class MemTraceFilesArtifact:
         if path not in self.path_contents:
             raise FileNotFoundError(path)
 
-        self.temp_read_dir = tempfile.TemporaryDirectory()
-        write_path = os.path.join(self.temp_read_dir.name, filename or path)
+        temp_dir = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
+        self._temp_read_dirs.append(temp_dir)
+        self.temp_read_dir = temp_dir
+        write_path = os.path.join(temp_dir.name, filename or path)
         with open(write_path, "wb") as f:
             f.write(self.path_contents[path])
             f.flush()
