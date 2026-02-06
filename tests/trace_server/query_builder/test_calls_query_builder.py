@@ -1738,39 +1738,98 @@ def test_storage_size_fields():
     )
 
 
-def test_total_storage_size():
-    """Test querying with total storage size."""
+@pytest.mark.parametrize("with_filter", [False, True])
+def test_total_storage_size(with_filter: bool):
+    """Test querying with total storage size.
+
+    Args:
+        with_filter: If True, test the optimized case where trace_id filtering is added
+                     to the total_storage_size JOIN via the filtered_calls CTE.
+    """
     cq = CallsQuery(project_id="test/project", include_total_storage_size=True)
     cq.add_field("id")
     cq.add_field("total_storage_size_bytes")
 
-    assert_sql(
-        cq,
-        """
-        SELECT
-            calls_merged.id AS id,
-            CASE
-                WHEN any(calls_merged.parent_id) IS NULL
-                THEN any(rolled_up_cms.total_storage_size_bytes)
-                ELSE NULL
-            END AS total_storage_size_bytes
-        FROM calls_merged
-        LEFT JOIN (SELECT
-            trace_id,
-            sum(COALESCE(attributes_size_bytes,0) + COALESCE(inputs_size_bytes,0) + COALESCE(output_size_bytes,0) + COALESCE(summary_size_bytes,0)) AS total_storage_size_bytes
-        FROM calls_merged_stats
-        WHERE project_id = {pb_0:String}
-        GROUP BY trace_id) AS rolled_up_cms
-        ON calls_merged.trace_id = rolled_up_cms.trace_id
-        PREWHERE calls_merged.project_id = {pb_0:String}
-        GROUP BY (calls_merged.project_id, calls_merged.id)
-        HAVING (
-            ((any(calls_merged.deleted_at) IS NULL))
-            AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+    if with_filter:
+        # Add a heavy field (inputs) to trigger the filtered_calls CTE optimization
+        cq.add_field("inputs_dump")
+        # Add a filter to trigger the optimization path
+        cq.set_hardcoded_filter(
+            HardCodedFilter(filter=tsi.CallsFilter(op_names=["a", "b"]))
         )
-        """,
-        {"pb_0": "test/project"},
-    )
+
+        # Expected SQL with the filtered_calls CTE and trace_id filter in the JOIN
+        assert_sql(
+            cq,
+            """
+            WITH filtered_calls AS (
+                SELECT
+                    calls_merged.id AS id
+                FROM calls_merged
+                PREWHERE calls_merged.project_id = {pb_1:String}
+                WHERE ((calls_merged.op_name IN {pb_0:Array(String)})
+                    OR (calls_merged.op_name IS NULL))
+                GROUP BY (calls_merged.project_id, calls_merged.id)
+                HAVING (((any(calls_merged.deleted_at) IS NULL))
+                    AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+            )
+            SELECT
+                calls_merged.id AS id,
+                CASE
+                    WHEN any(calls_merged.parent_id) IS NULL
+                    THEN any(rolled_up_cms.total_storage_size_bytes)
+                    ELSE NULL
+                END AS total_storage_size_bytes,
+                any(calls_merged.inputs_dump) AS inputs_dump
+            FROM calls_merged
+            LEFT JOIN (SELECT
+                trace_id,
+                sum(COALESCE(attributes_size_bytes,0) + COALESCE(inputs_size_bytes,0) + COALESCE(output_size_bytes,0) + COALESCE(summary_size_bytes,0)) AS total_storage_size_bytes
+            FROM calls_merged_stats
+            WHERE project_id = {pb_1:String}
+            AND trace_id IN (
+                SELECT trace_id
+                FROM calls_merged
+                WHERE project_id = {pb_1:String}
+                AND id IN filtered_calls
+            )
+            GROUP BY trace_id) AS rolled_up_cms
+            ON calls_merged.trace_id = rolled_up_cms.trace_id
+            PREWHERE calls_merged.project_id = {pb_1:String}
+            WHERE (calls_merged.id IN filtered_calls)
+            GROUP BY (calls_merged.project_id, calls_merged.id)
+            """,
+            {"pb_0": ["a", "b"], "pb_1": "test/project"},
+        )
+    else:
+        # Expected SQL without filters (baseline case)
+        assert_sql(
+            cq,
+            """
+            SELECT
+                calls_merged.id AS id,
+                CASE
+                    WHEN any(calls_merged.parent_id) IS NULL
+                    THEN any(rolled_up_cms.total_storage_size_bytes)
+                    ELSE NULL
+                END AS total_storage_size_bytes
+            FROM calls_merged
+            LEFT JOIN (SELECT
+                trace_id,
+                sum(COALESCE(attributes_size_bytes,0) + COALESCE(inputs_size_bytes,0) + COALESCE(output_size_bytes,0) + COALESCE(summary_size_bytes,0)) AS total_storage_size_bytes
+            FROM calls_merged_stats
+            WHERE project_id = {pb_0:String}
+            GROUP BY trace_id) AS rolled_up_cms
+            ON calls_merged.trace_id = rolled_up_cms.trace_id
+            PREWHERE calls_merged.project_id = {pb_0:String}
+            GROUP BY (calls_merged.project_id, calls_merged.id)
+            HAVING (
+                ((any(calls_merged.deleted_at) IS NULL))
+                AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+            )
+            """,
+            {"pb_0": "test/project"},
+        )
 
 
 def test_aggregated_data_size_field():
