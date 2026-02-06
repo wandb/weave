@@ -1754,7 +1754,9 @@ def test_total_storage_size(with_filter: bool):
         # Add a heavy field (inputs) to trigger the filtered_calls CTE optimization
         cq.add_field("inputs_dump")
         # Add a filter to trigger the optimization path
-        cq.set_hardcoded_filter(HardCodedFilter(filter=tsi.CallsFilter(op_names=["a", "b"])))
+        cq.set_hardcoded_filter(
+            HardCodedFilter(filter=tsi.CallsFilter(op_names=["a", "b"]))
+        )
 
         # Expected SQL with the filtered_calls CTE and trace_id filter in the JOIN
         assert_sql(
