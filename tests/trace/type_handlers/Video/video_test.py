@@ -43,7 +43,7 @@ def test_save_clip(tmp_path: Path, test_video: VideoClip, extension: str):
 @pytest.mark.parametrize("filename", ["test", "test.invalid"])
 def test_save_invalid_clip(tmp_path: Path, test_video: VideoClip, filename: str):
     fp = str(tmp_path / filename)
-    # Write video should throw exception if it recieves invalid format
+    # Write video should throw exception if it receives invalid format
     with pytest.raises(ValueError):
         write_video(fp, test_video)
 
