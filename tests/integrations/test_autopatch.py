@@ -187,6 +187,7 @@ def test_init_weave_calls_patching(setup_env, monkeypatch):
         mock_get_context.return_value = MagicMock(api_key="test_key")
         mock_server = MagicMock()
         mock_server.server_info.return_value.min_required_weave_python_version = "0.0.0"
+        mock_server.server_info.return_value.trace_server_version = "0.0.0"
         mock_get_server.return_value = mock_server
         mock_get_username.return_value = "test_user"
 
