@@ -4,9 +4,9 @@ import logging
 import threading
 from collections.abc import Callable
 from typing import Any
-from typing_extensions import Self
 
 from pydantic import BaseModel, Field
+from typing_extensions import Self
 
 from weave.integrations.openai_realtime.audio_buffer import AudioBufferManager
 from weave.integrations.openai_realtime.encoding import pcm_to_wav

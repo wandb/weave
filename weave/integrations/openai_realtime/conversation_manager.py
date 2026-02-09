@@ -100,7 +100,7 @@ class ConversationManager:
             return
         self._stop_event.set()
         # Wake the thread if it's blocked waiting for an item
-        self._queue.put_nowait(None) # type: ignore
+        self._queue.put_nowait(None)  # type: ignore
         # Don't block indefinitely; thread is daemon and will also exit on main-thread exit
         self._worker_thread.join(timeout=1.0)
         self._worker_thread = None
