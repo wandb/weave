@@ -142,6 +142,12 @@ def test_sync_method_call(client, weave_obj, py_obj):
     with pytest.raises(OpCallError):
         res2, call2 = py_obj.method.call(1)
 
+    # Verify a trace span was created for the failed call
+    calls = list(client.get_calls())
+    error_calls = [c for c in calls if c.exception is not None]
+    assert len(error_calls) == 1
+    assert "OpCallError" in error_calls[0].exception or "Error calling" in error_calls[0].exception
+
 
 @pytest.mark.asyncio
 async def test_async_method(client, weave_obj, py_obj):
@@ -176,6 +182,12 @@ async def test_async_method_call(client, weave_obj, py_obj):
 
     with pytest.raises(OpCallError):
         res2, call2 = await py_obj.amethod.call(1)
+
+    # Verify a trace span was created for the failed call
+    calls = list(client.get_calls())
+    error_calls = [c for c in calls if c.exception is not None]
+    assert len(error_calls) == 1
+    assert "OpCallError" in error_calls[0].exception or "Error calling" in error_calls[0].exception
 
 
 def test_sync_func_patching_passes_inspection(func):
@@ -489,3 +501,93 @@ def test_op_kind_and_color_attributes():
     result = setup_dunder_weave_dict(llm_func)
     assert result["attributes"]["weave"]["kind"] == "llm"
     assert result["attributes"]["weave"]["color"] == "green"
+
+
+def test_sync_func_wrong_kwargs_creates_span(client):
+    """Test that calling a sync op with wrong kwargs creates a trace span with error."""
+
+    @op
+    def my_func(a: int, b: str) -> str:
+        return f"{a}-{b}"
+
+    with pytest.raises(OpCallError):
+        my_func(wrong_param="hello")
+
+    calls = list(client.get_calls())
+    assert len(calls) == 1
+    assert calls[0].exception is not None
+    assert "Error calling" in calls[0].exception
+    assert calls[0].inputs == {"wrong_param": "hello"}
+
+
+@pytest.mark.asyncio
+async def test_async_func_wrong_kwargs_creates_span(client):
+    """Test that calling an async op with wrong kwargs creates a trace span with error."""
+
+    @op
+    async def my_async_func(a: int, b: str) -> str:
+        return f"{a}-{b}"
+
+    with pytest.raises(OpCallError):
+        await my_async_func(wrong_param="hello")
+
+    calls = list(client.get_calls())
+    assert len(calls) == 1
+    assert calls[0].exception is not None
+    assert "Error calling" in calls[0].exception
+    assert calls[0].inputs == {"wrong_param": "hello"}
+
+
+def test_sync_gen_wrong_kwargs_creates_span(client):
+    """Test that calling a sync generator op with wrong kwargs creates a trace span."""
+
+    @op
+    def my_gen(a: int) -> int:
+        yield a
+
+    with pytest.raises(OpCallError):
+        my_gen(wrong_param="hello")
+
+    calls = list(client.get_calls())
+    assert len(calls) == 1
+    assert calls[0].exception is not None
+    assert "Error calling" in calls[0].exception
+    assert calls[0].inputs == {"wrong_param": "hello"}
+
+
+@pytest.mark.asyncio
+async def test_async_gen_wrong_kwargs_creates_span(client):
+    """Test that calling an async generator op with wrong kwargs creates a trace span."""
+
+    @op
+    async def my_async_gen(a: int):
+        yield a
+
+    with pytest.raises(OpCallError):
+        async for _ in my_async_gen(wrong_param="hello"):
+            pass
+
+    calls = list(client.get_calls())
+    assert len(calls) == 1
+    assert calls[0].exception is not None
+    assert "Error calling" in calls[0].exception
+    assert calls[0].inputs == {"wrong_param": "hello"}
+
+
+def test_bind_error_span_records_exception_details(client):
+    """Test that the span created for a bind error records the exception details."""
+
+    @op
+    def add(x: int, y: int) -> int:
+        return x + y
+
+    with pytest.raises(OpCallError):
+        add(x=1, z=2)  # 'z' is wrong, should be 'y'
+
+    calls = list(client.get_calls())
+    assert len(calls) == 1
+    call = calls[0]
+    assert call.exception is not None
+    assert "z" in call.exception or "unexpected keyword" in call.exception
+    assert call.inputs == {"x": 1, "z": 2}
+    assert call.output is None

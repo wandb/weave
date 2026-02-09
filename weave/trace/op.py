@@ -372,6 +372,51 @@ def _create_call(
     )
 
 
+def _handle_op_call_error(
+    op: Op,
+    e: OpCallError,
+    args: tuple,
+    kwargs: dict,
+    __weave: WeaveKwargs | None = None,
+    use_stack: bool = True,
+) -> None:
+    """Create and finish a trace span for an op that failed argument binding."""
+    try:
+        client = weave_client_context.require_weave_client()
+        parent_call = call_context.get_current_call()
+
+        raw_inputs = {f"arg_{i}": a for i, a in enumerate(args)}
+        raw_inputs.update(kwargs)
+
+        call_time_display_name = __weave.get("display_name") if __weave else None
+        call_attrs = __weave.get("attributes") if __weave else None
+
+        from weave.trace.serialization.serialize import dictify
+
+        attributes = dictify(call_attributes.get())
+        if call_attrs is not None:
+            attributes = {**attributes, **call_attrs}
+
+        preferred_call_id = __weave.get("call_id") if __weave else None
+
+        error_call = client.create_call(
+            op,
+            raw_inputs,
+            parent_call,
+            display_name=call_time_display_name or op.call_display_name,
+            attributes=attributes,
+            use_stack=use_stack,
+            _call_id_override=preferred_call_id,
+        )
+        client.finish_call(error_call, None, e, op=op)
+
+        current_call = call_context.get_current_call()
+        if current_call and current_call.id == error_call.id:
+            call_context.pop_call(error_call.id)
+    except Exception:
+        logger.debug("Failed to create span for OpCallError", exc_info=True)
+
+
 def is_tracing_setting_disabled() -> bool:
     if settings.should_disable_weave():
         return True
@@ -456,7 +501,8 @@ def _call_sync_func(
     try:
         call = _create_call(op, *args, __weave=__weave, **kwargs)
     except OpCallError as e:
-        raise e
+        _handle_op_call_error(op, e, args, kwargs, __weave=__weave)
+        raise
     except Exception as e:
         if get_raise_on_captured_errors():
             raise
@@ -599,7 +645,8 @@ async def _call_async_func(
     try:
         call = _create_call(op, *args, __weave=__weave, **kwargs)
     except OpCallError as e:
-        raise e
+        _handle_op_call_error(op, e, args, kwargs, __weave=__weave)
+        raise
     except Exception as e:
         if get_raise_on_captured_errors():
             raise
@@ -731,7 +778,8 @@ def _call_sync_gen(
         # For generators, use_stack=False because we push when iteration starts,
         # not when the call is created. This avoids double-pushing.
         call = _create_call(op, *args, __weave=__weave, use_stack=False, **kwargs)
-    except OpCallError:
+    except OpCallError as e:
+        _handle_op_call_error(op, e, args, kwargs, __weave=__weave, use_stack=False)
         raise
     except Exception:
         if get_raise_on_captured_errors():
@@ -943,7 +991,8 @@ async def _call_async_gen(
         # For generators, use_stack=False because we push when iteration starts,
         # not when the call is created. This avoids double-pushing.
         call = _create_call(op, *args, __weave=__weave, use_stack=False, **kwargs)
-    except OpCallError:
+    except OpCallError as e:
+        _handle_op_call_error(op, e, args, kwargs, __weave=__weave, use_stack=False)
         raise
     except Exception:
         if get_raise_on_captured_errors():
