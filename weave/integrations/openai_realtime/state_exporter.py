@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import threading
 from collections.abc import Callable
-from typing import Any
+from typing import Any, Self
 
 from pydantic import BaseModel, Field
 
@@ -39,12 +39,17 @@ class SessionSpan(BaseModel):
 
     def on_created(self, msg: dict) -> None:
         self.session = msg.get("session")
+        if not self.session or not isinstance(self.session, dict):
+            self.session = {}
         wc = require_weave_client()
         if not self.root_call:
             self.root_call = wc.create_call("realtime.session", inputs=self.session)
 
     def on_updated(self, msg: dict) -> None:
         self.session = msg.get("session")
+        if not self.session or not isinstance(self.session, dict):
+            self.session = {}
+
         wc = require_weave_client()
 
         if not self.root_call:
@@ -74,7 +79,7 @@ class SessionSpan(BaseModel):
             def update_cb(root_call: Call) -> Call:
                 return wc.create_call(
                     "realtime.session.update",
-                    inputs=self.session,
+                    inputs=self.session, # type: ignore
                     parent=root_call,
                 )
 
@@ -175,14 +180,14 @@ class StateExporter(BaseModel):
         self.session_span.on_updated(msg)
 
     def handle_speech_stopped(self, msg: dict) -> None:
-        item_id = msg.get("item_id")
+        item_id = msg.get("item_id", "")
         markers = self.user_speech_markers.setdefault(
             item_id, {"audio_start_ms": None, "audio_end_ms": None}
         )
         markers["audio_end_ms"] = msg.get("audio_end_ms")
 
     def handle_speech_started(self, msg: dict) -> None:
-        item_id = msg.get("item_id")
+        item_id = msg.get("item_id", "")
         self.user_speech_markers[item_id] = {
             "audio_start_ms": msg.get("audio_start_ms"),
             "audio_end_ms": None,
@@ -364,12 +369,12 @@ class StateExporter(BaseModel):
             inputs["messages"] = list(map(self._resolve_audio, messages))
             inputs["messages"].reverse()  # Reverse to put in order
 
-        if pending_create_params and pending_create_params.input_items:
-            for item in pending_create_params.input_items:
+        if pending_create_params and (items := pending_create_params.get("input_items")):
+            for item in items: 
                 inputs["messages"].append(item)
 
-        if pending_create_params and pending_create_params.append_input_items:
-            for item in pending_create_params.append_input_items:
+        if pending_create_params and (items := pending_create_params.get("append_input_items")):
+            for item in items:
                 inputs["messages"].append(item)
 
         if pending_create_params is not None:
@@ -395,9 +400,8 @@ class StateExporter(BaseModel):
         if conv_id and self.conversation_responses.get(conv_id) is not None:
             if response_id:
                 self.conversation_responses[conv_id].append(response_id)
-        elif conv_id:
-            if response_id:
-                self.conversation_responses[conv_id] = [response_id]
+        elif conv_id and response_id:
+            self.conversation_responses[conv_id] = [response_id]
 
         if conv_id and (conv_call := self.conversation_calls.get(conv_id)):
             response_parent = conv_call
