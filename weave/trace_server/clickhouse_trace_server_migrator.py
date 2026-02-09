@@ -87,9 +87,8 @@ VIEW_SUFFIX = "_view"
 
 # Tables that use ID-based sharding (sipHash64(field)) instead of random sharding
 # in distributed mode. Maps table name to the field used for sharding.
-# This ensures all data for a specific ID goes to the same shard, enabling
-# efficient point lookups.
-ID_SHARDED_TABLES: dict[str, str] = {"calls_complete": "id"}
+# calls_complete: shard by `trace_id` to ensure full-trace lookups hit only one replica
+ID_SHARDED_TABLES: dict[str, str] = {"calls_complete": "trace_id"}
 
 
 @dataclass(frozen=True)
