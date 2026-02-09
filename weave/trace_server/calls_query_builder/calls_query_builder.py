@@ -1090,18 +1090,31 @@ class CallsQuery(BaseModel):
             return safely_format_sql(raw_sql, logger)
 
         ctes.add_cte(CTE_ALL_CALLS, base_sql)
-        self._add_cost_ctes_to_builder(ctes, pb)
+
+        all_calls_field_names = [field.field for field in select_query.select_fields]
+        self._add_cost_ctes_to_builder(ctes, pb, all_calls_field_names)
 
         select_fields = [field.field for field in self.select_fields]
         final_select = get_cost_final_select(
-            pb, select_fields, self.order_fields, self.project_id
+            pb,
+            select_fields,
+            self.order_fields,
+            self.project_id,
+            all_calls_alias=CTE_ALL_CALLS,
         )
 
         raw_sql = ctes.to_sql() + "\n" + final_select
         return safely_format_sql(raw_sql, logger)
 
-    def _add_cost_ctes_to_builder(self, ctes: CTECollection, pb: ParamBuilder) -> None:
-        cost_cte_list = build_cost_ctes(pb, CTE_ALL_CALLS, self.project_id)
+    def _add_cost_ctes_to_builder(
+        self,
+        ctes: CTECollection,
+        pb: ParamBuilder,
+        select_fields: list[str] | None = None,
+    ) -> None:
+        cost_cte_list = build_cost_ctes(
+            pb, CTE_ALL_CALLS, self.project_id, select_fields=select_fields
+        )
         for cte in cost_cte_list:
             ctes.add_cte(cte.name, cte.sql)
 
