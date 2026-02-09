@@ -79,7 +79,7 @@ class SessionSpan(BaseModel):
             def update_cb(root_call: Call) -> Call:
                 return wc.create_call(
                     "realtime.session.update",
-                    inputs=self.session, # type: ignore
+                    inputs=self.session,  # type: ignore
                     parent=root_call,
                 )
 
@@ -369,11 +369,15 @@ class StateExporter(BaseModel):
             inputs["messages"] = list(map(self._resolve_audio, messages))
             inputs["messages"].reverse()  # Reverse to put in order
 
-        if pending_create_params and (items := pending_create_params.get("input_items")):
-            for item in items: 
+        if pending_create_params and (
+            items := pending_create_params.get("input_items")
+        ):
+            for item in items:
                 inputs["messages"].append(item)
 
-        if pending_create_params and (items := pending_create_params.get("append_input_items")):
+        if pending_create_params and (
+            items := pending_create_params.get("append_input_items")
+        ):
             for item in items:
                 inputs["messages"].append(item)
 
