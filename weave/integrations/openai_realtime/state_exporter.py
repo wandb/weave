@@ -3,7 +3,8 @@ from __future__ import annotations
 import logging
 import threading
 from collections.abc import Callable
-from typing import Any, Self
+from typing import Any
+from typing_extensions import Self
 
 from pydantic import BaseModel, Field
 
@@ -564,7 +565,10 @@ class StateExporter(BaseModel):
             # The loop continues only if the immediate next is also ready now.
             continue
 
-    def build_conversation_forward(self, item_id: str) -> list[dict]:
+    def build_conversation_forward(self, item_id: str | None) -> list[dict]:
+        if not item_id:
+            return []
+
         item = self.items.get(item_id)
         if not item:
             return []
