@@ -9,6 +9,8 @@ import logging
 import re
 from typing import Any, TypeVar
 
+import ddtrace
+
 from weave.trace_server.trace_server_interface import (
     CallEndReq,
     CallEndV2Req,
@@ -55,6 +57,7 @@ def is_data_uri(data_uri: str) -> bool:
     return DATA_URI_PATTERN.match(data_uri) is not None
 
 
+@ddtrace.tracer.wrap(name="store_content_object")
 def store_content_object(
     content_obj: Content,
     project_id: str,
@@ -174,6 +177,7 @@ def replace_base64_with_content_objects(
 R = TypeVar("R", bound=CallStartReq | CallEndReq | CallEndV2Req)
 
 
+@ddtrace.tracer.wrap(name="process_call_req_to_content")
 def process_call_req_to_content(
     req: R,
     trace_server: TraceServerInterface,
@@ -201,6 +205,7 @@ def process_call_req_to_content(
     return req
 
 
+@ddtrace.tracer.wrap(name="process_complete_call_to_content")
 def process_complete_call_to_content(
     complete_call: CompletedCallSchemaForInsert,
     trace_server: TraceServerInterface,

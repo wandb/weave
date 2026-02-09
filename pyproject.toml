@@ -45,6 +45,7 @@ dependencies = [
   "jsonschema>=4.23.0",                   # Used by scorers for field validation
   "diskcache==5.6.3",                     # Used for data caching
   "tzdata; platform_system == 'Windows'", # Required for timezone support on Windows
+  "cachetools>=6.2.4",                    # Used for TTLCache in call_batch_processor
 
   # Used for content type detection
   # Remove once license content filtering is upstreamed
@@ -207,6 +208,8 @@ filterwarnings = [
   # ignore deprecation warnings from installed packages, they're printed at the
   # bottom of test output, making it hard to find the actual errors.
   "ignore::DeprecationWarning",
+  # google.api_core warns about Python 3.10 EOL; keep pytest output clean.
+  "ignore:You are using a Python version .*:FutureWarning:google\\.api_core\\._python_version_support",
 ]
 addopts = "-v"
 markers = [
@@ -330,7 +333,7 @@ disallow_untyped_defs = true
 disallow_untyped_calls = true
 
 [tool.bumpversion]
-current_version = "0.52.26-dev0"
+current_version = "0.52.27-dev0"
 parse = """(?x)
     (?P<major>0|[1-9]\\d*)\\.
     (?P<minor>0|[1-9]\\d*)\\.

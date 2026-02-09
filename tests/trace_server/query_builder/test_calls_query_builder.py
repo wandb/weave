@@ -7,7 +7,10 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     AggregatedDataSizeField,
     CallsQuery,
     HardCodedFilter,
+    _is_minimal_filter,
+    build_calls_complete_delete_query,
     build_calls_complete_update_end_query,
+    build_calls_complete_update_query,
 )
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.orm import ParamBuilder
@@ -49,7 +52,8 @@ def test_query_baseline(read_table: ReadTable, expected_table: str) -> None:
             SELECT {expected_table}.id AS id
             FROM {expected_table}
             PREWHERE {expected_table}.project_id = {{pb_0:String}}
-            AND (
+            WHERE 1
+              AND (
                 ((
                     {expected_table}.deleted_at IS NULL
                 ))
@@ -644,6 +648,7 @@ def test_query_with_simple_feedback_filter_calls_complete() -> None:
             calls_complete.id))
         PREWHERE
             calls_complete.project_id = {pb_3:String}
+        WHERE 1
         AND
             (((coalesce(nullIf(JSON_VALUE(CASE WHEN feedback.feedback_type = {pb_0:String} THEN feedback.payload_dump END,
             {pb_1:String}), 'null'), '') > coalesce(nullIf(JSON_VALUE(CASE WHEN feedback.feedback_type = {pb_0:String} THEN feedback.payload_dump END,
@@ -1213,6 +1218,125 @@ def test_query_with_json_value_in_condition() -> None:
     )
 
 
+def test_calls_query_with_like_optimization_calls_complete() -> None:
+    """Test that LIKE optimization on calls_complete does NOT include null checks.
+
+    For calls_complete, every row is a complete call, so there are no unmerged
+    call parts with NULL fields. The LIKE condition should be tighter without
+    the OR IS NULL clause.
+    """
+    cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_COMPLETE)
+    cq.add_field("id")
+    cq.add_condition(
+        tsi_query.EqOperation.model_validate(
+            {
+                "$eq": [
+                    {"$getField": "inputs.param"},
+                    {"$literal": "hello"},
+                ]
+            }
+        )
+    )
+
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_complete.id AS id
+        FROM calls_complete
+        PREWHERE calls_complete.project_id = {pb_3:String}
+        WHERE (calls_complete.inputs_dump LIKE {pb_2:String})
+        AND
+            (((coalesce(nullIf(JSON_VALUE(calls_complete.inputs_dump, {pb_0:String}), 'null'), '') = {pb_1:String}))
+                AND ((calls_complete.deleted_at IS NULL))
+                    AND ((NOT ((calls_complete.started_at IS NULL)))))
+        """,
+        {
+            "pb_3": "project",
+            "pb_2": '%"hello"%',
+            "pb_1": "hello",
+            "pb_0": '$."param"',
+        },
+    )
+
+
+def test_calls_query_with_like_optimization_contains_calls_complete() -> None:
+    """Test that contains LIKE optimization on calls_complete does NOT include null checks."""
+    cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_COMPLETE)
+    cq.add_field("id")
+    cq.add_condition(
+        tsi_query.ContainsOperation.model_validate(
+            {
+                "$contains": {
+                    "input": {"$getField": "inputs.param"},
+                    "substr": {"$literal": "hello"},
+                    "case_insensitive": True,
+                }
+            }
+        )
+    )
+
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_complete.id AS id
+        FROM calls_complete
+        PREWHERE calls_complete.project_id = {pb_3:String}
+        WHERE (lower(calls_complete.inputs_dump) LIKE {pb_2:String})
+        AND
+            ((positionCaseInsensitive(coalesce(nullIf(JSON_VALUE(calls_complete.inputs_dump, {pb_0:String}), 'null'), ''), {pb_1:String}) > 0)
+                AND ((calls_complete.deleted_at IS NULL))
+                    AND ((NOT ((calls_complete.started_at IS NULL)))))
+        """,
+        {
+            "pb_0": '$."param"',
+            "pb_3": "project",
+            "pb_2": '%"%hello%"%',
+            "pb_1": "hello",
+        },
+    )
+
+
+def test_calls_query_with_like_optimization_in_calls_complete() -> None:
+    """Test that IN LIKE optimization on calls_complete does NOT include null checks."""
+    cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_COMPLETE)
+    cq.add_field("id")
+    cq.add_condition(
+        tsi_query.InOperation.model_validate(
+            {
+                "$in": [
+                    {"$getField": "inputs.param"},
+                    [{"$literal": "hello"}, {"$literal": "world"}],
+                ]
+            }
+        )
+    )
+
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_complete.id AS id
+        FROM calls_complete
+        PREWHERE calls_complete.project_id = {pb_5:String}
+        WHERE ((calls_complete.inputs_dump LIKE {pb_3:String} OR calls_complete.inputs_dump LIKE {pb_4:String}))
+        AND
+            (((coalesce(nullIf(JSON_VALUE(calls_complete.inputs_dump, {pb_0:String}), 'null'), '') IN ({pb_1:String},{pb_2:String})))
+                AND ((calls_complete.deleted_at IS NULL))
+                    AND ((NOT ((calls_complete.started_at IS NULL)))))
+        """,
+        {
+            "pb_0": '$."param"',
+            "pb_1": "hello",
+            "pb_2": "world",
+            "pb_5": "project",
+            "pb_3": '%"hello"%',
+            "pb_4": '%"world"%',
+        },
+    )
+
+
 def test_calls_query_with_combined_like_optimizations_and_op_filter() -> None:
     """Test combining multiple LIKE optimizations with different operators and fields."""
     cq = CallsQuery(project_id="project")
@@ -1614,39 +1738,98 @@ def test_storage_size_fields():
     )
 
 
-def test_total_storage_size():
-    """Test querying with total storage size."""
+@pytest.mark.parametrize("with_filter", [False, True])
+def test_total_storage_size(with_filter: bool):
+    """Test querying with total storage size.
+
+    Args:
+        with_filter: If True, test the optimized case where trace_id filtering is added
+                     to the total_storage_size JOIN via the filtered_calls CTE.
+    """
     cq = CallsQuery(project_id="test/project", include_total_storage_size=True)
     cq.add_field("id")
     cq.add_field("total_storage_size_bytes")
 
-    assert_sql(
-        cq,
-        """
-        SELECT
-            calls_merged.id AS id,
-            CASE
-                WHEN any(calls_merged.parent_id) IS NULL
-                THEN any(rolled_up_cms.total_storage_size_bytes)
-                ELSE NULL
-            END AS total_storage_size_bytes
-        FROM calls_merged
-        LEFT JOIN (SELECT
-            trace_id,
-            sum(COALESCE(attributes_size_bytes,0) + COALESCE(inputs_size_bytes,0) + COALESCE(output_size_bytes,0) + COALESCE(summary_size_bytes,0)) AS total_storage_size_bytes
-        FROM calls_merged_stats
-        WHERE project_id = {pb_0:String}
-        GROUP BY trace_id) AS rolled_up_cms
-        ON calls_merged.trace_id = rolled_up_cms.trace_id
-        PREWHERE calls_merged.project_id = {pb_0:String}
-        GROUP BY (calls_merged.project_id, calls_merged.id)
-        HAVING (
-            ((any(calls_merged.deleted_at) IS NULL))
-            AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+    if with_filter:
+        # Add a heavy field (inputs) to trigger the filtered_calls CTE optimization
+        cq.add_field("inputs_dump")
+        # Add a filter to trigger the optimization path
+        cq.set_hardcoded_filter(
+            HardCodedFilter(filter=tsi.CallsFilter(op_names=["a", "b"]))
         )
-        """,
-        {"pb_0": "test/project"},
-    )
+
+        # Expected SQL with the filtered_calls CTE and trace_id filter in the JOIN
+        assert_sql(
+            cq,
+            """
+            WITH filtered_calls AS (
+                SELECT
+                    calls_merged.id AS id
+                FROM calls_merged
+                PREWHERE calls_merged.project_id = {pb_1:String}
+                WHERE ((calls_merged.op_name IN {pb_0:Array(String)})
+                    OR (calls_merged.op_name IS NULL))
+                GROUP BY (calls_merged.project_id, calls_merged.id)
+                HAVING (((any(calls_merged.deleted_at) IS NULL))
+                    AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+            )
+            SELECT
+                calls_merged.id AS id,
+                CASE
+                    WHEN any(calls_merged.parent_id) IS NULL
+                    THEN any(rolled_up_cms.total_storage_size_bytes)
+                    ELSE NULL
+                END AS total_storage_size_bytes,
+                any(calls_merged.inputs_dump) AS inputs_dump
+            FROM calls_merged
+            LEFT JOIN (SELECT
+                trace_id,
+                sum(COALESCE(attributes_size_bytes,0) + COALESCE(inputs_size_bytes,0) + COALESCE(output_size_bytes,0) + COALESCE(summary_size_bytes,0)) AS total_storage_size_bytes
+            FROM calls_merged_stats
+            WHERE project_id = {pb_1:String}
+            AND trace_id IN (
+                SELECT trace_id
+                FROM calls_merged
+                WHERE project_id = {pb_1:String}
+                AND id IN filtered_calls
+            )
+            GROUP BY trace_id) AS rolled_up_cms
+            ON calls_merged.trace_id = rolled_up_cms.trace_id
+            PREWHERE calls_merged.project_id = {pb_1:String}
+            WHERE (calls_merged.id IN filtered_calls)
+            GROUP BY (calls_merged.project_id, calls_merged.id)
+            """,
+            {"pb_0": ["a", "b"], "pb_1": "test/project"},
+        )
+    else:
+        # Expected SQL without filters (baseline case)
+        assert_sql(
+            cq,
+            """
+            SELECT
+                calls_merged.id AS id,
+                CASE
+                    WHEN any(calls_merged.parent_id) IS NULL
+                    THEN any(rolled_up_cms.total_storage_size_bytes)
+                    ELSE NULL
+                END AS total_storage_size_bytes
+            FROM calls_merged
+            LEFT JOIN (SELECT
+                trace_id,
+                sum(COALESCE(attributes_size_bytes,0) + COALESCE(inputs_size_bytes,0) + COALESCE(output_size_bytes,0) + COALESCE(summary_size_bytes,0)) AS total_storage_size_bytes
+            FROM calls_merged_stats
+            WHERE project_id = {pb_0:String}
+            GROUP BY trace_id) AS rolled_up_cms
+            ON calls_merged.trace_id = rolled_up_cms.trace_id
+            PREWHERE calls_merged.project_id = {pb_0:String}
+            GROUP BY (calls_merged.project_id, calls_merged.id)
+            HAVING (
+                ((any(calls_merged.deleted_at) IS NULL))
+                AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+            )
+            """,
+            {"pb_0": "test/project"},
+        )
 
 
 def test_aggregated_data_size_field():
@@ -1698,6 +1881,44 @@ def test_datetime_optimization_simple() -> None:
             "pb_0": 1709251200,
             "pb_2": "project",
             "pb_1": "2024-02-29 23:55:00.000000",
+        },
+    )
+
+
+def test_datetime_optimization_lt_simple() -> None:
+    """Test basic datetime optimization with a single LT timestamp condition."""
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_condition(
+        tsi_query.LtOperation.model_validate(
+            {
+                "$lt": [
+                    {"$getField": "started_at"},
+                    {"$literal": 1709251200},  # 2024-03-01 00:00:00 UTC
+                ]
+            }
+        )
+    )
+
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id
+        FROM calls_merged
+        PREWHERE calls_merged.project_id = {pb_2:String}
+        WHERE (calls_merged.sortable_datetime < {pb_1:String})
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING (
+            ((any(calls_merged.started_at) < {pb_0:UInt64}))
+            AND ((any(calls_merged.deleted_at) IS NULL))
+            AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+        )
+        """,
+        {
+            "pb_0": 1709251200,
+            "pb_2": "project",
+            "pb_1": "2024-03-01 00:05:00.000000",
         },
     )
 
@@ -2306,6 +2527,34 @@ def test_disallowed_fields():
         )
         cq.as_sql(ParamBuilder())
 
+    cq = CallsQuery(project_id="test/project")  # reset
+    with pytest.raises(ValueError):
+        cq.add_condition(
+            tsi_query.LtOperation.model_validate(
+                {
+                    "$lt": [
+                        {"$getField": "storage_size_bytes"},
+                        {"$literal": 1},
+                    ]
+                }
+            )
+        )
+        cq.as_sql(ParamBuilder())
+
+    cq = CallsQuery(project_id="test/project")  # reset
+    with pytest.raises(ValueError):
+        cq.add_condition(
+            tsi_query.LteOperation.model_validate(
+                {
+                    "$lte": [
+                        {"$getField": "total_storage_size_bytes"},
+                        {"$literal": 1},
+                    ]
+                }
+            )
+        )
+        cq.as_sql(ParamBuilder())
+
 
 def test_thread_id_filter_eq():
     """Test thread_id filter with single thread ID."""
@@ -2583,7 +2832,8 @@ def test_calls_complete_with_light_filter_and_order() -> None:
             calls_complete.op_name AS op_name
         FROM calls_complete
         PREWHERE calls_complete.project_id = {pb_2:String}
-        AND (
+        WHERE 1
+          AND (
             ((calls_complete.started_at > {pb_0:UInt64}))
             AND ((calls_complete.wb_user_id = {pb_1:String}))
             AND ((calls_complete.deleted_at IS NULL))
@@ -2722,7 +2972,8 @@ def test_query_with_simple_feedback_sort_calls_complete() -> None:
                 calls_complete.id))
             PREWHERE
                 calls_complete.project_id = {pb_4:String}
-            AND (
+            WHERE 1
+              AND (
                 ((calls_complete.deleted_at IS NULL))
                     AND ((NOT ((calls_complete.started_at IS NULL)))))
             ORDER BY
@@ -2834,7 +3085,8 @@ def test_calls_complete_with_feedback_filter() -> None:
             calls_complete.id))
         PREWHERE
             calls_complete.project_id = {pb_3:String}
-        AND (
+        WHERE 1
+          AND (
             ((coalesce(nullIf(JSON_VALUE(CASE WHEN feedback.feedback_type = {pb_0:String}
             THEN feedback.payload_dump END,
             {pb_1:String}), 'null'), '') > {pb_2:Float64}))
@@ -2887,7 +3139,8 @@ def test_query_with_summary_weave_status_filter_calls_complete() -> None:
         SELECT
             calls_complete.id AS id
         FROM calls_complete PREWHERE calls_complete.project_id = {pb_5:String}
-        AND (
+        WHERE 1
+          AND (
             (((CASE
                 WHEN calls_complete.exception IS NOT NULL THEN {pb_1:String}
                 WHEN IFNULL(toInt64OrNull(coalesce(nullIf(JSON_VALUE(calls_complete.summary_dump, {pb_0:String}), 'null'), '')), 0) > 0 THEN {pb_4:String}
@@ -2913,3 +3166,255 @@ def test_query_with_summary_weave_status_filter_calls_complete() -> None:
             "pb_5": "project",
         },
     )
+
+
+def test_build_calls_complete_delete_query() -> None:
+    """Ensure the delete helper builds the expected query."""
+    query = build_calls_complete_delete_query(
+        table_name="calls_complete",
+        project_id_param="project_id",
+        call_ids_param="call_ids",
+    )
+
+    expected = sqlparse.format(
+        """
+        DELETE FROM calls_complete
+        WHERE project_id = {project_id:String} AND id IN {call_ids:Array(String)}
+        """,
+        reindent=True,
+    )
+
+    assert query == expected, f"\nExpected:\n{expected}\n\nGot:\n{query}"
+
+
+def test_build_calls_complete_delete_query_with_cluster() -> None:
+    """Ensure the delete helper builds the expected query with cluster name.
+
+    In distributed mode, mutations target the local table with ON CLUSTER clause.
+    """
+    query = build_calls_complete_delete_query(
+        table_name="calls_complete",
+        project_id_param="project_id",
+        call_ids_param="call_ids",
+        cluster_name="my_cluster",
+    )
+
+    expected = sqlparse.format(
+        """
+        DELETE FROM calls_complete_local ON CLUSTER my_cluster
+        WHERE project_id = {project_id:String} AND id IN {call_ids:Array(String)}
+        """,
+        reindent=True,
+    )
+
+    assert query == expected, f"\nExpected:\n{expected}\n\nGot:\n{query}"
+
+
+def test_build_calls_complete_update_query() -> None:
+    """Ensure the update helper builds the expected query."""
+    query = build_calls_complete_update_query(
+        table_name="calls_complete",
+        project_id_param="project_id",
+        id_param="id",
+        display_name_param="display_name",
+    )
+
+    expected = sqlparse.format(
+        """
+        UPDATE calls_complete
+        SET display_name = {display_name:String}
+        WHERE project_id = {project_id:String} AND id = {id:String}
+        """,
+        reindent=True,
+    )
+
+    assert query == expected, f"\nExpected:\n{expected}\n\nGot:\n{query}"
+
+
+def test_build_calls_complete_update_query_with_cluster() -> None:
+    """Ensure the update helper builds the expected query with cluster name.
+
+    In distributed mode, mutations target the local table with ON CLUSTER clause.
+    """
+    query = build_calls_complete_update_query(
+        table_name="calls_complete",
+        project_id_param="project_id",
+        id_param="id",
+        display_name_param="display_name",
+        cluster_name="my_cluster",
+    )
+
+    expected = sqlparse.format(
+        """
+        UPDATE calls_complete_local ON CLUSTER my_cluster
+        SET display_name = {display_name:String}
+        WHERE project_id = {project_id:String} AND id = {id:String}
+        """,
+        reindent=True,
+    )
+
+    assert query == expected, f"\nExpected:\n{expected}\n\nGot:\n{query}"
+
+
+def test_query_with_queue_filter_calls_merged() -> None:
+    """Test queue filtering with calls_merged table - should use aggregate functions."""
+    cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_MERGED)
+    cq.add_field("id")
+    cq.add_condition(
+        tsi_query.EqOperation.model_validate(
+            {
+                "$eq": [
+                    {"$getField": "annotation_queue_items.queue_id"},
+                    {"$literal": "test_queue_id"},
+                ]
+            }
+        )
+    )
+
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id
+        FROM
+            calls_merged
+        INNER JOIN (
+            SELECT * FROM annotation_queue_items
+            WHERE annotation_queue_items.project_id = {pb_1:String}
+              AND annotation_queue_items.deleted_at IS NULL
+              AND annotation_queue_items.queue_id = {pb_0:String}
+        ) AS annotation_queue_items ON (
+            annotation_queue_items.project_id = calls_merged.project_id
+            AND annotation_queue_items.call_id = calls_merged.id)
+        PREWHERE
+            calls_merged.project_id = {pb_1:String}
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING (
+            ((any(annotation_queue_items.queue_id) = {pb_0:String}))
+            AND ((any(calls_merged.deleted_at) IS NULL))
+            AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+        """,
+        {
+            "pb_0": "test_queue_id",
+            "pb_1": "project",
+        },
+    )
+
+
+def test_query_with_queue_filter_calls_complete() -> None:
+    """Test queue filtering with calls_complete table - should NOT use aggregate functions."""
+    cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_COMPLETE)
+    cq.add_field("id")
+    cq.add_condition(
+        tsi_query.EqOperation.model_validate(
+            {
+                "$eq": [
+                    {"$getField": "annotation_queue_items.queue_id"},
+                    {"$literal": "test_queue_id"},
+                ]
+            }
+        )
+    )
+
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_complete.id AS id
+        FROM
+            calls_complete
+        INNER JOIN (
+            SELECT * FROM annotation_queue_items
+            WHERE annotation_queue_items.project_id = {pb_1:String}
+              AND annotation_queue_items.deleted_at IS NULL
+              AND annotation_queue_items.queue_id = {pb_0:String}
+        ) AS annotation_queue_items ON (
+            annotation_queue_items.project_id = calls_complete.project_id
+            AND annotation_queue_items.call_id = calls_complete.id)
+        PREWHERE
+            calls_complete.project_id = {pb_1:String}
+        WHERE 1
+          AND (
+            ((annotation_queue_items.queue_id = {pb_0:String}))
+            AND ((calls_complete.deleted_at IS NULL))
+            AND ((NOT ((calls_complete.started_at IS NULL)))))
+        """,
+        {
+            "pb_0": "test_queue_id",
+            "pb_1": "project",
+        },
+    )
+
+
+# -----------------------------------------------------------------------------
+# HardCodedFilter.is_useful()
+# -----------------------------------------------------------------------------
+
+
+def test_hardcoded_filter_is_useful_thread_ids_only() -> None:
+    """Filter with only thread_ids must be considered useful so set_hardcoded_filter applies it."""
+    hcf = HardCodedFilter(filter=tsi.CallsFilter(thread_ids=["thread_1"]))
+    assert hcf.is_useful() is True
+
+
+def test_hardcoded_filter_is_useful_empty_thread_ids_only() -> None:
+    """Filter with only thread_ids must be considered useful, even when the list is empty."""
+    hcf = HardCodedFilter(filter=tsi.CallsFilter(thread_ids=[]))
+    assert hcf.is_useful() is True
+
+
+def test_hardcoded_filter_is_useful_turn_ids_only() -> None:
+    """Filter with only turn_ids must be considered useful."""
+    hcf = HardCodedFilter(filter=tsi.CallsFilter(turn_ids=["turn_1"]))
+    assert hcf.is_useful() is True
+
+
+def test_hardcoded_filter_is_useful_empty_not_useful() -> None:
+    """Filter with no fields set is not useful."""
+    hcf = HardCodedFilter(filter=tsi.CallsFilter())
+    assert hcf.is_useful() is False
+
+
+def test_hardcoded_filter_set_hardcoded_filter_with_thread_ids_only() -> None:
+    """set_hardcoded_filter must accept a filter that only has thread_ids (is_useful True)."""
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.set_hardcoded_filter(HardCodedFilter(filter=tsi.CallsFilter(thread_ids=["t1"])))
+    assert cq.hardcoded_filter is not None
+    assert cq.hardcoded_filter.filter.thread_ids == ["t1"]
+
+
+# -----------------------------------------------------------------------------
+# _is_minimal_filter()
+# -----------------------------------------------------------------------------
+
+
+def test_is_minimal_filter_none() -> None:
+    assert _is_minimal_filter(None) is True
+
+
+def test_is_minimal_filter_empty() -> None:
+    assert _is_minimal_filter(tsi.CallsFilter()) is True
+
+
+def test_is_minimal_filter_thread_ids_not_minimal() -> None:
+    """Filter with thread_ids set must not be considered minimal (optimized path must not apply)."""
+    assert _is_minimal_filter(tsi.CallsFilter(thread_ids=["thread_1"])) is False
+
+
+def test_is_minimal_filter_turn_ids_not_minimal() -> None:
+    assert _is_minimal_filter(tsi.CallsFilter(turn_ids=["turn_1"])) is False
+
+
+def test_is_minimal_filter_wb_user_ids_not_minimal() -> None:
+    assert _is_minimal_filter(tsi.CallsFilter(wb_user_ids=["user_1"])) is False
+
+
+def test_is_minimal_filter_empty_thread_ids_not_minimal() -> None:
+    """thread_ids=[] is still a set filter (not None), so not minimal."""
+    assert _is_minimal_filter(tsi.CallsFilter(thread_ids=[])) is False
+
+
+def test_is_minimal_filter_empty_turn_ids_not_minimal() -> None:
+    """turn_ids=[] is still a set filter (not None), so not minimal."""
+    assert _is_minimal_filter(tsi.CallsFilter(turn_ids=[])) is False
