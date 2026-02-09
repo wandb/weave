@@ -41,18 +41,14 @@ class SessionSpan(BaseModel):
         self.session = msg.get("session")
         wc = require_weave_client()
         if not self.root_call:
-            self.root_call = wc.create_call(
-                "realtime.session", inputs=self.session
-            )
+            self.root_call = wc.create_call("realtime.session", inputs=self.session)
 
     def on_updated(self, msg: dict) -> None:
         self.session = msg.get("session")
         wc = require_weave_client()
 
         if not self.root_call:
-            self.root_call = wc.create_call(
-                "realtime.session", inputs=self.session
-            )
+            self.root_call = wc.create_call("realtime.session", inputs=self.session)
 
         # Return after confirming initialization if we can't properly complete
         if not self.last_update:
@@ -428,7 +424,9 @@ class StateExporter(BaseModel):
                     content_dict = dict(content)
                     content_type = content.get("type")
                     if content_type in ("audio", "output_audio"):
-                        audio_bytes = self.response_audio.get(item_id) if item_id else None
+                        audio_bytes = (
+                            self.response_audio.get(item_id) if item_id else None
+                        )
                         if not audio_bytes:
                             logger.error("failed to fetch audio bytes")
                             continue
