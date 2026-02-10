@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from pydantic import Field, model_validator
+
 from weave.flow.scorer import Scorer
 from weave.trace.objectify import register_object
 
@@ -19,7 +20,9 @@ class CodeScorer(Scorer):
     At least one of docker_image or requirements must be set.
     """
 
-    op_ref: str = Field(description="URI reference to the published Weave Op to execute")
+    op_ref: str = Field(
+        description="URI reference to the published Weave Op to execute"
+    )
     docker_image: str | None = Field(
         default=None,
         description="Docker image to use as the sandbox environment",
