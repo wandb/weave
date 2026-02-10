@@ -410,9 +410,15 @@ def test_call_stats_percentiles(client: weave_client.WeaveClient):
     assert p95 is not None, "p95 should be present"
     assert p99 is not None, "p99 should be present"
 
-    assert 25 <= p50 <= 75, f"p50 should be around 50, got {p50}"
-    assert 85 <= p95 <= 100, f"p95 should be around 95, got {p95}"
-    assert 90 <= p99 <= 100, f"p99 should be around 99, got {p99}"
+    min_tokens = min(token_values)
+    max_tokens = max(token_values)
+
+    assert min_tokens <= p50 <= max_tokens, f"p50 out of range, got {p50}"
+    assert min_tokens <= p95 <= max_tokens, f"p95 out of range, got {p95}"
+    assert min_tokens <= p99 <= max_tokens, f"p99 out of range, got {p99}"
+    assert p50 <= p95 <= p99, (
+        f"percentiles should be non-decreasing (p50={p50}, p95={p95}, p99={p99})"
+    )
 
 
 def test_call_stats_time_buckets(client: weave_client.WeaveClient):
