@@ -2166,10 +2166,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         result = self.ch_client.query(query, parameters=pb.get_params())
         rows = result.named_results()
 
-        if not rows:
-            raise NotFoundError(f"Queue {req.queue_id} not found")
-
-        row = next(rows)
+        try:
+            row = next(rows)
+        except StopIteration:
+            raise NotFoundError(f"Queue {req.queue_id} not found") from None
         queue = tsi.AnnotationQueueSchema(
             id=str(row["id"]),
             project_id=row["project_id"],

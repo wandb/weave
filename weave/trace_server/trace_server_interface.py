@@ -995,6 +995,11 @@ class FeedbackCreateReq(BaseModelStrict):
     trigger_ref: str | None = Field(
         default=None, examples=["weave:///entity/project/object/name:digest"]
     )
+    queue_id: str | None = Field(
+        default=None,
+        description="The annotation queue ID this feedback was created from. References annotation_queues.id. NULL when feedback is created outside of queues.",
+        examples=["018f1f2a-9c2b-7d3e-b5a1-8c9d2e4f6a7b"],
+    )
 
     # wb_user_id is automatically populated by the server
     wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
