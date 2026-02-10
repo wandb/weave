@@ -592,11 +592,14 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
 
         # Match the batch server:
         if req.sort_by is None:
-            order_by = [("started_at", "asc")]
+            order_by = [("started_at", "asc"), ("id", "desc")]
         elif len(req.sort_by) == 0:
             order_by = None
         else:
             order_by = [(s.field, s.direction) for s in req.sort_by]
+            # Add id as secondary sort for consistency if not already present
+            if not any(field == "id" for field, _ in order_by):
+                order_by.append(("id", "desc"))
 
         if order_by is not None:
             order_parts = []

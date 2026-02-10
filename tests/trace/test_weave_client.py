@@ -2549,6 +2549,87 @@ def test_calls_query_filter_by_strings(client):
         assert call.inputs["value"] > 0
 
 
+def test_calls_default_sort_secondary_id_desc(client):
+    """Test that the default sort uses id DESC as a secondary tiebreaker.
+
+    When no explicit sort_by is provided, calls should be sorted by
+    started_at ASC, then id DESC. This test creates three calls with
+    identical started_at timestamps but different explicit IDs, then
+    verifies that within the same started_at group the ids are returned
+    in descending order.
+    """
+    # Use explicit IDs that have a clear lexicographic ordering:
+    # id_small < id_mid < id_large
+    id_small = "00000000-0000-7000-8000-00000000000a"
+    id_mid = "00000000-0000-7000-8000-00000000000b"
+    id_large = "00000000-0000-7000-8000-00000000000c"
+
+    # All calls share the exact same started_at to force the tiebreaker
+    fixed_time = datetime.datetime(2025, 1, 1, 12, 0, 0)
+    project_id = client._project_id()
+    trace_id = generate_id()
+
+    # Insert calls via server API with controlled ids and started_at.
+    # Insert in ascending id order to ensure the sort isn't just insertion order.
+    for call_id in [id_small, id_mid, id_large]:
+        client.server.call_start(
+            tsi.CallStartReq(
+                start=tsi.StartedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=call_id,
+                    trace_id=trace_id,
+                    op_name="test_secondary_sort",
+                    started_at=fixed_time,
+                    attributes={},
+                    inputs={"call_id": call_id},
+                )
+            )
+        )
+        client.server.call_end(
+            tsi.CallEndReq(
+                end=tsi.EndedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=call_id,
+                    ended_at=fixed_time + datetime.timedelta(seconds=1),
+                    output={"result": "ok"},
+                    summary={},
+                )
+            )
+        )
+
+    # Query with default sort (no sort_by) -- should be started_at ASC, id DESC
+    result = client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=project_id,
+            filter=tsi.CallsFilter(op_names=["test_secondary_sort"]),
+        )
+    )
+    returned_ids = [c.id for c in result.calls]
+    assert len(returned_ids) == 3
+
+    # All have the same started_at, so order is determined by id DESC:
+    # id_large > id_mid > id_small
+    assert returned_ids == [id_large, id_mid, id_small], (
+        f"Expected id DESC tiebreaker order [{id_large}, {id_mid}, {id_small}], "
+        f"but got {returned_ids}"
+    )
+
+    # Also verify with explicit sort_by -- secondary id sort should
+    # still be DESC when user provides a primary sort
+    result_explicit = client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=project_id,
+            filter=tsi.CallsFilter(op_names=["test_secondary_sort"]),
+            sort_by=[SortBy(field="started_at", direction="asc")],
+        )
+    )
+    returned_ids_explicit = [c.id for c in result_explicit.calls]
+    assert returned_ids_explicit == [id_large, id_mid, id_small], (
+        f"Expected id DESC tiebreaker with explicit sort [{id_large}, {id_mid}, {id_small}], "
+        f"but got {returned_ids_explicit}"
+    )
+
+
 def test_calls_query_sort_by_status(client):
     """Test that sort_by summary.weave.status works with get_calls."""
     # Use a unique test ID to identify these calls
