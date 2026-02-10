@@ -28,7 +28,7 @@ Outstanding Optimizations/Work:
 import datetime
 import logging
 import re
-from collections.abc import Callable, KeysView
+from collections.abc import Callable, KeysView, Sequence
 from typing import Literal, NamedTuple, cast
 
 from pydantic import BaseModel, Field
@@ -1743,8 +1743,8 @@ class FilterToConditions(BaseModel):
 
 
 def _maybe_convert_datetime_operands(
-    operands: list["tsi_query.Operand"],
-) -> list["tsi_query.Operand"]:
+    operands: Sequence["tsi_query.Operand"],
+) -> Sequence["tsi_query.Operand"]:
     """Convert numeric literals to datetime strings when compared against DateTime columns.
 
     When a numeric literal (int/float unix timestamp) is being compared against a
@@ -1752,7 +1752,7 @@ def _maybe_convert_datetime_operands(
     string so ClickHouse can properly use primary key / ORDER BY indexes on DateTime64
     columns.
 
-    Returns a new list of operands with conversions applied, or the original list if
+    Returns a new list of operands with conversions applied, or the original sequence if
     no conversion is needed.
 
     Examples:
@@ -1785,6 +1785,7 @@ def _maybe_convert_datetime_operands(
 
     # Convert numeric timestamp to datetime string for proper DateTime64 comparison
     timestamp = operands[literal_idx].literal_
+    assert isinstance(timestamp, (int, float))
     datetime_str = datetime.datetime.fromtimestamp(
         timestamp, tz=datetime.timezone.utc
     ).strftime("%Y-%m-%d %H:%M:%S.%f")
