@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import field
 import logging
 import threading
 from collections.abc import Callable
@@ -97,10 +98,9 @@ class SessionSpan(BaseModel):
 
 
 class ItemRegistry:
-    speech_markers: dict[str, dict[str, int | None]] = {}
-    input_audio_buffer: AudioBufferManager = AudioBufferManager()
+    speech_markers: dict[str, dict[str, int | None]] = field(default_factory=dict)
+    input_audio_buffer: AudioBufferManager = field(default_factory=AudioBufferManager)
 
-    # ---- Convenience lookups ----
     def get_audio_segment(self, item_id: str) -> bytes | None:
         markers = self.speech_markers.get(item_id)
         if not markers:
