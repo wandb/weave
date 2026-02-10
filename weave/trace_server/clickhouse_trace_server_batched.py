@@ -1140,11 +1140,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 cq.add_order(sort_by.field, sort_by.direction)
             # If user isn't already sorting by id, add id as secondary sort for consistency
             if not any(sort_by.field == "id" for sort_by in req.sort_by):
-                cq.add_order("id", "asc")
+                cq.add_order("id", "desc")
         else:
             # Default sorting: started_at with id as secondary sort for consistency
             cq.add_order("started_at", "asc")
-            cq.add_order("id", "asc")
+            cq.add_order("id", "desc")
         if req.limit is not None:
             cq.set_limit(req.limit)
         if req.offset is not None:
