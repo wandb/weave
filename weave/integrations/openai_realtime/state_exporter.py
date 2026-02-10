@@ -72,15 +72,18 @@ class SessionSpan(BaseModel):
         wc.finish_call(call, output=self.session)
         self.last_update = None
 
+    # Unfortunately the order can be session.update -> session.created -> session.
     def on_update(self, msg: dict) -> None:
         self.session = msg.get("session")
         wc = require_weave_client()
+        # If there's no active session or ID on that session then we need to defer
+        # That way session.update is a child call for session.create
         if not self.session or not self.session.get("id"):
             # Registered a CB since updated will run after created
             def update_cb(root_call: Call) -> Call:
                 return wc.create_call(
                     "realtime.session.update",
-                    inputs=self.session,  # type: ignore
+                    inputs=msg.get("session", {}),
                     parent=root_call,
                 )
 
@@ -88,14 +91,14 @@ class SessionSpan(BaseModel):
         else:
             self.last_update = wc.create_call(
                 "realtime.session.update",
-                inputs=self.session,
+                inputs=msg.get("session", {}),
                 parent=self.root_call,
             )
 
 
 class ItemRegistry:
-    speech_markers: dict[str, dict[str, int | None]] = Field(default_factory=dict)
-    input_audio_buffer: AudioBufferManager = Field(default_factory=AudioBufferManager)
+    speech_markers: dict[str, dict[str, int | None]] = {}
+    input_audio_buffer: AudioBufferManager = AudioBufferManager()
 
     # ---- Convenience lookups ----
     def get_audio_segment(self, item_id: str) -> bytes | None:
