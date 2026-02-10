@@ -1,7 +1,7 @@
 import pytest
 import sqlparse
 
-from tests.trace_server.query_builder.utils import assert_sql
+from tests.trace_server.query_builder.utils import assert_sql, assert_stats_sql
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.calls_query_builder.calls_query_builder import (
     AggregatedDataSizeField,
@@ -11,7 +11,6 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     build_calls_complete_delete_query,
     build_calls_complete_update_end_query,
     build_calls_complete_update_query,
-    build_calls_stats_query,
 )
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.orm import ParamBuilder
@@ -3426,28 +3425,6 @@ def test_is_minimal_filter_empty_turn_ids_not_minimal() -> None:
 # -----------------------------------------------------------------------------
 
 
-def _assert_stats_sql(
-    req: tsi.CallsQueryStatsReq,
-    exp_query: str,
-    exp_params: dict,
-    read_table: ReadTable = ReadTable.CALLS_MERGED,
-) -> None:
-    """Assert that build_calls_stats_query generates the expected SQL and parameters."""
-    pb = ParamBuilder("pb")
-    query, _columns = build_calls_stats_query(req, pb, read_table)
-    params = pb.get_params()
-
-    exp_formatted = sqlparse.format(exp_query, reindent=True).strip()
-    found_formatted = sqlparse.format(query, reindent=True).strip()
-
-    assert exp_formatted == found_formatted, (
-        f"\nExpected:\n{exp_formatted}\n\nGot:\n{found_formatted}"
-    )
-    assert exp_params == params, (
-        f"\nExpected params: {exp_params}\n\nGot params: {params}"
-    )
-
-
 def test_stats_query_calls_complete_flat_count() -> None:
     """Stats query on calls_complete should be flat (no subquery wrapping).
 
@@ -3455,7 +3432,7 @@ def test_stats_query_calls_complete_flat_count() -> None:
     Slow:  SELECT count() FROM (SELECT id FROM calls_complete PREWHERE ... WHERE ...)
     """
     req = tsi.CallsQueryStatsReq(project_id="project")
-    _assert_stats_sql(
+    assert_stats_sql(
         req,
         """
         SELECT count() AS count
@@ -3475,7 +3452,7 @@ def test_stats_query_calls_complete_flat_count_with_filter() -> None:
         project_id="project",
         filter=tsi.CallsFilter(op_names=["my_op"]),
     )
-    _assert_stats_sql(
+    assert_stats_sql(
         req,
         """
         SELECT count() AS count
@@ -3496,7 +3473,7 @@ def test_stats_query_calls_complete_flat_with_total_storage_size() -> None:
         project_id="project",
         include_total_storage_size=True,
     )
-    _assert_stats_sql(
+    assert_stats_sql(
         req,
         """
         SELECT count() AS count,
@@ -3525,7 +3502,7 @@ def test_stats_query_calls_complete_flat_with_total_storage_size() -> None:
 def test_stats_query_calls_merged_uses_subquery() -> None:
     """Stats query on calls_merged should use subquery wrapping (GROUP BY requires it)."""
     req = tsi.CallsQueryStatsReq(project_id="project")
-    _assert_stats_sql(
+    assert_stats_sql(
         req,
         """
         SELECT count()

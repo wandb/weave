@@ -8,7 +8,10 @@ import sqlparse
 from weave.trace_server.calls_query_builder.call_metrics_query_builder import (
     build_call_metrics_query,
 )
-from weave.trace_server.calls_query_builder.calls_query_builder import CallsQuery
+from weave.trace_server.calls_query_builder.calls_query_builder import (
+    CallsQuery,
+    build_calls_stats_query,
+)
 from weave.trace_server.calls_query_builder.usage_query_builder import (
     build_usage_query,
 )
@@ -20,6 +23,7 @@ from weave.trace_server.threads_query_builder import (
 )
 from weave.trace_server.trace_server_interface import (
     CallMetricSpec,
+    CallsQueryStatsReq,
     CallStatsReq,
     UsageMetricSpec,
 )
@@ -138,6 +142,35 @@ def assert_usage_sql(
         assert exp_start == start, f"\nExpected start: {exp_start}\n\nGot: {start}"
     if exp_end is not None:
         assert exp_end == end, f"\nExpected end: {exp_end}\n\nGot: {end}"
+
+
+def assert_stats_sql(
+    req: CallsQueryStatsReq,
+    exp_query: str,
+    exp_params: dict,
+    read_table: ReadTable = ReadTable.CALLS_MERGED,
+) -> None:
+    """Assert that build_calls_stats_query generates the expected SQL and parameters.
+
+    Args:
+        req: The stats query request
+        exp_query: The expected SQL query string
+        exp_params: The expected parameter dictionary
+        read_table: Which table to query (calls_merged or calls_complete)
+    """
+    pb = ParamBuilder("pb")
+    query, _columns = build_calls_stats_query(req, pb, read_table)
+    params = pb.get_params()
+
+    exp_formatted = sqlparse.format(exp_query, reindent=True).strip()
+    found_formatted = sqlparse.format(query, reindent=True).strip()
+
+    assert exp_formatted == found_formatted, (
+        f"\nExpected:\n{exp_formatted}\n\nGot:\n{found_formatted}"
+    )
+    assert exp_params == params, (
+        f"\nExpected params: {exp_params}\n\nGot params: {params}"
+    )
 
 
 def assert_call_metrics_sql(
