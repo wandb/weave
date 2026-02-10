@@ -639,7 +639,11 @@ def test_get_calls_page_size_with_offset(client):
         batch_num += 1
 
     assert len(all_call_ids) == 20
-    assert all_values == list(range(20))
+    # Use sorted() because calls created in a tight loop may share the same
+    # started_at timestamp (especially on Windows with ~15ms clock resolution),
+    # and the default sort tiebreaker (id DESC) uses random UUIDv7 suffixes
+    # which don't preserve insertion order.
+    assert sorted(all_values) == list(range(20))
 
 
 def test_calls_delete(client):
