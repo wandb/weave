@@ -520,7 +520,10 @@ class CallsQueryReq(BaseModelStrict):
     filter: CallsFilter | None = None
     limit: int | None = None
     offset: int | None = None
-    # Sort by multiple fields
+    # Sort by multiple fields.
+    # - None (default): uses default sorting (started_at asc, id asc)
+    # - [] (empty list): explicitly disables sorting for performance
+    # - [SortBy(...)]: sorts by the specified fields
     sort_by: list[SortBy] | None = None
     query: Query | None = None
     include_costs: bool | None = Field(

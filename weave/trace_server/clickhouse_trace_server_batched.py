@@ -1134,13 +1134,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if req.query is not None:
             cq.add_condition(req.query.expr_)
 
-        # Sort with empty list results in no sorting
         if req.sort_by is not None:
-            for sort_by in req.sort_by:
-                cq.add_order(sort_by.field, sort_by.direction)
-            # If user isn't already sorting by id, add id as secondary sort for consistency
-            if not any(sort_by.field == "id" for sort_by in req.sort_by):
-                cq.add_order("id", "asc")
+            if len(req.sort_by) > 0:
+                # Explicit sort fields provided
+                for sort_by in req.sort_by:
+                    cq.add_order(sort_by.field, sort_by.direction)
+                # If user isn't already sorting by id, add id as secondary sort for consistency
+                if not any(sort_by.field == "id" for sort_by in req.sort_by):
+                    cq.add_order("id", "asc")
+            # else: sort_by=[] means explicitly no sorting
         else:
             # Default sorting: started_at with id as secondary sort for consistency
             cq.add_order("started_at", "asc")

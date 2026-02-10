@@ -308,6 +308,9 @@ def test_filter_sort_by_query_validation(client):
     # test valid
     client.get_calls(sort_by=[SortBy(field="started_at", direction="desc")])
 
+    # test empty list (explicitly no sorting) is valid
+    client.get_calls(sort_by=[])
+
     # now query like filter
     with pytest.raises(TypeError):
         client.get_calls(query="not a query")
@@ -2670,6 +2673,35 @@ def test_calls_query_sort_by_latency(client):
     assert calls_desc[0].id == slow_call.id
     assert calls_desc[1].id == medium_call.id
     assert calls_desc[2].id == fast_call.id
+
+
+def test_calls_query_no_sort(client):
+    """Test that sort_by=[] explicitly disables sorting and still returns results."""
+    test_id = str(uuid.uuid4())
+
+    # Create a few calls
+    call1 = client.create_call("x", {"a": 1, "test_id": test_id})
+    client.finish_call(call1, "result1")
+
+    call2 = client.create_call("x", {"a": 2, "test_id": test_id})
+    client.finish_call(call2, "result2")
+
+    call3 = client.create_call("x", {"a": 3, "test_id": test_id})
+    client.finish_call(call3, "result3")
+
+    client.flush()
+
+    query = tsi.Query(
+        **{"$expr": {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]}}
+    )
+
+    # Passing sort_by=[] should return all results with no guaranteed order
+    calls_unsorted = list(client.get_calls(query=query, sort_by=[]))
+    assert len(calls_unsorted) == 3
+
+    # Verify all expected call IDs are present (order is unspecified)
+    returned_ids = {c.id for c in calls_unsorted}
+    assert returned_ids == {call1.id, call2.id, call3.id}
 
 
 def test_calls_filter_by_status(client):
