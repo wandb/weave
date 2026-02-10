@@ -112,13 +112,16 @@ from weave.trace_server.feedback import (
     validate_feedback_purge_req,
 )
 from weave.trace_server.file_storage import (
+    AsyncFileStorageClient,
     FileStorageClient,
     FileStorageReadError,
     FileStorageWriteError,
     key_for_project_digest,
+    maybe_get_async_storage_client_from_env,
     maybe_get_storage_client_from_env,
     read_from_bucket,
     store_in_bucket,
+    store_in_bucket_async,
 )
 from weave.trace_server.file_storage_uris import FileStorageURI
 from weave.trace_server.ids import generate_id
@@ -233,6 +236,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self._use_async_insert = use_async_insert
         self._model_to_provider_info_map = read_model_to_provider_info_map()
         self._file_storage_client: FileStorageClient | None = None
+        self._async_file_storage_client: AsyncFileStorageClient | None = None
+        self._async_ch_client: clickhouse_connect.driver.AsyncClient | None = None
         self._kafka_producer: KafkaProducer | None = None
         self._evaluate_model_dispatcher = evaluate_model_dispatcher
         self._table_routing_resolver: TableRoutingResolver | None = None
@@ -297,6 +302,34 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             return self._file_storage_client
         self._file_storage_client = maybe_get_storage_client_from_env()
         return self._file_storage_client
+
+    @property
+    def async_file_storage_client(self) -> AsyncFileStorageClient | None:
+        if self._async_file_storage_client is not None:
+            return self._async_file_storage_client
+        self._async_file_storage_client = maybe_get_async_storage_client_from_env()
+        return self._async_file_storage_client
+
+    async def _get_async_ch_client(self) -> clickhouse_connect.driver.AsyncClient:
+        """Get or create async ClickHouse client."""
+        if self._async_ch_client is None:
+            self._async_ch_client = await clickhouse_connect.get_async_client(
+                host=self._host,
+                port=self._port,
+                user=self._user,
+                password=self._password,
+                database=self._database,
+            )
+        return self._async_ch_client
+
+    async def close_async_ch_client(self) -> None:
+        """Close the async ClickHouse client if it exists.
+
+        Should be called during shutdown to release resources.
+        """
+        if self._async_ch_client is not None:
+            await self._async_ch_client.close()
+            self._async_ch_client = None
 
     @property
     def kafka_producer(self) -> KafkaProducer:
@@ -4738,6 +4771,102 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             self._file_create_clickhouse(req, digest)
         set_root_span_dd_tags({"write_bytes": len(req.content)})
         return tsi.FileCreateRes(digest=digest)
+
+    async def file_create_async(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
+        """Async version of file_create using async storage and ClickHouse clients."""
+        with ddtrace.tracer.trace(
+            name="clickhouse_trace_server_batched.file_create_async"
+        ):
+            digest = bytes_digest(req.content)
+            use_file_storage = self._should_use_file_storage_for_writes(req.project_id)
+            async_client = self.async_file_storage_client
+
+            if async_client is not None and use_file_storage:
+                try:
+                    await self._file_create_bucket_async(req, digest, async_client)
+                except FileStorageWriteError:
+                    await self._file_create_clickhouse_async(req, digest)
+            else:
+                await self._file_create_clickhouse_async(req, digest)
+            set_root_span_dd_tags({"write_bytes": len(req.content)})
+            return tsi.FileCreateRes(digest=digest)
+
+    async def _file_create_clickhouse_async(
+        self, req: tsi.FileCreateReq, digest: str
+    ) -> None:
+        """Async version of _file_create_clickhouse."""
+        with ddtrace.tracer.trace(
+            name="clickhouse_trace_server_batched._file_create_clickhouse_async"
+        ):
+            set_root_span_dd_tags({"storage_provider": "clickhouse"})
+            chunks = [
+                req.content[i : i + ch_settings.FILE_CHUNK_SIZE]
+                for i in range(0, len(req.content), ch_settings.FILE_CHUNK_SIZE)
+            ]
+            await self._insert_file_chunks_async(
+                [
+                    FileChunkCreateCHInsertable(
+                        project_id=req.project_id,
+                        digest=digest,
+                        chunk_index=i,
+                        n_chunks=len(chunks),
+                        name=req.name,
+                        val_bytes=chunk,
+                        bytes_stored=len(chunk),
+                        file_storage_uri=None,
+                    )
+                    for i, chunk in enumerate(chunks)
+                ]
+            )
+
+    async def _file_create_bucket_async(
+        self, req: tsi.FileCreateReq, digest: str, client: AsyncFileStorageClient
+    ) -> None:
+        """Async version of _file_create_bucket."""
+        with ddtrace.tracer.trace(
+            name="clickhouse_trace_server_batched._file_create_bucket_async"
+        ):
+            set_root_span_dd_tags({"storage_provider": "bucket"})
+            target_file_storage_uri = await store_in_bucket_async(
+                client, key_for_project_digest(req.project_id, digest), req.content
+            )
+            await self._insert_file_chunks_async(
+                [
+                    FileChunkCreateCHInsertable(
+                        project_id=req.project_id,
+                        digest=digest,
+                        chunk_index=0,
+                        n_chunks=1,
+                        name=req.name,
+                        val_bytes=b"",
+                        bytes_stored=len(req.content),
+                        file_storage_uri=target_file_storage_uri.to_uri_str(),
+                    )
+                ]
+            )
+
+    async def _insert_file_chunks_async(
+        self, file_chunks: list[FileChunkCreateCHInsertable]
+    ) -> None:
+        """Async version of _insert_file_chunks using async ClickHouse client."""
+        with ddtrace.tracer.trace(
+            name="clickhouse_trace_server_batched._insert_file_chunks_async"
+        ):
+            data = []
+            for chunk in file_chunks:
+                chunk_dump = chunk.model_dump()
+                row = []
+                for col in ALL_FILE_CHUNK_INSERT_COLUMNS:
+                    row.append(chunk_dump.get(col, None))
+                data.append(row)
+
+            if data:
+                client = await self._get_async_ch_client()
+                await client.insert(
+                    "files",
+                    data=data,
+                    column_names=ALL_FILE_CHUNK_INSERT_COLUMNS,
+                )
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._file_create_clickhouse")
     def _file_create_clickhouse(self, req: tsi.FileCreateReq, digest: str) -> None:

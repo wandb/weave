@@ -5,8 +5,10 @@ Each storage implementation is tested with similar patterns but with their
 specific setup requirements.
 """
 
+import asyncio
 import base64
 import os
+import time
 from unittest import mock
 
 import boto3
@@ -481,3 +483,282 @@ def test_file_storage_retry_limit(client: WeaveClient):
 
         # Verify GCS was attempted exactly 3 times before fallback
         assert attempt_count == 3, f"Expected 3 GCS attempts, got {attempt_count}"
+
+
+# =============================================================================
+# Async file_create tests
+# =============================================================================
+
+
+@pytest.fixture
+def aws_storage_env_async():
+    """Setup AWS storage environment for async tests."""
+    with mock.patch.dict(
+        os.environ,
+        {
+            "WF_FILE_STORAGE_AWS_ACCESS_KEY_ID": "test-key",
+            "WF_FILE_STORAGE_AWS_SECRET_ACCESS_KEY": "test-secret",
+            "WF_FILE_STORAGE_URI": f"s3://{TEST_BUCKET}",
+            "WF_FILE_STORAGE_PROJECT_ALLOW_LIST": "c2hhd24vdGVzdC1wcm9qZWN0",
+        },
+    ):
+        yield
+
+
+@pytest.fixture
+def gcp_storage_env_async():
+    """Setup GCP storage environment for async tests."""
+    with mock.patch.dict(
+        os.environ,
+        {
+            "WF_FILE_STORAGE_GCP_CREDENTIALS_JSON_B64": base64.b64encode(
+                b"""{
+                "type": "service_account",
+                "project_id": "test-project",
+                "private_key_id": "test-key-id",
+                "private_key": "test-key",
+                "client_email": "test@test-project.iam.gserviceaccount.com",
+                "client_id": "test-client-id",
+                "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                "token_uri": "https://oauth2.googleapis.com/token",
+                "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+                "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/test@test-project.iam.gserviceaccount.com"
+            }"""
+            ).decode(),
+            "WF_FILE_STORAGE_URI": f"gs://{TEST_BUCKET}",
+            "WF_FILE_STORAGE_PROJECT_ALLOW_LIST": "c2hhd24vdGVzdC1wcm9qZWN0",
+        },
+    ):
+        yield
+
+
+@pytest.fixture
+def mock_gcp_credentials():
+    """Mock GCP credentials to prevent authentication."""
+    with mock.patch(
+        "google.oauth2.service_account.Credentials.from_service_account_info"
+    ) as mock_creds:
+        mock_creds.return_value = AnonymousCredentials()
+        yield
+
+
+@pytest.fixture
+def mock_gcs_client():
+    """Google Cloud Storage mock for tests."""
+    mock_storage_client = mock.MagicMock()
+    mock_bucket = mock.MagicMock()
+    mock_blob = mock.MagicMock()
+
+    mock_storage_client.bucket.return_value = mock_bucket
+    mock_bucket.blob.return_value = mock_blob
+
+    blob_data = {}
+
+    def mock_upload_from_string(data, timeout=None, if_generation_match=None, **kwargs):
+        blob_name = mock_blob.name
+        if if_generation_match == 0 and blob_name in blob_data:
+            raise exceptions.PreconditionFailed("Object already exists")
+        blob_data[blob_name] = data
+
+    def mock_download_as_bytes(timeout=None, **kwargs):
+        blob_name = mock_blob.name
+        return blob_data.get(blob_name, b"")
+
+    mock_blob.upload_from_string.side_effect = mock_upload_from_string
+    mock_blob.download_as_bytes.side_effect = mock_download_as_bytes
+
+    with mock.patch("google.cloud.storage.Client", return_value=mock_storage_client):
+        yield mock_storage_client
+
+
+@pytest.fixture
+def s3_mock():
+    """Moto S3 mock that implements the S3 API."""
+    with mock_aws():
+        s3_client = boto3.client(
+            "s3",
+            aws_access_key_id="test-key",
+            aws_secret_access_key="test-secret",
+            region_name="us-east-1",
+        )
+        s3_client.create_bucket(Bucket=TEST_BUCKET)
+        yield s3_client
+
+
+# Parametrized test data for async file creation with various content sizes
+ASYNC_FILE_CREATE_PARAMS = [
+    pytest.param(TEST_CONTENT, "basic.txt", id="basic_content"),
+    pytest.param(b"x" * 300000, "large.bin", id="large_file"),  # 3x chunk size
+]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("content", "filename"), ASYNC_FILE_CREATE_PARAMS)
+async def test_async_file_create(client: WeaveClient, content: bytes, filename: str):
+    """Test async file creation with various content sizes."""
+    if client_is_sqlite(client):
+        pytest.skip("Skipping for SQLite - testing ClickHouse async path")
+
+    req = FileCreateReq(
+        project_id=client._project_id(),
+        name=filename,
+        content=content,
+    )
+    res = await client.server.file_create_async(req)
+
+    assert res.digest is not None
+    assert res.digest != ""
+
+    # Verify content can be read back
+    file = client.server.file_content_read(
+        FileContentReadReq(project_id=client._project_id(), digest=res.digest)
+    )
+    assert file.content == content
+
+
+@pytest.mark.asyncio
+async def test_async_file_create_consistency_with_sync(client: WeaveClient):
+    """Test that async and sync produce identical digests for the same content."""
+    if client_is_sqlite(client):
+        pytest.skip("Skipping for SQLite")
+
+    req = FileCreateReq(
+        project_id=client._project_id(),
+        name="consistency_test.txt",
+        content=b"consistent content for testing",
+    )
+
+    sync_res = client.server.file_create(req)
+    async_res = await client.server.file_create_async(req)
+
+    assert sync_res.digest == async_res.digest
+
+
+@pytest.mark.asyncio
+async def test_async_file_create_concurrent(client: WeaveClient):
+    """Test concurrent async file creations complete correctly with unique digests."""
+    if client_is_sqlite(client):
+        pytest.skip("Skipping for SQLite")
+
+    async def create_file(content: bytes, name: str) -> tuple[str, float]:
+        start = time.monotonic()
+        req = FileCreateReq(
+            project_id=client._project_id(),
+            name=name,
+            content=content,
+        )
+        res = await client.server.file_create_async(req)
+        return res.digest, time.monotonic() - start
+
+    tasks = [create_file(f"content_{i}".encode(), f"file_{i}.txt") for i in range(5)]
+
+    start_total = time.monotonic()
+    results = await asyncio.gather(*tasks)
+    total_elapsed = time.monotonic() - start_total
+
+    digests = [r[0] for r in results]
+    assert all(d is not None and d != "" for d in digests)
+    assert len(set(digests)) == 5  # All unique
+
+    # Sanity check: concurrent should show some speedup vs serial
+    individual_times = [r[1] for r in results]
+    assert total_elapsed < sum(individual_times) * 0.9 or total_elapsed < 1.0
+
+
+@pytest.mark.asyncio
+@pytest.mark.usefixtures("aws_storage_env_async")
+async def test_async_aws_storage(client: WeaveClient, s3_mock):
+    """Test async file storage using AWS S3."""
+    if client_is_sqlite(client):
+        pytest.skip("Skipping for SQLite")
+
+    req = FileCreateReq(
+        project_id=client._project_id(),
+        name="async_s3_test.txt",
+        content=TEST_CONTENT,
+    )
+    res = await client.server.file_create_async(req)
+
+    assert res.digest is not None
+
+    # Verify the object exists in S3
+    response = s3_mock.list_objects_v2(Bucket=TEST_BUCKET)
+    assert "Contents" in response
+    assert len(response["Contents"]) >= 1
+
+    # Verify content via server
+    file = client.server.file_content_read(
+        FileContentReadReq(project_id=client._project_id(), digest=res.digest)
+    )
+    assert file.content == TEST_CONTENT
+
+
+@pytest.mark.asyncio
+@pytest.mark.usefixtures("gcp_storage_env_async", "mock_gcp_credentials")
+async def test_async_gcs_storage(client: WeaveClient, mock_gcs_client):
+    """Test async file storage using GCS."""
+    if client_is_sqlite(client):
+        pytest.skip("Skipping for SQLite")
+
+    req = FileCreateReq(
+        project_id=client._project_id(),
+        name="async_gcs_test.txt",
+        content=TEST_CONTENT,
+    )
+    res = await client.server.file_create_async(req)
+
+    assert res.digest is not None
+
+    # Verify content via server
+    file = client.server.file_content_read(
+        FileContentReadReq(project_id=client._project_id(), digest=res.digest)
+    )
+    assert file.content == TEST_CONTENT
+
+
+# Parametrized test data for SQLite async tests
+SQLITE_ASYNC_PARAMS = [
+    pytest.param(TEST_CONTENT, "sqlite_async_test.txt", 1, id="single_file"),
+    pytest.param(None, None, 3, id="concurrent_files"),  # Special case for concurrent
+]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("content", "filename", "count"), SQLITE_ASYNC_PARAMS)
+async def test_sqlite_async(client: WeaveClient, content, filename, count):
+    """Test SQLite async operations: single file and concurrent file creation."""
+    if not client_is_sqlite(client):
+        pytest.skip("This test is specifically for SQLite")
+
+    if count == 1:
+        # Single file test
+        req = FileCreateReq(
+            project_id=client._project_id(),
+            name=filename,
+            content=content,
+        )
+        res = await client.server.file_create_async(req)
+
+        assert res.digest is not None
+        assert res.digest != ""
+
+        file = client.server.file_content_read(
+            FileContentReadReq(project_id=client._project_id(), digest=res.digest)
+        )
+        assert file.content == content
+    else:
+        # Concurrent files test
+        async def create_file(i: int) -> str:
+            req = FileCreateReq(
+                project_id=client._project_id(),
+                name=f"sqlite_concurrent_{i}.txt",
+                content=f"sqlite_content_{i}".encode(),
+            )
+            res = await client.server.file_create_async(req)
+            return res.digest
+
+        tasks = [create_file(i) for i in range(count)]
+        digests = await asyncio.gather(*tasks)
+
+        assert all(d is not None and d != "" for d in digests)
+        assert len(set(digests)) == count

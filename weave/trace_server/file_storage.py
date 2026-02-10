@@ -40,14 +40,19 @@ There are two ways to authenticate with Azure Blob Storage:
     - `WF_FILE_STORAGE_AZURE_ACCOUNT_URL`: (optional) the account url for the azure account - defaults to `https://<account>.blob.core.windows.net/`
 """
 
+import asyncio
 import logging
 from abc import abstractmethod
-from collections.abc import Callable
+from collections.abc import AsyncIterator, Callable
+from contextlib import asynccontextmanager
 from typing import Any, cast
 
 import boto3
+from aiobotocore.session import AioSession
+from aiobotocore.session import get_session as get_aio_session
 from azure.core.exceptions import HttpResponseError
 from azure.storage.blob import BlobServiceClient
+from azure.storage.blob.aio import BlobServiceClient as AsyncBlobServiceClient
 from botocore.config import Config
 from botocore.exceptions import ClientError
 from google.api_core import exceptions as gcp_exceptions
@@ -130,8 +135,8 @@ def store_in_bucket(
     client: FileStorageClient, path: str, data: bytes
 ) -> FileStorageURI:
     """Store a file in a storage bucket."""
+    target_file_storage_uri = client.base_uri.with_path(path)
     try:
-        target_file_storage_uri = client.base_uri.with_path(path)
         client.store(target_file_storage_uri, data)
     except Exception as e:
         logger.exception("Failed to store file at %s", target_file_storage_uri)
@@ -407,4 +412,290 @@ def maybe_get_storage_client_from_env() -> FileStorageClient | None:
     else:
         raise NotImplementedError(
             f"Storage client for URI type {type(file_storage_uri)} not supported"
+        )
+
+
+# =============================================================================
+# Async Storage Clients
+# =============================================================================
+#
+# Async implementations use different strategies based on library support:
+# - S3: Native async via aiobotocore (best performance)
+# - GCS: Thread pool wrapper (no mature async library available)
+# - Azure: Native async via azure-storage-blob aio support
+
+
+def create_async_retry_decorator(operation_name: str) -> Callable[[Any], Any]:
+    """Creates an async retry decorator with consistent retry policy and special 429 handling.
+
+    Uses the same retry logic as the sync version to ensure consistent error handling.
+    """
+
+    def after_retry(retry_state: RetryCallState) -> None:
+        if retry_state.attempt_number > 1:
+            logger.info(
+                "%s: Attempt %d/%d after %.2f seconds",
+                operation_name,
+                retry_state.attempt_number,
+                RETRY_MAX_ATTEMPTS,
+                retry_state.seconds_since_start,
+            )
+
+    def create_wait_strategy(retry_state: RetryCallState) -> float:
+        """Create wait strategy that uses jitter for rate limit errors."""
+        if retry_state.outcome and retry_state.outcome.failed:
+            exception = retry_state.outcome.exception()
+            if exception and _is_rate_limit_error(exception):
+                # Use random exponential backoff with jitter for rate limiting
+                return wait_random_exponential(
+                    multiplier=RETRY_MIN_WAIT, max=RETRY_MAX_WAIT
+                )(retry_state)
+        # Use regular exponential backoff for other errors
+        return wait_exponential(multiplier=RETRY_MIN_WAIT, max=RETRY_MAX_WAIT)(
+            retry_state
+        )
+
+    return retry(
+        stop=stop_after_attempt(RETRY_MAX_ATTEMPTS),
+        wait=create_wait_strategy,
+        reraise=True,
+        before_sleep=before_sleep_log(logger, logging.DEBUG),
+        after=after_retry,
+    )
+
+
+class AsyncFileStorageClient:
+    """Abstract base class for async cloud storage operations.
+
+    Follows the same pattern as FileStorageClient - uses @abstractmethod
+    without ABC inheritance for interface definition.
+    """
+
+    base_uri: FileStorageURI
+    _sync_client: FileStorageClient
+
+    def __init__(self, base_uri: FileStorageURI, sync_client: FileStorageClient):
+        """Initialize async storage client.
+
+        Args:
+            base_uri: The base URI for storage operations.
+            sync_client: A sync client used for fallback or thread pool operations.
+        """
+        self.base_uri = base_uri
+        self._sync_client = sync_client
+
+    @abstractmethod
+    async def store_async(self, uri: FileStorageURI, data: bytes) -> None:
+        """Store data at the specified URI location in cloud storage (async)."""
+        pass
+
+    @abstractmethod
+    async def read_async(self, uri: FileStorageURI) -> bytes:
+        """Read data from the specified URI location in cloud storage (async)."""
+        pass
+
+
+class AsyncS3StorageClient(AsyncFileStorageClient):
+    """Async AWS S3 storage implementation using aiobotocore."""
+
+    def __init__(
+        self,
+        base_uri: FileStorageURI,
+        credentials: AWSCredentials,
+        sync_client: S3StorageClient,
+    ):
+        super().__init__(base_uri, sync_client)
+        assert isinstance(base_uri, S3FileStorageURI)
+        self._credentials = credentials
+        self._kms_key = credentials.get("kms_key")
+        self._session: AioSession | None = None
+
+    def _get_session(self) -> AioSession:
+        """Get or create an aiobotocore session (reused across calls)."""
+        if self._session is None:
+            self._session = get_aio_session()
+        return self._session
+
+    @asynccontextmanager
+    async def _get_async_s3_client(self) -> AsyncIterator[Any]:
+        """Context manager that yields an async S3 client."""
+        session = self._get_session()
+        async with session.create_client(
+            "s3",
+            region_name=self._credentials.get("region"),
+            aws_access_key_id=self._credentials.get("access_key_id"),
+            aws_secret_access_key=self._credentials.get("secret_access_key"),
+            aws_session_token=self._credentials.get("session_token"),
+        ) as client:
+            yield client
+
+    @create_async_retry_decorator("async_s3_storage")
+    async def store_async(self, uri: FileStorageURI, data: bytes) -> None:
+        """Store data in S3 bucket asynchronously using aiobotocore."""
+        assert isinstance(uri, S3FileStorageURI)
+        assert uri.to_uri_str().startswith(self.base_uri.to_uri_str())
+
+        async with self._get_async_s3_client() as client:
+            put_object_params: dict[str, Any] = {
+                "Bucket": uri.bucket,
+                "Key": uri.path,
+                "Body": data,
+            }
+            if self._kms_key:
+                put_object_params["ServerSideEncryption"] = "aws:kms"
+                put_object_params["SSEKMSKeyId"] = self._kms_key
+
+            await client.put_object(**put_object_params)
+
+    @create_async_retry_decorator("async_s3_read")
+    async def read_async(self, uri: FileStorageURI) -> bytes:
+        """Read data from S3 bucket asynchronously."""
+        assert isinstance(uri, S3FileStorageURI)
+        assert uri.to_uri_str().startswith(self.base_uri.to_uri_str())
+
+        async with self._get_async_s3_client() as client:
+            response = await client.get_object(Bucket=uri.bucket, Key=uri.path)
+            async with response["Body"] as stream:
+                return await stream.read()
+
+
+class AsyncGCSStorageClient(AsyncFileStorageClient):
+    """Async Google Cloud Storage implementation using thread pool wrapper.
+
+    GCS does not have a mature async library, so we wrap sync operations
+    in asyncio.to_thread. The sync client already has retry logic applied.
+    """
+
+    def __init__(
+        self,
+        base_uri: FileStorageURI,
+        credentials: GCPCredentials | None,
+        sync_client: GCSStorageClient,
+    ):
+        super().__init__(base_uri, sync_client)
+        assert isinstance(base_uri, GCSFileStorageURI)
+        self._credentials = credentials
+
+    async def store_async(self, uri: FileStorageURI, data: bytes) -> None:
+        """Store data in GCS bucket asynchronously.
+
+        Delegates to sync client which has retry logic applied.
+        """
+        assert isinstance(uri, GCSFileStorageURI)
+        assert uri.to_uri_str().startswith(self.base_uri.to_uri_str())
+        await asyncio.to_thread(self._sync_client.store, uri, data)
+
+    async def read_async(self, uri: FileStorageURI) -> bytes:
+        """Read data from GCS bucket asynchronously.
+
+        Delegates to sync client which has retry logic applied.
+        """
+        assert isinstance(uri, GCSFileStorageURI)
+        assert uri.to_uri_str().startswith(self.base_uri.to_uri_str())
+        return await asyncio.to_thread(self._sync_client.read, uri)
+
+
+class AsyncAzureStorageClient(AsyncFileStorageClient):
+    """Async Azure Blob Storage implementation using built-in aio support."""
+
+    def __init__(
+        self,
+        base_uri: FileStorageURI,
+        credentials: AzureConnectionCredentials | AzureAccountCredentials,
+        sync_client: AzureStorageClient,
+    ):
+        super().__init__(base_uri, sync_client)
+        assert isinstance(base_uri, AzureFileStorageURI)
+        self._credentials = credentials
+
+    async def _get_async_client(self, account: str) -> AsyncBlobServiceClient:
+        """Create async Azure client based on available credentials."""
+        if "connection_string" in self._credentials:
+            connection_creds = cast(AzureConnectionCredentials, self._credentials)
+            return AsyncBlobServiceClient.from_connection_string(
+                connection_creds["connection_string"],
+                connection_timeout=DEFAULT_CONNECT_TIMEOUT,
+                read_timeout=DEFAULT_READ_TIMEOUT,
+            )
+        else:
+            account_creds = cast(AzureAccountCredentials, self._credentials)
+            if "account_url" in account_creds and account_creds["account_url"]:
+                account_url = account_creds["account_url"]
+            else:
+                account_url = f"https://{account}.blob.core.windows.net/"
+            return AsyncBlobServiceClient(
+                account_url=account_url,
+                credential=account_creds["access_key"],
+                connection_timeout=DEFAULT_CONNECT_TIMEOUT,
+                read_timeout=DEFAULT_READ_TIMEOUT,
+            )
+
+    @create_async_retry_decorator("async_azure_storage")
+    async def store_async(self, uri: FileStorageURI, data: bytes) -> None:
+        """Store data in Azure container asynchronously."""
+        assert isinstance(uri, AzureFileStorageURI)
+        assert uri.to_uri_str().startswith(self.base_uri.to_uri_str())
+
+        async with await self._get_async_client(uri.account) as client:
+            container_client = client.get_container_client(uri.container)
+            blob_client = container_client.get_blob_client(uri.path)
+            await blob_client.upload_blob(data, overwrite=True)
+
+    @create_async_retry_decorator("async_azure_read")
+    async def read_async(self, uri: FileStorageURI) -> bytes:
+        """Read data from Azure container asynchronously."""
+        assert isinstance(uri, AzureFileStorageURI)
+        assert uri.to_uri_str().startswith(self.base_uri.to_uri_str())
+
+        async with await self._get_async_client(uri.account) as client:
+            container_client = client.get_container_client(uri.container)
+            blob_client = container_client.get_blob_client(uri.path)
+            stream = await blob_client.download_blob()
+            return await stream.readall()
+
+
+async def store_in_bucket_async(
+    client: AsyncFileStorageClient, path: str, data: bytes
+) -> FileStorageURI:
+    """Store a file in a storage bucket asynchronously."""
+    target_file_storage_uri = client.base_uri.with_path(path)
+    try:
+        await client.store_async(target_file_storage_uri, data)
+    except Exception as e:
+        logger.exception("Failed to store file at %s", target_file_storage_uri)
+        raise FileStorageWriteError(f"Failed to store file at {path}: {e!s}") from e
+    return target_file_storage_uri
+
+
+def maybe_get_async_storage_client_from_env() -> AsyncFileStorageClient | None:
+    """Factory method that returns appropriate async storage client based on URI type."""
+    file_storage_uri = wf_file_storage_uri()
+    if not file_storage_uri:
+        return None
+    try:
+        parsed_uri = FileStorageURI.parse_uri_str(file_storage_uri)
+    except Exception as e:
+        logger.warning(f"Error parsing file storage URI: {e}")
+        return None
+    if parsed_uri.has_path():
+        logger.error(
+            f"Supplied file storage uri contains path components: {file_storage_uri}"
+        )
+        return None
+
+    if isinstance(parsed_uri, S3FileStorageURI):
+        credentials = get_aws_credentials()
+        sync_client = S3StorageClient(parsed_uri, credentials)
+        return AsyncS3StorageClient(parsed_uri, credentials, sync_client)
+    elif isinstance(parsed_uri, GCSFileStorageURI):
+        credentials = get_gcp_credentials()
+        sync_client = GCSStorageClient(parsed_uri, credentials)
+        return AsyncGCSStorageClient(parsed_uri, credentials, sync_client)
+    elif isinstance(parsed_uri, AzureFileStorageURI):
+        credentials = get_azure_credentials()
+        sync_client = AzureStorageClient(parsed_uri, credentials)
+        return AsyncAzureStorageClient(parsed_uri, credentials, sync_client)
+    else:
+        raise NotImplementedError(
+            f"Async storage client for URI type {type(parsed_uri)} not supported"
         )

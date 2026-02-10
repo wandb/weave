@@ -1,5 +1,6 @@
 # Sqlite Trace Server
 
+import asyncio
 import datetime
 import hashlib
 import json
@@ -1538,6 +1539,10 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             )
             conn.commit()
         return tsi.FileCreateRes(digest=digest)
+
+    async def file_create_async(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
+        """Async version - wraps sync in thread pool for SQLite."""
+        return await asyncio.to_thread(self.file_create, req)
 
     def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
         conn, cursor = get_conn_cursor(self.db_path)
