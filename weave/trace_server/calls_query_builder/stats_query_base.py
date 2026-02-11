@@ -8,7 +8,8 @@ This module contains common utilities used by both usage_query_builder.py
 from __future__ import annotations
 
 import datetime
-from typing import TYPE_CHECKING
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any
 
 from weave.trace_server.calls_query_builder.utils import param_slot
 from weave.trace_server.orm import ParamBuilder, combine_conditions
@@ -23,6 +24,24 @@ if TYPE_CHECKING:
 
 # Maximum number of buckets to prevent excessive query results
 MAX_BUCKETS = 10_000
+
+
+@dataclass(frozen=True)
+class StatsQueryTimeBounds:
+    granularity_seconds: int
+    start: datetime.datetime
+    end: datetime.datetime
+    bucket_expr: str
+
+
+@dataclass(frozen=True)
+class StatsQueryBuildResult:
+    sql: str
+    columns: list[str]
+    parameters: dict[str, Any]
+    granularity_seconds: int
+    start: datetime.datetime
+    end: datetime.datetime
 
 
 def auto_select_granularity_seconds(delta: datetime.timedelta) -> int:
@@ -55,7 +74,7 @@ def ensure_max_buckets(granularity_seconds: int, time_range_seconds: float) -> i
 def determine_bounds_and_bucket(
     req: CallStatsReq,
     read_table: ReadTable = ReadTable.CALLS_MERGED,
-) -> tuple[int, datetime.datetime, datetime.datetime, str]:
+) -> StatsQueryTimeBounds:
     """Resolve request parameters to concrete time bounds and bucket configuration.
 
     Args:
@@ -63,10 +82,7 @@ def determine_bounds_and_bucket(
         read_table: Which table to query (calls_merged or calls_complete).
 
     Returns:
-        - granularity_seconds: bucket size in seconds
-        - start: start datetime (UTC)
-        - end: end datetime (UTC)
-        - bucket_sql_expr: ClickHouse expression for bucketing
+        StatsQueryTimeBounds containing bucket size, UTC range bounds, and bucket SQL.
     """
     now_utc = datetime.datetime.now(datetime.timezone.utc)
 
@@ -90,7 +106,12 @@ def determine_bounds_and_bucket(
     datetime_field = table_config.datetime_filter_field
     bucket_expr = f"toStartOfInterval({datetime_field}, INTERVAL {granularity_seconds} SECOND, {{tz}})"
 
-    return granularity_seconds, start, end, bucket_expr
+    return StatsQueryTimeBounds(
+        granularity_seconds=granularity_seconds,
+        start=start,
+        end=end,
+        bucket_expr=bucket_expr,
+    )
 
 
 def aggregation_selects_for_metric(

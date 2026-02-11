@@ -299,7 +299,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         return self._file_storage_client
 
     @property
-    def kafka_producer(self) -> KafkaProducer:
+    def kafka_producer(self) -> KafkaProducer | None:
+        """Lazily initialize the Kafka producer, only if online eval is enabled."""
+        if not wf_env.wf_enable_online_eval():
+            return None
         if self._kafka_producer is not None:
             return self._kafka_producer
         self._kafka_producer = KafkaProducer.from_env()
@@ -548,8 +551,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.kafka_producer.flush")
     def _flush_kafka_producer(self) -> None:
-        if wf_env.wf_enable_online_eval():
-            self.kafka_producer.flush()
+        producer = self.kafka_producer
+        if producer is not None:
+            producer.flush()
 
     @contextmanager
     def call_batch(self) -> Iterator[None]:
@@ -957,11 +961,14 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # Process token metrics (grouped by model)
         if token_metrics:
             pb = ParamBuilder()
-            sql, columns, parameters, granularity, start, end = build_usage_query(
-                req, token_metrics, pb, read_table
+            usage_query = build_usage_query(req, token_metrics, pb, read_table)
+            granularity = usage_query.granularity_seconds
+            start = usage_query.start
+            end = usage_query.end
+            query_result = self._query(usage_query.sql, usage_query.parameters)
+            usage_buckets = rows_to_bucket_dicts(
+                usage_query.columns, query_result.result_rows
             )
-            query_result = self._query(sql, parameters)
-            usage_buckets = rows_to_bucket_dicts(columns, query_result.result_rows)
 
         # Compute costs post-query if cost metrics were requested
         if requested_cost_metrics and usage_buckets:
@@ -972,11 +979,18 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # Process call metrics (not grouped by model)
         if req.call_metrics:
             pb = ParamBuilder()
-            sql, columns, parameters, granularity, start, end = (
-                build_call_metrics_query(req, req.call_metrics, pb, read_table)
+            call_metrics_query = build_call_metrics_query(
+                req, req.call_metrics, pb, read_table
             )
-            query_result = self._query(sql, parameters)
-            call_buckets = rows_to_bucket_dicts(columns, query_result.result_rows)
+            granularity = call_metrics_query.granularity_seconds
+            start = call_metrics_query.start
+            end = call_metrics_query.end
+            query_result = self._query(
+                call_metrics_query.sql, call_metrics_query.parameters
+            )
+            call_buckets = rows_to_bucket_dicts(
+                call_metrics_query.columns, query_result.result_rows
+            )
 
         return tsi.CallStatsRes(
             start=start,
@@ -5191,23 +5205,25 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # Use shared setup logic
         model_info = self._model_to_provider_info_map.get(req.inputs.model)
         try:
-            model_name, api_key, provider, base_url, extra_headers, return_type = (
-                _setup_completion_model_info(model_info, req, self.obj_read)
+            completion_model_info = _setup_completion_model_info(
+                model_info, req, self.obj_read
             )
         except Exception as e:
             return tsi.CompletionsCreateRes(response={"error": str(e)})
+
+        model_name = completion_model_info.model_name
 
         # Now that we have all the fields for both cases, we can make the API call
         start_time = datetime.datetime.now()
 
         # Make the API call
         res = lite_llm_completion(
-            api_key=api_key,
+            api_key=completion_model_info.api_key,
             inputs=req.inputs,
-            provider=provider,
-            base_url=base_url,
-            extra_headers=extra_headers,
-            return_type=return_type,
+            provider=completion_model_info.provider,
+            base_url=completion_model_info.base_url,
+            extra_headers=completion_model_info.extra_headers,
+            return_type=completion_model_info.return_type,
         )
 
         end_time = datetime.datetime.now()
@@ -5327,20 +5343,22 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # --- Shared setup logic (copy of completions_create up to litellm call)
         model_info = self._model_to_provider_info_map.get(req.inputs.model)
         try:
-            (
-                model_name,
-                api_key,
-                provider,
-                base_url,
-                extra_headers,
-                return_type,
-            ) = _setup_completion_model_info(model_info, req, self.obj_read)
+            completion_model_info = _setup_completion_model_info(
+                model_info, req, self.obj_read
+            )
         except Exception as e:
             # Yield error as single chunk then stop.
             def _single_error_iter(err: Exception) -> Iterator[dict[str, str]]:
                 yield {"error": str(err)}
 
             return _single_error_iter(e)
+
+        model_name = completion_model_info.model_name
+        api_key = completion_model_info.api_key
+        provider = completion_model_info.provider
+        base_url = completion_model_info.base_url
+        extra_headers = completion_model_info.extra_headers
+        return_type = completion_model_info.return_type
 
         # Track start call if requested
         start_call: CallStartCHInsertable | None = None
@@ -6380,7 +6398,7 @@ def _ch_complete_call_to_row(ch_call: CallCompleteCHInsertable) -> list[Any]:
 
 
 def _maybe_enqueue_minimal_call_end(
-    kafka_producer: "KafkaProducer",
+    kafka_producer: KafkaProducer | None,
     project_id: str,
     id: str,
     ended_at: datetime.datetime,
@@ -6398,7 +6416,7 @@ def _maybe_enqueue_minimal_call_end(
         ended_at: The call end timestamp.
         flush_immediately: Whether to flush the producer immediately.
     """
-    if not wf_env.wf_enable_online_eval():
+    if kafka_producer is None:
         return
 
     minimal_end = tsi.EndedCallSchemaForInsert(
@@ -6732,14 +6750,26 @@ def _create_tracked_stream_wrapper(
     return _stream_wrapper()
 
 
+@dataclasses.dataclass(frozen=True)
+class CompletionModelInfo:
+    model_name: str
+    api_key: str | None
+    provider: str
+    base_url: str | None
+    extra_headers: dict[str, str]
+    return_type: str | None
+
+
 def _setup_completion_model_info(
     model_info: LLMModelProviderInfo | None,
     req: tsi.CompletionsCreateReq,
     obj_read: Callable[[tsi.ObjReadReq], tsi.ObjReadRes],
-) -> tuple[str, str | None, str, str | None, dict[str, str], str | None]:
+) -> CompletionModelInfo:
     """Extract model setup logic shared between completions_create and completions_create_stream.
 
-    Returns: (model_name, api_key, provider, base_url, extra_headers, return_type)
+    Returns:
+        CompletionModelInfo containing model/provider/credential config.
+
     Note: api_key can be None for bedrock providers since they use AWS credentials instead.
     """
     model_name = req.inputs.model
@@ -6812,13 +6842,13 @@ def _setup_completion_model_info(
             else "openai/" + final_model_name
         )
 
-        return (
-            provider_model_name,
-            custom_provider_info.api_key,
-            "custom",  # return "custom" as provider
-            base_url,
-            custom_provider_info.extra_headers,
-            custom_provider_info.return_type,
+        return CompletionModelInfo(
+            model_name=provider_model_name,
+            api_key=custom_provider_info.api_key,
+            provider="custom",
+            base_url=base_url,
+            extra_headers=custom_provider_info.extra_headers,
+            return_type=custom_provider_info.return_type,
         )
     elif model_info:
         secret_name = model_info.get("api_key_name")
@@ -6840,13 +6870,13 @@ def _setup_completion_model_info(
                 api_key_name=secret_name,
             )
 
-    return (
-        model_name,
-        api_key,
-        provider,
-        base_url,
-        extra_headers,
-        return_type,
+    return CompletionModelInfo(
+        model_name=model_name,
+        api_key=api_key,
+        provider=provider,
+        base_url=base_url,
+        extra_headers=extra_headers,
+        return_type=return_type,
     )
 
 
