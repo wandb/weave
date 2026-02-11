@@ -10,7 +10,7 @@ from weave.trace_server import clickhouse_trace_server_settings as ch_settings
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.emoji_util import detone_emojis
-from weave.trace_server.errors import InvalidRequest
+from weave.trace_server.errors import InvalidRequest, NotFoundError
 from weave.trace_server.ids import generate_id
 from weave.trace_server.interface.builtin_object_classes.annotation_spec import (
     AnnotationSpec,
@@ -46,6 +46,7 @@ TABLE_FEEDBACK = Table(
         Column("runnable_ref", "string", nullable=True),
         Column("call_ref", "string", nullable=True),
         Column("trigger_ref", "string", nullable=True),
+        Column("queue_id", "string", nullable=True),
     ],
 )
 
@@ -181,6 +182,24 @@ def validate_feedback_create_req(
     if req.trigger_ref:
         ensure_ref_is_valid(req.trigger_ref, (ri.InternalObjectRef,))
 
+    # Validate queue_id if provided
+    if req.queue_id:
+        try:
+            queue_result = trace_server.annotation_queue_read(
+                tsi.AnnotationQueueReadReq(
+                    project_id=req.project_id, queue_id=req.queue_id
+                )
+            )
+            # Verify the queue belongs to the same project
+            if queue_result.queue.project_id != req.project_id:
+                raise InvalidRequest(
+                    f"Queue {req.queue_id} does not belong to project {req.project_id}"
+                )
+        except NotFoundError as e:
+            raise InvalidRequest(
+                f"Queue {req.queue_id} not found or has been deleted"
+            ) from e
+
 
 MESSAGE_INVALID_FEEDBACK_PURGE = (
     "Can only purge feedback by specifying one or more feedback ids"
@@ -236,6 +255,7 @@ def format_feedback_to_row(
         "runnable_ref": feedback_req.runnable_ref,
         "call_ref": feedback_req.call_ref,
         "trigger_ref": feedback_req.trigger_ref,
+        "queue_id": feedback_req.queue_id,
     }
 
 

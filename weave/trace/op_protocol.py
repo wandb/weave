@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import (
     TYPE_CHECKING,
     Any,
+    Concatenate,
     Literal,
     Protocol,
     overload,
@@ -18,6 +19,7 @@ if TYPE_CHECKING:
     from weave.trace.refs import ObjectRef
 
 P = ParamSpec("P")
+P2 = ParamSpec("P2")
 R = TypeVar("R")
 
 # Each Op kind has an associated icon in the UI.
@@ -68,6 +70,14 @@ class Op(Protocol[P, R]):
     _on_finish_handler: OnFinishHandlerType | None
     _on_finish_post_processor: Callable[[Any], Any] | None
 
+    # needed so type checkers bind `self` when an Op is used as a method
+    @overload
+    def __get__(self, instance: None, owner: type) -> Op[P, R]: ...
+    @overload
+    def __get__(
+        self: Op[Concatenate[Any, P2], R], instance: object, owner: type
+    ) -> Op[P2, R]: ...
+
     # __call__: Callable[..., Any]
     @overload
     def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R: ...
@@ -97,6 +107,12 @@ class Op(Protocol[P, R]):
 
     # The color for the kind icon in the UI. Overrides the default color for the kind.
     color: OpColor | None
+
+    # Whether this op's call start should be sent eagerly (immediately rather than batched).
+    # Useful for long-running operations that need to be visible in the UI immediately,
+    # like evaluation runs. Flipping this will incur a heavy cost at call-end time, only use
+    # for very long running ops that require in-progress tracking.
+    eager_call_start: bool
 
 
 @dataclass
