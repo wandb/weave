@@ -957,9 +957,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # Process token metrics (grouped by model)
         if token_metrics:
             pb = ParamBuilder()
-            usage_query = build_usage_query(
-                req, token_metrics, pb, read_table
-            )
+            usage_query = build_usage_query(req, token_metrics, pb, read_table)
             granularity = usage_query.granularity_seconds
             start = usage_query.start
             end = usage_query.end
