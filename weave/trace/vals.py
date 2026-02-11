@@ -656,6 +656,10 @@ class WeaveList(Traceable, list):
         super().extend(items)
         self._mark_dirty()
 
+    def __add__(self, value: list[Any]) -> list[Any]:
+        # Mirror built-in list `+` behavior (including returned type).
+        return super().__add__(value)
+
     def __iadd__(self, iterable: Iterable[Any]) -> "WeaveList":
         items = list(iterable)
         if not items:
@@ -803,6 +807,10 @@ class WeaveDict(Traceable, dict):
             self._adopt_child(value)
         super().update(updates)
         self._mark_dirty()
+
+    def __or__(self, other: Any) -> dict[Any, Any]:
+        # Mirror built-in dict `|` behavior (including returned type).
+        return super().__or__(other)
 
     def __ior__(self, other: Any) -> "WeaveDict":
         self.update(other)
