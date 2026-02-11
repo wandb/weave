@@ -185,8 +185,14 @@ def get_llm_usage(
     # carrying it through row-multiplying CTEs (arrayJoin + LEFT JOIN).
     # summary_dump is still read from the source table for usage_raw extraction,
     # but not included in the output columns.
+    # Also filter out fields that aren't in calls_merged (e.g. total_storage_size_bytes
+    # which comes from optional JOINs and doesn't exist in this CTE).
     if select_fields is not None:
-        llm_fields = [f for f in select_fields if f != "summary_dump"]
+        valid_columns = {col.name for col in get_calls_merged_columns()}
+        llm_fields = [
+            f for f in select_fields
+            if f != "summary_dump" and f in valid_columns
+        ]
         # Ensure id and started_at are always present (needed by downstream CTEs)
         for required in ("id", "started_at"):
             if required not in llm_fields:
@@ -389,19 +395,26 @@ def get_ranked_prices(
 """
 
 
-def _build_cost_summary_dump_snippet(all_calls_alias: str | None = None) -> str:
+def _build_cost_summary_dump_snippet(
+    all_calls_alias: str | None = None,
+    prices_alias: str = "ranked_prices",
+) -> str:
     """Build the SQL snippet for adding costs to summary_dump.
 
     Args:
         all_calls_alias: When provided, qualifies summary_dump references with this
             alias (e.g. "all_calls.summary_dump") so it reads from the original
             all_calls CTE rather than from ranked_prices (which no longer carries it).
+        prices_alias: Table alias for qualifying cost/usage field references to avoid
+            ambiguity when other tables (e.g. feedback) are joined. Defaults to
+            "ranked_prices".
 
     Returns:
         SQL expression for the summary_dump field with costs
     """
     # Build the qualified reference to summary_dump
     sd = f"{all_calls_alias}.summary_dump" if all_calls_alias else "summary_dump"
+    p = prices_alias  # shorthand for qualifying fields
 
     # These two objects are used to construct the costs object
     cost_string_fields = [
@@ -425,20 +438,20 @@ def _build_cost_summary_dump_snippet(all_calls_alias: str | None = None) -> str:
     numeric_fields_str = " ".join(
         [
             *[
-                f""" '"{field}":', toString({field}), ',', """
+                f""" '"{field}":', toString({p}.{field}), ',', """
                 for field in cost_numeric_fields
             ],
             # These numeric fields are derived or mapped to another name
-            """
-            '"prompt_token_cost":', toString(prompt_token_cost), ',',
-            '"completion_token_cost":', toString(completion_token_cost), ',',
-            '"prompt_tokens_total_cost":', toString(prompt_tokens * prompt_token_cost), ',',
-            '"completion_tokens_total_cost":', toString(completion_tokens * completion_token_cost), ',',
+            f"""
+            '"prompt_token_cost":', toString({p}.prompt_token_cost), ',',
+            '"completion_token_cost":', toString({p}.completion_token_cost), ',',
+            '"prompt_tokens_total_cost":', toString({p}.prompt_tokens * {p}.prompt_token_cost), ',',
+            '"completion_tokens_total_cost":', toString({p}.completion_tokens * {p}.completion_token_cost), ',',
         """,
         ]
     )
     string_fields_str = """ '",', """.join(
-        [f""" '"{field}":"', toString({field}), """ for field in cost_string_fields]
+        [f""" '"{field}":"', toString({p}.{field}), """ for field in cost_string_fields]
     )
 
     cost_snippet = f"""
@@ -449,7 +462,7 @@ def _build_cost_summary_dump_snippet(all_calls_alias: str | None = None) -> str:
             arrayStringConcat(
                 groupUniqArray(
                     concat(
-                        '"', toString(llm_id), '":{{',
+                        '"', toString({p}.llm_id), '":{{',
                         {numeric_fields_str}
                         {string_fields_str}
                     '"}}'
@@ -462,7 +475,7 @@ def _build_cost_summary_dump_snippet(all_calls_alias: str | None = None) -> str:
 
     # If no cost was found dont add a costs object
     return f"""
-    if( any(llm_id) = '{DUMMY_LLM_ID}' or any(llm_token_prices.id) == '',
+    if( any({p}.llm_id) = '{DUMMY_LLM_ID}' or any(llm_token_prices.id) == '',
     any({sd}),
     concat(
         left(any({sd}), length(any({sd})) - 1),
@@ -612,7 +625,21 @@ def get_cost_final_select(
         Complete SQL SELECT statement
     """
     final_fields = _prepare_final_select_fields(select_fields, order_fields)
-    fields_str = ", ".join(final_fields)
+
+    # When joining all_calls back, qualify field names to avoid ambiguity.
+    # Fields that exist in calls_merged flow through ranked_prices; fields from
+    # optional JOINs (e.g. total_storage_size_bytes) only exist in all_calls.
+    if all_calls_alias:
+        calls_merged_field_names = {col.name for col in get_calls_merged_columns()}
+        qualified_fields = []
+        for f in final_fields:
+            if f in calls_merged_field_names:
+                qualified_fields.append(f"ranked_prices.{f}")
+            else:
+                qualified_fields.append(f"{all_calls_alias}.{f}")
+    else:
+        qualified_fields = final_fields
+    fields_str = ", ".join(qualified_fields)
 
     # Build SELECT clause with cost calculation
     summary_dump = _build_cost_summary_dump_snippet(all_calls_alias=all_calls_alias)
@@ -632,7 +659,7 @@ def get_cost_final_select(
         feedback_join = "\n" + _build_feedback_join(pb, project_id, "ranked_prices")
 
     where_clause = f"WHERE (rank = {{{pb.add_param(1)}:UInt64}})"
-    group_by = f"GROUP BY {', '.join(final_fields)}"
+    group_by = f"GROUP BY {', '.join(qualified_fields)}"
     order_by = ""
     if order_fields:
         order_parts = [of.as_sql(pb, "ranked_prices") for of in order_fields]
