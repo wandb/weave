@@ -2822,20 +2822,19 @@ def test_calls_filter_by_latency(client):
     # Use a unique test ID to identify these calls
     test_id = str(uuid.uuid4())
 
-    # Create calls with different latencies
-    # Fast call - minimal latency
+    # Create calls with different latencies.
+    # Use substantial sleep differences to ensure reliable latency ordering
+    # across all backends (SQLite, ClickHouse).
     fast_call = client.create_call("x-fast", {"a": 1, "b": 1, "test_id": test_id})
-    time.sleep(0.001)
-    client.finish_call(fast_call, "fast result")  # Minimal latency
+    time.sleep(0.05)
+    client.finish_call(fast_call, "fast result")
 
-    # Medium latency
     medium_call = client.create_call("x-medium", {"a": 2, "b": 2, "test_id": test_id})
-    time.sleep(0.1)  # Add delay to increase latency
+    time.sleep(0.3)
     client.finish_call(medium_call, "medium result")
 
-    # Slow call - higher latency
     slow_call = client.create_call("x-slow", {"a": 3, "b": 3, "test_id": test_id})
-    time.sleep(0.2)  # Add more delay to further increase latency
+    time.sleep(0.6)
     client.finish_call(slow_call, "slow result")
 
     # Flush to make sure all calls are committed
@@ -2848,30 +2847,42 @@ def test_calls_filter_by_latency(client):
     all_calls = list(client.get_calls(query=tsi.Query(**base_query)))
     assert len(all_calls) == 3
 
-    # Print summary structure to debug
-    for call in all_calls:
-        print(f"Call {call.id} summary: {call.summary}")
-        print(
-            f"Call {call.id} latency: {call.summary.get('weave', {}).get('latency_ms')}"
+    # Verify asc order: latencies should be monotonically non-decreasing
+    sorted_calls_asc = list(
+        client.get_calls(
+            query=tsi.Query(**base_query),
+            sort_by=[SortBy(field="summary.weave.latency_ms", direction="asc")],
+        )
+    )
+    latencies_asc = [
+        c.summary.get("weave", {}).get("latency_ms") for c in sorted_calls_asc
+    ]
+    # All latencies should be present (non-None)
+    assert all(lat is not None for lat in latencies_asc), (
+        f"Expected all calls to have latency_ms, but got {latencies_asc}"
+    )
+    for i in range(len(latencies_asc) - 1):
+        assert latencies_asc[i] <= latencies_asc[i + 1], (
+            f"Expected latency ASC order, but got {latencies_asc}"
         )
 
-    # Verify asc order
-    sorted_calls = client.get_calls(
-        query=tsi.Query(**base_query),
-        sort_by=[SortBy(field="summary.weave.latency_ms", direction="asc")],
+    # Verify desc order: latencies should be monotonically non-increasing
+    sorted_calls_desc = list(
+        client.get_calls(
+            query=tsi.Query(**base_query),
+            sort_by=[SortBy(field="summary.weave.latency_ms", direction="desc")],
+        )
     )
-    assert sorted_calls[0].id == fast_call.id  # Fast call
-    assert sorted_calls[1].id == medium_call.id  # Medium call
-    assert sorted_calls[2].id == slow_call.id  # Slow call
-
-    # Verify desc order
-    sorted_calls = client.get_calls(
-        query=tsi.Query(**base_query),
-        sort_by=[SortBy(field="summary.weave.latency_ms", direction="desc")],
+    latencies_desc = [
+        c.summary.get("weave", {}).get("latency_ms") for c in sorted_calls_desc
+    ]
+    assert all(lat is not None for lat in latencies_desc), (
+        f"Expected all calls to have latency_ms, but got {latencies_desc}"
     )
-    assert sorted_calls[0].id == slow_call.id  # Slow call
-    assert sorted_calls[1].id == medium_call.id  # Medium call
-    assert sorted_calls[2].id == fast_call.id  # Fast call
+    for i in range(len(latencies_desc) - 1):
+        assert latencies_desc[i] >= latencies_desc[i + 1], (
+            f"Expected latency DESC order, but got {latencies_desc}"
+        )
 
     # Filter by latency, Float
     latency_calls = list(
