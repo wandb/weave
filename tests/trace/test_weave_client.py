@@ -2553,14 +2553,14 @@ def test_calls_query_filter_by_strings(client):
         assert call.inputs["value"] > 0
 
 
-def test_calls_default_sort_secondary_id_desc(client):
-    """Test that the default sort uses id DESC as a secondary tiebreaker.
+def test_calls_default_sort_secondary_id_asc(client):
+    """Test that the default sort uses id ASC as a secondary tiebreaker.
 
     When no explicit sort_by is provided, calls should be sorted by
-    started_at ASC, then id DESC. This test creates three calls with
+    started_at ASC, then id ASC. This test creates three calls with
     identical started_at timestamps but different explicit IDs, then
     verifies that within the same started_at group the ids are returned
-    in descending order.
+    in ascending order.
     """
     # Use explicit IDs that have a clear lexicographic ordering:
     # id_small < id_mid < id_large
@@ -2601,7 +2601,7 @@ def test_calls_default_sort_secondary_id_desc(client):
             )
         )
 
-    # Query with default sort (no sort_by) -- should be started_at ASC, id DESC
+    # Query with default sort (no sort_by) -- should be started_at ASC, id ASC
     result = client.server.calls_query(
         tsi.CallsQueryReq(
             project_id=project_id,
@@ -2611,15 +2611,15 @@ def test_calls_default_sort_secondary_id_desc(client):
     returned_ids = [c.id for c in result.calls]
     assert len(returned_ids) == 3
 
-    # All have the same started_at, so order is determined by id DESC:
-    # id_large > id_mid > id_small
-    assert returned_ids == [id_large, id_mid, id_small], (
-        f"Expected id DESC tiebreaker order [{id_large}, {id_mid}, {id_small}], "
+    # All have the same started_at, so order is determined by id ASC:
+    # id_small < id_mid < id_large
+    assert returned_ids == [id_small, id_mid, id_large], (
+        f"Expected id ASC tiebreaker order [{id_small}, {id_mid}, {id_large}], "
         f"but got {returned_ids}"
     )
 
-    # Also verify with explicit sort_by -- secondary id sort should
-    # still be DESC when user provides a primary sort
+    # Also verify with explicit sort_by -- when sorting by started_at,
+    # secondary id sort should match the started_at direction for perf
     result_explicit = client.server.calls_query(
         tsi.CallsQueryReq(
             project_id=project_id,
@@ -2628,8 +2628,8 @@ def test_calls_default_sort_secondary_id_desc(client):
         )
     )
     returned_ids_explicit = [c.id for c in result_explicit.calls]
-    assert returned_ids_explicit == [id_large, id_mid, id_small], (
-        f"Expected id DESC tiebreaker with explicit sort [{id_large}, {id_mid}, {id_small}], "
+    assert returned_ids_explicit == [id_small, id_mid, id_large], (
+        f"Expected id ASC tiebreaker with explicit sort [{id_small}, {id_mid}, {id_large}], "
         f"but got {returned_ids_explicit}"
     )
 
