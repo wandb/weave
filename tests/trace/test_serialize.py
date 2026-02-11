@@ -4,11 +4,12 @@ import openai
 from pydantic import BaseModel
 
 import weave
-from weave.trace.object_record import pydantic_object_record
+from weave.trace.object_record import ObjectRecord, pydantic_object_record
 from weave.trace.serialization.op_type import _replace_memory_address
 from weave.trace.serialization.serialize import (
     dictify,
     fallback_encode,
+    from_json,
     is_pydantic_model_class,
     to_json,
 )
@@ -321,3 +322,38 @@ def test__replace_memory_address() -> None:
     )
     # Test with no memory addresses
     assert _replace_memory_address("No memory address here") == "No memory address here"
+
+
+def test_from_json_does_not_mutate_typed_payload(client) -> None:
+    payload = {
+        "_type": "TopLevel",
+        "value": 1,
+        "nested": {"_type": "Nested", "value": 2},
+    }
+
+    decoded = from_json(payload, client._project_id(), client.server)
+
+    assert isinstance(decoded, ObjectRecord)
+    assert isinstance(decoded.nested, ObjectRecord)
+    assert payload == {
+        "_type": "TopLevel",
+        "value": 1,
+        "nested": {"_type": "Nested", "value": 2},
+    }
+
+
+def test_from_json_decodes_shared_typed_dict_consistently(client) -> None:
+    shared = {"_type": "Shared", "value": 3}
+    payload = {"left": shared, "right": shared}
+
+    decoded = from_json(payload, client._project_id(), client.server)
+
+    assert isinstance(decoded["left"], ObjectRecord)
+    assert isinstance(decoded["right"], ObjectRecord)
+    assert decoded["left"].value == 3
+    assert decoded["right"].value == 3
+    assert shared == {"_type": "Shared", "value": 3}
+    assert payload == {
+        "left": {"_type": "Shared", "value": 3},
+        "right": {"_type": "Shared", "value": 3},
+    }
