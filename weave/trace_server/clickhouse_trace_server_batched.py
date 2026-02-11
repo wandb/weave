@@ -148,9 +148,11 @@ from weave.trace_server.project_version.project_version import (
 )
 from weave.trace_server.project_version.types import WriteTarget
 from weave.trace_server.query_builder.annotation_queues_query_builder import (
+    make_annotator_progress_update_query,
     make_queue_add_calls_check_duplicates_query,
     make_queue_add_calls_fetch_calls_query,
     make_queue_create_query,
+    make_queue_delete_query,
     make_queue_items_query,
     make_queue_read_query,
     make_queues_query,
@@ -2198,6 +2200,57 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         return tsi.AnnotationQueueReadRes(queue=queue)
 
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.annotation_queue_delete")
+    def annotation_queue_delete(
+        self, req: tsi.AnnotationQueueDeleteReq
+    ) -> tsi.AnnotationQueueDeleteRes:
+        """Soft-delete an annotation queue by setting deleted_at timestamp."""
+        pb = ParamBuilder()
+
+        # First, verify the queue exists and is not already deleted
+        read_query = make_queue_read_query(
+            project_id=req.project_id,
+            queue_id=req.queue_id,
+            pb=pb,
+        )
+        result = self._query(read_query, pb.get_params())
+        rows = list(result.named_results())
+
+        if len(rows) == 0:
+            raise NotFoundError(f"Queue {req.queue_id} not found or already deleted")
+
+        # Store the queue data before deletion
+        row = rows[0]
+
+        # Now perform the soft delete
+        pb = ParamBuilder()  # Reset parameter builder
+        delete_query = make_queue_delete_query(
+            project_id=req.project_id,
+            queue_id=req.queue_id,
+            pb=pb,
+            cluster_name=self.clickhouse_cluster_name,
+        )
+
+        self._command(delete_query, pb.get_params())
+
+        # Build the response with updated timestamps
+        deleted_at = datetime.datetime.now(tz=ZoneInfo("UTC"))
+        updated_at = deleted_at
+
+        queue = tsi.AnnotationQueueSchema(
+            id=str(row["id"]),
+            project_id=row["project_id"],
+            name=row["name"],
+            description=row["description"],
+            scorer_refs=row["scorer_refs"],
+            created_at=_ensure_datetimes_have_tz(row["created_at"]),
+            created_by=row["created_by"],
+            updated_at=updated_at,
+            deleted_at=deleted_at,
+        )
+
+        return tsi.AnnotationQueueDeleteRes(queue=queue)
+
     @ddtrace.tracer.wrap(
         name="clickhouse_trace_server_batched.annotation_queue_add_calls"
     )
@@ -2516,27 +2569,24 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 f"Queue item '{req.item_id}' not found in queue '{req.queue_id}'"
             )
 
-        new_state_param = pb.add(req.annotation_state)
-        now = datetime.datetime.now(datetime.timezone.utc)
-        now_param = pb.add(now)
-
         if has_record:
             # Use ClickHouse lightweight UPDATE for existing record
-            update_query = f"""
-            UPDATE annotator_queue_items_progress
-            SET
-                annotation_state = {new_state_param},
-                updated_at = {now_param}
-            WHERE project_id = {project_id_param}
-              AND queue_item_id = {item_id_param}
-              AND annotator_id = {annotator_id_param}
-              AND deleted_at IS NULL
-            """
+            update_query = make_annotator_progress_update_query(
+                project_id=req.project_id,
+                queue_item_id=req.item_id,
+                annotator_id=annotator_id,
+                annotation_state=req.annotation_state,
+                pb=pb,
+                cluster_name=self.clickhouse_cluster_name,
+            )
             self._command(update_query, parameters=pb.get_params())
         else:
             # Create new record
             progress_id = generate_id()
             progress_id_param = pb.add(progress_id)
+            new_state_param = pb.add(req.annotation_state)
+            now = datetime.datetime.now(datetime.timezone.utc)
+            now_param = pb.add(now)
 
             insert_query = f"""
             INSERT INTO annotator_queue_items_progress
