@@ -13,11 +13,11 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from tests.trace.util import client_is_sqlite
+from weave.shared.trace_server_interface_util import str_digest
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.base64_content_conversion import AUTO_CONVERSION_MIN_SIZE
 from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
 from weave.trace_server.errors import InvalidRequest, ObjectDeletedError
-from weave.shared.trace_server_interface_util import str_digest
 
 
 def make_base_64_content(content: str) -> str:

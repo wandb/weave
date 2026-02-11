@@ -14,6 +14,7 @@ from weave.shared import (
     compute_table_digest,
 )
 from weave.shared.object_class_util import process_incoming_object_val
+from weave.shared.trace_server_interface_util import bytes_digest, str_digest
 from weave.trace_server.trace_server_interface import (
     FileCreateReq,
     ObjCreateReq,
@@ -21,7 +22,6 @@ from weave.trace_server.trace_server_interface import (
     TableCreateReq,
     TableSchemaForInsert,
 )
-from weave.shared.trace_server_interface_util import bytes_digest, str_digest
 
 pytestmark = pytest.mark.trace_server
 

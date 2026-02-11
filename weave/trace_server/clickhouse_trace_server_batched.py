@@ -29,11 +29,21 @@ from tenacity import (
     wait_exponential,
 )
 
+from weave.shared import refs_internal as ri
+from weave.shared.digest import (
+    compute_file_digest,
+    compute_object_digest_result,
+    compute_row_digest,
+    compute_table_digest,
+)
+from weave.shared.trace_server_interface_util import (
+    assert_non_null_wb_user_id,
+    extract_refs_from_values,
+)
 from weave.trace_server import clickhouse_trace_server_migrator as wf_migrator
 from weave.trace_server import clickhouse_trace_server_settings as ch_settings
 from weave.trace_server import constants, object_creation_utils, usage_utils
 from weave.trace_server import environment as wf_env
-from weave.shared import refs_internal as ri
 from weave.trace_server import trace_server_common as tsc
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.actions_worker.dispatcher import execute_batch
@@ -164,12 +174,6 @@ from weave.trace_server.query_builder.project_query_builder import (
     make_project_stats_query,
 )
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
-from weave.shared.digest import (
-    compute_file_digest,
-    compute_object_digest_result,
-    compute_row_digest,
-    compute_table_digest,
-)
 from weave.trace_server.table_query_builder import (
     ROW_ORDER_COLUMN_NAME,
     TABLE_ROWS_ALIAS,
@@ -194,10 +198,6 @@ from weave.trace_server.trace_server_common import (
     make_derived_summary_fields,
     make_feedback_query_req,
     set_nested_key,
-)
-from weave.shared.trace_server_interface_util import (
-    assert_non_null_wb_user_id,
-    extract_refs_from_values,
 )
 from weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker import (
     EvaluateModelArgs,

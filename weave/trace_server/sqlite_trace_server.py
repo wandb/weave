@@ -11,8 +11,19 @@ from typing import Any, cast
 
 from opentelemetry.proto.trace.v1.trace_pb2 import ResourceSpans
 
-from weave.trace_server import constants, object_creation_utils
 from weave.shared import refs_internal as ri
+from weave.shared.digest import (
+    compute_file_digest,
+    compute_object_digest_result,
+    compute_row_digest,
+    compute_table_digest,
+)
+from weave.shared.trace_server_interface_util import (
+    WILDCARD_ARTIFACT_VERSION_AND_PATH,
+    assert_non_null_wb_user_id,
+    extract_refs_from_values,
+)
+from weave.trace_server import constants, object_creation_utils
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.common_interface import SortBy
 from weave.trace_server.errors import (
@@ -35,12 +46,6 @@ from weave.trace_server.methods.evaluation_status import evaluation_status
 from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
 from weave.trace_server.opentelemetry.python_spans import Resource, Span
 from weave.trace_server.orm import quote_json_path
-from weave.shared.digest import (
-    compute_file_digest,
-    compute_object_digest_result,
-    compute_row_digest,
-    compute_table_digest,
-)
 from weave.trace_server.threads_query_builder import make_threads_query_sqlite
 from weave.trace_server.trace_server_common import (
     assert_parameter_length_less_than_max,
@@ -53,11 +58,6 @@ from weave.trace_server.trace_server_common import (
     make_feedback_query_req,
     op_name_matches,
     set_nested_key,
-)
-from weave.shared.trace_server_interface_util import (
-    WILDCARD_ARTIFACT_VERSION_AND_PATH,
-    assert_non_null_wb_user_id,
-    extract_refs_from_values,
 )
 from weave.trace_server.validation import object_id_validator
 from weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker import (

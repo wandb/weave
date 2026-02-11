@@ -33,6 +33,9 @@ from typing import Literal, NamedTuple, cast
 from pydantic import BaseModel, Field
 from typing_extensions import Self
 
+from weave.shared.trace_server_interface_util import (
+    WILDCARD_ARTIFACT_VERSION_AND_PATH,
+)
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.calls_query_builder.cte import CTECollection
 from weave.trace_server.calls_query_builder.object_ref_query_builder import (
@@ -67,9 +70,6 @@ from weave.trace_server.orm import (
 from weave.trace_server.project_version.types import ReadTable, TableConfig
 from weave.trace_server.token_costs import build_cost_ctes, get_cost_final_select
 from weave.trace_server.trace_server_common import assert_parameter_length_less_than_max
-from weave.shared.trace_server_interface_util import (
-    WILDCARD_ARTIFACT_VERSION_AND_PATH,
-)
 
 logger = logging.getLogger(__name__)
 

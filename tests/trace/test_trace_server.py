@@ -2,8 +2,8 @@ import urllib
 
 import pytest
 
-from weave.trace_server import trace_server_interface as tsi
 from weave.shared.refs_internal import InvalidInternalRef
+from weave.trace_server import trace_server_interface as tsi
 
 
 def test_save_object(client):

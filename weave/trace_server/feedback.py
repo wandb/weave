@@ -6,8 +6,8 @@ from zoneinfo import ZoneInfo
 import emoji
 from pydantic import ValidationError
 
-from weave.trace_server import clickhouse_trace_server_settings as ch_settings
 from weave.shared import refs_internal as ri
+from weave.trace_server import clickhouse_trace_server_settings as ch_settings
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.emoji_util import detone_emojis
 from weave.trace_server.errors import InvalidRequest, NotFoundError
