@@ -422,7 +422,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         return ServerInfoRes.model_validate(response.model_dump())
 
     @validate_call
-    def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
+    def otel_export(self, req: tsi.OTelExportReq) -> tsi.OTelExportRes:
         """Export OTEL traces.
 
         Args:

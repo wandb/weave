@@ -11,6 +11,7 @@ import logging
 import os
 from pathlib import Path
 from typing import Literal
+from urllib.parse import urlparse
 
 import click
 
@@ -19,6 +20,20 @@ from weave.compat.wandb.wandb_thin import env
 from weave.compat.wandb.wandb_thin.util import app_url
 
 logger = logging.getLogger(__name__)
+
+
+def _normalize_host(host: str) -> str:
+    """Normalize host input to a netrc-safe machine name.
+
+    Matches wandb's netrc host normalization behavior (`urlparse(host).netloc`)
+    while supporting this thin layer's host-only defaults.
+    """
+    normalized_host = host.strip().rstrip("/")
+    machine = urlparse(normalized_host).netloc
+    if machine:
+        return machine
+    # Thin compat defaults and settings may be hostname-only (no scheme).
+    return urlparse(f"https://{normalized_host}").netloc
 
 
 def _handle_host_wandb_setting(host: str | None) -> None:
@@ -175,8 +190,7 @@ class _WandbLogin:
         self._force = force
         self._timeout = timeout
         self._key = key
-        resolved_host = host if host else _get_default_host()
-        self._host = _normalize_host(resolved_host) or resolved_host
+        self._host = _normalize_host(host) if host else _get_default_host()
         self.is_anonymous = anonymous == "must"
 
     def is_apikey_configured(self) -> bool:

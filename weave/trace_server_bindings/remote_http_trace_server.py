@@ -561,7 +561,7 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         handle_response_error(r, "/server_info")
         return ServerInfoRes.model_validate(r.json())
 
-    def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
+    def otel_export(self, req: tsi.OTelExportReq) -> tsi.OTelExportRes:
         # TODO: Add docs link (DOCS-1390)
         raise NotImplementedError("Sending otel traces directly is not yet supported.")
 

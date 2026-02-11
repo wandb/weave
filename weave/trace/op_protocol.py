@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import (
     TYPE_CHECKING,
     Any,
+    Concatenate,
     Literal,
     Protocol,
     overload,
@@ -18,6 +19,7 @@ if TYPE_CHECKING:
     from weave.trace.refs import ObjectRef
 
 P = ParamSpec("P")
+P2 = ParamSpec("P2")
 R = TypeVar("R")
 
 # Each Op kind has an associated icon in the UI.
@@ -67,6 +69,14 @@ class Op(Protocol[P, R]):
     _set_on_finish_handler: Callable[[OnFinishHandlerType], None]
     _on_finish_handler: OnFinishHandlerType | None
     _on_finish_post_processor: Callable[[Any], Any] | None
+
+    # needed so type checkers bind `self` when an Op is used as a method
+    @overload
+    def __get__(self, instance: None, owner: type) -> Op[P, R]: ...
+    @overload
+    def __get__(
+        self: Op[Concatenate[Any, P2], R], instance: object, owner: type
+    ) -> Op[P2, R]: ...
 
     # __call__: Callable[..., Any]
     @overload
