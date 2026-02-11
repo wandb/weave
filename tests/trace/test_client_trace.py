@@ -3750,7 +3750,7 @@ def test_large_keys_are_stripped_call(client, caplog, monkeypatch):
     assert large_calls[0].inputs == json.loads(ENTITY_TOO_LARGE_PAYLOAD)
 
 
-def test_weave_finish_unsets_client(client):
+def test_weave_finish_unsets_client(client, monkeypatch):
     @weave.op
     def foo():
         return 1
@@ -3759,10 +3759,21 @@ def test_weave_finish_unsets_client(client):
     weave_client = get_weave_client()
     assert get_weave_client() is not None
 
+    finish_called = False
+    original_finish = weave_client.finish
+
+    def tracked_finish(*args, **kwargs):
+        nonlocal finish_called
+        finish_called = True
+        return original_finish(*args, **kwargs)
+
+    monkeypatch.setattr(weave_client, "finish", tracked_finish)
+
     foo()
     assert len(list(weave_client.get_calls())) == 1
 
     weave.finish()
+    assert finish_called
 
     foo()
     assert len(list(weave_client.get_calls())) == 1
