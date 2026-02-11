@@ -792,7 +792,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                         usage_utils.UsageCall(
                             id=trace_call.id,
                             parent_id=trace_call.parent_id,
-                            summary=trace_call.summary,
+                            summary=cast(dict[str, Any] | None, trace_call.summary),
                         )
                         for trace_call in trace_calls
                     ),

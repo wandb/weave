@@ -83,9 +83,7 @@ def with_rolled_up_usage(
         dict(existing_weave_summary) if isinstance(existing_weave_summary, dict) else {}
     )
     existing_costs = weave_summary.get("costs")
-    existing_costs_by_model = (
-        existing_costs if isinstance(existing_costs, dict) else {}
-    )
+    existing_costs_by_model = existing_costs if isinstance(existing_costs, dict) else {}
 
     rolled_up_usage: dict[str, dict[str, int | None]] = {}
     rolled_up_costs: dict[str, dict[str, Any]] = {}

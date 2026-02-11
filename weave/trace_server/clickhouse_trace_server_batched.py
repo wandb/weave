@@ -1188,7 +1188,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                         growth_factor=10,
                     )
                     for batch in batch_processor.make_batches(raw_res):
-                        batch_call_dicts = [row_to_call_schema_dict(row) for row in batch]
+                        batch_call_dicts = [
+                            row_to_call_schema_dict(row) for row in batch
+                        ]
                         if expand_columns and req.return_expanded_column_values:
                             self._expand_call_refs(
                                 req.project_id,
@@ -1197,7 +1199,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                                 ref_cache,
                             )
                         if include_feedback:
-                            self._add_feedback_to_calls(req.project_id, batch_call_dicts)
+                            self._add_feedback_to_calls(
+                                req.project_id, batch_call_dicts
+                            )
                         call_dicts.extend(batch_call_dicts)
 
                 self._add_descendant_usage_to_calls(
@@ -1268,17 +1272,17 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 )
             )
 
-            def iter_trace_usage_calls() -> Iterator[usage_utils.UsageCall]:
-                for trace_call in trace_calls:
-                    yield usage_utils.UsageCall(
-                        id=trace_call.id,
-                        parent_id=trace_call.parent_id,
-                        summary=trace_call.summary,
-                    )
-
             aggregated_usage.update(
                 usage_utils.aggregate_usage_with_descendants(
-                    iter_trace_usage_calls(), include_costs
+                    (
+                        usage_utils.UsageCall(
+                            id=trace_call.id,
+                            parent_id=trace_call.parent_id,
+                            summary=cast(dict[str, Any] | None, trace_call.summary),
+                        )
+                        for trace_call in trace_calls
+                    ),
+                    include_costs,
                 )
             )
 
