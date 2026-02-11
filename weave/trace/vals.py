@@ -616,7 +616,9 @@ class WeaveList(Traceable, list):
         index = operator.index(i)
         new_ref = self.ref.with_index(index) if self.ref else None
         index_val = super().__getitem__(index)
-        wrapped = make_trace_obj(index_val, new_ref, self.server, self.root, parent=self)
+        wrapped = make_trace_obj(
+            index_val, new_ref, self.server, self.root, parent=self
+        )
         if isinstance(wrapped, Traceable) and wrapped is not index_val:
             # Cache wrapped mutables into the list so nested in-place edits
             # mutate this list's value rather than a detached copy.
@@ -630,10 +632,7 @@ class WeaveList(Traceable, list):
     def __setitem__(self, i: SupportsIndex | slice, value: Any) -> None:
         if isinstance(i, slice):
             raise TypeError("Slices not yet supported")
-        if (
-            (index := operator.index(i)) >= len(self)
-            or index < (-len(self))
-        ):
+        if (index := operator.index(i)) >= len(self) or index < (-len(self)):
             raise IndexError("list assignment index out of range")
 
         # Though this ostensibly only marks the parent (list) as dirty, siblings
