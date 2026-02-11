@@ -3,7 +3,7 @@ import inspect
 import logging
 import operator
 import typing
-from collections.abc import Generator, Iterator, Sequence
+from collections.abc import Generator, Iterable, Iterator, Sequence
 from copy import deepcopy
 from typing import Any, Literal, Optional, SupportsIndex
 
@@ -199,10 +199,11 @@ class Traceable:
             self.ref = new_ref
             self._base_ref = None
             self._is_dirty = False
-            return new_ref
         except Exception:
             self.mutations = original_mutations
             raise
+        else:
+            return new_ref
 
     def unwrap(self) -> Any: ...
 
@@ -695,11 +696,15 @@ class WeaveList(Traceable, list):
 
         super().append(item)
 
-    def extend(self, iterable: Any) -> None:
+    def extend(self, iterable: Iterable[Any]) -> None:
         for item in iterable:
             self.append(item)
 
-    def __iadd__(self, x: Any) -> "WeaveList":
+    def __add__(self, x: Iterable[Any], /) -> "WeaveList":
+        values = super().__add__(list(x))
+        return WeaveList(values, server=self.server, ref=None)
+
+    def __iadd__(self, x: Iterable[Any], /) -> "WeaveList":
         self.extend(x)
         return self
 
