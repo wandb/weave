@@ -29,7 +29,16 @@ def _compute_table_digest(row_digests: list[str]) -> str:
 
 
 class DurableWriteAheadLog:
-    """Durable on-disk WAL for write-intent events."""
+    """Durable on-disk WAL for write-intent events.
+
+    Design goals for this phase:
+    1. Preserve current request/response behavior.
+    2. Ensure every write-intent is durably recorded before network I/O.
+    3. Track acknowledgement and failure metadata for future replay.
+
+    This implementation is intentionally minimal: append + ack + failure-marking.
+    Replay and backoff behavior are planned for the next phase.
+    """
 
     def __init__(self, db_path: str | Path):
         self._db_path = Path(db_path)
@@ -43,13 +52,21 @@ class DurableWriteAheadLog:
 
     def _connect(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self._db_path, timeout=30.0)
+        # Use SQLite WAL mode so appends and updates are crash-resilient and
+        # readers can observe state while writes continue.
         conn.execute("PRAGMA journal_mode=WAL")
+        # FULL sync to minimize acknowledged-but-not-durable risk on power loss.
         conn.execute("PRAGMA synchronous=FULL")
+        # Give concurrent callers time to obtain the write lock instead of failing
+        # immediately with "database is locked".
         conn.execute("PRAGMA busy_timeout=30000")
         return conn
 
     def _init_db(self) -> None:
         with self._lock, self._connect() as conn:
+            # Each row is a durable write-intent event.
+            # `status` starts as pending and transitions to acked after a
+            # successful remote write.
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS wal_events (
@@ -67,6 +84,8 @@ class DurableWriteAheadLog:
             )
             conn.execute(
                 """
+                -- Query pattern for replay workers is expected to be:
+                -- WHERE status='pending' ORDER BY created_at
                 CREATE INDEX IF NOT EXISTS wal_events_status_created_at_idx
                 ON wal_events(status, created_at)
                 """
@@ -74,6 +93,7 @@ class DurableWriteAheadLog:
             conn.commit()
 
     def append_event(self, event_type: str, project_id: str, payload_json: str) -> str:
+        # `event_id` is an internal WAL identifier (not server-side idempotency key).
         event_id = str(uuid.uuid4())
         created_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
         with self._lock, self._connect() as conn:
@@ -83,12 +103,14 @@ class DurableWriteAheadLog:
                     event_id, created_at, event_type, project_id, payload_json, status
                 ) VALUES (?, ?, ?, ?, ?, ?)
                 """,
+                # New events are always pending until remote success is observed.
                 (event_id, created_at, event_type, project_id, payload_json, "pending"),
             )
             conn.commit()
         return event_id
 
     def ack_event(self, event_id: str) -> None:
+        # Ack is write-after-success: only called after remote write returns.
         acked_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
         with self._lock, self._connect() as conn:
             conn.execute(
@@ -102,6 +124,7 @@ class DurableWriteAheadLog:
             conn.commit()
 
     def mark_event_failed(self, event_id: str, error: Exception) -> None:
+        # Keep status as pending so replay can retry later.
         last_error = f"{type(error).__name__}: {error}"
         with self._lock, self._connect() as conn:
             conn.execute(
@@ -118,7 +141,20 @@ class DurableWriteAheadLog:
 class WriteAheadLogMiddlewareTraceServer(
     DelegatingTraceServerMixin, TraceServerClientInterface
 ):
-    """Middleware that durably logs write intents around remote writes."""
+    """Middleware that durably logs write intents around remote writes.
+
+    This sits in front of the remote trace server and wraps selected write methods:
+    - obj_create
+    - table_create
+    - table_create_from_digests
+    - file_create
+
+    Flow per write:
+    1. Append WAL event as `pending`.
+    2. Execute underlying remote write.
+    3. On success: mark `acked`.
+    4. On failure: increment failure metadata and leave `pending`.
+    """
 
     _next_trace_server: TraceServerClientInterface
     delegated_methods = DelegatingTraceServerMixin.delegated_methods | {"server_info"}
@@ -159,6 +195,7 @@ class WriteAheadLogMiddlewareTraceServer(
         if event_type == "":
             raise ValueError("event_type must be non-empty")
 
+        # Durability first: record intent before touching the network.
         event_id = self._wal.append_event(
             event_type=event_type,
             project_id=project_id,
@@ -167,8 +204,10 @@ class WriteAheadLogMiddlewareTraceServer(
         try:
             result = write_fn()
         except Exception as exc:
+            # Failure does not remove the event; it remains pending for replay.
             self._wal.mark_event_failed(event_id, exc)
             raise
+        # Success path: mark event as acknowledged.
         self._wal.ack_event(event_id)
         return result
 
@@ -191,6 +230,8 @@ class WriteAheadLogMiddlewareTraceServer(
     def table_create_from_digests(
         self, req: tsi.TableCreateFromDigestsReq
     ) -> tsi.TableCreateFromDigestsRes:
+        # For this request type we log an enriched payload with deterministic digest
+        # so replay tooling can validate intent vs server response.
         payload_json = json.dumps(
             {
                 "event_type": "table_create_from_digests",

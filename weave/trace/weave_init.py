@@ -149,6 +149,9 @@ def init_weave(
             "Weave is not available on the server.  Please contact support."
         )
     server: TraceServerClientInterface = remote_server
+    # Middleware order is intentional:
+    # 1) WAL first, so every attempted write is durably recorded.
+    # 2) Cache second, so cache hits on reads do not create synthetic WAL writes.
     if should_enable_write_ahead_log():
         server = WriteAheadLogMiddlewareTraceServer.from_env(server)
     if use_server_cache():
