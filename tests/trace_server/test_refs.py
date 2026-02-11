@@ -4,7 +4,7 @@ import pytest
 
 from weave.trace import refs
 from weave.trace.weave_client import sanitize_object_name
-from weave.trace_server import refs_internal
+from weave.shared import refs_internal
 
 quote = refs_internal.extra_value_quoter
 

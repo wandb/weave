@@ -67,7 +67,7 @@ from weave.trace_server.orm import (
 from weave.trace_server.project_version.types import ReadTable, TableConfig
 from weave.trace_server.token_costs import build_cost_ctes, get_cost_final_select
 from weave.trace_server.trace_server_common import assert_parameter_length_less_than_max
-from weave.trace_server.trace_server_interface_util import (
+from weave.shared.trace_server_interface_util import (
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
 )
 

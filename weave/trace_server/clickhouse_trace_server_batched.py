@@ -33,7 +33,7 @@ from weave.trace_server import clickhouse_trace_server_migrator as wf_migrator
 from weave.trace_server import clickhouse_trace_server_settings as ch_settings
 from weave.trace_server import constants, object_creation_utils, usage_utils
 from weave.trace_server import environment as wf_env
-from weave.trace_server import refs_internal as ri
+from weave.shared import refs_internal as ri
 from weave.trace_server import trace_server_common as tsc
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.actions_worker.dispatcher import execute_batch
@@ -195,7 +195,7 @@ from weave.trace_server.trace_server_common import (
     make_feedback_query_req,
     set_nested_key,
 )
-from weave.trace_server.trace_server_interface_util import (
+from weave.shared.trace_server_interface_util import (
     assert_non_null_wb_user_id,
     extract_refs_from_values,
 )

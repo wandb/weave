@@ -17,7 +17,7 @@ from weave.trace_server.interface.feedback_types import (
     RUNNABLE_FEEDBACK_TYPE_PREFIX,
     RunnablePayloadSchema,
 )
-from weave.trace_server.refs_internal import (
+from weave.shared.refs_internal import (
     InternalCallRef,
     InternalObjectRef,
     InternalOpRef,

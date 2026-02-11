@@ -12,7 +12,7 @@ from typing import Any, cast
 from opentelemetry.proto.trace.v1.trace_pb2 import ResourceSpans
 
 from weave.trace_server import constants, object_creation_utils
-from weave.trace_server import refs_internal as ri
+from weave.shared import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.common_interface import SortBy
 from weave.trace_server.errors import (
@@ -54,7 +54,7 @@ from weave.trace_server.trace_server_common import (
     op_name_matches,
     set_nested_key,
 )
-from weave.trace_server.trace_server_interface_util import (
+from weave.shared.trace_server_interface_util import (
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
     assert_non_null_wb_user_id,
     extract_refs_from_values,

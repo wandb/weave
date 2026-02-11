@@ -46,9 +46,9 @@ from weave.trace_server.clickhouse_trace_server_settings import ENTITY_TOO_LARGE
 from weave.trace_server.common_interface import SortBy
 from weave.trace_server.errors import InsertTooLarge, InvalidFieldError, InvalidRequest
 from weave.trace_server.ids import generate_id
-from weave.trace_server.refs_internal import extra_value_quoter
+from weave.shared.refs_internal import extra_value_quoter
 from weave.trace_server.token_costs import COST_OBJECT_NAME
-from weave.trace_server.trace_server_interface_util import (
+from weave.shared.trace_server_interface_util import (
     TRACE_REF_SCHEME,
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
     extract_refs_from_values,

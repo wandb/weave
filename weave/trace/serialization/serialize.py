@@ -16,7 +16,7 @@ from weave.trace_server.trace_server_interface import (
     FileCreateReq,
     TraceServerInterface,
 )
-from weave.trace_server.trace_server_interface_util import bytes_digest
+from weave.shared.trace_server_interface_util import bytes_digest
 from weave.utils.sanitize import REDACTED_VALUE, should_redact
 
 if TYPE_CHECKING:
