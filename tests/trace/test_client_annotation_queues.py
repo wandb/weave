@@ -16,6 +16,7 @@ from tests.trace.util import client_is_sqlite
 from tests.trace_server.conftest import TEST_ENTITY
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.common_interface import AnnotationQueueItemsFilter, SortBy
+from weave.trace_server.errors import NotFoundError
 from weave.trace_server.ids import generate_id
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer
 
@@ -2180,3 +2181,26 @@ def test_annotation_queue_add_calls_with_calls_complete_table(trace_server):
     assert stats_res.stats[0].completed_items == 0, (
         f"Expected 0 completed items, got {stats_res.stats[0].completed_items}"
     )
+
+
+def test_annotation_queue_read_nonexistent(client):
+    """Test that reading a non-existent annotation queue raises NotFoundError.
+
+    This test validates the iterator handling fix in annotation_queue_read where
+    an empty result set (iterator with no items) correctly raises NotFoundError
+    instead of raising StopIteration.
+    """
+    if client_is_sqlite(client):
+        pytest.skip("Annotation queues not supported in SQLite")
+
+    project_id = client._project_id()
+    nonexistent_queue_id = "00000000-0000-0000-0000-000000000000"
+
+    # Attempt to read a queue that doesn't exist
+    with pytest.raises(NotFoundError, match=f"Queue {nonexistent_queue_id} not found"):
+        client.server.annotation_queue_read(
+            tsi.AnnotationQueueReadReq(
+                project_id=project_id,
+                queue_id=nonexistent_queue_id,
+            )
+        )

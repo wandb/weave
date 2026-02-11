@@ -196,6 +196,7 @@ def test_annotation_feedback(client: WeaveClient) -> None:
         "runnable_ref": None,
         "call_ref": None,
         "trigger_ref": None,
+        "queue_id": None,
     }
 
 
@@ -346,6 +347,7 @@ def test_runnable_feedback(client: WeaveClient) -> None:
         "runnable_ref": runnable_ref,
         "call_ref": call_ref,
         "trigger_ref": trigger_ref,
+        "queue_id": None,
     }
 
 
@@ -811,3 +813,223 @@ def test_feedback_query_contains_numeric_literal(client) -> None:
     )
     assert len(res.result) == 1
     assert res.result[0]["payload"]["dataset_id_str"] == "94"
+
+
+def test_feedback_with_queue_id(client: WeaveClient) -> None:
+    """Test feedback creation with queue_id field."""
+    if client_is_sqlite(client):
+        # Skip for SQLite - annotation queues not implemented
+        return pytest.skip()
+
+    project_id = client._project_id()
+    weave_ref = f"weave:///{project_id}/call/call_id_789"
+
+    # Create an annotation queue first
+    queue_create_req = tsi.AnnotationQueueCreateReq(
+        project_id=project_id,
+        name="Test Queue",
+        description="Queue for testing feedback",
+        scorer_refs=[],
+        wb_user_id="test_user",
+    )
+    queue_res = client.server.annotation_queue_create(queue_create_req)
+    queue_id = queue_res.id
+
+    # Case 1: Create feedback with valid queue_id
+    feedback_req = FeedbackCreateReq(
+        project_id=project_id,
+        weave_ref=weave_ref,
+        feedback_type="custom.score",
+        payload={"score": 5},
+        queue_id=queue_id,
+    )
+    create_res = client.server.feedback_create(feedback_req)
+    assert create_res.id is not None
+
+    # Verify queue_id is in query results
+    query_res = client.server.feedback_query(FeedbackQueryReq(project_id=project_id))
+    assert len(query_res.result) == 1
+    assert query_res.result[0]["queue_id"] == queue_id
+
+    # Case 2: Create feedback without queue_id (should still work)
+    feedback_req_no_queue = FeedbackCreateReq(
+        project_id=project_id,
+        weave_ref=weave_ref,
+        feedback_type="custom.score2",
+        payload={"score": 3},
+    )
+    create_res_no_queue = client.server.feedback_create(feedback_req_no_queue)
+    assert create_res_no_queue.id is not None
+
+    # Verify queue_id is None in query results
+    query_res = client.server.feedback_query(FeedbackQueryReq(project_id=project_id))
+    assert len(query_res.result) == 2
+    no_queue_feedback = next(
+        f for f in query_res.result if f["id"] == create_res_no_queue.id
+    )
+    assert no_queue_feedback["queue_id"] is None
+
+
+def test_feedback_with_invalid_queue_id(client: WeaveClient) -> None:
+    """Test feedback creation with invalid queue_id."""
+    if client_is_sqlite(client):
+        # Skip for SQLite - annotation queues not implemented
+        return pytest.skip()
+
+    project_id = client._project_id()
+    weave_ref = f"weave:///{project_id}/call/call_id_invalid"
+    invalid_queue_id = "00000000-0000-0000-0000-000000000000"
+
+    # Case 1: Error with non-existent queue_id
+    with pytest.raises(InvalidRequest, match="Queue .* not found or has been deleted"):
+        client.server.feedback_create(
+            FeedbackCreateReq(
+                project_id=project_id,
+                weave_ref=weave_ref,
+                feedback_type="custom.score",
+                payload={"score": 5},
+                queue_id=invalid_queue_id,
+            )
+        )
+
+
+def test_feedback_with_queue_id_from_different_project(client: WeaveClient) -> None:
+    """Test feedback creation with queue_id from a different project."""
+    if client_is_sqlite(client):
+        # Skip for SQLite - annotation queues not implemented
+        return pytest.skip()
+
+    project_id = client._project_id()
+    other_project_id = f"{project_id}_other"
+
+    # Create a queue in the original project
+    queue_create_req = tsi.AnnotationQueueCreateReq(
+        project_id=project_id,
+        name="Original Project Queue",
+        description="Queue in original project",
+        scorer_refs=[],
+        wb_user_id="test_user",
+    )
+    queue_res = client.server.annotation_queue_create(queue_create_req)
+    queue_id = queue_res.id
+
+    # Try to create feedback in a different project with the queue_id
+    # This should fail because the queue doesn't belong to the target project
+    with pytest.raises(InvalidRequest, match="Queue .* not found or has been deleted"):
+        client.server.feedback_create(
+            FeedbackCreateReq(
+                project_id=other_project_id,
+                weave_ref=f"weave:///{other_project_id}/call/call_id_123",
+                feedback_type="custom.score",
+                payload={"score": 5},
+                queue_id=queue_id,
+            )
+        )
+
+
+def test_feedback_query_by_queue_id(client: WeaveClient) -> None:
+    """Test querying feedback filtered by queue_id."""
+    if client_is_sqlite(client):
+        # Skip for SQLite - annotation queues not implemented
+        return pytest.skip()
+
+    project_id = client._project_id()
+
+    # Create two queues
+    queue1_res = client.server.annotation_queue_create(
+        tsi.AnnotationQueueCreateReq(
+            project_id=project_id,
+            name="Queue 1",
+            description="First queue",
+            scorer_refs=[],
+            wb_user_id="test_user",
+        )
+    )
+    queue1_id = queue1_res.id
+
+    queue2_res = client.server.annotation_queue_create(
+        tsi.AnnotationQueueCreateReq(
+            project_id=project_id,
+            name="Queue 2",
+            description="Second queue",
+            scorer_refs=[],
+            wb_user_id="test_user",
+        )
+    )
+    queue2_id = queue2_res.id
+
+    # Create feedback for queue 1
+    client.server.feedback_create(
+        FeedbackCreateReq(
+            project_id=project_id,
+            weave_ref=f"weave:///{project_id}/call/call1",
+            feedback_type="custom.score",
+            payload={"score": 1},
+            queue_id=queue1_id,
+        )
+    )
+
+    # Create feedback for queue 2
+    client.server.feedback_create(
+        FeedbackCreateReq(
+            project_id=project_id,
+            weave_ref=f"weave:///{project_id}/call/call2",
+            feedback_type="custom.score",
+            payload={"score": 2},
+            queue_id=queue2_id,
+        )
+    )
+
+    # Create feedback without queue
+    client.server.feedback_create(
+        FeedbackCreateReq(
+            project_id=project_id,
+            weave_ref=f"weave:///{project_id}/call/call3",
+            feedback_type="custom.score",
+            payload={"score": 3},
+        )
+    )
+
+    # Query feedback for queue 1
+    queue1_feedback = client.server.feedback_query(
+        FeedbackQueryReq(
+            project_id=project_id,
+            query=Query(
+                **{
+                    "$expr": {
+                        "$eq": [
+                            {"$getField": "queue_id"},
+                            {"$literal": queue1_id},
+                        ]
+                    }
+                }
+            ),
+        )
+    )
+    assert len(queue1_feedback.result) == 1
+    assert queue1_feedback.result[0]["payload"]["score"] == 1
+    assert queue1_feedback.result[0]["queue_id"] == queue1_id
+
+    # Query feedback for queue 2
+    queue2_feedback = client.server.feedback_query(
+        FeedbackQueryReq(
+            project_id=project_id,
+            query=Query(
+                **{
+                    "$expr": {
+                        "$eq": [
+                            {"$getField": "queue_id"},
+                            {"$literal": queue2_id},
+                        ]
+                    }
+                }
+            ),
+        )
+    )
+    assert len(queue2_feedback.result) == 1
+    assert queue2_feedback.result[0]["payload"]["score"] == 2
+    assert queue2_feedback.result[0]["queue_id"] == queue2_id
+
+    # Query all feedback
+    all_feedback = client.server.feedback_query(FeedbackQueryReq(project_id=project_id))
+    assert len(all_feedback.result) == 3
