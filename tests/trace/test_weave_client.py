@@ -4068,7 +4068,6 @@ def test_table_create_from_digests(network_proxy_client):
 
 def test_calls_query_with_wb_run_id_not_null(client, monkeypatch):
     """Test optimized stats query for wb_run_id not null."""
-    # Step 1: Mock the global wandb run context so created calls get wb_run_id metadata.
     mock_run_id = f"{client._project_id()}/test_run_123"
     monkeypatch.setattr(
         weave_client,
@@ -4076,7 +4075,6 @@ def test_calls_query_with_wb_run_id_not_null(client, monkeypatch):
         lambda: WandbRunContext(run_id="test_run_123", step=0),
     )
 
-    # Step 2: Define and execute an op to create a call carrying wb_run_id.
     @weave.op
     def test_op(x: int) -> int:
         return x * 2
@@ -4084,7 +4082,6 @@ def test_calls_query_with_wb_run_id_not_null(client, monkeypatch):
     test_op(5)
     client.flush()
 
-    # Step 3: Query calls directly from the server and verify wb_run_id was persisted.
     calls = client.server.calls_query(
         tsi.CallsQueryReq(project_id=client._project_id())
     ).calls

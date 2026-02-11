@@ -2,16 +2,12 @@ import weave
 
 
 def test_call_to_dict(client):
-    # Step 1: Define a simple op so we can create a real traced call object.
     @weave.op
     def greet(name: str, age: int) -> str:
         return f"Hello {name}, you are {age}!"
 
-    # Step 2: Execute the op and capture the resulting Call instance.
     _, call = greet.call("Alice", 30)
 
-    # Step 3: Verify that to_dict() includes all expected serialized fields,
-    # including wb_run_* and storage size metadata fields.
     assert call.to_dict() == {
         "op_name": call.op_name,
         "display_name": call.display_name,
