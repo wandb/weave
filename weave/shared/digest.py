@@ -1,15 +1,15 @@
 from __future__ import annotations
 
-import dataclasses
 import hashlib
 import json
+from dataclasses import dataclass
 from typing import Any
 
 from weave.shared.object_class_util import process_incoming_object_val
 from weave.shared.trace_server_interface_util import bytes_digest, str_digest
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclass(frozen=True)
 class ObjectDigestResult:
     """Deterministic digest data for object-create style payloads."""
 

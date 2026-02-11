@@ -1,3 +1,5 @@
+"""Utilities shared between the Weave client and trace server implementations."""
+
 from weave.shared.digest import (
     ObjectDigestResult,
     compute_file_digest,
