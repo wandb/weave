@@ -71,6 +71,55 @@ def aggregate_usage_with_descendants(
     return aggregated_usage
 
 
+def with_rolled_up_usage(
+    summary: dict[str, Any] | None,
+    usage_by_model: dict[str, tsi.LLMAggregatedUsage],
+    include_costs: bool,
+) -> dict[str, Any]:
+    """Return a summary with usage replaced by rolled-up descendant usage."""
+    summary_dict = dict(summary) if isinstance(summary, dict) else {}
+    existing_weave_summary = summary_dict.get("weave")
+    weave_summary = (
+        dict(existing_weave_summary) if isinstance(existing_weave_summary, dict) else {}
+    )
+    existing_costs = weave_summary.get("costs")
+    existing_costs_by_model = (
+        existing_costs if isinstance(existing_costs, dict) else {}
+    )
+
+    rolled_up_usage: dict[str, dict[str, int | None]] = {}
+    rolled_up_costs: dict[str, dict[str, Any]] = {}
+    for model_name, usage in usage_by_model.items():
+        usage_dict: dict[str, int | None] = {
+            "requests": usage.requests,
+            "prompt_tokens": usage.prompt_tokens,
+            "completion_tokens": usage.completion_tokens,
+            "total_tokens": usage.total_tokens,
+        }
+        rolled_up_usage[model_name] = usage_dict
+
+        if include_costs:
+            existing_model_costs = existing_costs_by_model.get(model_name)
+            model_costs = (
+                dict(existing_model_costs)
+                if isinstance(existing_model_costs, dict)
+                else {}
+            )
+            model_costs.update(usage_dict)
+            model_costs["prompt_tokens_total_cost"] = usage.prompt_tokens_total_cost
+            model_costs["completion_tokens_total_cost"] = (
+                usage.completion_tokens_total_cost
+            )
+            rolled_up_costs[model_name] = model_costs
+
+    summary_dict["usage"] = rolled_up_usage
+    if include_costs:
+        weave_summary["costs"] = rolled_up_costs
+        summary_dict["weave"] = weave_summary
+
+    return summary_dict
+
+
 def _extract_call_usage(
     call: UsageCall,
     include_costs: bool,

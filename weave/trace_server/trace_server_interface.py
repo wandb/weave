@@ -543,6 +543,12 @@ class CallsQueryReq(BaseModelStrict):
         description="Beta, subject to change. If true, the response will"
         " include the total storage size for a trace.",
     )
+    include_descendant_usage: bool | None = Field(
+        default=False,
+        description="If true, replace `summary.usage` on returned calls with"
+        " usage rolled up across each call's descendants. This is computed at"
+        " query time and may increase latency for large traces.",
+    )
 
     # TODO: type this with call schema columns, following the same rules as
     # SortBy and thus GetFieldOperator.get_field_ (without direction)

@@ -12,7 +12,7 @@ from typing import Any, cast
 
 from opentelemetry.proto.trace.v1.trace_pb2 import ResourceSpans
 
-from weave.trace_server import constants, object_creation_utils
+from weave.trace_server import constants, object_creation_utils, usage_utils
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.common_interface import SortBy
@@ -39,6 +39,7 @@ from weave.trace_server.opentelemetry.python_spans import Resource, Span
 from weave.trace_server.orm import quote_json_path
 from weave.trace_server.threads_query_builder import make_threads_query_sqlite
 from weave.trace_server.trace_server_common import (
+    MAX_FILTER_LENGTH,
     assert_parameter_length_less_than_max,
     determine_call_status,
     digest_is_version_like,
@@ -743,12 +744,70 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                         call_dict[col] = {}
             calls.append(call_dict)
 
+        if req.include_descendant_usage:
+            self._add_descendant_usage_to_calls(
+                req.project_id, calls, req.include_costs or False
+            )
+
         if req.include_feedback:
             feedback_query_req = make_feedback_query_req(req.project_id, calls)
             feedback = self.feedback_query(feedback_query_req)
             hydrate_calls_with_feedback(calls, feedback)
 
         return tsi.CallsQueryRes(calls=[tsi.CallSchema(**call) for call in calls])
+
+    def _add_descendant_usage_to_calls(
+        self,
+        project_id: str,
+        calls: list[dict[str, Any]],
+        include_costs: bool,
+    ) -> None:
+        if len(calls) == 0:
+            return
+
+        trace_ids = sorted(
+            {
+                str(trace_id)
+                for trace_id in (call.get("trace_id") for call in calls)
+                if trace_id
+            }
+        )
+        aggregated_usage: dict[str, dict[str, tsi.LLMAggregatedUsage]] = {}
+
+        for i in range(0, len(trace_ids), MAX_FILTER_LENGTH):
+            trace_id_chunk = trace_ids[i : i + MAX_FILTER_LENGTH]
+            trace_calls = self.calls_query(
+                tsi.CallsQueryReq(
+                    project_id=project_id,
+                    filter=tsi.CallsFilter(trace_ids=trace_id_chunk),
+                    columns=["id", "parent_id", "summary"],
+                    include_costs=include_costs,
+                    include_descendant_usage=False,
+                )
+            ).calls
+
+            aggregated_usage.update(
+                usage_utils.aggregate_usage_with_descendants(
+                    (
+                        usage_utils.UsageCall(
+                            id=trace_call.id,
+                            parent_id=trace_call.parent_id,
+                            summary=trace_call.summary,
+                        )
+                        for trace_call in trace_calls
+                    ),
+                    include_costs,
+                )
+            )
+
+        for call in calls:
+            call_id = call.get("id")
+            rolled_up_usage = aggregated_usage.get(str(call_id), {}) if call_id else {}
+            call["summary"] = usage_utils.with_rolled_up_usage(
+                cast(dict[str, Any] | None, call.get("summary")),
+                rolled_up_usage,
+                include_costs,
+            )
 
     def _expand_refs(
         self, data: dict[str, Any], expand_columns: list[str]
