@@ -15,6 +15,44 @@ _websocket_patcher: MultiPatcher | None = None
 logger = logging.getLogger(__name__)
 
 
+class _WeaveConnectWrapper:
+    """Wraps websockets.connect to preserve both ``await`` and ``async with`` protocols.
+
+    ``websockets.connect(...)`` returns a ``Connect`` object that supports both
+    ``await`` and ``async with``.  Our patched wrapper must do the same, otherwise
+    user code that does ``async with websockets.connect(...) as ws:`` will break
+    with ``TypeError: 'coroutine' object does not support the asynchronous context
+    manager protocol``.
+    """
+
+    def __init__(self, original_result: Any) -> None:
+        # original_result is whatever websockets.connect(...) returned – typically
+        # a Connect object that is both awaitable and an async context manager.
+        self._original_result = original_result
+        self._original_connection: Any = None
+
+    async def _connect(self) -> connection.WeaveAsyncWebsocketConnection:
+        original_connection = await self._original_result
+        return connection.WeaveAsyncWebsocketConnection(original_connection)
+
+    def __await__(self):  # type: ignore[override]
+        return self._connect().__await__()
+
+    async def __aenter__(self) -> connection.WeaveAsyncWebsocketConnection:
+        if hasattr(self._original_result, "__aenter__"):
+            self._original_connection = await self._original_result.__aenter__()
+        else:
+            self._original_connection = await self._original_result
+        return connection.WeaveAsyncWebsocketConnection(self._original_connection)
+
+    async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> bool:
+        if hasattr(self._original_result, "__aexit__"):
+            return await self._original_result.__aexit__(exc_type, exc_val, exc_tb)  # type: ignore[return-value]
+        if self._original_connection is not None:
+            await self._original_connection.close()
+        return False
+
+
 def _to_str_or_none(value: Any) -> str | None:
     try:
         if value is None:
@@ -135,13 +173,13 @@ def get_openai_realtime_websocket_patcher(
             return original_connect
 
         @wraps(original_connect)
-        async def wrapper(*args: Any, **kwargs: Any) -> Any:
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
             supplied_url = _extract_url_from_args_kwargs(args, kwargs, pos=0, kw="uri")
             if not _is_valid_realtime_url(supplied_url):
-                # Autopatcher case: return unwrapped original connection
-                return await original_connect(*args, **kwargs)
-            original_connection = await original_connect(*args, **kwargs)
-            return connection.WeaveAsyncWebsocketConnection(original_connection)
+                # Autopatcher case: return unwrapped original result (preserves
+                # both await and async-with protocols)
+                return original_connect(*args, **kwargs)
+            return _WeaveConnectWrapper(original_connect(*args, **kwargs))
 
         return wrapper
 
@@ -261,22 +299,25 @@ def wrap_websocket_connect(connect_func: Callable) -> Callable:
         from weave.integrations.openai_realtime import wrap_websocket_connect
 
         tracked_connect = wrap_websocket_connect(websockets.connect)
+        async with tracked_connect(url) as ws:
+            ...
+        # or
         ws = await tracked_connect(url)
     """
     if getattr(connect_func, "_weave_initialized", False):
         return connect_func
 
     @wraps(connect_func)
-    async def wrapper(*args: Any, **kwargs: Any) -> Any:
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
         supplied_url = _extract_url_from_args_kwargs(args, kwargs, pos=0, kw="uri")
         if not _is_valid_realtime_url(supplied_url):
             logger.error(
                 "Cannot patch non-realtime websocket connection %s. Expected url to start with wss://api.openai.com",
                 _to_str_or_none(supplied_url),
             )
-            # Return unwrapped original connection
-            return await connect_func(*args, **kwargs)
-        original_connection = await connect_func(*args, **kwargs)
-        return connection.WeaveAsyncWebsocketConnection(original_connection)
+            # Return unwrapped original result (preserves both await and
+            # async-with protocols)
+            return connect_func(*args, **kwargs)
+        return _WeaveConnectWrapper(connect_func(*args, **kwargs))
 
     return wrapper

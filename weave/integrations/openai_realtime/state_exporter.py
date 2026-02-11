@@ -84,7 +84,7 @@ class SessionSpan(BaseModel):
             def update_cb(root_call: Call) -> Call:
                 return wc.create_call(
                     "realtime.session.update",
-                    inputs=msg.get("session", {}),
+                    inputs=self.session or {},
                     parent=root_call,
                 )
 
@@ -92,7 +92,7 @@ class SessionSpan(BaseModel):
         else:
             self.last_update = wc.create_call(
                 "realtime.session.update",
-                inputs=msg.get("session", {}),
+                inputs=self.session or {},
                 parent=self.root_call,
             )
 
@@ -131,8 +131,10 @@ class StateExporter(BaseModel):
     prev_by_item: dict[str, str | None] = Field(default_factory=dict)
     next_by_item: dict[str, str | None] = Field(default_factory=dict)
 
-    input_buffer: AudioBufferManager = Field(default_factory=AudioBufferManager)
-    output_buffer: AudioBufferManager = Field(default_factory=AudioBufferManager)
+    audio_input_buffer: AudioBufferManager = Field(default_factory=AudioBufferManager)
+    audio_output_buffer: AudioBufferManager = Field(default_factory=AudioBufferManager)
+
+    text_buffer: str = Field(default_factory=str)
 
     user_messages: dict[str, dict] = Field(default_factory=dict)
     user_speech_markers: dict[str, dict[str, int | None]] = Field(default_factory=dict)
@@ -164,7 +166,7 @@ class StateExporter(BaseModel):
 
         if start_ms is None or end_ms is None:
             return None
-        return self.input_buffer.get_segment_ms(start_ms, end_ms)
+        return self.audio_input_buffer.get_segment_ms(start_ms, end_ms)
 
     def handle_session_created(self, msg: dict) -> None:
         session = msg.get("session")
@@ -231,7 +233,7 @@ class StateExporter(BaseModel):
                 pass
 
     def handle_input_audio_cleared(self, _: dict) -> None:
-        self.input_buffer.clear()
+        self.audio_input_buffer.clear()
 
     def handle_input_audio_committed(self, msg: dict) -> None:
         item_id = msg.get("item_id")
@@ -245,21 +247,27 @@ class StateExporter(BaseModel):
     def handle_response_created(self, msg: dict) -> None:
         self.pending_response = msg.get("response")
 
+
+    def handle_input_text_delta(self, msg: dict) -> None:
+        print("handle text delta")
+        text = msg.get("delta", "")
+        self.text_buffer += text
+
     def handle_input_audio_append(self, msg: dict) -> None:
         audio = msg.get("audio")
         if audio:
-            self.input_buffer.extend_base64(audio)
+            self.audio_input_buffer.extend_base64(audio)
 
     def handle_response_audio_delta(self, msg: dict) -> None:
         delta = msg.get("delta")
         if delta:
-            self.output_buffer.extend_base64(delta)
+            self.audio_output_buffer.extend_base64(delta)
 
     def handle_response_audio_done(self, msg: dict) -> None:
         item_id = msg.get("item_id")
         if item_id:
-            self.response_audio[item_id] = bytes(self.output_buffer.buffer)
-        self.output_buffer.clear()
+            self.response_audio[item_id] = bytes(self.audio_output_buffer.buffer)
+        self.audio_output_buffer.clear()
 
     def _response_with_audio(self, resp: dict) -> dict[str, Any]:
         response_dict = dict(resp)
