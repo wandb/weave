@@ -45,6 +45,8 @@ from weave.trace.context.call_context import (
 from weave.trace.context.tests_context import get_raise_on_captured_errors
 from weave.trace.op_accumulator import (
     _add_accumulator as _add_accumulator_impl,
+)
+from weave.trace.op_accumulator import (
     _build_iterator_from_accumulator_for_op as _build_iterator_from_accumulator_for_op_impl,
 )
 from weave.trace.op_protocol import (
@@ -1653,7 +1655,6 @@ def _add_accumulator(
         return acc
     add_accumulator(fn, simple_list_accumulator) # returns the op with `list(range(9, -1, -1))` as output
     """
-
     return _add_accumulator_impl(
         op,
         make_accumulator,
