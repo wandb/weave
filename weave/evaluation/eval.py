@@ -278,14 +278,13 @@ class Evaluation(Object):
 
     @op(call_display_name=default_evaluation_display_name, eager_call_start=True)
     async def evaluate(self, model: Op | Model) -> dict:
-        if self.evaluation_name:
-            if current_call := get_current_call():
-                display_name = (
-                    self.evaluation_name(current_call)
-                    if callable(self.evaluation_name)
-                    else self.evaluation_name
-                )
-                current_call.set_display_name(display_name)
+        if self.evaluation_name and (current_call := get_current_call()):
+            display_name = (
+                self.evaluation_name(current_call)
+                if callable(self.evaluation_name)
+                else self.evaluation_name
+            )
+            current_call.set_display_name(display_name)
 
         eval_results = await self.get_eval_results(model)
         summary = await self.summarize(eval_results)
