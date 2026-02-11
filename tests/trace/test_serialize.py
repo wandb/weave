@@ -1,3 +1,4 @@
+import datetime
 from dataclasses import dataclass
 
 import openai
@@ -9,8 +10,12 @@ from weave.trace.serialization.op_type import _replace_memory_address
 from weave.trace.serialization.serialize import (
     dictify,
     fallback_encode,
+    from_json,
     is_pydantic_model_class,
     to_json,
+)
+from weave.trace_server.interface.builtin_object_classes.llm_structured_model import (
+    LLMStructuredCompletionModel,
 )
 
 
@@ -267,6 +272,47 @@ def test_to_json_object_excludes_ref(client) -> None:
     obj_rec = pydantic_object_record(obj)
     serialized = to_json(obj_rec, client._project_id(), client)
     assert "ref" not in serialized
+
+
+def test_from_json_builtin_object_decodes_nested_structures(client) -> None:
+    expected_dt = datetime.datetime(2024, 1, 2, 3, 4, 5, tzinfo=datetime.timezone.utc)
+    prompt_ref_uri = "weave:///entity/project/object/my-prompt:latest"
+    # Transport payload for a nested custom object value. This is the same shape
+    # a serialized datetime would have when embedded in a larger object payload.
+    encoded_dt = {
+        "_type": "CustomWeaveType",
+        "weave_type": {"type": "datetime.datetime"},
+        "val": expected_dt.isoformat(),
+        "load_op": None,
+    }
+    # Top-level payload for a builtin object (`LLMStructuredCompletionModel`).
+    # The important part is that `default_params.functions[*].deadline` is still
+    # in transport form and must be decoded before model validation.
+    payload = {
+        "_type": "LLMStructuredCompletionModel",
+        "llm_model_id": "openai/gpt-4o-mini",
+        "default_params": {
+            "_type": "LLMStructuredCompletionModelDefaultParams",
+            "functions": [{"deadline": encoded_dt}],
+            "prompt": prompt_ref_uri,
+            "_class_name": "LLMStructuredCompletionModelDefaultParams",
+            "_bases": ["BaseModel"],
+        },
+        "_class_name": "LLMStructuredCompletionModel",
+        "_bases": ["Model", "Object", "BaseModel"],
+    }
+
+    deserialized = from_json(payload, client._project_id(), client.server)
+
+    assert isinstance(deserialized, LLMStructuredCompletionModel)
+    assert deserialized.default_params.functions is not None
+    # Nested transport custom object is materialized into a runtime datetime.
+    assert isinstance(
+        deserialized.default_params.functions[0]["deadline"], datetime.datetime
+    )
+    assert deserialized.default_params.functions[0]["deadline"] == expected_dt
+    # RefStr fields should still be strings (not coerced to Ref objects).
+    assert deserialized.default_params.prompt == prompt_ref_uri
 
 
 def test_to_json_function_with_memory_address_in_op(client) -> None:

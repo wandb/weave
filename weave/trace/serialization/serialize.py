@@ -297,6 +297,64 @@ def _load_custom_obj_files(
     return loaded_files
 
 
+def _decode_builtin_object_field_value(
+    value: Any,
+    project_id: str,
+    server: TraceServerInterface,
+    builtin_types: set[str],
+) -> Any:
+    """Decode nested transport structures for builtin object fields.
+
+    Why this exists:
+    - Builtin objects are validated by pydantic models, but nested values can still
+      arrive in transport form (e.g. `CustomWeaveType` dicts).
+    - We need to decode those nested transport values before `model_validate`,
+      otherwise higher-level object models receive low-level payloads.
+
+    Why this is intentionally selective:
+    - Many builtin object fields are typed as `RefStr` (an alias for `str`) and are
+      expected to remain plain strings in the model.
+    - A broad call to `from_json` on every nested dict/string would convert
+      `weave://...` strings into `Ref` objects and break that contract.
+    - Therefore we only decode nested values that are clearly transport-encoded
+      structures we know should be materialized.
+    """
+    if isinstance(value, dict):
+        val_type = value.get("_type")
+        # CustomWeaveType payloads are always transport wrappers for registered
+        # serializers, so we should eagerly decode them.
+        if val_type == "CustomWeaveType":
+            return from_json(value, project_id, server)
+
+        # Builtin object payloads carry `_type` + matching `_class_name`.
+        # If such a payload appears nested inside another builtin object, decode
+        # it recursively so pydantic receives typed values instead of raw transport
+        # dicts.
+        if (
+            isinstance(val_type, str)
+            and value.get("_class_name") == val_type
+            and val_type in builtin_types
+        ):
+            return from_json(value, project_id, server)
+
+        # For regular dicts (including schema-like dicts), recurse only into their
+        # values and preserve the container shape.
+        return {
+            key: _decode_builtin_object_field_value(
+                val, project_id, server, builtin_types
+            )
+            for key, val in value.items()
+        }
+    if isinstance(value, list):
+        # Preserve list structure while recursively decoding list members.
+        return [
+            _decode_builtin_object_field_value(item, project_id, server, builtin_types)
+            for item in value
+        ]
+    # Primitive values (including strings) pass through unchanged.
+    return value
+
+
 def from_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
     if isinstance(obj, list):
         return [from_json(v, project_id, server) for v in obj]
@@ -329,9 +387,17 @@ def from_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
 
             cls = BUILTIN_OBJECT_REGISTRY.get(val_type)
             if cls:
+                builtin_types = set(BUILTIN_OBJECT_REGISTRY.keys())
                 # Filter out metadata fields before validation
                 obj_data = {
-                    k: v for k, v in obj.items() if k in cls.model_fields.keys()
+                    # Decode nested structured transport payloads before pydantic
+                    # validation so builtin object models receive high-level values.
+                    # Intentionally does not coerce plain RefStr strings.
+                    k: _decode_builtin_object_field_value(
+                        v, project_id, server, builtin_types
+                    )
+                    for k, v in obj.items()
+                    if k in cls.model_fields.keys()
                 }
                 return cls.model_validate(obj_data)
 
