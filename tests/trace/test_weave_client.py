@@ -4068,7 +4068,7 @@ def test_table_create_from_digests(network_proxy_client):
 
 def test_calls_query_with_wb_run_id_not_null(client, monkeypatch):
     """Test optimized stats query for wb_run_id not null."""
-    # Mock wandb to simulate a run
+    # Step 1: Mock the global wandb run context so created calls get wb_run_id metadata.
     mock_run_id = f"{client._project_id()}/test_run_123"
     monkeypatch.setattr(
         weave_client,
@@ -4076,15 +4076,15 @@ def test_calls_query_with_wb_run_id_not_null(client, monkeypatch):
         lambda: WandbRunContext(run_id="test_run_123", step=0),
     )
 
+    # Step 2: Define and execute an op to create a call carrying wb_run_id.
     @weave.op
     def test_op(x: int) -> int:
         return x * 2
 
-    # Create a call with wb_run_id
     test_op(5)
     client.flush()
 
-    # first query all root calls
+    # Step 3: Query calls directly from the server and verify wb_run_id was persisted.
     calls = client.server.calls_query(
         tsi.CallsQueryReq(project_id=client._project_id())
     ).calls
@@ -4093,6 +4093,7 @@ def test_calls_query_with_wb_run_id_not_null(client, monkeypatch):
 
 
 def test_get_calls_columns_wb_run_id(client, monkeypatch):
+    # Step 1: Mock wandb run context so a deterministic wb_run_id is attached to the call.
     mock_run_id = f"{client._project_id()}/test_run_456"
     monkeypatch.setattr(
         weave_client,
@@ -4100,6 +4101,7 @@ def test_get_calls_columns_wb_run_id(client, monkeypatch):
         lambda: WandbRunContext(run_id="test_run_456", step=7),
     )
 
+    # Step 2: Create a traced call and flush so it can be queried.
     @weave.op
     def test_op(x: int) -> int:
         return x * 3
@@ -4107,6 +4109,7 @@ def test_get_calls_columns_wb_run_id(client, monkeypatch):
     _, call = test_op.call(2)
     client.flush()
 
+    # Step 3: Request only the wb_run_id column through client.get_calls.
     calls = list(
         client.get_calls(
             columns=["wb_run_id"],
@@ -4118,7 +4121,8 @@ def test_get_calls_columns_wb_run_id(client, monkeypatch):
     assert hasattr(calls[0], "wb_run_id")
     assert calls[0].wb_run_id == mock_run_id
 
-    # Now query for calls with wb_run_id not null using limit=1 to trigger optimization
+    # Step 4: Query via optimized server path (limit=1 + query expression) and
+    # verify wb_run_id is still available.
     query = tsi.Query(
         **{
             "$expr": {
