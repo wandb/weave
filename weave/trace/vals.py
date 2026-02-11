@@ -136,7 +136,9 @@ class Traceable:
             return
 
         # Mutations are only meaningful for objects rooted at object refs.
-        if not isinstance(root.ref, ObjectRef) and not isinstance(root._base_ref, ObjectRef):
+        if not isinstance(root.ref, ObjectRef) and not isinstance(
+            root._base_ref, ObjectRef
+        ):
             return
 
         path = self._mutation_path()

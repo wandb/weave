@@ -83,7 +83,13 @@ from weave.trace.settings import (
 from weave.trace.table import Table
 from weave.trace.table_upload_chunking import ChunkingConfig, TableChunkManager
 from weave.trace.util import log_once
-from weave.trace.vals import WeaveDict, WeaveList, WeaveObject, WeaveTable, make_trace_obj
+from weave.trace.vals import (
+    WeaveDict,
+    WeaveList,
+    WeaveObject,
+    WeaveTable,
+    make_trace_obj,
+)
 from weave.trace.wandb_run_context import (
     WandbRunContext,
     check_wandb_run_matches,
