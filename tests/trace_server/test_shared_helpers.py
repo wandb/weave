@@ -3,7 +3,8 @@ import json
 
 import pytest
 
-from weave.trace.offline import (
+from weave.trace_server.object_class_util import process_incoming_object_val
+from weave.trace_server.shared import (
     build_file_create_event,
     build_obj_create_event,
     build_table_create_event,
@@ -13,7 +14,6 @@ from weave.trace.offline import (
     compute_row_digest,
     compute_table_digest,
 )
-from weave.trace_server.object_class_util import process_incoming_object_val
 from weave.trace_server.trace_server_interface import (
     FileCreateReq,
     ObjCreateReq,
@@ -56,7 +56,7 @@ def test_compute_table_digest_matches_server_formula() -> None:
 
 
 def test_compute_file_digest_matches_server_formula() -> None:
-    content = b"hello-offline"
+    content = b"hello-shared"
     assert compute_file_digest(content) == bytes_digest(content)
 
 

@@ -6,13 +6,17 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from weave.trace.offline.digest import (
+from weave.trace_server.shared.digest import (
     compute_file_digest,
     compute_object_digest_result,
     compute_row_digest,
     compute_table_digest,
 )
-from weave.trace_server.trace_server_interface import FileCreateReq, ObjCreateReq, TableCreateReq
+from weave.trace_server.trace_server_interface import (
+    FileCreateReq,
+    ObjCreateReq,
+    TableCreateReq,
+)
 
 
 def _utcnow() -> datetime.datetime:
@@ -59,7 +63,9 @@ class LocalEventEnvelope(_StrictModel):
 
 
 def build_obj_create_event(req: ObjCreateReq) -> LocalEventEnvelope:
-    digest_result = compute_object_digest_result(req.obj.val, req.obj.builtin_object_class)
+    digest_result = compute_object_digest_result(
+        req.obj.val, req.obj.builtin_object_class
+    )
     return LocalEventEnvelope(
         body=ObjCreateEventBody(
             project_id=req.obj.project_id,

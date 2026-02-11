@@ -1,4 +1,4 @@
-from weave.trace.offline.digest import (
+from weave.trace_server.shared.digest import (
     ObjectDigestResult,
     compute_file_digest,
     compute_object_digest,
@@ -6,7 +6,7 @@ from weave.trace.offline.digest import (
     compute_row_digest,
     compute_table_digest,
 )
-from weave.trace.offline.events import (
+from weave.trace_server.shared.events import (
     FileCreateEventBody,
     LocalEventEnvelope,
     LocalEventUnion,
