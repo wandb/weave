@@ -127,11 +127,19 @@ async def apply_model_async(
     model_predict_fn_name = model_predict_op.name
 
     predict_signature = inspect.signature(model_predict_op)
-    model_predict_arg_names = list(predict_signature.parameters.keys())
+    model_predict_parameters = predict_signature.parameters
+    supports_var_kwargs = any(
+        param.kind == inspect.Parameter.VAR_KEYWORD
+        for param in model_predict_parameters.values()
+    )
 
-    model_predict_args = {
-        k: v for k, v in model_input.items() if k in model_predict_arg_names
-    }
+    if supports_var_kwargs:
+        model_predict_args = dict(model_input)
+    else:
+        model_predict_arg_names = list(model_predict_parameters.keys())
+        model_predict_args = {
+            k: v for k, v in model_input.items() if k in model_predict_arg_names
+        }
     try:
         model_predict_op = as_op(model_predict_op)
         if model_self is not None:
@@ -152,6 +160,13 @@ async def apply_model_async(
             param.name
             for param in predict_signature.parameters.values()
             if param.default == inspect.Parameter.empty
+            and param.kind
+            in (
+                inspect.Parameter.POSITIONAL_ONLY,
+                inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                inspect.Parameter.KEYWORD_ONLY,
+            )
+            and param.name != "self"
         ]
 
         message = textwrap.dedent(
