@@ -2202,7 +2202,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         result = self._query(read_query, pb.get_params())
         rows = list(result.named_results())
 
-        if not rows:
+        if len(rows) == 0:
             raise NotFoundError(f"Queue {req.queue_id} not found or already deleted")
 
         # Store the queue data before deletion
