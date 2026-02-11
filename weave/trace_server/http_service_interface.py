@@ -26,6 +26,26 @@ class AnnotationQueueAddCallsBody(BaseModelStrict):
     )
 
 
+class AnnotationQueueUpdateBody(BaseModelStrict):
+    """Request body for updating an annotation queue (queue_id comes from path).
+
+    All fields except project_id are optional - only provided fields will be updated.
+    """
+
+    project_id: str = Field(examples=["entity/project"])
+    name: str | None = Field(None, examples=["Updated Queue Name"])
+    description: str | None = Field(None, examples=["Updated description"])
+    scorer_refs: list[str] | None = Field(
+        None,
+        examples=[
+            [
+                "weave:///entity/project/scorer/error_severity:abc123",
+                "weave:///entity/project/scorer/resolution_quality:def456",
+            ]
+        ],
+    )
+
+
 class AnnotationQueueItemsQueryBody(BaseModelStrict):
     """Request body for querying items in an annotation queue (queue_id comes from path)."""
 
