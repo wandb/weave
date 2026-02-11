@@ -2,7 +2,11 @@ import warnings
 from typing import Any
 
 from weave.trace.call import Call
-from weave.trace.serialization.serialize import dictify, stringify
+from weave.trace.serialization.serialize import (
+    DEFAULT_MAX_DICTIFY_DEPTH,
+    dictify,
+    stringify,
+)
 
 EXCLUDE_TASK_ATTRS = {"agent": True}
 
@@ -90,7 +94,7 @@ def safe_serialize_crewai_object(obj: Any) -> Any:
         elif obj.__class__.__name__ == "Task":
             return safe_serialize_crewai_task(obj)
         else:
-            return dictify(obj)
+            return dictify(obj, maxdepth=DEFAULT_MAX_DICTIFY_DEPTH)
 
 
 def crewai_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
@@ -120,7 +124,7 @@ def crew_kickoff_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
                 else:
                     results["self"] = crew_dict
         if k == "inputs":
-            results["inputs"] = dictify(v)
+            results["inputs"] = dictify(v, maxdepth=DEFAULT_MAX_DICTIFY_DEPTH)
 
     return results
 

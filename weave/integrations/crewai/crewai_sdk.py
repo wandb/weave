@@ -26,7 +26,7 @@ from weave.integrations.crewai.crewai_utils import (
 )
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
-from weave.trace.serialization.serialize import dictify
+from weave.trace.serialization.serialize import DEFAULT_MAX_DICTIFY_DEPTH, dictify
 
 _crewai_patcher: MultiPatcher | None = None
 
@@ -151,8 +151,8 @@ def get_crewai_patcher(
             update={
                 "name": base.name or f"crewai.Flow.{method_name}",
                 "call_display_name": base.call_display_name,
-                "postprocess_inputs": lambda inputs: dictify(inputs),
-                "postprocess_output": lambda output: dictify(output),
+                "postprocess_inputs": lambda inputs: dictify(inputs, maxdepth=DEFAULT_MAX_DICTIFY_DEPTH),
+                "postprocess_output": lambda output: dictify(output, maxdepth=DEFAULT_MAX_DICTIFY_DEPTH),
                 "kind": base.kind or "agent",
             }
         )
