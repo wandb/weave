@@ -3,6 +3,7 @@ from collections.abc import Iterator
 from enum import Enum
 from typing import Any, Literal, Protocol
 
+from opentelemetry.proto.trace.v1.trace_pb2 import ResourceSpans
 from pydantic import BaseModel, ConfigDict, Field, field_serializer, model_validator
 from typing_extensions import TypedDict
 
@@ -297,12 +298,17 @@ class TableSchemaForInsert(BaseModel):
     rows: list[dict[str, Any]]
 
 
-class OtelExportReq(BaseModel):
+class ProcessedResourceSpans(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
+    entity: str
+    project: str
+    run_id: str | None
+    resource_spans: ResourceSpans
+
+
+class OTelExportReq(BaseModel):
+    processed_spans: list[ProcessedResourceSpans]
     project_id: str
-    # traces must be ExportTraceServiceRequest payload but allowing Any removes the proto package as a requirement.
-    traces: Any
-    wb_run_id: str | None = None
     wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
@@ -313,7 +319,7 @@ class ExportTracePartialSuccess(BaseModel):
 
 # Spec requires that the response be of type Export<signal>ServiceResponse
 # https://opentelemetry.io/docs/specs/otlp/
-class OtelExportRes(BaseModel):
+class OTelExportRes(BaseModel):
     partial_success: ExportTracePartialSuccess | None = Field(
         default=None,
         description="The details of a partially successful export request. When None or rejected_spans is 0, the request was fully accepted.",
@@ -989,6 +995,11 @@ class FeedbackCreateReq(BaseModelStrict):
     trigger_ref: str | None = Field(
         default=None, examples=["weave:///entity/project/object/name:digest"]
     )
+    queue_id: str | None = Field(
+        default=None,
+        description="The annotation queue ID this feedback was created from. References annotation_queues.id. NULL when feedback is created outside of queues.",
+        examples=["018f1f2a-9c2b-7d3e-b5a1-8c9d2e4f6a7b"],
+    )
 
     # wb_user_id is automatically populated by the server
     wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
@@ -1371,6 +1382,7 @@ class AnnotatorQueueItemsProgressUpdateReq(BaseModelStrict):
     - (absence) -> 'in_progress': Mark item as in progress (only when no record exists)
     - (absence) -> 'completed' or 'skipped': Directly complete/skip item
     - 'in_progress' or 'unstarted' -> 'completed' or 'skipped': Complete/skip started item
+    - same_state -> same_state: Idempotent no-op (returns existing item unchanged)
     """
 
     project_id: str = Field(examples=["entity/project"])
@@ -2243,7 +2255,7 @@ class TraceServerInterface(Protocol):
         return EnsureProjectExistsRes(project_name=project)
 
     # OTEL API
-    def otel_export(self, req: OtelExportReq) -> OtelExportRes: ...
+    def otel_export(self, req: OTelExportReq) -> OTelExportRes: ...
 
     # Call API
     def call_start(self, req: CallStartReq) -> CallStartRes: ...

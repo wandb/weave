@@ -2218,6 +2218,21 @@
           "default": null,
           "title": "Columns"
         },
+        "column_order": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Column Order"
+        },
         "header_depth": {
           "anyOf": [
             {

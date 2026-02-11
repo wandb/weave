@@ -1384,3 +1384,298 @@ def test_calls_delete_cascade(trace_server, clickhouse_trace_server):
     )
     assert res.num_deleted == 4
     assert len(_fetch_calls_stream(trace_server, project3)) == 0
+
+
+def test_project_stats_with_calls_complete(trace_server, clickhouse_trace_server):
+    """Test project_stats uses calls_complete_stats when project uses calls_complete.
+
+    This test verifies that the project_stats endpoint correctly queries
+    from calls_complete_stats (not calls_merged_stats) when the project
+    has data in calls_complete table.
+    """
+    project_id = f"{TEST_ENTITY}/project_stats_calls_complete"
+    internal_project_id = b64(project_id)
+
+    # Define test data sizes
+    attr_size = 100
+    inputs_size = 200
+    output_size = 300
+    summary_size = 400
+    expected_trace_size = attr_size + inputs_size + output_size + summary_size
+
+    # Insert data directly into calls_complete_stats table
+    # This bypasses the materialized view to have predictable test data
+    clickhouse_trace_server.ch_client.command(
+        f"""
+        INSERT INTO calls_complete_stats (
+            project_id,
+            id,
+            attributes_size_bytes,
+            inputs_size_bytes,
+            output_size_bytes,
+            summary_size_bytes
+        )
+        VALUES (
+            '{internal_project_id}',
+            '{uuid.uuid4()}',
+            {attr_size},
+            {inputs_size},
+            {output_size},
+            {summary_size}
+        )
+        """
+    )
+
+    # Insert a row into calls_complete to establish project residence
+    _insert_complete_call(clickhouse_trace_server.ch_client, internal_project_id)
+
+    # Verify we're reading from calls_complete
+    read_table = clickhouse_trace_server.table_routing_resolver.resolve_read_table(
+        internal_project_id,
+        clickhouse_trace_server.ch_client,
+    )
+    assert read_table == ReadTable.CALLS_COMPLETE
+
+    # Query project stats - use defaults (all True) to get all fields
+    res = trace_server.project_stats(tsi.ProjectStatsReq(project_id=project_id))
+
+    # Should get the data from calls_complete_stats, not calls_merged_stats
+    # The expected_trace_size is the sum of all _size_bytes fields we inserted
+    # Plus any sizes from the _insert_complete_call (which inserts empty JSON)
+    assert res.trace_storage_size_bytes >= expected_trace_size
+
+
+def test_project_stats_uses_correct_stats_table_based_on_residence(
+    trace_server, clickhouse_trace_server
+):
+    """Test project_stats uses the correct stats table based on data residence.
+
+    This test creates two projects:
+    1. One with data only in calls_merged (should use calls_merged_stats)
+    2. One with data only in calls_complete (should use calls_complete_stats)
+
+    It verifies each project gets stats from its corresponding stats table.
+    """
+    # Project 1: calls_merged only
+    project1_id = f"{TEST_ENTITY}/stats_merged_only"
+    internal_project1_id = b64(project1_id)
+    merged_trace_size = 1000
+
+    # Insert into calls_merged_stats
+    clickhouse_trace_server.ch_client.command(
+        f"""
+        INSERT INTO calls_merged_stats (
+            project_id,
+            id,
+            attributes_size_bytes,
+            inputs_size_bytes,
+            output_size_bytes,
+            summary_size_bytes
+        )
+        VALUES (
+            '{internal_project1_id}',
+            '{uuid.uuid4()}',
+            {merged_trace_size},
+            0,
+            0,
+            0
+        )
+        """
+    )
+
+    # Insert call into calls_merged to establish residence
+    _insert_merged_call(clickhouse_trace_server.ch_client, internal_project1_id)
+
+    # Project 2: calls_complete only
+    project2_id = f"{TEST_ENTITY}/stats_complete_only"
+    internal_project2_id = b64(project2_id)
+    complete_trace_size = 2000
+
+    # Insert into calls_complete_stats
+    clickhouse_trace_server.ch_client.command(
+        f"""
+        INSERT INTO calls_complete_stats (
+            project_id,
+            id,
+            attributes_size_bytes,
+            inputs_size_bytes,
+            output_size_bytes,
+            summary_size_bytes
+        )
+        VALUES (
+            '{internal_project2_id}',
+            '{uuid.uuid4()}',
+            {complete_trace_size},
+            0,
+            0,
+            0
+        )
+        """
+    )
+
+    # Insert call into calls_complete to establish residence
+    _insert_complete_call(clickhouse_trace_server.ch_client, internal_project2_id)
+
+    # Verify project residences
+    read_table1 = clickhouse_trace_server.table_routing_resolver.resolve_read_table(
+        internal_project1_id, clickhouse_trace_server.ch_client
+    )
+    read_table2 = clickhouse_trace_server.table_routing_resolver.resolve_read_table(
+        internal_project2_id, clickhouse_trace_server.ch_client
+    )
+
+    assert read_table1 == ReadTable.CALLS_MERGED
+    assert read_table2 == ReadTable.CALLS_COMPLETE
+
+    # Query stats for both projects using defaults (all True)
+    res1 = trace_server.project_stats(tsi.ProjectStatsReq(project_id=project1_id))
+    res2 = trace_server.project_stats(tsi.ProjectStatsReq(project_id=project2_id))
+
+    # Each should get data from its respective stats table
+    # Use >= because _insert_*_call also adds some size data
+    assert res1.trace_storage_size_bytes >= merged_trace_size
+    assert res2.trace_storage_size_bytes >= complete_trace_size
+
+    # Critically: project1 should NOT have the complete_trace_size and vice versa
+    # This verifies we're reading from the correct table
+    # The values should be different because each project reads from different stats tables
+    assert res1.trace_storage_size_bytes != res2.trace_storage_size_bytes
+
+
+def test_call_stats_with_calls_complete(trace_server, clickhouse_trace_server):
+    """Test call_stats endpoint works correctly with calls_complete table.
+
+    This test verifies that the analytics endpoint properly queries from
+    calls_complete when that's the project's data residence.
+    """
+    project_id = f"{TEST_ENTITY}/call_stats_complete_test"
+    internal_project_id = b64(project_id)
+    model_name = "gpt-4o-complete-test"
+
+    now = datetime.datetime.now(datetime.timezone.utc)
+    start_time = now - datetime.timedelta(minutes=30)
+
+    # Insert calls directly into calls_complete with usage data
+    call_id_1 = str(uuid.uuid4())
+    trace_id_1 = str(uuid.uuid4())
+    usage_data_1 = json.dumps(
+        {"usage": {model_name: {"prompt_tokens": 100, "completion_tokens": 50}}}
+    )
+
+    clickhouse_trace_server.ch_client.command(
+        f"""
+        INSERT INTO calls_complete (
+            project_id,
+            id,
+            op_name,
+            started_at,
+            ended_at,
+            trace_id,
+            parent_id,
+            attributes_dump,
+            inputs_dump,
+            output_dump,
+            summary_dump
+        )
+        VALUES (
+            '{internal_project_id}',
+            '{call_id_1}',
+            'test_op',
+            '{start_time.strftime("%Y-%m-%d %H:%M:%S")}',
+            '{(start_time + datetime.timedelta(milliseconds=100)).strftime("%Y-%m-%d %H:%M:%S")}',
+            '{trace_id_1}',
+            '',
+            '{{}}',
+            '{{}}',
+            'null',
+            '{usage_data_1}'
+        )
+        """
+    )
+
+    call_id_2 = str(uuid.uuid4())
+    trace_id_2 = str(uuid.uuid4())
+    usage_data_2 = json.dumps(
+        {"usage": {model_name: {"prompt_tokens": 200, "completion_tokens": 100}}}
+    )
+
+    clickhouse_trace_server.ch_client.command(
+        f"""
+        INSERT INTO calls_complete (
+            project_id,
+            id,
+            op_name,
+            started_at,
+            ended_at,
+            trace_id,
+            parent_id,
+            attributes_dump,
+            inputs_dump,
+            output_dump,
+            summary_dump,
+            exception
+        )
+        VALUES (
+            '{internal_project_id}',
+            '{call_id_2}',
+            'test_op',
+            '{(start_time + datetime.timedelta(minutes=1)).strftime("%Y-%m-%d %H:%M:%S")}',
+            '{(start_time + datetime.timedelta(minutes=1, milliseconds=200)).strftime("%Y-%m-%d %H:%M:%S")}',
+            '{trace_id_2}',
+            '',
+            '{{}}',
+            '{{}}',
+            'null',
+            '{usage_data_2}',
+            'Test error'
+        )
+        """
+    )
+
+    # Verify we're reading from calls_complete
+    read_table = clickhouse_trace_server.table_routing_resolver.resolve_read_table(
+        internal_project_id,
+        clickhouse_trace_server.ch_client,
+    )
+    assert read_table == ReadTable.CALLS_COMPLETE
+
+    # Query call_stats endpoint
+    result = trace_server.call_stats(
+        tsi.CallStatsReq(
+            project_id=project_id,
+            start=start_time - datetime.timedelta(minutes=1),
+            end=now + datetime.timedelta(minutes=1),
+            granularity=3600,
+            usage_metrics=[
+                tsi.UsageMetricSpec(
+                    metric="input_tokens",
+                    aggregations=[tsi.AggregationType.SUM],
+                ),
+            ],
+            call_metrics=[
+                tsi.CallMetricSpec(
+                    metric="call_count",
+                    aggregations=[tsi.AggregationType.SUM],
+                ),
+                tsi.CallMetricSpec(
+                    metric="error_count",
+                    aggregations=[tsi.AggregationType.SUM],
+                ),
+            ],
+        )
+    )
+
+    # Verify usage metrics
+    model_buckets = [b for b in result.usage_buckets if b.get("model") == model_name]
+    assert len(model_buckets) > 0, f"Expected buckets for model {model_name}"
+    total_input_tokens = sum(b.get("sum_input_tokens", 0) for b in model_buckets)
+    assert total_input_tokens == 300, (
+        f"Expected 300 input tokens (100 + 200), got {total_input_tokens}"
+    )
+
+    # Verify call metrics
+    assert len(result.call_buckets) > 0, "Expected call buckets"
+    total_call_count = sum(b.get("sum_call_count", 0) for b in result.call_buckets)
+    total_error_count = sum(b.get("sum_error_count", 0) for b in result.call_buckets)
+    assert total_call_count == 2, f"Expected 2 calls, got {total_call_count}"
+    assert total_error_count == 1, f"Expected 1 error, got {total_error_count}"

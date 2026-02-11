@@ -725,6 +725,7 @@ class HardCodedFilter(BaseModel):
                 self.filter.wb_user_ids,
                 self.filter.wb_run_ids,
                 self.filter.turn_ids,
+                self.filter.thread_ids is not None,
             ]
         )
 
@@ -1219,6 +1220,7 @@ class CallsQuery(BaseModel):
         queue_id_filter: str | None,
         expand_columns: list[str] | None,
         field_to_object_join_alias_map: dict[str, str] | None,
+        id_subquery_name: str | None = None,
     ) -> QueryJoins:
         """Build all JOIN clauses for the query.
 
@@ -1288,6 +1290,18 @@ class CallsQuery(BaseModel):
         # Total storage size join
         total_storage_size_join = ""
         if self.include_total_storage_size:
+            # When we have a filtered set of call IDs, restrict the trace_ids
+            # looked up in calls_merged_stats to only those related to the
+            # filtered calls. This leverages the primary key index to avoid
+            # aggregating over the entire project when only a subset is needed.
+            trace_id_filter = ""
+            if id_subquery_name is not None:
+                trace_id_filter = f"""AND trace_id IN (
+                    SELECT trace_id
+                    FROM {table_alias}
+                    WHERE project_id = {param_slot(project_param, "String")}
+                    AND id IN {id_subquery_name}
+                )"""
             total_storage_size_join = f"""
             LEFT JOIN (
                 SELECT
@@ -1295,6 +1309,7 @@ class CallsQuery(BaseModel):
                     sum(COALESCE(attributes_size_bytes,0) + COALESCE(inputs_size_bytes,0) + COALESCE(output_size_bytes,0) + COALESCE(summary_size_bytes,0)) AS total_storage_size_bytes
                 FROM {config.stats_table_name}
                 WHERE project_id = {param_slot(project_param, "String")}
+                {trace_id_filter}
                 GROUP BY trace_id
             ) AS {ROLLED_UP_CALL_MERGED_STATS_TABLE_NAME}
             ON {table_alias}.trace_id = {ROLLED_UP_CALL_MERGED_STATS_TABLE_NAME}.trace_id
@@ -1489,6 +1504,7 @@ class CallsQuery(BaseModel):
             queue_id_filter=filter_result.queue_id_filter,
             expand_columns=expand_columns,
             field_to_object_join_alias_map=field_to_object_join_alias_map,
+            id_subquery_name=id_subquery_name,
         )
         group_by_sql = ""
         if self.use_agg_fn:
@@ -1765,10 +1781,18 @@ def process_query_to_conditions(
             lhs_part = process_operand(operation.gt_[0])
             rhs_part = process_operand(operation.gt_[1])
             cond = f"({lhs_part} > {rhs_part})"
+        elif isinstance(operation, tsi_query.LtOperation):
+            lhs_part = process_operand(operation.lt_[0])
+            rhs_part = process_operand(operation.lt_[1])
+            cond = f"({lhs_part} < {rhs_part})"
         elif isinstance(operation, tsi_query.GteOperation):
             lhs_part = process_operand(operation.gte_[0])
             rhs_part = process_operand(operation.gte_[1])
             cond = f"({lhs_part} >= {rhs_part})"
+        elif isinstance(operation, tsi_query.LteOperation):
+            lhs_part = process_operand(operation.lte_[0])
+            rhs_part = process_operand(operation.lte_[1])
+            cond = f"({lhs_part} <= {rhs_part})"
         elif isinstance(operation, tsi_query.InOperation):
             lhs_part = process_operand(operation.in_[0])
             rhs_part = ",".join(process_operand(op) for op in operation.in_[1])
@@ -1825,7 +1849,9 @@ def process_query_to_conditions(
                 tsi_query.NotOperation,
                 tsi_query.EqOperation,
                 tsi_query.GtOperation,
+                tsi_query.LtOperation,
                 tsi_query.GteOperation,
+                tsi_query.LteOperation,
                 tsi_query.InOperation,
                 tsi_query.ContainsOperation,
             ),
@@ -2346,6 +2372,7 @@ def _is_minimal_filter(filter: tsi.CallsFilter | None) -> bool:
         return True
     return (
         filter.wb_run_ids is None
+        and filter.wb_user_ids is None
         and filter.op_names is None
         and filter.call_ids is None
         and filter.trace_ids is None
@@ -2353,6 +2380,8 @@ def _is_minimal_filter(filter: tsi.CallsFilter | None) -> bool:
         and filter.trace_roots_only is None
         and filter.input_refs is None
         and filter.output_refs is None
+        and filter.thread_ids is None
+        and filter.turn_ids is None
     )
 
 

@@ -6,9 +6,6 @@ from datetime import datetime
 from typing import Any
 
 import pytest
-from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
-    ExportTraceServiceRequest,
-)
 from opentelemetry.proto.common.v1.common_pb2 import (
     AnyValue,
     InstrumentationScope,
@@ -105,8 +102,8 @@ def create_test_span():
     return span
 
 
-def create_test_export_request(project_id="test_project"):
-    """Create a test ExportTraceServiceRequest with one span."""
+def create_test_export_request(project_id="test_project") -> tsi.OTelExportReq:
+    """Create a test OTelExportReq with one span."""
     span = create_test_span()
 
     # Create instrumentation scope
@@ -131,15 +128,17 @@ def create_test_export_request(project_id="test_project"):
     resource_spans.resource.CopyFrom(resource)
     resource_spans.scope_spans.append(scope_spans)
 
-    # Create traces data
-    traces_data = TracesData()
-    traces_data.resource_spans.append(resource_spans)
+    # Create processed resource spans
+    processed_span = tsi.ProcessedResourceSpans(
+        entity="test-entity",
+        project="test-project",
+        run_id=None,
+        resource_spans=resource_spans,
+    )
 
-    # Create export request
-    request = ExportTraceServiceRequest()
-    request.resource_spans.append(resource_spans)
-
-    return tsi.OtelExportReq(project_id=project_id, traces=request, wb_user_id=None)
+    return tsi.OTelExportReq(
+        project_id=project_id, processed_spans=[processed_span], wb_user_id=None
+    )
 
 
 def test_otel_export_clickhouse(client: weave_client.WeaveClient):
@@ -152,7 +151,7 @@ def test_otel_export_clickhouse(client: weave_client.WeaveClient):
     # Export the otel traces
     response = client.server.otel_export(export_req)
     # Verify the response is of the correct type
-    assert isinstance(response, tsi.OtelExportRes)
+    assert isinstance(response, tsi.OTelExportRes)
 
     # Query the calls
     res = client.server.calls_query(
@@ -164,7 +163,7 @@ def test_otel_export_clickhouse(client: weave_client.WeaveClient):
     assert len(res.calls) == 1
 
     call = res.calls[0]
-    export_span = export_req.traces.resource_spans[0].scope_spans[0].spans[0]
+    export_span = export_req.processed_spans[0].resource_spans.scope_spans[0].spans[0]
     decoded_trace = hexlify(export_span.trace_id).decode("ascii")
     decoded_span = hexlify(export_span.span_id).decode("ascii")
 
@@ -213,8 +212,10 @@ def test_otel_export_with_turn_and_thread(client: weave_client.WeaveClient):
     export_req.wb_user_id = "abcd123"
 
     # Add turn and thread attributes to the span
+    # Materialize processed_spans to avoid iterator exhaustion
     test_thread_id = str(uuid.uuid4())
-    span = export_req.traces.resource_spans[0].scope_spans[0].spans[0]
+    processed_spans_list = export_req.processed_spans
+    span = processed_spans_list[0].resource_spans.scope_spans[0].spans[0]
 
     kv_is_turn = KeyValue()
     kv_is_turn.key = "wandb.is_turn"
@@ -226,9 +227,11 @@ def test_otel_export_with_turn_and_thread(client: weave_client.WeaveClient):
     kv_thread.value.string_value = test_thread_id
     span.attributes.append(kv_thread)
 
+    export_req.processed_spans = processed_spans_list
+
     # Export the otel traces
     response = client.server.otel_export(export_req)
-    assert isinstance(response, tsi.OtelExportRes)
+    assert isinstance(response, tsi.OTelExportRes)
 
     # Query the calls
     res = client.server.calls_query(
@@ -263,16 +266,20 @@ def test_otel_export_with_turn_no_thread(client: weave_client.WeaveClient):
     export_req.wb_user_id = "abcd123"
 
     # Add only is_turn attribute (no thread_id)
-    span = export_req.traces.resource_spans[0].scope_spans[0].spans[0]
+    # Materialize processed_spans to avoid iterator exhaustion
+    processed_spans_list = export_req.processed_spans
+    span = processed_spans_list[0].resource_spans.scope_spans[0].spans[0]
 
     kv_is_turn = KeyValue()
     kv_is_turn.key = "wandb.is_turn"
     kv_is_turn.value.bool_value = True
     span.attributes.append(kv_is_turn)
 
+    export_req.processed_spans = processed_spans_list
+
     # Export the otel traces
     response = client.server.otel_export(export_req)
-    assert isinstance(response, tsi.OtelExportRes)
+    assert isinstance(response, tsi.OTelExportRes)
 
     # Query the calls
     res = client.server.calls_query(
@@ -462,8 +469,9 @@ class TestPythonSpans:
     def test_traces_data_from_proto(self):
         """Test converting protobuf TracesData to Python TracesData."""
         export_req = create_test_export_request()
+        resource_spans_list = [ps.resource_spans for ps in export_req.processed_spans]
         traces_data = PyTracesData.from_proto(
-            TracesData(resource_spans=export_req.traces.resource_spans)
+            TracesData(resource_spans=resource_spans_list)
         )
 
         assert len(traces_data.resource_spans) == 1
@@ -1160,7 +1168,12 @@ class TestSemanticConventionParsing:
 
         # Create export request
         export_req = create_test_export_request(project_id=project_id)
-        export_req.traces.resource_spans[0].scope_spans[0].spans[0].CopyFrom(span_gpt4)
+        # Materialize processed_spans to avoid iterator exhaustion
+        processed_spans_list = export_req.processed_spans
+        processed_spans_list[0].resource_spans.scope_spans[0].spans[0].CopyFrom(
+            span_gpt4
+        )
+        export_req.processed_spans = processed_spans_list
         export_req.wb_user_id = "test_user"
 
         # Export the trace
@@ -1444,7 +1457,11 @@ def test_otel_export_partial_success_on_attribute_conflict(
     export_req.wb_user_id = "abcd123"
 
     # Good span (already present at index 0)
-    good_span = export_req.traces.resource_spans[0].scope_spans[0].spans[0]
+    # Materialize processed_spans to avoid iterator exhaustion
+    processed_spans_list = export_req.processed_spans
+
+    # Good span (already present at index 0)
+    good_span = processed_spans_list[0].resource_spans.scope_spans[0].spans[0]
     good_span_id = hexlify(good_span.span_id).decode("ascii")
 
     # Add a conflicting span to the same batch
@@ -1461,12 +1478,13 @@ def test_otel_export_partial_success_on_attribute_conflict(
     kv_child.value.string_value = "Hello"
     bad_span.attributes.append(kv_child)
 
-    export_req.traces.resource_spans[0].scope_spans[0].spans.append(bad_span)
+    processed_spans_list[0].resource_spans.scope_spans[0].spans.append(bad_span)
+    export_req.processed_spans = processed_spans_list
     bad_span_id = hexlify(bad_span.span_id).decode("ascii")
 
     # Export
     res = client.server.otel_export(export_req)
-    assert isinstance(res, tsi.OtelExportRes)
+    assert isinstance(res, tsi.OTelExportRes)
     assert res.partial_success is not None
     assert res.partial_success.rejected_spans == 1
     # Error message should mention the conflicting key and guidance
@@ -1522,7 +1540,9 @@ def test_otel_span_wandb_attributes_and_data_routing(
     export_req.wb_user_id = "abcd123"
 
     # Get the span to add custom attributes
-    span = export_req.traces.resource_spans[0].scope_spans[0].spans[0]
+    # Materialize processed_spans to avoid iterator exhaustion
+    processed_spans_list = export_req.processed_spans
+    span = processed_spans_list[0].resource_spans.scope_spans[0].spans[0]
 
     # Clear default test attributes
     del span.attributes[:]
@@ -1591,9 +1611,11 @@ def test_otel_span_wandb_attributes_and_data_routing(
     kv_provider.value.string_value = "openai"
     span.attributes.append(kv_provider)
 
+    export_req.processed_spans = processed_spans_list
+
     # Export the OTEL traces
     response = client.server.otel_export(export_req)
-    assert isinstance(response, tsi.OtelExportRes)
+    assert isinstance(response, tsi.OTelExportRes)
 
     # Query the calls
     res = client.server.calls_query(
