@@ -95,16 +95,6 @@ def _clear_setting(key: str) -> None:
         logger.warning(f"Failed to clear setting {key}: {e}")
 
 
-def _normalize_host(host: str | None) -> str | None:
-    """Normalize a host or base URL to a hostname without scheme or trailing slash."""
-    if host is None:
-        return None
-    host = host.rstrip("/")
-    if host.startswith(("http://", "https://")):
-        host = host.split("://", 1)[1]
-    return host
-
-
 def login(
     anonymous: Literal["must", "allow", "never"] | None = None,
     key: str | None = None,
