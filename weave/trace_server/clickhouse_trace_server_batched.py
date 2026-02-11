@@ -299,7 +299,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         return self._file_storage_client
 
     @property
-    def kafka_producer(self) -> KafkaProducer:
+    def kafka_producer(self) -> KafkaProducer | None:
+        """Lazily initialize the Kafka producer, only if online eval is enabled."""
+        if not wf_env.wf_enable_online_eval():
+            return None
         if self._kafka_producer is not None:
             return self._kafka_producer
         self._kafka_producer = KafkaProducer.from_env()
@@ -548,8 +551,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.kafka_producer.flush")
     def _flush_kafka_producer(self) -> None:
-        if wf_env.wf_enable_online_eval():
-            self.kafka_producer.flush()
+        producer = self.kafka_producer
+        if producer is not None:
+            producer.flush()
 
     @contextmanager
     def call_batch(self) -> Iterator[None]:
@@ -6380,7 +6384,7 @@ def _ch_complete_call_to_row(ch_call: CallCompleteCHInsertable) -> list[Any]:
 
 
 def _maybe_enqueue_minimal_call_end(
-    kafka_producer: "KafkaProducer",
+    kafka_producer: KafkaProducer | None,
     project_id: str,
     id: str,
     ended_at: datetime.datetime,
@@ -6398,7 +6402,7 @@ def _maybe_enqueue_minimal_call_end(
         ended_at: The call end timestamp.
         flush_immediately: Whether to flush the producer immediately.
     """
-    if not wf_env.wf_enable_online_eval():
+    if kafka_producer is None:
         return
 
     minimal_end = tsi.EndedCallSchemaForInsert(
