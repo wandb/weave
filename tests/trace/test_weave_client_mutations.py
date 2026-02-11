@@ -2,6 +2,8 @@ import pytest
 from pydantic import Field
 
 import weave
+from weave.trace.refs import OBJECT_ATTR_EDGE_NAME
+from weave.trace.vals import MutationAppend, MutationSetattr, MutationSetitem
 
 
 def test_object_mutation_saving(client):
@@ -27,6 +29,66 @@ def test_object_mutation_saving(client):
     assert thing3.a == "newer"
     assert thing3.b == 2
     assert thing3.c == 4.2
+
+
+def test_traceable_save_records_object_mutations(client):
+    class Thing(weave.Object):
+        rows: list[int]
+        description: str | None = None
+
+    ref = client._save_object(Thing(rows=[1, 2]), "my-thing")
+    thing = client.get(ref, objectify=False)
+
+    thing.rows[1] = 20
+    thing.rows.append(3)
+    thing.description = "moo"
+
+    mutations = thing.mutations
+    assert mutations is not None
+    assert len(mutations) == 3
+
+    assert mutations[0] == MutationSetitem(
+        path=(OBJECT_ATTR_EDGE_NAME, "rows"),
+        operation="setitem",
+        args=("1", 20),
+    )
+    assert mutations[1] == MutationAppend(
+        path=(OBJECT_ATTR_EDGE_NAME, "rows"),
+        operation="append",
+        args=(3,),
+    )
+    assert mutations[2] == MutationSetattr(
+        path=(),
+        operation="setattr",
+        args=("description", "moo"),
+    )
+
+    new_ref = thing.save()
+    new_thing = client.get(new_ref)
+    assert new_thing.description == "moo"
+    assert list(new_thing.rows) == [1, 20, 3]
+
+
+def test_traceable_save_republishes_mutated_list(client):
+    saved = client.save([1, 2], "my-list")
+    saved[0] = 10
+    saved.extend([3])
+    saved += [4]
+
+    mutations = saved.mutations
+    assert mutations is not None
+    assert len(mutations) == 3
+    assert mutations[0] == MutationSetitem(
+        path=(),
+        operation="setitem",
+        args=("0", 10),
+    )
+    assert mutations[1] == MutationAppend(path=(), operation="append", args=(3,))
+    assert mutations[2] == MutationAppend(path=(), operation="append", args=(4,))
+
+    new_ref = saved.save()
+    new_list = client.get(new_ref)
+    assert new_list == [10, 2, 3, 4]
 
 
 def test_list_mutation_saving(client):

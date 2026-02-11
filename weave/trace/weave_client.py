@@ -83,7 +83,7 @@ from weave.trace.settings import (
 from weave.trace.table import Table
 from weave.trace.table_upload_chunking import ChunkingConfig, TableChunkManager
 from weave.trace.util import log_once
-from weave.trace.vals import WeaveObject, WeaveTable, make_trace_obj
+from weave.trace.vals import WeaveDict, WeaveList, WeaveObject, WeaveTable, make_trace_obj
 from weave.trace.wandb_run_context import (
     WandbRunContext,
     check_wandb_run_matches,
@@ -266,6 +266,10 @@ def map_to_refs(obj: Any) -> Any:
         return obj.ref
     elif isinstance(obj, WeaveTable):
         return obj.ref
+    elif isinstance(obj, WeaveList):
+        return [map_to_refs(v) for v in list.__iter__(obj)]
+    elif isinstance(obj, WeaveDict):
+        return {k: map_to_refs(v) for k, v in dict.items(obj)}
     elif isinstance_namedtuple(obj):
         return {k: map_to_refs(v) for k, v in obj._asdict().items()}
     elif isinstance(obj, (list, tuple)):

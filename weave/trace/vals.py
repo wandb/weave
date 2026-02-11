@@ -117,13 +117,46 @@ def unwrap(val: Any) -> Any:
 class Traceable:
     ref: RefWithExtra | None
     mutations: list[Mutation] | None = None
+    _base_ref: ObjectRef | None = None
     root: "Traceable"
     parent: Optional["Traceable"] = None
     server: TraceServerInterface
     _is_dirty: bool = False
 
+    def _mutation_path(self) -> tuple[str, ...]:
+        if isinstance(self.ref, RefWithExtra):
+            return self.ref.extra
+        if isinstance(self._base_ref, RefWithExtra):
+            return self._base_ref.extra
+        return ()
+
+    def _record_mutation(self, operation: MutationOperation, *args: Any) -> None:
+        root = self.root
+        if not isinstance(root, Traceable):
+            return
+
+        # Mutations are only meaningful for objects rooted at object refs.
+        if not isinstance(root.ref, ObjectRef) and not isinstance(root._base_ref, ObjectRef):
+            return
+
+        path = self._mutation_path()
+        root.add_mutation(path, operation, *args)
+
     def _mark_dirty(self) -> None:
         """Recursively mark this object and its ancestors as dirty and removes their refs."""
+        if self._base_ref is None and isinstance(self.ref, ObjectRef):
+            self._base_ref = self.ref
+
+        # Preserve the root object ref so Traceable.save() can still publish a new version
+        # after dirtying nulls out refs.
+        root = self.root
+        if (
+            isinstance(root, Traceable)
+            and root._base_ref is None
+            and isinstance(root.ref, ObjectRef)
+        ):
+            root._base_ref = root.ref
+
         self._is_dirty = True
         self.ref = None
         if (
@@ -142,17 +175,32 @@ class Traceable:
         self.mutations.append(make_mutation(path, operation, args))
 
     def save(self) -> ObjectRef:
-        if not isinstance(self.ref, ObjectRef):
-            raise TypeError("Can only save from object refs")
         if self.root is not self:
             raise ValueError("Can only save from root object")
+
+        root_ref = self.ref if isinstance(self.ref, ObjectRef) else self._base_ref
+        if not isinstance(root_ref, ObjectRef):
+            raise TypeError("Can only save from object refs")
+
+        if not self._is_dirty:
+            return root_ref
+
         if self.mutations is None:
             raise ValueError("No mutations to save")
 
-        mutations = self.mutations
+        # Preserve the mutation list in case publishing fails.
+        original_mutations = self.mutations
         self.mutations = None
-        raise NotImplementedError("Traceable.save not implemented")
-        # return self.server.mutate(self.ref, mutations)
+        try:
+            wc = require_weave_client()
+            new_ref = wc._save_object(self, root_ref.name)
+            self.ref = new_ref
+            self._base_ref = None
+            self._is_dirty = False
+            return new_ref
+        except Exception:
+            self.mutations = original_mutations
+            raise
 
     def unwrap(self) -> Any: ...
 
@@ -270,11 +318,13 @@ class WeaveObject(Traceable):
             "server",
             "root",
             "mutations",
+            "_base_ref",
             "_is_dirty",
             "parent",
         ]:
             return object.__setattr__(self, __name, __value)
         else:
+            self._record_mutation("setattr", __name, unwrap(__value))
             self._mark_dirty()
             if isinstance(__value, Traceable):
                 __value.parent = self
@@ -570,6 +620,7 @@ class WeaveTable(Traceable):
         rows = self._inefficiently_materialize_rows_as_list()
         if not isinstance(val, dict):
             raise TypeError("Can only append dicts to tables")
+        self._record_mutation("append", unwrap(val))
         self._mark_dirty()
         rows.append(val)
 
@@ -627,6 +678,7 @@ class WeaveList(Traceable, list):
         # Though this ostensibly only marks the parent (list) as dirty, siblings
         # will also get new refs because their old refs are relative to the parent
         # (the element refs will be extras of the new parent ref)
+        self._record_mutation("setitem", str(index), unwrap(value))
         self._mark_dirty()
         if isinstance(value, Traceable):
             value.parent = self
@@ -634,11 +686,20 @@ class WeaveList(Traceable, list):
         super().__setitem__(index, value)
 
     def append(self, item: Any) -> None:
+        self._record_mutation("append", unwrap(item))
         self._mark_dirty()
         if isinstance(item, Traceable):
             item.parent = self
 
         super().append(item)
+
+    def extend(self, iterable: Any) -> None:
+        for item in iterable:
+            self.append(item)
+
+    def __iadd__(self, x: Any) -> "WeaveList":
+        self.extend(x)
+        return self
 
     def __iter__(self) -> Iterator[Any]:
         for i in range(len(self)):
@@ -704,6 +765,7 @@ class WeaveDict(Traceable, dict):
         # Though this ostensibly only marks the parent (dict) as dirty, siblings
         # will also get new refs because their old refs are relative to the parent
         # (the element refs will be extras of the new parent ref)
+        self._record_mutation("setitem", key, unwrap(value))
         self._mark_dirty()
         if isinstance(value, Traceable):
             value.parent = self
