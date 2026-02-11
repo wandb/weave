@@ -35,7 +35,7 @@ from weave.trace_server.methods.evaluation_status import evaluation_status
 from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
 from weave.trace_server.opentelemetry.python_spans import Resource, Span
 from weave.trace_server.orm import quote_json_path
-from weave.trace_server.shared.digest import (
+from weave.shared.digest import (
     compute_file_digest,
     compute_object_digest_result,
     compute_row_digest,

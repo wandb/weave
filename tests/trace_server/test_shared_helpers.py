@@ -3,8 +3,7 @@ import json
 
 import pytest
 
-from weave.trace_server.object_class_util import process_incoming_object_val
-from weave.trace_server.shared import (
+from weave.shared import (
     build_file_create_event,
     build_obj_create_event,
     build_table_create_event,
@@ -14,6 +13,7 @@ from weave.trace_server.shared import (
     compute_row_digest,
     compute_table_digest,
 )
+from weave.shared.object_class_util import process_incoming_object_val
 from weave.trace_server.trace_server_interface import (
     FileCreateReq,
     ObjCreateReq,
@@ -21,7 +21,7 @@ from weave.trace_server.trace_server_interface import (
     TableCreateReq,
     TableSchemaForInsert,
 )
-from weave.trace_server.trace_server_interface_util import bytes_digest, str_digest
+from weave.shared.trace_server_interface_util import bytes_digest, str_digest
 
 pytestmark = pytest.mark.trace_server
 

@@ -164,7 +164,7 @@ from weave.trace_server.query_builder.project_query_builder import (
     make_project_stats_query,
 )
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
-from weave.trace_server.shared.digest import (
+from weave.shared.digest import (
     compute_file_digest,
     compute_object_digest_result,
     compute_row_digest,
