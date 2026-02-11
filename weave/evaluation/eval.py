@@ -28,10 +28,11 @@ from weave.flow.scorer import (
 from weave.flow.util import make_memorable_name, transpose
 from weave.object.obj import Object
 from weave.trace.call import Call, CallsIter
+from weave.trace.context.call_context import get_current_call
 from weave.trace.context.weave_client_context import require_weave_client
 from weave.trace.env import get_weave_parallelism
 from weave.trace.objectify import maybe_objectify, register_object
-from weave.trace.op import OpCallError, as_op, is_op, op
+from weave.trace.op import OpCallError, is_op, op
 from weave.trace.op_protocol import CallDisplayNameFunc, Op
 from weave.trace.refs import ObjectRef
 from weave.trace.table import Table
@@ -167,10 +168,6 @@ class Evaluation(Object):
                 "Using 'model_output' key for compatibility with older scorers. Please update scorers to use 'output' parameter.",
             )
 
-        if self.evaluation_name:
-            eval_op = as_op(self.evaluate)
-            eval_op.call_display_name = self.evaluation_name
-
         if self.name is None and self.dataset.name is not None:
             self.name = self.dataset.name + "-evaluation"  # type: ignore
 
@@ -281,6 +278,15 @@ class Evaluation(Object):
 
     @op(call_display_name=default_evaluation_display_name, eager_call_start=True)
     async def evaluate(self, model: Op | Model) -> dict:
+        if self.evaluation_name:
+            if current_call := get_current_call():
+                display_name = (
+                    self.evaluation_name(current_call)
+                    if callable(self.evaluation_name)
+                    else self.evaluation_name
+                )
+                current_call.set_display_name(display_name)
+
         eval_results = await self.get_eval_results(model)
         summary = await self.summarize(eval_results)
 
