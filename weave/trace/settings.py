@@ -185,6 +185,23 @@ class UserSettings(BaseModel):
     Can be overridden with the environment variable `WEAVE_ENABLE_DISK_FALLBACK`
     """
 
+    enable_write_ahead_log: bool = False
+    """
+    Toggles durable write-ahead logging for object/table/file writes.
+
+    If True, write-intent events are durably appended to a local SQLite WAL before
+    network writes, and marked as acknowledged after successful responses.
+    Can be overridden with the environment variable `WEAVE_ENABLE_WRITE_AHEAD_LOG`
+    """
+
+    write_ahead_log_dir: str = str(Path.home() / ".cache" / "wandb" / "weave" / "wal")
+    """
+    Sets the directory for durable write-ahead log storage.
+
+    Ignored if `enable_write_ahead_log` is False.
+    Can be overridden with the environment variable `WEAVE_WRITE_AHEAD_LOG_DIR`
+    """
+
     use_parallel_table_upload: bool = True
     """
     Toggles parallel table upload chunking.
@@ -336,6 +353,18 @@ def retry_max_interval() -> float:
 def should_enable_disk_fallback() -> bool:
     """Returns whether disk fallback should be enabled for dropped items."""
     return _should("enable_disk_fallback")
+
+
+def should_enable_write_ahead_log() -> bool:
+    """Returns whether durable write-ahead logging should be enabled."""
+    return _should("enable_write_ahead_log")
+
+
+def write_ahead_log_dir() -> str:
+    """Returns the directory for durable write-ahead log storage."""
+    return _optional_str("write_ahead_log_dir") or str(
+        Path.home() / ".cache" / "wandb" / "weave" / "wal"
+    )
 
 
 def should_use_parallel_table_upload() -> bool:
