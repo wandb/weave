@@ -568,6 +568,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             self._flush_file_chunks()
             self._flush_calls()
             self._flush_calls_complete()
+
+            # Never fail a batch and cause an insert retry if we fail to flush kafka
             try:
                 self._flush_kafka_producer()
             except Exception:
