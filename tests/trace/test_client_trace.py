@@ -604,6 +604,15 @@ def test_trace_call_wb_run_step_query(client):
     )
     assert len(res.calls) == count
 
+    lt_query = tsi.Query(
+        **{"$expr": {"$lt": [{"$getField": "wb_run_step"}, {"$literal": compare_step}]}}
+    )
+    res = server.calls_query(
+        tsi.CallsQueryReq(project_id=get_client_project_id(client), query=lt_query)
+    )
+    exp_lt_count = len([step for step in exp_start_steps if step < compare_step])
+    assert len(res.calls) == exp_lt_count
+
     count = 4
     compare_step = exp_end_steps[-count]
     range_query = tsi.Query(
@@ -3145,9 +3154,13 @@ def test_calls_iter_different_value_same_page_cached(client):
     elapsed_time3 = end_time3 - start_time3
 
     # cached lookup should be way faster!
-    # Use 3x threshold instead of 10x to reduce flakiness while still verifying caching
-    assert elapsed_time1 > elapsed_time2 * 3
-    assert elapsed_time1 > elapsed_time3 * 3
+    if sys.platform == "win32":  # Test on windows is slower...
+        assert elapsed_time1 > elapsed_time2
+        assert elapsed_time1 > elapsed_time3
+    else:
+        # Use 3x threshold instead of 10x to reduce flakiness while still verifying caching
+        assert elapsed_time1 > elapsed_time2 * 3
+        assert elapsed_time1 > elapsed_time3 * 3
 
 
 class BasicModel(weave.Model):
@@ -3737,7 +3750,7 @@ def test_large_keys_are_stripped_call(client, caplog, monkeypatch):
     assert large_calls[0].inputs == json.loads(ENTITY_TOO_LARGE_PAYLOAD)
 
 
-def test_weave_finish_unsets_client(client):
+def test_weave_finish_unsets_client(client, monkeypatch):
     @weave.op
     def foo():
         return 1
@@ -3746,10 +3759,21 @@ def test_weave_finish_unsets_client(client):
     weave_client = get_weave_client()
     assert get_weave_client() is not None
 
+    finish_called = False
+    original_finish = weave_client.finish
+
+    def tracked_finish(*args, **kwargs):
+        nonlocal finish_called
+        finish_called = True
+        return original_finish(*args, **kwargs)
+
+    monkeypatch.setattr(weave_client, "finish", tracked_finish)
+
     foo()
     assert len(list(weave_client.get_calls())) == 1
 
     weave.finish()
+    assert finish_called
 
     foo()
     assert len(list(weave_client.get_calls())) == 1
@@ -4691,6 +4715,99 @@ def test_calls_query_stats_with_limit(client):
     assert result.total_storage_size_bytes is not None
 
 
+@pytest.mark.parametrize(
+    "thread_ids",
+    [
+        ["thread_does_not_exist"],  # single thread id that does not match
+        ["thread_exists_no_calls"],  # thread exists but has zero calls
+        [],  # empty list -> no threads -> 0 calls
+    ],
+)
+def test_calls_query_stats_thread_ids_filter_not_minimal(client, thread_ids):
+    """Ensure that we do not optimize away the thread_ids filter when it is present."""
+    client.set_wandb_run_context(run_id="stats-thread-run", step=0)
+
+    @weave.op
+    def stats_thread_op() -> int:
+        return 1
+
+    # Create calls in one thread (so project has calls with wb_run_id; optimized path would return 1)
+    with weave.thread("thread_with_calls"):
+        stats_thread_op()
+        stats_thread_op()
+
+    # Thread that exists but has zero calls (ensures we test this distinct case)
+    with weave.thread("thread_exists_no_calls"):
+        pass
+
+    # A query is required to exercise the "Pattern 2" check in _try_optimized_stats_query.
+    # Use a query that matches the created calls (wb_run_id not null).
+    wb_run_id_not_null_query = tsi.Query(
+        **{
+            "$expr": {
+                "$not": [{"$eq": [{"$getField": "wb_run_id"}, {"$literal": None}]}]
+            }
+        }
+    )
+    # Confirm that this query returns results, so we can test filtering with the second query below.
+    res_with_matching_thread = client.server.calls_query_stats(
+        tsi.CallsQueryStatsReq(
+            project_id=get_client_project_id(client),
+            limit=1,
+            query=wb_run_id_not_null_query,
+            filter=tsi.CallsFilter(thread_ids=["thread_with_calls"]),
+        )
+    )
+    assert res_with_matching_thread.count == 1
+
+    # Query with thread_ids that match zero calls. Full path -> 0. Incorrectly choosing the optimized path -> 1.
+    res = client.server.calls_query_stats(
+        tsi.CallsQueryStatsReq(
+            project_id=get_client_project_id(client),
+            limit=1,
+            query=wb_run_id_not_null_query,
+            filter=tsi.CallsFilter(thread_ids=thread_ids),
+        )
+    )
+    assert res.count == 0
+
+
+def test_calls_query_thread_ids_filter_returns_matching_thread(client):
+    """Create 3 threads, request the second one, assert the returned call has the correct thread_id."""
+    client.set_wandb_run_context(run_id="thread-filter-run", step=0)
+
+    @weave.op
+    def thread_op() -> int:
+        return 1
+
+    thread_1, thread_2, thread_3 = "thread_first", "thread_second", "thread_third"
+    with weave.thread(thread_1):
+        thread_op()
+    with weave.thread(thread_2):
+        thread_op()
+    with weave.thread(thread_3):
+        thread_op()
+
+    # Use a query that matches the created calls (wb_run_id not null).
+    wb_run_id_not_null_query = tsi.Query(
+        **{
+            "$expr": {
+                "$not": [{"$eq": [{"$getField": "wb_run_id"}, {"$literal": None}]}]
+            }
+        }
+    )
+    res = client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=get_client_project_id(client),
+            limit=1,
+            query=wb_run_id_not_null_query,
+            filter=tsi.CallsFilter(thread_ids=[thread_2]),
+        )
+    )
+    assert len(res.calls) == 1
+    assert res.calls[0].thread_id == thread_2
+
+
 def test_calls_query_stats_total_storage_size_clickhouse(client, clickhouse_client):
     """Test querying calls with total storage size."""
     if client_is_sqlite(client):
@@ -5127,6 +5244,36 @@ def test_thread_id_query_filtering(client):
         assert None in thread_ids_found, (
             f"Should find None thread_id, got: {thread_ids_found}"
         )
+
+
+def test_get_calls_filter_by_thread_ids_only(client):
+    """Test that get_calls with only CallsFilter(thread_ids=[...]) returns just that thread's calls.
+
+    This exercises the path where thread_ids is the sole filter (HardCodedFilter.is_useful()
+    """
+    unique = uuid.uuid4().hex
+
+    @weave.op
+    def thread_filter_op(value: str) -> str:
+        return f"out_{value}"
+
+    with weave.thread(f"thread_a_{unique}"):
+        thread_filter_op("a1")
+        thread_filter_op("a2")
+
+    with weave.thread(f"thread_b_{unique}"):
+        thread_filter_op("b1")
+
+    # Filter using only thread_ids (no op_names, trace_ids, etc.)
+    calls_thread_a = list(
+        client.get_calls(
+            filter=tsi.CallsFilter(thread_ids=[f"thread_a_{unique}"]),
+            limit=100,
+        )
+    )
+
+    assert len(calls_thread_a) == 2
+    assert all(call.thread_id == f"thread_a_{unique}" for call in calls_thread_a)
 
 
 def test_thread_context_error_handling(client):

@@ -13,6 +13,7 @@ from weave.trace_server.calls_query_builder.usage_query_builder import (
     build_usage_query,
 )
 from weave.trace_server.orm import ParamBuilder
+from weave.trace_server.project_version.types import ReadTable
 from weave.trace_server.threads_query_builder import (
     make_threads_query,
     make_threads_query_sqlite,
@@ -100,6 +101,7 @@ def assert_usage_sql(
     exp_granularity_seconds: int,
     exp_start: datetime.datetime | None = None,
     exp_end: datetime.datetime | None = None,
+    read_table: ReadTable = ReadTable.CALLS_MERGED,
 ) -> None:
     """Assert that the CallStatsReq generates the expected usage SQL and parameters.
 
@@ -112,11 +114,16 @@ def assert_usage_sql(
         exp_granularity_seconds: The expected granularity in seconds
         exp_start: The expected start datetime (if None, not checked)
         exp_end: The expected end datetime (if None, not checked)
+        read_table: Which table to query (calls_merged or calls_complete)
     """
     pb = ParamBuilder("pb")
-    sql, cols, params, granularity_seconds, start, end = build_usage_query(
-        req, metrics, pb
-    )
+    query_result = build_usage_query(req, metrics, pb, read_table)
+    sql = query_result.sql
+    cols = query_result.columns
+    params = query_result.parameters
+    granularity_seconds = query_result.granularity_seconds
+    start = query_result.start
+    end = query_result.end
 
     exp_formatted = sqlparse.format(exp_query, reindent=True)
     found_formatted = sqlparse.format(sql, reindent=True)
@@ -146,6 +153,7 @@ def assert_call_metrics_sql(
     exp_granularity_seconds: int,
     exp_start: datetime.datetime | None = None,
     exp_end: datetime.datetime | None = None,
+    read_table: ReadTable = ReadTable.CALLS_MERGED,
 ) -> None:
     """Assert that the CallStatsReq generates the expected call metrics SQL and parameters.
 
@@ -158,11 +166,16 @@ def assert_call_metrics_sql(
         exp_granularity_seconds: The expected granularity in seconds
         exp_start: The expected start datetime (if None, not checked)
         exp_end: The expected end datetime (if None, not checked)
+        read_table: Which table to query (calls_merged or calls_complete)
     """
     pb = ParamBuilder("pb")
-    sql, cols, params, granularity_seconds, start, end = build_call_metrics_query(
-        req, metrics, pb
-    )
+    query_result = build_call_metrics_query(req, metrics, pb, read_table)
+    sql = query_result.sql
+    cols = query_result.columns
+    params = query_result.parameters
+    granularity_seconds = query_result.granularity_seconds
+    start = query_result.start
+    end = query_result.end
 
     exp_formatted = sqlparse.format(exp_query, reindent=True)
     found_formatted = sqlparse.format(sql, reindent=True)

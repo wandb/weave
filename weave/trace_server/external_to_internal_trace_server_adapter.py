@@ -78,12 +78,13 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
     def _stream_ref_apply(
         self, method: Callable[[A], Iterator[B]], req: A
     ) -> Iterator[B]:
+        """Stream results while converting internal refs to external refs."""
         req_conv = universal_ext_to_int_ref_converter(
             req, self._idc.ext_to_int_project_id
         )
         res = method(req_conv)
 
-        int_to_ext_project_cache = {}
+        int_to_ext_project_cache: dict[str, str | None] = {}
 
         def cached_int_to_ext_project_id(project_id: str) -> str | None:
             if project_id not in int_to_ext_project_cache:
@@ -92,8 +93,15 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
                 )
             return int_to_ext_project_cache[project_id]
 
-        for item in res:
-            yield universal_int_to_ext_ref_converter(item, cached_int_to_ext_project_id)
+        try:
+            for item in res:
+                yield universal_int_to_ext_ref_converter(
+                    item, cached_int_to_ext_project_id
+                )
+        finally:
+            int_to_ext_project_cache.clear()
+            if hasattr(res, "close"):
+                res.close()
 
     # Standard API Below:
     def ensure_project_exists(
@@ -101,12 +109,21 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
     ) -> tsi.EnsureProjectExistsRes:
         return self._internal_trace_server.ensure_project_exists(entity, project)
 
-    def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
+    def otel_export(self, req: tsi.OTelExportReq) -> tsi.OTelExportRes:
+        # Convert project_id at request level
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        if req.wb_run_id is not None:
-            req.wb_run_id = self._idc.ext_to_int_run_id(req.wb_run_id)
+        # Convert run_id for each processed span, preserving the collection type
+        # We materialize to a list to allow multiple iterations (Iterable includes list)
+        for i, processed_span in enumerate(req.processed_spans):
+            if processed_span.run_id is not None:
+                processed_span.run_id = self._idc.ext_to_int_run_id(
+                    processed_span.run_id
+                )
+            req.processed_spans[i] = processed_span
+
         if req.wb_user_id is not None:
             req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
+
         return self._ref_apply(self._internal_trace_server.otel_export, req)
 
     def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
@@ -452,6 +469,12 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
     ) -> tsi.AnnotationQueueReadRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         return self._ref_apply(self._internal_trace_server.annotation_queue_read, req)
+
+    def annotation_queue_delete(
+        self, req: tsi.AnnotationQueueDeleteReq
+    ) -> tsi.AnnotationQueueDeleteRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(self._internal_trace_server.annotation_queue_delete, req)
 
     def annotation_queue_add_calls(
         self, req: tsi.AnnotationQueueAddCallsReq

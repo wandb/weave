@@ -561,7 +561,7 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         handle_response_error(r, "/server_info")
         return ServerInfoRes.model_validate(r.json())
 
-    def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
+    def otel_export(self, req: tsi.OTelExportReq) -> tsi.OTelExportRes:
         # TODO: Add docs link (DOCS-1390)
         raise NotImplementedError("Sending otel traces directly is not yet supported.")
 
@@ -929,6 +929,18 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
             tsi.AnnotationQueueReadReq,
             tsi.AnnotationQueueReadRes,
             method="GET",
+            params={"project_id": req.project_id},
+        )
+
+    def annotation_queue_delete(
+        self, req: tsi.AnnotationQueueDeleteReq
+    ) -> tsi.AnnotationQueueDeleteRes:
+        return self._generic_request(
+            f"/annotation_queues/{req.queue_id}",
+            req,
+            tsi.AnnotationQueueDeleteReq,
+            tsi.AnnotationQueueDeleteRes,
+            method="DELETE",
             params={"project_id": req.project_id},
         )
 

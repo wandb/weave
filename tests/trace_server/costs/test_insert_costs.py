@@ -3,7 +3,7 @@
 import unittest
 import uuid
 from datetime import datetime, timezone
-from unittest.mock import ANY, MagicMock, mock_open, patch
+from unittest.mock import MagicMock, mock_open, patch
 
 # Import the module to be tested
 from weave.trace_server.costs import insert_costs
@@ -63,7 +63,7 @@ class TestInsertCosts(unittest.TestCase):
         result = insert_costs.load_costs_from_json()
 
         # Assertions
-        mock_file_open.assert_called_once_with(ANY, "r")
+        mock_file_open.assert_called_once()
         args, kwargs = mock_file_open.call_args
         opened_file_path = args[0]
         self.assertTrue(opened_file_path.endswith(insert_costs.COST_FILE))
@@ -187,9 +187,7 @@ class TestInsertCosts(unittest.TestCase):
 
         # Assertions
         mock_load_json.assert_called_once()
-        mock_logger.error.assert_called_once_with(
-            "Failed to load costs from json, %s", e
-        )
+        mock_logger.exception.assert_called_once_with("Failed to load costs from json")
 
     @patch("weave.trace_server.costs.insert_costs.logger")
     @patch("weave.trace_server.costs.insert_costs.filter_out_current_costs")
@@ -208,8 +206,8 @@ class TestInsertCosts(unittest.TestCase):
         # Assertions
         mock_load_json.assert_called_once()
         mock_filter_costs.assert_called_once_with(self.client, self.sample_costs_json)
-        mock_logger.error.assert_called_once_with(
-            "Failed to filter out current costs, %s", e
+        mock_logger.exception.assert_called_once_with(
+            "Failed to filter out current costs"
         )
 
     @patch("weave.trace_server.costs.insert_costs.logger")
@@ -232,9 +230,7 @@ class TestInsertCosts(unittest.TestCase):
         mock_load_json.assert_called_once()
         mock_filter_costs.assert_called_once_with(self.client, self.sample_costs_json)
         mock_insert_db.assert_called_once_with(self.client, self.sample_costs_json)
-        mock_logger.error.assert_called_once_with(
-            "Failed to insert costs into db, %s", e
-        )
+        mock_logger.exception.assert_called_once_with("Failed to insert costs into db")
 
     @patch("weave.trace_server.costs.insert_costs.logger")
     @patch("weave.trace_server.costs.insert_costs.insert_costs_into_db")

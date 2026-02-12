@@ -8,9 +8,9 @@ from __future__ import annotations
 
 import datetime
 import logging
-from typing import Any
 
 from weave.trace_server.calls_query_builder.stats_query_base import (
+    StatsQueryBuildResult,
     aggregation_selects_for_metric,
     build_calls_filter_sql,
     build_grouped_calls_subquery,
@@ -18,6 +18,7 @@ from weave.trace_server.calls_query_builder.stats_query_base import (
 )
 from weave.trace_server.calls_query_builder.utils import param_slot, safely_format_sql
 from weave.trace_server.orm import ParamBuilder
+from weave.trace_server.project_version.types import ReadTable, TableConfig
 from weave.trace_server.trace_server_interface import (
     AggregationType,
     CallStatsReq,
@@ -78,23 +79,25 @@ def build_usage_query(
     req: CallStatsReq,
     metrics: list[UsageMetricSpec],
     pb: ParamBuilder,
-) -> tuple[
-    str,
-    list[str],
-    dict[str, Any],
-    int,
-    datetime.datetime,
-    datetime.datetime,
-]:
+    read_table: ReadTable = ReadTable.CALLS_MERGED,
+) -> StatsQueryBuildResult:
     """Generate parameterized ClickHouse SQL for usage metrics (grouped by model).
 
-    Returns (sql, output_columns, parameters, granularity_seconds, start, end).
+    Args:
+        req: The CallStatsReq containing time range and filter settings.
+        metrics: Usage metrics to compute (tokens, etc.).
+        pb: ParamBuilder for parameterized queries.
+        read_table: Which table to query (calls_merged or calls_complete).
+
+    Returns:
+        Named query build result with SQL, output columns, params, and time bounds.
     """
-    granularity_seconds, start, end, bucket_expr = determine_bounds_and_bucket(req)
+    time_bounds = determine_bounds_and_bucket(req, read_table)
+    granularity_seconds = time_bounds.granularity_seconds
 
     project_param = pb.add_param(req.project_id)
-    start_epoch = start.replace(tzinfo=datetime.timezone.utc).timestamp()
-    end_epoch = end.replace(tzinfo=datetime.timezone.utc).timestamp()
+    start_epoch = time_bounds.start.replace(tzinfo=datetime.timezone.utc).timestamp()
+    end_epoch = time_bounds.end.replace(tzinfo=datetime.timezone.utc).timestamp()
     start_param = pb.add_param(start_epoch)
     end_param = pb.add_param(end_epoch)
     tz_param = pb.add_param(req.timezone or "UTC")
@@ -145,13 +148,18 @@ def build_usage_query(
 
     # Build bucket expression for all_buckets using seconds interval
     all_buckets_interval = f"INTERVAL {granularity_seconds} SECOND"
+
+    # Select the appropriate datetime field based on the table
+    table_config = TableConfig.from_read_table(read_table)
+    datetime_field = table_config.datetime_filter_field
     grouped_calls_sql = build_grouped_calls_subquery(
         project_param=project_param,
         start_param=start_param,
         end_param=end_param,
         tz_param=tz_param,
         where_filter_sql=where_filter_sql,
-        select_columns=["sortable_datetime", "summary_dump"],
+        select_columns=[datetime_field, "summary_dump"],
+        read_table=read_table,
     )
 
     raw_sql = f"""
@@ -182,12 +190,12 @@ def build_usage_query(
         FROM
         (
           SELECT
-            {bucket_expr.format(tz=param_slot(tz_param, "String"))} AS bucket,
+            {time_bounds.bucket_expr.format(tz=param_slot(tz_param, "String"))} AS bucket,
             kv.1 AS model{inner_metric_sql}
           FROM
           (
             SELECT
-              sortable_datetime,
+              {datetime_field},
               JSONExtractRaw(ifNull(summary_dump, '{{}}'), 'usage') AS usage_raw
             FROM (
               {grouped_calls_sql}
@@ -210,11 +218,11 @@ def build_usage_query(
     ORDER BY all_buckets.bucket, all_models.model
     """
 
-    return (
-        safely_format_sql(raw_sql, logger),
-        columns,
-        pb.get_params(),
-        granularity_seconds,
-        start,
-        end,
+    return StatsQueryBuildResult(
+        sql=safely_format_sql(raw_sql, logger),
+        columns=columns,
+        parameters=pb.get_params(),
+        granularity_seconds=granularity_seconds,
+        start=time_bounds.start,
+        end=time_bounds.end,
     )

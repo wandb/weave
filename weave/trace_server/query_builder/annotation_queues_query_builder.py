@@ -4,7 +4,10 @@ This module provides query building functions for the queue-based call annotatio
 following the same patterns as threads_query_builder.py and other query builders in the codebase.
 """
 
-from weave.trace_server.calls_query_builder.calls_query_builder import ReadTable
+from weave.trace_server.calls_query_builder.calls_query_builder import (
+    ReadTable,
+    _format_table_name_with_cluster,
+)
 from weave.trace_server.common_interface import (
     AnnotationQueueItemsFilter,
     SortBy,
@@ -227,6 +230,43 @@ def make_queue_create_query(
     return query
 
 
+def make_queue_delete_query(
+    project_id: str,
+    queue_id: str,
+    pb: ParamBuilder,
+    cluster_name: str | None = None,
+) -> str:
+    """Generate an UPDATE query to soft-delete an annotation queue.
+
+    Sets the deleted_at timestamp to the current time.
+
+    Args:
+        project_id: The project ID
+        queue_id: The queue ID (UUID as string)
+        pb: Parameter builder for safe SQL parameter injection
+        cluster_name: Optional ClickHouse cluster name for distributed mutations
+
+    Returns:
+        SQL query string for soft-deleting a queue
+    """
+    project_id_param = pb.add_param(project_id)
+    queue_id_param = pb.add_param(queue_id)
+
+    # Format table name with ON CLUSTER if cluster_name is provided
+    formatted_table = _format_table_name_with_cluster("annotation_queues", cluster_name)
+
+    query = f"""
+    UPDATE {formatted_table} SET
+        deleted_at = now64(3),
+        updated_at = now64(3)
+    WHERE project_id = {{{project_id_param}: String}}
+        AND id = {{{queue_id_param}: String}}
+        AND deleted_at IS NULL
+    """
+
+    return query
+
+
 def make_queue_add_calls_check_duplicates_query(
     project_id: str,
     queue_id: str,
@@ -423,6 +463,10 @@ def make_queue_items_query(
 
     # Add filters that can be applied directly on queue_items table
     if filter is not None:
+        if filter.id is not None:
+            param = pb.add(filter.id, None, "String")
+            where_clauses.append(f"qi.id = {param}")
+
         if filter.call_id is not None:
             param = pb.add(filter.call_id, None, "String")
             where_clauses.append(f"qi.call_id = {param}")
@@ -532,3 +576,48 @@ def make_queue_items_query(
         sql_query += f" OFFSET {{{offset_param}: Int64}}"
 
     return sql_query
+
+
+def make_annotator_progress_update_query(
+    project_id: str,
+    queue_item_id: str,
+    annotator_id: str,
+    annotation_state: str,
+    pb: ParamBuilder,
+    cluster_name: str | None = None,
+) -> str:
+    """Generate an UPDATE query to update annotator progress for a queue item.
+
+    Args:
+        project_id: The project ID
+        queue_item_id: The queue item ID (UUID as string)
+        annotator_id: The annotator's wb_user_id
+        annotation_state: The new annotation state
+        pb: Parameter builder for safe SQL parameter injection
+        cluster_name: Optional ClickHouse cluster name for distributed mutations
+
+    Returns:
+        SQL query string for updating annotator progress
+    """
+    project_id_param = pb.add_param(project_id)
+    queue_item_id_param = pb.add_param(queue_item_id)
+    annotator_id_param = pb.add_param(annotator_id)
+    annotation_state_param = pb.add_param(annotation_state)
+
+    # Format table name with ON CLUSTER if cluster_name is provided
+    formatted_table = _format_table_name_with_cluster(
+        "annotator_queue_items_progress", cluster_name
+    )
+
+    query = f"""
+    UPDATE {formatted_table}
+    SET
+        annotation_state = {{{annotation_state_param}: String}},
+        updated_at = now64(3)
+    WHERE project_id = {{{project_id_param}: String}}
+      AND queue_item_id = {{{queue_item_id_param}: String}}
+      AND annotator_id = {{{annotator_id_param}: String}}
+      AND deleted_at IS NULL
+    """
+
+    return query

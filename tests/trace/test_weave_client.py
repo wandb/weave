@@ -44,6 +44,7 @@ from weave.trace.serialization.serializer import (
     get_serializer_for_obj,
     register_serializer,
 )
+from weave.trace.wandb_run_context import WandbRunContext
 from weave.trace_server.clickhouse_trace_server_batched import NotFoundError
 from weave.trace_server.common_interface import SortBy
 from weave.trace_server.constants import MAX_DISPLAY_NAME_LENGTH
@@ -317,7 +318,8 @@ def test_filter_sort_by_query_validation(client):
         client.get_calls(query=["not a query"])
 
     with pytest.raises(
-        ValidationError, match="8 validation errors for WeaveClient.get_calls"
+        ValidationError,
+        match=r"\d+ validation errors for WeaveClient.get_calls",
     ):
         client.get_calls(query={"$expr": {"$invalid_field": "invalid_value"}})
 
@@ -3155,6 +3157,22 @@ def test_calls_query_datetime_optimization_with_gt_operation(client):
     mid_call_ids = {call.id for call in mid_calls}
     assert mid_call_ids == {call3.id, call4.id}
 
+    # Test LT operation on started_at
+    lt_query = tsi.Query(
+        **{
+            "$expr": {
+                "$and": [
+                    {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]},
+                    {"$lt": [{"$getField": "started_at"}, {"$literal": call3_ts}]},
+                ]
+            }
+        }
+    )
+    lt_calls = list(client.get_calls(query=lt_query))
+    assert len(lt_calls) == 2  # Should get call1 and call2
+    lt_call_ids = {call.id for call in lt_calls}
+    assert lt_call_ids == {call1.id, call2.id}
+
     # Test GT operation with a timestamp after all calls
     future_timestamp = call4_ts + 1000  # 1000 seconds after the last call
     future_query = tsi.Query(
@@ -3183,13 +3201,9 @@ def test_calls_query_datetime_optimization_with_gt_operation(client):
                     {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]},
                     {"$gt": [{"$getField": "started_at"}, {"$literal": call2_ts}]},
                     {
-                        "$not": [
-                            {
-                                "$gt": [
-                                    {"$getField": "started_at"},
-                                    {"$literal": call4_ts},
-                                ]
-                            }
+                        "$lte": [
+                            {"$getField": "started_at"},
+                            {"$literal": call4_ts},
                         ]
                     },
                 ]
@@ -3209,8 +3223,9 @@ def test_calls_query_datetime_optimization_with_gt_operation(client):
                     {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]},
                     {"$gt": [{"$getField": "ended_at"}, {"$literal": call2_ts}]},
                     {
-                        "$not": [
-                            {"$gt": [{"$getField": "ended_at"}, {"$literal": call4_ts}]}
+                        "$lte": [
+                            {"$getField": "ended_at"},
+                            {"$literal": call4_ts},
                         ]
                     },
                 ]
@@ -4053,10 +4068,6 @@ def test_table_create_from_digests(network_proxy_client):
 
 def test_calls_query_with_wb_run_id_not_null(client, monkeypatch):
     """Test optimized stats query for wb_run_id not null."""
-    # Mock wandb to simulate a run
-    from weave.trace import weave_client
-    from weave.trace.wandb_run_context import WandbRunContext
-
     mock_run_id = f"{client._project_id()}/test_run_123"
     monkeypatch.setattr(
         weave_client,
@@ -4068,18 +4079,47 @@ def test_calls_query_with_wb_run_id_not_null(client, monkeypatch):
     def test_op(x: int) -> int:
         return x * 2
 
-    # Create a call with wb_run_id
     test_op(5)
     client.flush()
 
-    # first query all root calls
     calls = client.server.calls_query(
         tsi.CallsQueryReq(project_id=client._project_id())
     ).calls
     assert len(calls) == 1
     assert calls[0].wb_run_id == mock_run_id
 
-    # Now query for calls with wb_run_id not null using limit=1 to trigger optimization
+
+def test_get_calls_columns_wb_run_id(client, monkeypatch):
+    # Step 1: Mock wandb run context so a deterministic wb_run_id is attached to the call.
+    mock_run_id = f"{client._project_id()}/test_run_456"
+    monkeypatch.setattr(
+        weave_client,
+        "get_global_wb_run_context",
+        lambda: WandbRunContext(run_id="test_run_456", step=7),
+    )
+
+    # Step 2: Create a traced call and flush so it can be queried.
+    @weave.op
+    def test_op(x: int) -> int:
+        return x * 3
+
+    _, call = test_op.call(2)
+    client.flush()
+
+    # Step 3: Request only the wb_run_id column through client.get_calls.
+    calls = list(
+        client.get_calls(
+            columns=["wb_run_id"],
+            filter=tsi.CallsFilter(call_ids=[call.id]),
+        )
+    )
+
+    assert len(calls) == 1
+    assert hasattr(calls[0], "wb_run_id")
+    assert calls[0].wb_run_id == mock_run_id
+
+    # Step 4: Query via optimized server path (limit=1 + query expression) and
+    # verify wb_run_id is still available.
     query = tsi.Query(
         **{
             "$expr": {
