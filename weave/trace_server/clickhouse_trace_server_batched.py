@@ -6742,9 +6742,7 @@ def _setup_completion_model_info(
     base_url: str | None = None
     extra_headers: dict[str, str] = {}
     return_type: str | None = None
-    vertex_credentials: str | None = getattr(
-        req.inputs, "vertex_credentials", None
-    )
+    vertex_credentials: str | None = getattr(req.inputs, "vertex_credentials", None)
 
     # Check for explicit custom provider prefix
     is_explicit_custom = model_name.startswith("custom::")
@@ -6843,10 +6841,15 @@ def _setup_completion_model_info(
         is_vertex_provider = provider in ("vertex_ai", "vertex_ai-language-models")
         if is_vertex_provider and vertex_credentials:
             api_key = None  # Use vertex_credentials instead
-        if not api_key and provider not in (
-            "bedrock",
-            "bedrock_converse",
-        ) and not (is_vertex_provider and vertex_credentials):
+        if (
+            not api_key
+            and provider
+            not in (
+                "bedrock",
+                "bedrock_converse",
+            )
+            and not (is_vertex_provider and vertex_credentials)
+        ):
             raise MissingLLMApiKeyError(
                 f"No API key {secret_name} found for model {model_name}",
                 api_key_name=secret_name,
