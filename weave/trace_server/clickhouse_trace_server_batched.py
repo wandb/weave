@@ -237,6 +237,14 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self._evaluate_model_dispatcher = evaluate_model_dispatcher
         self._table_routing_resolver: TableRoutingResolver | None = None
 
+    def __del__(self) -> None:
+        """Flush the Kafka producer on cleanup to avoid dropping in-flight messages."""
+        if self._kafka_producer is not None:
+            try:
+                self._kafka_producer.flush()
+            except Exception:
+                pass
+
     @property
     def _flush_immediately(self) -> bool:
         return getattr(self._thread_local, "flush_immediately", True)
@@ -635,9 +643,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self._insert_call(ch_call)
 
         if publish:
-            # Use self._flush_immediately to determine whether to flush Kafka.
-            # Inside call_batch() context this is False (batch flushes on exit),
-            # outside batch context this is True so we flush per-request.
             _maybe_enqueue_minimal_call_end(
                 self.kafka_producer,
                 req.end.project_id,
@@ -746,9 +751,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             if self._flush_immediately:
                 self._flush_calls()
 
-        # Use self._flush_immediately to determine whether to flush Kafka.
-        # Inside call_batch() context this is False (batch flushes on exit),
-        # outside batch context this is True so we flush per-request.
         _maybe_enqueue_minimal_call_end(
             self.kafka_producer,
             req.end.project_id,
