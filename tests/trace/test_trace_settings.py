@@ -10,7 +10,12 @@ import tenacity
 import weave
 from tests.trace.util import capture_output, flushing_callback
 from weave.trace.constants import TRACE_CALL_EMOJI, TRACE_OBJECT_EMOJI
-from weave.trace.settings import UserSettings, parse_and_apply_settings
+from weave.trace.settings import (
+    UserSettings,
+    parse_and_apply_settings,
+    should_disable_weave,
+    should_print_call_link,
+)
 from weave.trace.weave_client import get_parallelism_settings
 from weave.utils.retry import with_retry
 
@@ -34,6 +39,21 @@ def test_disabled_setting(client):
     assert disabled_time * 10 < enabled_time, (
         "Disabled weave should be faster than enabled weave"
     )
+
+
+@pytest.mark.trace_server
+def test_reused_usersettings_instance_does_not_reset():
+    settings = UserSettings(disabled=True, print_call_link=False)
+
+    parse_and_apply_settings(settings)
+    assert should_disable_weave() is True
+    assert should_print_call_link() is False
+
+    parse_and_apply_settings(settings)
+    assert should_disable_weave() is True
+    assert should_print_call_link() is False
+    assert settings.disabled is True
+    assert settings.print_call_link is False
 
 
 def test_disabled_env(client):

@@ -15,7 +15,7 @@ from contextvars import ContextVar
 from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, PrivateAttr
+from pydantic import BaseModel, ConfigDict
 
 SETTINGS_PREFIX = "WEAVE_"
 
@@ -228,18 +228,8 @@ class UserSettings(BaseModel):
     """
 
     model_config = ConfigDict(extra="forbid")
-    _is_first_apply: bool = PrivateAttr(True)
-
-    def _reset(self) -> None:
-        for name, field in self.model_fields.items():
-            setattr(self, name, field.default)
 
     def apply(self) -> None:
-        if self._is_first_apply:
-            self._is_first_apply = False
-        else:
-            self._reset()
-
         for name in self.model_fields:
             context_var = _context_vars[name]
             context_var.set(getattr(self, name))
