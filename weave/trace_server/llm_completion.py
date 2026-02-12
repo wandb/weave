@@ -230,6 +230,7 @@ def lite_llm_completion(
     base_url: str | None = None,
     extra_headers: dict[str, str] | None = None,
     return_type: str | None = None,
+    vertex_credentials: str | None = None,
 ) -> tsi.CompletionsCreateRes:
     # Setup provider-specific credentials and model modifications
     (
@@ -247,7 +248,8 @@ def lite_llm_completion(
 
     # Exclude weave-specific fields that litellm doesn't understand
     inputs_dict = inputs.model_dump(
-        exclude_none=True, exclude={"prompt", "template_vars"}
+        exclude_none=True,
+        exclude={"prompt", "template_vars", "vertex_credentials"},
     )
 
     # Handle custom provider
@@ -284,15 +286,23 @@ def lite_llm_completion(
         )
 
     try:
-        res = litellm.completion(
+        # For vertex_ai / vertex_ai-language-models, use vertex_credentials when provided instead of api_key
+        is_vertex_provider = provider in ("vertex_ai", "vertex_ai-language-models")
+        api_key_for_call = api_key
+        if is_vertex_provider and vertex_credentials:
+            api_key_for_call = None
+        completion_kwargs: dict[str, Any] = {
             **inputs_dict,
-            api_key=api_key,
-            aws_access_key_id=aws_access_key_id,
-            aws_secret_access_key=aws_secret_access_key,
-            aws_region_name=aws_region_name,
-            api_base=azure_api_base,
-            api_version=azure_api_version,
-        )
+            "api_key": api_key_for_call,
+            "aws_access_key_id": aws_access_key_id,
+            "aws_secret_access_key": aws_secret_access_key,
+            "aws_region_name": aws_region_name,
+            "api_base": azure_api_base,
+            "api_version": azure_api_version,
+        }
+        if is_vertex_provider and vertex_credentials:
+            completion_kwargs["vertex_credentials"] = vertex_credentials
+        res = litellm.completion(**completion_kwargs)
         return tsi.CompletionsCreateRes(response=res.model_dump())
     except Exception as e:
         error_message = str(e)
@@ -526,6 +536,7 @@ def lite_llm_completion_stream(
     base_url: str | None = None,
     extra_headers: dict[str, str] | None = None,
     return_type: str | None = None,
+    vertex_credentials: str | None = None,
 ) -> Iterator[dict[str, Any]]:
     """Stream completion chunks from the underlying LLM provider using litellm.
 
@@ -570,17 +581,30 @@ def lite_llm_completion_stream(
                     stream_options={"include_usage": True},
                 )
             else:
-                stream = litellm.completion(
-                    **inputs.model_dump(exclude_none=True),
-                    api_key=api_key,
-                    aws_access_key_id=aws_access_key_id,
-                    aws_secret_access_key=aws_secret_access_key,
-                    aws_region_name=aws_region_name,
-                    api_base=azure_api_base,
-                    api_version=azure_api_version,
-                    stream=True,
-                    stream_options={"include_usage": True},
+                is_vertex_provider = provider in (
+                    "vertex_ai",
+                    "vertex_ai-language-models",
                 )
+                api_key_for_call = api_key
+                if is_vertex_provider and vertex_credentials:
+                    api_key_for_call = None
+                stream_kwargs: dict[str, Any] = {
+                    **inputs.model_dump(
+                        exclude_none=True,
+                        exclude={"prompt", "template_vars", "vertex_credentials"},
+                    ),
+                    "api_key": api_key_for_call,
+                    "aws_access_key_id": aws_access_key_id,
+                    "aws_secret_access_key": aws_secret_access_key,
+                    "aws_region_name": aws_region_name,
+                    "api_base": azure_api_base,
+                    "api_version": azure_api_version,
+                    "stream": True,
+                    "stream_options": {"include_usage": True},
+                }
+                if is_vertex_provider and vertex_credentials:
+                    stream_kwargs["vertex_credentials"] = vertex_credentials
+                stream = litellm.completion(**stream_kwargs)
 
             for chunk in stream:
                 # ``chunk`` is a BaseModel (ChatCompletionChunk). Convert to dict.

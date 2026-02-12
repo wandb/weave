@@ -5191,9 +5191,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # Use shared setup logic
         model_info = self._model_to_provider_info_map.get(req.inputs.model)
         try:
-            model_name, api_key, provider, base_url, extra_headers, return_type = (
-                _setup_completion_model_info(model_info, req, self.obj_read)
-            )
+            (
+                model_name,
+                api_key,
+                provider,
+                base_url,
+                extra_headers,
+                return_type,
+                vertex_credentials,
+            ) = _setup_completion_model_info(model_info, req, self.obj_read)
         except Exception as e:
             return tsi.CompletionsCreateRes(response={"error": str(e)})
 
@@ -5208,6 +5214,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             base_url=base_url,
             extra_headers=extra_headers,
             return_type=return_type,
+            vertex_credentials=vertex_credentials,
         )
 
         end_time = datetime.datetime.now()
@@ -5232,7 +5239,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             wb_user_id=req.wb_user_id,
             op_name=COMPLETIONS_CREATE_OP_NAME,
             started_at=start_time,
-            inputs={**req.inputs.model_dump(exclude_none=True)},
+            inputs={
+                **req.inputs.model_dump(
+                    exclude_none=True, exclude={"vertex_credentials"}
+                )
+            },
             attributes={},
         )
         start_call = _start_call_for_insert_to_ch_insertable_start_call(start)
@@ -5313,6 +5324,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 base_url,
                 extra_headers,
                 return_type,
+                vertex_credentials,
             ) = _setup_completion_model_info(model_info, req, self.obj_read)
         except Exception as e:
             # Yield error as single chunk then stop.
@@ -5341,7 +5353,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
             # Prepare inputs for tracking: use original messages (with template syntax)
             # and include prompt and template_vars
-            tracked_inputs = req.inputs.model_dump(exclude_none=True)
+            tracked_inputs = req.inputs.model_dump(
+                exclude_none=True, exclude={"vertex_credentials"}
+            )
             tracked_inputs["model"] = model_name
             tracked_inputs["messages"] = initial_messages
             if prompt:
@@ -5380,6 +5394,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             base_url=base_url,
             extra_headers=extra_headers,
             return_type=return_type,
+            vertex_credentials=vertex_credentials,
         )
 
         # If tracking not requested just return chunks directly
@@ -6715,11 +6730,11 @@ def _setup_completion_model_info(
     model_info: LLMModelProviderInfo | None,
     req: tsi.CompletionsCreateReq,
     obj_read: Callable[[tsi.ObjReadReq], tsi.ObjReadRes],
-) -> tuple[str, str | None, str, str | None, dict[str, str], str | None]:
+) -> tuple[str, str | None, str, str | None, dict[str, str], str | None, str | None]:
     """Extract model setup logic shared between completions_create and completions_create_stream.
 
-    Returns: (model_name, api_key, provider, base_url, extra_headers, return_type)
-    Note: api_key can be None for bedrock providers since they use AWS credentials instead.
+    Returns: (model_name, api_key, provider, base_url, extra_headers, return_type, vertex_credentials)
+    Note: api_key can be None for bedrock providers (AWS credentials) or vertex_ai when vertex_credentials is provided.
     """
     model_name = req.inputs.model
     api_key: str | None = None
@@ -6727,6 +6742,9 @@ def _setup_completion_model_info(
     base_url: str | None = None
     extra_headers: dict[str, str] = {}
     return_type: str | None = None
+    vertex_credentials: str | None = getattr(
+        req.inputs, "vertex_credentials", None
+    )
 
     # Check for explicit custom provider prefix
     is_explicit_custom = model_name.startswith("custom::")
@@ -6746,6 +6764,15 @@ def _setup_completion_model_info(
             extra_headers = req.inputs.extra_headers
             req.inputs.extra_headers = None
         return_type = "openai"
+        return (
+            model_name,
+            api_key,
+            provider,
+            base_url,
+            extra_headers,
+            return_type,
+            None,  # vertex_credentials
+        )
     elif is_explicit_custom:
         # Custom provider path - model_name format: custom::<provider>::<model>
         # Parse provider and model names, create sanitized object_id for lookup
@@ -6798,6 +6825,7 @@ def _setup_completion_model_info(
             base_url,
             custom_provider_info.extra_headers,
             custom_provider_info.return_type,
+            None,  # vertex_credentials
         )
     elif model_info:
         secret_name = model_info.get("api_key_name")
@@ -6812,12 +6840,28 @@ def _setup_completion_model_info(
 
         api_key = secret_fetcher.fetch(secret_name).get("secrets", {}).get(secret_name)
         provider = model_info.get("litellm_provider", "openai")
-
-        if not api_key and provider not in ("bedrock", "bedrock_converse"):
+        is_vertex_provider = provider in ("vertex_ai", "vertex_ai-language-models")
+        if is_vertex_provider and vertex_credentials:
+            api_key = None  # Use vertex_credentials instead
+        if not api_key and provider not in (
+            "bedrock",
+            "bedrock_converse",
+        ) and not (is_vertex_provider and vertex_credentials):
             raise MissingLLMApiKeyError(
                 f"No API key {secret_name} found for model {model_name}",
                 api_key_name=secret_name,
             )
+
+    # Detect vertex_ai from model name when not in provider map (e.g. vertex_ai/gemini-2.5-pro)
+    if not model_info and (
+        model_name.startswith("vertex_ai/")
+        or model_name.startswith("vertex_ai-language-models/")
+    ):
+        provider = (
+            "vertex_ai-language-models"
+            if model_name.startswith("vertex_ai-language-models/")
+            else "vertex_ai"
+        )
 
     return (
         model_name,
@@ -6826,6 +6870,7 @@ def _setup_completion_model_info(
         base_url,
         extra_headers,
         return_type,
+        vertex_credentials,
     )
 
 
