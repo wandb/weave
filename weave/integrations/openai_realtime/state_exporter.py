@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 from dataclasses import field
 import logging
 import threading
@@ -16,6 +17,16 @@ from weave.trace.weave_client import Call
 from weave.type_wrappers.Content import Content
 
 logger = logging.getLogger(__name__)
+
+# Content types that represent audio output from the model.
+# Both "audio" (beta API) and "output_audio" (GA API) map to the same handling.
+OUTPUT_AUDIO_TYPES = ("audio", "output_audio")
+INPUT_AUDIO_TYPES = ("audio", "input_audio")
+
+
+def _get_from_dict(obj: Any, key: str, default: Any = None) -> Any:
+    """Safely get a value from obj if it's a dict, otherwise return default."""
+    return obj.get(key, default) if isinstance(obj, dict) else default
 
 
 class SessionSpan(BaseModel):
@@ -279,7 +290,7 @@ class StateExporter(BaseModel):
             content_list = output.get("content", [])
             for content_idx, content in enumerate(content_list):
                 content_type = content.get("type")
-                if content_type in ("audio", "output_audio"):
+                if content_type in OUTPUT_AUDIO_TYPES:
                     output_id = output.get("id")
                     audio = self.response_audio.get(output_id) if output_id else None
                     if not audio:
@@ -316,6 +327,14 @@ class StateExporter(BaseModel):
             prev_item = self.items.get(prev_id)
         return inputs
 
+    @staticmethod
+    def _apply_transcript(item: dict, content_index: int | None, transcript: str | None) -> None:
+        """Update the transcript field on an item's content entry at the given index."""
+        if content_index is not None and isinstance(item.get("content"), list):
+            content_list = item["content"]
+            if content_index < len(content_list):
+                content_list[content_index]["transcript"] = transcript
+
     def handle_item_input_audio_transcription_completed(self, msg: dict) -> None:
         item_id = msg.get("item_id")
         if not item_id:
@@ -323,14 +342,10 @@ class StateExporter(BaseModel):
         item = self.items.get(item_id)
         if not item:
             return
-        content_index = msg.get("content_index")
-        transcript = msg.get("transcript")
-        if content_index is not None and isinstance(item.get("content"), list):
-            content_list = item["content"]
-            if content_index < len(content_list):
-                content_list[content_index]["transcript"] = transcript
+        self._apply_transcript(item, msg.get("content_index"), msg.get("transcript"))
         self.items[item_id] = item
         self.transcript_completed.add(item_id)
+        # A transcript becoming available may unblock the head of the FIFO
         self._schedule_fifo_check()
 
     def _resolve_audio(self, msg: dict) -> Any:
@@ -340,20 +355,23 @@ class StateExporter(BaseModel):
         msg_dict = dict(msg)
         item_id = msg.get("id")
         content_list = msg.get("content", [])
+
         for content_idx, content in enumerate(content_list):
             audio = None
             content_type = content.get("type")
-            if content_type == "input_audio":
+            if content_type == INPUT_AUDIO_TYPE:
                 audio = self._get_item_audio(item_id) if item_id else None
-            elif content_type in ("audio", "output_audio"):
+            elif content_type in OUTPUT_AUDIO_TYPES:
                 audio = self.response_audio.get(item_id) if item_id else None
+                audio = pcm_to_wav(audio)
 
-            if not audio:
-                continue
-            audio = pcm_to_wav(audio)
-            msg_dict["content"][content_idx]["audio"] = Content.from_bytes(
-                audio, extension=".wav"
-            )
+            if audio:
+                audio = pcm_to_wav(audio)
+                content_list[content_idx][content_type] = Content.from_bytes(
+                    audio, extension=".wav"
+                )
+        if len(content_list) > 0:
+            msg_dict["content"] = content_list
 
         return msg_dict
 
@@ -443,7 +461,7 @@ class StateExporter(BaseModel):
                 for content_idx, content in enumerate(content_list):
                     content_dict = dict(content)
                     content_type = content.get("type")
-                    if content_type in ("audio", "output_audio"):
+                    if content_type in OUTPUT_AUDIO_TYPES:
                         audio_bytes = (
                             self.response_audio.get(item_id) if item_id else None
                         )
@@ -459,6 +477,7 @@ class StateExporter(BaseModel):
         client.finish_call(call, output=output_dict)
 
     def handle_response_done(self, msg: dict) -> None:
+        # Update state to the completed version and enqueue for FIFO completion.
         response = msg.get("response", {})
         response_id = response.get("id")
         if response_id:
@@ -477,9 +496,10 @@ class StateExporter(BaseModel):
 
         messages = self._get_input_item_list(response.get("output", []))
 
+        # Store the prepared context for this response id
         ctx: dict[str, Any] = {
             "msg": msg,
-            "session": self.session_span.get_session() if self.session_span else None,
+            "session": copy.deepcopy(self.session_span.get_session()) if self.session_span else None,
             "pending_create_params": pending_create_params,
             "pending_response": pending_response,
             "messages": messages,
@@ -491,19 +511,19 @@ class StateExporter(BaseModel):
                 if response_id not in self.completion_queue:
                     self.completion_queue.append(response_id)
 
+        # Check if we can advance the FIFO now or schedule retries
         self._schedule_fifo_check()
 
     def _transcripts_ready_for_ctx(self, ctx: dict[str, Any]) -> bool:
         session = ctx.get("session")
         messages = ctx.get("messages", [])
-        modalities = session.get("modalities", []) if isinstance(session, dict) else []
+        modalities = _get_from_dict(session, "modalities", [])
         if session and "text" in modalities:
             for message in messages:
-                msg_id = message.get("id") if isinstance(message, dict) else None
                 if (
-                    message.get("type") == "message"
-                    and message.get("role") == "user"
-                    and msg_id not in self.transcript_completed
+                    _get_from_dict(message, "type") == "message"
+                    and _get_from_dict(message, "role") == "user"
+                    and _get_from_dict(message, "id") not in self.transcript_completed
                 ):
                     return False
         return True
@@ -565,7 +585,7 @@ class StateExporter(BaseModel):
 
             # Remove the head and continue to next (if it's immediately ready)
             with self.fifo_lock:
-                rid = msg.get("response", {}).get("id")
+                rid = _get_from_dict(_get_from_dict(msg, "response", {}), "id")
                 if rid and self.completion_queue and self.completion_queue[0] == rid:
                     self.completion_queue.pop(0)
                 if rid:
