@@ -44,6 +44,7 @@ from weave.trace.serialization.serializer import (
     get_serializer_for_obj,
     register_serializer,
 )
+from weave.trace.wandb_run_context import WandbRunContext
 from weave.trace_server.clickhouse_trace_server_batched import NotFoundError
 from weave.trace_server.common_interface import SortBy
 from weave.trace_server.constants import MAX_DISPLAY_NAME_LENGTH
@@ -4067,10 +4068,6 @@ def test_table_create_from_digests(network_proxy_client):
 
 def test_calls_query_with_wb_run_id_not_null(client, monkeypatch):
     """Test optimized stats query for wb_run_id not null."""
-    # Mock wandb to simulate a run
-    from weave.trace import weave_client
-    from weave.trace.wandb_run_context import WandbRunContext
-
     mock_run_id = f"{client._project_id()}/test_run_123"
     monkeypatch.setattr(
         weave_client,
@@ -4082,18 +4079,47 @@ def test_calls_query_with_wb_run_id_not_null(client, monkeypatch):
     def test_op(x: int) -> int:
         return x * 2
 
-    # Create a call with wb_run_id
     test_op(5)
     client.flush()
 
-    # first query all root calls
     calls = client.server.calls_query(
         tsi.CallsQueryReq(project_id=client._project_id())
     ).calls
     assert len(calls) == 1
     assert calls[0].wb_run_id == mock_run_id
 
-    # Now query for calls with wb_run_id not null using limit=1 to trigger optimization
+
+def test_get_calls_columns_wb_run_id(client, monkeypatch):
+    # Step 1: Mock wandb run context so a deterministic wb_run_id is attached to the call.
+    mock_run_id = f"{client._project_id()}/test_run_456"
+    monkeypatch.setattr(
+        weave_client,
+        "get_global_wb_run_context",
+        lambda: WandbRunContext(run_id="test_run_456", step=7),
+    )
+
+    # Step 2: Create a traced call and flush so it can be queried.
+    @weave.op
+    def test_op(x: int) -> int:
+        return x * 3
+
+    _, call = test_op.call(2)
+    client.flush()
+
+    # Step 3: Request only the wb_run_id column through client.get_calls.
+    calls = list(
+        client.get_calls(
+            columns=["wb_run_id"],
+            filter=tsi.CallsFilter(call_ids=[call.id]),
+        )
+    )
+
+    assert len(calls) == 1
+    assert hasattr(calls[0], "wb_run_id")
+    assert calls[0].wb_run_id == mock_run_id
+
+    # Step 4: Query via optimized server path (limit=1 + query expression) and
+    # verify wb_run_id is still available.
     query = tsi.Query(
         **{
             "$expr": {

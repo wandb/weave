@@ -16,6 +16,7 @@ from tests.trace.util import client_is_sqlite
 from tests.trace_server.conftest import TEST_ENTITY
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.common_interface import AnnotationQueueItemsFilter, SortBy
+from weave.trace_server.errors import NotFoundError
 from weave.trace_server.ids import generate_id
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer
 
@@ -2180,3 +2181,150 @@ def test_annotation_queue_add_calls_with_calls_complete_table(trace_server):
     assert stats_res.stats[0].completed_items == 0, (
         f"Expected 0 completed items, got {stats_res.stats[0].completed_items}"
     )
+
+
+def test_annotation_queue_read_nonexistent(client):
+    """Test that reading a non-existent annotation queue raises NotFoundError.
+
+    This test validates the iterator handling fix in annotation_queue_read where
+    an empty result set (iterator with no items) correctly raises NotFoundError
+    instead of raising StopIteration.
+    """
+    if client_is_sqlite(client):
+        pytest.skip("Annotation queues not supported in SQLite")
+
+    project_id = client._project_id()
+    nonexistent_queue_id = "00000000-0000-0000-0000-000000000000"
+
+    # Attempt to read a queue that doesn't exist
+    with pytest.raises(NotFoundError, match=f"Queue {nonexistent_queue_id} not found"):
+        client.server.annotation_queue_read(
+            tsi.AnnotationQueueReadReq(
+                project_id=project_id,
+                queue_id=nonexistent_queue_id,
+            )
+        )
+
+
+# ============================================================================
+# Tests for annotation_queue_delete
+# ============================================================================
+
+
+def test_annotation_queue_delete_basic(client):
+    """Test complete deletion lifecycle: delete, verify response, verify cannot read/delete again."""
+    if client_is_sqlite(client):
+        pytest.skip("Annotation queues not supported in SQLite")
+
+    # Create a queue
+    queue_id = create_annotation_queue(
+        client, name="Delete Test Queue", description="Queue to be deleted"
+    )
+
+    # Read the queue to verify it exists and capture original timestamps
+    read_req = tsi.AnnotationQueueReadReq(
+        project_id=client._project_id(),
+        queue_id=queue_id,
+    )
+    read_res = client.server.annotation_queue_read(read_req)
+    assert read_res.queue.id == queue_id
+    assert read_res.queue.deleted_at is None
+    original_created_at = read_res.queue.created_at
+
+    # Delete the queue
+    delete_req = tsi.AnnotationQueueDeleteReq(
+        project_id=client._project_id(),
+        queue_id=queue_id,
+        wb_user_id="test_user",
+    )
+    delete_res = client.server.annotation_queue_delete(delete_req)
+
+    # Verify response contains the deleted queue with deleted_at set
+    assert delete_res.queue.id == queue_id
+    assert delete_res.queue.name == "Delete Test Queue"
+    assert delete_res.queue.description == "Queue to be deleted"
+    assert delete_res.queue.deleted_at is not None
+    assert delete_res.queue.updated_at is not None
+
+    # Verify deleted_at and updated_at are timestamps
+    assert isinstance(delete_res.queue.deleted_at, datetime.datetime)
+    assert isinstance(delete_res.queue.updated_at, datetime.datetime)
+
+    # Verify created_at doesn't change
+    assert delete_res.queue.created_at == original_created_at
+
+    # Verify deleted queue cannot be read
+    read_req = tsi.AnnotationQueueReadReq(
+        project_id=client._project_id(),
+        queue_id=queue_id,
+    )
+    with pytest.raises(NotFoundError, match=f"Queue {queue_id} not found"):
+        client.server.annotation_queue_read(read_req)
+
+    # Verify already-deleted queue cannot be deleted again (idempotency)
+    delete_req = tsi.AnnotationQueueDeleteReq(
+        project_id=client._project_id(),
+        queue_id=queue_id,
+        wb_user_id="test_user",
+    )
+    with pytest.raises(
+        NotFoundError, match=f"Queue {queue_id} not found or already deleted"
+    ):
+        client.server.annotation_queue_delete(delete_req)
+
+
+def test_annotation_queue_delete_not_in_query(client):
+    """Test that deleted queues don't appear in query results."""
+    if client_is_sqlite(client):
+        pytest.skip("Annotation queues not supported in SQLite")
+
+    # Create two queues
+    queue1_id = create_annotation_queue(client, name="Queue 1")
+    queue2_id = create_annotation_queue(client, name="Queue 2")
+
+    # Query all queues - should see both
+    query_req = tsi.AnnotationQueuesQueryReq(
+        project_id=client._project_id(),
+    )
+    queues = list(client.server.annotation_queues_query_stream(query_req))
+    queue_ids = {q.id for q in queues}
+    assert queue1_id in queue_ids
+    assert queue2_id in queue_ids
+
+    # Delete queue1
+    delete_req = tsi.AnnotationQueueDeleteReq(
+        project_id=client._project_id(),
+        queue_id=queue1_id,
+        wb_user_id="test_user",
+    )
+    client.server.annotation_queue_delete(delete_req)
+
+    # Query again - should only see queue2
+    query_req = tsi.AnnotationQueuesQueryReq(
+        project_id=client._project_id(),
+    )
+    queues = list(client.server.annotation_queues_query_stream(query_req))
+    queue_ids = {q.id for q in queues}
+    assert queue1_id not in queue_ids
+    assert queue2_id in queue_ids
+
+
+def test_annotation_queue_delete_nonexistent(client):
+    """Test that deleting a non-existent queue raises NotFoundError."""
+    if client_is_sqlite(client):
+        pytest.skip("Annotation queues not supported in SQLite")
+
+    nonexistent_queue_id = "00000000-0000-0000-0000-000000000000"
+
+    # Try to delete non-existent queue
+    delete_req = tsi.AnnotationQueueDeleteReq(
+        project_id=client._project_id(),
+        queue_id=nonexistent_queue_id,
+        wb_user_id="test_user",
+    )
+
+    with pytest.raises(
+        NotFoundError,
+        match=f"Queue {nonexistent_queue_id} not found or already deleted",
+    ):
+        client.server.annotation_queue_delete(delete_req)

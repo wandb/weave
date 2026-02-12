@@ -117,9 +117,13 @@ def assert_usage_sql(
         read_table: Which table to query (calls_merged or calls_complete)
     """
     pb = ParamBuilder("pb")
-    sql, cols, params, granularity_seconds, start, end = build_usage_query(
-        req, metrics, pb, read_table
-    )
+    query_result = build_usage_query(req, metrics, pb, read_table)
+    sql = query_result.sql
+    cols = query_result.columns
+    params = query_result.parameters
+    granularity_seconds = query_result.granularity_seconds
+    start = query_result.start
+    end = query_result.end
 
     exp_formatted = sqlparse.format(exp_query, reindent=True)
     found_formatted = sqlparse.format(sql, reindent=True)
@@ -165,9 +169,13 @@ def assert_call_metrics_sql(
         read_table: Which table to query (calls_merged or calls_complete)
     """
     pb = ParamBuilder("pb")
-    sql, cols, params, granularity_seconds, start, end = build_call_metrics_query(
-        req, metrics, pb, read_table
-    )
+    query_result = build_call_metrics_query(req, metrics, pb, read_table)
+    sql = query_result.sql
+    cols = query_result.columns
+    params = query_result.parameters
+    granularity_seconds = query_result.granularity_seconds
+    start = query_result.start
+    end = query_result.end
 
     exp_formatted = sqlparse.format(exp_query, reindent=True)
     found_formatted = sqlparse.format(sql, reindent=True)

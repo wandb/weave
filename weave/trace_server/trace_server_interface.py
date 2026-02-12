@@ -1001,6 +1001,11 @@ class FeedbackCreateReq(BaseModelStrict):
     trigger_ref: str | None = Field(
         default=None, examples=["weave:///entity/project/object/name:digest"]
     )
+    queue_id: str | None = Field(
+        default=None,
+        description="The annotation queue ID this feedback was created from. References annotation_queues.id. NULL when feedback is created outside of queues.",
+        examples=["018f1f2a-9c2b-7d3e-b5a1-8c9d2e4f6a7b"],
+    )
 
     # wb_user_id is automatically populated by the server
     wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
@@ -1278,6 +1283,20 @@ class AnnotationQueueReadReq(BaseModelStrict):
 
 class AnnotationQueueReadRes(BaseModel):
     """Response from reading an annotation queue."""
+
+    queue: AnnotationQueueSchema
+
+
+class AnnotationQueueDeleteReq(BaseModelStrict):
+    """Request to delete (soft-delete) an annotation queue."""
+
+    project_id: str = Field(examples=["entity/project"])
+    queue_id: str = Field(examples=["550e8400-e29b-41d4-a716-446655440000"])
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class AnnotationQueueDeleteRes(BaseModel):
+    """Response from deleting an annotation queue."""
 
     queue: AnnotationQueueSchema
 
@@ -2354,6 +2373,10 @@ class TraceServerInterface(Protocol):
     def annotation_queue_read(
         self, req: AnnotationQueueReadReq
     ) -> AnnotationQueueReadRes: ...
+
+    def annotation_queue_delete(
+        self, req: AnnotationQueueDeleteReq
+    ) -> AnnotationQueueDeleteRes: ...
 
     def annotation_queue_add_calls(
         self, req: AnnotationQueueAddCallsReq

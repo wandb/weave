@@ -1,4 +1,5 @@
 import datetime
+import json
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -12,6 +13,7 @@ from weave.trace_server.errors import (
     NotFoundError,
 )
 from weave.trace_server.llm_completion import get_custom_provider_info
+from weave.trace_server.project_version.types import WriteTarget
 from weave.trace_server.secret_fetcher_context import (
     _secret_fetcher_context,
 )
@@ -1309,6 +1311,204 @@ class TestResolveAndApplyPrompt(unittest.TestCase):
         # Second user message should have template vars applied
         self.assertEqual(combined[3]["role"], "user")
         self.assertEqual(combined[3]["content"], "Yes, my name is Alice.")
+
+
+@pytest.fixture
+def completions_mock_server():
+    """Create a mock ClickHouseTraceServer for completions tests."""
+    server = chts.ClickHouseTraceServer(host="test_host")
+    mock_ch_client = MagicMock()
+    mock_ch_client.query.return_value = MagicMock(result_rows=[[0, 0]])
+    server._thread_local.ch_client = mock_ch_client
+    return server
+
+
+@pytest.fixture
+def completions_secret_fetcher():
+    """Set up mock secret fetcher with test API key."""
+    mock_fetcher = MagicMock()
+    mock_fetcher.fetch.return_value = {
+        "secrets": {"OPENAI_API_KEY": "test-api-key-value"}
+    }
+    token = _secret_fetcher_context.set(mock_fetcher)
+    yield mock_fetcher
+    _secret_fetcher_context.reset(token)
+
+
+@pytest.fixture
+def completions_mock_response():
+    """Standard mock LLM response for completions tests."""
+    return {
+        "id": "chatcmpl-123",
+        "object": "chat.completion",
+        "created": 1234567890,
+        "model": "gpt-3.5-turbo",
+        "choices": [
+            {
+                "index": 0,
+                "message": {"role": "assistant", "content": "Hello!"},
+                "finish_reason": "stop",
+            }
+        ],
+        "usage": {
+            "prompt_tokens": 10,
+            "completion_tokens": 5,
+            "total_tokens": 15,
+        },
+    }
+
+
+@pytest.mark.parametrize(
+    ("write_target", "expect_complete_called", "expect_batch_called"),
+    [
+        pytest.param("CALLS_COMPLETE", True, False, id="routes_to_calls_complete"),
+        pytest.param("CALLS_MERGED", False, True, id="routes_to_calls_merged"),
+    ],
+)
+def test_completions_write_target_routing(
+    completions_mock_server,
+    completions_secret_fetcher,
+    completions_mock_response,
+    write_target,
+    expect_complete_called,
+    expect_batch_called,
+):
+    """Verify completions_create routes writes to the correct table based on project write target."""
+    target = getattr(WriteTarget, write_target)
+
+    with (
+        patch(
+            "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion"
+        ) as mock_litellm,
+        patch.object(
+            completions_mock_server.table_routing_resolver, "resolve_v2_write_target"
+        ) as mock_resolve,
+        patch.object(
+            chts.ClickHouseTraceServer, "_insert_call_complete"
+        ) as mock_insert_complete,
+        patch.object(
+            chts.ClickHouseTraceServer, "_insert_call_batch"
+        ) as mock_insert_batch,
+    ):
+        mock_litellm.return_value = MagicMock(response=completions_mock_response)
+        mock_resolve.return_value = target
+
+        req = tsi.CompletionsCreateReq(
+            project_id="dGVzdF9wcm9qZWN0",  # base64 of "test_project"
+            inputs=tsi.CompletionsCreateRequestInputs(
+                model="gpt-3.5-turbo",
+                messages=[{"role": "user", "content": "Say hello"}],
+            ),
+            track_llm_call=True,
+        )
+
+        result = completions_mock_server.completions_create(req)
+
+        mock_resolve.assert_called_once()
+        assert mock_insert_complete.called == expect_complete_called
+        assert mock_insert_batch.called == expect_batch_called
+        assert result.weave_call_id is not None
+        assert result.response["choices"][0]["message"]["content"] == "Hello!"
+
+        if expect_batch_called:
+            batch_data = mock_insert_batch.call_args[0][0]
+            assert len(batch_data) == 2  # start + end
+
+
+@pytest.mark.parametrize(
+    ("write_target", "check_exception_field"),
+    [
+        pytest.param("CALLS_COMPLETE", True, id="calls_complete_captures_error"),
+        pytest.param("CALLS_MERGED", False, id="calls_merged_captures_error"),
+    ],
+)
+def test_completions_handles_error_response(
+    completions_mock_server,
+    completions_secret_fetcher,
+    write_target,
+    check_exception_field,
+):
+    """Verify error responses are properly captured in both write paths."""
+    target = getattr(WriteTarget, write_target)
+    error_response = {"error": "Rate limit exceeded", "choices": []}
+
+    with (
+        patch(
+            "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion"
+        ) as mock_litellm,
+        patch.object(
+            completions_mock_server.table_routing_resolver, "resolve_v2_write_target"
+        ) as mock_resolve,
+        patch.object(
+            chts.ClickHouseTraceServer, "_insert_call_complete"
+        ) as mock_insert_complete,
+        patch.object(
+            chts.ClickHouseTraceServer, "_insert_call_batch"
+        ) as mock_insert_batch,
+    ):
+        mock_litellm.return_value = MagicMock(response=error_response)
+        mock_resolve.return_value = target
+
+        req = tsi.CompletionsCreateReq(
+            project_id="dGVzdF9wcm9qZWN0",  # base64 of "test_project"
+            inputs=tsi.CompletionsCreateRequestInputs(
+                model="gpt-3.5-turbo",
+                messages=[{"role": "user", "content": "Say hello"}],
+            ),
+            track_llm_call=True,
+        )
+
+        result = completions_mock_server.completions_create(req)
+
+        assert result.response["error"] == "Rate limit exceeded"
+
+        if check_exception_field:
+            mock_insert_complete.assert_called_once()
+            ch_call = mock_insert_complete.call_args[0][0]
+            assert ch_call.exception == "Rate limit exceeded"
+        else:
+            mock_insert_batch.assert_called_once()
+
+
+def test_completions_usage_captured_in_summary(
+    completions_mock_server, completions_secret_fetcher, completions_mock_response
+):
+    """Verify usage data is properly captured in summary for calls_complete."""
+    with (
+        patch(
+            "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion"
+        ) as mock_litellm,
+        patch.object(
+            completions_mock_server.table_routing_resolver, "resolve_v2_write_target"
+        ) as mock_resolve,
+        patch.object(
+            chts.ClickHouseTraceServer, "_insert_call_complete"
+        ) as mock_insert_complete,
+    ):
+        mock_litellm.return_value = MagicMock(response=completions_mock_response)
+        mock_resolve.return_value = WriteTarget.CALLS_COMPLETE
+
+        req = tsi.CompletionsCreateReq(
+            project_id="dGVzdF9wcm9qZWN0",  # base64 of "test_project"
+            inputs=tsi.CompletionsCreateRequestInputs(
+                model="gpt-3.5-turbo",
+                messages=[{"role": "user", "content": "Say hello"}],
+            ),
+            track_llm_call=True,
+        )
+
+        completions_mock_server.completions_create(req)
+
+        mock_insert_complete.assert_called_once()
+        ch_call = mock_insert_complete.call_args[0][0]
+
+        summary = json.loads(ch_call.summary_dump)
+        assert "usage" in summary
+        assert "gpt-3.5-turbo" in summary["usage"]
+        usage = summary["usage"]["gpt-3.5-turbo"]
+        assert usage["prompt_tokens"] == 10
+        assert usage["completion_tokens"] == 5
+        assert usage["total_tokens"] == 15
 
 
 if __name__ == "__main__":
