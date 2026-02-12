@@ -17,6 +17,11 @@ except ImportError:
     ClientWebSocketResponse = None
     WSMsgType = None
 
+try:
+    from websockets.exceptions import ConnectionClosed as AsyncWSConnectionClosed
+except ImportError:
+    AsyncWSConnectionClosed = Exception
+
 
 def _try_json_load(data: Any) -> Any:
     if isinstance(data, str):
@@ -248,7 +253,7 @@ class WeaveAsyncWebsocketConnection:
     async def __anext__(self) -> Any:
         try:
             return await self.recv()
-        except self.original_connection.ConnectionClosed:
+        except AsyncWSConnectionClosed:
             raise StopAsyncIteration from None
 
     def get_conversation_manager(self) -> ConversationManager:
