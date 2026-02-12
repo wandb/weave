@@ -574,8 +574,14 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 # with incomplete file data
                 raise
 
-            self._flush_calls()
-            self._flush_calls_complete()
+            try:
+                self._flush_calls()
+                self._flush_calls_complete()
+            except Exception:
+                logger.exception("Failed to flush calls")
+                # Explicitly re-raise, if insert fails there is no reason to
+                # produce to the queue
+                raise
 
             # Never raise an error here if we fail to flush kafka, this will
             # trigger a client retry and cause the whole batch to be inserted again
