@@ -565,18 +565,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         try:
             yield
             self._flush_immediately = True
-            try:
-                self._flush_file_chunks()
-            except Exception:
-                logger.exception("Failed to flush file chunks")
-            try:
-                self._flush_calls()
-            except Exception:
-                logger.exception("Failed to flush calls")
-            try:
-                self._flush_calls_complete()
-            except Exception:
-                logger.exception("Failed to flush calls complete")
+            self._flush_file_chunks()
+            self._flush_calls()
+            self._flush_calls_complete()
             try:
                 self._flush_kafka_producer()
             except Exception:
