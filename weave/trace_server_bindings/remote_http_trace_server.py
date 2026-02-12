@@ -932,6 +932,18 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
             params={"project_id": req.project_id},
         )
 
+    def annotation_queue_delete(
+        self, req: tsi.AnnotationQueueDeleteReq
+    ) -> tsi.AnnotationQueueDeleteRes:
+        return self._generic_request(
+            f"/annotation_queues/{req.queue_id}",
+            req,
+            tsi.AnnotationQueueDeleteReq,
+            tsi.AnnotationQueueDeleteRes,
+            method="DELETE",
+            params={"project_id": req.project_id},
+        )
+
     def annotation_queue_add_calls(
         self, req: tsi.AnnotationQueueAddCallsReq
     ) -> tsi.AnnotationQueueAddCallsRes:

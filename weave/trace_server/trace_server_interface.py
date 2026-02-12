@@ -1281,6 +1281,20 @@ class AnnotationQueueReadRes(BaseModel):
     queue: AnnotationQueueSchema
 
 
+class AnnotationQueueDeleteReq(BaseModelStrict):
+    """Request to delete (soft-delete) an annotation queue."""
+
+    project_id: str = Field(examples=["entity/project"])
+    queue_id: str = Field(examples=["550e8400-e29b-41d4-a716-446655440000"])
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class AnnotationQueueDeleteRes(BaseModel):
+    """Response from deleting an annotation queue."""
+
+    queue: AnnotationQueueSchema
+
+
 class AnnotationQueueItemSchema(BaseModel):
     """Schema for annotation queue item responses."""
 
@@ -2353,6 +2367,10 @@ class TraceServerInterface(Protocol):
     def annotation_queue_read(
         self, req: AnnotationQueueReadReq
     ) -> AnnotationQueueReadRes: ...
+
+    def annotation_queue_delete(
+        self, req: AnnotationQueueDeleteReq
+    ) -> AnnotationQueueDeleteRes: ...
 
     def annotation_queue_add_calls(
         self, req: AnnotationQueueAddCallsReq
