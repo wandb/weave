@@ -3,7 +3,6 @@
 We should never be breaking the user's program with an error.
 """
 
-# TODO: Test code capture resilience
 # TODO: Test postprocess input/output resilience
 from collections import Counter
 
@@ -508,3 +507,198 @@ async def test_resilience_to_accumulator_internal_errors_async(client):
         with pytest.raises(DummyTestException):
             res = await do_test()
             l = [item async for item in res]
+
+
+# =============================================================================
+# Code Capture Resilience Tests
+# =============================================================================
+# These tests ensure that the @weave.op decorator and weave.publish() never
+# crash user code due to failures in the code capture step.
+
+
+def test_code_capture_resilience_no_source_available(client):
+    """
+    Requirement: Publishing an op should not crash when source code is unavailable
+    Interface: weave.publish(op)
+    Given: A function wrapped with @weave.op where inspect.getsource() would fail
+    When: weave.publish(op) is called
+    Then: The publish completes without raising an exception
+    """
+    # Create a function dynamically using exec - this has no source file
+    namespace = {}
+    exec(
+        """
+def dynamic_func(x):
+    return x * 2
+""",
+        namespace,
+    )
+    dynamic_func = namespace["dynamic_func"]
+
+    # Wrap it with weave.op
+    op_func = weave.op(dynamic_func)
+
+    # This should not raise - code capture should handle the missing source gracefully
+    ref = weave.publish(op_func)
+    assert ref is not None
+
+    # The op should still work correctly
+    assert op_func(5) == 10
+
+
+def test_code_capture_resilience_disabled_capture_no_source(client):
+    """
+    Requirement: Publishing an op with code capture disabled should not crash
+                 even when source is unavailable
+    Interface: weave.publish(op) with enable_code_capture=False
+    Given: A dynamically created function with @weave.op(enable_code_capture=False)
+    When: weave.publish(op) is called
+    Then: The publish completes without raising an exception
+    """
+    # Create a function dynamically - no source available
+    namespace = {}
+    exec(
+        """
+def no_source_func(x):
+    return x + 1
+""",
+        namespace,
+    )
+    no_source_func = namespace["no_source_func"]
+
+    # Wrap with code capture disabled
+    op_func = weave.op(no_source_func, enable_code_capture=False)
+
+    # This should not raise
+    ref = weave.publish(op_func)
+    assert ref is not None
+
+    # The op should still work correctly
+    assert op_func(10) == 11
+
+
+def test_code_capture_resilience_builtin_function(client):
+    """
+    Requirement: Wrapping and publishing a built-in function should not crash
+    Interface: @weave.op decorator applied to built-in, then weave.publish()
+    Given: A built-in function like len wrapped with @weave.op
+    When: weave.publish(op) is called
+    Then: The publish completes without raising an exception
+    """
+    # Wrap a built-in function - these have no Python source
+    op_len = weave.op(len)
+
+    # This should not raise
+    ref = weave.publish(op_len)
+    assert ref is not None
+
+    # The op should still work
+    assert op_len([1, 2, 3]) == 3
+
+
+def test_code_capture_resilience_closure_with_non_serializable_object(client):
+    """
+    Requirement: Code capture should handle closures with non-serializable objects
+    Interface: weave.publish(op) for op with problematic closure
+    Given: A function with a closure containing an object that fails serialization
+    When: weave.publish(op) is called
+    Then: The publish completes (possibly with warnings) without raising an exception
+    """
+
+    class NonSerializableObject:
+        """An object that raises on equality comparison (like pandas DataFrames)."""
+
+        def __eq__(self, other):
+            raise ValueError("Cannot compare this object")
+
+        def __repr__(self):
+            return "<NonSerializableObject>"
+
+    # Create a closure with the non-serializable object
+    problematic_obj = NonSerializableObject()
+
+    @weave.op
+    def func_with_problematic_closure(x):
+        # Reference the problematic object in the closure
+        _ = problematic_obj
+        return x * 2
+
+    # This should not raise - code capture should handle the serialization failure
+    ref = weave.publish(func_with_problematic_closure)
+    assert ref is not None
+
+    # The op should still work correctly
+    assert func_with_problematic_closure(5) == 10
+
+
+def test_code_capture_resilience_lambda(client):
+    """
+    Requirement: Publishing a lambda wrapped as an op should not crash
+    Interface: weave.publish(op) for lambda
+    Given: A lambda function wrapped with weave.op
+    When: weave.publish(op) is called
+    Then: The publish completes without raising an exception
+    """
+    # Lambdas can have tricky source extraction
+    op_lambda = weave.op(lambda x: x**2)
+
+    # This should not raise
+    ref = weave.publish(op_lambda)
+    assert ref is not None
+
+    # The op should still work
+    assert op_lambda(4) == 16
+
+
+def test_code_capture_resilience_op_execution_unaffected(client):
+    """
+    Requirement: Op execution must not be affected by code capture failures
+    Interface: Calling an @weave.op decorated function
+    Given: An op where code capture would fail
+    When: The op is called multiple times
+    Then: All calls execute correctly and return expected results
+    """
+    # Create a function that will have code capture issues
+    namespace = {}
+    exec(
+        """
+def compute(a, b):
+    return a + b
+""",
+        namespace,
+    )
+    compute = namespace["compute"]
+    op_compute = weave.op(compute)
+
+    # Multiple calls should all work correctly
+    assert op_compute(1, 2) == 3
+    assert op_compute(10, 20) == 30
+    assert op_compute(-5, 5) == 0
+
+    # Publishing should also work
+    ref = weave.publish(op_compute)
+    assert ref is not None
+
+    # Calls after publish should still work
+    assert op_compute(100, 200) == 300
+
+
+def test_code_capture_resilience_c_extension_function(client):
+    """
+    Requirement: Wrapping C extension functions should not crash during publish
+    Interface: weave.publish(op) for C extension function
+    Given: A C extension function (like math.sqrt) wrapped with @weave.op
+    When: weave.publish(op) is called
+    Then: The publish completes without raising an exception
+    """
+    import math
+
+    # math.sqrt is a C extension function with no Python source
+    op_sqrt = weave.op(math.sqrt)
+
+    # This should not raise
+    ref = weave.publish(op_sqrt)
+    assert ref is not None
+
+    # The op should still work
+    assert op_sqrt(16) == 4.0

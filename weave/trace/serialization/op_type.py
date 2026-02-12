@@ -264,7 +264,15 @@ def get_source_or_fallback(fn: Callable, *, warnings: list[str]) -> str:
         fn_is_op and not op._code_capture_enabled
     ):
         # This digest is kept for op versioning purposes
-        digest = str_digest(inspect.getsource(fn))
+        try:
+            digest = str_digest(inspect.getsource(fn))
+        except (OSError, TypeError):
+            # Source not available (built-in, C extension, or dynamically created function)
+            # Fall back to using function identity for the digest
+            func_name = getattr(fn, "__name__", "unknown")
+            func_module = getattr(fn, "__module__", "unknown")
+            func_qualname = getattr(fn, "__qualname__", func_name)
+            digest = str_digest(f"{func_module}.{func_qualname}")
         return textwrap.dedent(
             f"""
             def func(*args, **kwargs):
@@ -274,7 +282,9 @@ def get_source_or_fallback(fn: Callable, *, warnings: list[str]) -> str:
 
     try:
         return get_source_notebook_safe(fn)
-    except OSError:
+    except (OSError, TypeError):
+        # OSError: source not available (dynamically created, etc.)
+        # TypeError: built-in function or C extension
         pass
 
     try:
@@ -283,7 +293,7 @@ def get_source_or_fallback(fn: Callable, *, warnings: list[str]) -> str:
         warnings.append(f"Failed to reconstruct signature: {e}")
         sig_str = "(*args, **kwargs)"
 
-    func_name = fn.__name__
+    func_name = getattr(fn, "__name__", "func")
     missing_code_template = textwrap.dedent(
         f"""
         def {func_name}{sig_str}:
