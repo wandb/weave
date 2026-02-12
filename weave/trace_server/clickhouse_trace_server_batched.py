@@ -565,15 +565,25 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         try:
             yield
             self._flush_immediately = True
-            self._flush_file_chunks()
+
+            try:
+                self._flush_file_chunks()
+            except Exception:
+                logger.exception("Failed to flush file chunks")
+                # Explicitly re-raise, we don't want to catch and insert calls
+                # with incomplete file data
+                raise
+
             self._flush_calls()
             self._flush_calls_complete()
 
-            # Never fail a batch and cause an insert retry if we fail to flush kafka
+            # Never raise an error here if we fail to flush kafka, this will
+            # trigger a client retry and cause the whole batch to be inserted again
             try:
                 self._flush_kafka_producer()
             except Exception:
                 logger.exception("Failed to flush kafka producer")
+
         finally:
             self._file_batch = []
             self._call_batch = []
