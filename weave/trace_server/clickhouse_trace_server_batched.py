@@ -559,15 +559,28 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     @contextmanager
     def call_batch(self) -> Iterator[None]:
+        """Batch call operations and flush them all at the end."""
         # Not thread safe - do not use across threads
         self._flush_immediately = False
         try:
             yield
             self._flush_immediately = True
-            self._flush_file_chunks()
-            self._flush_calls()
-            self._flush_calls_complete()
-            self._flush_kafka_producer()
+            try:
+                self._flush_file_chunks()
+            except Exception:
+                logger.exception("Failed to flush file chunks")
+            try:
+                self._flush_calls()
+            except Exception:
+                logger.exception("Failed to flush calls")
+            try:
+                self._flush_calls_complete()
+            except Exception:
+                logger.exception("Failed to flush calls complete")
+            try:
+                self._flush_kafka_producer()
+            except Exception:
+                logger.exception("Failed to flush kafka producer")
         finally:
             self._file_batch = []
             self._call_batch = []
