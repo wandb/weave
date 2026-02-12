@@ -579,7 +579,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 if item.mode == "start":
                     res.append(self.call_start(item.req))
                 elif item.mode == "end":
-                    res.append(self.call_end(item.req, flush_immediately=False))
+                    res.append(self.call_end(item.req))
                 else:
                     raise ValueError("Invalid mode")
         return tsi.CallCreateBatchRes(res=res)
@@ -615,7 +615,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self,
         req: tsi.CallEndReq,
         publish: bool = True,
-        flush_immediately: bool = False,
     ) -> tsi.CallEndRes:
         # Converts the user-provided call details into a clickhouse schema.
         # This does validation and conversion of the input data as well
@@ -636,12 +635,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self._insert_call(ch_call)
 
         if publish:
+            # Use self._flush_immediately to determine whether to flush Kafka.
+            # Inside call_batch() context this is False (batch flushes on exit),
+            # outside batch context this is True so we flush per-request.
             _maybe_enqueue_minimal_call_end(
                 self.kafka_producer,
                 req.end.project_id,
                 req.end.id,
                 req.end.ended_at,
-                flush_immediately,
+                self._flush_immediately,
             )
 
         # Returns the id of the newly created call
@@ -744,11 +746,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             if self._flush_immediately:
                 self._flush_calls()
 
+        # Use self._flush_immediately to determine whether to flush Kafka.
+        # Inside call_batch() context this is False (batch flushes on exit),
+        # outside batch context this is True so we flush per-request.
         _maybe_enqueue_minimal_call_end(
             self.kafka_producer,
             req.end.project_id,
             req.end.id,
             req.end.ended_at,
+            self._flush_immediately,
         )
 
         return tsi.CallEndV2Res()
