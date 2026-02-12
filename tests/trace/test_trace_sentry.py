@@ -1,11 +1,74 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
+from typing import Any
 from unittest.mock import ANY, MagicMock, call
 
 import pytest
 
 from weave.telemetry import trace_sentry
+
+
+class FakeSession:
+    def __init__(self) -> None:
+        self.status_updates: list[str | None] = []
+
+    def update(self, status: str | None = None) -> None:
+        self.status_updates.append(status)
+
+
+class FakeScope:
+    def __init__(self) -> None:
+        self._session: FakeSession | None = None
+        self.tags: dict[str, Any] = {}
+        self.user: Any = None
+
+    def set_tag(self, key: str, value: Any) -> None:
+        self.tags[key] = value
+
+
+class FakeScopeContext:
+    def __init__(self, scope: FakeScope) -> None:
+        self.scope = scope
+
+    def __enter__(self) -> FakeScope:
+        return self.scope
+
+    def __exit__(self, *_args: object) -> bool:
+        return False
+
+
+class FakeHub:
+    def __init__(self, client: MagicMock) -> None:
+        self.client = client
+        self.scope = FakeScope()
+        self._stack = [(client, self.scope)]
+        self.captured_events: list[tuple[object, object | None]] = []
+        self.raise_on_capture = False
+        self.start_session_calls = 0
+        self.end_session_calls = 0
+
+    def capture_event(self, event: object, hint: object | None = None) -> None:
+        if self.raise_on_capture:
+            raise RuntimeError("capture failed")
+        self.captured_events.append((event, hint))
+
+    def start_session(self) -> None:
+        self.start_session_calls += 1
+        self.scope._session = FakeSession()
+
+    def end_session(self) -> None:
+        self.end_session_calls += 1
+        self.scope._session = None
+
+    def configure_scope(self) -> FakeScopeContext:
+        return FakeScopeContext(self.scope)
+
+
+def make_client() -> MagicMock:
+    client = MagicMock()
+    client.options = {"option": "value"}
+    return client
 
 
 def make_sentry(
@@ -14,45 +77,6 @@ def make_sentry(
     monkeypatch.setattr(trace_sentry, "SENTRY_AVAILABLE", sentry_available)
     monkeypatch.setattr(trace_sentry.atexit, "register", lambda _fn: None)
     return trace_sentry.Sentry()
-
-
-def make_hub_with_scope(
-    *,
-    session: MagicMock | None = None,
-    start_session_side_effect: bool = False,
-    end_session_side_effect: bool = False,
-) -> tuple[MagicMock, MagicMock, MagicMock, MagicMock | None]:
-    client = MagicMock()
-    client.options = {"option": "value"}
-
-    scope = MagicMock()
-    scope._session = session
-
-    hub = MagicMock()
-    hub.client = client
-    hub._stack = [(client, scope)]
-
-    if start_session_side_effect:
-        created_session = session if session is not None else MagicMock()
-
-        def _start_session() -> None:
-            scope._session = created_session
-
-        hub.start_session.side_effect = _start_session
-
-    if end_session_side_effect:
-
-        def _end_session() -> None:
-            scope._session = None
-
-        hub.end_session.side_effect = _end_session
-
-    scope_context = MagicMock()
-    scope_context.__enter__.return_value = scope
-    scope_context.__exit__.return_value = False
-    hub.configure_scope.return_value = scope_context
-
-    return hub, client, scope, session
 
 
 def test_sentry_init_uses_sentry_available_for_disabled_flag(
@@ -108,9 +132,10 @@ def test_environment_uses_install_location(
 
 
 def test_setup_creates_client_and_hub(monkeypatch: pytest.MonkeyPatch) -> None:
+    client = make_client()
+    hub = FakeHub(client)
+
     sentry_sdk = MagicMock()
-    client = MagicMock()
-    hub = MagicMock()
     sentry_sdk.Client.return_value = client
     sentry_sdk.Hub.return_value = hub
 
@@ -141,8 +166,9 @@ def test_exception_marks_session_and_flushes(monkeypatch: pytest.MonkeyPatch) ->
     monkeypatch.setattr(trace_sentry, "sentry_sdk", sentry_sdk)
 
     sentry = make_sentry(monkeypatch, sentry_available=True)
-    session = MagicMock()
-    hub, client, _scope, _ = make_hub_with_scope(session=session)
+    client = make_client()
+    hub = FakeHub(client)
+    hub.scope._session = FakeSession()
     sentry.hub = hub
 
     sentry.exception("boom", handled=True)
@@ -154,8 +180,9 @@ def test_exception_marks_session_and_flushes(monkeypatch: pytest.MonkeyPatch) ->
         client_options=client.options,
         mechanism={"type": "generic", "handled": True},
     )
-    hub.capture_event.assert_called_once_with({"event": "ok"}, hint={"hint": "ok"})
-    session.update.assert_called_once_with(status="errored")
+    assert hub.captured_events == [({"event": "ok"}, {"hint": "ok"})]
+    assert hub.scope._session is not None
+    assert hub.scope._session.status_updates == ["errored"]
     client.flush.assert_called_once()
 
 
@@ -171,9 +198,10 @@ def test_exception_uses_sys_exc_info_and_handles_capture_failures(
     monkeypatch.setattr(trace_sentry, "sentry_sdk", sentry_sdk)
 
     sentry = make_sentry(monkeypatch, sentry_available=True)
-    session = MagicMock()
-    hub, client, _scope, _ = make_hub_with_scope(session=session)
-    hub.capture_event.side_effect = RuntimeError("capture failed")
+    client = make_client()
+    hub = FakeHub(client)
+    hub.scope._session = FakeSession()
+    hub.raise_on_capture = True
     sentry.hub = hub
 
     exc_info = (RuntimeError, RuntimeError("boom"), None)
@@ -187,40 +215,33 @@ def test_exception_uses_sys_exc_info_and_handles_capture_failures(
         client_options=client.options,
         mechanism={"type": "generic", "handled": False},
     )
-    session.update.assert_called_once_with(status="abnormal")
+    assert hub.scope._session is not None
+    assert hub.scope._session.status_updates == ["abnormal"]
     client.flush.assert_called_once()
 
 
 def test_session_lifecycle_methods(monkeypatch: pytest.MonkeyPatch) -> None:
     sentry = make_sentry(monkeypatch, sentry_available=True)
-    session = MagicMock()
-    hub, client, scope, _ = make_hub_with_scope(
-        session=None,
-        start_session_side_effect=True,
-        end_session_side_effect=True,
-    )
-
-    def _start_session() -> None:
-        scope._session = session
-
-    hub.start_session.side_effect = _start_session
+    client = make_client()
+    hub = FakeHub(client)
     sentry.hub = hub
 
     sentry.start_session()
-    assert hub.start_session.call_count == 1
+    assert hub.start_session_calls == 1
 
     sentry.start_session()
-    assert hub.start_session.call_count == 1
+    assert hub.start_session_calls == 1
 
     sentry.mark_session(status="ok")
-    session.update.assert_called_once_with(status="ok")
+    assert hub.scope._session is not None
+    assert hub.scope._session.status_updates == ["ok"]
 
     sentry.end_session()
-    assert hub.end_session.call_count == 1
+    assert hub.end_session_calls == 1
     client.flush.assert_called_once()
 
     sentry.end_session()
-    assert hub.end_session.call_count == 1
+    assert hub.end_session_calls == 1
     client.flush.assert_called_once()
 
 
@@ -228,28 +249,19 @@ def test_configure_scope_sets_tags_user_and_starts_session(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     sentry = make_sentry(monkeypatch, sentry_available=True)
-    session = MagicMock()
-    hub, _client, scope, _ = make_hub_with_scope(session=None)
-
-    def _start_session() -> None:
-        scope._session = session
-
-    hub.start_session.side_effect = _start_session
+    hub = FakeHub(make_client())
     sentry.hub = hub
 
     sentry.configure_scope(
         tags={"team": "ml", "empty": "", "missing": None, "user": {"id": "u1"}}
     )
 
-    assert scope.set_tag.call_args_list == [
-        call("team", "ml"),
-        call("user", {"id": "u1"}),
-    ]
-    assert scope.user == {"id": "u1"}
-    assert hub.start_session.call_count == 1
+    assert hub.scope.tags == {"team": "ml", "user": {"id": "u1"}}
+    assert hub.scope.user == {"id": "u1"}
+    assert hub.start_session_calls == 1
 
     sentry.configure_scope(tags=None)
-    assert hub.start_session.call_count == 1
+    assert hub.start_session_calls == 1
 
 
 def test_watch_decorator_reports_and_reraises(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -270,30 +282,33 @@ def test_track_event_captures_structured_payload(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     sentry = make_sentry(monkeypatch, sentry_available=True)
-    hub, _client, _scope, _ = make_hub_with_scope()
+    hub = FakeHub(make_client())
     sentry.hub = hub
 
     sentry.track_event("user_login", tags={"plan": "pro"}, username="andrew")
 
-    hub.capture_event.assert_called_once_with(
-        {
-            "message": "user_login",
-            "level": "info",
-            "tags": {"plan": "pro"},
-            "user": {"username": "andrew"},
-        }
-    )
+    assert hub.captured_events == [
+        (
+            {
+                "message": "user_login",
+                "level": "info",
+                "tags": {"plan": "pro"},
+                "user": {"username": "andrew"},
+            },
+            None,
+        )
+    ]
 
 
 def test_track_event_noops_when_sentry_unavailable(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     sentry = make_sentry(monkeypatch, sentry_available=False)
-    hub, _client, _scope, _ = make_hub_with_scope()
+    hub = FakeHub(make_client())
     sentry.hub = hub
 
     sentry.track_event("ignored")
-    hub.capture_event.assert_not_called()
+    assert hub.captured_events == []
 
 
 def test_is_local_dev_install_checks_site_packages(
