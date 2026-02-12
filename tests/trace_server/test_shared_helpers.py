@@ -4,9 +4,6 @@ import json
 import pytest
 
 from weave.shared import (
-    build_file_create_event,
-    build_obj_create_event,
-    build_table_create_event,
     compute_file_digest,
     compute_object_digest,
     compute_object_digest_result,
@@ -15,13 +12,6 @@ from weave.shared import (
 )
 from weave.shared.object_class_util import process_incoming_object_val
 from weave.shared.trace_server_interface_util import bytes_digest, str_digest
-from weave.trace_server.trace_server_interface import (
-    FileCreateReq,
-    ObjCreateReq,
-    ObjSchemaForInsert,
-    TableCreateReq,
-    TableSchemaForInsert,
-)
 
 pytestmark = pytest.mark.trace_server
 
@@ -58,42 +48,3 @@ def test_compute_table_digest_matches_server_formula() -> None:
 def test_compute_file_digest_matches_server_formula() -> None:
     content = b"hello-shared"
     assert compute_file_digest(content) == bytes_digest(content)
-
-
-def test_build_obj_create_event() -> None:
-    req = ObjCreateReq(
-        obj=ObjSchemaForInsert(
-            project_id="entity/project",
-            object_id="my_obj",
-            val={"a": 1},
-        )
-    )
-    event = build_obj_create_event(req)
-    assert event.body.event_type == "obj_create"
-    assert event.body.project_id == req.obj.project_id
-    assert event.body.object_id == req.obj.object_id
-    assert event.body.digest == compute_object_digest(req.obj.val)
-    assert event.body.val_json == json.dumps(event.body.processed_val)
-
-
-def test_build_table_create_event() -> None:
-    rows = [{"a": 1}, {"a": 2}, {"a": 3}]
-    req = TableCreateReq(
-        table=TableSchemaForInsert(project_id="entity/project", rows=rows)
-    )
-    event = build_table_create_event(req)
-    assert event.body.event_type == "table_create"
-    assert event.body.project_id == req.table.project_id
-    assert event.body.rows == rows
-    assert event.body.row_digests == [compute_row_digest(r) for r in rows]
-    assert event.body.digest == compute_table_digest(event.body.row_digests)
-
-
-def test_build_file_create_event() -> None:
-    req = FileCreateReq(project_id="entity/project", name="obj.py", content=b"abc123")
-    event = build_file_create_event(req)
-    assert event.body.event_type == "file_create"
-    assert event.body.project_id == req.project_id
-    assert event.body.name == req.name
-    assert event.body.content == req.content
-    assert event.body.digest == compute_file_digest(req.content)

@@ -1,3 +1,18 @@
+"""Deterministic digest calculation helpers to be shared by client and server.
+
+This module centralizes digest calculation logic to ensure consistency between
+the client and server, allowing digests to be safely computed client-side,
+ultimately supporting a client-side write-ahead-log (WAL).
+
+Use these helpers when computing:
+- Object digests
+- Table row digests (and the aggregate table digest)
+- File/content digests
+
+Do not implement ad-hoc digest calculation logic outside this module, as that
+could break ref stability across systems.
+"""
+
 from __future__ import annotations
 
 import hashlib
