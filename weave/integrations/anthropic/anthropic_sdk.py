@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import importlib
 from collections.abc import AsyncIterator, Callable, Iterator
 from functools import wraps
@@ -137,6 +138,10 @@ def anthropic_stream_accumulator(
 
 
 class AnthropicIteratorWrapper(_IteratorWrapper):
+    def _feed_message_to_accumulator(self, message: Message) -> None:
+        self._on_yield(MessageStopEvent(type="message_stop", message=message))
+        self._call_on_close_once()
+
     def __getattr__(self, name: str) -> Any:
         """Delegate all other attributes to the wrapped iterator."""
         if name in [
@@ -149,7 +154,46 @@ class AnthropicIteratorWrapper(_IteratorWrapper):
             "text_stream",
         ]:
             return object.__getattribute__(self, name)
-        return getattr(self._iterator_or_ctx_manager, name)
+
+        attr = getattr(self._iterator_or_ctx_manager, name)
+
+        if name == "get_final_message":
+            if asyncio.iscoroutinefunction(attr):
+                @wraps(attr)
+                async def async_get_final_message() -> Message:
+                    message = await attr()
+                    self._feed_message_to_accumulator(message)
+                    return message
+                return async_get_final_message
+            else:
+                @wraps(attr)
+                def sync_get_final_message() -> Message:
+                    message = attr()
+                    self._feed_message_to_accumulator(message)
+                    return message
+                return sync_get_final_message
+
+        if name == "get_final_text":
+            if asyncio.iscoroutinefunction(attr):
+                @wraps(attr)
+                async def async_get_final_text() -> str:
+                    text = await attr()
+                    final_msg_fn = getattr(self._iterator_or_ctx_manager, "get_final_message")
+                    message = await final_msg_fn()
+                    self._feed_message_to_accumulator(message)
+                    return text
+                return async_get_final_text
+            else:
+                @wraps(attr)
+                def sync_get_final_text() -> str:
+                    text = attr()
+                    final_msg_fn = getattr(self._iterator_or_ctx_manager, "get_final_message")
+                    message = final_msg_fn()
+                    self._feed_message_to_accumulator(message)
+                    return text
+                return sync_get_final_text
+
+        return attr
 
     def __stream_text__(self) -> Iterator[str] | AsyncIterator[str]:
         if isinstance(self._iterator_or_ctx_manager, AsyncIterator):
