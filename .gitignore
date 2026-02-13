@@ -26,3 +26,10 @@ pyrightconfig.json
 .coverage/
 coverage.xml
 htmlcov/
+**/AGENTS.md
+**/CLAUDE.md
+**/.pyright_config.json
+**/.claude
+**/.serena
+**/.mcp.json
+**/AGENTS_WORKSPACE
