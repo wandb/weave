@@ -15,8 +15,8 @@ class DummyWeaveClient:
         self.created.append(op)
         return Call(
             _op_name=op,
-            trace_id="dummy",
-            project_id="dummy",
+            trace_id="trace",
+            project_id="proj",
             parent_id=None,
             inputs=inputs or {},
         )
@@ -52,6 +52,37 @@ def make_session_text():
         "tool_choice": "auto",
         "temperature": 0.6,
         "max_response_output_tokens": None,
+    }
+
+
+def make_user_item(item_id):
+    return {
+        "id": item_id,
+        "type": "message",
+        "object": "realtime.item",
+        "role": "user",
+        "content": [{"type": "input_audio", "audio": "", "transcript": None}],
+    }
+
+
+def make_assistant_output(item_id, content=None):
+    return {
+        "id": item_id,
+        "type": "message",
+        "status": "completed",
+        "role": "assistant",
+        "content": content or [{"type": "audio"}],
+    }
+
+
+def make_response(resp_id, output):
+    return {
+        "id": resp_id,
+        "status": "completed",
+        "status_details": None,
+        "output": [output],
+        "usage": None,
+        "conversation_id": None,
     }
 
 
@@ -98,7 +129,7 @@ def test_response_audio_delta_and_done():
     )
     # Buffer cleared and audio stored
     assert item_id in exp.response_audio
-    assert len(exp.output_buffer.buffer) == 0
+    assert len(exp.audio_output_buffer.buffer) == 0
 
 
 def test_fifo_completion_orders_responses_by_arrival(monkeypatch):
@@ -125,38 +156,14 @@ def test_fifo_completion_orders_responses_by_arrival(monkeypatch):
     )
 
     # User items
-    user1 = {
-        "id": "item_u1",
-        "type": "message",
-        "object": "realtime.item",
-        "role": "user",
-        "content": [{"type": "input_audio", "audio": "", "transcript": None}],
-    }
-    user2 = {
-        "id": "item_u2",
-        "type": "message",
-        "object": "realtime.item",
-        "role": "user",
-        "content": [{"type": "input_audio", "audio": "", "transcript": None}],
-    }
+    user1 = make_user_item("item_u1")
+    user2 = make_user_item("item_u2")
     exp.items[user1["id"]] = user1
     exp.items[user2["id"]] = user2
 
     # Assistant outputs
-    out1 = {
-        "id": "item_a1",
-        "type": "message",
-        "status": "completed",
-        "role": "assistant",
-        "content": [{"type": "audio"}],
-    }
-    out2 = {
-        "id": "item_a2",
-        "type": "message",
-        "status": "completed",
-        "role": "assistant",
-        "content": [{"type": "audio"}],
-    }
+    out1 = make_assistant_output("item_a1")
+    out2 = make_assistant_output("item_a2")
 
     # Link outputs to previous user items for input resolution
     exp.prev_by_item[out1["id"]] = user1["id"]
@@ -167,22 +174,8 @@ def test_fifo_completion_orders_responses_by_arrival(monkeypatch):
     exp.response_audio[out2["id"]] = b"\x02\x03"
 
     # Create responses
-    resp1 = {
-        "id": "resp_1",
-        "status": "completed",
-        "status_details": None,
-        "output": [out1],
-        "usage": None,
-        "conversation_id": None,
-    }
-    resp2 = {
-        "id": "resp_2",
-        "status": "completed",
-        "status_details": None,
-        "output": [out2],
-        "usage": None,
-        "conversation_id": None,
-    }
+    resp1 = make_response("resp_1", out1)
+    resp2 = make_response("resp_2", out2)
 
     # Signal created (sets pending_response, used for context)
     exp.handle_response_created(
@@ -253,21 +246,8 @@ def test_transcripts_not_required_when_text_modality_absent(monkeypatch):
         {"type": "session.updated", "event_id": "event_0", "session": session}
     )
 
-    out = {
-        "id": "item_a",
-        "type": "message",
-        "status": "completed",
-        "role": "assistant",
-        "content": [{"type": "text", "text": "hi"}],
-    }
-    resp = {
-        "id": "resp_x",
-        "status": "completed",
-        "status_details": None,
-        "output": [out],
-        "usage": None,
-        "conversation_id": None,
-    }
+    out = make_assistant_output("item_a", content=[{"type": "text", "text": "hi"}])
+    resp = make_response("resp_x", out)
     exp.handle_response_created(
         {"type": "response.created", "event_id": "event_1", "response": resp}
     )

@@ -42,8 +42,8 @@ class DummyWeaveClient:
 
         return Call(
             _op_name=op or "",
-            trace_id="dummy",
-            project_id="dummy",
+            trace_id="trace",
+            project_id="proj",
             parent_id=None,
             inputs=inputs or {},
         )
