@@ -52,6 +52,7 @@ CLICKHOUSE_DEFAULT_QUERY_SETTINGS = {
     "function_json_value_return_type_allow_complex": RETURN_TYPE_ALLOW_COMPLEX,
     # Valid values here are 'allow' or 'global', with 'global' slightly outperforming in testing
     "distributed_product_mode": "global",
+    "allow_experimental_lightweight_update": 1,
 }
 
 # ClickHouse async insert settings
