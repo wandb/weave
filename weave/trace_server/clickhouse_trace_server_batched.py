@@ -5964,7 +5964,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         """Directly queries the database and returns the result."""
         if not settings:
             settings = {}
-        settings.update(ch_settings.CLICKHOUSE_DEFAULT_QUERY_SETTINGS)
+        # Get version-aware default settings and merge with user settings
+        default_settings = ch_settings.get_query_settings_for_client(self.ch_client)
+        default_settings.update(settings)  # User settings override defaults
+        settings = default_settings
 
         parameters = _process_parameters(parameters)
         try:
@@ -6010,7 +6013,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         """
         if not settings:
             settings = {}
-        settings.update(ch_settings.CLICKHOUSE_DEFAULT_QUERY_SETTINGS)
+        # Get version-aware default settings and merge with user settings
+        default_settings = ch_settings.get_query_settings_for_client(self.ch_client)
+        default_settings.update(settings)  # User settings override defaults
+        settings = default_settings
 
         processed_params = _process_parameters(parameters) if parameters else None
         try:
