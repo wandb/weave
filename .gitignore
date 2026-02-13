@@ -26,10 +26,16 @@ pyrightconfig.json
 .coverage/
 coverage.xml
 htmlcov/
+
+# Local agent rules
+**/AGENT_SETTINGS.md
+# Local agent scratch space
+**/AGENTS_WORKSPACE
+
+# Various other configurations & generated files
 **/AGENTS.md
 **/CLAUDE.md
 **/.pyright_config.json
 **/.claude
 **/.serena
 **/.mcp.json
-**/AGENTS_WORKSPACE

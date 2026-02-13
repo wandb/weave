@@ -1,0 +1,1 @@
+/Users/zach/Development/core/services/weave-python/weave-public/AGENTS.md

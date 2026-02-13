@@ -8,6 +8,8 @@
 - Document any significant architectural decisions or changes.
 - All planning or documentation files you create belong in the AGENTS_WORKSPACE directory unless explictly told otherwise.
 - If the AGENTS_WORKSPACE directory does not exist you must create it in the same location as this file.
+- If a AGENT_SETTINGS.md file exists you **MUST** read it.
+- Rules defined in the AGENT_SETTINGS.md file take precedent over rules defined in this one.
 
 
 ## Python Import Rules
