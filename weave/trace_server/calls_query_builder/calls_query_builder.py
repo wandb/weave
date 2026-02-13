@@ -1804,6 +1804,15 @@ def process_query_to_conditions(
             if operation.contains_.case_insensitive:
                 position_operation = "positionCaseInsensitive"
             cond = f"{position_operation}({lhs_part}, {rhs_part}) > 0"
+        elif isinstance(operation, tsi_query.AgeOlderThanSecondsOperation):
+            spec = operation.age_older_than_seconds_
+            field_sql = process_operand(spec.field)
+            threshold_param = param_slot(
+                param_builder.add_param(spec.threshold_seconds),
+                "Float64",
+            )
+            # dateDiff('second', field, now()) = age in seconds; pass when age > threshold
+            cond = f"(dateDiff('second', {field_sql}, now()) > {threshold_param})"
         else:
             raise TypeError(f"Unknown operation type: {operation}")
 
@@ -1854,6 +1863,7 @@ def process_query_to_conditions(
                 tsi_query.LteOperation,
                 tsi_query.InOperation,
                 tsi_query.ContainsOperation,
+                tsi_query.AgeOlderThanSecondsOperation,
             ),
         ):
             return process_operation(operand)

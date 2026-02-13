@@ -334,6 +334,40 @@ class ContainsSpec(BaseModel):
     case_insensitive: bool | None = False
 
 
+# Weave-specific: filter datetime fields by age (now - field > threshold_seconds).
+# Operates on datetime values: (now - field_value) > threshold_seconds passes the filter.
+class AgeOlderThanSecondsSpec(BaseModel):
+    """Specification for the `$ageOlderThanSeconds` operation.
+
+    - `field`: The datetime operand (e.g. {"$getField": "started_at"}).
+    - `threshold_seconds`: Age threshold in seconds; rows older than this pass.
+    """
+
+    field: "Operand"
+    threshold_seconds: float = Field(alias="$thresholdSeconds")
+
+
+class AgeOlderThanSecondsOperation(BaseModel):
+    """Filter calls whose datetime field is older than a threshold in seconds.
+
+    Not part of MongoDB. Weave-specific addition.
+
+    The datetime from the field is subtracted from "now" to get age. Rows whose
+    age exceeds threshold_seconds pass the filter.
+
+    Example:
+        ```
+        {"$ageOlderThanSeconds": {"field": {"$getField": "started_at"}, "thresholdSeconds": 3600}}
+        ```
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    age_older_than_seconds_: AgeOlderThanSecondsSpec = Field(
+        alias="$ageOlderThanSeconds"
+    )
+
+
 # Weave-specific grouping filter for monitor call filtering.
 # 1_to_n: filter to calls that are in a 1-to-n grouping (e.g. one parent, many children).
 #   When present, optional `field` is the key to expand/group by (e.g. "trace_id").
@@ -372,6 +406,7 @@ Operation = (
     | LteOperation
     | InOperation
     | ContainsOperation
+    | AgeOlderThanSecondsOperation
     | GroupingFilterOperation
 )
 Operand = LiteralOperation | GetFieldOperator | ConvertOperation | Operation
@@ -389,6 +424,8 @@ GteOperation.model_rebuild()
 LteOperation.model_rebuild()
 InOperation.model_rebuild()
 ContainsOperation.model_rebuild()
+AgeOlderThanSecondsSpec.model_rebuild()
+AgeOlderThanSecondsOperation.model_rebuild()
 GroupingFilterOperation.model_rebuild()
 
 

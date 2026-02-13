@@ -915,6 +915,8 @@ def is_object_ref_operand(
             )  # Only check the field being compared
         elif isinstance(op, tsi_query.ContainsOperation):
             return check_operand_recursive(op.contains_.input)
+        elif isinstance(op, tsi_query.AgeOlderThanSecondsOperation):
+            return check_operand_recursive(op.age_older_than_seconds_.field)
         elif isinstance(op, tsi_query.ConvertOperation):
             return check_operand_recursive(op.convert_.input)
         return False
