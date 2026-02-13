@@ -315,6 +315,13 @@ class StateExporter(BaseModel):
         self.audio_output_buffer.clear()
 
     def _response_with_audio(self, resp: dict) -> dict[str, Any]:
+        """
+        This function takes in the final response message.
+        The full audio string could be huge so we don't ever get it all at once
+        - We build the full audio Base64 message from the delta parts in the delta handlers above
+        - Decode to bytes and encode to wav format
+        - Create a content object from it and store in the result that will be uploaded to weave
+        """
         response_dict = dict(resp)
         output_list = resp.get("output", [])
 
