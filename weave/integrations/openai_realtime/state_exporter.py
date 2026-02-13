@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 # Content types that represent audio output from the model.
 # Both "audio" (beta API) and "output_audio" (GA API) map to the same handling.
 OUTPUT_AUDIO_TYPES = ("audio", "output_audio")
-INPUT_AUDIO_TYPES = ("audio", "input_audio")
+INPUT_AUDIO_TYPE = "input_audio"
 
 
 def _get_from_dict(obj: Any, key: str, default: Any = None) -> Any:
@@ -259,11 +259,6 @@ class StateExporter(BaseModel):
         self.pending_response = msg.get("response")
 
 
-    def handle_input_text_delta(self, msg: dict) -> None:
-        print("handle text delta")
-        text = msg.get("delta", "")
-        self.text_buffer += text
-
     def handle_input_audio_append(self, msg: dict) -> None:
         audio = msg.get("audio")
         if audio:
@@ -283,10 +278,12 @@ class StateExporter(BaseModel):
     def _response_with_audio(self, resp: dict) -> dict[str, Any]:
         response_dict = dict(resp)
         output_list = resp.get("output", [])
+
         for output_idx, output in enumerate(output_list):
             output_type = output.get("type")
             if output_type in ("function_call", "function_call_output"):
                 continue
+
             content_list = output.get("content", [])
             for content_idx, content in enumerate(content_list):
                 content_type = content.get("type")
@@ -352,6 +349,7 @@ class StateExporter(BaseModel):
         msg_type = msg.get("type")
         if msg_type != "message":
             return msg
+
         msg_dict = dict(msg)
         item_id = msg.get("id")
         content_list = msg.get("content", [])
@@ -363,13 +361,13 @@ class StateExporter(BaseModel):
                 audio = self._get_item_audio(item_id) if item_id else None
             elif content_type in OUTPUT_AUDIO_TYPES:
                 audio = self.response_audio.get(item_id) if item_id else None
-                audio = pcm_to_wav(audio)
 
             if audio:
                 audio = pcm_to_wav(audio)
-                content_list[content_idx][content_type] = Content.from_bytes(
+                content_list[content_idx]["audio"] = Content.from_bytes(
                     audio, extension=".wav"
                 )
+
         if len(content_list) > 0:
             msg_dict["content"] = content_list
 
@@ -439,6 +437,7 @@ class StateExporter(BaseModel):
 
         if conv_id and (conv_call := self.conversation_calls.get(conv_id)):
             response_parent = conv_call
+
         elif conv_id:
             conv_call = client.create_call(
                 op="realtime.conversation", inputs={"id": conv_id}, parent=session_call
@@ -465,9 +464,11 @@ class StateExporter(BaseModel):
                         audio_bytes = (
                             self.response_audio.get(item_id) if item_id else None
                         )
+
                         if not audio_bytes:
                             logger.error("failed to fetch audio bytes")
                             continue
+
                         content_dict["audio"] = Content.from_bytes(
                             pcm_to_wav(bytes(audio_bytes)), extension=".wav"
                         )
