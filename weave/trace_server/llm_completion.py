@@ -231,6 +231,11 @@ def lite_llm_completion(
     extra_headers: dict[str, str] | None = None,
     return_type: str | None = None,
 ) -> tsi.CompletionsCreateRes:
+    # Normalize base_url to prevent issues with trailing slashes causing redirects
+    # that change POST to GET (HTTP 301/302 redirect behavior)
+    if base_url:
+        base_url = base_url.rstrip("/")
+
     # Setup provider-specific credentials and model modifications
     (
         aws_access_key_id,
@@ -534,6 +539,11 @@ def lite_llm_completion_stream(
     follows the non-streaming version: any exception is surfaced to the caller
     as a single error chunk and the iterator terminates.
     """
+    # Normalize base_url to prevent issues with trailing slashes causing redirects
+    # that change POST to GET (HTTP 301/302 redirect behavior)
+    if base_url:
+        base_url = base_url.rstrip("/")
+
     # Setup provider-specific credentials and model modifications
     (
         aws_access_key_id,
