@@ -59,12 +59,20 @@ class SessionSpan(BaseModel):
             self.root_call = wc.create_call("realtime.session", inputs=self.session)
 
     def on_updated(self, msg: dict) -> None:
+        """
+        This function runs when we recieve a session.updated message
+        In Beta:
+            session.updated message can come from the server before send/recv session.create(d)
+        In GA:
+            session.created is sent by the server on connection
+        """
         self.session = msg.get("session")
         if not self.session or not isinstance(self.session, dict):
             self.session = {}
 
         wc = require_weave_client()
 
+        # If we never ran on_created then we initialize the root call here
         if not self.root_call:
             self.root_call = wc.create_call("realtime.session", inputs=self.session)
 
@@ -81,11 +89,17 @@ class SessionSpan(BaseModel):
             call = self.last_update(self.root_call)
         else:
             call = self.last_update
-        wc.finish_call(call, output=self.session)
+        # Connect the session.update inputs with the session.updated outputs
+        wc.finish_call(call, output=msg.get('session'))
         self.last_update = None
 
     # Unfortunately the order can be session.update -> session.created -> session.
     def on_update(self, msg: dict) -> None:
+        """
+        This function triggers when user sends a session.update message
+        We start a call with the params as inputs & defer if we haven't gotten session.created (Beta)
+        Finish call when we get the session.updated result
+        """
         self.session = msg.get("session")
         wc = require_weave_client()
         # If there's no active session or ID on that session then we need to defer
@@ -95,7 +109,7 @@ class SessionSpan(BaseModel):
             def update_cb(root_call: Call) -> Call:
                 return wc.create_call(
                     "realtime.session.update",
-                    inputs=self.session or {},
+                    inputs=msg.get('session', {}),
                     parent=root_call,
                 )
 
@@ -103,7 +117,7 @@ class SessionSpan(BaseModel):
         else:
             self.last_update = wc.create_call(
                 "realtime.session.update",
-                inputs=self.session or {},
+                inputs=msg.get('session', {}),
                 parent=self.root_call,
             )
 
