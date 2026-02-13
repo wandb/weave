@@ -334,6 +334,32 @@ class ContainsSpec(BaseModel):
     case_insensitive: bool | None = False
 
 
+# Weave-specific grouping filter for monitor call filtering.
+# 1_to_n: filter to calls that are in a 1-to-n grouping (e.g. one parent, many children).
+#   When present, optional `field` is the key to expand/group by (e.g. "trace_id").
+# n_to_1_max: filter to calls that are the n_to_1_max in their group.
+#   When present, optional `field` is the field to maximize when picking one call per group (e.g. "started_at").
+class GroupingFilterOperation(BaseModel):
+    """Filter for call grouping in monitors (1_to_n expand, n_to_1_max contract).
+
+    Not part of MongoDB. Weave-specific addition.
+
+    Example:
+        ```
+        {"$groupingFilter": "1_to_n", "field": "trace_id"}
+        {"$groupingFilter": "n_to_1_max", "field": "started_at"}
+        ```
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    grouping_filter_: typing.Literal["1_to_n", "n_to_1_max"] = Field(
+        alias="$groupingFilter"
+    )
+    # Optional: for 1_to_n = group/expand key (default "trace_id"); for n_to_1_max = max field (default "started_at").
+    field: str | None = None
+
+
 # Convenience type for all Operands and Operations
 Operation = (
     AndOperation
@@ -346,6 +372,7 @@ Operation = (
     | LteOperation
     | InOperation
     | ContainsOperation
+    | GroupingFilterOperation
 )
 Operand = LiteralOperation | GetFieldOperator | ConvertOperation | Operation
 
@@ -362,6 +389,7 @@ GteOperation.model_rebuild()
 LteOperation.model_rebuild()
 InOperation.model_rebuild()
 ContainsOperation.model_rebuild()
+GroupingFilterOperation.model_rebuild()
 
 
 class Query(BaseModel):
