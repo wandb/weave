@@ -239,11 +239,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     def __del__(self) -> None:
         """Flush the Kafka producer on cleanup to avoid dropping in-flight messages."""
-        if self._kafka_producer is not None:
-            try:
-                self._kafka_producer.flush()
-            except Exception:
-                pass
+        try:
+            self._flush_all_batches_in_order()
+        except Exception:
+            pass
+        finally:
+            self._file_batch = []
+            self._call_batch = []
+            self._calls_complete_batch = []
+            self._flush_immediately = True
 
     @property
     def _flush_immediately(self) -> bool:
@@ -570,15 +574,43 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         try:
             yield
             self._flush_immediately = True
-            self._flush_file_chunks()
-            self._flush_calls()
-            self._flush_calls_complete()
-            self._flush_kafka_producer()
+            self._flush_all_batches_in_order()
         finally:
             self._file_batch = []
             self._call_batch = []
             self._calls_complete_batch = []
             self._flush_immediately = True
+
+    def _flush_all_batches_in_order(self) -> None:
+        """Flush all batches in order of dependency.
+        1. File chunks, if this fails, we raise so that we don't insert calls that
+           are missing file data. Forces retry.
+        2. Calls, if this fails, we raise so that clients can retry, and so we don't
+           continue and push bad ids to the queue.
+        3. Produce to kafka, if this fails, we don't raise because all of the data
+           is already in the database, we don't want the client to retry.
+           TODO: consider kafka retry logic.
+        """
+        # Raises on fail
+        try:
+            self._flush_file_chunks()
+        except Exception:
+            logger.exception("Failed to flush file chunks")
+            raise
+
+        # Raises on fail
+        try:
+            self._flush_calls()
+            self._flush_calls_complete()
+        except Exception:
+            logger.exception("Failed to flush calls")
+            raise
+
+        # Catch and continue on fail
+        try:
+            self._flush_kafka_producer()
+        except Exception:
+            logger.exception("Failed to flush kafka producer")
 
     def call_start_batch(self, req: tsi.CallCreateBatchReq) -> tsi.CallCreateBatchRes:
         with self.call_batch():
