@@ -257,6 +257,17 @@ class StateExporter(BaseModel):
 
     def handle_response_created(self, msg: dict) -> None:
         self.pending_response = msg.get("response")
+        response = self.pending_response or {}
+        conv_id = response.get("conversation_id")
+        if conv_id and conv_id not in self.conversation_calls:
+            from weave.trace.context.weave_client_context import require_weave_client
+
+            session_call = self.session_span.get_root_call() if self.session_span else None
+            client = require_weave_client()
+            conv_call = client.create_call(
+                op="realtime.conversation", inputs={"id": conv_id}, parent=session_call
+            )
+            self.conversation_calls[conv_id] = conv_call
 
 
     def handle_input_audio_append(self, msg: dict) -> None:
