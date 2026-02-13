@@ -59,8 +59,7 @@ class SessionSpan(BaseModel):
             self.root_call = wc.create_call("realtime.session", inputs=self.session)
 
     def on_updated(self, msg: dict) -> None:
-        """
-        This function runs when we recieve a session.updated message
+        """This function runs when we recieve a session.updated message
         In Beta:
             session.updated message can come from the server before send/recv session.create(d)
         In GA:
@@ -90,13 +89,12 @@ class SessionSpan(BaseModel):
         else:
             call = self.last_update
         # Connect the session.update inputs with the session.updated outputs
-        wc.finish_call(call, output=msg.get('session'))
+        wc.finish_call(call, output=msg.get("session"))
         self.last_update = None
 
     # Unfortunately the order can be session.update -> session.created -> session.
     def on_update(self, msg: dict) -> None:
-        """
-        This function triggers when user sends a session.update message
+        """This function triggers when user sends a session.update message
         We start a call with the params as inputs & defer if we haven't gotten session.created (Beta)
         Finish call when we get the session.updated result
         """
@@ -109,7 +107,7 @@ class SessionSpan(BaseModel):
             def update_cb(root_call: Call) -> Call:
                 return wc.create_call(
                     "realtime.session.update",
-                    inputs=msg.get('session', {}),
+                    inputs=msg.get("session", {}),
                     parent=root_call,
                 )
 
@@ -117,7 +115,7 @@ class SessionSpan(BaseModel):
         else:
             self.last_update = wc.create_call(
                 "realtime.session.update",
-                inputs=msg.get('session', {}),
+                inputs=msg.get("session", {}),
                 parent=self.root_call,
             )
 
