@@ -35,7 +35,7 @@ class _WeaveConnectWrapper:
         original_connection = await self._original_result
         return connection.WeaveAsyncWebsocketConnection(original_connection)
 
-    def __await__(self):  # type: ignore[override]
+    def __await__(self) -> Any:  # type: ignore[override]
         return self._connect().__await__()
 
     async def __aenter__(self) -> connection.WeaveAsyncWebsocketConnection:
