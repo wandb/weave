@@ -40,6 +40,7 @@ from weave.trace_server.actions_worker.dispatcher import execute_batch
 from weave.trace_server.base64_content_conversion import (
     process_call_req_to_content,
     process_complete_call_to_content,
+    replace_large_strings_with_content_objects,
 )
 from weave.trace_server.call_stats_helpers import (
     rows_to_bucket_dicts,
@@ -5948,11 +5949,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         try:
             self._insert_call_batch(self._call_batch)
         except InsertTooLarge:
-            logger.info("Retrying with large objects stripped.")
-            batch = self._strip_large_values(self._call_batch)
-            # Insert rows one at a time after stripping large values
-            for row in batch:
-                self._insert_call_batch([row])
+            logger.info("Retrying with large values offloaded to content storage.")
+            batch = self._offload_large_values(
+                self._call_batch, ALL_CALL_INSERT_COLUMNS
+            )
+            self._insert_call_batch(batch)
         finally:
             self._call_batch = []
 
@@ -6032,66 +6033,133 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         try:
             self._insert_call_complete_batch(self._calls_complete_batch)
         except InsertTooLarge:
-            # Try 1 by 1
-            for row in self._calls_complete_batch:
-                self._insert_call_complete_batch([row])
+            logger.info(
+                "Retrying calls_complete with large values offloaded to content storage."
+            )
+            batch = self._offload_large_values(
+                self._calls_complete_batch, ALL_CALL_COMPLETE_INSERT_COLUMNS
+            )
+            self._insert_call_complete_batch(batch)
         finally:
             self._calls_complete_batch = []
 
-    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._strip_large_values")
-    def _strip_large_values(self, batch: list[list[Any]]) -> list[list[Any]]:
-        """Iterate through the batch and replace large JSON values with placeholders.
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._offload_large_values")
+    def _offload_large_values(
+        self, batch: list[list[Any]], column_names: list[str]
+    ) -> list[list[Any]]:
+        """Offload large string values from JSON columns to file storage as Content objects.
 
-        Only considers JSON dump columns and ensures their combined size stays under
-        the limit by selectively replacing the largest values.
+        When a row's combined JSON column size exceeds the ClickHouse row limit,
+        this method processes each oversized column (largest first) in two phases:
+
+        1. **Content offloading** -- parse the JSON, replace large string leaf values
+           with Content object references stored in file storage, and re-serialize.
+           This preserves the data structure and user data.
+        2. **Error-payload fallback** -- if offloading alone does not reduce the column
+           enough, replace the entire column with ``ENTITY_TOO_LARGE_PAYLOAD``.
+
+        Only JSON dump columns (inputs, output, attributes, summary) are considered.
+
+        Args:
+            batch: List of rows, where each row is a list of column values.
+            column_names: Column name list matching the row layout (e.g.
+                ``ALL_CALL_INSERT_COLUMNS`` or ``ALL_CALL_COMPLETE_INSERT_COLUMNS``).
         """
+        offloaded_count = 0
         stripped_count = 0
         final_batch = []
 
+        project_id_idx = column_names.index("project_id")
         json_column_indices = [
-            ALL_CALL_INSERT_COLUMNS.index(f"{col}_dump")
-            for col in ALL_CALL_JSON_COLUMNS
+            column_names.index(f"{col}_dump") for col in ALL_CALL_JSON_COLUMNS
         ]
         entity_too_large_payload_byte_size = _num_bytes(
             ch_settings.ENTITY_TOO_LARGE_PAYLOAD
         )
+        row_limit = ch_settings.CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT
 
         for item in batch:
-            # Calculate only JSON dump bytes
             json_idx_size_pairs = [
                 (i, _num_bytes(item[i])) for i in json_column_indices
             ]
             total_json_bytes = sum(size for _, size in json_idx_size_pairs)
 
-            # If over limit, try to optimize by selectively stripping largest JSON values
-            stripped_item = list(item)
+            processed_item = list(item)
             sorted_json_idx_size_pairs = sorted(
                 json_idx_size_pairs, key=lambda x: x[1], reverse=True
             )
 
-            # Try to get under the limit by replacing largest JSON values
-            for col_idx, size in sorted_json_idx_size_pairs:
-                if (
-                    total_json_bytes
-                    <= ch_settings.CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT
-                ):
+            for col_idx, original_size in sorted_json_idx_size_pairs:
+                if total_json_bytes <= row_limit:
                     break
 
-                # Replace this large JSON value with placeholder, update running size
-                stripped_item[col_idx] = ch_settings.ENTITY_TOO_LARGE_PAYLOAD
-                total_json_bytes -= size - entity_too_large_payload_byte_size
-                stripped_count += 1
+                current_col_size = original_size
 
-            final_batch.append(stripped_item)
+                # Phase 1: try to offload large strings to Content objects
+                new_dump = _try_offload_json_column(
+                    processed_item[col_idx],
+                    processed_item[project_id_idx],
+                    self,
+                    min_chars=ch_settings.LARGE_STRING_OFFLOAD_MIN_CHARS,
+                )
+                if new_dump is not None:
+                    new_size = _num_bytes(new_dump)
+                    if new_size < current_col_size:
+                        processed_item[col_idx] = new_dump
+                        total_json_bytes -= current_col_size - new_size
+                        current_col_size = new_size
+                        offloaded_count += 1
+
+                # Phase 2: if still over the limit, replace entire column
+                if total_json_bytes > row_limit:
+                    processed_item[col_idx] = ch_settings.ENTITY_TOO_LARGE_PAYLOAD
+                    total_json_bytes -= (
+                        current_col_size - entity_too_large_payload_byte_size
+                    )
+                    stripped_count += 1
+
+            final_batch.append(processed_item)
 
         ddtrace.tracer.current_span().set_tags(
             {
-                "clickhouse_trace_server_batched._strip_large_values.stripped_count": str(
+                "clickhouse_trace_server_batched._offload_large_values.offloaded_count": str(
+                    offloaded_count
+                ),
+                "clickhouse_trace_server_batched._offload_large_values.stripped_count": str(
                     stripped_count
-                )
+                ),
             }
         )
         return final_batch
+
+
+def _try_offload_json_column(
+    json_dump: str,
+    project_id: str,
+    trace_server: tsi.TraceServerInterface,
+    min_chars: int,
+) -> str | None:
+    """Try to reduce a JSON column by offloading large string leaves to Content storage.
+
+    Parses the JSON dump, replaces string values whose character count exceeds
+    ``min_chars`` with Content object references stored in file storage, and
+    re-serializes.
+    """
+    try:
+        parsed = json.loads(json_dump)
+        processed = replace_large_strings_with_content_objects(
+            parsed,
+            project_id,
+            trace_server,
+            min_chars=min_chars,
+        )
+        return json.dumps(processed)
+    except Exception:
+        logger.warning(
+            "Content offload failed for JSON column",
+            exc_info=True,
+        )
+        return None
 
 
 def _num_bytes(data: Any) -> int:
