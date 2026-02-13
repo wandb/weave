@@ -204,7 +204,7 @@ def replace_large_strings_with_content_objects(
             return [_visit(v) for v in val]
         elif isinstance(val, str) and len(val) > min_chars:
             try:
-                content = Content.from_text(val)
+                content: Content[Any] = Content.from_text(val)
                 return store_content_object(content, project_id, trace_server)
             except Exception as e:
                 logger.warning(
