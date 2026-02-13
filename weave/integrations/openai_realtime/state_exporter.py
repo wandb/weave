@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import copy
-from dataclasses import field
 import logging
 import threading
 from collections.abc import Callable
+from dataclasses import field
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -274,13 +274,14 @@ class StateExporter(BaseModel):
         if conv_id and conv_id not in self.conversation_calls:
             from weave.trace.context.weave_client_context import require_weave_client
 
-            session_call = self.session_span.get_root_call() if self.session_span else None
+            session_call = (
+                self.session_span.get_root_call() if self.session_span else None
+            )
             client = require_weave_client()
             conv_call = client.create_call(
                 op="realtime.conversation", inputs={"id": conv_id}, parent=session_call
             )
             self.conversation_calls[conv_id] = conv_call
-
 
     def handle_input_audio_append(self, msg: dict) -> None:
         audio = msg.get("audio")
@@ -348,7 +349,9 @@ class StateExporter(BaseModel):
         return inputs
 
     @staticmethod
-    def _apply_transcript(item: dict, content_index: int | None, transcript: str | None) -> None:
+    def _apply_transcript(
+        item: dict, content_index: int | None, transcript: str | None
+    ) -> None:
         """Update the transcript field on an item's content entry at the given index."""
         if content_index is not None and isinstance(item.get("content"), list):
             content_list = item["content"]
@@ -523,7 +526,9 @@ class StateExporter(BaseModel):
         # Store the prepared context for this response id
         ctx: dict[str, Any] = {
             "msg": msg,
-            "session": copy.deepcopy(self.session_span.get_session()) if self.session_span else None,
+            "session": copy.deepcopy(self.session_span.get_session())
+            if self.session_span
+            else None,
             "pending_create_params": pending_create_params,
             "pending_response": pending_response,
             "messages": messages,
