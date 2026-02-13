@@ -148,7 +148,9 @@ class StateExporter(BaseModel):
 
     text_buffer: str = Field(default_factory=str)
 
-    user_messages: dict[str, dict] = Field(default_factory=dict) # For efficiency we don't convert back to base64
+    user_messages: dict[str, dict] = Field(
+        default_factory=dict
+    )  # For efficiency we don't convert back to base64
     user_speech_markers: dict[str, dict[str, int | None]] = Field(default_factory=dict)
 
     response_audio: dict[str, bytes] = Field(default_factory=dict)
@@ -317,6 +319,7 @@ class StateExporter(BaseModel):
                     audio = self.response_audio.get(output_id) if output_id else None
                     if not audio:
                         continue
+                    # No need to copy this, we want to replace the base64 everywhere
                     response_dict["output"][output_idx]["content"][content_idx][
                         "audio"
                     ] = Content.from_bytes(pcm_to_wav(audio), extension=".wav")
