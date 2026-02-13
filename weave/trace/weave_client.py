@@ -555,6 +555,7 @@ class WeaveClient:
             `limit`: Maximum number of calls to return.
             `offset`: Number of calls to skip before returning results (used for pagination).
             `sort_by`: List of fields to sort the results by (e.g., `started_at desc`).
+                    Pass an empty list `[]` to explicitly disable sorting for performance.
             `query`: A mongo-like expression for advanced filtering. Not all Mongo operators are supported.
             `include_costs`: If True, includes token/cost info in `summary.weave`.
             `include_feedback`: If True, includes feedback in `summary.weave.feedback`.
