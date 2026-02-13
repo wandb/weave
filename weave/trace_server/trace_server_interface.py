@@ -464,6 +464,12 @@ class CompletionsCreateRequestInputs(BaseModel):
         "Variables in messages like '{variable_name}' will be replaced with the corresponding values. "
         "Applied to both prompt messages (if prompt is provided) and regular messages.",
     )
+    vertex_credentials: str | None = Field(
+        None,
+        description="JSON string of Vertex AI service account credentials. "
+        "When provided for vertex_ai models (e.g. vertex_ai/gemini-2.5-pro), used for authentication "
+        "instead of api_key. Not persisted in trace storage.",
+    )
 
 
 class CompletionsCreateReq(BaseModelStrict):
