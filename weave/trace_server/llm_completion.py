@@ -14,6 +14,9 @@ from weave.trace_server.interface.builtin_object_classes.provider import (
     Provider,
     ProviderModel,
 )
+from weave.trace_server.model_providers.model_providers import (
+    VERTEX_PROVIDER_NAMES,
+)
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 
 NOVA_MODELS = ("nova-pro-v1", "nova-lite-v1", "nova-micro-v1")
@@ -286,8 +289,8 @@ def lite_llm_completion(
         )
 
     try:
-        # For vertex_ai / vertex_ai-language-models, use vertex_credentials when provided instead of api_key
-        is_vertex_provider = provider in ("vertex_ai", "vertex_ai-language-models")
+        # For vertex providers, use vertex_credentials when provided instead of api_key
+        is_vertex_provider = provider in VERTEX_PROVIDER_NAMES
         api_key_for_call = api_key
         if is_vertex_provider and vertex_credentials:
             api_key_for_call = None
@@ -581,10 +584,7 @@ def lite_llm_completion_stream(
                     stream_options={"include_usage": True},
                 )
             else:
-                is_vertex_provider = provider in (
-                    "vertex_ai",
-                    "vertex_ai-language-models",
-                )
+                is_vertex_provider = provider in VERTEX_PROVIDER_NAMES
                 api_key_for_call = api_key
                 if is_vertex_provider and vertex_credentials:
                     api_key_for_call = None

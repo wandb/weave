@@ -136,6 +136,7 @@ from weave.trace_server.llm_completion import (
 )
 from weave.trace_server.methods.evaluation_status import evaluation_status
 from weave.trace_server.model_providers.model_providers import (
+    VERTEX_PROVIDER_NAMES,
     LLMModelProviderInfo,
     read_model_to_provider_info_map,
 )
@@ -6939,33 +6940,19 @@ def _setup_completion_model_info(
 
         api_key = secret_fetcher.fetch(secret_name).get("secrets", {}).get(secret_name)
         provider = model_info.get("litellm_provider", "openai")
-        is_vertex_provider = provider in ("vertex_ai", "vertex_ai-language-models")
+        is_vertex_provider = provider in VERTEX_PROVIDER_NAMES
         if is_vertex_provider and vertex_credentials:
             api_key = None  # Use vertex_credentials instead
+        credentials_satisfied = is_vertex_provider and vertex_credentials
         if (
             not api_key
-            and provider
-            not in (
-                "bedrock",
-                "bedrock_converse",
-            )
-            and not (is_vertex_provider and vertex_credentials)
+            and provider not in ("bedrock", "bedrock_converse")
+            and not credentials_satisfied
         ):
             raise MissingLLMApiKeyError(
                 f"No API key {secret_name} found for model {model_name}",
                 api_key_name=secret_name,
             )
-
-    # Detect vertex_ai from model name when not in provider map (e.g. vertex_ai/gemini-2.5-pro)
-    if not model_info and (
-        model_name.startswith("vertex_ai/")
-        or model_name.startswith("vertex_ai-language-models/")
-    ):
-        provider = (
-            "vertex_ai-language-models"
-            if model_name.startswith("vertex_ai-language-models/")
-            else "vertex_ai"
-        )
 
     return CompletionModelInfo(
         model_name=model_name,
