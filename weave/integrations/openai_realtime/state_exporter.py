@@ -4,7 +4,7 @@ import copy
 import logging
 import threading
 from collections.abc import Callable
-from dataclasses import field
+from dataclasses import dataclass, field
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -108,6 +108,7 @@ class SessionSpan(BaseModel):
             )
 
 
+@dataclass
 class ItemRegistry:
     speech_markers: dict[str, dict[str, int | None]] = field(default_factory=dict)
     input_audio_buffer: AudioBufferManager = field(default_factory=AudioBufferManager)
