@@ -57,7 +57,7 @@ class ConversationManager:
             # Conversation item changes (GA: .added/.done, Beta: .created)
             "conversation.item.created": self.state.handle_item_created,
             "conversation.item.added": self.state.handle_item_created,
-            "conversation.item.done": self.state.handle_item_created,
+            "conversation.item.done": self.state.handle_item_done,
             "conversation.item.deleted": self.state.handle_item_deleted,
             "conversation.item.input_audio_transcription.completed": self.state.handle_item_input_audio_transcription_completed,
             # Response lifecycle and parts

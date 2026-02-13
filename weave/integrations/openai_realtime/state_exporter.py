@@ -221,6 +221,18 @@ class StateExporter(BaseModel):
             self.items[item_id] = item
             self.last_input_item_id = item_id
 
+    def handle_item_done(self, msg: dict) -> None:
+        """Handle conversation.item.done — update item data without touching ordering.
+
+        Unlike conversation.item.added, the .done event signals that an item has
+        finished streaming.  It carries previous_item_id=null, so we must not
+        overwrite the prev_by_item / next_by_item chain that .added already set.
+        """
+        item = msg.get("item") or {}
+        item_id = item.get("id")
+        if item_id:
+            self.items[item_id] = item
+
     def handle_item_deleted(self, msg: dict) -> None:
         item_id = msg.get("item_id")
         item = self.items.get(item_id) if item_id else None
