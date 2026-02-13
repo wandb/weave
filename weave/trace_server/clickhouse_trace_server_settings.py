@@ -4,9 +4,16 @@ This module contains all configuration constants, type definitions, and column
 specifications used by the ClickHouse trace server implementation.
 """
 
-from typing import Any
+from typing import Any, Protocol
 
 from weave.trace_server import environment as wf_env
+
+
+class ClickHouseClient(Protocol):
+    """Protocol for ClickHouse client with server_version attribute."""
+
+    server_version: str
+
 
 # File and batch processing settings
 FILE_CHUNK_SIZE = 100000
@@ -52,8 +59,63 @@ CLICKHOUSE_DEFAULT_QUERY_SETTINGS = {
     "function_json_value_return_type_allow_complex": RETURN_TYPE_ALLOW_COMPLEX,
     # Valid values here are 'allow' or 'global', with 'global' slightly outperforming in testing
     "distributed_product_mode": "global",
-    "allow_experimental_lightweight_update": 1,
 }
+
+
+def parse_clickhouse_version(version_string: str) -> tuple[int, ...]:
+    """Parse ClickHouse version string to tuple of integers.
+
+    Examples:
+        '25.8.15.25' -> (25, 8, 15, 25)
+        '24.3.1.2672.altinity' -> (24, 3, 1, 2672)
+
+    Args:
+        version_string: Version string from ClickHouse server
+
+    Returns:
+        Tuple of version numbers (major, minor, patch, ...)
+    """
+    return tuple(int(x) for x in version_string.split(".") if x.isnumeric())
+
+
+def supports_lightweight_update(version_string: str) -> bool:
+    """Check if ClickHouse version supports lightweight updates.
+
+    Lightweight updates are available in ClickHouse 25.8+
+
+    Args:
+        version_string: Version string from client.server_version
+
+    Returns:
+        True if version >= 25.8
+    """
+    try:
+        version = parse_clickhouse_version(version_string)
+    except (ValueError, IndexError):
+        # If we can't parse, assume it doesn't support it
+        return False
+    else:
+        # Check if version >= 25.8
+        return version >= (25, 8)
+
+
+def get_query_settings_for_client(client: ClickHouseClient) -> dict[str, Any]:
+    """Get default query settings adjusted for the client's ClickHouse version.
+
+    Args:
+        client: ClickHouse client instance with server_version attribute
+
+    Returns:
+        Dictionary of query settings appropriate for the server version
+    """
+    settings = CLICKHOUSE_DEFAULT_QUERY_SETTINGS.copy()
+
+    # Only include lightweight update setting if supported
+    if supports_lightweight_update(client.server_version):
+        settings["allow_experimental_lightweight_update"] = 1
+
+    return settings
+
 
 # ClickHouse async insert settings
 # These settings are used when async_insert is enabled for high-throughput scenarios
