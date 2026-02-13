@@ -6,6 +6,9 @@
 - If there is something that doesn't make sense architecturally, devex-wise, or product-wise, please update the `Requests to Humans` section below.
 - Always follow the established coding patterns and conventions in the codebase.
 - Document any significant architectural decisions or changes.
+- All planning or documentation files you create belong in the AGENTS_WORKSPACE directory unless explictly told otherwise.
+- If the AGENTS_WORKSPACE directory does not exist you must create it in the same location as this file.
+
 
 ## Python Import Rules
 
