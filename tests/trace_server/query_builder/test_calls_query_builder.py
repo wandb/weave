@@ -8,6 +8,7 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     CallsQuery,
     HardCodedFilter,
     _is_minimal_filter,
+    _maybe_convert_datetime_operands,
     build_calls_complete_delete_query,
     build_calls_complete_update_end_query,
     build_calls_complete_update_query,
@@ -1872,13 +1873,13 @@ def test_datetime_optimization_simple() -> None:
         WHERE (calls_merged.sortable_datetime > {pb_1:String})
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (
-            ((any(calls_merged.started_at) > {pb_0:UInt64}))
+            ((any(calls_merged.started_at) > {pb_0:String}))
             AND ((any(calls_merged.deleted_at) IS NULL))
             AND ((NOT ((any(calls_merged.started_at) IS NULL))))
         )
         """,
         {
-            "pb_0": 1709251200,
+            "pb_0": "2024-03-01 00:00:00.000000",
             "pb_2": "project",
             "pb_1": "2024-02-29 23:55:00.000000",
         },
@@ -1910,13 +1911,13 @@ def test_datetime_optimization_lt_simple() -> None:
         WHERE (calls_merged.sortable_datetime < {pb_1:String})
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (
-            ((any(calls_merged.started_at) < {pb_0:UInt64}))
+            ((any(calls_merged.started_at) < {pb_0:String}))
             AND ((any(calls_merged.deleted_at) IS NULL))
             AND ((NOT ((any(calls_merged.started_at) IS NULL))))
         )
         """,
         {
-            "pb_0": 1709251200,
+            "pb_0": "2024-03-01 00:00:00.000000",
             "pb_2": "project",
             "pb_1": "2024-03-01 00:05:00.000000",
         },
@@ -1953,13 +1954,13 @@ def test_datetime_optimization_not_operation() -> None:
         WHERE (NOT (calls_merged.sortable_datetime >= {pb_1:String}))
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING ((
-            (NOT ((any(calls_merged.started_at) >= {pb_0:UInt64}))))
+            (NOT ((any(calls_merged.started_at) >= {pb_0:String}))))
             AND ((any(calls_merged.deleted_at) IS NULL))
             AND ((NOT ((any(calls_merged.started_at) IS NULL))))
         )
         """,
         {
-            "pb_0": 1709251200,
+            "pb_0": "2024-03-01 00:00:00.000000",
             "pb_2": "project",
             "pb_1": "2024-03-01 00:05:00.000000",
         },
@@ -2037,18 +2038,18 @@ def test_datetime_optimization_multiple_conditions() -> None:
         WHERE (calls_merged.sortable_datetime > {pb_2:String}
             AND NOT (calls_merged.sortable_datetime > {pb_3:String}))
         GROUP BY (calls_merged.project_id, calls_merged.id)
-        HAVING (((any(calls_merged.started_at) > {pb_0:UInt64}))
-            AND ((NOT ((any(calls_merged.started_at) > {pb_1:UInt64}))))
-            AND (((any(calls_merged.ended_at) > {pb_0:UInt64})
-                OR ((any(calls_merged.ended_at) >= {pb_0:UInt64})
-                    AND (any(calls_merged.ended_at) > {pb_1:UInt64}))))
+        HAVING (((any(calls_merged.started_at) > {pb_0:String}))
+            AND ((NOT ((any(calls_merged.started_at) > {pb_1:String}))))
+            AND (((any(calls_merged.ended_at) > {pb_0:String})
+                OR ((any(calls_merged.ended_at) >= {pb_0:String})
+                    AND (any(calls_merged.ended_at) > {pb_1:String}))))
             AND ((any(calls_merged.deleted_at) IS NULL))
             AND ((NOT ((any(calls_merged.started_at) IS NULL))))
         )
         """,
         {
-            "pb_0": 1709251200,
-            "pb_1": 1709337600,
+            "pb_0": "2024-03-01 00:00:00.000000",
+            "pb_1": "2024-03-02 00:00:00.000000",
             "pb_4": "project",
             "pb_2": "2024-02-29 23:55:00.000000",
             "pb_3": "2024-03-02 00:05:00.000000",
@@ -2102,6 +2103,69 @@ def test_datetime_optimization_invalid_field() -> None:
     )
 
 
+def test_maybe_convert_datetime_operands() -> None:
+    """Test that _maybe_convert_datetime_operands converts numeric timestamps to datetime strings
+    for DateTime column fields (started_at, ended_at, deleted_at), and leaves other fields unchanged.
+    """
+    # Test: numeric int literal compared to started_at → should convert
+    ops = _maybe_convert_datetime_operands(
+        [
+            tsi_query.GetFieldOperator(**{"$getField": "started_at"}),
+            tsi_query.LiteralOperation(**{"$literal": 1709251200}),
+        ]
+    )
+    assert isinstance(ops[1], tsi_query.LiteralOperation)
+    assert ops[1].literal_ == "2024-03-01 00:00:00.000000"
+
+    # Test: numeric float literal compared to ended_at → should convert
+    ops = _maybe_convert_datetime_operands(
+        [
+            tsi_query.GetFieldOperator(**{"$getField": "ended_at"}),
+            tsi_query.LiteralOperation(**{"$literal": 1709251200.5}),
+        ]
+    )
+    assert isinstance(ops[1], tsi_query.LiteralOperation)
+    assert isinstance(ops[1].literal_, str)
+    assert ops[1].literal_.startswith("2024-03-01 00:00:00")
+
+    # Test: numeric literal compared to non-datetime field → should NOT convert
+    ops = _maybe_convert_datetime_operands(
+        [
+            tsi_query.GetFieldOperator(**{"$getField": "wb_user_id"}),
+            tsi_query.LiteralOperation(**{"$literal": 1709251200}),
+        ]
+    )
+    assert ops[1].literal_ == 1709251200
+
+    # Test: string literal compared to started_at → should NOT convert (already a string)
+    ops = _maybe_convert_datetime_operands(
+        [
+            tsi_query.GetFieldOperator(**{"$getField": "started_at"}),
+            tsi_query.LiteralOperation(**{"$literal": "2024-03-01 00:00:00"}),
+        ]
+    )
+    assert ops[1].literal_ == "2024-03-01 00:00:00"
+
+    # Test: None literal compared to deleted_at → should NOT convert
+    ops = _maybe_convert_datetime_operands(
+        [
+            tsi_query.GetFieldOperator(**{"$getField": "deleted_at"}),
+            tsi_query.LiteralOperation(**{"$literal": None}),
+        ]
+    )
+    assert ops[1].literal_ is None
+
+    # Test: original operands are NOT mutated
+    original_lit = tsi_query.LiteralOperation(**{"$literal": 1709251200})
+    _maybe_convert_datetime_operands(
+        [
+            tsi_query.GetFieldOperator(**{"$getField": "started_at"}),
+            original_lit,
+        ]
+    )
+    assert original_lit.literal_ == 1709251200
+
+
 def test_query_with_feedback_filter_and_datetime_and_string_filter() -> None:
     cq = CallsQuery(project_id="project")
     cq.add_field("id")
@@ -2149,7 +2213,7 @@ def test_query_with_feedback_filter_and_datetime_and_string_filter() -> None:
             GROUP BY (calls_merged.project_id,
                         calls_merged.id)
             HAVING (((coalesce(nullIf(JSON_VALUE(anyIf(feedback.payload_dump, feedback.feedback_type = {pb_0:String}), {pb_1:String}), 'null'), '') > coalesce(nullIf(JSON_VALUE(anyIf(feedback.payload_dump, feedback.feedback_type = {pb_0:String}), {pb_2:String}), 'null'), '')))
-                AND ((any(calls_merged.started_at) > {pb_3:UInt64}))
+                AND ((any(calls_merged.started_at) > {pb_3:String}))
                 AND ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_4:String}), 'null'), '') = {pb_5:String}))
                 AND ((any(calls_merged.deleted_at) IS NULL))
                 AND ((NOT ((any(calls_merged.started_at) IS NULL))))))
@@ -2164,7 +2228,7 @@ def test_query_with_feedback_filter_and_datetime_and_string_filter() -> None:
             "pb_0": "wandb.runnable.my_op",
             "pb_1": '$."output"."expected"',
             "pb_2": '$."output"."found"',
-            "pb_3": 1709251200,
+            "pb_3": "2024-03-01 00:00:00.000000",
             "pb_4": '$."message"',
             "pb_5": "hello",
             "pb_6": '%"hello"%',
@@ -2834,7 +2898,7 @@ def test_calls_complete_with_light_filter_and_order() -> None:
         PREWHERE calls_complete.project_id = {pb_2:String}
         WHERE 1
           AND (
-            ((calls_complete.started_at > {pb_0:UInt64}))
+            ((calls_complete.started_at > {pb_0:String}))
             AND ((calls_complete.wb_user_id = {pb_1:String}))
             AND ((calls_complete.deleted_at IS NULL))
             AND ((NOT ((calls_complete.started_at IS NULL))))
@@ -2843,7 +2907,7 @@ def test_calls_complete_with_light_filter_and_order() -> None:
         LIMIT 50
         """,
         {
-            "pb_0": 1709251200,
+            "pb_0": "2024-03-01 00:00:00.000000",
             "pb_1": "user_123",
             "pb_2": "project",
         },
