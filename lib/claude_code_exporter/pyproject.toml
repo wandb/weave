@@ -1,0 +1,47 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "claude-code-weave-exporter"
+version = "0.1.0"
+description = "Export Claude Code session traces to W&B Weave for observability"
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.9"
+authors = [
+    { name = "Weights & Biases", email = "support@wandb.com" }
+]
+keywords = ["claude", "weave", "observability", "tracing", "wandb"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+dependencies = [
+    "weave>=0.51.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/wandb/weave"
+Documentation = "https://weave-docs.wandb.ai"
+Repository = "https://github.com/wandb/weave"
+Issues = "https://github.com/wandb/weave/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["scripts"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "scripts/",
+    "hooks/",
+    ".claude-plugin/",
+    ".env.example",
+    "README.md",
+    "LICENSE",
+]
