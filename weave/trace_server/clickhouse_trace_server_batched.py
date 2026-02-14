@@ -240,6 +240,18 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self._evaluate_model_dispatcher = evaluate_model_dispatcher
         self._table_routing_resolver: TableRoutingResolver | None = None
 
+    def __del__(self) -> None:
+        """Flush the Kafka producer on cleanup to avoid dropping in-flight messages."""
+        try:
+            self._flush_all_batches_in_order()
+        except Exception:
+            pass
+        finally:
+            self._file_batch = []
+            self._call_batch = []
+            self._calls_complete_batch = []
+            self._flush_immediately = True
+
     @property
     def _flush_immediately(self) -> bool:
         return getattr(self._thread_local, "flush_immediately", True)
@@ -565,15 +577,43 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         try:
             yield
             self._flush_immediately = True
-            self._flush_file_chunks()
-            self._flush_calls()
-            self._flush_calls_complete()
-            self._flush_kafka_producer()
+            self._flush_all_batches_in_order()
         finally:
             self._file_batch = []
             self._call_batch = []
             self._calls_complete_batch = []
             self._flush_immediately = True
+
+    def _flush_all_batches_in_order(self) -> None:
+        """Flush all batches in order of dependency.
+        1. File chunks, if this fails, we raise so that we don't insert calls that
+           are missing file data. Forces retry.
+        2. Calls, if this fails, we raise so that clients can retry, and so we don't
+           continue and push bad ids to the queue.
+        3. Produce to kafka, if this fails, we don't raise because all of the data
+           is already in the database, we don't want the client to retry.
+           TODO: consider kafka retry logic.
+        """
+        # Raises on fail
+        try:
+            self._flush_file_chunks()
+        except Exception:
+            logger.exception("Failed to flush file chunks")
+            raise
+
+        # Raises on fail
+        try:
+            self._flush_calls()
+            self._flush_calls_complete()
+        except Exception:
+            logger.exception("Failed to flush calls")
+            raise
+
+        # Catch and continue on fail
+        try:
+            self._flush_kafka_producer()
+        except Exception:
+            logger.exception("Failed to flush kafka producer")
 
     def call_start_batch(self, req: tsi.CallCreateBatchReq) -> tsi.CallCreateBatchRes:
         with self.call_batch():
@@ -582,7 +622,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 if item.mode == "start":
                     res.append(self.call_start(item.req))
                 elif item.mode == "end":
-                    res.append(self.call_end(item.req, flush_immediately=False))
+                    res.append(self.call_end(item.req))
                 else:
                     raise ValueError("Invalid mode")
         return tsi.CallCreateBatchRes(res=res)
@@ -618,7 +658,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self,
         req: tsi.CallEndReq,
         publish: bool = True,
-        flush_immediately: bool = False,
     ) -> tsi.CallEndRes:
         # Converts the user-provided call details into a clickhouse schema.
         # This does validation and conversion of the input data as well
@@ -644,7 +683,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 req.end.project_id,
                 req.end.id,
                 req.end.ended_at,
-                flush_immediately,
+                self._flush_immediately,
             )
 
         # Returns the id of the newly created call
@@ -752,6 +791,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             req.end.project_id,
             req.end.id,
             req.end.ended_at,
+            self._flush_immediately,
         )
 
         return tsi.CallEndV2Res()
