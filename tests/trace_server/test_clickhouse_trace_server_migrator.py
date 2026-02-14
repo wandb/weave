@@ -396,7 +396,7 @@ def test_create_distributed_table_sql_id_sharded():
     expected = """
         CREATE TABLE IF NOT EXISTS calls_complete ON CLUSTER test_cluster
         AS calls_complete_local
-        ENGINE = Distributed(test_cluster, currentDatabase(), calls_complete_local, sipHash64(id))
+        ENGINE = Distributed(test_cluster, currentDatabase(), calls_complete_local, sipHash64(trace_id))
     """
     assert sql.strip() == expected.strip()
 
