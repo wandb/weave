@@ -138,6 +138,10 @@ class TableRef(Ref):
 
 @dataclass(frozen=True)
 class RefWithExtra(Ref):
+    @property
+    def extra(self) -> tuple[str, ...]:
+        raise NotImplementedError
+
     def with_extra(self, extra: tuple[str | Future[str], ...]) -> Self:
         params = self.as_param_dict()
         params["_extra"] = self._extra + tuple(extra)  # type: ignore
