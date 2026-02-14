@@ -41,6 +41,7 @@ from weave.trace_server.opentelemetry.attributes import (
     get_weave_inputs,
     get_weave_outputs,
     get_weave_usage,
+    parse_events
 )
 from weave.trace_server.opentelemetry.helpers import (
     shorten_name,
@@ -302,6 +303,13 @@ class Span:
                 inputs = to_json_serializable(nested_top_level_input)
 
         outputs = get_weave_outputs(events, self.attributes) or {}
+
+        res = parse_events(events)
+
+        inputs.update(res.get('inputs', {}))
+        outputs.update(res.get('output', {}))
+
+
         # Only de-nest if we have one key
         if len(outputs) == 1:
             nested_top_level_output = outputs.get("outputs") or outputs.get("output")
