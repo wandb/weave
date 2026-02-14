@@ -1,7 +1,7 @@
 import {setGlobalClient} from '../clientApi';
-import {Api as TraceServerApi} from '../generated/traceServerApi';
 import {InMemoryTraceServer} from '../inMemoryTraceServer';
 import {Settings} from '../settings';
+import {TraceServerApiLike} from '../traceServerApiFactory';
 import {WandbServerApi} from '../wandb/wandbServerApi';
 import {WeaveClient} from '../weaveClient';
 
@@ -11,7 +11,7 @@ export function initWithCustomTraceServer(
   settings: Settings = new Settings(true)
 ) {
   const client = new WeaveClient(
-    customTraceServer as unknown as TraceServerApi<any>,
+    customTraceServer as unknown as TraceServerApiLike,
     {} as WandbServerApi, // Placeholder, as we don't use WandbServerApi in this case
     projectName,
     settings
