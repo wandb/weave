@@ -178,7 +178,7 @@ class AnthropicIteratorWrapper(_IteratorWrapper):
         self._call_on_close_once()
 
     def get_final_message(self) -> Message | Coroutine[Any, Any, Message]:
-        underlying = self._iterator_or_ctx_manager.get_final_message
+        underlying = self._iterator_or_ctx_manager.get_final_message # type: ignore
         if asyncio.iscoroutinefunction(underlying):
             async def _async() -> Message:
                 message = await underlying()
@@ -190,7 +190,7 @@ class AnthropicIteratorWrapper(_IteratorWrapper):
         return message
 
     def get_final_text(self) -> str | Coroutine[Any, Any, str]:
-        underlying_text = self._iterator_or_ctx_manager.get_final_text
+        underlying_text = self._iterator_or_ctx_manager.get_final_text # type: ignore
         if asyncio.iscoroutinefunction(underlying_text):
             async def _async() -> str:
                 await self.get_final_message()  # type: ignore[misc]
