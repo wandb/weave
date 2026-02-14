@@ -650,6 +650,7 @@ class WeaveClient:
         *,
         use_stack: bool = True,
         _call_id_override: str | None = None,
+        started_at: datetime.datetime | None = None,
     ) -> Call:
         """Create, log, and push a call onto the runtime stack.
 
@@ -660,6 +661,8 @@ class WeaveClient:
             display_name: The display name for the call. Defaults to None.
             attributes: The attributes for the call. Defaults to None.
             use_stack: Whether to push the call onto the runtime stack. Defaults to True.
+            started_at: Optional timestamp for when the call started. If not provided,
+                uses the current time. Useful for retroactive logging.
 
         Returns:
             The created Call object.
@@ -770,7 +773,8 @@ class WeaveClient:
             current_wb_run_id = None
             current_wb_run_step = None
 
-        started_at = datetime.datetime.now(tz=datetime.timezone.utc)
+        if started_at is None:
+            started_at = datetime.datetime.now(tz=datetime.timezone.utc)
         call.started_at = started_at
         project_id = self._project_id()
 
@@ -864,12 +868,21 @@ class WeaveClient:
         exception: BaseException | None = None,
         *,
         op: Op | None = None,
+        ended_at: datetime.datetime | None = None,
     ) -> None:
         """Finalize a call and persist its results.
 
         Any values present in ``call.summary`` are deep-merged with computed
         summary statistics (e.g. usage and status counts) before being written
         to the database.
+
+        Args:
+            call: The call to finish.
+            output: The output of the call. Defaults to None.
+            exception: Optional exception if the call failed. Defaults to None.
+            op: Optional op for postprocessing. Defaults to None.
+            ended_at: Optional timestamp for when the call ended. If not provided,
+                uses the current time. Useful for retroactive logging.
         """
         if (
             is_tracing_setting_disabled()
@@ -880,7 +893,8 @@ class WeaveClient:
 
         from weave.trace.api import _global_postprocess_output
 
-        ended_at = datetime.datetime.now(tz=datetime.timezone.utc)
+        if ended_at is None:
+            ended_at = datetime.datetime.now(tz=datetime.timezone.utc)
         call.ended_at = ended_at
         original_output = output
 

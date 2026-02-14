@@ -26,3 +26,12 @@ pyrightconfig.json
 .coverage/
 coverage.xml
 htmlcov/
+
+# Node
+node_modules/
+
+# Claude plans
+docs/plans/
+
+# Data files
+*.parquet
