@@ -9,6 +9,7 @@ from weave.telemetry import trace_sentry
 from weave.trace import env, init_message, weave_client
 from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace.settings import (
+    should_enable_write_ahead_log,
     should_redact_pii,
     should_use_stainless_server,
     use_server_cache,
@@ -22,6 +23,9 @@ from weave.trace_server_bindings.caching_middleware_trace_server import (
 )
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface
 from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
+from weave.trace_server_bindings.wal_middleware_trace_server import (
+    WriteAheadLogMiddlewareTraceServer,
+)
 from weave.trace_server_version import MIN_TRACE_SERVER_VERSION
 
 logger = logging.getLogger(__name__)
@@ -145,6 +149,11 @@ def init_weave(
             "Weave is not available on the server.  Please contact support."
         )
     server: TraceServerClientInterface = remote_server
+    # Middleware order is intentional:
+    # 1) WAL first, so every attempted write is durably recorded.
+    # 2) Cache second, so cache hits on reads do not create synthetic WAL writes.
+    if should_enable_write_ahead_log():
+        server = WriteAheadLogMiddlewareTraceServer.from_env(server)
     if use_server_cache():
         server = CachingMiddlewareTraceServer.from_env(server)
 
