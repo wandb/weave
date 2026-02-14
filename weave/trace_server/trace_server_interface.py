@@ -1,11 +1,15 @@
 import datetime
 from collections.abc import Iterator
 from enum import Enum
-from typing import Any, Literal, Protocol
+from typing import Any, Literal, Protocol, TypeAlias
 
-from opentelemetry.proto.trace.v1.trace_pb2 import ResourceSpans
 from pydantic import BaseModel, ConfigDict, Field, field_serializer, model_validator
 from typing_extensions import TypedDict
+
+try:
+    from opentelemetry.proto.trace.v1.trace_pb2 import ResourceSpans
+except ImportError:
+    ResourceSpans: TypeAlias = Any
 
 from weave.trace_server import http_service_interface as his
 from weave.trace_server.common_interface import (
