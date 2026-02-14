@@ -62,6 +62,69 @@ def test_dict_mutation_saving(client):
     assert d3 == {"a": 1, "b": "new_value", "new_key": 3}
 
 
+def test_list_mutation_saving_inherited_mutators(client):
+    lst = [1, 2, 3]
+    ref = weave.publish(lst)
+
+    lst2 = ref.get()
+    lst2.extend([4])
+    lst2 += [5]
+    lst2.insert(0, 0)
+    lst2.pop()
+    lst2.remove(2)
+    lst2.reverse()
+    ref2 = weave.publish(lst2)
+
+    lst3 = ref2.get()
+    assert lst3 == [4, 3, 1, 0]
+
+
+def test_dict_mutation_saving_inherited_mutators(client):
+    d = {"a": 1, "b": 2}
+    ref = weave.publish(d)
+
+    d2 = ref.get()
+    d2.update({"c": 3})
+    d2 |= {"d": 4}
+    assert d2.setdefault("a", 999) == 1
+    assert d2.setdefault("e", 5) == 5
+    assert d2.pop("b") == 2
+    assert d2.popitem() == ("e", 5)
+    d2.clear()
+    d2.update({"z": 26})
+    ref2 = weave.publish(d2)
+
+    d3 = ref2.get()
+    assert d3 == {"z": 26}
+
+
+def test_list_nested_in_place_mutation_saving(client):
+    lst = [{"a": [1, 2]}]
+    ref = weave.publish(lst)
+
+    lst2 = ref.get()
+    lst2[0]["a"].append(3)
+    ref2 = weave.publish(lst2)
+
+    lst3 = ref2.get()
+    assert lst3 == [{"a": [1, 2, 3]}]
+
+
+def test_dict_nested_in_place_mutation_saving(client):
+    d = {"a": {"b": [1, 2]}}
+    ref = weave.publish(d)
+
+    d2 = ref.get()
+    d2["a"]["b"].pop(0)
+    d2["a"]["b"].insert(0, 99)
+    d2["a"]["c"] = {"d": 1}
+    d2["a"]["c"]["d"] = 2
+    ref2 = weave.publish(d2)
+
+    d3 = ref2.get()
+    assert d3 == {"a": {"b": [99, 2], "c": {"d": 2}}}
+
+
 def test_object_mutation_saving_nested(client):
     class A(weave.Object):
         b: int = 1
