@@ -80,6 +80,19 @@ def should_use_accumulator(inputs: dict) -> bool:
     return isinstance(inputs, dict) and bool(inputs.get("stream"))
 
 
+def anthropic_on_finish_post_processor(value: Any) -> dict | None:
+    """Post-process the response to serialize Pydantic models.
+
+    This is used for both regular messages and parsed messages (structured outputs).
+    For ParsedBetaMessage, this ensures the parsed_output field is properly serialized.
+    """
+    if value is None:
+        return None
+    if not hasattr(value, "model_dump"):
+        return value
+    return value.model_dump(exclude_unset=True, exclude_none=True)
+
+
 def create_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
         """We need to do this so we can check if `stream` is used."""
@@ -89,6 +102,7 @@ def create_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable]:
             op,  # type: ignore
             make_accumulator=lambda inputs: anthropic_accumulator,
             should_accumulate=should_use_accumulator,
+            on_finish_post_processor=anthropic_on_finish_post_processor,
         )
 
     return wrapper
@@ -113,6 +127,7 @@ def create_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callable]
             op,  # type: ignore
             make_accumulator=lambda inputs: anthropic_accumulator,
             should_accumulate=should_use_accumulator,
+            on_finish_post_processor=anthropic_on_finish_post_processor,
         )
 
     return wrapper
@@ -261,6 +276,12 @@ def get_anthropic_patcher(
             "kind": base.kind or "llm",
         }
     )
+    beta_parse_settings = base.model_copy(
+        update={"name": base.name or "anthropic.beta.Messages.parse"}
+    )
+    beta_async_parse_settings = base.model_copy(
+        update={"name": base.name or "anthropic.beta.AsyncMessages.parse"}
+    )
 
     _anthropic_patcher = MultiPatcher(
         [
@@ -314,6 +335,16 @@ def get_anthropic_patcher(
                 lambda: importlib.import_module("anthropic.resources.beta.messages"),
                 "AsyncMessages.stream",
                 create_stream_wrapper(beta_async_stream_settings),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("anthropic.resources.beta.messages"),
+                "Messages.parse",
+                create_wrapper_sync(beta_parse_settings),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("anthropic.resources.beta.messages"),
+                "AsyncMessages.parse",
+                create_wrapper_async(beta_async_parse_settings),
             ),
         ]
     )
