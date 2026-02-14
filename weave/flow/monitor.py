@@ -1,4 +1,5 @@
 from pydantic import Field
+from typing import Literal
 from typing_extensions import Self
 
 from weave.flow.casting import Scorer
@@ -50,6 +51,9 @@ class Monitor(Object):
     op_names: list[str]
     query: Query | None = None
     active: bool = False
+    debounced_scoring_enabled: bool = False
+    debounced_scoring_aggregation_field: Literal["trace_id", "thread_id"] | None = None
+    debounced_scoring_timeout_seconds: float | None = None
 
     def activate(self) -> ObjectRef:
         """Activates the monitor.
