@@ -351,6 +351,9 @@ def apply_processor(
         return processor.process_lt(operation)
     elif isinstance(operation, tsi_query.LteOperation):
         return processor.process_lte(operation)
+    elif isinstance(operation, tsi_query.AgeOlderThanSecondsOperation):
+        # No pushdown optimization for age_older_than_seconds (uses now()).
+        return None
     return None
 
 

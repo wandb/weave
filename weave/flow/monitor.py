@@ -1,4 +1,4 @@
-from pydantic import Field
+from pydantic import BaseModel, Field
 from typing_extensions import Self
 
 from weave.flow.casting import Scorer
@@ -7,6 +7,17 @@ from weave.trace.api import ObjectRef, publish
 from weave.trace.objectify import register_object
 from weave.trace.vals import WeaveObject
 from weave.trace_server.interface.query import Query
+
+
+class DelayedFilter(BaseModel):
+    """Filter applied after a delay (e.g. to score calls only after N seconds).
+
+    The delay is intended to allow data to settle before evaluation; the worker
+    may apply this filter immediately until delay scheduling is implemented.
+    """
+
+    query: Query | None = None
+    delay_seconds: int = Field(ge=0, default=0)
 
 
 @register_object
@@ -49,6 +60,7 @@ class Monitor(Object):
     scorers: list[Scorer]
     op_names: list[str]
     query: Query | None = None
+    delayed_filter: DelayedFilter | None = None
     active: bool = False
 
     def activate(self) -> ObjectRef:
