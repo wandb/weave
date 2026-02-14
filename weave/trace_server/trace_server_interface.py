@@ -1308,6 +1308,34 @@ class AnnotationQueueDeleteRes(BaseModel):
     queue: AnnotationQueueSchema
 
 
+class AnnotationQueueUpdateReq(BaseModelStrict):
+    """Request to update an annotation queue.
+
+    All fields except project_id and queue_id are optional - only provided fields will be updated.
+    """
+
+    project_id: str = Field(examples=["entity/project"])
+    queue_id: str = Field(examples=["550e8400-e29b-41d4-a716-446655440000"])
+    name: str | None = Field(None, examples=["Updated Queue Name"])
+    description: str | None = Field(None, examples=["Updated description"])
+    scorer_refs: list[str] | None = Field(
+        None,
+        examples=[
+            [
+                "weave:///entity/project/scorer/error_severity:abc123",
+                "weave:///entity/project/scorer/resolution_quality:def456",
+            ]
+        ],
+    )
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class AnnotationQueueUpdateRes(BaseModel):
+    """Response from updating an annotation queue."""
+
+    queue: AnnotationQueueSchema
+
+
 class AnnotationQueueItemSchema(BaseModel):
     """Schema for annotation queue item responses."""
 
@@ -2384,6 +2412,10 @@ class TraceServerInterface(Protocol):
     def annotation_queue_delete(
         self, req: AnnotationQueueDeleteReq
     ) -> AnnotationQueueDeleteRes: ...
+
+    def annotation_queue_update(
+        self, req: AnnotationQueueUpdateReq
+    ) -> AnnotationQueueUpdateRes: ...
 
     def annotation_queue_add_calls(
         self, req: AnnotationQueueAddCallsReq

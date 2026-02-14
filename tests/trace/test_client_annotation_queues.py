@@ -216,6 +216,146 @@ def test_annotation_queue_multiple_scorer_refs(client):
     assert "weave:///entity/project/scorer/safety:ghi789" in read_res.queue.scorer_refs
 
 
+def test_annotation_queue_update_all_fields(client):
+    """Test updating all fields of an annotation queue."""
+    if client_is_sqlite(client):
+        pytest.skip("Annotation queues not supported in SQLite")
+
+    # Create a queue
+    create_req = tsi.AnnotationQueueCreateReq(
+        project_id=client._project_id(),
+        name="Original Queue",
+        description="Original description",
+        scorer_refs=["weave:///entity/project/scorer/original:abc123"],
+        wb_user_id="test_user_123",
+    )
+    create_res = client.server.annotation_queue_create(create_req)
+    original_queue_id = create_res.id
+
+    # Update all fields
+    update_req = tsi.AnnotationQueueUpdateReq(
+        project_id=client._project_id(),
+        queue_id=original_queue_id,
+        name="Updated Queue",
+        description="Updated description",
+        scorer_refs=[
+            "weave:///entity/project/scorer/new1:def456",
+            "weave:///entity/project/scorer/new2:ghi789",
+        ],
+        wb_user_id="test_user_123",
+    )
+    update_res = client.server.annotation_queue_update(update_req)
+
+    # Verify update response
+    assert update_res.queue.id == original_queue_id
+    assert update_res.queue.name == "Updated Queue"
+    assert update_res.queue.description == "Updated description"
+    assert len(update_res.queue.scorer_refs) == 2
+    assert "weave:///entity/project/scorer/new1:def456" in update_res.queue.scorer_refs
+    assert "weave:///entity/project/scorer/new2:ghi789" in update_res.queue.scorer_refs
+    assert update_res.queue.created_by == "test_user_123"
+    assert update_res.queue.deleted_at is None
+
+    # Read back to verify persistence
+    read_req = tsi.AnnotationQueueReadReq(
+        project_id=client._project_id(),
+        queue_id=original_queue_id,
+    )
+    read_res = client.server.annotation_queue_read(read_req)
+
+    assert read_res.queue.name == "Updated Queue"
+    assert read_res.queue.description == "Updated description"
+    assert len(read_res.queue.scorer_refs) == 2
+
+
+def test_annotation_queue_update_partial(client):
+    """Test updating only some fields (partial update)."""
+    if client_is_sqlite(client):
+        pytest.skip("Annotation queues not supported in SQLite")
+
+    # Create a queue
+    create_req = tsi.AnnotationQueueCreateReq(
+        project_id=client._project_id(),
+        name="Original Queue",
+        description="Original description",
+        scorer_refs=["weave:///entity/project/scorer/test:abc123"],
+        wb_user_id="test_user_123",
+    )
+    create_res = client.server.annotation_queue_create(create_req)
+    original_queue_id = create_res.id
+
+    # Update only name
+    update_req = tsi.AnnotationQueueUpdateReq(
+        project_id=client._project_id(),
+        queue_id=original_queue_id,
+        name="New Name Only",
+        description=None,  # Not updating
+        scorer_refs=None,  # Not updating
+        wb_user_id="test_user_123",
+    )
+    update_res = client.server.annotation_queue_update(update_req)
+
+    # Verify only name changed
+    assert update_res.queue.name == "New Name Only"
+    assert update_res.queue.description == "Original description"
+    assert update_res.queue.scorer_refs == [
+        "weave:///entity/project/scorer/test:abc123"
+    ]
+
+
+def test_annotation_queue_update_nonexistent(client):
+    """Test updating a non-existent queue raises NotFoundError."""
+    if client_is_sqlite(client):
+        pytest.skip("Annotation queues not supported in SQLite")
+
+    # Try to update a non-existent queue
+    update_req = tsi.AnnotationQueueUpdateReq(
+        project_id=client._project_id(),
+        queue_id=generate_id(),  # Random non-existent ID
+        name="New Name",
+        wb_user_id="test_user_123",
+    )
+
+    with pytest.raises(NotFoundError):
+        client.server.annotation_queue_update(update_req)
+
+
+def test_annotation_queue_update_no_fields(client):
+    """Test updating with no fields provided returns existing queue."""
+    if client_is_sqlite(client):
+        pytest.skip("Annotation queues not supported in SQLite")
+
+    # Create a queue
+    create_req = tsi.AnnotationQueueCreateReq(
+        project_id=client._project_id(),
+        name="Test Queue",
+        description="Test description",
+        scorer_refs=["weave:///entity/project/scorer/test:abc123"],
+        wb_user_id="test_user_123",
+    )
+    create_res = client.server.annotation_queue_create(create_req)
+    original_queue_id = create_res.id
+
+    # Update with no fields
+    update_req = tsi.AnnotationQueueUpdateReq(
+        project_id=client._project_id(),
+        queue_id=original_queue_id,
+        name=None,
+        description=None,
+        scorer_refs=None,
+        wb_user_id="test_user_123",
+    )
+    update_res = client.server.annotation_queue_update(update_req)
+
+    # Verify nothing changed
+    assert update_res.queue.id == original_queue_id
+    assert update_res.queue.name == "Test Queue"
+    assert update_res.queue.description == "Test description"
+    assert update_res.queue.scorer_refs == [
+        "weave:///entity/project/scorer/test:abc123"
+    ]
+
+
 def test_annotation_queues_query_stream_all(client):
     """Test querying all annotation queues for a project."""
     if client_is_sqlite(client):
