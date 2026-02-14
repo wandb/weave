@@ -176,7 +176,7 @@ def tests(session: nox.Session, shard: str):
     test_dirs_dict = {
         "custom": [],
         "flow": ["tests/flow/"],
-        "trace_server": ["tests/trace_server/"],
+        "trace_server": ["tests/trace_server/", "tests/shared/"],
         "trace_server_bindings": ["tests/trace_server_bindings/"],
         "stainless": ["tests/trace_server_bindings/"],
         "scorers": ["tests/scorers/"],

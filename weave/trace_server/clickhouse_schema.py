@@ -2,7 +2,7 @@ import datetime
 
 from pydantic import BaseModel, Field, field_validator
 
-from weave.trace_server import refs_internal as ri
+from weave.shared import refs_internal as ri
 from weave.trace_server import validation
 
 # =============================================================================
