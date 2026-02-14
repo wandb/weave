@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import importlib
-from collections.abc import AsyncIterator, Callable, Iterator
+from collections.abc import AsyncIterator, Callable, Coroutine, Iterator
 from functools import wraps
 from typing import TYPE_CHECKING, Any
 
@@ -138,9 +138,6 @@ def anthropic_stream_accumulator(
 
 
 class AnthropicIteratorWrapper(_IteratorWrapper):
-    def _feed_message_to_accumulator(self, message: Message) -> None:
-        self._on_yield(MessageStopEvent(type="message_stop", message=message))
-        self._call_on_close_once()
 
     def __getattr__(self, name: str) -> Any:
         """Delegate all other attributes to the wrapped iterator."""
@@ -154,46 +151,7 @@ class AnthropicIteratorWrapper(_IteratorWrapper):
             "text_stream",
         ]:
             return object.__getattribute__(self, name)
-
-        attr = getattr(self._iterator_or_ctx_manager, name)
-
-        if name == "get_final_message":
-            if asyncio.iscoroutinefunction(attr):
-                @wraps(attr)
-                async def async_get_final_message() -> Message:
-                    message = await attr()
-                    self._feed_message_to_accumulator(message)
-                    return message
-                return async_get_final_message
-            else:
-                @wraps(attr)
-                def sync_get_final_message() -> Message:
-                    message = attr()
-                    self._feed_message_to_accumulator(message)
-                    return message
-                return sync_get_final_message
-
-        if name == "get_final_text":
-            if asyncio.iscoroutinefunction(attr):
-                @wraps(attr)
-                async def async_get_final_text() -> str:
-                    text = await attr()
-                    final_msg_fn = getattr(self._iterator_or_ctx_manager, "get_final_message")
-                    message = await final_msg_fn()
-                    self._feed_message_to_accumulator(message)
-                    return text
-                return async_get_final_text
-            else:
-                @wraps(attr)
-                def sync_get_final_text() -> str:
-                    text = attr()
-                    final_msg_fn = getattr(self._iterator_or_ctx_manager, "get_final_message")
-                    message = final_msg_fn()
-                    self._feed_message_to_accumulator(message)
-                    return text
-                return sync_get_final_text
-
-        return attr
+        return getattr(self._iterator_or_ctx_manager, name)
 
     def __stream_text__(self) -> Iterator[str] | AsyncIterator[str]:
         if isinstance(self._iterator_or_ctx_manager, AsyncIterator):
@@ -214,6 +172,32 @@ class AnthropicIteratorWrapper(_IteratorWrapper):
     @property
     def text_stream(self) -> Iterator[str] | AsyncIterator[str]:
         return self.__stream_text__()
+
+    def _feed_message_to_accumulator(self, message: Message) -> None:
+        self._on_yield(MessageStopEvent(type="message_stop", message=message))
+        self._call_on_close_once()
+
+    def get_final_message(self) -> Message | Coroutine[Any, Any, Message]:
+        underlying = self._iterator_or_ctx_manager.get_final_message
+        if asyncio.iscoroutinefunction(underlying):
+            async def _async() -> Message:
+                message = await underlying()
+                self._feed_message_to_accumulator(message)
+                return message
+            return _async()
+        message = underlying()
+        self._feed_message_to_accumulator(message)
+        return message
+
+    def get_final_text(self) -> str | Coroutine[Any, Any, str]:
+        underlying_text = self._iterator_or_ctx_manager.get_final_text
+        if asyncio.iscoroutinefunction(underlying_text):
+            async def _async() -> str:
+                await self.get_final_message()  # type: ignore[misc]
+                return await underlying_text()
+            return _async()
+        self.get_final_message()
+        return underlying_text()
 
 
 def create_stream_wrapper(settings: OpSettings) -> Callable[[Callable], Callable]:
