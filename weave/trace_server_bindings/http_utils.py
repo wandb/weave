@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any, TypeVar, Union
 
 import httpx
 
+from weave.telemetry.trace_sentry import SENTRY_AVAILABLE, sentry_sdk
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
 from weave.utils.retry import _is_retryable_exception
@@ -200,6 +201,13 @@ def process_batch_with_retry(
                     f"Error sending batch of {len(batch)} {batch_name} to server.",
                     exc_info=True,
                 )
+            if SENTRY_AVAILABLE:
+                with sentry_sdk.push_scope() as scope:
+                    scope.set_tag("batch_name", batch_name)
+                    scope.set_tag("batch_size", len(batch))
+                    scope.set_tag("drop_reason", "non_retryable_error")
+                    scope.set_level("error")
+                    sentry_sdk.capture_exception(e)
         else:
             # Add items back to the queue for later processing
             logger.warning(
@@ -221,6 +229,13 @@ def process_batch_with_retry(
                 logger.exception(
                     f"Failed to enqueue {batch_name} batch of size {len(batch)} - Processor is shutting down"
                 )
+                if SENTRY_AVAILABLE:
+                    with sentry_sdk.push_scope() as scope:
+                        scope.set_tag("batch_name", batch_name)
+                        scope.set_tag("batch_size", len(batch))
+                        scope.set_tag("drop_reason", "shutdown_during_retry")
+                        scope.set_level("error")
+                        sentry_sdk.capture_exception(e)
 
 
 def handle_response_error(response: httpx.Response, url: str) -> None:
