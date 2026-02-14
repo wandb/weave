@@ -9,6 +9,7 @@ from PIL import Image
 import weave
 from tests.trace.util import AnyIntMatcher, AnyStrMatcher
 from weave import Evaluation, Model
+from weave.flow.model import ApplyModelSuccess, apply_model_async
 from weave.trace.ref_util import get_ref
 from weave.trace.refs import CallRef
 from weave.trace_server import trace_server_interface as tsi
@@ -667,6 +668,25 @@ async def test_eval_supports_model_class(client):
     gotten_model = weave.ref(model.ref.uri()).get()
     res = await evaluation.evaluate(gotten_model)
     assert res is not None
+
+
+class MyTestModelWithKwargs(Model):
+    @weave.op
+    def predict(self, sentence: str, **kwargs: Any) -> dict:
+        return {"generated_text": sentence, "kwargs": kwargs}
+
+
+@pytest.mark.asyncio
+async def test_apply_model_async_passes_extra_fields_to_var_kwargs(client):
+    result = await apply_model_async(
+        MyTestModelWithKwargs(),
+        {"sentence": "hello", "tone": "formal", "retry_count": 2},
+    )
+    assert isinstance(result, ApplyModelSuccess)
+    assert result.model_output == {
+        "generated_text": "hello",
+        "kwargs": {"tone": "formal", "retry_count": 2},
+    }
 
 
 @pytest.mark.asyncio
