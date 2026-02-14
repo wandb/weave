@@ -536,6 +536,7 @@ class WeaveClient:
         include_feedback: bool = False,
         include_storage_size: bool = False,
         include_total_storage_size: bool = False,
+        include_username: bool = False,
         columns: list[str] | None = None,
         expand_columns: list[str] | None = None,
         return_expanded_column_values: bool = True,
@@ -560,6 +561,7 @@ class WeaveClient:
             `include_feedback`: If True, includes feedback in `summary.weave.feedback`.
             `include_storage_size`: If True, includes the storage size for a call.
             `include_total_storage_size`: If True, includes the total storage size for a trace.
+            `include_username`: If True, resolves wb_user_id to wb_username for each call.
             `columns`: List of fields to return per call. Reducing this can significantly improve performance.
                     (Some fields like `id`, `trace_id`, `op_name`, and `started_at` are always included.)
             `scored_by`: Filter by one or more scorers (name or ref URI). Multiple scorers are AND-ed.
@@ -596,6 +598,7 @@ class WeaveClient:
             include_feedback=include_feedback,
             include_storage_size=include_storage_size,
             include_total_storage_size=include_total_storage_size,
+            include_username=include_username,
             columns=columns,
             expand_columns=expand_columns,
             return_expanded_column_values=return_expanded_column_values,
