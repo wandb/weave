@@ -180,7 +180,8 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 wb_run_step_end INTEGER,
                 deleted_at TEXT,
                 display_name TEXT,
-                otel_dump TEXT
+                otel_dump TEXT,
+                view_spec_ref TEXT
             )
         """
         )
@@ -322,7 +323,8 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                     output = ?,
                     output_refs = ?,
                     summary = ?,
-                    wb_run_step_end = ?
+                    wb_run_step_end = ?,
+                    view_spec_ref = ?
                 WHERE id = ?""",
                 (
                     req.end.ended_at.isoformat(),
@@ -333,6 +335,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                     ),
                     json.dumps(req.end.summary),
                     req.end.wb_run_step_end,
+                    req.end.view_spec_ref,
                     req.end.id,
                 ),
             )

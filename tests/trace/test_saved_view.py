@@ -235,6 +235,44 @@ def test_saved_view_load(client):
     assert loaded_view.base.definition.cols["attributes.weave.client_version"] is True
 
 
+def test_saved_view_filter_roundtrip(client):
+    """Test that filters are correctly serialized and deserialized through save/load."""
+    from weave.flow.saved_view import query_to_filters
+
+    saved_view = weave.SavedView("traces", "My saved view")
+    saved_view.add_filter("inputs.model", "equals", "gpt-3.5-turbo")
+    saved_view.add_filter("output.score", ">", 0.5)
+
+    # Verify filters were added correctly
+    filters = query_to_filters(saved_view.base.definition.query)
+    assert filters is not None
+    assert len(filters) == 2
+    assert filters[0].field == "inputs.model"
+    assert filters[0].value == "gpt-3.5-turbo"
+    assert filters[1].field == "output.score"
+    assert filters[1].value == 0.5
+
+    # Save and load the view
+    saved_view.save()
+    uri = saved_view.ref.uri()
+    loaded_view = weave.SavedView.load(uri)
+
+    # Verify filters survived round-trip
+    loaded_filters = query_to_filters(loaded_view.base.definition.query)
+    assert loaded_filters is not None
+    assert len(loaded_filters) == 2
+    assert loaded_filters[0].field == "inputs.model"
+    assert loaded_filters[0].value == "gpt-3.5-turbo"
+    assert loaded_filters[1].field == "output.score"
+    assert loaded_filters[1].value == 0.5
+
+    # Verify the query structure is correct (no extra type metadata)
+    query = loaded_view.base.definition.query
+    assert query is not None
+    # The query should be a valid Query object
+    assert hasattr(query, "expr_")
+
+
 def test_saved_view_column_pinning():
     view = weave.SavedView("traces", "My saved view")
 
