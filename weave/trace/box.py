@@ -7,7 +7,7 @@ does not box None and bool which simplify checks for trace users.
 from __future__ import annotations
 
 import datetime
-from typing import Any, TypeVar
+from typing import Any, TypeVar, overload
 
 from weave.trace.refs import Ref
 
@@ -49,9 +49,37 @@ class BoxedTimedelta(datetime.timedelta):
         )
 
 
+@overload
+def box(obj: bool) -> bool: ...
+
+
+@overload
+def box(obj: int) -> BoxedInt: ...
+
+
+@overload
+def box(obj: float) -> BoxedFloat: ...
+
+
+@overload
+def box(obj: str) -> BoxedStr: ...
+
+
+@overload
+def box(obj: datetime.datetime) -> BoxedDatetime: ...
+
+
+@overload
+def box(obj: datetime.timedelta) -> BoxedTimedelta: ...
+
+
+@overload
+def box(obj: T) -> T: ...
+
+
 def box(
-    obj: T,
-) -> T | BoxedInt | BoxedFloat | BoxedStr | BoxedDatetime | BoxedTimedelta:
+    obj: Any,
+) -> Any:
     """Box an object to add reference tracking capabilities.
 
     Args:
@@ -81,9 +109,33 @@ def box(
     return obj
 
 
+@overload
+def unbox(obj: BoxedInt) -> int: ...
+
+
+@overload
+def unbox(obj: BoxedFloat) -> float: ...
+
+
+@overload
+def unbox(obj: BoxedStr) -> str: ...
+
+
+@overload
+def unbox(obj: BoxedDatetime) -> datetime.datetime: ...
+
+
+@overload
+def unbox(obj: BoxedTimedelta) -> datetime.timedelta: ...
+
+
+@overload
+def unbox(obj: T) -> T: ...
+
+
 def unbox(
-    obj: T,
-) -> T | int | float | str | datetime.datetime | datetime.timedelta:
+    obj: Any,
+) -> Any:
     """Unbox an object to get the underlying value.
 
     Args:
