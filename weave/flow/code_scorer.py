@@ -31,6 +31,19 @@ class CodeScorer(Scorer):
         default=None,
         description="Pip requirements to install in the sandbox",
     )
+    use_pip: bool = Field(
+        default=False,
+        description="Use pip instead of uv for dependency resolution",
+    )
+    secrets: list[str] | dict[str, str] | None = Field(
+        default=None,
+        description=(
+            "Secrets to inject as environment variables in the sandbox. "
+            "Pass a list of secret names (injected as-is), "
+            'the string "*" in a list to inject all entity secrets, '
+            "or a dict mapping secret names to env var names."
+        ),
+    )
 
     @model_validator(mode="after")
     def validate_environment(self) -> CodeScorer:
