@@ -138,7 +138,6 @@ def anthropic_stream_accumulator(
 
 
 class AnthropicIteratorWrapper(_IteratorWrapper):
-
     def __getattr__(self, name: str) -> Any:
         """Delegate all other attributes to the wrapped iterator."""
         if name in [
@@ -178,23 +177,27 @@ class AnthropicIteratorWrapper(_IteratorWrapper):
         self._call_on_close_once()
 
     def get_final_message(self) -> Message | Coroutine[Any, Any, Message]:
-        underlying = self._iterator_or_ctx_manager.get_final_message # type: ignore
+        underlying = self._iterator_or_ctx_manager.get_final_message  # type: ignore
         if asyncio.iscoroutinefunction(underlying):
+
             async def _async() -> Message:
                 message = await underlying()
                 self._feed_message_to_accumulator(message)
                 return message
+
             return _async()
         message = underlying()
         self._feed_message_to_accumulator(message)
         return message
 
     def get_final_text(self) -> str | Coroutine[Any, Any, str]:
-        underlying_text = self._iterator_or_ctx_manager.get_final_text # type: ignore
+        underlying_text = self._iterator_or_ctx_manager.get_final_text  # type: ignore
         if asyncio.iscoroutinefunction(underlying_text):
+
             async def _async() -> str:
                 await self.get_final_message()  # type: ignore[misc]
                 return await underlying_text()
+
             return _async()
         self.get_final_message()
         return underlying_text()
