@@ -71,15 +71,15 @@ class ExternalVariableFinder(ast.NodeVisitor):
         self.external_vars: dict[str, bool] = {}
         self.scope_stack: list[set[str]] = [set()]  # Start with a global scope
 
-    def visit_Import(self, node: ast.Import) -> None:
+    def visit_Import(self, node: ast.Import) -> None:  # noqa: N802
         for alias in node.names:
             self.scope_stack[-1].add(alias.asname or alias.name)
 
-    def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
+    def visit_ImportFrom(self, node: ast.ImportFrom) -> None:  # noqa: N802
         for alias in node.names:
             self.scope_stack[-1].add(alias.asname or alias.name)
 
-    def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> None:  # noqa: N802
         # Add function name to the current scope
         self.scope_stack[-1].add(node.name)
         # Add function arguments to new scope
@@ -87,40 +87,40 @@ class ExternalVariableFinder(ast.NodeVisitor):
         self.generic_visit(node)
         self.scope_stack.pop()  # Pop function scope when we exit the function
 
-    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
+    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:  # noqa: N802
         self.scope_stack[-1].add(node.name)
         self.scope_stack.append(arg_names(node.args))
         self.generic_visit(node)
         self.scope_stack.pop()  # Pop function scope when we exit the function
 
-    def visit_Lambda(self, node: ast.Lambda) -> None:
+    def visit_Lambda(self, node: ast.Lambda) -> None:  # noqa: N802
         # Add function arguments to the current scope
         self.scope_stack.append(arg_names(node.args))
         self.generic_visit(node)
         self.scope_stack.pop()  # Pop function scope when we exit the function
 
-    def visit_ListComp(self, node: ast.ListComp) -> None:
+    def visit_ListComp(self, node: ast.ListComp) -> None:  # noqa: N802
         # Change visit order, visit generators first which is where variable
         # definitions happen
         for generator in node.generators:
             self.visit(generator)
         self.visit(node.elt)
 
-    def visit_SetComp(self, node: ast.SetComp) -> Any:
+    def visit_SetComp(self, node: ast.SetComp) -> Any:  # noqa: N802
         # Change visit order, visit generators first which is where variable
         # definitions happen
         for generator in node.generators:
             self.visit(generator)
         self.visit(node.elt)
 
-    def visit_GeneratorExp(self, node: ast.GeneratorExp) -> None:
+    def visit_GeneratorExp(self, node: ast.GeneratorExp) -> None:  # noqa: N802
         # Change visit order, visit generators first which is where variable
         # definitions happen
         for generator in node.generators:
             self.visit(generator)
         self.visit(node.elt)
 
-    def visit_DictComp(self, node: ast.DictComp) -> None:
+    def visit_DictComp(self, node: ast.DictComp) -> None:  # noqa: N802
         # Change visit order, visit generators first which is where variable
         # definitions happen
         for generator in node.generators:
@@ -128,13 +128,13 @@ class ExternalVariableFinder(ast.NodeVisitor):
         self.visit(node.key)
         self.visit(node.value)
 
-    def visit_ExceptHandler(self, node: ExceptHandler) -> None:
+    def visit_ExceptHandler(self, node: ExceptHandler) -> None:  # noqa: N802
         if node.name is None:
             return
         self.scope_stack[-1].add(node.name)
         self.generic_visit(node)
 
-    def visit_Name(self, node: ast.Name) -> None:
+    def visit_Name(self, node: ast.Name) -> None:  # noqa: N802
         # print("  VISIT NAME", node.id, node.ctx)
         # If a variable is used (loaded) but not defined in any scope in the stack, and not builtin it's external
         # TODO: we don't capture python version, but builtins can change from version to version!
