@@ -21,12 +21,6 @@ def str_digest(json_val: str) -> str:
     return bytes_digest(json_val.encode())
 
 
-def _order_dict(dictionary: dict) -> dict:
-    return {
-        k: _order_dict(v) if isinstance(v, dict) else v
-        for k, v in sorted(dictionary.items())
-    }
-
 
 valid_internal_schemes = [
     ARTIFACT_REF_SCHEME,
