@@ -3620,7 +3620,7 @@ def test_large_keys_are_stripped_call(client, caplog, monkeypatch):
     )
     monkeypatch.setattr(
         weave.trace_server.clickhouse_trace_server_settings,
-        "LARGE_STRING_OFFLOAD_MIN_CHARS",
+        "LARGE_STRING_OFFLOAD_MAX_CHARS",
         1024,
     )
 

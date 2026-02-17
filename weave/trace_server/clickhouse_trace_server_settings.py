@@ -34,7 +34,7 @@ ENTITY_TOO_LARGE_PAYLOAD = '{"_weave": {"error":"<EXCEEDS_LIMITS>"}}'
 PROACTIVE_OFFLOAD_BYTES_LIMIT = 1 * 1024 * 1024  # 1 MiB
 
 # Minimum string length (in characters) to offload to Content storage when a row
-# exceeds the offload threshold.  Strings shorter than this are left inline;
+# exceeds the offload threshold. Strings shorter than this are left inline;
 # longer ones are stored as Content objects in file storage so the row can fit
 # within limits without data loss.
 LARGE_STRING_OFFLOAD_MAX_CHARS = 100 * 1024  # 100k characters
