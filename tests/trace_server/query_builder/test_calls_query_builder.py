@@ -165,6 +165,123 @@ def test_query_heavy_column_simple_filter() -> None:
     )
 
 
+def test_query_no_order() -> None:
+    """Test that omitting add_order produces no ORDER BY clause.
+
+    This corresponds to passing sort_by=[] at the API level, which explicitly
+    disables sorting for performance.
+    """
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_field("started_at")
+    # No add_order calls — should produce no ORDER BY
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id,
+            any(calls_merged.started_at) AS started_at
+        FROM calls_merged
+        PREWHERE calls_merged.project_id = {pb_0:String}
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING (
+            ((
+                any(calls_merged.deleted_at) IS NULL
+            ))
+            AND
+            ((
+               NOT ((
+                  any(calls_merged.started_at) IS NULL
+               ))
+            ))
+        )
+        """,
+        {"pb_0": "project"},
+    )
+
+
+def test_query_no_order_with_limit() -> None:
+    """Test no ORDER BY with LIMIT still works.
+
+    This is the primary performance case: getting a batch of rows without
+    paying for sorting.
+    """
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_field("started_at")
+    cq.set_limit(100)
+    # No add_order calls — should produce LIMIT but no ORDER BY
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id,
+            any(calls_merged.started_at) AS started_at
+        FROM calls_merged
+        PREWHERE calls_merged.project_id = {pb_0:String}
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING (
+            ((
+                any(calls_merged.deleted_at) IS NULL
+            ))
+            AND
+            ((
+               NOT ((
+                  any(calls_merged.started_at) IS NULL
+               ))
+            ))
+        )
+        LIMIT 100
+        """,
+        {"pb_0": "project"},
+    )
+
+
+def test_query_no_order_with_filter() -> None:
+    """Test no ORDER BY with filter applied.
+
+    Verifies that the filtered_calls CTE also has no ORDER BY when no
+    sorting is specified.
+    """
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_field("inputs")
+    cq.set_hardcoded_filter(
+        HardCodedFilter(
+            filter=tsi.CallsFilter(
+                op_names=["a", "b"],
+            )
+        )
+    )
+    # No add_order calls — neither CTE nor main query should have ORDER BY
+    assert_sql(
+        cq,
+        """
+        WITH filtered_calls AS (
+            SELECT
+                calls_merged.id AS id
+            FROM calls_merged
+            PREWHERE calls_merged.project_id = {pb_1:String}
+            WHERE ((calls_merged.op_name IN {pb_0:Array(String)})
+                    OR (calls_merged.op_name IS NULL))
+            GROUP BY (calls_merged.project_id, calls_merged.id)
+            HAVING (
+                ((any(calls_merged.deleted_at) IS NULL))
+                AND ((NOT ((any(calls_merged.started_at) IS NULL))))
+            )
+        )
+        SELECT
+            calls_merged.id AS id,
+            any(calls_merged.inputs_dump) AS inputs_dump
+        FROM calls_merged
+        PREWHERE calls_merged.project_id = {pb_1:String}
+        WHERE (calls_merged.id IN filtered_calls)
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        """,
+        {"pb_0": ["a", "b"], "pb_1": "project"},
+    )
+
+
 def test_query_heavy_column_simple_filter_with_order() -> None:
     cq = CallsQuery(project_id="project")
     cq.add_field("id")
