@@ -124,6 +124,7 @@ class CallSchema(BaseModel):
 
     # WB Metadata
     wb_user_id: str | None = None
+    wb_username: str | None = None  # Resolved username from wb_user_id
     wb_run_id: str | None = None
     wb_run_step: int | None = None
     wb_run_step_end: int | None = None

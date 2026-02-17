@@ -35,6 +35,13 @@ class IdConverter:
     def int_to_ext_user_id(self, user_id: str) -> str:
         raise NotImplementedError()
 
+    def get_auth_user(self) -> typing.Any:
+        """Override to provide auth user for username resolution.
+
+        Returns an object with `id` and `username` attributes, or None.
+        """
+        return None
+
 
 A = TypeVar("A")
 B = TypeVar("B")
@@ -199,6 +206,7 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         res = self._stream_ref_apply(
             self._internal_trace_server.calls_query_stream, req
         )
+        auth_user = self._idc.get_auth_user()
         for call in res:
             if call.project_id != req.project_id:
                 raise ValueError("Internal Error - Project Mismatch")
@@ -207,6 +215,9 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
                 call.wb_run_id = self._idc.int_to_ext_run_id(call.wb_run_id)
             if call.wb_user_id is not None:
                 call.wb_user_id = self._idc.int_to_ext_user_id(call.wb_user_id)
+                # Resolve username from auth scope when user matches
+                if auth_user and call.wb_user_id == auth_user.id:
+                    call.wb_username = auth_user.username
             yield call
 
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:

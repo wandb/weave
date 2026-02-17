@@ -55,11 +55,20 @@ def b64(s: str) -> str:
     return base64.b64encode(s.encode("ascii")).decode("ascii")
 
 
+class DummyAuthUser:
+    """Mock auth user for testing."""
+
+    def __init__(self, user_id: str, username: str):
+        self.id = user_id
+        self.username = username
+
+
 class DummyIdConverter(external_to_internal_trace_server_adapter.IdConverter):
-    def __init__(self):
+    def __init__(self, auth_user: DummyAuthUser | None = None):
         self._project_map = TwoWayMapping()
         self._run_map = TwoWayMapping()
         self._user_map = TwoWayMapping()
+        self._auth_user = auth_user
 
     def ext_to_int_project_id(self, project_id: str) -> str:
         return self._project_map.ext_to_int(project_id, b64(project_id))
@@ -79,6 +88,9 @@ class DummyIdConverter(external_to_internal_trace_server_adapter.IdConverter):
 
     def int_to_ext_user_id(self, user_id: str) -> str:
         return self._user_map.int_to_ext(user_id, b64(user_id))
+
+    def get_auth_user(self) -> DummyAuthUser | None:
+        return self._auth_user
 
 
 class TestOnlyUserInjectingExternalTraceServer(
@@ -161,9 +173,12 @@ def externalize_trace_server(
     trace_server: tsi.TraceServerInterface,
     user_id: str = "test_user",
     id_converter: external_to_internal_trace_server_adapter.IdConverter | None = None,
+    auth_user: DummyAuthUser | None = None,
 ) -> TestOnlyUserInjectingExternalTraceServer:
+    if id_converter is None:
+        id_converter = DummyIdConverter(auth_user=auth_user)
     return TestOnlyUserInjectingExternalTraceServer(
         trace_server,
-        id_converter or DummyIdConverter(),
+        id_converter,
         user_id,
     )
