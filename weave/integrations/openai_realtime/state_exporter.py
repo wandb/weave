@@ -12,6 +12,7 @@ from typing_extensions import Self
 
 from weave.integrations.openai_realtime.audio_buffer import AudioBufferManager
 from weave.integrations.openai_realtime.encoding import pcm_to_wav
+from weave.trace.context.call_context import set_thread_id
 from weave.trace.context.weave_client_context import require_weave_client
 from weave.trace.weave_client import Call
 from weave.type_wrappers.Content import Content
@@ -495,35 +496,36 @@ class StateExporter(BaseModel):
         else:
             response_parent = session_call
 
-        call = client.create_call(
-            "realtime.response", inputs=inputs, parent=response_parent
-        )
+        with set_thread_id(conv_id):
+            call = client.create_call(
+                "realtime.response", inputs=inputs, parent=response_parent
+            )
 
-        output_dict = dict(response)
-        output_list = response.get("output", [])
-        for output_idx, output in enumerate(output_list):
-            if output.get("type") == "message":
-                item_id = output.get("id")
-                content_list = output.get("content", [])
-                for content_idx, content in enumerate(content_list):
-                    content_dict = dict(content)
-                    content_type = content.get("type")
-                    if content_type in OUTPUT_AUDIO_TYPES:
-                        audio_bytes = (
-                            self.response_audio.get(item_id) if item_id else None
+            output_dict = dict(response)
+            output_list = response.get("output", [])
+            for output_idx, output in enumerate(output_list):
+                if output.get("type") == "message":
+                    item_id = output.get("id")
+                    content_list = output.get("content", [])
+                    for content_idx, content in enumerate(content_list):
+                        content_dict = dict(content)
+                        content_type = content.get("type")
+                        if content_type in OUTPUT_AUDIO_TYPES:
+                            audio_bytes = (
+                                self.response_audio.get(item_id) if item_id else None
+                            )
+
+                            if not audio_bytes:
+                                logger.error("failed to fetch audio bytes")
+                                continue
+
+                            content_dict["audio"] = Content.from_bytes(
+                                pcm_to_wav(bytes(audio_bytes)), extension=".wav"
+                            )
+                        output_dict["output"][output_idx]["content"][content_idx] = (
+                            content_dict
                         )
-
-                        if not audio_bytes:
-                            logger.error("failed to fetch audio bytes")
-                            continue
-
-                        content_dict["audio"] = Content.from_bytes(
-                            pcm_to_wav(bytes(audio_bytes)), extension=".wav"
-                        )
-                    output_dict["output"][output_idx]["content"][content_idx] = (
-                        content_dict
-                    )
-        client.finish_call(call, output=output_dict)
+            client.finish_call(call, output=output_dict)
 
     def handle_response_done(self, msg: dict) -> None:
         # Update state to the completed version and enqueue for FIFO completion.

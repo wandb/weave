@@ -8,11 +8,14 @@ class DummyWeaveClient:
     def __init__(self):
         self.created: list[str] = []
         self.finished: list[str] = []
+        self.thread_ids: list[str | None] = []
 
     def create_call(self, op, inputs=None, parent=None):
         from weave.trace.call import Call
+        from weave.trace.context.call_context import get_thread_id
 
         self.created.append(op)
+        self.thread_ids.append(get_thread_id())
         return Call(
             _op_name=op,
             trace_id="trace",
@@ -214,6 +217,119 @@ def test_fifo_completion_orders_responses_by_arrival(monkeypatch):
     # Allow timer to fire
     time.sleep(0.12)
     assert client.finished == ["resp_1", "resp_2"]
+
+
+def test_response_calls_have_thread_id_set_to_conversation_id(monkeypatch):
+    """Each realtime.response call should be created with thread_id = conversation_id."""
+    client = DummyWeaveClient()
+    install_require_weave_client(monkeypatch, client)
+    import weave.integrations.openai_realtime.state_exporter as se
+
+    monkeypatch.setattr(
+        se.Content, "from_bytes", staticmethod(lambda b, extension: {"ok": True})
+    )
+
+    exp = StateExporter()
+    session = {
+        "id": "sess_1",
+        "model": "m",
+        "modalities": ["audio"],
+        "instructions": "",
+        "voice": "alloy",
+        "input_audio_format": "pcm16",
+        "output_audio_format": "pcm16",
+        "input_audio_transcription": None,
+        "turn_detection": {"type": "none"},
+        "tools": [],
+        "tool_choice": "auto",
+        "temperature": 0.6,
+        "max_response_output_tokens": None,
+    }
+    exp.handle_session_updated(
+        {"type": "session.updated", "event_id": "event_0", "session": session}
+    )
+
+    conv_id = "conv_abc123"
+    out = make_assistant_output("item_a", content=[{"type": "text", "text": "hi"}])
+    resp = {
+        "id": "resp_1",
+        "status": "completed",
+        "status_details": None,
+        "output": [out],
+        "usage": None,
+        "conversation_id": conv_id,
+    }
+    exp.handle_response_created(
+        {"type": "response.created", "event_id": "event_1", "response": resp}
+    )
+    exp.handle_response_done(
+        {"type": "response.done", "event_id": "event_2", "response": resp}
+    )
+
+    time.sleep(0.08)
+
+    # Find the thread_id captured when realtime.response was created
+    response_indices = [
+        i for i, op in enumerate(client.created) if op == "realtime.response"
+    ]
+    assert len(response_indices) == 1
+    assert client.thread_ids[response_indices[0]] == conv_id
+
+    # Conversation call should NOT have thread_id set
+    conv_indices = [
+        i for i, op in enumerate(client.created) if op == "realtime.conversation"
+    ]
+    assert len(conv_indices) == 1
+    assert client.thread_ids[conv_indices[0]] is None
+
+
+def test_response_without_conversation_id_has_no_thread_id(monkeypatch):
+    """When conversation_id is None (Beta API), no thread_id should be set."""
+    client = DummyWeaveClient()
+    install_require_weave_client(monkeypatch, client)
+    import weave.integrations.openai_realtime.state_exporter as se
+
+    monkeypatch.setattr(
+        se.Content, "from_bytes", staticmethod(lambda b, extension: {"ok": True})
+    )
+
+    exp = StateExporter()
+    session = {
+        "id": "sess_1",
+        "model": "m",
+        "modalities": ["audio"],
+        "instructions": "",
+        "voice": "alloy",
+        "input_audio_format": "pcm16",
+        "output_audio_format": "pcm16",
+        "input_audio_transcription": None,
+        "turn_detection": {"type": "none"},
+        "tools": [],
+        "tool_choice": "auto",
+        "temperature": 0.6,
+        "max_response_output_tokens": None,
+    }
+    exp.handle_session_updated(
+        {"type": "session.updated", "event_id": "event_0", "session": session}
+    )
+
+    out = make_assistant_output("item_a", content=[{"type": "text", "text": "hi"}])
+    resp = make_response("resp_1", out)  # conversation_id is None
+    exp.handle_response_created(
+        {"type": "response.created", "event_id": "event_1", "response": resp}
+    )
+    exp.handle_response_done(
+        {"type": "response.done", "event_id": "event_2", "response": resp}
+    )
+
+    time.sleep(0.08)
+
+    # All calls should have None thread_id
+    response_indices = [
+        i for i, op in enumerate(client.created) if op == "realtime.response"
+    ]
+    assert len(response_indices) == 1
+    assert client.thread_ids[response_indices[0]] is None
 
 
 def test_transcripts_not_required_when_text_modality_absent(monkeypatch):
