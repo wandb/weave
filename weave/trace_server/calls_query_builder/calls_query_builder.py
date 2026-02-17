@@ -25,7 +25,6 @@ Outstanding Optimizations/Work:
 
 """
 
-import datetime
 import logging
 import re
 from collections.abc import Callable, KeysView, Sequence
@@ -53,6 +52,7 @@ from weave.trace_server.calls_query_builder.utils import (
     json_dump_field_as_sql,
     param_slot,
     safely_format_sql,
+    timestamp_to_datetime_str,
 )
 from weave.trace_server.clickhouse_trace_server_settings import LOCAL_TABLE_SUFFIX
 from weave.trace_server.common_interface import SortBy
@@ -1817,9 +1817,7 @@ def _maybe_convert_datetime_operands(
     # Convert numeric timestamp to datetime string for proper DateTime64 comparison
     timestamp = operands[literal_idx].literal_
     assert isinstance(timestamp, (int, float))
-    datetime_str = datetime.datetime.fromtimestamp(
-        timestamp, tz=datetime.timezone.utc
-    ).strftime("%Y-%m-%d %H:%M:%S.%f")
+    datetime_str = timestamp_to_datetime_str(timestamp)
 
     new_operands = list(operands)
     new_operands[literal_idx] = tsi_query.LiteralOperation(**{"$literal": datetime_str})
