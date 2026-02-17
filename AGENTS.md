@@ -51,6 +51,14 @@ _Important:_ For OpenAI Codex agents (most likely you!), your environment does n
   - `weave/` - Python package implementation
   - `weave/trace_server` - Backend server implementation
 
+### Eval Results Read APIs
+
+- The trace server now exposes read-oriented eval endpoints:
+  - `POST /v2/{entity}/{project}/eval_results/query`
+  - `POST /v2/{entity}/{project}/eval_results/summary`
+- These endpoints are designed for Compare Evaluations-style UIs and return data grouped by dataset row digest across one or more `Evaluation.evaluate` roots.
+- Pass-rate aggregation remains convention-based and uses scorer outputs where `passed` is present as a boolean (no dedicated `feedback.passed` column).
+
 
 ## Python Testing Guidelines
 

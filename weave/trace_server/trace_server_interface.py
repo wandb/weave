@@ -2303,6 +2303,138 @@ class ScoreDeleteRes(BaseModel):
     num_deleted: int = Field(..., description="Number of scores deleted")
 
 
+class EvalResultsQueryBody(BaseModelStrict):
+    evaluation_call_ids: list[str] | None = Field(
+        default=None,
+        description="Evaluation root call IDs to include.",
+    )
+    evaluation_run_ids: list[str] | None = Field(
+        default=None,
+        description="Alias for evaluation call IDs from the Evaluation Runs API.",
+    )
+    require_intersection: bool = Field(
+        default=False,
+        description="When true, only include rows present in all requested evaluations.",
+    )
+    include_raw_data_rows: bool = Field(
+        default=False,
+        description=(
+            "When true, populate raw_data_row on each result row. "
+            "Inline rows are returned as their dict value; dataset-referenced rows are "
+            "returned as the ref string unless resolve_row_refs is also true."
+        ),
+    )
+    resolve_row_refs: bool = Field(
+        default=False,
+        description=(
+            "When true (requires include_raw_data_rows=True), resolve dataset-row "
+            "reference strings to actual row data via a table lookup. "
+            "When false, dataset-row refs are returned as-is."
+        ),
+    )
+    limit: int | None = Field(
+        default=None,
+        description="Optional row-level page size applied after grouping and intersection.",
+    )
+    offset: int = Field(
+        default=0,
+        description="Optional row-level page offset applied after grouping and intersection.",
+    )
+
+    @model_validator(mode="after")
+    def validate_identifiers(self) -> "EvalResultsQueryBody":
+        """Validate that at least one evaluation identifier is provided."""
+        call_ids = self.evaluation_call_ids or []
+        run_ids = self.evaluation_run_ids or []
+        if not call_ids and not run_ids:
+            raise ValueError(
+                "At least one of evaluation_call_ids or evaluation_run_ids must be provided"
+            )
+        return self
+
+
+class EvalResultsQueryReq(EvalResultsQueryBody):
+    project_id: str
+
+
+class EvalResultsTrial(BaseModel):
+    predict_and_score_call_id: str
+    predict_call_id: str | None = None
+    model_output: Any | None = None
+    scores: dict[str, Any] = Field(default_factory=dict)
+    model_latency_seconds: float | None = None
+    total_tokens: int | None = None
+    scorer_call_ids: dict[str, str] = Field(default_factory=dict)
+
+
+class EvalResultsRowEvaluation(BaseModel):
+    evaluation_call_id: str
+    trials: list[EvalResultsTrial] = Field(default_factory=list)
+
+
+class EvalResultsRow(BaseModel):
+    row_digest: str
+    raw_data_row: Any | None = None
+    evaluations: list[EvalResultsRowEvaluation] = Field(default_factory=list)
+
+
+class EvalResultsQueryRes(BaseModel):
+    rows: list[EvalResultsRow]
+    total_rows: int
+
+
+class EvalResultsScorerStats(BaseModel):
+    scorer_key: str
+    trial_count: int = 0
+    numeric_count: int = 0
+    numeric_mean: float | None = None
+    pass_true_count: int = 0
+    pass_known_count: int = 0
+    pass_rate: float | None = None
+    pass_signal_coverage: float | None = None
+
+
+class EvalResultsEvaluationSummary(BaseModel):
+    evaluation_call_id: str
+    trial_count: int = 0
+    scorer_stats: list[EvalResultsScorerStats] = Field(default_factory=list)
+
+
+class EvalResultsSummaryBody(BaseModelStrict):
+    evaluation_call_ids: list[str] | None = Field(
+        default=None,
+        description="Evaluation root call IDs to include.",
+    )
+    evaluation_run_ids: list[str] | None = Field(
+        default=None,
+        description="Alias for evaluation call IDs from the Evaluation Runs API.",
+    )
+    require_intersection: bool = Field(
+        default=False,
+        description="When true, only aggregate rows present in all requested evaluations.",
+    )
+
+    @model_validator(mode="after")
+    def validate_identifiers(self) -> "EvalResultsSummaryReq":
+        """Validate that at least one evaluation identifier is provided."""
+        call_ids = self.evaluation_call_ids or []
+        run_ids = self.evaluation_run_ids or []
+        if not call_ids and not run_ids:
+            raise ValueError(
+                "At least one of evaluation_call_ids or evaluation_run_ids must be provided"
+            )
+        return EvalResultsSummaryReq(**self.model_dump())
+
+
+class EvalResultsSummaryReq(EvalResultsSummaryBody):
+    project_id: str
+
+
+class EvalResultsSummaryRes(BaseModel):
+    row_count: int = 0
+    evaluations: list[EvalResultsEvaluationSummary] = Field(default_factory=list)
+
+
 class TraceServerInterface(Protocol):
     def ensure_project_exists(
         self, entity: str, project: str
@@ -2514,6 +2646,10 @@ class ObjectInterface(Protocol):
     def score_read(self, req: ScoreReadReq) -> ScoreReadRes: ...
     def score_list(self, req: ScoreListReq) -> Iterator[ScoreReadRes]: ...
     def score_delete(self, req: ScoreDeleteReq) -> ScoreDeleteRes: ...
+    def eval_results_query(self, req: EvalResultsQueryReq) -> EvalResultsQueryRes: ...
+    def eval_results_summary(
+        self, req: EvalResultsSummaryReq
+    ) -> EvalResultsSummaryRes: ...
 
 
 class FullTraceServerInterface(TraceServerInterface, ObjectInterface, Protocol):

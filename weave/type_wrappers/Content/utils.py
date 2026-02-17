@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import base64
-import functools
 import logging
 import re
 from pathlib import Path
@@ -34,10 +33,6 @@ MIME_DETECTION_BUFFER_SIZE = 2048
 
 # A global variable to hold the lazily imported mimetypes module.
 _mimetypes_module: ModuleType | None = None
-
-# Cached polyfile matcher -- initialised once on first use.
-_polyfile_matcher: MagicMatcher | None = None
-_polyfile_unavailable: bool = False
 
 DATA_URL_PATTERN = re.compile(
     r"^data:(?P<media_type>[\w\/\-\+\.]+(?:;[\w\-]+\=[\w\-\.]+)*)?(?P<base64>;base64)?,(?P<data>.*)$"
@@ -111,62 +106,38 @@ def default_filename(
 
 
 def get_extension_from_mimetype(mimetype: str) -> str | None:
-    """Map a MIME type to a file extension via the stdlib mimetypes db."""
     mimetypes = _get_mimetypes_module()
     extension = mimetypes.guess_extension(mimetype)
     if not extension:
-        logger.debug(
-            "Got mime-type %s but failed to resolve a valid extension", mimetype
+        logger.warning(
+            f"Got mime-type {mimetype} but failed to resolve a valid extension"
         )
     return extension
 
 
-def _get_polyfile_matcher() -> MagicMatcher | None:
-    """Return the cached polyfile MagicMatcher, or None if unavailable.
-
-    The matcher and the "not installed" state are each determined once per
-    process so that we never re-import polyfile or log the warning repeatedly.
-    """
-    global _polyfile_matcher, _polyfile_unavailable
-    if _polyfile_matcher is not None:
-        return _polyfile_matcher
-    if _polyfile_unavailable:
+def guess_from_buffer(buffer: bytes) -> str | None:
+    """Guess the mimetype from a byte buffer using polyfile."""
+    if len(buffer) == 0:
         return None
+
     try:
+        # Lazily import polyfile only when needed.
         from polyfile.magic import MagicMatcher
     except (ImportError, ModuleNotFoundError):
-        _polyfile_unavailable = True
         logger.warning(
-            "MIME type detection from raw data requires the polyfile library. "
-            "Install it by running: `pip install polyfile`. "
+            "Failed to determine MIME type from file extension and cannot infer from data\n"
+            "MIME type detection from raw data requires the polyfile library\n"
+            "Install it by running: `pip install polyfile `\n"
             "See: https://pypi.org/project/polyfile for detailed instructions"
         )
         return None
-    else:
-        _polyfile_matcher = cast("MagicMatcher", MagicMatcher.DEFAULT_INSTANCE)
-        return _polyfile_matcher
 
-
-@functools.lru_cache(maxsize=256)
-def guess_from_buffer(buffer: bytes) -> str | None:
-    """Guess the mimetype from a byte buffer using polyfile.
-
-    Results are LRU-cached (keyed on the buffer bytes) so that repeated
-    calls with identical content skip the expensive magic-match pass.
-    """
-    if len(buffer) == 0:
-        return None
-    matcher = _get_polyfile_matcher()
-    if matcher is None:
-        return None
     try:
-        match = next(matcher.match(buffer), None)
-        if match is not None and match.mimetypes:
-            return match.mimetypes[0]
-    except Exception:
-        # Broad guard so a polyfile bug can never crash a caller.
-        logger.debug("polyfile match raised an unexpected error", exc_info=True)
-    return None
+        matcher = cast("MagicMatcher", MagicMatcher.DEFAULT_INSTANCE)
+        return next(matcher.match(buffer)).mimetypes[0]
+    except IndexError:
+        # This occurs if polyfile is installed but finds no match.
+        return None
 
 
 def guess_from_filename(filename: str) -> str | None:
@@ -201,11 +172,6 @@ def get_mime_and_extension(
     if extension is not None and len(extension) > 0:
         extension = f".{extension.lstrip('.')}"
 
-    # Track whether we already tried (and failed) to derive an extension
-    # from the current mimetype, so we don't call get_extension_from_mimetype
-    # twice with the same value.
-    extension_lookup_failed_for: str | None = None
-
     # --- Fast paths: both known, or one can be derived cheaply ----------
     if mimetype and extension:
         return mimetype, extension
@@ -216,7 +182,6 @@ def get_mime_and_extension(
             return mimetype, guessed_ext
         # mimetype is valid but has no known extension — keep it, keep looking
         # for an extension below instead of discarding it.
-        extension_lookup_failed_for = mimetype
 
     if extension and not mimetype:
         guessed_type = guess_from_extension(extension)
@@ -238,7 +203,7 @@ def get_mime_and_extension(
     if mimetype and extension:
         return mimetype, extension
 
-    if mimetype and not extension and mimetype != extension_lookup_failed_for:
+    if mimetype and not extension:
         extension = get_extension_from_mimetype(mimetype)
         if extension:
             return mimetype, extension
@@ -320,7 +285,7 @@ def try_parse_data_url(url: str) -> DataUrl | None:
                 encoding=encoding,
             )
         )
-    elif is_base64:
+    elif base64:
         return DataUrl(
             params=DataUrlBase64(
                 mimetype=base_media_type,

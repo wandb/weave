@@ -4618,6 +4618,335 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         res = self.calls_delete(calls_delete_req)
         return tsi.ScoreDeleteRes(num_deleted=res.num_deleted)
 
+    def _resolve_eval_root_ids(
+        self, req: tsi.EvalResultsQueryReq | tsi.EvalResultsSummaryReq
+    ) -> list[str]:
+        """Return de-duplicated evaluation root IDs preserving request order."""
+        combined = (req.evaluation_call_ids or []) + (req.evaluation_run_ids or [])
+        return list(dict.fromkeys(combined))
+
+    def _extract_row_digest_from_example(self, example: Any) -> tuple[str, bool]:
+        """Extract row digest from dataset refs or derive a stable digest."""
+        split = "/attr/rows/id/"
+        if isinstance(example, str) and split in example:
+            prefix, digest = example.split(split, 1)
+            if prefix and digest and "/" not in digest:
+                return digest, True
+        return str_digest(example), False
+
+    def _select_predict_call(
+        self, child_calls: list[tsi.CallSchema], model_ref: Any
+    ) -> tsi.CallSchema | None:
+        """Best-effort selection of the model predict child call."""
+        for call in child_calls:
+            weave_attrs = call.attributes.get(constants.WEAVE_ATTRIBUTES_NAMESPACE, {})
+            if weave_attrs.get(constants.SCORE_ATTR_KEY) == "true":
+                continue
+            eval_meta = call.attributes.get("_weave_eval_meta", {})
+            if isinstance(eval_meta, dict) and eval_meta.get("score"):
+                continue
+            if isinstance(call.inputs, dict) and call.inputs.get("self") == model_ref:
+                return call
+            op_name = call.op_name.lower()
+            if "predict" in op_name or "invoke" in op_name:
+                return call
+        return None
+
+    def _extract_total_tokens(self, summary: dict[str, Any] | None) -> int | None:
+        """Return the total token count from summary usage if present."""
+        if not isinstance(summary, dict):
+            return None
+        usage = summary.get("usage")
+        if not isinstance(usage, dict):
+            return None
+        total_tokens = 0
+        found_any = False
+        for model_usage in usage.values():
+            if not isinstance(model_usage, dict):
+                continue
+            tokens = model_usage.get("total_tokens")
+            if isinstance(tokens, (int, float)):
+                total_tokens += int(tokens)
+                found_any = True
+        return total_tokens if found_any else None
+
+    def _best_effort_scorer_call_ids(
+        self, scores: dict[str, Any], child_calls: list[tsi.CallSchema]
+    ) -> dict[str, str]:
+        """Map scorer keys to scorer call IDs using heuristic name matching."""
+        scorer_calls: list[tsi.CallSchema] = []
+        for call in child_calls:
+            weave_attrs = call.attributes.get(constants.WEAVE_ATTRIBUTES_NAMESPACE, {})
+            eval_meta = call.attributes.get("_weave_eval_meta", {})
+            if weave_attrs.get(constants.SCORE_ATTR_KEY) == "true" or (
+                isinstance(eval_meta, dict) and eval_meta.get("score")
+            ):
+                scorer_calls.append(call)
+                continue
+            op_name = call.op_name.lower()
+            if ".score" in op_name or "scorer" in op_name:
+                scorer_calls.append(call)
+        result: dict[str, str] = {}
+        for scorer_key in scores:
+            key_lower = scorer_key.lower()
+            match = next(
+                (
+                    call
+                    for call in scorer_calls
+                    if key_lower in call.op_name.lower()
+                    or call.op_name.lower() in key_lower
+                ),
+                None,
+            )
+            if match is not None:
+                result[scorer_key] = match.id
+        return result
+
+    def _eval_results_grouped_rows(
+        self, req: tsi.EvalResultsQueryReq
+    ) -> tuple[list[tsi.EvalResultsRow], int]:
+        """Build grouped eval rows before pagination."""
+        eval_root_ids = self._resolve_eval_root_ids(req)
+        if not eval_root_ids:
+            return [], 0
+
+        pas_req = tsi.CallsQueryReq(
+            project_id=req.project_id,
+            filter=tsi.CallsFilter(parent_ids=eval_root_ids),
+            columns=["id", "parent_id", "op_name", "inputs.example", "inputs.model", "output"],
+            sort_by=[tsi.SortBy(field="started_at", direction="asc")],
+        )
+        predict_and_score_calls = [
+            call
+            for call in self.calls_query_stream(pas_req)
+            if call.parent_id in eval_root_ids
+            and tsc.op_name_matches(
+                call.op_name, constants.EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME
+            )
+        ]
+        if not predict_and_score_calls:
+            return [], 0
+
+        pas_ids = [call.id for call in predict_and_score_calls]
+        child_req = tsi.CallsQueryReq(
+            project_id=req.project_id,
+            filter=tsi.CallsFilter(parent_ids=pas_ids),
+            columns=[
+                "id",
+                "parent_id",
+                "op_name",
+                "attributes",
+                "inputs.self",
+                "output",
+                "summary.usage",
+                "started_at",
+                "ended_at",
+            ],
+        )
+        child_calls = list(self.calls_query_stream(child_req))
+        child_by_parent: dict[str, list[tsi.CallSchema]] = defaultdict(list)
+        for call in child_calls:
+            if call.parent_id is not None:
+                child_by_parent[call.parent_id].append(call)
+
+        row_map: dict[str, tsi.EvalResultsRow] = {}
+        # Intermediate dict for O(1) lookup during build; converted to list at the end.
+        row_eval_map: dict[str, dict[str, tsi.EvalResultsRowEvaluation]] = defaultdict(dict)
+        for pas_call in predict_and_score_calls:
+            eval_call_id = pas_call.parent_id
+            if eval_call_id is None:
+                continue
+            example = (
+                pas_call.inputs.get("example") if isinstance(pas_call.inputs, dict) else None
+            )
+            row_digest, _ = self._extract_row_digest_from_example(example)
+
+            row = row_map.get(row_digest)
+            if row is None:
+                row = tsi.EvalResultsRow(
+                    row_digest=row_digest,
+                    raw_data_row=example if req.include_raw_data_rows else None,
+                )
+                row_map[row_digest] = row
+            elif req.include_raw_data_rows and row.raw_data_row is None and example is not None:
+                row.raw_data_row = example
+
+            eval_entry = row_eval_map[row_digest].get(eval_call_id)
+            if eval_entry is None:
+                eval_entry = tsi.EvalResultsRowEvaluation(evaluation_call_id=eval_call_id)
+                row_eval_map[row_digest][eval_call_id] = eval_entry
+
+            output = pas_call.output if isinstance(pas_call.output, dict) else {}
+            scores = output.get("scores") if isinstance(output.get("scores"), dict) else {}
+            trial_children = child_by_parent.get(pas_call.id, [])
+            model_ref = pas_call.inputs.get("model") if isinstance(pas_call.inputs, dict) else None
+            predict_call = self._select_predict_call(trial_children, model_ref)
+            latency_seconds = None
+            if predict_call and predict_call.started_at and predict_call.ended_at:
+                latency_seconds = (
+                    predict_call.ended_at - predict_call.started_at
+                ).total_seconds()
+            elif isinstance(output.get("model_latency"), dict):
+                model_latency = output.get("model_latency", {})
+                mean_latency = model_latency.get("mean")
+                if isinstance(mean_latency, (int, float)):
+                    latency_seconds = float(mean_latency)
+
+            eval_entry.trials.append(
+                tsi.EvalResultsTrial(
+                    predict_and_score_call_id=pas_call.id,
+                    predict_call_id=predict_call.id if predict_call else None,
+                    model_output=output.get("output"),
+                    scores=scores,
+                    model_latency_seconds=latency_seconds,
+                    total_tokens=self._extract_total_tokens(
+                        predict_call.summary if predict_call else None
+                    ),
+                    scorer_call_ids=self._best_effort_scorer_call_ids(
+                        scores, trial_children
+                    ),
+                )
+            )
+
+        for row_digest, eval_entries in row_eval_map.items():
+            if row_digest in row_map:
+                row_map[row_digest].evaluations = list(eval_entries.values())
+
+        rows = list(row_map.values())
+        if req.include_raw_data_rows and req.resolve_row_refs:
+            # Resolve dataset-row refs via refs_read_batch which handles the
+            # full object → TableRef → row traversal.  Refs stored in
+            # ClickHouse use the weave-trace-internal:/// scheme.
+            dataset_ref_by_digest: dict[str, str] = {}
+            internal_prefix = f"{ri.WEAVE_INTERNAL_SCHEME}:///"
+            for row in rows:
+                raw = row.raw_data_row
+                if isinstance(raw, str) and "/attr/rows/id/" in raw:
+                    if raw.startswith(internal_prefix):
+                        dataset_ref_by_digest[row.row_digest] = raw
+                    elif raw.startswith("weave:///"):
+                        dataset_ref_by_digest[row.row_digest] = raw.replace(
+                            "weave:///", internal_prefix, 1
+                        )
+                    else:
+                        dataset_ref_by_digest[row.row_digest] = (
+                            f"{internal_prefix}{req.project_id}/object/{raw}"
+                        )
+            if dataset_ref_by_digest:
+                try:
+                    refs_res = self.refs_read_batch(
+                        tsi.RefsReadBatchReq(refs=list(dataset_ref_by_digest.values()))
+                    )
+                    row_lookup = {row.row_digest: row for row in rows}
+                    for row_digest, val in zip(
+                        dataset_ref_by_digest.keys(), refs_res.vals, strict=False
+                    ):
+                        if val is not None and row_digest in row_lookup:
+                            row_lookup[row_digest].raw_data_row = val
+                except Exception:
+                    logger.warning("Failed to resolve dataset row refs", exc_info=True)
+
+        if req.require_intersection and len(eval_root_ids) > 1:
+            eval_root_id_set = set(eval_root_ids)
+            rows = [
+                row
+                for row in rows
+                if eval_root_id_set.issubset(
+                    {e.evaluation_call_id for e in row.evaluations}
+                )
+            ]
+
+        rows.sort(key=lambda row: row.row_digest)
+        total_rows = len(rows)
+        start = max(req.offset, 0)
+        end = start + req.limit if req.limit is not None else None
+        return rows[start:end], total_rows
+
+    def eval_results_query(self, req: tsi.EvalResultsQueryReq) -> tsi.EvalResultsQueryRes:
+        """Return grouped prediction/trial/score data for evaluation results."""
+        rows, total_rows = self._eval_results_grouped_rows(req)
+        return tsi.EvalResultsQueryRes(rows=rows, total_rows=total_rows)
+
+    def eval_results_summary(
+        self, req: tsi.EvalResultsSummaryReq
+    ) -> tsi.EvalResultsSummaryRes:
+        """Return scorer aggregates and pass-rate stats for evaluation results."""
+        query_req = tsi.EvalResultsQueryReq(
+            project_id=req.project_id,
+            evaluation_call_ids=req.evaluation_call_ids,
+            evaluation_run_ids=req.evaluation_run_ids,
+            require_intersection=req.require_intersection,
+            include_raw_data_rows=False,
+        )
+        rows, _ = self._eval_results_grouped_rows(query_req)
+        # Accumulate into intermediate dicts for O(1) lookup, then convert to lists.
+        eval_summary_map: dict[str, tsi.EvalResultsEvaluationSummary] = {}
+        scorer_stats_map: dict[str, dict[str, tsi.EvalResultsScorerStats]] = {}
+        for row in rows:
+            for eval_entry in row.evaluations:
+                eval_call_id = eval_entry.evaluation_call_id
+                eval_summary = eval_summary_map.get(eval_call_id)
+                if eval_summary is None:
+                    eval_summary = tsi.EvalResultsEvaluationSummary(
+                        evaluation_call_id=eval_call_id,
+                        trial_count=0,
+                    )
+                    eval_summary_map[eval_call_id] = eval_summary
+                    scorer_stats_map[eval_call_id] = {}
+                for trial in eval_entry.trials:
+                    eval_summary.trial_count += 1
+                    for scorer_key, scorer_val in trial.scores.items():
+                        scorer_stats = scorer_stats_map[eval_call_id].get(scorer_key)
+                        if scorer_stats is None:
+                            scorer_stats = tsi.EvalResultsScorerStats(scorer_key=scorer_key)
+                            scorer_stats_map[eval_call_id][scorer_key] = scorer_stats
+                        scorer_stats.trial_count += 1
+
+                        numeric_val: float | None = None
+                        if isinstance(scorer_val, (int, float)) and not isinstance(
+                            scorer_val, bool
+                        ):
+                            numeric_val = float(scorer_val)
+                        if numeric_val is not None:
+                            current_total = (
+                                (scorer_stats.numeric_mean or 0.0)
+                                * scorer_stats.numeric_count
+                            )
+                            scorer_stats.numeric_count += 1
+                            scorer_stats.numeric_mean = (
+                                current_total + numeric_val
+                            ) / scorer_stats.numeric_count
+
+                        pass_signal: bool | None = None
+                        if isinstance(scorer_val, bool):
+                            pass_signal = scorer_val
+                        elif isinstance(scorer_val, dict):
+                            passed = scorer_val.get("passed")
+                            if isinstance(passed, bool):
+                                pass_signal = passed
+                        if pass_signal is not None:
+                            scorer_stats.pass_known_count += 1
+                            if pass_signal:
+                                scorer_stats.pass_true_count += 1
+
+                for scorer_stats in scorer_stats_map[eval_call_id].values():
+                    if scorer_stats.pass_known_count > 0:
+                        scorer_stats.pass_rate = (
+                            scorer_stats.pass_true_count / scorer_stats.pass_known_count
+                        )
+                    if scorer_stats.trial_count > 0:
+                        scorer_stats.pass_signal_coverage = (
+                            scorer_stats.pass_known_count / scorer_stats.trial_count
+                        )
+
+        for eval_call_id, eval_summary in eval_summary_map.items():
+            eval_summary.scorer_stats = list(scorer_stats_map[eval_call_id].values())
+
+        return tsi.EvalResultsSummaryRes(
+            row_count=len(rows),
+            evaluations=list(eval_summary_map.values()),
+        )
+
     def _obj_read_with_retry(
         self, req: tsi.ObjReadReq, max_retries: int = 10, initial_delay: float = 0.05
     ) -> tsi.ObjReadRes:

@@ -11,6 +11,7 @@ from pydantic import PrivateAttr
 from typing_extensions import Self
 
 from weave.dataset.dataset import Dataset
+from weave.evaluation.criteria import EvaluationCriterion, evaluate_criteria
 from weave.flow import util
 from weave.flow.casting import DatasetLike, ScorerLike
 from weave.flow.model import (
@@ -108,6 +109,7 @@ class Evaluation(Object):
     trials: int = 1
 
     metadata: dict[str, Any] | None = None
+    criteria: list[EvaluationCriterion] | None = None
 
     # Custom evaluation name for display in the UI.  This is the same API as passing a
     # custom `call_display_name` to `weave.op` (see that for more details).
@@ -235,6 +237,11 @@ class Evaluation(Object):
                 model_output_summary = auto_summarize(vals)
                 if model_output_summary:
                     summary[name] = model_output_summary
+
+        if self.criteria:
+            criteria_result = evaluate_criteria(self.criteria, summary)
+            summary["_criteria"] = criteria_result.model_dump()
+
         return summary
 
     async def get_eval_results(self, model: Op | Model) -> EvaluationResults:

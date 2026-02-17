@@ -21,6 +21,7 @@ wandb_init_hook()
 from weave.agent.agent import Agent as Agent
 from weave.agent.agent import AgentState as AgentState
 from weave.dataset.dataset import Dataset
+from weave.evaluation.criteria import EvaluationCriterion
 from weave.evaluation.eval import Evaluation
 from weave.evaluation.eval_imperative import EvaluationLogger
 from weave.flow.annotation_spec import AnnotationSpec
@@ -51,6 +52,7 @@ __all__ = [
     "Dataset",
     "EasyPrompt",
     "Evaluation",
+    "EvaluationCriterion",
     "EvaluationLogger",
     "File",
     "Markdown",

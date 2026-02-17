@@ -7,7 +7,7 @@ import pytest
 from pydantic import BaseModel
 
 import weave
-from weave import Dataset, Evaluation, Model
+from weave import Dataset, Evaluation, EvaluationCriterion, Model
 
 dataset_rows = [{"input": "1 + 2", "target": 3}, {"input": "2**4", "target": 15}]
 dataset = Dataset(rows=dataset_rows)
@@ -512,3 +512,113 @@ def test_evaluate_with_pydantic_summary(client):
     model = EvalModel()
     result = asyncio.run(evaluation.evaluate(model))
     assert result["MyScorer"].awesome == 3
+
+
+def test_evaluate_with_no_criteria(client):
+    evaluation = Evaluation(
+        dataset=dataset_rows,
+        scorers=[score],
+    )
+    model = EvalModel()
+    result = asyncio.run(evaluation.evaluate(model))
+    assert "_criteria" not in result
+
+
+def test_evaluate_with_criteria_all_pass(client):
+    evaluation = Evaluation(
+        dataset=dataset_rows,
+        scorers=[score],
+        criteria=[
+            EvaluationCriterion(
+                scorer="score",
+                metric="true_fraction",
+                op=">=",
+                threshold=0.5,
+            ),
+        ],
+    )
+    model = EvalModel()
+    result = asyncio.run(evaluation.evaluate(model))
+    assert "_criteria" in result
+    criteria = result["_criteria"]
+    assert criteria["passed"] is True
+    assert len(criteria["results"]) == 1
+    assert criteria["results"][0]["passed"] is True
+    assert criteria["results"][0]["actual"] == 0.5
+
+
+def test_evaluate_with_criteria_failure(client):
+    evaluation = Evaluation(
+        dataset=dataset_rows,
+        scorers=[score],
+        criteria=[
+            EvaluationCriterion(
+                scorer="score",
+                metric="true_fraction",
+                op=">=",
+                threshold=1.0,
+            ),
+        ],
+    )
+    model = EvalModel()
+    result = asyncio.run(evaluation.evaluate(model))
+    assert "_criteria" in result
+    criteria = result["_criteria"]
+    assert criteria["passed"] is False
+    assert criteria["results"][0]["passed"] is False
+    assert criteria["results"][0]["actual"] == 0.5
+
+
+def test_evaluate_criteria_nested_metric(client):
+    @weave.op
+    def nested_score(target, output):
+        return {"passed": target == output, "detail": 1.0}
+
+    evaluation = Evaluation(
+        dataset=dataset_rows,
+        scorers=[nested_score],
+        criteria=[
+            EvaluationCriterion(
+                scorer="nested_score",
+                metric="passed.true_fraction",
+                op=">=",
+                threshold=0.5,
+            ),
+            EvaluationCriterion(
+                scorer="nested_score",
+                metric="detail.mean",
+                op="==",
+                threshold=1.0,
+            ),
+        ],
+    )
+    model = EvalModel()
+    result = asyncio.run(evaluation.evaluate(model))
+    criteria = result["_criteria"]
+    assert criteria["passed"] is True
+    assert len(criteria["results"]) == 2
+    assert criteria["results"][0]["passed"] is True
+    assert criteria["results"][0]["actual"] == 0.5
+    assert criteria["results"][1]["passed"] is True
+    assert criteria["results"][1]["actual"] == 1.0
+
+
+def test_evaluate_criteria_missing_scorer(client):
+    evaluation = Evaluation(
+        dataset=dataset_rows,
+        scorers=[score],
+        criteria=[
+            EvaluationCriterion(
+                scorer="nonexistent_scorer",
+                metric="true_fraction",
+                op=">=",
+                threshold=0.5,
+            ),
+        ],
+    )
+    model = EvalModel()
+    result = asyncio.run(evaluation.evaluate(model))
+    criteria = result["_criteria"]
+    assert criteria["passed"] is False
+    assert criteria["results"][0]["actual"] is None
+    assert criteria["results"][0]["passed"] is False
