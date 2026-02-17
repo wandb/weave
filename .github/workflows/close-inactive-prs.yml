@@ -1,0 +1,23 @@
+name: Close inactive PRs
+
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  stale:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/stale@v9
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          days-before-pr-stale: 14
+          days-before-pr-close: 7
+          stale-pr-message: "This PR has been inactive for 14 days. It will be closed in 7 days unless there is new activity."
+          close-pr-message: "Closing this PR due to inactivity."
+          exempt-pr-labels: "do-not-close"

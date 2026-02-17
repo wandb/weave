@@ -1,7 +1,7 @@
 import pytest
 import sqlparse
 
-from tests.trace_server.query_builder.utils import assert_sql
+from tests.trace_server.query_builder.utils import assert_sql, assert_stats_sql
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.calls_query_builder.calls_query_builder import (
     AggregatedDataSizeField,
@@ -3418,3 +3418,106 @@ def test_is_minimal_filter_empty_thread_ids_not_minimal() -> None:
 def test_is_minimal_filter_empty_turn_ids_not_minimal() -> None:
     """turn_ids=[] is still a set filter (not None), so not minimal."""
     assert _is_minimal_filter(tsi.CallsFilter(turn_ids=[])) is False
+
+
+# -----------------------------------------------------------------------------
+# build_calls_stats_query() — flat vs subquery shape
+# -----------------------------------------------------------------------------
+
+
+def test_stats_query_calls_complete_flat_count() -> None:
+    """Stats query on calls_complete should be flat (no subquery wrapping).
+
+    Fast:  SELECT count() AS count FROM calls_complete PREWHERE ... WHERE ...
+    Slow:  SELECT count() FROM (SELECT id FROM calls_complete PREWHERE ... WHERE ...)
+    """
+    req = tsi.CallsQueryStatsReq(project_id="project")
+    assert_stats_sql(
+        req,
+        """
+        SELECT count() AS count
+        FROM calls_complete
+        PREWHERE calls_complete.project_id = {pb_0:String}
+        WHERE 1
+          AND (calls_complete.deleted_at IS NULL)
+        """,
+        {"pb_0": "project"},
+        read_table=ReadTable.CALLS_COMPLETE,
+    )
+
+
+def test_stats_query_calls_complete_flat_count_with_filter() -> None:
+    """Stats query on calls_complete with hardcoded filter should be flat."""
+    req = tsi.CallsQueryStatsReq(
+        project_id="project",
+        filter=tsi.CallsFilter(op_names=["my_op"]),
+    )
+    assert_stats_sql(
+        req,
+        """
+        SELECT count() AS count
+        FROM calls_complete
+        PREWHERE calls_complete.project_id = {pb_1:String}
+        WHERE ((calls_complete.op_name IN {pb_0:Array(String)})
+               OR (calls_complete.op_name IS NULL))
+          AND (calls_complete.deleted_at IS NULL)
+        """,
+        {"pb_0": ["my_op"], "pb_1": "project"},
+        read_table=ReadTable.CALLS_COMPLETE,
+    )
+
+
+def test_stats_query_calls_complete_flat_with_total_storage_size() -> None:
+    """Stats query on calls_complete with total_storage_size should be flat with JOIN."""
+    req = tsi.CallsQueryStatsReq(
+        project_id="project",
+        include_total_storage_size=True,
+    )
+    assert_stats_sql(
+        req,
+        """
+        SELECT count() AS count,
+               sum(coalesce(CASE
+                   WHEN calls_complete.parent_id IS NULL
+                        THEN rolled_up_cms.total_storage_size_bytes
+                   ELSE NULL
+               END, 0)) AS total_storage_size_bytes
+        FROM calls_complete
+        LEFT JOIN (
+            SELECT trace_id,
+                   sum(COALESCE(attributes_size_bytes,0) + COALESCE(inputs_size_bytes,0) + COALESCE(output_size_bytes,0) + COALESCE(summary_size_bytes,0)) AS total_storage_size_bytes
+            FROM calls_complete_stats
+            WHERE project_id = {pb_0:String}
+            GROUP BY trace_id
+        ) AS rolled_up_cms ON calls_complete.trace_id = rolled_up_cms.trace_id
+        PREWHERE calls_complete.project_id = {pb_0:String}
+        WHERE 1
+          AND (calls_complete.deleted_at IS NULL)
+        """,
+        {"pb_0": "project"},
+        read_table=ReadTable.CALLS_COMPLETE,
+    )
+
+
+def test_stats_query_calls_merged_uses_subquery() -> None:
+    """Stats query on calls_merged should use subquery wrapping (GROUP BY requires it)."""
+    req = tsi.CallsQueryStatsReq(project_id="project")
+    assert_stats_sql(
+        req,
+        """
+        SELECT count()
+        FROM (
+            SELECT calls_merged.id AS id
+            FROM calls_merged
+            PREWHERE calls_merged.project_id = {pb_0:String}
+            GROUP BY (calls_merged.project_id, calls_merged.id)
+            HAVING (
+                ((any(calls_merged.deleted_at) IS NULL))
+                AND
+                ((NOT ((any(calls_merged.started_at) IS NULL))))
+            )
+        )
+        """,
+        {"pb_0": "project"},
+        read_table=ReadTable.CALLS_MERGED,
+    )

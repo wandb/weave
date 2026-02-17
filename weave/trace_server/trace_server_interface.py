@@ -1,11 +1,18 @@
 import datetime
 from collections.abc import Iterator
 from enum import Enum
-from typing import Any, Literal, Protocol
+from typing import TYPE_CHECKING, Any, Literal, Protocol
 
-from opentelemetry.proto.trace.v1.trace_pb2 import ResourceSpans
 from pydantic import BaseModel, ConfigDict, Field, field_serializer, model_validator
 from typing_extensions import TypedDict
+
+if TYPE_CHECKING:
+    from opentelemetry.proto.trace.v1.trace_pb2 import ResourceSpans
+else:
+    try:
+        from opentelemetry.proto.trace.v1.trace_pb2 import ResourceSpans
+    except ImportError:
+        ResourceSpans = Any
 
 from weave.trace_server import http_service_interface as his
 from weave.trace_server.common_interface import (
@@ -463,6 +470,12 @@ class CompletionsCreateRequestInputs(BaseModel):
         description="Dictionary of template variables to substitute in prompt messages. "
         "Variables in messages like '{variable_name}' will be replaced with the corresponding values. "
         "Applied to both prompt messages (if prompt is provided) and regular messages.",
+    )
+    vertex_credentials: str | None = Field(
+        None,
+        description="JSON string of Vertex AI service account credentials. "
+        "When provided for vertex_ai models (e.g. vertex_ai/gemini-2.5-pro), used for authentication "
+        "instead of api_key. Not persisted in trace storage.",
     )
 
 

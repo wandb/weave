@@ -1,3 +1,4 @@
+import asyncio
 import json
 
 from weave.integrations.openai_realtime.connection import (
@@ -35,7 +36,27 @@ class DummyWSApp:
         return None
 
 
-def test_weave_media_connection_wrapping_sends_and_receives():
+class DummyWeaveClient:
+    def create_call(self, op=None, inputs=None, parent=None):
+        from weave.trace.call import Call
+
+        return Call(
+            _op_name=op or "",
+            trace_id="trace",
+            project_id="proj",
+            parent_id=None,
+            inputs=inputs or {},
+        )
+
+    def finish_call(self, call, output=None):
+        pass
+
+
+def test_weave_media_connection_wrapping_sends_and_receives(monkeypatch):
+    import weave.integrations.openai_realtime.state_exporter as se
+
+    monkeypatch.setattr(se, "require_weave_client", lambda: DummyWeaveClient())
+
     mc = WeaveMediaConnection(
         url="ws://example",
         original_websocket_app=DummyWSApp,
@@ -69,10 +90,10 @@ def test_weave_media_connection_wrapping_sends_and_receives():
     mc.wrapped_on_message(mc.ws, json.dumps(server_msg))
 
     # Verify session propagated into state
-    assert mc.get_session() is not None
+    assert mc.conversation_manager.state.session_span is not None
 
-
-import asyncio
+    # Prevent atexit handler from firing after monkeypatch restores require_weave_client
+    mc._exit_ran = True
 
 
 class DummyAsyncConn:
@@ -112,17 +133,23 @@ class DummyAsyncConn:
         raise self.ConnectionClosed()
 
 
-async def _drive_async_wrapper():
-    conn = WeaveAsyncWebsocketConnection(DummyAsyncConn())
-    await conn.send(json.dumps({"type": "response.create"}))
-    # Try to receive once
-    try:
-        await conn.recv()
-    except Exception:
-        pass
-    # Session should be set from received message
-    assert conn.get_session() is not None
+def test_async_wrapper_basic(monkeypatch):
+    import weave.integrations.openai_realtime.state_exporter as se
 
+    monkeypatch.setattr(se, "require_weave_client", lambda: DummyWeaveClient())
 
-def test_async_wrapper_basic():
+    async def _drive_async_wrapper():
+        conn = WeaveAsyncWebsocketConnection(DummyAsyncConn())
+        await conn.send(json.dumps({"type": "response.create"}))
+        # Try to receive once
+        try:
+            await conn.recv()
+        except Exception:
+            pass
+        # Session should be set from received message
+        assert conn.conversation_manager.state.session_span is not None
+
+        # Prevent atexit handler from firing after monkeypatch restores require_weave_client
+        conn._exit_ran = True
+
     asyncio.run(_drive_async_wrapper())

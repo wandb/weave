@@ -3952,6 +3952,57 @@ def test_op_sampling_inheritance_async(client):
     assert "call_start" in client.server.attribute_access_log  # Verify tracing occurred
 
 
+def test_op_sampling_inheritance_generator(client):
+    parent_calls = 0
+    child_calls = 0
+
+    @weave.op
+    def child_op(x: int) -> int:
+        nonlocal child_calls
+        child_calls += 1
+        return x + 1
+
+    @weave.op(tracing_sample_rate=0.0)
+    def parent_op(x: int):
+        nonlocal parent_calls
+        parent_calls += 1
+        yield child_op(x)
+
+    # When parent is sampled out, child should execute but also remain untraced.
+    for i in range(10):
+        assert list(parent_op(i)) == [i + 1]
+
+    assert parent_calls == 10
+    assert child_calls == 10
+    assert len(client.get_calls()) == 0
+
+
+@pytest.mark.asyncio
+async def test_op_sampling_inheritance_async_generator(client):
+    parent_calls = 0
+    child_calls = 0
+
+    @weave.op
+    async def child_op(x: int) -> int:
+        nonlocal child_calls
+        child_calls += 1
+        return x + 1
+
+    @weave.op(tracing_sample_rate=0.0)
+    async def parent_op(x: int):
+        nonlocal parent_calls
+        parent_calls += 1
+        yield await child_op(x)
+
+    # When parent is sampled out, child should execute but also remain untraced.
+    for i in range(10):
+        assert [item async for item in parent_op(i)] == [i + 1]
+
+    assert parent_calls == 10
+    assert child_calls == 10
+    assert len(client.get_calls()) == 0
+
+
 def test_op_sampling_invalid_rates(client):
     with pytest.raises(ValueError):
 
