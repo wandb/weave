@@ -451,6 +451,12 @@ class CrossProcessTraceServerSender(tsi.TraceServerInterface):
         """Read an annotation queue."""
         return self._send_request("annotation_queue_read", req)
 
+    def annotation_queue_update(
+        self, req: tsi.AnnotationQueueUpdateReq
+    ) -> tsi.AnnotationQueueUpdateRes:
+        """Update an annotation queue."""
+        return self._send_request("annotation_queue_update", req)
+
     def annotation_queue_delete(
         self, req: tsi.AnnotationQueueDeleteReq
     ) -> tsi.AnnotationQueueDeleteRes:
