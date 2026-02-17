@@ -1,11 +1,18 @@
 import datetime
 from collections.abc import Iterator
 from enum import Enum
-from typing import Any, Literal, Protocol
+from typing import TYPE_CHECKING, Any, Literal, Protocol
 
-from opentelemetry.proto.trace.v1.trace_pb2 import ResourceSpans
 from pydantic import BaseModel, ConfigDict, Field, field_serializer, model_validator
 from typing_extensions import TypedDict
+
+if TYPE_CHECKING:
+    from opentelemetry.proto.trace.v1.trace_pb2 import ResourceSpans
+else:
+    try:
+        from opentelemetry.proto.trace.v1.trace_pb2 import ResourceSpans
+    except ImportError:
+        ResourceSpans = Any
 
 from weave.trace_server import http_service_interface as his
 from weave.trace_server.common_interface import (
@@ -463,6 +470,12 @@ class CompletionsCreateRequestInputs(BaseModel):
         description="Dictionary of template variables to substitute in prompt messages. "
         "Variables in messages like '{variable_name}' will be replaced with the corresponding values. "
         "Applied to both prompt messages (if prompt is provided) and regular messages.",
+    )
+    vertex_credentials: str | None = Field(
+        None,
+        description="JSON string of Vertex AI service account credentials. "
+        "When provided for vertex_ai models (e.g. vertex_ai/gemini-2.5-pro), used for authentication "
+        "instead of api_key. Not persisted in trace storage.",
     )
 
 
@@ -1277,6 +1290,20 @@ class AnnotationQueueReadReq(BaseModelStrict):
 
 class AnnotationQueueReadRes(BaseModel):
     """Response from reading an annotation queue."""
+
+    queue: AnnotationQueueSchema
+
+
+class AnnotationQueueDeleteReq(BaseModelStrict):
+    """Request to delete (soft-delete) an annotation queue."""
+
+    project_id: str = Field(examples=["entity/project"])
+    queue_id: str = Field(examples=["550e8400-e29b-41d4-a716-446655440000"])
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class AnnotationQueueDeleteRes(BaseModel):
+    """Response from deleting an annotation queue."""
 
     queue: AnnotationQueueSchema
 
@@ -2353,6 +2380,10 @@ class TraceServerInterface(Protocol):
     def annotation_queue_read(
         self, req: AnnotationQueueReadReq
     ) -> AnnotationQueueReadRes: ...
+
+    def annotation_queue_delete(
+        self, req: AnnotationQueueDeleteReq
+    ) -> AnnotationQueueDeleteRes: ...
 
     def annotation_queue_add_calls(
         self, req: AnnotationQueueAddCallsReq

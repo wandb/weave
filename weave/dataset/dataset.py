@@ -232,4 +232,8 @@ class Dataset(Object):
             raise ValueError("Cannot select rows with an empty set of indices.")
 
         selected_rows = [self[i] for i in indices_list]
-        return self.__class__(rows=selected_rows)
+        return self.__class__(
+            name=self.name,
+            description=self.description,
+            rows=selected_rows,
+        )

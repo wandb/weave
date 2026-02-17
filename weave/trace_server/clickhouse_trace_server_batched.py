@@ -136,6 +136,7 @@ from weave.trace_server.llm_completion import (
 )
 from weave.trace_server.methods.evaluation_status import evaluation_status
 from weave.trace_server.model_providers.model_providers import (
+    VERTEX_PROVIDER_NAMES,
     LLMModelProviderInfo,
     read_model_to_provider_info_map,
 )
@@ -148,9 +149,11 @@ from weave.trace_server.project_version.project_version import (
 )
 from weave.trace_server.project_version.types import WriteTarget
 from weave.trace_server.query_builder.annotation_queues_query_builder import (
+    make_annotator_progress_update_query,
     make_queue_add_calls_check_duplicates_query,
     make_queue_add_calls_fetch_calls_query,
     make_queue_create_query,
+    make_queue_delete_query,
     make_queue_items_query,
     make_queue_read_query,
     make_queues_query,
@@ -299,7 +302,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         return self._file_storage_client
 
     @property
-    def kafka_producer(self) -> KafkaProducer:
+    def kafka_producer(self) -> KafkaProducer | None:
+        """Lazily initialize the Kafka producer, only if online eval is enabled."""
+        if not wf_env.wf_enable_online_eval():
+            return None
         if self._kafka_producer is not None:
             return self._kafka_producer
         self._kafka_producer = KafkaProducer.from_env()
@@ -548,8 +554,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.kafka_producer.flush")
     def _flush_kafka_producer(self) -> None:
-        if wf_env.wf_enable_online_eval():
-            self.kafka_producer.flush()
+        producer = self.kafka_producer
+        if producer is not None:
+            producer.flush()
 
     @contextmanager
     def call_batch(self) -> Iterator[None]:
@@ -957,11 +964,14 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # Process token metrics (grouped by model)
         if token_metrics:
             pb = ParamBuilder()
-            sql, columns, parameters, granularity, start, end = build_usage_query(
-                req, token_metrics, pb, read_table
+            usage_query = build_usage_query(req, token_metrics, pb, read_table)
+            granularity = usage_query.granularity_seconds
+            start = usage_query.start
+            end = usage_query.end
+            query_result = self._query(usage_query.sql, usage_query.parameters)
+            usage_buckets = rows_to_bucket_dicts(
+                usage_query.columns, query_result.result_rows
             )
-            query_result = self._query(sql, parameters)
-            usage_buckets = rows_to_bucket_dicts(columns, query_result.result_rows)
 
         # Compute costs post-query if cost metrics were requested
         if requested_cost_metrics and usage_buckets:
@@ -972,11 +982,18 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # Process call metrics (not grouped by model)
         if req.call_metrics:
             pb = ParamBuilder()
-            sql, columns, parameters, granularity, start, end = (
-                build_call_metrics_query(req, req.call_metrics, pb, read_table)
+            call_metrics_query = build_call_metrics_query(
+                req, req.call_metrics, pb, read_table
             )
-            query_result = self._query(sql, parameters)
-            call_buckets = rows_to_bucket_dicts(columns, query_result.result_rows)
+            granularity = call_metrics_query.granularity_seconds
+            start = call_metrics_query.start
+            end = call_metrics_query.end
+            query_result = self._query(
+                call_metrics_query.sql, call_metrics_query.parameters
+            )
+            call_buckets = rows_to_bucket_dicts(
+                call_metrics_query.columns, query_result.result_rows
+            )
 
         return tsi.CallStatsRes(
             start=start,
@@ -1138,11 +1155,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if req.sort_by is not None:
             for sort_by in req.sort_by:
                 cq.add_order(sort_by.field, sort_by.direction)
-            # If user isn't already sorting by id, add id as secondary sort for consistency
+            # If user isn't already sorting by id, add id as secondary sort for consistency.
             if not any(sort_by.field == "id" for sort_by in req.sort_by):
-                cq.add_order("id", "asc")
+                last_sort = req.sort_by[-1]
+                # When sorting by started_at, match the id direction to started_at for perf
+                if last_sort.field == "started_at":
+                    cq.add_order("id", last_sort.direction)
+                else:
+                    cq.add_order("id", "desc")
         else:
-            # Default sorting: started_at with id as secondary sort for consistency
             cq.add_order("started_at", "asc")
             cq.add_order("id", "asc")
         if req.limit is not None:
@@ -2184,6 +2205,57 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         return tsi.AnnotationQueueReadRes(queue=queue)
 
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.annotation_queue_delete")
+    def annotation_queue_delete(
+        self, req: tsi.AnnotationQueueDeleteReq
+    ) -> tsi.AnnotationQueueDeleteRes:
+        """Soft-delete an annotation queue by setting deleted_at timestamp."""
+        pb = ParamBuilder()
+
+        # First, verify the queue exists and is not already deleted
+        read_query = make_queue_read_query(
+            project_id=req.project_id,
+            queue_id=req.queue_id,
+            pb=pb,
+        )
+        result = self._query(read_query, pb.get_params())
+        rows = list(result.named_results())
+
+        if len(rows) == 0:
+            raise NotFoundError(f"Queue {req.queue_id} not found or already deleted")
+
+        # Store the queue data before deletion
+        row = rows[0]
+
+        # Now perform the soft delete
+        pb = ParamBuilder()  # Reset parameter builder
+        delete_query = make_queue_delete_query(
+            project_id=req.project_id,
+            queue_id=req.queue_id,
+            pb=pb,
+            cluster_name=self.clickhouse_cluster_name,
+        )
+
+        self._command(delete_query, pb.get_params())
+
+        # Build the response with updated timestamps
+        deleted_at = datetime.datetime.now(tz=ZoneInfo("UTC"))
+        updated_at = deleted_at
+
+        queue = tsi.AnnotationQueueSchema(
+            id=str(row["id"]),
+            project_id=row["project_id"],
+            name=row["name"],
+            description=row["description"],
+            scorer_refs=row["scorer_refs"],
+            created_at=_ensure_datetimes_have_tz(row["created_at"]),
+            created_by=row["created_by"],
+            updated_at=updated_at,
+            deleted_at=deleted_at,
+        )
+
+        return tsi.AnnotationQueueDeleteRes(queue=queue)
+
     @ddtrace.tracer.wrap(
         name="clickhouse_trace_server_batched.annotation_queue_add_calls"
     )
@@ -2502,27 +2574,24 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 f"Queue item '{req.item_id}' not found in queue '{req.queue_id}'"
             )
 
-        new_state_param = pb.add(req.annotation_state)
-        now = datetime.datetime.now(datetime.timezone.utc)
-        now_param = pb.add(now)
-
         if has_record:
             # Use ClickHouse lightweight UPDATE for existing record
-            update_query = f"""
-            UPDATE annotator_queue_items_progress
-            SET
-                annotation_state = {new_state_param},
-                updated_at = {now_param}
-            WHERE project_id = {project_id_param}
-              AND queue_item_id = {item_id_param}
-              AND annotator_id = {annotator_id_param}
-              AND deleted_at IS NULL
-            """
+            update_query = make_annotator_progress_update_query(
+                project_id=req.project_id,
+                queue_item_id=req.item_id,
+                annotator_id=annotator_id,
+                annotation_state=req.annotation_state,
+                pb=pb,
+                cluster_name=self.clickhouse_cluster_name,
+            )
             self._command(update_query, parameters=pb.get_params())
         else:
             # Create new record
             progress_id = generate_id()
             progress_id_param = pb.add(progress_id)
+            new_state_param = pb.add(req.annotation_state)
+            now = datetime.datetime.now(datetime.timezone.utc)
+            now_param = pb.add(now)
 
             insert_query = f"""
             INSERT INTO annotator_queue_items_progress
@@ -5191,23 +5260,26 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # Use shared setup logic
         model_info = self._model_to_provider_info_map.get(req.inputs.model)
         try:
-            model_name, api_key, provider, base_url, extra_headers, return_type = (
-                _setup_completion_model_info(model_info, req, self.obj_read)
+            completion_model_info = _setup_completion_model_info(
+                model_info, req, self.obj_read
             )
         except Exception as e:
             return tsi.CompletionsCreateRes(response={"error": str(e)})
+
+        model_name = completion_model_info.model_name
 
         # Now that we have all the fields for both cases, we can make the API call
         start_time = datetime.datetime.now()
 
         # Make the API call
         res = lite_llm_completion(
-            api_key=api_key,
+            api_key=completion_model_info.api_key,
             inputs=req.inputs,
-            provider=provider,
-            base_url=base_url,
-            extra_headers=extra_headers,
-            return_type=return_type,
+            provider=completion_model_info.provider,
+            base_url=completion_model_info.base_url,
+            extra_headers=completion_model_info.extra_headers,
+            return_type=completion_model_info.return_type,
+            vertex_credentials=completion_model_info.vertex_credentials,
         )
 
         end_time = datetime.datetime.now()
@@ -5242,7 +5314,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 started_at=start_time,
                 ended_at=end_time,
                 attributes={},
-                inputs={**req.inputs.model_dump(exclude_none=True)},
+                inputs={
+                    **req.inputs.model_dump(
+                        exclude_none=True, exclude={"vertex_credentials"}
+                    )
+                },
                 output=res.response,
                 summary=summary,
                 exception=exception,
@@ -5259,7 +5335,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 wb_user_id=req.wb_user_id,
                 op_name=COMPLETIONS_CREATE_OP_NAME,
                 started_at=start_time,
-                inputs={**req.inputs.model_dump(exclude_none=True)},
+                inputs={
+                    **req.inputs.model_dump(
+                        exclude_none=True, exclude={"vertex_credentials"}
+                    )
+                },
                 attributes={},
             )
             start_call = _start_call_for_insert_to_ch_insertable_start_call(start)
@@ -5327,20 +5407,23 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # --- Shared setup logic (copy of completions_create up to litellm call)
         model_info = self._model_to_provider_info_map.get(req.inputs.model)
         try:
-            (
-                model_name,
-                api_key,
-                provider,
-                base_url,
-                extra_headers,
-                return_type,
-            ) = _setup_completion_model_info(model_info, req, self.obj_read)
+            completion_model_info = _setup_completion_model_info(
+                model_info, req, self.obj_read
+            )
         except Exception as e:
             # Yield error as single chunk then stop.
             def _single_error_iter(err: Exception) -> Iterator[dict[str, str]]:
                 yield {"error": str(err)}
 
             return _single_error_iter(e)
+
+        model_name = completion_model_info.model_name
+        api_key = completion_model_info.api_key
+        provider = completion_model_info.provider
+        base_url = completion_model_info.base_url
+        extra_headers = completion_model_info.extra_headers
+        return_type = completion_model_info.return_type
+        vertex_credentials = completion_model_info.vertex_credentials
 
         # Track start call if requested
         start_call: CallStartCHInsertable | None = None
@@ -5362,7 +5445,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
             # Prepare inputs for tracking: use original messages (with template syntax)
             # and include prompt and template_vars
-            tracked_inputs = req.inputs.model_dump(exclude_none=True)
+            tracked_inputs = req.inputs.model_dump(
+                exclude_none=True, exclude={"vertex_credentials"}
+            )
             tracked_inputs["model"] = model_name
             tracked_inputs["messages"] = initial_messages
             if prompt:
@@ -5401,6 +5486,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             base_url=base_url,
             extra_headers=extra_headers,
             return_type=return_type,
+            vertex_credentials=vertex_credentials,
         )
 
         # If tracking not requested just return chunks directly
@@ -6380,7 +6466,7 @@ def _ch_complete_call_to_row(ch_call: CallCompleteCHInsertable) -> list[Any]:
 
 
 def _maybe_enqueue_minimal_call_end(
-    kafka_producer: "KafkaProducer",
+    kafka_producer: KafkaProducer | None,
     project_id: str,
     id: str,
     ended_at: datetime.datetime,
@@ -6398,7 +6484,7 @@ def _maybe_enqueue_minimal_call_end(
         ended_at: The call end timestamp.
         flush_immediately: Whether to flush the producer immediately.
     """
-    if not wf_env.wf_enable_online_eval():
+    if kafka_producer is None:
         return
 
     minimal_end = tsi.EndedCallSchemaForInsert(
@@ -6732,15 +6818,29 @@ def _create_tracked_stream_wrapper(
     return _stream_wrapper()
 
 
+@dataclasses.dataclass(frozen=True)
+class CompletionModelInfo:
+    model_name: str
+    api_key: str | None
+    provider: str
+    base_url: str | None
+    extra_headers: dict[str, str]
+    return_type: str | None
+    vertex_credentials: str | None = None
+
+
 def _setup_completion_model_info(
     model_info: LLMModelProviderInfo | None,
     req: tsi.CompletionsCreateReq,
     obj_read: Callable[[tsi.ObjReadReq], tsi.ObjReadRes],
-) -> tuple[str, str | None, str, str | None, dict[str, str], str | None]:
+) -> CompletionModelInfo:
     """Extract model setup logic shared between completions_create and completions_create_stream.
 
-    Returns: (model_name, api_key, provider, base_url, extra_headers, return_type)
-    Note: api_key can be None for bedrock providers since they use AWS credentials instead.
+    Returns:
+        CompletionModelInfo containing model/provider/credential config.
+
+    Note: api_key can be None for bedrock providers (AWS credentials) or vertex_ai
+    when vertex_credentials is provided.
     """
     model_name = req.inputs.model
     api_key: str | None = None
@@ -6748,6 +6848,7 @@ def _setup_completion_model_info(
     base_url: str | None = None
     extra_headers: dict[str, str] = {}
     return_type: str | None = None
+    vertex_credentials: str | None = getattr(req.inputs, "vertex_credentials", None)
 
     # Check for explicit custom provider prefix
     is_explicit_custom = model_name.startswith("custom::")
@@ -6767,6 +6868,15 @@ def _setup_completion_model_info(
             extra_headers = req.inputs.extra_headers
             req.inputs.extra_headers = None
         return_type = "openai"
+        return CompletionModelInfo(
+            model_name=model_name,
+            api_key=api_key,
+            provider=provider,
+            base_url=base_url,
+            extra_headers=extra_headers,
+            return_type=return_type,
+            vertex_credentials=None,
+        )
     elif is_explicit_custom:
         # Custom provider path - model_name format: custom::<provider>::<model>
         # Parse provider and model names, create sanitized object_id for lookup
@@ -6812,13 +6922,14 @@ def _setup_completion_model_info(
             else "openai/" + final_model_name
         )
 
-        return (
-            provider_model_name,
-            custom_provider_info.api_key,
-            "custom",  # return "custom" as provider
-            base_url,
-            custom_provider_info.extra_headers,
-            custom_provider_info.return_type,
+        return CompletionModelInfo(
+            model_name=provider_model_name,
+            api_key=custom_provider_info.api_key,
+            provider="custom",
+            base_url=base_url,
+            extra_headers=custom_provider_info.extra_headers,
+            return_type=custom_provider_info.return_type,
+            vertex_credentials=None,
         )
     elif model_info:
         secret_name = model_info.get("api_key_name")
@@ -6833,20 +6944,28 @@ def _setup_completion_model_info(
 
         api_key = secret_fetcher.fetch(secret_name).get("secrets", {}).get(secret_name)
         provider = model_info.get("litellm_provider", "openai")
-
-        if not api_key and provider not in ("bedrock", "bedrock_converse"):
+        is_vertex_provider = provider in VERTEX_PROVIDER_NAMES
+        if is_vertex_provider and vertex_credentials:
+            api_key = None  # Use vertex_credentials instead
+        credentials_satisfied = is_vertex_provider and vertex_credentials
+        if (
+            not api_key
+            and provider not in ("bedrock", "bedrock_converse")
+            and not credentials_satisfied
+        ):
             raise MissingLLMApiKeyError(
                 f"No API key {secret_name} found for model {model_name}",
                 api_key_name=secret_name,
             )
 
-    return (
-        model_name,
-        api_key,
-        provider,
-        base_url,
-        extra_headers,
-        return_type,
+    return CompletionModelInfo(
+        model_name=model_name,
+        api_key=api_key,
+        provider=provider,
+        base_url=base_url,
+        extra_headers=extra_headers,
+        return_type=return_type,
+        vertex_credentials=vertex_credentials,
     )
 
 
