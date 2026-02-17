@@ -201,7 +201,7 @@ SELECT
     anySimpleState(calls_complete.op_name) as op_name,
     anySimpleState(calls_complete.started_at) as started_at,
     anySimpleState(calls_complete.ended_at) as ended_at,
-    anySimpleState(length(calls_complete.attributes_dump)) as attributes_size_bytes,
+    anySimpleState(length(toString(calls_complete.attributes_dump))) as attributes_size_bytes,
     anySimpleState(length(calls_complete.inputs_dump)) as inputs_size_bytes,
     anySimpleState(length(calls_complete.output_dump)) as output_size_bytes,
     anySimpleState(length(calls_complete.summary_dump)) as summary_size_bytes,
