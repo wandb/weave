@@ -181,7 +181,7 @@ class DiskCache:
         """Cleanup resources."""
         try:
             self._cache.close()
-        except Exception as e:
+        except Exception:
             logger.exception("Error closing disk cache")
 
     def __contains__(self, key: str) -> bool:
