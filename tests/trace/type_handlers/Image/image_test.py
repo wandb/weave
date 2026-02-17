@@ -37,7 +37,10 @@ def test_img(request) -> Image.Image:
         img.save(buffer, format=fmt)
         img = Image.open(buffer)
 
-    return img
+    try:
+        yield img
+    finally:
+        img.close()
 
 
 def test_image_publish(client: WeaveClient, test_img: Image.Image) -> None:
@@ -47,7 +50,10 @@ def test_image_publish(client: WeaveClient, test_img: Image.Image) -> None:
 
     assert ref is not None
     gotten_img = weave.ref(ref.uri()).get()
-    assert test_img.tobytes() == gotten_img.tobytes()
+    try:
+        assert test_img.tobytes() == gotten_img.tobytes()
+    finally:
+        gotten_img.close()
 
 
 class ImageWrapper(weave.Object):
@@ -65,7 +71,10 @@ def test_image_as_property(client: WeaveClient, test_img: Image.Image) -> None:
     assert ref is not None
 
     gotten_img_wrapper = weave.ref(ref.uri()).get()
-    assert gotten_img_wrapper.img.tobytes() == test_img.tobytes()
+    try:
+        assert gotten_img_wrapper.img.tobytes() == test_img.tobytes()
+    finally:
+        gotten_img_wrapper.img.close()
 
 
 def test_image_as_dataset_cell(client: WeaveClient, test_img: Image.Image) -> None:
@@ -79,7 +88,10 @@ def test_image_as_dataset_cell(client: WeaveClient, test_img: Image.Image) -> No
     assert ref is not None
 
     gotten_dataset = weave.ref(ref.uri()).get()
-    assert gotten_dataset.rows[0]["img"].tobytes() == test_img.tobytes()
+    try:
+        assert gotten_dataset.rows[0]["img"].tobytes() == test_img.tobytes()
+    finally:
+        gotten_dataset.rows[0]["img"].close()
 
 
 @weave.op
@@ -122,9 +134,15 @@ def test_image_as_call_io_refs(client: WeaveClient, test_img: Image.Image) -> No
     image_as_solo_output_call = image_as_solo_output.calls()[0]
     image_as_input_and_output_part_call = image_as_input_and_output_part.calls()[0]
 
-    assert image_as_solo_output_call.output.tobytes() == exp_bytes
-    assert image_as_input_and_output_part_call.inputs["in_img"].tobytes() == exp_bytes
-    assert image_as_input_and_output_part_call.output["out_img"].tobytes() == exp_bytes
+    try:
+        assert image_as_solo_output_call.output.tobytes() == exp_bytes
+        assert image_as_input_and_output_part_call.inputs["in_img"].tobytes() == exp_bytes
+        assert image_as_input_and_output_part_call.output["out_img"].tobytes() == exp_bytes
+    finally:
+        img_dict["out_img"].close()
+        image_as_solo_output_call.output.close()
+        image_as_input_and_output_part_call.inputs["in_img"].close()
+        image_as_input_and_output_part_call.output["out_img"].close()
 
 
 def test_image_as_file(client: WeaveClient) -> None:
@@ -143,8 +161,12 @@ def test_image_as_file(client: WeaveClient) -> None:
 
     Image.new("RGB", (64, 64), "purple").save(file_path)
     try:
-        res = accept_image_jpg_pillow(return_image_jpg_pillow(file_path))
-        assert res == "Image size: 64x64"
+        img = return_image_jpg_pillow(file_path)
+        try:
+            res = accept_image_jpg_pillow(img)
+            assert res == "Image size: 64x64"
+        finally:
+            img.close()
     finally:
         file_path.unlink()
 
@@ -181,10 +203,14 @@ async def test_images_in_dataset_for_evaluation(client, dataset_ref):
     # Expect that evaluation works for a ref-get'd dataset containing images
     res = await evaluation.evaluate(model)
 
-    assert isinstance(res, dict)
-    assert "model_latency" in res
-    assert "mean" in res["model_latency"]
-    assert isinstance(res["model_latency"]["mean"], (int, float))
+    try:
+        assert isinstance(res, dict)
+        assert "model_latency" in res
+        assert "mean" in res["model_latency"]
+        assert isinstance(res["model_latency"]["mean"], (int, float))
+    finally:
+        for row in dataset.rows:
+            row["img"].close()
 
 
 @pytest.mark.skip("Temporarily skip live tests")
@@ -214,5 +240,8 @@ def test_images_in_load_of_dataset(client):
     dataset = ref.get()
     for gotten_row, local_row in zip(dataset, rows, strict=False):
         assert isinstance(gotten_row["img"], Image.Image)
-        assert gotten_row["img"].size == local_row["img"].size
-        assert gotten_row["img"].tobytes() == local_row["img"].tobytes()
+        try:
+            assert gotten_row["img"].size == local_row["img"].size
+            assert gotten_row["img"].tobytes() == local_row["img"].tobytes()
+        finally:
+            gotten_row["img"].close()
