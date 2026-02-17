@@ -991,25 +991,14 @@ class CallsQuery(BaseModel):
         should_optimize = self._should_optimize()
 
         # Important: Always inject deleted_at into the query.
-        # For calls_complete (v2), deleted_at uses a sentinel value (epoch zero)
-        # instead of NULL. For calls_merged (v1), we use IS NULL.
-        if self.read_table == ReadTable.CALLS_COMPLETE:
-            self.add_condition(
-                tsi_query.EqOperation.model_validate(
-                    {
-                        "$eq": [
-                            {"$getField": "deleted_at"},
-                            {"$literal": "1970-01-01T00:00:00Z"},
-                        ]
-                    }
-                )
+        # We use None as the literal for both table types. The sentinel handling
+        # in process_operation converts None to the correct sentinel value with
+        # proper DateTime64(3) typing for calls_complete, or IS NULL for calls_merged.
+        self.add_condition(
+            tsi_query.EqOperation.model_validate(
+                {"$eq": [{"$getField": "deleted_at"}, {"$literal": None}]}
             )
-        else:
-            self.add_condition(
-                tsi_query.EqOperation.model_validate(
-                    {"$eq": [{"$getField": "deleted_at"}, {"$literal": None}]}
-                )
-            )
+        )
 
         # Important: We must always filter out calls that have not been started
         # This can occur when there is an out of order call part insertion or worse,
