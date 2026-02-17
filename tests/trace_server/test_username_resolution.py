@@ -162,3 +162,83 @@ def test_username_none_when_no_auth_user(sqlite_server):
 
     # wb_username should be None when no auth user
     assert call.wb_username is None
+
+
+def test_username_resolved_in_calls_query(sqlite_server):
+    """
+    Username resolution should also work in calls_query (non-streaming).
+    """
+    auth_user = DummyAuthUser(user_id="user-123", username="testuser")
+    id_converter = DummyIdConverter(auth_user=auth_user)
+
+    external_server = externalize_trace_server(
+        sqlite_server,
+        user_id="user-123",
+        id_converter=id_converter,
+    )
+
+    project_id = "test-entity/test-project"
+    call_id = str(uuid.uuid4())
+
+    external_server.call_start(
+        tsi.CallStartReq(
+            start=tsi.StartedCallSchemaForInsert(
+                project_id=project_id,
+                id=call_id,
+                trace_id=call_id,
+                started_at=datetime.datetime.now(),
+                op_name="test_op",
+                attributes={},
+                inputs={},
+            )
+        )
+    )
+
+    # Query calls via non-streaming method
+    res = external_server.calls_query(tsi.CallsQueryReq(project_id=project_id))
+
+    assert len(res.calls) == 1
+    call = res.calls[0]
+
+    assert call.wb_user_id == auth_user.id
+    assert call.wb_username == auth_user.username
+
+
+def test_username_resolved_in_call_read(sqlite_server):
+    """
+    Username resolution should also work in call_read.
+    """
+    auth_user = DummyAuthUser(user_id="user-123", username="testuser")
+    id_converter = DummyIdConverter(auth_user=auth_user)
+
+    external_server = externalize_trace_server(
+        sqlite_server,
+        user_id="user-123",
+        id_converter=id_converter,
+    )
+
+    project_id = "test-entity/test-project"
+    call_id = str(uuid.uuid4())
+
+    external_server.call_start(
+        tsi.CallStartReq(
+            start=tsi.StartedCallSchemaForInsert(
+                project_id=project_id,
+                id=call_id,
+                trace_id=call_id,
+                started_at=datetime.datetime.now(),
+                op_name="test_op",
+                attributes={},
+                inputs={},
+            )
+        )
+    )
+
+    # Read the call directly
+    res = external_server.call_read(
+        tsi.CallReadReq(project_id=project_id, id=call_id)
+    )
+
+    assert res.call is not None
+    assert res.call.wb_user_id == auth_user.id
+    assert res.call.wb_username == auth_user.username
