@@ -1,9 +1,9 @@
 import contextlib
-import weakref
 import json
 import logging
 import os
 import typing
+import weakref
 from datetime import datetime
 from typing import Any
 from unittest.mock import MagicMock, patch
