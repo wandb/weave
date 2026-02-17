@@ -366,6 +366,28 @@ def test_obj_batch_different_key_order_deduplicates(trace_server, client):
     assert len(res.objs) == 1
 
 
+def test_table_create_different_key_order_same_digest(trace_server):
+    """Rows with different key ordering produce the same digest in table_create."""
+    server = trace_server._internal_trace_server
+    pid = _internal_pid()
+
+    row_a = {"b": 1, "a": 2}
+    row_b = {"a": 2, "b": 1}
+
+    res = server.table_create(
+        tsi.TableCreateReq(
+            table=tsi.TableSchemaForInsert(
+                project_id=pid,
+                rows=[row_a, row_b],
+            )
+        )
+    )
+
+    # Both rows are logically identical so their digests must match
+    assert len(res.row_digests) == 2
+    assert res.row_digests[0] == res.row_digests[1]
+
+
 def test_obj_batch_mixed_projects_errors(trace_server, client):
     """Uploading objects to different projects in one batch should error."""
     if client_is_sqlite(client):

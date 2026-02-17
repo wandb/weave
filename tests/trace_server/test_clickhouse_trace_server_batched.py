@@ -1127,6 +1127,82 @@ def test_call_batch_flushes_kafka_once_not_per_call_end(server_with_mock_kafka):
 
 
 @pytest.mark.disable_logging_error_check
+def test_flush_all_batches_file_failure_raises():
+    """File flush failure propagates and prevents call/kafka flush."""
+    mock_ch_client = MagicMock()
+    mock_ch_client.command.return_value = None
+
+    with patch.object(
+        chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
+    ):
+        server = chts.ClickHouseTraceServer(host="test_host")
+
+        with (
+            patch.object(
+                server, "_flush_file_chunks", side_effect=RuntimeError("file boom")
+            ),
+            patch.object(server, "_flush_calls") as mock_flush_calls,
+            patch.object(server, "_flush_calls_complete") as mock_flush_complete,
+            patch.object(server, "_flush_kafka_producer") as mock_flush_kafka,
+        ):
+            with pytest.raises(RuntimeError, match="file boom"):
+                server._flush_all_batches_in_order()
+
+            mock_flush_calls.assert_not_called()
+            mock_flush_complete.assert_not_called()
+            mock_flush_kafka.assert_not_called()
+
+
+@pytest.mark.disable_logging_error_check
+def test_flush_all_batches_call_failure_raises():
+    """Call flush failure propagates and prevents kafka flush."""
+    mock_ch_client = MagicMock()
+    mock_ch_client.command.return_value = None
+
+    with patch.object(
+        chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
+    ):
+        server = chts.ClickHouseTraceServer(host="test_host")
+
+        with (
+            patch.object(server, "_flush_file_chunks"),
+            patch.object(
+                server, "_flush_calls", side_effect=RuntimeError("call boom")
+            ),
+            patch.object(server, "_flush_kafka_producer") as mock_flush_kafka,
+        ):
+            with pytest.raises(RuntimeError, match="call boom"):
+                server._flush_all_batches_in_order()
+
+            mock_flush_kafka.assert_not_called()
+
+
+@pytest.mark.disable_logging_error_check
+def test_flush_all_batches_kafka_failure_does_not_raise():
+    """Kafka flush failure is caught — does not propagate."""
+    mock_ch_client = MagicMock()
+    mock_ch_client.command.return_value = None
+
+    with patch.object(
+        chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
+    ):
+        server = chts.ClickHouseTraceServer(host="test_host")
+
+        with (
+            patch.object(server, "_flush_file_chunks"),
+            patch.object(server, "_flush_calls"),
+            patch.object(server, "_flush_calls_complete"),
+            patch.object(
+                server,
+                "_flush_kafka_producer",
+                side_effect=RuntimeError("kafka boom"),
+            ),
+        ):
+            # Should NOT raise
+            server._flush_all_batches_in_order()
+
+
+@pytest.mark.disable_logging_error_check
 def test_file_batch_clears_on_insert_failure():
     """Verify _file_batch is cleared even when insert fails."""
     mock_ch_client = MagicMock()
