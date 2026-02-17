@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import os
 import threading
 from collections import OrderedDict
 from typing import Generic, Protocol, TypeVar
@@ -143,7 +142,6 @@ class DiskCache:
             cache_dir: Directory path for disk cache storage
             size_limit: Maximum size in bytes for disk cache (default 1GB)
         """
-        self._cache_dir = cache_dir
         self._cache: diskcache.Cache[str, str | bytes] = diskcache.Cache(
             cache_dir, size_limit=size_limit
         )
@@ -181,31 +179,10 @@ class DiskCache:
 
     def close(self) -> None:
         """Cleanup resources."""
-        cache = self._cache
-        cache_dir: str | None = None
         try:
-            if cache is not None:
-                try:
-                    cache_dir = cache.directory
-                except Exception:
-                    cache_dir = self._cache_dir
-                cache.close()
+            self._cache.close()
         except Exception:
             logger.exception("Error closing disk cache")
-        finally:
-            self._cache = None
-
-        if cache_dir is None:
-            return
-
-        for suffix in ("-wal", "-shm"):
-            path = os.path.join(cache_dir, f"cache.db{suffix}")
-            try:
-                os.remove(path)
-            except FileNotFoundError:
-                pass
-            except Exception as exc:
-                logger.debug(f"Error removing disk cache file '{path}': {exc}")
 
     def __contains__(self, key: str) -> bool:
         """Check if key exists in cache. Returns False on errors."""
@@ -299,10 +276,8 @@ class StackedCache:
         return False
 
     def close(self) -> None:
-        """Close all cache layers and release references."""
-        layers = self._layers
-        self._layers = []
-        for layer in layers:
+        """Close all cache layers."""
+        for layer in self._layers:
             layer.close()
 
     @property

@@ -3,7 +3,6 @@ import json
 import logging
 import os
 import typing
-import weakref
 from datetime import datetime
 from typing import Any
 from unittest.mock import MagicMock, patch
@@ -381,6 +380,10 @@ def client(zero_stack, request, trace_server, caching_client_isolation):
         yield client
     finally:
         weave_client_context.set_weave_client_global(None)
+        try:
+            client.server.close()
+        except Exception:
+            pass
 
 
 @pytest.fixture
@@ -407,6 +410,10 @@ def client_creator(zero_stack, request, trace_server, caching_client_isolation):
             weave.trace.settings.parse_and_apply_settings(
                 weave.trace.settings.UserSettings()
             )
+            try:
+                client.server.close()
+            except Exception:
+                pass
 
     return client
 
@@ -554,29 +561,6 @@ def caching_client_isolation(monkeypatch, tmp_path):
     monkeypatch.setenv("WEAVE_SERVER_CACHE_DIR", str(test_specific_cache_dir))
     return test_specific_cache_dir
     # tmp_path and monkeypatch automatically handle cleanup
-
-
-@pytest.fixture(autouse=True)
-def caching_server_cleanup(monkeypatch):
-    """Close any CachingMiddlewareTraceServer instances created during a test."""
-    original_init = CachingMiddlewareTraceServer.__init__
-    instances: weakref.WeakSet[CachingMiddlewareTraceServer] = weakref.WeakSet()
-
-    def tracking_init(self, *args, **kwargs):
-        original_init(self, *args, **kwargs)
-        instances.add(self)
-
-    monkeypatch.setattr(
-        CachingMiddlewareTraceServer, "__init__", tracking_init, raising=True
-    )
-    try:
-        yield
-    finally:
-        for server in list(instances):
-            try:
-                server.close()
-            except Exception:
-                pass
 
 
 @pytest.fixture
