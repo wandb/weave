@@ -139,6 +139,7 @@ def test_server_cache_size_limit(client):
             size_limit=50000,
         )
 
+        caching_server.close()
         sizes = get_cache_sizes(temp_dir)
         assert len(sizes) == 3
         assert sizes["cache.db-shm"] <= 50000
@@ -361,6 +362,9 @@ def test_cache_isolation_between_tests(tmp_path, monkeypatch):
     assert cache_server_1._safe_cache_get("test_key") == "test_value_1"
     assert cache_server_2._safe_cache_get("test_key") == "test_value_2"
 
+    cache_server_1.close()
+    cache_server_2.close()
+
 
 def test_cache_persistence_across_client_instances(tmp_path):
     """Test that cache persists when creating new client instances with same cache directory."""
@@ -384,8 +388,8 @@ def test_cache_persistence_across_client_instances(tmp_path):
     assert cached_value == "persistent_value"
 
     # Cleanup
-    cache_server_1.__del__()  # Simulate client shutdown
-    cache_server_2.__del__()
+    cache_server_1.close()  # Simulate client shutdown
+    cache_server_2.close()
 
 
 def test_cache_existence_check_optimization(tmp_path):
