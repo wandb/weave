@@ -572,6 +572,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     @contextmanager
     def call_batch(self) -> Iterator[None]:
+        """Batch call operations and flush them all at the end."""
         # Not thread safe - do not use across threads
         self._flush_immediately = False
         try:
