@@ -150,6 +150,7 @@ class StateExporter(BaseModel):
     committed_item_ids: set[str] = Field(default_factory=set)
 
     transcript_completed: set[str] = Field(default_factory=set)
+    transcription_usage: dict[str, dict] = Field(default_factory=dict)
     items: dict[str, dict] = Field(default_factory=dict)
     last_input_item_id: str | None = None
 
@@ -391,6 +392,9 @@ class StateExporter(BaseModel):
         self._apply_transcript(item, msg.get("content_index"), msg.get("transcript"))
         self.items[item_id] = item
         self.transcript_completed.add(item_id)
+        usage = msg.get("usage")
+        if usage and isinstance(usage, dict):
+            self.transcription_usage[item_id] = usage
         # A transcript becoming available may unblock the head of the FIFO
         self._schedule_fifo_check()
 
@@ -525,6 +529,57 @@ class StateExporter(BaseModel):
                         output_dict["output"][output_idx]["content"][content_idx] = (
                             content_dict
                         )
+            summary_usage: dict[str, dict] = {}
+
+            # Response (speech) model usage
+            usage = response.get("usage")
+            model = session.get("model", "unknown") if session else "unknown"
+            if usage and isinstance(usage, dict):
+                summary_usage[model] = {
+                    "requests": 1,
+                    "input_tokens": usage.get("input_tokens", 0),
+                    "output_tokens": usage.get("output_tokens", 0),
+                    "total_tokens": usage.get("total_tokens", 0),
+                }
+
+            # Transcription model usage
+            transcription_model = (
+                _get_from_dict(
+                    _get_from_dict(
+                        _get_from_dict(session, "audio", {}),
+                        "input",
+                        {},
+                    ),
+                    "transcription",
+                    {},
+                ).get("model")
+                if session
+                else None
+            )
+            if transcription_model and messages:
+                t_input = 0
+                t_output = 0
+                t_total = 0
+                t_count = 0
+                for message in messages:
+                    item_id = message.get("id") if isinstance(message, dict) else None
+                    t_usage = self.transcription_usage.get(item_id) if item_id else None
+                    if t_usage:
+                        t_input += t_usage.get("input_tokens", 0)
+                        t_output += t_usage.get("output_tokens", 0)
+                        t_total += t_usage.get("total_tokens", 0)
+                        t_count += 1
+                if t_count > 0:
+                    summary_usage[transcription_model] = {
+                        "requests": t_count,
+                        "input_tokens": t_input,
+                        "output_tokens": t_output,
+                        "total_tokens": t_total,
+                    }
+
+            if summary_usage:
+                call.summary = {"usage": summary_usage}
+
             client.finish_call(call, output=output_dict)
 
     def handle_response_done(self, msg: dict) -> None:
