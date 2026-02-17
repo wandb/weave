@@ -2266,14 +2266,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             pb=pb,
         )
         result = self.ch_client.query(read_query, parameters=pb.get_params())
-        rows = result.named_results()
-
+        res = result.named_results()
         try:
-            row = next(rows)
+            row = next(res)
         except StopIteration:
             raise NotFoundError(
                 f"Queue {req.queue_id} not found or already deleted"
             ) from None
+        finally:
+            res.close()
 
         # Check if any fields are actually being updated
         has_updates = any(
@@ -2316,17 +2317,20 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # Build the response with updated values
         # Use the new values if provided, otherwise keep the old ones
         updated_at = datetime.datetime.now(tz=ZoneInfo("UTC"))
+        name = req.name if req.name is not None else row["name"]
+        description = (
+            req.description if req.description is not None else row["description"]
+        )
+        scorer_refs = (
+            req.scorer_refs if req.scorer_refs is not None else row["scorer_refs"]
+        )
 
         queue = tsi.AnnotationQueueSchema(
             id=str(row["id"]),
             project_id=row["project_id"],
-            name=req.name if req.name is not None else row["name"],
-            description=req.description
-            if req.description is not None
-            else row["description"],
-            scorer_refs=req.scorer_refs
-            if req.scorer_refs is not None
-            else row["scorer_refs"],
+            name=name,
+            description=description,
+            scorer_refs=scorer_refs,
             created_at=_ensure_datetimes_have_tz(row["created_at"]),
             created_by=row["created_by"],
             updated_at=updated_at,
