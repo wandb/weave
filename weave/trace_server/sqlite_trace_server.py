@@ -592,11 +592,19 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
 
         # Match the batch server:
         if req.sort_by is None:
-            order_by = [("started_at", "asc")]
+            order_by = [("started_at", "asc"), ("id", "asc")]
         elif len(req.sort_by) == 0:
             order_by = None
         else:
             order_by = [(s.field, s.direction) for s in req.sort_by]
+            # Add id as secondary sort for consistency if not already present
+            if not any(field == "id" for field, _ in order_by):
+                last_sort = req.sort_by[-1]
+                # When sorting by started_at, match the id direction for perf
+                if last_sort.field == "started_at":
+                    order_by.append(("id", last_sort.direction))
+                else:
+                    order_by.append(("id", "desc"))
 
         if order_by is not None:
             order_parts = []
@@ -1742,6 +1750,12 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
     def annotation_queue_read(
         self, req: tsi.AnnotationQueueReadReq
     ) -> tsi.AnnotationQueueReadRes:
+        """Annotation queues not supported in SQLite."""
+        raise NotImplementedError("Annotation queues are not supported in SQLite")
+
+    def annotation_queue_delete(
+        self, req: tsi.AnnotationQueueDeleteReq
+    ) -> tsi.AnnotationQueueDeleteRes:
         """Annotation queues not supported in SQLite."""
         raise NotImplementedError("Annotation queues are not supported in SQLite")
 
