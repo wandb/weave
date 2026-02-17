@@ -1166,9 +1166,7 @@ def test_flush_all_batches_call_failure_raises():
 
         with (
             patch.object(server, "_flush_file_chunks"),
-            patch.object(
-                server, "_flush_calls", side_effect=RuntimeError("call boom")
-            ),
+            patch.object(server, "_flush_calls", side_effect=RuntimeError("call boom")),
             patch.object(server, "_flush_kafka_producer") as mock_flush_kafka,
         ):
             with pytest.raises(RuntimeError, match="call boom"):

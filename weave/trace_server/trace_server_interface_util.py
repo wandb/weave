@@ -21,7 +21,6 @@ def str_digest(json_val: str) -> str:
     return bytes_digest(json_val.encode())
 
 
-
 valid_internal_schemes = [
     ARTIFACT_REF_SCHEME,
     refs_internal.WEAVE_INTERNAL_SCHEME,
