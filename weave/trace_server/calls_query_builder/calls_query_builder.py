@@ -33,6 +33,7 @@ from typing import Literal, NamedTuple, cast
 from pydantic import BaseModel, Field
 from typing_extensions import Self
 
+from weave.trace_server import ch_sentinel_values
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.calls_query_builder.cte import CTECollection
 from weave.trace_server.calls_query_builder.object_ref_query_builder import (
@@ -397,9 +398,15 @@ class AggregatedDataSizeField(CallsMergedField):
         storage_expr = maybe_agg(
             f"{self.join_table_name}.total_storage_size_bytes", use_agg_fn
         )
+        # For calls_complete (use_agg_fn=False), parent_id uses sentinel ''
+        # instead of NULL. For calls_merged (use_agg_fn=True), use IS NULL.
+        if use_agg_fn:
+            null_check = f"{parent_id_expr} IS NULL"
+        else:
+            null_check = f"{parent_id_expr} = ''"
         conditional_field = f"""
             CASE
-                WHEN {parent_id_expr} IS NULL
+                WHEN {null_check}
                 THEN {storage_expr}
                 ELSE NULL
             END
@@ -632,6 +639,7 @@ class Condition(BaseModel):
         expand_columns: list[str] | None = None,
         field_to_object_join_alias_map: dict[str, str] | None = None,
         use_agg_fn: bool = True,
+        read_table: "ReadTable | None" = None,
     ) -> str:
         # Check if this condition involves object references
         if (
@@ -658,6 +666,7 @@ class Condition(BaseModel):
             pb,
             table_alias,
             use_agg_fn=use_agg_fn,
+            read_table=read_table,
         )
         if self._consumed_fields is None:
             self._consumed_fields = []
@@ -982,12 +991,25 @@ class CallsQuery(BaseModel):
         should_optimize = self._should_optimize()
 
         # Important: Always inject deleted_at into the query.
-        # Note: it might be better to make this configurable.
-        self.add_condition(
-            tsi_query.EqOperation.model_validate(
-                {"$eq": [{"$getField": "deleted_at"}, {"$literal": None}]}
+        # For calls_complete (v2), deleted_at uses a sentinel value (epoch zero)
+        # instead of NULL. For calls_merged (v1), we use IS NULL.
+        if self.read_table == ReadTable.CALLS_COMPLETE:
+            self.add_condition(
+                tsi_query.EqOperation.model_validate(
+                    {
+                        "$eq": [
+                            {"$getField": "deleted_at"},
+                            {"$literal": "1970-01-01T00:00:00Z"},
+                        ]
+                    }
+                )
             )
-        )
+        else:
+            self.add_condition(
+                tsi_query.EqOperation.model_validate(
+                    {"$eq": [{"$getField": "deleted_at"}, {"$literal": None}]}
+                )
+            )
 
         # Important: We must always filter out calls that have not been started
         # This can occur when there is an out of order call part insertion or worse,
@@ -1155,7 +1177,7 @@ class CallsQuery(BaseModel):
         )
         ref_filter = process_ref_filters_to_sql(self.hardcoded_filter, pb, table_alias)
         trace_roots_only = process_trace_roots_only_filter_to_sql(
-            self.hardcoded_filter, pb, table_alias
+            self.hardcoded_filter, pb, table_alias, self.read_table
         )
         parent_ids = process_parent_ids_filter_to_sql(
             self.hardcoded_filter, pb, table_alias
@@ -1378,6 +1400,7 @@ class CallsQuery(BaseModel):
                     expand_columns=expand_columns,
                     field_to_object_join_alias_map=field_to_object_join_alias_map,
                     use_agg_fn=self.use_agg_fn,
+                    read_table=self.read_table,
                 )
                 filter_conditions_sql.append(query_condition_sql)
                 if query_condition.is_feedback(table_alias):
@@ -1824,15 +1847,24 @@ def _maybe_convert_datetime_operands(
     return new_operands
 
 
+def _extract_field_name(operand: "tsi_query.Operand") -> str | None:
+    """Extract the top-level field name from a GetFieldOperator, if present."""
+    if isinstance(operand, tsi_query.GetFieldOperator):
+        return operand.get_field_
+    return None
+
+
 def process_query_to_conditions(
     query: tsi.Query,
     param_builder: ParamBuilder,
     table_alias: str,
     use_agg_fn: bool = True,
+    read_table: "ReadTable | None" = None,
 ) -> FilterToConditions:
     """Converts a Query to a list of conditions for a clickhouse query."""
     conditions = []
     raw_fields_used: dict[str, CallsMergedField] = {}
+    use_sentinels = read_table == ReadTable.CALLS_COMPLETE if read_table else False
 
     # This is the mongo-style query
     def process_operation(operation: tsi_query.Operation) -> str:
@@ -1862,7 +1894,29 @@ def process_query_to_conditions(
                 isinstance(ops[1], tsi_query.LiteralOperation)
                 and ops[1].literal_ is None
             ):
-                cond = f"({lhs_part} IS NULL)"
+                # For calls_complete, sentinel fields use equality checks
+                # against the sentinel value instead of IS NULL.
+                field_name = _extract_field_name(ops[0])
+                sentinel = (
+                    ch_sentinel_values.get_sentinel_value(field_name)
+                    if use_sentinels and field_name
+                    else None
+                )
+                if sentinel is not None:
+                    sentinel_param = param_builder.add_param(sentinel)
+                    sentinel_type = (
+                        "String"
+                        if isinstance(sentinel, str)
+                        else "DateTime64(3)"
+                        if field_name in ch_sentinel_values.SENTINEL_DATETIME_FIELDS
+                        else "String"
+                    )
+                    # Use DateTime64(6) for ended_at specifically
+                    if field_name == "ended_at":
+                        sentinel_type = "DateTime64(6)"
+                    cond = f"({lhs_part} = {param_slot(sentinel_param, sentinel_type)})"
+                else:
+                    cond = f"({lhs_part} IS NULL)"
             else:
                 rhs_part = process_operand(ops[1])
                 cond = f"({lhs_part} = {rhs_part})"
@@ -2118,6 +2172,7 @@ def process_trace_roots_only_filter_to_sql(
     hardcoded_filter: HardCodedFilter | None,
     param_builder: ParamBuilder,
     table_alias: str,
+    read_table: ReadTable = ReadTable.CALLS_MERGED,
 ) -> str:
     """Pulls out the trace_roots_only and returns a sql string if there are any trace_roots_only."""
     if hardcoded_filter is None or not hardcoded_filter.filter.trace_roots_only:
@@ -2131,7 +2186,13 @@ def process_trace_roots_only_filter_to_sql(
         param_builder, table_alias, use_agg_fn=False
     )
 
-    return f"AND ({parent_id_field_sql} IS NULL)"
+    # For calls_complete, parent_id uses sentinel '' instead of NULL
+    if read_table == ReadTable.CALLS_COMPLETE:
+        null_check = f"{parent_id_field_sql} = ''"
+    else:
+        null_check = f"{parent_id_field_sql} IS NULL"
+
+    return f"AND ({null_check})"
 
 
 def process_parent_ids_filter_to_sql(
@@ -2412,11 +2473,17 @@ def _build_calls_complete_stats_query(
     table_name = get_calls_table_name(ReadTable.CALLS_COMPLETE)
     cq = _build_stats_calls_query(req, ReadTable.CALLS_COMPLETE)
 
-    # Only inject deleted_at filter (started_at check is unnecessary for calls_complete
-    # since each row is a complete call, no orphaned call parts)
+    # Inject deleted_at sentinel filter for calls_complete (epoch zero = not deleted).
+    # This is needed because _build_query_body doesn't inject it automatically --
+    # that happens in as_sql() which we bypass here.
     cq.add_condition(
         tsi_query.EqOperation.model_validate(
-            {"$eq": [{"$getField": "deleted_at"}, {"$literal": None}]}
+            {
+                "$eq": [
+                    {"$getField": "deleted_at"},
+                    {"$literal": "1970-01-01T00:00:00Z"},
+                ]
+            }
         )
     )
 
@@ -2431,8 +2498,9 @@ def _build_calls_complete_stats_query(
             # Inline the total_storage_size expression for the flat query.
             # Mirrors AggregatedDataSizeField.as_select_sql(use_agg_fn=False),
             # wrapped in the aggregate function directly.
+            # For calls_complete, parent_id uses sentinel '' instead of NULL
             total_storage_expr = (
-                f"CASE WHEN {table_name}.parent_id IS NULL "
+                f"CASE WHEN {table_name}.parent_id = '' "
                 f"THEN {ROLLED_UP_CALL_MERGED_STATS_TABLE_NAME}.total_storage_size_bytes "
                 f"ELSE NULL END"
             )
@@ -2517,13 +2585,23 @@ def _optimized_wb_run_id_not_null_query(
     """
     project_id_param = param_builder.add_param(project_id)
     table_name = get_calls_table_name(read_table)
+    # For calls_complete, sentinel values replace NULL checks
+    if read_table == ReadTable.CALLS_COMPLETE:
+        wb_run_id_check = f"{table_name}.wb_run_id != ''"
+        deleted_at_param = param_builder.add_param("1970-01-01T00:00:00Z")
+        deleted_at_check = (
+            f"{table_name}.deleted_at = {param_slot(deleted_at_param, 'String')}"
+        )
+    else:
+        wb_run_id_check = f"{table_name}.wb_run_id IS NOT NULL"
+        deleted_at_check = f"{table_name}.deleted_at IS NULL"
     return f"""
         SELECT count() FROM (
             SELECT {table_name}.id AS id
             FROM {table_name}
             WHERE {table_name}.project_id = {param_slot(project_id_param, "String")}
-                AND {table_name}.wb_run_id IS NOT NULL
-                AND {table_name}.deleted_at IS NULL
+                AND {wb_run_id_check}
+                AND {deleted_at_check}
             LIMIT 1
         )
     """

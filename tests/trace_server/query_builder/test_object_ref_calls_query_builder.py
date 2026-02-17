@@ -1024,7 +1024,7 @@ def test_object_ref_filter_calls_complete() -> None:
                    OR regexpExtract(coalesce(nullIf(JSON_VALUE(calls_complete.output_dump, {pb_3:String}), 'null'), ''), '/([^/]+)$', 1) IN
                       (SELECT ref
                        FROM obj_filter_0)))
-                   AND ((calls_complete.deleted_at IS NULL))
+                   AND ((calls_complete.deleted_at = {pb_4:String}))
                    AND ((NOT ((calls_complete.started_at IS NULL)))))
            ORDER BY calls_complete.started_at DESC)
         SELECT calls_complete.id AS id
@@ -1037,6 +1037,7 @@ def test_object_ref_filter_calls_complete() -> None:
             "pb_1": '$."temperature"',
             "pb_2": 1,
             "pb_3": '$."model"',
+            "pb_4": "1970-01-01T00:00:00Z",
         },
     )
 
@@ -1102,7 +1103,7 @@ def test_object_ref_filter_calls_complete_mixed_conditions() -> None:
              filtered_calls AS (
         SELECT calls_complete.id AS id
         FROM calls_complete PREWHERE calls_complete.project_id = {pb_0:String}
-        WHERE (calls_complete.parent_id IS NULL)
+        WHERE (calls_complete.parent_id = '')
           AND (length(calls_complete.input_refs) > 0
                OR calls_complete.started_at IS NULL)
         AND (((((coalesce(nullIf(JSON_VALUE(calls_complete.inputs_dump, {pb_3:String}), 'null'), '') IN
@@ -1112,7 +1113,7 @@ def test_object_ref_filter_calls_complete_mixed_conditions() -> None:
                        (SELECT ref
                         FROM obj_filter_0)))
                   OR ((coalesce(nullIf(JSON_VALUE(calls_complete.inputs_dump, {pb_4:String}), 'null'), '') = {pb_5:String}))))
-                AND ((calls_complete.deleted_at IS NULL))
+                AND ((calls_complete.deleted_at = {pb_6:String}))
                 AND ((NOT ((calls_complete.started_at IS NULL)))))
                 ORDER BY calls_complete.started_at DESC
                 LIMIT 10)
@@ -1129,5 +1130,6 @@ def test_object_ref_filter_calls_complete_mixed_conditions() -> None:
             "pb_3": '$."model"',
             "pb_4": '$."prompt"',
             "pb_5": "test prompt",
+            "pb_6": "1970-01-01T00:00:00Z",
         },
     )
