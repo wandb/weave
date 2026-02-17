@@ -268,12 +268,15 @@ def build_grouped_calls_subquery(
             for column in select_columns
         )
         group_by_clause = "\n        GROUP BY project_id, id"
+        deleted_at_filter = f"{table_alias}.deleted_at IS NULL"
     else:
         # calls_complete: single row per call, no aggregation needed
         select_sql = ",\n              ".join(
             f"{table_alias}.{column} AS {column}" for column in select_columns
         )
         group_by_clause = ""
+        # calls_complete uses non-nullable DateTime64(3) with epoch zero sentinel
+        deleted_at_filter = f"{table_alias}.deleted_at = toDateTime64(0, 3)"
 
     return f"""
         SELECT
@@ -283,5 +286,5 @@ def build_grouped_calls_subquery(
               {table_alias}.project_id = {param_slot(project_param, "String")}
               AND {table_alias}.{datetime_field} >= toDateTime({param_slot(start_param, "Float64")}, {param_slot(tz_param, "String")})
               AND {table_alias}.{datetime_field} < toDateTime({param_slot(end_param, "Float64")}, {param_slot(tz_param, "String")})
-              AND {table_alias}.deleted_at IS NULL{where_filter_sql}{group_by_clause}
+              AND {deleted_at_filter}{where_filter_sql}{group_by_clause}
         """
