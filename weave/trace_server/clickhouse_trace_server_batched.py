@@ -136,6 +136,7 @@ from weave.trace_server.llm_completion import (
 )
 from weave.trace_server.methods.evaluation_status import evaluation_status
 from weave.trace_server.model_providers.model_providers import (
+    VERTEX_PROVIDER_NAMES,
     LLMModelProviderInfo,
     read_model_to_provider_info_map,
 )
@@ -1154,11 +1155,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if req.sort_by is not None:
             for sort_by in req.sort_by:
                 cq.add_order(sort_by.field, sort_by.direction)
-            # If user isn't already sorting by id, add id as secondary sort for consistency
+            # If user isn't already sorting by id, add id as secondary sort for consistency.
             if not any(sort_by.field == "id" for sort_by in req.sort_by):
-                cq.add_order("id", "asc")
+                last_sort = req.sort_by[-1]
+                # When sorting by started_at, match the id direction to started_at for perf
+                if last_sort.field == "started_at":
+                    cq.add_order("id", last_sort.direction)
+                else:
+                    cq.add_order("id", "desc")
         else:
-            # Default sorting: started_at with id as secondary sort for consistency
             cq.add_order("started_at", "asc")
             cq.add_order("id", "asc")
         if req.limit is not None:
@@ -5274,6 +5279,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             base_url=completion_model_info.base_url,
             extra_headers=completion_model_info.extra_headers,
             return_type=completion_model_info.return_type,
+            vertex_credentials=completion_model_info.vertex_credentials,
         )
 
         end_time = datetime.datetime.now()
@@ -5308,7 +5314,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 started_at=start_time,
                 ended_at=end_time,
                 attributes={},
-                inputs={**req.inputs.model_dump(exclude_none=True)},
+                inputs={
+                    **req.inputs.model_dump(
+                        exclude_none=True, exclude={"vertex_credentials"}
+                    )
+                },
                 output=res.response,
                 summary=summary,
                 exception=exception,
@@ -5325,7 +5335,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 wb_user_id=req.wb_user_id,
                 op_name=COMPLETIONS_CREATE_OP_NAME,
                 started_at=start_time,
-                inputs={**req.inputs.model_dump(exclude_none=True)},
+                inputs={
+                    **req.inputs.model_dump(
+                        exclude_none=True, exclude={"vertex_credentials"}
+                    )
+                },
                 attributes={},
             )
             start_call = _start_call_for_insert_to_ch_insertable_start_call(start)
@@ -5409,6 +5423,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         base_url = completion_model_info.base_url
         extra_headers = completion_model_info.extra_headers
         return_type = completion_model_info.return_type
+        vertex_credentials = completion_model_info.vertex_credentials
 
         # Track start call if requested
         start_call: CallStartCHInsertable | None = None
@@ -5430,7 +5445,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
             # Prepare inputs for tracking: use original messages (with template syntax)
             # and include prompt and template_vars
-            tracked_inputs = req.inputs.model_dump(exclude_none=True)
+            tracked_inputs = req.inputs.model_dump(
+                exclude_none=True, exclude={"vertex_credentials"}
+            )
             tracked_inputs["model"] = model_name
             tracked_inputs["messages"] = initial_messages
             if prompt:
@@ -5469,6 +5486,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             base_url=base_url,
             extra_headers=extra_headers,
             return_type=return_type,
+            vertex_credentials=vertex_credentials,
         )
 
         # If tracking not requested just return chunks directly
@@ -6808,6 +6826,7 @@ class CompletionModelInfo:
     base_url: str | None
     extra_headers: dict[str, str]
     return_type: str | None
+    vertex_credentials: str | None = None
 
 
 def _setup_completion_model_info(
@@ -6820,7 +6839,8 @@ def _setup_completion_model_info(
     Returns:
         CompletionModelInfo containing model/provider/credential config.
 
-    Note: api_key can be None for bedrock providers since they use AWS credentials instead.
+    Note: api_key can be None for bedrock providers (AWS credentials) or vertex_ai
+    when vertex_credentials is provided.
     """
     model_name = req.inputs.model
     api_key: str | None = None
@@ -6828,6 +6848,7 @@ def _setup_completion_model_info(
     base_url: str | None = None
     extra_headers: dict[str, str] = {}
     return_type: str | None = None
+    vertex_credentials: str | None = getattr(req.inputs, "vertex_credentials", None)
 
     # Check for explicit custom provider prefix
     is_explicit_custom = model_name.startswith("custom::")
@@ -6847,6 +6868,15 @@ def _setup_completion_model_info(
             extra_headers = req.inputs.extra_headers
             req.inputs.extra_headers = None
         return_type = "openai"
+        return CompletionModelInfo(
+            model_name=model_name,
+            api_key=api_key,
+            provider=provider,
+            base_url=base_url,
+            extra_headers=extra_headers,
+            return_type=return_type,
+            vertex_credentials=None,
+        )
     elif is_explicit_custom:
         # Custom provider path - model_name format: custom::<provider>::<model>
         # Parse provider and model names, create sanitized object_id for lookup
@@ -6899,6 +6929,7 @@ def _setup_completion_model_info(
             base_url=base_url,
             extra_headers=custom_provider_info.extra_headers,
             return_type=custom_provider_info.return_type,
+            vertex_credentials=None,
         )
     elif model_info:
         secret_name = model_info.get("api_key_name")
@@ -6913,8 +6944,15 @@ def _setup_completion_model_info(
 
         api_key = secret_fetcher.fetch(secret_name).get("secrets", {}).get(secret_name)
         provider = model_info.get("litellm_provider", "openai")
-
-        if not api_key and provider not in ("bedrock", "bedrock_converse"):
+        is_vertex_provider = provider in VERTEX_PROVIDER_NAMES
+        if is_vertex_provider and vertex_credentials:
+            api_key = None  # Use vertex_credentials instead
+        credentials_satisfied = is_vertex_provider and vertex_credentials
+        if (
+            not api_key
+            and provider not in ("bedrock", "bedrock_converse")
+            and not credentials_satisfied
+        ):
             raise MissingLLMApiKeyError(
                 f"No API key {secret_name} found for model {model_name}",
                 api_key_name=secret_name,
@@ -6927,6 +6965,7 @@ def _setup_completion_model_info(
         base_url=base_url,
         extra_headers=extra_headers,
         return_type=return_type,
+        vertex_credentials=vertex_credentials,
     )
 
 
