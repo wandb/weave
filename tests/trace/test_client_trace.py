@@ -1,7 +1,6 @@
 import dataclasses
 import datetime
 import json
-import logging
 import platform
 import random
 import sys
@@ -45,7 +44,7 @@ from weave.trace.weave_client import sanitize_object_name
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.clickhouse_trace_server_settings import ENTITY_TOO_LARGE_PAYLOAD
 from weave.trace_server.common_interface import SortBy
-from weave.trace_server.errors import InsertTooLarge, InvalidFieldError, InvalidRequest
+from weave.trace_server.errors import InvalidFieldError, InvalidRequest
 from weave.trace_server.ids import generate_id
 from weave.trace_server.refs_internal import extra_value_quoter
 from weave.trace_server.token_costs import COST_OBJECT_NAME
@@ -3609,34 +3608,18 @@ def test_large_keys_are_stripped_call(client, caplog, monkeypatch):
         # no need to strip in sqlite
         return
 
-    caplog.set_level(logging.INFO)
-
-    original_insert_call_batch = weave.trace_server.clickhouse_trace_server_batched.ClickHouseTraceServer._insert_call_batch
     max_size = 10 * 1024
 
-    # Patch _insert_call_batch to raise InsertTooLarge
-    def mock_insert_call_batch(self, batch):
-        # mock raise insert error
-        if len(str(batch)) > max_size:
-            raise InsertTooLarge(
-                "Database insertion failed. Record too large. "
-                "A likely cause is that a single row or cell exceeded "
-                "the limit. If logging images, save them as `Image.PIL`."
-            )
-        original_insert_call_batch(self, batch)
-
+    # Lower the proactive offload threshold so our 10KB test data triggers it.
     monkeypatch.setattr(
         weave.trace_server.clickhouse_trace_server_settings,
-        "CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT",
+        "PROACTIVE_OFFLOAD_BYTES_LIMIT",
         max_size,
     )
-    monkeypatch.setattr(
-        weave.trace_server.clickhouse_trace_server_batched.ClickHouseTraceServer,
-        "_insert_call_batch",
-        mock_insert_call_batch,
-    )
 
-    # Use a dictionary that will exceed our new 10KB limit
+    # Use a dictionary that will exceed our new 10KB limit.
+    # Dict values are small ints (no large string leaves to offload),
+    # so the fallback replaces the whole column with ENTITY_TOO_LARGE_PAYLOAD.
     data = {"dictionary": {f"{i}": i for i in range(max_size // 10)}}
 
     @weave.op
@@ -3650,10 +3633,9 @@ def test_large_keys_are_stripped_call(client, caplog, monkeypatch):
     assert calls[0].output == json.loads(ENTITY_TOO_LARGE_PAYLOAD)
     assert calls[0].inputs == json.loads(ENTITY_TOO_LARGE_PAYLOAD)
 
-    # now test for inputs/output as raw string
-    # With Phase 1 of _offload_large_values, large string leaf values are
-    # offloaded to Content storage (preserving data) instead of being replaced
-    # with ENTITY_TOO_LARGE_PAYLOAD.
+    # Now test for inputs/output as raw string.
+    # Large string leaf values are offloaded to Content storage (preserving
+    # data) instead of being replaced with ENTITY_TOO_LARGE_PAYLOAD.
     @weave.op
     def test_op_str(input_data: str):
         return input_data
@@ -3690,15 +3672,6 @@ def test_large_keys_are_stripped_call(client, caplog, monkeypatch):
     assert len(calls[0].inputs["input_data"]) == 1
     assert isinstance(calls[0].inputs["input_data"][0], Content)
     assert calls[0].inputs["input_data"][0].data == str_data.encode("utf-8")
-
-    # Verify retry was logged at INFO level (new behavior uses content offloading)
-    info_messages = [
-        record.message for record in caplog.records if record.levelname == "INFO"
-    ]
-    assert any(
-        "Retrying with large values offloaded to content storage" in msg
-        for msg in info_messages
-    )
 
     # test that when inputs + output > max_size but input < max_size
     # we only strip the inputs

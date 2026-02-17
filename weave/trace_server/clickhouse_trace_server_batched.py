@@ -520,6 +520,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 )
                 for start, end in calls
             ]
+            rows = self._offload_large_values(rows, ALL_CALL_COMPLETE_INSERT_COLUMNS)
             self._insert_call_complete_batch(rows, settings=None, do_sync_insert=True)
         else:
             rows = []
@@ -532,6 +533,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 rows.append(
                     _ch_call_to_row(_end_call_for_insert_to_ch_insertable_end_call(end))
                 )
+            rows = self._offload_large_values(rows, ALL_CALL_INSERT_COLUMNS)
             self._insert_call_batch(rows, settings=None, do_sync_insert=True)
 
         # Run callbacks and flush
@@ -5947,9 +5949,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._flush_calls")
     def _flush_calls(self) -> None:
         try:
-            self._insert_call_batch(self._call_batch)
-        except InsertTooLarge:
-            logger.info("Retrying with large values offloaded to content storage.")
             batch = self._offload_large_values(
                 self._call_batch, ALL_CALL_INSERT_COLUMNS
             )
@@ -6029,13 +6028,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         """Flush the calls_complete batch to the database."""
         if not self._calls_complete_batch:
             return
-
         try:
-            self._insert_call_complete_batch(self._calls_complete_batch)
-        except InsertTooLarge:
-            logger.info(
-                "Retrying calls_complete with large values offloaded to content storage."
-            )
             batch = self._offload_large_values(
                 self._calls_complete_batch, ALL_CALL_COMPLETE_INSERT_COLUMNS
             )
@@ -6045,20 +6038,26 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._offload_large_values")
     def _offload_large_values(
-        self, batch: list[list[Any]], column_names: list[str]
+        self,
+        batch: list[list[Any]],
+        column_names: list[str],
     ) -> list[list[Any]]:
-        """Offload large string values from JSON columns to file storage as Content objects.
+        """Offload large string values from JSON columns to file storage.
 
-        When a row's combined JSON column size exceeds the ClickHouse row limit,
-        this method processes each oversized column (largest first) in two phases:
+        Called before every batch insert (call_start/call_end, calls_complete,
+        and OTEL export).  When a row's combined JSON column size exceeds
+        ``PROACTIVE_OFFLOAD_BYTES_LIMIT`` (1 MiB), each oversized column
+        (largest first) is processed in two steps:
 
-        1. **Content offloading** -- parse the JSON, replace large string leaf values
-           with Content object references stored in file storage, and re-serialize.
-           This preserves the data structure and user data.
-        2. **Error-payload fallback** -- if offloading alone does not reduce the column
-           enough, replace the entire column with ``ENTITY_TOO_LARGE_PAYLOAD``.
+        1. **Content offloading** -- parse the JSON, replace large string leaf
+           values with Content object references stored in file storage, and
+           re-serialize.  This preserves the data structure and user data.
+        2. **Error-payload fallback** -- if offloading alone does not reduce
+           the column enough, replace the entire column with
+           ``ENTITY_TOO_LARGE_PAYLOAD``.
 
-        Only JSON dump columns (inputs, output, attributes, summary) are considered.
+        Only JSON dump columns (inputs, output, attributes, summary) are
+        considered.
 
         Args:
             batch: List of rows, where each row is a list of column values.
@@ -6076,13 +6075,17 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         entity_too_large_payload_byte_size = _num_bytes(
             ch_settings.ENTITY_TOO_LARGE_PAYLOAD
         )
-        row_limit = ch_settings.CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT
+        row_limit = ch_settings.PROACTIVE_OFFLOAD_BYTES_LIMIT
 
         for item in batch:
             json_idx_size_pairs = [
                 (i, _num_bytes(item[i])) for i in json_column_indices
             ]
             total_json_bytes = sum(size for _, size in json_idx_size_pairs)
+
+            if total_json_bytes <= row_limit:
+                final_batch.append(item)
+                continue
 
             processed_item = list(item)
             sorted_json_idx_size_pairs = sorted(
@@ -6095,7 +6098,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
                 current_col_size = original_size
 
-                # Phase 1: try to offload large strings to Content objects
+                # Try to offload large strings to Content objects
                 new_dump = _try_offload_json_column(
                     processed_item[col_idx],
                     processed_item[project_id_idx],
@@ -6110,7 +6113,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                         current_col_size = new_size
                         offloaded_count += 1
 
-                # Phase 2: if still over the limit, replace entire column
+                # If still over the limit, replace entire column
                 if total_json_bytes > row_limit:
                     processed_item[col_idx] = ch_settings.ENTITY_TOO_LARGE_PAYLOAD
                     total_json_bytes -= (
