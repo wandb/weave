@@ -183,7 +183,7 @@ def test_large_string_offloading():
     # -- basic threshold: large converted, small/exact untouched --
     ts = _mock_ts(num_files=2)
     r = replace_large_strings_with_content_objects(
-        {"lg": large, "sm": small, "eq": exact}, "proj", ts, min_chars=threshold
+        {"lg": large, "sm": small, "eq": exact}, "proj", ts, max_chars=threshold
     )
     assert _is_content_ref(r["lg"])
     assert r["sm"] == small  # below threshold
@@ -197,7 +197,7 @@ def test_large_string_offloading():
         {"outer": {"inner": deep, "sib": "short"}, "list": ["tiny", deep]},
         "proj",
         ts,
-        min_chars=threshold,
+        max_chars=threshold,
     )
     assert _is_content_ref(r["outer"]["inner"])
     assert r["outer"]["sib"] == "short"  # small sibling untouched
@@ -210,7 +210,7 @@ def test_large_string_offloading():
     primitives = {"int": 42, "float": 3.14, "bool": True, "none": None}
     assert (
         replace_large_strings_with_content_objects(
-            primitives, "proj", ts, min_chars=threshold
+            primitives, "proj", ts, max_chars=threshold
         )
         == primitives
     )
@@ -219,11 +219,11 @@ def test_large_string_offloading():
     # -- empty structures --
     ts = _mock_ts()
     assert (
-        replace_large_strings_with_content_objects({}, "p", ts, min_chars=threshold)
+        replace_large_strings_with_content_objects({}, "p", ts, max_chars=threshold)
         == {}
     )
     assert (
-        replace_large_strings_with_content_objects([], "p", ts, min_chars=threshold)
+        replace_large_strings_with_content_objects([], "p", ts, max_chars=threshold)
         == []
     )
 
@@ -237,7 +237,7 @@ def test_large_string_offloading():
         },
         "proj",
         ts,
-        min_chars=threshold,
+        max_chars=threshold,
     )
     for k in ("a", "b", "c"):
         assert _is_content_ref(r[k])
@@ -246,7 +246,7 @@ def test_large_string_offloading():
     # -- stored metadata is text/plain --
     ts = _mock_ts()
     replace_large_strings_with_content_objects(
-        {"f": "hello " * (threshold // 6 + 1)}, "proj", ts, min_chars=threshold
+        {"f": "hello " * (threshold // 6 + 1)}, "proj", ts, max_chars=threshold
     )
     meta = json.loads(ts.file_create.call_args_list[1][0][0].content)
     assert meta["mimetype"] == "text/plain"
@@ -256,7 +256,7 @@ def test_large_string_offloading():
     broken_ts = MagicMock()
     broken_ts.file_create = MagicMock(side_effect=RuntimeError("boom"))
     r = replace_large_strings_with_content_objects(
-        {"f": large}, "proj", broken_ts, min_chars=threshold
+        {"f": large}, "proj", broken_ts, max_chars=threshold
     )
     assert r["f"] == large  # original preserved
 

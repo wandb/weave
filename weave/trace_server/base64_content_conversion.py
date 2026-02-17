@@ -183,12 +183,12 @@ def replace_large_strings_with_content_objects(
     vals: T,
     project_id: str,
     trace_server: TraceServerInterface,
-    min_chars: int,
+    max_chars: int,
 ) -> T:
     """Recursively replace large string values with Content objects in file storage.
 
     Walks the value tree and converts any string leaf whose character count exceeds
-    ``min_chars`` into a Content object stored via the trace server's file storage.
+    ``max_chars`` into a Content object stored via the trace server's file storage.
     The original string is preserved as ``text/plain`` content, and a Content
     reference dict is returned in its place.
 
@@ -202,7 +202,7 @@ def replace_large_strings_with_content_objects(
             return {k: _visit(v) for k, v in val.items()}
         elif isinstance(val, list):
             return [_visit(v) for v in val]
-        elif isinstance(val, str) and len(val) > min_chars:
+        elif isinstance(val, str) and len(val) > max_chars:
             try:
                 content: Content[Any] = Content.from_text(val)
                 return store_content_object(content, project_id, trace_server)
@@ -211,6 +211,7 @@ def replace_large_strings_with_content_objects(
                     "Failed to offload large string (%d chars) to content storage: %s",
                     len(val),
                     e,
+                    exc_info=True,
                 )
                 return val
         return val
