@@ -136,8 +136,12 @@ def test_image_as_call_io_refs(client: WeaveClient, test_img: Image.Image) -> No
 
     try:
         assert image_as_solo_output_call.output.tobytes() == exp_bytes
-        assert image_as_input_and_output_part_call.inputs["in_img"].tobytes() == exp_bytes
-        assert image_as_input_and_output_part_call.output["out_img"].tobytes() == exp_bytes
+        assert (
+            image_as_input_and_output_part_call.inputs["in_img"].tobytes() == exp_bytes
+        )
+        assert (
+            image_as_input_and_output_part_call.output["out_img"].tobytes() == exp_bytes
+        )
     finally:
         img_dict["out_img"].close()
         image_as_solo_output_call.output.close()
