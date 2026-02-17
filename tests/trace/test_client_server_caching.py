@@ -139,12 +139,19 @@ def test_server_cache_size_limit(client):
             size_limit=50000,
         )
 
+        caching_server.obj_read(
+            ObjReadReq(project_id="test", object_id="test", digest="prime")
+        )
         caching_server.close()
         sizes = get_cache_sizes(temp_dir)
-        assert len(sizes) == 3
-        assert sizes["cache.db-shm"] <= 50000
-        assert sizes["cache.db-wal"] == 0  # WAL should be at 0 now
+        assert len(sizes) == 1
         assert sizes["cache.db"] <= 50000
+
+        caching_server = CachingMiddlewareTraceServer(
+            next_trace_server=MockServer("a" * 1000),
+            cache_dir=temp_dir,
+            size_limit=50000,
+        )
 
         for i in range(count):
             caching_server.obj_read(
@@ -164,19 +171,10 @@ def test_server_cache_size_limit(client):
             assert sizes["cache.db"] <= limit * 1.1
             print(sizes)
 
+        caching_server.close()
         sizes = get_cache_sizes(temp_dir)
-        # depending on the OS, we could be in 1 of two cases.
-        # Case 1: only the db file remains
-        if len(sizes) == 1:
-            assert sizes["cache.db"] <= limit * 1.1
-        elif len(sizes) == 3:
-            assert sizes["cache.db-shm"] <= 50000
-            assert sizes["cache.db-wal"] == 0
-            assert sizes["cache.db"] <= limit * 1.1
-        else:
-            raise ValueError(
-                f"Unexpected number of files in cache directory: {len(sizes)}"
-            )
+        assert len(sizes) == 1
+        assert sizes["cache.db"] <= limit * 1.1
 
 
 def test_server_cache_latency(client):
