@@ -138,32 +138,30 @@ def test_server_cache_size_limit(client):
             cache_dir=temp_dir,
             size_limit=50000,
         )
-        try:
+
+        sizes = get_cache_sizes(temp_dir)
+        assert len(sizes) == 3
+        assert sizes["cache.db-shm"] <= 50000
+        assert sizes["cache.db-wal"] == 0  # WAL should be at 0 now
+        assert sizes["cache.db"] <= 50000
+
+        for i in range(count):
+            caching_server.obj_read(
+                ObjReadReq(project_id="test", object_id="test", digest=f"test_{i}")
+            )
+
+            # Internally, the cache estimates it's own size
+            # Access the disk cache layer (second layer in the stack)
+            disk_cache = caching_server._cache.layers[1]
+            assert disk_cache._cache.volume() <= limit * 1.1
+
+            # Allows us to test the on-disk size
             sizes = get_cache_sizes(temp_dir)
             assert len(sizes) == 3
             assert sizes["cache.db-shm"] <= 50000
-            assert sizes["cache.db-wal"] == 0  # WAL should be at 0 now
-            assert sizes["cache.db"] <= 50000
-
-            for i in range(count):
-                caching_server.obj_read(
-                    ObjReadReq(project_id="test", object_id="test", digest=f"test_{i}")
-                )
-
-                # Internally, the cache estimates it's own size
-                # Access the disk cache layer (second layer in the stack)
-                disk_cache = caching_server._cache.layers[1]
-                assert disk_cache._cache.volume() <= limit * 1.1
-
-                # Allows us to test the on-disk size
-                sizes = get_cache_sizes(temp_dir)
-                assert len(sizes) == 3
-                assert sizes["cache.db-shm"] <= 50000
-                assert sizes["cache.db-wal"] < 4_000_000 * 1.1  # WAL bound by 4MB
-                assert sizes["cache.db"] <= limit * 1.1
-                print(sizes)
-        finally:
-            caching_server.close()
+            assert sizes["cache.db-wal"] < 4_000_000 * 1.1  # WAL bound by 4MB
+            assert sizes["cache.db"] <= limit * 1.1
+            print(sizes)
 
         sizes = get_cache_sizes(temp_dir)
         # depending on the OS, we could be in 1 of two cases.
@@ -186,28 +184,25 @@ def test_server_cache_latency(client):
     base_server = MockServer("a" * 1000)
     caching_server = CachingMiddlewareTraceServer(next_trace_server=base_server)
 
-    try:
-        def get_latency_for_server(server: TraceServerInterface, count: int):
-            start = time.time()
-            for i in range(count):
-                server.obj_read(
-                    ObjReadReq(project_id="test", object_id="test", digest=f"test_{i}")
-                )
-            end = time.time()
-            return (end - start) / count
+    def get_latency_for_server(server: TraceServerInterface, count: int):
+        start = time.time()
+        for i in range(count):
+            server.obj_read(
+                ObjReadReq(project_id="test", object_id="test", digest=f"test_{i}")
+            )
+        end = time.time()
+        return (end - start) / count
 
-        latency_without_cache = get_latency_for_server(base_server, count)
-        latency_with_cache = get_latency_for_server(caching_server, count)
+    latency_without_cache = get_latency_for_server(base_server, count)
+    latency_with_cache = get_latency_for_server(caching_server, count)
 
-        added_latency = latency_with_cache - latency_without_cache
-        print(f"Added latency: {added_latency}")
+    added_latency = latency_with_cache - latency_without_cache
+    print(f"Added latency: {added_latency}")
 
-        if sys.platform == "win32":
-            assert added_latency < 0.05  # Windows is REALLY slow
-        else:
-            assert added_latency < 0.002
-    finally:
-        caching_server.close()
+    if sys.platform == "win32":
+        assert added_latency < 0.05  # Windows is REALLY slow
+    else:
+        assert added_latency < 0.002
 
 
 def test_file_create_caching(client):
@@ -355,19 +350,16 @@ def test_cache_isolation_between_tests(tmp_path, monkeypatch):
     base_server = ThrowingServer()
     cache_server_1 = CachingMiddlewareTraceServer(base_server, str(test_cache_dir_1))
     cache_server_2 = CachingMiddlewareTraceServer(base_server, str(test_cache_dir_2))
-    try:
-        # Write to first cache
-        cache_server_1._safe_cache_set("test_key", "test_value_1")
 
-        # Write different value to second cache with same key
-        cache_server_2._safe_cache_set("test_key", "test_value_2")
+    # Write to first cache
+    cache_server_1._safe_cache_set("test_key", "test_value_1")
 
-        # Verify isolation - each cache should have its own value
-        assert cache_server_1._safe_cache_get("test_key") == "test_value_1"
-        assert cache_server_2._safe_cache_get("test_key") == "test_value_2"
-    finally:
-        cache_server_1.close()
-        cache_server_2.close()
+    # Write different value to second cache with same key
+    cache_server_2._safe_cache_set("test_key", "test_value_2")
+
+    # Verify isolation - each cache should have its own value
+    assert cache_server_1._safe_cache_get("test_key") == "test_value_1"
+    assert cache_server_2._safe_cache_get("test_key") == "test_value_2"
 
 
 def test_cache_persistence_across_client_instances(tmp_path):
@@ -382,10 +374,7 @@ def test_cache_persistence_across_client_instances(tmp_path):
 
     # Create first cache instance and store something
     cache_server_1 = CachingMiddlewareTraceServer(base_server, cache_dir)
-    try:
-        cache_server_1._safe_cache_set("persistent_key", "persistent_value")
-    finally:
-        cache_server_1.close()  # Simulate client shutdown
+    cache_server_1._safe_cache_set("persistent_key", "persistent_value")
 
     # Create second cache instance with same directory
     cache_server_2 = CachingMiddlewareTraceServer(base_server, cache_dir)
@@ -395,7 +384,8 @@ def test_cache_persistence_across_client_instances(tmp_path):
     assert cached_value == "persistent_value"
 
     # Cleanup
-    cache_server_2.close()
+    cache_server_1.__del__()  # Simulate client shutdown
+    cache_server_2.__del__()
 
 
 def test_cache_existence_check_optimization(tmp_path):
@@ -516,12 +506,12 @@ def test_cache_directory_creation(tmp_path):
 
     base_server = ThrowingServer()
     cache_server = CachingMiddlewareTraceServer(base_server, cache_dir)
-    try:
-        # Directory should be created
-        assert os.path.exists(cache_dir)
 
-        # Should be able to use the cache
-        cache_server._safe_cache_set("creation_test", "success")
-        assert cache_server._safe_cache_get("creation_test") == "success"
-    finally:
-        cache_server.close()
+    # Directory should be created
+    assert os.path.exists(cache_dir)
+
+    # Should be able to use the cache
+    cache_server._safe_cache_set("creation_test", "success")
+    assert cache_server._safe_cache_get("creation_test") == "success"
+
+    cache_server.__del__()

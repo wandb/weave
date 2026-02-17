@@ -1,4 +1,5 @@
 import contextlib
+import weakref
 import json
 import logging
 import os
@@ -379,11 +380,6 @@ def client(zero_stack, request, trace_server, caching_client_isolation):
     try:
         yield client
     finally:
-        try:
-            # Ensure diskcache (sqlite) connections are closed.
-            client.server.close()
-        except Exception:
-            pass
         weave_client_context.set_weave_client_global(None)
 
 
@@ -406,11 +402,6 @@ def client_creator(zero_stack, request, trace_server, caching_client_isolation):
         try:
             yield client
         finally:
-            try:
-                # Ensure diskcache (sqlite) connections are closed.
-                client.server.close()
-            except Exception:
-                pass
             weave_client_context.set_weave_client_global(None)
             weave.trace.api._global_attributes = {}
             weave.trace.settings.parse_and_apply_settings(
@@ -563,6 +554,29 @@ def caching_client_isolation(monkeypatch, tmp_path):
     monkeypatch.setenv("WEAVE_SERVER_CACHE_DIR", str(test_specific_cache_dir))
     return test_specific_cache_dir
     # tmp_path and monkeypatch automatically handle cleanup
+
+
+@pytest.fixture(autouse=True)
+def caching_server_cleanup(monkeypatch):
+    """Close any CachingMiddlewareTraceServer instances created during a test."""
+    original_init = CachingMiddlewareTraceServer.__init__
+    instances: weakref.WeakSet[CachingMiddlewareTraceServer] = weakref.WeakSet()
+
+    def tracking_init(self, *args, **kwargs):
+        original_init(self, *args, **kwargs)
+        instances.add(self)
+
+    monkeypatch.setattr(
+        CachingMiddlewareTraceServer, "__init__", tracking_init, raising=True
+    )
+    try:
+        yield
+    finally:
+        for server in list(instances):
+            try:
+                server.close()
+            except Exception:
+                pass
 
 
 @pytest.fixture
