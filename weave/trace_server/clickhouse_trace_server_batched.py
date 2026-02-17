@@ -174,7 +174,6 @@ from weave.trace_server.datadog import (
 from weave.trace_server.digest_validation import validate_expected_digest
 from weave.trace_server.errors import (
     CallsCompleteModeRequired,
-    InsertTooLarge,
     InvalidRequest,
     MissingLLMApiKeyError,
     NotFoundError,
@@ -7440,9 +7439,7 @@ def _offload_oversized_row(
     """
     offloaded_count = 0
     stripped_count = 0
-    entity_too_large_payload_byte_size = num_bytes(
-        ch_settings.ENTITY_TOO_LARGE_PAYLOAD
-    )
+    entity_too_large_payload_byte_size = num_bytes(ch_settings.ENTITY_TOO_LARGE_PAYLOAD)
 
     sorted_pairs = sorted(json_idx_size_pairs, key=lambda x: x[1], reverse=True)
 

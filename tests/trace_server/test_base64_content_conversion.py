@@ -163,7 +163,7 @@ def test_base64_and_data_uri_content_conversion():
     assert _is_content_ref(out["audio"])
     assert out["label"] == "ok"
     wav_meta = json.loads(ts.file_create.call_args_list[1][0][0].content)
-    assert wav_meta["mimetype"] in ("audio/wav", "audio/x-wav", "audio/wave")
+    assert wav_meta["mimetype"] in {"audio/wav", "audio/x-wav", "audio/wave"}
 
 
 # ---------------------------------------------------------------------------
