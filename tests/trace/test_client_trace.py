@@ -3611,10 +3611,17 @@ def test_large_keys_are_stripped_call(client, caplog, monkeypatch):
     max_size = 10 * 1024
 
     # Lower the proactive offload threshold so our 10KB test data triggers it.
+    # Also lower the per-string offload threshold so individual strings in the
+    # test data are large enough to be offloaded to Content storage.
     monkeypatch.setattr(
         weave.trace_server.clickhouse_trace_server_settings,
         "PROACTIVE_OFFLOAD_BYTES_LIMIT",
         max_size,
+    )
+    monkeypatch.setattr(
+        weave.trace_server.clickhouse_trace_server_settings,
+        "LARGE_STRING_OFFLOAD_MIN_CHARS",
+        1024,
     )
 
     # Use a dictionary that will exceed our new 10KB limit.
