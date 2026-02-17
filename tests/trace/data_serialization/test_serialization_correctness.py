@@ -35,6 +35,12 @@ independent of the actual code that is used to serialize the data.
 """
 
 
+def _maybe_close(obj: Any) -> None:
+    close = getattr(obj, "close", None)
+    if callable(close):
+        close()
+
+
 @pytest.fixture
 def set_weave_logger_to_debug():
     logger = logging.getLogger("weave")
@@ -194,103 +200,115 @@ def test_serialization_correctness(
         # deserialized using the ref-get pattern, and finally, assert that
         # the expected objects and files are created in the database.
 
-        runtime_object = case.runtime_object_factory()
+        runtime_object = None
+        gotten_obj = None
+        try:
+            runtime_object = case.runtime_object_factory()
 
-        # If we are in legacy mode, then we just publish the expected json directly.
-        if is_legacy:
-            published_obj = weave.publish(case.exp_json)
-        else:
-            published_obj = weave.publish(runtime_object)
-        digest = published_obj.digest
-        gotten_obj = weave.get(published_obj.uri())
-        assert case.equality_check(gotten_obj, runtime_object)
+            # If we are in legacy mode, then we just publish the expected json directly.
+            if is_legacy:
+                published_obj = weave.publish(case.exp_json)
+            else:
+                published_obj = weave.publish(runtime_object)
+            digest = published_obj.digest
+            gotten_obj = weave.get(published_obj.uri())
+            assert case.equality_check(gotten_obj, runtime_object)
 
-        # Verify the correct JSON is stored in the database.
-        res = client.server.obj_read(
-            ObjReadReq(
-                project_id=project_id,
-                object_id=published_obj.name,
-                digest=published_obj.digest,
+            # Verify the correct JSON is stored in the database.
+            res = client.server.obj_read(
+                ObjReadReq(
+                    project_id=project_id,
+                    object_id=published_obj.name,
+                    digest=published_obj.digest,
+                )
             )
-        )
-        val = res.obj.val
-        print(f"Found object json:\n{json.dumps(val, indent=2)}")
-        assert val == case.exp_json
+            val = res.obj.val
+            print(f"Found object json:\n{json.dumps(val, indent=2)}")
+            assert val == case.exp_json
 
-        # Check expected support objects and files
-        if case.exp_objects:
-            for obj in case.exp_objects:
-                obj_res = client.server.obj_read(
-                    ObjReadReq(
-                        project_id=project_id,
-                        object_id=obj["object_id"],
-                        digest=obj["digest"],
+            # Check expected support objects and files
+            if case.exp_objects:
+                for obj in case.exp_objects:
+                    obj_res = client.server.obj_read(
+                        ObjReadReq(
+                            project_id=project_id,
+                            object_id=obj["object_id"],
+                            digest=obj["digest"],
+                        )
                     )
-                )
-                assert obj_res.obj.val == obj["exp_val"]
+                    assert obj_res.obj.val == obj["exp_val"]
 
-        if case.exp_files:
-            for file in case.exp_files:
-                file_res = client.server.file_content_read(
-                    FileContentReadReq(
-                        project_id=project_id,
-                        digest=file["digest"],
+            if case.exp_files:
+                for file in case.exp_files:
+                    file_res = client.server.file_content_read(
+                        FileContentReadReq(
+                            project_id=project_id,
+                            digest=file["digest"],
+                        )
                     )
-                )
-                assert file_res.content == file["exp_content"]
+                    assert file_res.content == file["exp_content"]
+        finally:
+            _maybe_close(gotten_obj)
+            _maybe_close(runtime_object)
 
     def test_input_flow():
         # This method will assert that the input flow works as expected.
         # Specifically, when the value is used as an input, does it get
         # correctly serialized and deserialized by the client reader.
 
-        runtime_object = case.runtime_object_factory()
+        runtime_object = None
+        gotten_obj = None
+        try:
+            runtime_object = case.runtime_object_factory()
 
-        @weave.op
-        def func(val):
-            return val
+            @weave.op
+            def func(val):
+                return val
 
-        # Similarly to the publish flow, if we are in legacy mode, then we just
-        # use the expected json directly.
-        if is_legacy:
-            val = case.exp_json
-        else:
-            val = runtime_object
+            # Similarly to the publish flow, if we are in legacy mode, then we just
+            # use the expected json directly.
+            if is_legacy:
+                val = case.exp_json
+            else:
+                val = runtime_object
 
-        func(val)
-        client.flush()
-        calls = func.calls()
-        assert len(calls) == 1
-        calls_0 = calls[0]
-        call_id = calls_0.id
-        gotten_obj = calls_0.inputs["val"]
+            func(val)
+            client.flush()
+            calls = func.calls()
+            assert len(calls) == 1
+            calls_0 = calls[0]
+            call_id = calls_0.id
+            gotten_obj = calls_0.inputs["val"]
 
-        assert case.equality_check(gotten_obj, runtime_object)
+            assert case.equality_check(gotten_obj, runtime_object)
 
-        # Verify the correct JSON is stored in the database
-        res = client.server.call_read(
-            CallReadReq(
-                project_id=project_id,
-                id=call_id,
-            )
-        )
-
-        # If we are not inline, then the value is expected to be a Ref
-        # and we need to read it from the database.
-        if not case.inline_call_param and not is_legacy:
-            ref = ObjectRef.parse_uri(res.call.inputs["val"])
-            res = client.server.obj_read(
-                ObjReadReq(
+            # Verify the correct JSON is stored in the database
+            res = client.server.call_read(
+                CallReadReq(
                     project_id=project_id,
-                    object_id=ref.name,
-                    digest=ref.digest,
+                    id=call_id,
                 )
             )
-            val = res.obj.val
-        else:
-            val = res.call.inputs["val"]
 
-        assert val == case.exp_json
+            # If we are not inline, then the value is expected to be a Ref
+            # and we need to read it from the database.
+            if not case.inline_call_param and not is_legacy:
+                ref = ObjectRef.parse_uri(res.call.inputs["val"])
+                res = client.server.obj_read(
+                    ObjReadReq(
+                        project_id=project_id,
+                        object_id=ref.name,
+                        digest=ref.digest,
+                    )
+                )
+                val = res.obj.val
+            else:
+                val = res.call.inputs["val"]
+
+            assert val == case.exp_json
+        finally:
+            _maybe_close(gotten_obj)
+            _maybe_close(runtime_object)
 
     if is_legacy:
         seed_legacy_data()
