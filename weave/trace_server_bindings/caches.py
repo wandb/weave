@@ -180,9 +180,12 @@ class DiskCache:
     def close(self) -> None:
         """Cleanup resources."""
         try:
-            self._cache.close()
-        except Exception as e:
+            if self._cache is not None:
+                self._cache.close()
+        except Exception:
             logger.exception("Error closing disk cache")
+        finally:
+            self._cache = None
 
     def __contains__(self, key: str) -> bool:
         """Check if key exists in cache. Returns False on errors."""
@@ -276,8 +279,10 @@ class StackedCache:
         return False
 
     def close(self) -> None:
-        """Close all cache layers."""
-        for layer in self._layers:
+        """Close all cache layers and release references."""
+        layers = self._layers
+        self._layers = []
+        for layer in layers:
             layer.close()
 
     @property

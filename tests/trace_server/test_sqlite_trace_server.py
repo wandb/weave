@@ -58,7 +58,9 @@ def test_sqlite_storage_size_query_generation():
             call_args = mock_cursor.execute.call_args[0]
             sql = call_args[0]
             print(sql)
-            assert "storage_size_bytes" in sql  # Query should include storage_size_bytes
+            assert (
+                "storage_size_bytes" in sql
+            )  # Query should include storage_size_bytes
             assert (
                 "total_storage_size_bytes" in sql
             )  # Query should include total_storage_size_bytes
