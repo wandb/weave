@@ -1,9 +1,12 @@
+from __future__ import annotations
+
 from datetime import datetime, timezone
 
 import rich.markdown
 from PIL import Image
 
 import weave
+from tests.trace.test_utils import FailingSaveType
 from weave.trace.serialization.custom_objs import (
     KNOWN_TYPES,
     decode_custom_obj,
@@ -90,3 +93,37 @@ def test_no_extra_calls_created(client):
     # due to deserializing a custom object
     calls = client.get_calls()
     assert len(calls) == 1
+
+
+def test_encode_custom_obj_save_exception_returns_none(client, failing_serializer):
+    """Requirement: Type handler save exceptions should not crash user code
+    Interface: encode_custom_obj function
+    Given: A serializer is registered whose save function raises an exception
+    When: encode_custom_obj is called with an object of that type
+    Then: Returns None (graceful degradation)
+    """
+    obj = FailingSaveType("test_value")
+
+    # This should NOT raise - if it does, the test fails
+    result = encode_custom_obj(obj)
+
+    # Should return None instead of raising
+    assert result is None
+
+
+def test_encode_custom_obj_save_exception_does_not_propagate(
+    client, failing_serializer
+):
+    """Requirement: Type handler save exceptions must not propagate to user code
+    Interface: encode_custom_obj function
+    Given: A serializer is registered whose save function raises RuntimeError
+    When: encode_custom_obj is called
+    Then: No exception is raised to the caller
+    """
+    obj = FailingSaveType("test_value")
+
+    # This should NOT raise - if it does, the test fails
+    result = encode_custom_obj(obj)
+
+    # We expect None as the graceful degradation
+    assert result is None
