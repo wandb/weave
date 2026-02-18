@@ -161,6 +161,7 @@ from weave.trace_server.query_builder.annotation_queues_query_builder import (
     make_queue_delete_query,
     make_queue_items_query,
     make_queue_read_query,
+    make_queue_update_query,
     make_queues_query,
     make_queues_stats_query,
 )
@@ -1197,7 +1198,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             cq.add_condition(req.query.expr_)
 
         # Sort with empty list results in no sorting
-        if req.sort_by is not None:
+        if req.sort_by:
             for sort_by in req.sort_by:
                 cq.add_order(sort_by.field, sort_by.direction)
             # If user isn't already sorting by id, add id as secondary sort for consistency.
@@ -2249,6 +2250,98 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
 
         return tsi.AnnotationQueueReadRes(queue=queue)
+
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.annotation_queue_update")
+    def annotation_queue_update(
+        self, req: tsi.AnnotationQueueUpdateReq
+    ) -> tsi.AnnotationQueueUpdateRes:
+        """Update an annotation queue.
+
+        Only updates the fields that are provided (name, description, scorer_refs).
+        Always updates the updated_at timestamp.
+        """
+        assert_non_null_wb_user_id(req)
+
+        # First, verify the queue exists and is not already deleted
+        pb = ParamBuilder()
+        read_query = make_queue_read_query(
+            project_id=req.project_id,
+            queue_id=req.queue_id,
+            pb=pb,
+        )
+        result = self.ch_client.query(read_query, parameters=pb.get_params())
+        res = result.named_results()
+        try:
+            row = next(res)
+        except StopIteration:
+            raise NotFoundError(
+                f"Queue {req.queue_id} not found or already deleted"
+            ) from None
+        finally:
+            res.close()
+
+        # Check if any fields are actually being updated
+        has_updates = any(
+            [
+                req.name is not None,
+                req.description is not None,
+                req.scorer_refs is not None,
+            ]
+        )
+
+        if not has_updates:
+            # No updates requested, just return the existing queue
+            queue = tsi.AnnotationQueueSchema(
+                id=str(row["id"]),
+                project_id=row["project_id"],
+                name=row["name"],
+                description=row["description"],
+                scorer_refs=row["scorer_refs"],
+                created_at=_ensure_datetimes_have_tz(row["created_at"]),
+                created_by=row["created_by"],
+                updated_at=_ensure_datetimes_have_tz(row["updated_at"]),
+                deleted_at=_ensure_datetimes_have_tz(row["deleted_at"]),
+            )
+            return tsi.AnnotationQueueUpdateRes(queue=queue)
+
+        # Perform the update
+        pb = ParamBuilder()  # Reset parameter builder
+        update_query = make_queue_update_query(
+            project_id=req.project_id,
+            queue_id=req.queue_id,
+            pb=pb,
+            cluster_name=self.clickhouse_cluster_name,
+            name=req.name,
+            description=req.description,
+            scorer_refs=req.scorer_refs,
+        )
+
+        self._command(update_query, pb.get_params())
+
+        # Build the response with updated values
+        # Use the new values if provided, otherwise keep the old ones
+        updated_at = datetime.datetime.now(tz=ZoneInfo("UTC"))
+        name = req.name if req.name is not None else row["name"]
+        description = (
+            req.description if req.description is not None else row["description"]
+        )
+        scorer_refs = (
+            req.scorer_refs if req.scorer_refs is not None else row["scorer_refs"]
+        )
+
+        queue = tsi.AnnotationQueueSchema(
+            id=str(row["id"]),
+            project_id=row["project_id"],
+            name=name,
+            description=description,
+            scorer_refs=scorer_refs,
+            created_at=_ensure_datetimes_have_tz(row["created_at"]),
+            created_by=row["created_by"],
+            updated_at=updated_at,
+            deleted_at=None,  # Can't be deleted since we just updated it
+        )
+
+        return tsi.AnnotationQueueUpdateRes(queue=queue)
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.annotation_queue_delete")
     def annotation_queue_delete(
