@@ -1,4 +1,5 @@
 import base64
+from dataclasses import dataclass
 
 from weave.trace_server import (
     external_to_internal_trace_server_adapter,
@@ -55,12 +56,12 @@ def b64(s: str) -> str:
     return base64.b64encode(s.encode("ascii")).decode("ascii")
 
 
+@dataclass
 class DummyAuthUser:
     """Mock auth user for testing."""
 
-    def __init__(self, user_id: str, username: str):
-        self.id = user_id
-        self.username = username
+    id: str
+    username: str
 
 
 class DummyIdConverter(external_to_internal_trace_server_adapter.IdConverter):
