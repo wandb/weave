@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import logging
 import threading
+from collections import defaultdict
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
@@ -16,7 +17,6 @@ from weave.trace.context.call_context import set_thread_id
 from weave.trace.context.weave_client_context import require_weave_client
 from weave.trace.weave_client import Call
 from weave.type_wrappers.Content import Content
-from collections import defaultdict
 
 logger = logging.getLogger(__name__)
 
@@ -307,7 +307,9 @@ class StateExporter(BaseModel):
             client = require_weave_client()
             with set_thread_id(conv_id):
                 conv_call = client.create_call(
-                    op="realtime.conversation", inputs={"id": conv_id}, parent=session_call
+                    op="realtime.conversation",
+                    inputs={"id": conv_id},
+                    parent=session_call,
                 )
             self.conversation_calls[conv_id] = conv_call
 
@@ -417,9 +419,7 @@ class StateExporter(BaseModel):
             transcription_model = "unknown-transcription-model"
 
         if usage and isinstance(usage, dict):
-            self.transcription_usage[item_id] = {
-                transcription_model: usage
-            }
+            self.transcription_usage[item_id] = {transcription_model: usage}
         # A transcript becoming available may unblock the head of the FIFO
         self._schedule_fifo_check()
 
@@ -451,8 +451,9 @@ class StateExporter(BaseModel):
 
         return msg_dict
 
-
-    def _extract_audio_content(self, output_list: list[dict], output_dict: dict) -> None:
+    def _extract_audio_content(
+        self, output_list: list[dict], output_dict: dict
+    ) -> None:
         """Replace raw audio references in response outputs with encoded Content objects."""
         for output_idx, output in enumerate(output_list):
             if output.get("type") == "message":
@@ -483,7 +484,7 @@ class StateExporter(BaseModel):
         """Add speech model usage from the response to the summary."""
         usage = response.get("usage")
         if usage and isinstance(usage, dict):
-            summary_usage[model] = { **usage, "requests": 1 }
+            summary_usage[model] = {**usage, "requests": 1}
 
     def _update_usage_summary_for_transcription(
         self,
@@ -493,7 +494,6 @@ class StateExporter(BaseModel):
         """Add transcription model usage from input messages to the summary."""
         if not messages:
             return
-
 
         # We don't have multiple turns since there was only one response.
         # Need to sum across messages and calculate usage per model
@@ -516,8 +516,6 @@ class StateExporter(BaseModel):
                 "requests": len(usage_list),
                 **summed,
             }
-
-
 
     def _handle_response_done_inner(
         self,
@@ -584,7 +582,9 @@ class StateExporter(BaseModel):
                 response_parent = conv_call
             elif conv_id:
                 conv_call = client.create_call(
-                    op="realtime.conversation", inputs={"id": conv_id}, parent=session_call
+                    op="realtime.conversation",
+                    inputs={"id": conv_id},
+                    parent=session_call,
                 )
                 self.conversation_calls[conv_id] = conv_call
                 response_parent = conv_call
@@ -652,8 +652,10 @@ class StateExporter(BaseModel):
     def _transcripts_ready_for_ctx(self, ctx: dict[str, Any]) -> bool:
         session = ctx.get("session")
         messages = ctx.get("messages", [])
-        modalities = _get_from_dict(session, "modalities", []) # Beta
-        transcription_model = _get_nested(session, "audio", "input", "transcription", "model") # GA
+        modalities = _get_from_dict(session, "modalities", [])  # Beta
+        transcription_model = _get_nested(
+            session, "audio", "input", "transcription", "model"
+        )  # GA
         if session and ("text" in modalities or transcription_model):
             for message in messages:
                 if (

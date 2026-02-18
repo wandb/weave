@@ -239,7 +239,11 @@ def test_response_calls_have_thread_id_set_to_conversation_id(monkeypatch):
 
     exp = StateExporter()
     exp.handle_session_updated(
-        {"type": "session.updated", "event_id": "event_0", "session": make_session(modalities=["audio"])}
+        {
+            "type": "session.updated",
+            "event_id": "event_0",
+            "session": make_session(modalities=["audio"]),
+        }
     )
 
     conv_id = "conv_abc123"
@@ -270,7 +274,11 @@ def test_response_without_conversation_id_has_no_thread_id(monkeypatch):
 
     exp = StateExporter()
     exp.handle_session_updated(
-        {"type": "session.updated", "event_id": "event_0", "session": make_session(modalities=["audio"])}
+        {
+            "type": "session.updated",
+            "event_id": "event_0",
+            "session": make_session(modalities=["audio"]),
+        }
     )
 
     out = make_assistant_output("item_a", content=[{"type": "text", "text": "hi"}])
@@ -299,7 +307,11 @@ def test_transcripts_not_required_when_text_modality_absent(monkeypatch):
     exp = StateExporter()
     # Session without text modality -> no gating
     exp.handle_session_updated(
-        {"type": "session.updated", "event_id": "event_0", "session": make_session(modalities=["audio"])}
+        {
+            "type": "session.updated",
+            "event_id": "event_0",
+            "session": make_session(modalities=["audio"]),
+        }
     )
 
     out = make_assistant_output("item_a", content=[{"type": "text", "text": "hi"}])
