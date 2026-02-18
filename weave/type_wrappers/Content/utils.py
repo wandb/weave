@@ -281,7 +281,7 @@ def try_parse_data_url(url: str) -> DataUrl | None:
                 encoding=encoding,
             )
         )
-    elif base64:
+    elif is_base64:
         return DataUrl(
             params=DataUrlBase64(
                 mimetype=base_media_type,
