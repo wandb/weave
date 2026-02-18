@@ -702,10 +702,17 @@ def _call_sync_gen(
         return gen, call
 
     if _should_sample_traces(op):
-        with tracing_disabled():
-            gen = func(*args, **kwargs)
-            call.output = gen
-            return gen, call
+        # Generator bodies run at iteration time, so tracing must remain disabled
+        # while consuming the iterator (not only while constructing it).
+        gen = func(*args, **kwargs)
+
+        def untraced_gen() -> Generator[Any]:
+            with tracing_disabled():
+                yield from gen
+
+        wrapped_gen = untraced_gen()
+        call.output = wrapped_gen
+        return wrapped_gen, call
 
     __weave = setup_dunder_weave_dict(op, __weave)
     _set_python_function_type_on_weave_dict(__weave, "generator")
@@ -914,10 +921,18 @@ async def _call_async_gen(
         return gen, call
 
     if _should_sample_traces(op):
-        with tracing_disabled():
-            gen = func(*args, **kwargs)
-            call.output = gen
-            return gen, call
+        # Async generator bodies run at iteration time, so tracing must remain
+        # disabled while consuming the async iterator.
+        gen = func(*args, **kwargs)
+
+        async def untraced_gen() -> AsyncIterator[Any]:
+            with tracing_disabled():
+                async for item in gen:
+                    yield item
+
+        wrapped_gen = untraced_gen()
+        call.output = wrapped_gen
+        return wrapped_gen, call
 
     __weave = setup_dunder_weave_dict(op, __weave)
     _set_python_function_type_on_weave_dict(__weave, "async_generator")

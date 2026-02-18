@@ -43,6 +43,7 @@ class PaginatedIterator(Generic[T, R]):
         self.size_func = size_func
         self.limit = limit
         self.offset = offset
+        self._next_index = 0
 
         if page_size <= 0:
             raise ValueError("page_size must be greater than 0")
@@ -128,6 +129,18 @@ class PaginatedIterator(Generic[T, R]):
     def __iter__(self: PaginatedIterator[T, R]) -> Iterator[R]: ...
     def __iter__(self) -> Iterator[T] | Iterator[R]:
         return self._get_slice(slice(0, None, 1))
+
+    @overload
+    def __next__(self: PaginatedIterator[T, T]) -> T: ...
+    @overload
+    def __next__(self: PaginatedIterator[T, R]) -> R: ...
+    def __next__(self) -> T | R:
+        try:
+            item = self._get_one(self._next_index)
+        except IndexError as exc:
+            raise StopIteration from exc
+        self._next_index += 1
+        return item
 
     def __len__(self) -> int:
         """This method is included for convenience.  It includes a network call, which
