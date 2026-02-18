@@ -16,6 +16,7 @@ from weave.trace.context.call_context import set_thread_id
 from weave.trace.context.weave_client_context import require_weave_client
 from weave.trace.weave_client import Call
 from weave.type_wrappers.Content import Content
+from collections import defaultdict
 
 logger = logging.getLogger(__name__)
 
@@ -482,7 +483,7 @@ class StateExporter(BaseModel):
         """Add speech model usage from the response to the summary."""
         usage = response.get("usage")
         if usage and isinstance(usage, dict):
-            summary_usage[model] = usage
+            summary_usage[model] = { **usage, "requests": 1 }
 
     def _update_usage_summary_for_transcription(
         self,
@@ -493,10 +494,29 @@ class StateExporter(BaseModel):
         if not messages:
             return
 
+
+        # We don't have multiple turns since there was only one response.
+        # Need to sum across messages and calculate usage per model
+        usages = defaultdict(list)
         for message in messages:
-            item_id = message.get("id") if isinstance(message, dict) else None
-            usage = self.transcription_usage.get(item_id) if item_id else None
-            summary_usage.update(usage or {})
+            if msg_id := message.get("id"):
+                model_usage = self.transcription_usage.get(msg_id, None)
+                if not model_usage or len(model_usage.keys()) == 0:
+                    continue
+                for key, value in model_usage.items():
+                    usages[key].append(value)
+
+        for model, usage_list in usages.items():
+            summed = {}
+            for usage in usage_list:
+                for key, value in usage.items():
+                    if isinstance(value, (int, float)):
+                        summed[key] = summed.get(key, 0) + value
+            summary_usage[model] = {
+                "requests": len(usage_list),
+                **summed,
+            }
+
 
 
     def _handle_response_done_inner(
