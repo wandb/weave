@@ -16,7 +16,6 @@ logger = logging.getLogger(__name__)
 # We use two separate Magic instances because the mime and extension flags
 # use different libmagic modes that cannot be combined in a single instance.
 _magic_mime_instance: Any = None
-_magic_ext_instance: Any = None
 _magic_checked: bool = False
 
 
@@ -28,9 +27,11 @@ def _get_magic_instances() -> tuple[Any, Any]:
         try:
             import magic
             _magic_mime_instance = magic.Magic(mime=True, extension=True) # type: ignore
+        except NotImplementedError as e:
+            logger.warning("libmagic version out of date, upgrade libmagic to version above 524.", e)
         except (ImportError, Exception) as e:
             logger.debug("python-magic is not available: %s", e)
-    return _magic_mime_instance, _magic_ext_instance
+    return _magic_mime_instance, _magic_mime_instance
 
 
 def _normalize_magic_extension(raw_ext: str | None) -> str | None:
