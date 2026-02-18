@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from weave.trace_server.calls_query_builder.utils import param_slot
-from weave.trace_server.ch_sentinel_values import sentinel_ch_literal
+from weave.trace_server.ch_sentinel_values import null_check_sql, sentinel_ch_literal
 from weave.trace_server.orm import ParamBuilder, combine_conditions
 from weave.trace_server.project_version.types import ReadTable, TableConfig
 from weave.trace_server.trace_server_interface import (
@@ -157,11 +157,20 @@ def aggregation_selects_for_metric(
 def build_calls_filter_sql(
     calls_filter: CallsFilter | None,
     pb: ParamBuilder,
+    read_table: ReadTable = ReadTable.CALLS_MERGED,
 ) -> str:
     """Build WHERE clause SQL for CallsFilter.
 
     Generates filter conditions without table alias since this is used
-    in an inner subquery that directly queries calls_merged.
+    in an inner subquery that directly queries calls_merged or calls_complete.
+
+    Args:
+        calls_filter: The filter to convert to SQL.
+        pb: Parameter builder for parameterized queries.
+        read_table: Which table is being queried; affects NULL vs sentinel checks.
+
+    Returns:
+        SQL fragment with leading `` AND `` if any filters apply, or empty string.
     """
     if calls_filter is None:
         return ""
@@ -177,7 +186,7 @@ def build_calls_filter_sql(
 
     # Handle trace_roots_only
     if calls_filter.trace_roots_only:
-        where_clauses.append("parent_id IS NULL")
+        where_clauses.append(null_check_sql("parent_id", "parent_id", read_table, pb))
 
     # Handle trace_ids
     if calls_filter.trace_ids:

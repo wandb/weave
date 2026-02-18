@@ -1178,18 +1178,20 @@ class CallsQuery(BaseModel):
             self.hardcoded_filter, pb, table_alias
         )
         thread_id = process_thread_id_filter_to_sql(
-            self.hardcoded_filter, pb, table_alias
+            self.hardcoded_filter, pb, table_alias, self.read_table
         )
-        turn_id = process_turn_id_filter_to_sql(self.hardcoded_filter, pb, table_alias)
+        turn_id = process_turn_id_filter_to_sql(
+            self.hardcoded_filter, pb, table_alias, self.read_table
+        )
         wb_run_id = process_wb_run_ids_filter_to_sql(
-            self.hardcoded_filter, pb, table_alias
+            self.hardcoded_filter, pb, table_alias, self.read_table
         )
         ref_filter = process_ref_filters_to_sql(self.hardcoded_filter, pb, table_alias)
         trace_roots_only = process_trace_roots_only_filter_to_sql(
             self.hardcoded_filter, pb, table_alias, self.read_table
         )
         parent_ids = process_parent_ids_filter_to_sql(
-            self.hardcoded_filter, pb, table_alias
+            self.hardcoded_filter, pb, table_alias, self.read_table
         )
 
         # Filter out object ref conditions from optimization since they're handled via CTEs
@@ -1793,8 +1795,12 @@ def _handle_trace_name_summary_field(
     )
     op_name_sql = _field_as_sql_maybe_agg(op_name_field, pb, table_alias, read_table)
 
+    display_name_set = ch_sentinel_values.null_check_sql(
+        "display_name", display_name_sql, read_table, pb, negate=True
+    )
+
     return f"""CASE
-        WHEN {display_name_sql} IS NOT NULL AND {display_name_sql} != '' THEN {display_name_sql}
+        WHEN {display_name_set} THEN {display_name_sql}
         WHEN {op_name_sql} IS NOT NULL AND {op_name_sql} LIKE 'weave-trace-internal:///%' THEN
             regexpExtract(toString({op_name_sql}), '/([^/:]*):', 1)
         ELSE {op_name_sql}
@@ -2058,6 +2064,8 @@ def process_op_name_filter_to_sql(
     if not isinstance(op_field, CallsMergedAggField):
         raise TypeError("op_name is not an aggregate field")
 
+    # CALLS_COMPLETE is hardcoded because this filter runs in the pre-aggregation
+    # WHERE clause which always reads raw calls_complete rows.
     op_field_sql = op_field.as_sql(
         param_builder, table_alias, read_table=ReadTable.CALLS_COMPLETE
     )
@@ -2122,6 +2130,7 @@ def process_thread_id_filter_to_sql(
     hardcoded_filter: HardCodedFilter | None,
     param_builder: ParamBuilder,
     table_alias: str,
+    read_table: ReadTable = ReadTable.CALLS_MERGED,
 ) -> str:
     """Pulls out the thread_id and returns a sql string if there are any thread_ids."""
     if (
@@ -2142,7 +2151,6 @@ def process_thread_id_filter_to_sql(
         param_builder, table_alias, read_table=ReadTable.CALLS_COMPLETE
     )
 
-    # If there's only one thread_id, use an equality condition for performance
     if len(thread_ids) == 1:
         thread_cond = f"{thread_id_field_sql} = {param_slot(param_builder.add_param(thread_ids[0]), 'String')}"
     elif len(thread_ids) > 1:
@@ -2150,13 +2158,17 @@ def process_thread_id_filter_to_sql(
     else:
         return ""
 
-    return f" AND ({thread_cond} OR {thread_id_field_sql} IS NULL)"
+    thread_null = ch_sentinel_values.null_check_sql(
+        "thread_id", thread_id_field_sql, read_table, param_builder
+    )
+    return f" AND ({thread_cond} OR {thread_null})"
 
 
 def process_turn_id_filter_to_sql(
     hardcoded_filter: HardCodedFilter | None,
     param_builder: ParamBuilder,
     table_alias: str,
+    read_table: ReadTable = ReadTable.CALLS_MERGED,
 ) -> str:
     """Pulls out the turn_id and returns a sql string if there are any turn_ids."""
     if (
@@ -2177,7 +2189,6 @@ def process_turn_id_filter_to_sql(
         param_builder, table_alias, read_table=ReadTable.CALLS_COMPLETE
     )
 
-    # If there's only one turn_id, use an equality condition for performance
     if len(turn_ids) == 1:
         turn_cond = f"{turn_id_field_sql} = {param_slot(param_builder.add_param(turn_ids[0]), 'String')}"
     elif len(turn_ids) > 1:
@@ -2185,7 +2196,10 @@ def process_turn_id_filter_to_sql(
     else:
         return ""
 
-    return f" AND ({turn_cond} OR {turn_id_field_sql} IS NULL)"
+    turn_null = ch_sentinel_values.null_check_sql(
+        "turn_id", turn_id_field_sql, read_table, param_builder
+    )
+    return f" AND ({turn_cond} OR {turn_null})"
 
 
 def process_trace_roots_only_filter_to_sql(
@@ -2202,6 +2216,9 @@ def process_trace_roots_only_filter_to_sql(
     if not isinstance(parent_id_field, CallsMergedAggField):
         raise TypeError("parent_id is not an aggregate field")
 
+    # as_sql uses CALLS_COMPLETE because this filter runs in the pre-aggregation
+    # WHERE clause which always reads raw calls_complete rows. null_check_sql
+    # uses the caller's read_table for correct sentinel-vs-NULL semantics.
     parent_id_field_sql = parent_id_field.as_sql(
         param_builder, table_alias, read_table=ReadTable.CALLS_COMPLETE
     )
@@ -2216,6 +2233,7 @@ def process_parent_ids_filter_to_sql(
     hardcoded_filter: HardCodedFilter | None,
     param_builder: ParamBuilder,
     table_alias: str,
+    read_table: ReadTable = ReadTable.CALLS_MERGED,
 ) -> str:
     """Pulls out the parent_id and returns a sql string if there are any parent_ids."""
     if hardcoded_filter is None or not hardcoded_filter.filter.parent_ids:
@@ -2231,7 +2249,10 @@ def process_parent_ids_filter_to_sql(
 
     parent_ids_sql = f"{parent_id_field_sql} IN {param_slot(param_builder.add_param(hardcoded_filter.filter.parent_ids), 'Array(String)')}"
 
-    return f"AND ({parent_ids_sql} OR {parent_id_field_sql} IS NULL)"
+    parent_null = ch_sentinel_values.null_check_sql(
+        "parent_id", parent_id_field_sql, read_table, param_builder
+    )
+    return f"AND ({parent_ids_sql} OR {parent_null})"
 
 
 def process_ref_filters_to_sql(
@@ -2292,6 +2313,10 @@ def process_object_refs_filter_to_opt_sql(
 
     refs_filter_opt_sql = ""
     if "inputs_dump" in object_ref_fields_consumed:
+        # started_at is non-nullable and not a sentinel field, so this null
+        # check always produces `IS NULL` (always false) for calls_complete.
+        # The OR branch is effectively dead for that table but harmless; it
+        # remains meaningful for calls_merged where started_at is nullable.
         started_at_null = ch_sentinel_values.null_check_sql(
             "started_at", f"{table_alias}.started_at", read_table, param_builder
         )
@@ -2313,6 +2338,7 @@ def process_wb_run_ids_filter_to_sql(
     hardcoded_filter: HardCodedFilter | None,
     param_builder: ParamBuilder,
     table_alias: str,
+    read_table: ReadTable = ReadTable.CALLS_MERGED,
 ) -> str:
     """Pulls out the wb_run_id and returns a sql string if there are any wb_run_ids."""
     if hardcoded_filter is None or not hardcoded_filter.filter.wb_run_ids:
@@ -2329,7 +2355,10 @@ def process_wb_run_ids_filter_to_sql(
     )
     wb_run_id_filter_sql = f"{wb_run_id_field_sql} IN {param_slot(param_builder.add_param(wb_run_ids), 'Array(String)')}"
 
-    return f"AND ({wb_run_id_filter_sql} OR {wb_run_id_field_sql} IS NULL)"
+    wb_run_null = ch_sentinel_values.null_check_sql(
+        "wb_run_id", wb_run_id_field_sql, read_table, param_builder
+    )
+    return f"AND ({wb_run_id_filter_sql} OR {wb_run_null})"
 
 
 def process_calls_filter_to_conditions(

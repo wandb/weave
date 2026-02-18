@@ -1632,7 +1632,7 @@ def test_query_with_summary_weave_trace_name_sort() -> None:
             ))
         )
         ORDER BY CASE
-            WHEN argMaxMerge(calls_merged.display_name) IS NOT NULL AND argMaxMerge(calls_merged.display_name) != '' THEN argMaxMerge(calls_merged.display_name)
+            WHEN argMaxMerge(calls_merged.display_name) IS NOT NULL THEN argMaxMerge(calls_merged.display_name)
             WHEN any(calls_merged.op_name) IS NOT NULL AND any(calls_merged.op_name) LIKE 'weave-trace-internal:///%' THEN
                 regexpExtract(toString(any(calls_merged.op_name)), '/([^/:]*):', 1)
             ELSE any(calls_merged.op_name)
@@ -1673,7 +1673,7 @@ def test_query_with_summary_weave_trace_name_filter() -> None:
         PREWHERE calls_merged.project_id = {pb_1:String}
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (((CASE
-                WHEN argMaxMerge(calls_merged.display_name) IS NOT NULL AND argMaxMerge(calls_merged.display_name) != '' THEN argMaxMerge(calls_merged.display_name)
+                WHEN argMaxMerge(calls_merged.display_name) IS NOT NULL THEN argMaxMerge(calls_merged.display_name)
                 WHEN any(calls_merged.op_name) IS NOT NULL AND any(calls_merged.op_name) LIKE 'weave-trace-internal:///%' THEN
                     regexpExtract(toString(any(calls_merged.op_name)), '/([^/:]*):', 1)
                 ELSE any(calls_merged.op_name)
@@ -3696,5 +3696,138 @@ def test_latency_ms_filter_calls_complete_uses_sentinel_for_ended_at() -> None:
             "pb_0": SENTINEL_DATETIME,
             "pb_1": 1000,
             "pb_2": "project",
+        },
+    )
+
+
+def test_trace_roots_only_filter_calls_complete() -> None:
+    """Verify trace_roots_only uses parent_id = '' sentinel on calls_complete."""
+    cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_COMPLETE)
+    cq.add_field("id")
+    cq.hardcoded_filter = HardCodedFilter(filter={"trace_roots_only": True})
+    assert_sql(
+        cq,
+        """
+        SELECT calls_complete.id AS id
+        FROM calls_complete PREWHERE calls_complete.project_id = {pb_2:String}
+        WHERE (calls_complete.parent_id = {pb_1:String})
+          AND (((calls_complete.deleted_at = {pb_0:DateTime64(3)}))
+               AND ((NOT ((calls_complete.started_at IS NULL)))))
+        """,
+        {
+            "pb_0": SENTINEL_DATETIME,
+            "pb_1": "",
+            "pb_2": "project",
+        },
+    )
+
+
+def test_trace_name_filter_calls_complete_uses_sentinel() -> None:
+    """Verify display_name sentinel check in trace_name CASE on calls_complete."""
+    cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_COMPLETE)
+    cq.add_field("id")
+    cq.add_field("display_name")
+    cq.add_condition(
+        tsi_query.EqOperation.model_validate(
+            {
+                "$eq": [
+                    {"$getField": "summary.weave.trace_name"},
+                    {"$literal": "my_model"},
+                ]
+            }
+        )
+    )
+    assert_sql(
+        cq,
+        """
+        SELECT calls_complete.id AS id,
+               calls_complete.display_name AS display_name
+        FROM calls_complete PREWHERE calls_complete.project_id = {pb_3:String}
+        WHERE 1
+          AND (((CASE
+                     WHEN calls_complete.display_name != {pb_0:String} THEN calls_complete.display_name
+                     WHEN calls_complete.op_name IS NOT NULL
+                          AND calls_complete.op_name LIKE 'weave-trace-internal:///%' THEN regexpExtract(toString(calls_complete.op_name), '/([^/:]*):', 1)
+                     ELSE calls_complete.op_name
+                 END = {pb_1:String}))
+               AND ((calls_complete.deleted_at = {pb_2:DateTime64(3)}))
+               AND ((NOT ((calls_complete.started_at IS NULL)))))
+        """,
+        {
+            "pb_0": "",
+            "pb_1": "my_model",
+            "pb_2": SENTINEL_DATETIME,
+            "pb_3": "project",
+        },
+    )
+
+
+def test_not_eq_none_display_name_calls_complete() -> None:
+    """Verify $not: [$eq: [display_name, None]] uses sentinel on calls_complete."""
+    cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_COMPLETE)
+    cq.add_field("id")
+    cq.add_field("display_name")
+    cq.add_condition(
+        tsi_query.NotOperation.model_validate(
+            {
+                "$not": [
+                    {
+                        "$eq": [
+                            {"$getField": "display_name"},
+                            {"$literal": None},
+                        ]
+                    }
+                ]
+            }
+        )
+    )
+    assert_sql(
+        cq,
+        """
+        SELECT calls_complete.id AS id,
+               calls_complete.display_name AS display_name
+        FROM calls_complete PREWHERE calls_complete.project_id = {pb_2:String}
+        WHERE 1
+          AND (((NOT ((calls_complete.display_name = {pb_0:String}))))
+               AND ((calls_complete.deleted_at = {pb_1:DateTime64(3)}))
+               AND ((NOT ((calls_complete.started_at IS NULL)))))
+        """,
+        {
+            "pb_0": "",
+            "pb_1": SENTINEL_DATETIME,
+            "pb_2": "project",
+        },
+    )
+
+
+def test_status_sort_calls_complete_uses_sentinels() -> None:
+    """Verify status computation sort uses sentinel checks on calls_complete."""
+    cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_COMPLETE)
+    cq.add_field("id")
+    cq.add_order("summary.weave.status", "asc")
+    assert_sql(
+        cq,
+        """
+        SELECT calls_complete.id AS id
+        FROM calls_complete PREWHERE calls_complete.project_id = {pb_7:String}
+        WHERE 1
+          AND (((calls_complete.deleted_at = {pb_0:DateTime64(3)}))
+               AND ((NOT ((calls_complete.started_at IS NULL)))))
+        ORDER BY CASE
+                     WHEN calls_complete.exception != {pb_6:String} THEN {pb_2:String}
+                     WHEN IFNULL(toInt64OrNull(coalesce(nullIf(JSON_VALUE(calls_complete.summary_dump, {pb_1:String}), 'null'), '')), 0) > 0 THEN {pb_5:String}
+                     WHEN calls_complete.ended_at = {pb_0:DateTime64(6)} THEN {pb_3:String}
+                     ELSE {pb_4:String}
+                 END ASC
+        """,
+        {
+            "pb_0": SENTINEL_DATETIME,
+            "pb_1": '$."status_counts"."error"',
+            "pb_2": "error",
+            "pb_3": "running",
+            "pb_4": "success",
+            "pb_5": "descendant_error",
+            "pb_6": "",
+            "pb_7": "project",
         },
     )

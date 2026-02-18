@@ -9,6 +9,17 @@ The app layer converts between Python None and sentinels at the CH boundary:
 - On read (query result): sentinel -> None via from_ch_value()
 - On query (SQL generation): null_check_sql() generates the correct IS NULL
   or = sentinel comparison based on which table is being queried.
+
+IMPORTANT: Never write raw ``IS NULL`` / ``IS NOT NULL`` checks on sentinel
+fields in SQL query builders. Always use ``null_check_sql()`` from this module,
+which generates the correct comparison for the active ``ReadTable``:
+- calls_merged (nullable columns): ``field IS [NOT] NULL``
+- calls_complete (sentinel columns): ``field [!]= <sentinel>``
+
+Sentinel string fields: parent_id, display_name, exception, otel_dump,
+    wb_user_id, wb_run_id, thread_id, turn_id  (sentinel = '')
+Sentinel datetime fields: ended_at, updated_at, deleted_at
+    (sentinel = epoch zero)
 """
 
 from __future__ import annotations
@@ -201,6 +212,11 @@ def null_check_sql(
         return f"{field_sql} IS NOT NULL" if negate else f"{field_sql} IS NULL"
 
     sentinel = get_sentinel_value(field_name)
+    # ParamBuilder deduplicates by value, so all datetime sentinel fields share
+    # one parameter name even though sentinel_ch_type returns different precisions
+    # (e.g. DateTime64(3) for deleted_at vs DateTime64(6) for ended_at).  This is
+    # intentional: ClickHouse casts the parameter value to the column's type, so
+    # the same epoch-zero value works regardless of the precision in param_slot.
     sentinel_param = pb.add_param(sentinel)
     ch_type = sentinel_ch_type(field_name)
     op = "!=" if negate else "="

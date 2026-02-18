@@ -101,7 +101,7 @@ def build_call_metrics_query(
     tz_param = pb.add_param(req.timezone or "UTC")
     bucket_interval_param = pb.add_param(granularity_seconds)
 
-    where_filter_sql = build_calls_filter_sql(req.filter, pb)
+    where_filter_sql = build_calls_filter_sql(req.filter, pb, read_table)
 
     normalized_metrics = _normalize_call_metrics(metrics)
 
