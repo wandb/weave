@@ -186,6 +186,8 @@ jobs:
         run: echo "ACTIONS_STEP_DEBUG=true" >> $GITHUB_ENV
       - name: Install SQLite dev package
         run: sudo apt update && sudo apt install -y libsqlite3-dev
+      - name: Install Libmagic dependency package
+        run: sudo apt update && sudo apt install -y libmagic1
       - name: Set up Python ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
         uses: actions/setup-python@v5
         with:
