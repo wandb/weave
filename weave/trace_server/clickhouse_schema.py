@@ -130,7 +130,6 @@ class CallCompleteCHInsertable(
     # New columns added in migration 024
     ttl_at: datetime.datetime = datetime.datetime(2050, 1, 1)
     source: str = "direct"
-    speedy_keys: str = "{}"
 
     _wb_run_step_end_v = field_validator("wb_run_step_end")(
         validation.wb_run_step_validator

@@ -5,7 +5,7 @@
 --   3. Switch from MergeTree to ReplacingMergeTree(created_at)
 --   4. Partition by month on started_at
 --   5. Add TTL DELETE by ttl_at
---   6. Add new columns: ttl_at, source (Enum8), speedy_keys
+--   6. Add new columns: ttl_at, source (Enum8)
 --   7. Add bloom filter index on summary_dump
 --   8. Add table-level settings: min_bytes_for_wide_part=0
 --
@@ -57,8 +57,7 @@ CREATE TABLE calls_complete_new (
 
     -- New columns
     ttl_at          DateTime DEFAULT '2050-01-01 00:00:00',
-    source          Enum8('direct' = 1, 'dual' = 2, 'migration' = 3) DEFAULT 'migration',
-    speedy_keys     JSON DEFAULT '{}',
+    source          Enum8('direct' = 1, 'dual' = 2, 'migration' = 3) DEFAULT 'direct',
 
     -- Indexes (carried forward from v1 + new)
     INDEX idx_parent_id parent_id TYPE bloom_filter GRANULARITY 1,
@@ -114,8 +113,7 @@ SELECT
     wb_run_step,
     wb_run_step_end,
     toDateTime('2050-01-01 00:00:00') AS ttl_at,
-    'migration' AS source,
-    '{}' AS speedy_keys
+    'direct' AS source
 FROM calls_complete;
 
 
@@ -148,8 +146,7 @@ SELECT
     wb_run_step,
     wb_run_step_end,
     toDateTime('2050-01-01 00:00:00') AS ttl_at,
-    'migration' AS source,
-    '{}' AS speedy_keys
+    'direct' AS source
 FROM calls_complete;
 
 
