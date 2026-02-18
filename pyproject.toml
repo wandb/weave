@@ -246,6 +246,7 @@ select = [
   "TRY401",  # https://docs.astral.sh/ruff/rules/verbose-log-message/
   "C",       # https://docs.astral.sh/ruff/rules/#convention-c
   "T201",    # https://docs.astral.sh/ruff/rules/print-statement/
+  "SIM101",  # https://docs.astral.sh/ruff/rules/duplicate-isinstance-call/
   "SIM102",  # https://docs.astral.sh/ruff/rules/collapsible-if/,
   "N801",    # https://docs.astral.sh/ruff/rules/invalid-class-name/
   "N802",    # https://docs.astral.sh/ruff/rules/invalid-function-name/
