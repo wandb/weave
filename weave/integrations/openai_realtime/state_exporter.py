@@ -30,6 +30,15 @@ def _get_from_dict(obj: Any, key: str, default: Any = None) -> Any:
     return obj.get(key, default) if isinstance(obj, dict) else default
 
 
+def _get_nested(obj: Any, *keys: str) -> Any:
+    """Walk a chain of dict keys, returning None if any step is missing or not a dict."""
+    for key in keys:
+        if not isinstance(obj, dict):
+            return None
+        obj = obj.get(key)
+    return obj
+
+
 class SessionSpan(BaseModel):
     model_config = {"arbitrary_types_allowed": True}
     root_call: Call | None = None
@@ -385,17 +394,31 @@ class StateExporter(BaseModel):
 
     def handle_item_input_audio_transcription_completed(self, msg: dict) -> None:
         item_id = msg.get("item_id")
+
         if not item_id:
             return
+
         item = self.items.get(item_id)
+
         if not item:
             return
+
         self._apply_transcript(item, msg.get("content_index"), msg.get("transcript"))
         self.items[item_id] = item
         self.transcript_completed.add(item_id)
         usage = msg.get("usage")
+
+        if self.session_span and self.session_span.session:
+            transcription_model = _get_nested(
+                self.session_span.session, "audio", "input", "transcription", "model"
+            )
+        else:
+            transcription_model = "unknown-transcription-model"
+
         if usage and isinstance(usage, dict):
-            self.transcription_usage[item_id] = usage
+            self.transcription_usage[item_id] = {
+                transcription_model: usage
+            }
         # A transcript becoming available may unblock the head of the FIFO
         self._schedule_fifo_check()
 
@@ -459,54 +482,22 @@ class StateExporter(BaseModel):
         """Add speech model usage from the response to the summary."""
         usage = response.get("usage")
         if usage and isinstance(usage, dict):
-            summary_usage[model] = {
-                "requests": 1,
-                "input_tokens": usage.get("input_tokens", 0),
-                "output_tokens": usage.get("output_tokens", 0),
-                "total_tokens": usage.get("total_tokens", 0),
-            }
+            summary_usage[model] = usage
 
     def _update_usage_summary_for_transcription(
         self,
         summary_usage: dict,
-        session: dict | None,
         messages: list[dict] | None,
     ) -> None:
         """Add transcription model usage from input messages to the summary."""
-        transcription_model = (
-            _get_from_dict(
-                _get_from_dict(
-                    _get_from_dict(session, "audio", {}),
-                    "input",
-                    {},
-                ),
-                "transcription",
-                {},
-            ).get("model")
-            if session
-            else None
-        )
-        if not (transcription_model and messages):
+        if not messages:
             return
-        t_input = 0
-        t_output = 0
-        t_total = 0
-        t_count = 0
+
         for message in messages:
             item_id = message.get("id") if isinstance(message, dict) else None
-            t_usage = self.transcription_usage.get(item_id) if item_id else None
-            if t_usage:
-                t_input += t_usage.get("input_tokens", 0)
-                t_output += t_usage.get("output_tokens", 0)
-                t_total += t_usage.get("total_tokens", 0)
-                t_count += 1
-        if t_count > 0:
-            summary_usage[transcription_model] = {
-                "requests": t_count,
-                "input_tokens": t_input,
-                "output_tokens": t_output,
-                "total_tokens": t_total,
-            }
+            usage = self.transcription_usage.get(item_id) if item_id else None
+            summary_usage.update(usage or {})
+
 
     def _handle_response_done_inner(
         self,
@@ -591,7 +582,7 @@ class StateExporter(BaseModel):
             summary_usage: dict[str, dict] = {}
             model = session.get("model", "unknown") if session else "unknown"
             self._update_usage_summary_for_speech(summary_usage, response, model)
-            self._update_usage_summary_for_transcription(summary_usage, session, messages)
+            self._update_usage_summary_for_transcription(summary_usage, messages)
 
             if summary_usage:
                 call.summary = {"usage": summary_usage}
@@ -641,8 +632,9 @@ class StateExporter(BaseModel):
     def _transcripts_ready_for_ctx(self, ctx: dict[str, Any]) -> bool:
         session = ctx.get("session")
         messages = ctx.get("messages", [])
-        modalities = _get_from_dict(session, "modalities", [])
-        if session and "text" in modalities:
+        modalities = _get_from_dict(session, "modalities", []) # Beta
+        transcription_model = _get_nested(session, "audio", "input", "transcription", "model") # GA
+        if session and ("text" in modalities or transcription_model):
             for message in messages:
                 if (
                     _get_from_dict(message, "type") == "message"
