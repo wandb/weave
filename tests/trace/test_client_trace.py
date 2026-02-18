@@ -3419,7 +3419,7 @@ def test_objects_and_keys_with_special_characters(client):
         exp_key
         == "n-a_m.e%3A%20%2F%2B_%28%29%7B%7D%7C%22%27%3C%3E%21%40%24%5E%26%2A%23%3A%2C.%5B%5D-%3D%3B~%60100"
     )
-    exp_digest = "O66Mk7g91rlAUtcGYOFR1Y2Wk94YyPXJy2UEAzDQcYM"
+    exp_digest = "k8nuYiUMP6VgAP6wMjeY8dRYnMz2lCqlCyzu2F7iFMw"
 
     exp_obj_ref = f"{ref_base}/object/{exp_name}:{exp_digest}"
     assert obj.ref.uri() == exp_obj_ref
