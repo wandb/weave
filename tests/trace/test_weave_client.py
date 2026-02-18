@@ -574,30 +574,32 @@ def test_get_calls_limit_offset(client):
     for i in range(10):
         client.create_call("x", {"a": i})
 
-    calls = client.get_calls(limit=3)
+    sort_by = [SortBy(field="inputs.a", direction="asc")]
+
+    calls = client.get_calls(limit=3, sort_by=sort_by)
     assert len(calls) == 3
     for i, call in enumerate(calls):
         assert call.inputs["a"] == i
 
-    calls = client.get_calls(limit=5, offset=5)
+    calls = client.get_calls(limit=5, offset=5, sort_by=sort_by)
     assert len(calls) == 5
 
     for i, call in enumerate(calls):
         assert call.inputs["a"] == i + 5
 
-    calls = client.get_calls(offset=9)
+    calls = client.get_calls(offset=9, sort_by=sort_by)
     assert len(calls) == 1
     assert calls[0].inputs["a"] == 9
 
     # now test indexing
-    calls = client.get_calls()
+    calls = client.get_calls(sort_by=sort_by)
     assert calls[0].inputs["a"] == 0
     assert calls[1].inputs["a"] == 1
     assert calls[2].inputs["a"] == 2
     assert calls[3].inputs["a"] == 3
     assert calls[4].inputs["a"] == 4
 
-    calls = client.get_calls(offset=5)
+    calls = client.get_calls(offset=5, sort_by=sort_by)
     assert calls[0].inputs["a"] == 5
     assert calls[1].inputs["a"] == 6
     assert calls[2].inputs["a"] == 7
@@ -605,7 +607,7 @@ def test_get_calls_limit_offset(client):
     assert calls[4].inputs["a"] == 9
 
     # slicing
-    calls = client.get_calls(offset=5)
+    calls = client.get_calls(offset=5, sort_by=sort_by)
     for i, call in enumerate(calls[2:]):
         assert call.inputs["a"] == 7 + i
 
