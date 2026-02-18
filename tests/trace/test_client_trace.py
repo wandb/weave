@@ -109,7 +109,7 @@ def test_simple_op(client):
     calls = list(client.get_calls())
     assert len(calls) == 1
     fetched_call = calls[0]
-    digest = "nFk3Jq6jb72HLfeGaxwcsHyckk0gRWNFn17M2AR8Oxo"
+    digest = "VAjc7UcWtXC9OiUr6jrzM6CURhBaMiBr0gqOddcCxY4"
     expected_name = (
         f"{TRACE_REF_SCHEME}:///{client.entity}/{client.project}/op/my_op:{digest}"
     )
@@ -1798,7 +1798,7 @@ def test_dataset_row_ref(client):
     d2 = weave.ref(ref.uri()).get()
 
     inner = d2.rows[0]["a"]
-    exp_ref = "weave:///shawn/test-project/object/Dataset:0xTDJ6hEmsx8Wg9H75y42bL2WgvW5l4IXjuhHcrMh7A/attr/rows/id/XfhC9dNA5D4taMvhKT4MKN2uce7F56Krsyv4Q6mvVMA/key/a"
+    exp_ref = "weave:///shawn/test-project/object/Dataset:FkWFKCRcl9wsGp3yclN7v1IIAICTPenpZYrWo0otI4Y/attr/rows/id/XfhC9dNA5D4taMvhKT4MKN2uce7F56Krsyv4Q6mvVMA/key/a"
     assert inner == 5
     assert inner.ref.uri() == exp_ref
     gotten = weave.ref(exp_ref).get()
@@ -3419,7 +3419,7 @@ def test_objects_and_keys_with_special_characters(client):
         exp_key
         == "n-a_m.e%3A%20%2F%2B_%28%29%7B%7D%7C%22%27%3C%3E%21%40%24%5E%26%2A%23%3A%2C.%5B%5D-%3D%3B~%60100"
     )
-    exp_digest = "O66Mk7g91rlAUtcGYOFR1Y2Wk94YyPXJy2UEAzDQcYM"
+    exp_digest = "k8nuYiUMP6VgAP6wMjeY8dRYnMz2lCqlCyzu2F7iFMw"
 
     exp_obj_ref = f"{ref_base}/object/{exp_name}:{exp_digest}"
     assert obj.ref.uri() == exp_obj_ref
@@ -3440,7 +3440,7 @@ def test_objects_and_keys_with_special_characters(client):
     gotten_res = weave.ref(found_ref).get()
     assert gotten_res == "hello world"
 
-    exp_op_digest = "qlezedpwj0O4lZYB3vcgSYj0eQvQDdStowLaGBCEmaI"
+    exp_op_digest = "UsyKRnrEyBIieYPDU6eGrbGJgtXjFVFoR6PEemZma68"
     exp_op_ref = f"{ref_base}/op/{exp_name}:{exp_op_digest}"
 
     found_ref = test.ref.uri()

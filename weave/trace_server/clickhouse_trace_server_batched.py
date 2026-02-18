@@ -1498,7 +1498,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             req.obj.val, req.obj.builtin_object_class
         )
         processed_val = processed_result["val"]
-        json_val = json.dumps(processed_val)
+        json_val = json.dumps(processed_val, sort_keys=True)
         digest = str_digest(json_val)
 
         ch_obj = ObjCHInsertable(
@@ -1555,7 +1555,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 obj.val, obj.builtin_object_class
             )
             processed_val = processed_result["val"]
-            json_val = json.dumps(processed_val)
+            json_val = json.dumps(processed_val, sort_keys=True)
             digest = str_digest(json_val)
             ch_obj = ObjCHInsertable(
                 project_id=obj.project_id,
@@ -1721,7 +1721,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 raise TypeError(
                     f"""Validation Error: Encountered a non-dictionary row when creating a table. Please ensure that all rows are dictionaries. Violating row:\n{r}."""
                 )
-            row_json = json.dumps(r)
+            row_json = json.dumps(r, sort_keys=True)
             row_digest = str_digest(row_json)
             insert_rows.append(
                 (
@@ -1783,7 +1783,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         def add_new_row_needed_to_insert(row_data: Any) -> str:
             if not isinstance(row_data, dict):
                 raise TypeError("All rows must be dictionaries")
-            row_json = json.dumps(row_data)
+            row_json = json.dumps(row_data, sort_keys=True)
             row_digest = str_digest(row_json)
             if row_digest not in known_digests:
                 new_rows_needed_to_insert.append(
