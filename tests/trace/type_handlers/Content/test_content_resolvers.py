@@ -14,10 +14,8 @@ from __future__ import annotations
 
 import io
 import logging
-import struct
 import tempfile
 import wave
-import zlib
 from pathlib import Path
 from typing import Any
 from unittest.mock import patch
@@ -96,9 +94,7 @@ def resolver_backend(request):
 @pytest.fixture(scope="session")
 def png_bytes() -> bytes:
     """Generate a valid PNG image as bytes."""
-    img = Image.fromarray(
-        np.zeros((4, 4, 3), dtype=np.uint8), "RGB"
-    )
+    img = Image.fromarray(np.zeros((4, 4, 3), dtype=np.uint8), "RGB")
     buf = io.BytesIO()
     img.save(buf, format="PNG")
     return buf.getvalue()
@@ -107,9 +103,7 @@ def png_bytes() -> bytes:
 @pytest.fixture(scope="session")
 def jpeg_bytes() -> bytes:
     """Generate a valid JPEG image as bytes."""
-    img = Image.fromarray(
-        np.full((4, 4, 3), 128, dtype=np.uint8), "RGB"
-    )
+    img = Image.fromarray(np.full((4, 4, 3), 128, dtype=np.uint8), "RGB")
     buf = io.BytesIO()
     img.save(buf, format="JPEG")
     return buf.getvalue()
@@ -144,26 +138,16 @@ def pdf_bytes() -> bytes:
 @pytest.fixture(scope="session")
 def mp4_bytes() -> bytes:
     """Generate a minimal valid MP4 container as bytes."""
-    ftyp = (
-        b"\x00\x00\x00\x20"
-        b"ftyp"
-        b"isom"
-        b"\x00\x00\x02\x00"
-        b"isom"
-        b"iso2"
-        b"mp41"
-    )
-    mdat = b"\x00\x00\x00\x08" b"mdat"
-    moov = b"\x00\x00\x00\x08" b"moov"
+    ftyp = b"\x00\x00\x00\x20ftypisom\x00\x00\x02\x00isomiso2mp41"
+    mdat = b"\x00\x00\x00\x08mdat"
+    moov = b"\x00\x00\x00\x08moov"
     return ftyp + mdat + moov
 
 
 @pytest.fixture(scope="session")
 def gif_bytes() -> bytes:
     """Generate a valid GIF image as bytes."""
-    img = Image.fromarray(
-        np.zeros((4, 4, 3), dtype=np.uint8), "RGB"
-    )
+    img = Image.fromarray(np.zeros((4, 4, 3), dtype=np.uint8), "RGB")
     buf = io.BytesIO()
     img.save(buf, format="GIF")
     return buf.getvalue()
@@ -286,15 +270,19 @@ FILE_CASES = [
 class TestResolverDetectFromFile:
     """Verify detection from an actual file path on disk."""
 
-    @pytest.mark.parametrize(("fixture_name", "expected_mime", "expected_ext"), FILE_CASES)
+    @pytest.mark.parametrize(
+        ("fixture_name", "expected_mime", "expected_ext"), FILE_CASES
+    )
     def test_mime_from_file(
-        self, fixture_name: str, expected_mime: str, expected_ext: str,
-        resolver_backend, request,
+        self,
+        fixture_name: str,
+        expected_mime: str,
+        expected_ext: str,
+        resolver_backend,
+        request,
     ):
         file_path = request.getfixturevalue(fixture_name)
-        mime, ext = _detect_from_resolver(
-            filename=str(file_path), buffer=None
-        )
+        mime, ext = _detect_from_resolver(filename=str(file_path), buffer=None)
 
         if resolver_backend == "polyfile":
             # polyfile ignores filename, needs buffer
@@ -302,16 +290,20 @@ class TestResolverDetectFromFile:
         else:
             assert mime == expected_mime
 
-    @pytest.mark.parametrize(("fixture_name", "expected_mime", "expected_ext"), FILE_CASES)
+    @pytest.mark.parametrize(
+        ("fixture_name", "expected_mime", "expected_ext"), FILE_CASES
+    )
     def test_extension_from_file_python_magic(
-        self, fixture_name: str, expected_mime: str, expected_ext: str,
-        resolver_backend, request,
+        self,
+        fixture_name: str,
+        expected_mime: str,
+        expected_ext: str,
+        resolver_backend,
+        request,
     ):
         """python-magic can detect extension from file; polyfile cannot."""
         file_path = request.getfixturevalue(fixture_name)
-        _, ext = _detect_from_resolver(
-            filename=str(file_path), buffer=None
-        )
+        _, ext = _detect_from_resolver(filename=str(file_path), buffer=None)
 
         if resolver_backend == "polyfile":
             assert ext is None
@@ -319,9 +311,7 @@ class TestResolverDetectFromFile:
             assert ext is not None
             assert ext.startswith(".")
 
-    def test_nonexistent_file_falls_back_to_buffer(
-        self, resolver_backend, png_bytes
-    ):
+    def test_nonexistent_file_falls_back_to_buffer(self, resolver_backend, png_bytes):
         """When filename doesn't exist, should fall back to buffer detection."""
         mime, ext = _detect_from_resolver(
             filename="/nonexistent/file.png", buffer=png_bytes
@@ -349,24 +339,30 @@ class TestGetMimeAndExtension:
 
     def test_both_provided_returns_immediately(self, resolver_backend):
         mime, ext = get_mime_and_extension(
-            mimetype="text/html", extension=".html",
-            filename=None, buffer=None,
+            mimetype="text/html",
+            extension=".html",
+            filename=None,
+            buffer=None,
         )
         assert mime == "text/html"
         assert ext == ".html"
 
     def test_mimetype_only_resolves_extension(self, resolver_backend):
         mime, ext = get_mime_and_extension(
-            mimetype="image/png", extension=None,
-            filename=None, buffer=None,
+            mimetype="image/png",
+            extension=None,
+            filename=None,
+            buffer=None,
         )
         assert mime == "image/png"
         assert ext == ".png"
 
     def test_extension_only_resolves_mimetype(self, resolver_backend):
         mime, ext = get_mime_and_extension(
-            mimetype=None, extension=".pdf",
-            filename=None, buffer=None,
+            mimetype=None,
+            extension=".pdf",
+            filename=None,
+            buffer=None,
         )
         assert mime == "application/pdf"
         assert ext == ".pdf"
@@ -374,27 +370,30 @@ class TestGetMimeAndExtension:
     def test_filename_resolves_via_mimetypes(self, resolver_backend):
         """Filename-based detection (mimetypes) runs before content detection."""
         mime, ext = get_mime_and_extension(
-            mimetype=None, extension=None,
-            filename="report.pdf", buffer=None,
+            mimetype=None,
+            extension=None,
+            filename="report.pdf",
+            buffer=None,
         )
         assert mime == "application/pdf"
 
     def test_buffer_detection_as_fallback(self, resolver_backend, png_bytes):
         """When filename and extension are absent, buffer detection kicks in."""
         mime, ext = get_mime_and_extension(
-            mimetype=None, extension=None,
-            filename=None, buffer=png_bytes,
+            mimetype=None,
+            extension=None,
+            filename=None,
+            buffer=png_bytes,
         )
         assert mime == "image/png"
 
-    def test_filename_takes_priority_over_buffer(
-        self, resolver_backend, wav_bytes
-    ):
+    def test_filename_takes_priority_over_buffer(self, resolver_backend, wav_bytes):
         """Mimetypes from filename should be tried before buffer detection."""
         mime, ext = get_mime_and_extension(
-            mimetype=None, extension=None,
+            mimetype=None,
+            extension=None,
             filename="music.mp3",  # mimetypes says audio/mpeg
-            buffer=wav_bytes,       # buffer says audio/x-wav
+            buffer=wav_bytes,  # buffer says audio/x-wav
         )
         # Filename-based detection should win
         assert mime == "audio/mpeg"
@@ -409,28 +408,37 @@ class TestGetMimeAndExtension:
         ],
     )
     def test_buffer_only_detection(
-        self, buffer_fixture: str, expected_mime: str,
-        resolver_backend, request,
+        self,
+        buffer_fixture: str,
+        expected_mime: str,
+        resolver_backend,
+        request,
     ):
         buffer = request.getfixturevalue(buffer_fixture)
         mime, ext = get_mime_and_extension(
-            mimetype=None, extension=None,
-            filename=None, buffer=buffer,
+            mimetype=None,
+            extension=None,
+            filename=None,
+            buffer=buffer,
         )
         assert mime == expected_mime
 
     def test_defaults_when_nothing_available(self, resolver_backend):
         mime, ext = get_mime_and_extension(
-            mimetype=None, extension=None,
-            filename=None, buffer=None,
+            mimetype=None,
+            extension=None,
+            filename=None,
+            buffer=None,
         )
         assert mime == "application/octet-stream"
         assert ext == ""
 
     def test_custom_defaults(self, resolver_backend):
         mime, ext = get_mime_and_extension(
-            mimetype=None, extension=None,
-            filename=None, buffer=None,
+            mimetype=None,
+            extension=None,
+            filename=None,
+            buffer=None,
             default_mimetype="text/plain",
             default_extension=".txt",
         )
@@ -440,15 +448,19 @@ class TestGetMimeAndExtension:
     def test_extension_normalized_with_dot(self, resolver_backend):
         """Extensions without a dot prefix should be normalized."""
         mime, ext = get_mime_and_extension(
-            mimetype="image/png", extension="png",
-            filename=None, buffer=None,
+            mimetype="image/png",
+            extension="png",
+            filename=None,
+            buffer=None,
         )
         assert ext == ".png"
 
     def test_empty_buffer_treated_as_none(self, resolver_backend):
         mime, ext = get_mime_and_extension(
-            mimetype=None, extension=".txt",
-            filename=None, buffer=b"",
+            mimetype=None,
+            extension=".txt",
+            filename=None,
+            buffer=b"",
         )
         assert mime == "text/plain"
         assert ext == ".txt"
@@ -460,12 +472,13 @@ class TestGetMimeAndExtension:
 
 
 class TestGuessFromBuffer:
-    @pytest.mark.parametrize(
-        ("fixture_name", "expected_mime"), BUFFER_CASES
-    )
+    @pytest.mark.parametrize(("fixture_name", "expected_mime"), BUFFER_CASES)
     def test_returns_correct_mime(
-        self, fixture_name: str, expected_mime: str,
-        resolver_backend, request,
+        self,
+        fixture_name: str,
+        expected_mime: str,
+        resolver_backend,
+        request,
     ):
         buffer = request.getfixturevalue(fixture_name)
         mime = guess_from_buffer(buffer)
@@ -566,9 +579,7 @@ class TestContentIntegration:
         assert c.mimetype == "text/plain"
         assert c.extension == ".txt"
 
-    def test_from_path_extensionless(
-        self, resolver_backend, extensionless_png_file
-    ):
+    def test_from_path_extensionless(self, resolver_backend, extensionless_png_file):
         """File with no extension should still detect MIME from content."""
         c = Content.from_path(extensionless_png_file)
         assert c.mimetype == "image/png"
@@ -610,15 +621,19 @@ class TestNoResolverAvailable:
         _reset_resolver()
 
     def test_guess_from_buffer_warns(self, caplog):
-        with caplog.at_level(logging.WARNING, logger="weave.type_wrappers.Content.utils"):
+        with caplog.at_level(
+            logging.WARNING, logger="weave.type_wrappers.Content.utils"
+        ):
             result = guess_from_buffer(b"\x89PNG\r\n\x1a\n" + b"\x00" * 100)
         assert result is None
         assert "python-magic or polyfile" in caplog.text
 
     def test_get_mime_and_extension_uses_defaults(self):
         mime, ext = get_mime_and_extension(
-            mimetype=None, extension=None,
-            filename=None, buffer=b"\x89PNG\r\n",
+            mimetype=None,
+            extension=None,
+            filename=None,
+            buffer=b"\x89PNG\r\n",
         )
         assert mime == "application/octet-stream"
         assert ext == ""
@@ -626,8 +641,10 @@ class TestNoResolverAvailable:
     def test_mimetypes_still_works_without_resolver(self):
         """Stdlib mimetypes detection should work even without a resolver."""
         mime, ext = get_mime_and_extension(
-            mimetype=None, extension=None,
-            filename="image.png", buffer=None,
+            mimetype=None,
+            extension=None,
+            filename="image.png",
+            buffer=None,
         )
         assert mime == "image/png"
 
@@ -660,9 +677,7 @@ class TestPythonMagicFromFile:
         _reset_resolver()
 
     def test_from_file_detects_mime_and_extension(self, png_file):
-        mime, ext = python_magic_resolver.detect(
-            filename=str(png_file), buffer=None
-        )
+        mime, ext = python_magic_resolver.detect(filename=str(png_file), buffer=None)
         assert mime == "image/png"
         assert ext is not None
         assert ext.startswith(".")
@@ -715,21 +730,15 @@ class TestPolyfileResolver:
         assert mime_with == mime_without == "image/png"
 
     def test_detect_never_returns_extension(self, pdf_bytes):
-        _, ext = polyfile_magic_resolver.detect(
-            filename=None, buffer=pdf_bytes
-        )
+        _, ext = polyfile_magic_resolver.detect(filename=None, buffer=pdf_bytes)
         assert ext is None
 
     def test_detect_no_buffer_returns_none(self):
-        mime, ext = polyfile_magic_resolver.detect(
-            filename="report.pdf", buffer=None
-        )
+        mime, ext = polyfile_magic_resolver.detect(filename="report.pdf", buffer=None)
         assert mime is None
         assert ext is None
 
     def test_detect_empty_buffer_returns_none(self):
-        mime, ext = polyfile_magic_resolver.detect(
-            filename=None, buffer=b""
-        )
+        mime, ext = polyfile_magic_resolver.detect(filename=None, buffer=b"")
         assert mime is None
         assert ext is None

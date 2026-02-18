@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 def is_available() -> bool:
     """Check whether polyfile is installed and usable."""
     try:
-        from polyfile.magic import MagicMatcher  # noqa: F811
+        from polyfile.magic import MagicMatcher
 
         return True
     except (ImportError, ModuleNotFoundError):
@@ -39,7 +39,7 @@ def detect(
         return None, None
 
     try:
-        from polyfile.magic import MagicMatcher  # noqa: F811
+        from polyfile.magic import MagicMatcher
     except (ImportError, ModuleNotFoundError):
         return None, None
 
