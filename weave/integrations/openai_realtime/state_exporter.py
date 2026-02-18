@@ -295,9 +295,10 @@ class StateExporter(BaseModel):
                 self.session_span.get_root_call() if self.session_span else None
             )
             client = require_weave_client()
-            conv_call = client.create_call(
-                op="realtime.conversation", inputs={"id": conv_id}, parent=session_call
-            )
+            with set_thread_id(conv_id):
+                conv_call = client.create_call(
+                    op="realtime.conversation", inputs={"id": conv_id}, parent=session_call
+                )
             self.conversation_calls[conv_id] = conv_call
 
     def handle_input_audio_append(self, msg: dict) -> None:
@@ -426,6 +427,87 @@ class StateExporter(BaseModel):
 
         return msg_dict
 
+
+    def _extract_audio_content(self, output_list: list[dict], output_dict: dict) -> None:
+        """Replace raw audio references in response outputs with encoded Content objects."""
+        for output_idx, output in enumerate(output_list):
+            if output.get("type") == "message":
+                item_id = output.get("id")
+                content_list = output.get("content", [])
+                for content_idx, content in enumerate(content_list):
+                    content_dict = dict(content)
+                    content_type = content.get("type")
+                    if content_type in OUTPUT_AUDIO_TYPES:
+                        audio_bytes = (
+                            self.response_audio.get(item_id) if item_id else None
+                        )
+
+                        if not audio_bytes:
+                            logger.error("failed to fetch audio bytes")
+                            continue
+
+                        content_dict["audio"] = Content.from_bytes(
+                            pcm_to_wav(bytes(audio_bytes)), extension=".wav"
+                        )
+                    output_dict["output"][output_idx]["content"][content_idx] = (
+                        content_dict
+                    )
+
+    def _update_usage_summary_for_speech(
+        self, summary_usage: dict, response: dict, model: str
+    ) -> None:
+        """Add speech model usage from the response to the summary."""
+        usage = response.get("usage")
+        if usage and isinstance(usage, dict):
+            summary_usage[model] = {
+                "requests": 1,
+                "input_tokens": usage.get("input_tokens", 0),
+                "output_tokens": usage.get("output_tokens", 0),
+                "total_tokens": usage.get("total_tokens", 0),
+            }
+
+    def _update_usage_summary_for_transcription(
+        self,
+        summary_usage: dict,
+        session: dict | None,
+        messages: list[dict] | None,
+    ) -> None:
+        """Add transcription model usage from input messages to the summary."""
+        transcription_model = (
+            _get_from_dict(
+                _get_from_dict(
+                    _get_from_dict(session, "audio", {}),
+                    "input",
+                    {},
+                ),
+                "transcription",
+                {},
+            ).get("model")
+            if session
+            else None
+        )
+        if not (transcription_model and messages):
+            return
+        t_input = 0
+        t_output = 0
+        t_total = 0
+        t_count = 0
+        for message in messages:
+            item_id = message.get("id") if isinstance(message, dict) else None
+            t_usage = self.transcription_usage.get(item_id) if item_id else None
+            if t_usage:
+                t_input += t_usage.get("input_tokens", 0)
+                t_output += t_usage.get("output_tokens", 0)
+                t_total += t_usage.get("total_tokens", 0)
+                t_count += 1
+        if t_count > 0:
+            summary_usage[transcription_model] = {
+                "requests": t_count,
+                "input_tokens": t_input,
+                "output_tokens": t_output,
+                "total_tokens": t_total,
+            }
+
     def _handle_response_done_inner(
         self,
         msg: dict,
@@ -477,8 +559,6 @@ class StateExporter(BaseModel):
         if self.session_span:
             session_call = self.session_span.get_root_call()
 
-        response_parent = None
-
         response = msg.get("response", {})
         conv_id = response.get("conversation_id")
         response_id = response.get("id")
@@ -488,94 +568,30 @@ class StateExporter(BaseModel):
         elif conv_id and response_id:
             self.conversation_responses[conv_id] = [response_id]
 
-        if conv_id and (conv_call := self.conversation_calls.get(conv_id)):
-            response_parent = conv_call
-
-        elif conv_id:
-            conv_call = client.create_call(
-                op="realtime.conversation", inputs={"id": conv_id}, parent=session_call
-            )
-            self.conversation_calls[conv_id] = conv_call
-            response_parent = conv_call
-        else:
-            response_parent = session_call
-
         with set_thread_id(conv_id):
+            if conv_id and (conv_call := self.conversation_calls.get(conv_id)):
+                response_parent = conv_call
+            elif conv_id:
+                conv_call = client.create_call(
+                    op="realtime.conversation", inputs={"id": conv_id}, parent=session_call
+                )
+                self.conversation_calls[conv_id] = conv_call
+                response_parent = conv_call
+            else:
+                response_parent = session_call
+
             call = client.create_call(
                 "realtime.response", inputs=inputs, parent=response_parent
             )
 
             output_dict = dict(response)
             output_list = response.get("output", [])
-            for output_idx, output in enumerate(output_list):
-                if output.get("type") == "message":
-                    item_id = output.get("id")
-                    content_list = output.get("content", [])
-                    for content_idx, content in enumerate(content_list):
-                        content_dict = dict(content)
-                        content_type = content.get("type")
-                        if content_type in OUTPUT_AUDIO_TYPES:
-                            audio_bytes = (
-                                self.response_audio.get(item_id) if item_id else None
-                            )
+            self._extract_audio_content(output_list, output_dict)
 
-                            if not audio_bytes:
-                                logger.error("failed to fetch audio bytes")
-                                continue
-
-                            content_dict["audio"] = Content.from_bytes(
-                                pcm_to_wav(bytes(audio_bytes)), extension=".wav"
-                            )
-                        output_dict["output"][output_idx]["content"][content_idx] = (
-                            content_dict
-                        )
             summary_usage: dict[str, dict] = {}
-
-            # Response (speech) model usage
-            usage = response.get("usage")
             model = session.get("model", "unknown") if session else "unknown"
-            if usage and isinstance(usage, dict):
-                summary_usage[model] = {
-                    "requests": 1,
-                    "input_tokens": usage.get("input_tokens", 0),
-                    "output_tokens": usage.get("output_tokens", 0),
-                    "total_tokens": usage.get("total_tokens", 0),
-                }
-
-            # Transcription model usage
-            transcription_model = (
-                _get_from_dict(
-                    _get_from_dict(
-                        _get_from_dict(session, "audio", {}),
-                        "input",
-                        {},
-                    ),
-                    "transcription",
-                    {},
-                ).get("model")
-                if session
-                else None
-            )
-            if transcription_model and messages:
-                t_input = 0
-                t_output = 0
-                t_total = 0
-                t_count = 0
-                for message in messages:
-                    item_id = message.get("id") if isinstance(message, dict) else None
-                    t_usage = self.transcription_usage.get(item_id) if item_id else None
-                    if t_usage:
-                        t_input += t_usage.get("input_tokens", 0)
-                        t_output += t_usage.get("output_tokens", 0)
-                        t_total += t_usage.get("total_tokens", 0)
-                        t_count += 1
-                if t_count > 0:
-                    summary_usage[transcription_model] = {
-                        "requests": t_count,
-                        "input_tokens": t_input,
-                        "output_tokens": t_output,
-                        "total_tokens": t_total,
-                    }
+            self._update_usage_summary_for_speech(summary_usage, response, model)
+            self._update_usage_summary_for_transcription(summary_usage, session, messages)
 
             if summary_usage:
                 call.summary = {"usage": summary_usage}

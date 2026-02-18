@@ -40,11 +40,11 @@ def install_require_weave_client(monkeypatch, client: DummyWeaveClient):
     monkeypatch.setattr(wcc, "require_weave_client", lambda: client)
 
 
-def make_session_text():
+def make_session(modalities=None):
     return {
         "id": "sess_1",
         "model": "m",
-        "modalities": ["text"],
+        "modalities": modalities or ["text"],
         "instructions": "",
         "voice": "alloy",
         "input_audio_format": "pcm16",
@@ -78,15 +78,23 @@ def make_assistant_output(item_id, content=None):
     }
 
 
-def make_response(resp_id, output):
+def make_response(resp_id, output, conversation_id=None):
     return {
         "id": resp_id,
         "status": "completed",
         "status_details": None,
         "output": [output],
         "usage": None,
-        "conversation_id": None,
+        "conversation_id": conversation_id,
     }
+
+
+def assert_calls_with_thread_id(client, op, expected_thread_id, expected_count=1):
+    """Assert that calls for a given op have the expected thread_id."""
+    indices = [i for i, o in enumerate(client.created) if o == op]
+    assert len(indices) == expected_count
+    for idx in indices:
+        assert client.thread_ids[idx] == expected_thread_id
 
 
 def test_response_audio_delta_and_done():
@@ -154,7 +162,7 @@ def test_fifo_completion_orders_responses_by_arrival(monkeypatch):
         {
             "type": "session.updated",
             "event_id": "event_0",
-            "session": make_session_text(),
+            "session": make_session(),
         }
     )
 
@@ -230,35 +238,13 @@ def test_response_calls_have_thread_id_set_to_conversation_id(monkeypatch):
     )
 
     exp = StateExporter()
-    session = {
-        "id": "sess_1",
-        "model": "m",
-        "modalities": ["audio"],
-        "instructions": "",
-        "voice": "alloy",
-        "input_audio_format": "pcm16",
-        "output_audio_format": "pcm16",
-        "input_audio_transcription": None,
-        "turn_detection": {"type": "none"},
-        "tools": [],
-        "tool_choice": "auto",
-        "temperature": 0.6,
-        "max_response_output_tokens": None,
-    }
     exp.handle_session_updated(
-        {"type": "session.updated", "event_id": "event_0", "session": session}
+        {"type": "session.updated", "event_id": "event_0", "session": make_session(modalities=["audio"])}
     )
 
     conv_id = "conv_abc123"
     out = make_assistant_output("item_a", content=[{"type": "text", "text": "hi"}])
-    resp = {
-        "id": "resp_1",
-        "status": "completed",
-        "status_details": None,
-        "output": [out],
-        "usage": None,
-        "conversation_id": conv_id,
-    }
+    resp = make_response("resp_1", out, conversation_id=conv_id)
     exp.handle_response_created(
         {"type": "response.created", "event_id": "event_1", "response": resp}
     )
@@ -268,19 +254,8 @@ def test_response_calls_have_thread_id_set_to_conversation_id(monkeypatch):
 
     time.sleep(0.08)
 
-    # Find the thread_id captured when realtime.response was created
-    response_indices = [
-        i for i, op in enumerate(client.created) if op == "realtime.response"
-    ]
-    assert len(response_indices) == 1
-    assert client.thread_ids[response_indices[0]] == conv_id
-
-    # Conversation call should NOT have thread_id set
-    conv_indices = [
-        i for i, op in enumerate(client.created) if op == "realtime.conversation"
-    ]
-    assert len(conv_indices) == 1
-    assert client.thread_ids[conv_indices[0]] is None
+    assert_calls_with_thread_id(client, "realtime.response", conv_id)
+    assert_calls_with_thread_id(client, "realtime.conversation", conv_id)
 
 
 def test_response_without_conversation_id_has_no_thread_id(monkeypatch):
@@ -294,27 +269,12 @@ def test_response_without_conversation_id_has_no_thread_id(monkeypatch):
     )
 
     exp = StateExporter()
-    session = {
-        "id": "sess_1",
-        "model": "m",
-        "modalities": ["audio"],
-        "instructions": "",
-        "voice": "alloy",
-        "input_audio_format": "pcm16",
-        "output_audio_format": "pcm16",
-        "input_audio_transcription": None,
-        "turn_detection": {"type": "none"},
-        "tools": [],
-        "tool_choice": "auto",
-        "temperature": 0.6,
-        "max_response_output_tokens": None,
-    }
     exp.handle_session_updated(
-        {"type": "session.updated", "event_id": "event_0", "session": session}
+        {"type": "session.updated", "event_id": "event_0", "session": make_session(modalities=["audio"])}
     )
 
     out = make_assistant_output("item_a", content=[{"type": "text", "text": "hi"}])
-    resp = make_response("resp_1", out)  # conversation_id is None
+    resp = make_response("resp_1", out, conversation_id=None)
     exp.handle_response_created(
         {"type": "response.created", "event_id": "event_1", "response": resp}
     )
@@ -324,12 +284,7 @@ def test_response_without_conversation_id_has_no_thread_id(monkeypatch):
 
     time.sleep(0.08)
 
-    # All calls should have None thread_id
-    response_indices = [
-        i for i, op in enumerate(client.created) if op == "realtime.response"
-    ]
-    assert len(response_indices) == 1
-    assert client.thread_ids[response_indices[0]] is None
+    assert_calls_with_thread_id(client, "realtime.response", None)
 
 
 def test_transcripts_not_required_when_text_modality_absent(monkeypatch):
@@ -343,23 +298,8 @@ def test_transcripts_not_required_when_text_modality_absent(monkeypatch):
 
     exp = StateExporter()
     # Session without text modality -> no gating
-    session = {
-        "id": "sess_2",
-        "model": "m",
-        "modalities": ["audio"],
-        "instructions": "",
-        "voice": "alloy",
-        "input_audio_format": "pcm16",
-        "output_audio_format": "pcm16",
-        "input_audio_transcription": None,
-        "turn_detection": {"type": "none"},
-        "tools": [],
-        "tool_choice": "auto",
-        "temperature": 0.6,
-        "max_response_output_tokens": None,
-    }
     exp.handle_session_updated(
-        {"type": "session.updated", "event_id": "event_0", "session": session}
+        {"type": "session.updated", "event_id": "event_0", "session": make_session(modalities=["audio"])}
     )
 
     out = make_assistant_output("item_a", content=[{"type": "text", "text": "hi"}])
