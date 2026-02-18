@@ -1707,7 +1707,7 @@ def test_build_calls_complete_update_end_query() -> None:
         UPDATE calls_complete
         SET
             ended_at = fromUnixTimestamp64Micro({ended_at:Int64}, 'UTC'),
-            exception = {exception:Nullable(String)},
+            exception = {exception:String},
             output_dump = {output_dump:String},
             summary_dump = {summary_dump:String},
             output_refs = {output_refs:Array(String)},
@@ -2984,7 +2984,7 @@ def test_calls_complete_with_hardcoded_filter_and_json_condition_and_summary_ord
                 AND ((NOT ((calls_complete.started_at IS NULL))))
             )
             ORDER BY CASE
-                WHEN calls_complete.exception IS NOT NULL THEN {pb_6:String}
+                WHEN calls_complete.exception != '' THEN {pb_6:String}
                 WHEN IFNULL(
                     toInt64OrNull(
                         coalesce(nullIf(JSON_VALUE(calls_complete.summary_dump, {pb_5:String}), 'null'), '')
@@ -3005,7 +3005,7 @@ def test_calls_complete_with_hardcoded_filter_and_json_condition_and_summary_ord
         PREWHERE calls_complete.project_id = {pb_10:String}
         WHERE (calls_complete.id IN filtered_calls)
         ORDER BY CASE
-            WHEN calls_complete.exception IS NOT NULL THEN {pb_6:String}
+            WHEN calls_complete.exception != '' THEN {pb_6:String}
             WHEN IFNULL(
                 toInt64OrNull(
                     coalesce(nullIf(JSON_VALUE(calls_complete.summary_dump, {pb_5:String}), 'null'), '')
@@ -3226,14 +3226,14 @@ def test_query_with_summary_weave_status_filter_calls_complete() -> None:
         WHERE 1
           AND (
             (((CASE
-                WHEN calls_complete.exception IS NOT NULL THEN {pb_1:String}
+                WHEN calls_complete.exception != '' THEN {pb_1:String}
                 WHEN IFNULL(toInt64OrNull(coalesce(nullIf(JSON_VALUE(calls_complete.summary_dump, {pb_0:String}), 'null'), '')), 0) > 0 THEN {pb_4:String}
                 WHEN calls_complete.ended_at IS NULL THEN {pb_2:String}
                 ELSE {pb_3:String}
             END = {pb_3:String})
             OR
             (CASE
-                WHEN calls_complete.exception IS NOT NULL THEN {pb_1:String}
+                WHEN calls_complete.exception != '' THEN {pb_1:String}
                 WHEN IFNULL(toInt64OrNull(coalesce(nullIf(JSON_VALUE(calls_complete.summary_dump, {pb_0:String}), 'null'), '')), 0) > 0 THEN {pb_4:String}
                 WHEN calls_complete.ended_at IS NULL THEN {pb_2:String}
                 ELSE {pb_3:String}

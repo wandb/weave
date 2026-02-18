@@ -56,7 +56,7 @@ def test_update_query_cluster_support(
         UPDATE {expected_table_clause}
         SET
             ended_at = fromUnixTimestamp64Micro({{ended_at:Int64}}, 'UTC'),
-            exception = {{exception:Nullable(String)}},
+            exception = {{exception:String}},
             output_dump = {{output_dump:String}},
             summary_dump = {{summary_dump:String}},
             output_refs = {{output_refs:Array(String)}},

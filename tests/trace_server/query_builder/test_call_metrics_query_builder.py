@@ -819,7 +819,7 @@ def test_calls_complete_call_and_error_counts():
              (SELECT toStartOfInterval(started_at, INTERVAL 3600 SECOND, {pb_3:String}) AS bucket,
                      1 AS m_call_count,
                      if(
-                        exception IS NOT NULL, 1, 0) AS m_error_count
+                        exception != '', 1, 0) AS m_error_count
               FROM
                 (SELECT cm.started_at AS started_at,
                         cm.started_at AS started_at,
