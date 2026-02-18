@@ -763,7 +763,7 @@ def test_calls_complete_latency_basic():
                  WHERE cm.project_id = {pb_0:String}
                    AND cm.started_at >= toDateTime({pb_1:Float64}, {pb_3:String})
                    AND cm.started_at < toDateTime({pb_2:Float64}, {pb_3:String})
-                   AND cm.deleted_at IS NULL ))
+                   AND cm.deleted_at = toDateTime64(0, 3) ))
            GROUP BY bucket)
         SELECT all_buckets.bucket AS timestamp,
                COALESCE(aggregated_data.avg_latency_ms, 0) AS avg_latency_ms,
@@ -830,7 +830,7 @@ def test_calls_complete_call_and_error_counts():
                  WHERE cm.project_id = {pb_0:String}
                    AND cm.started_at >= toDateTime({pb_1:Float64}, {pb_3:String})
                    AND cm.started_at < toDateTime({pb_2:Float64}, {pb_3:String})
-                   AND cm.deleted_at IS NULL ))
+                   AND cm.deleted_at = toDateTime64(0, 3) ))
            GROUP BY bucket)
         SELECT all_buckets.bucket AS timestamp,
                COALESCE(aggregated_data.sum_call_count, 0) AS sum_call_count,
@@ -892,7 +892,7 @@ def test_calls_complete_with_filter():
                  WHERE cm.project_id = {pb_0:String}
                    AND cm.started_at >= toDateTime({pb_1:Float64}, {pb_3:String})
                    AND cm.started_at < toDateTime({pb_2:Float64}, {pb_3:String})
-                   AND cm.deleted_at IS NULL
+                   AND cm.deleted_at = toDateTime64(0, 3)
                    AND op_name IN {pb_5:Array(String)} ))
            GROUP BY bucket)
         SELECT all_buckets.bucket AS timestamp,

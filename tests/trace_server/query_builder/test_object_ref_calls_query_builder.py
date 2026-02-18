@@ -1,3 +1,5 @@
+import datetime
+
 from tests.trace_server.query_builder.utils import assert_sql
 from weave.trace_server.calls_query_builder.calls_query_builder import (
     CallsQuery,
@@ -5,6 +7,8 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
 )
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.project_version.types import ReadTable
+
+SENTINEL_DATETIME = datetime.datetime(1970, 1, 1, tzinfo=datetime.timezone.utc)
 
 
 def test_object_ref_filter_simple() -> None:
@@ -1024,7 +1028,7 @@ def test_object_ref_filter_calls_complete() -> None:
                    OR regexpExtract(coalesce(nullIf(JSON_VALUE(calls_complete.output_dump, {pb_3:String}), 'null'), ''), '/([^/]+)$', 1) IN
                       (SELECT ref
                        FROM obj_filter_0)))
-                   AND ((calls_complete.deleted_at = {pb_4:String}))
+                   AND ((calls_complete.deleted_at = {pb_4:DateTime64(3)}))
                    AND ((NOT ((calls_complete.started_at IS NULL)))))
            ORDER BY calls_complete.started_at DESC)
         SELECT calls_complete.id AS id
@@ -1037,7 +1041,7 @@ def test_object_ref_filter_calls_complete() -> None:
             "pb_1": '$."temperature"',
             "pb_2": 1,
             "pb_3": '$."model"',
-            "pb_4": "1970-01-01T00:00:00Z",
+            "pb_4": SENTINEL_DATETIME,
         },
     )
 
@@ -1113,7 +1117,7 @@ def test_object_ref_filter_calls_complete_mixed_conditions() -> None:
                        (SELECT ref
                         FROM obj_filter_0)))
                   OR ((coalesce(nullIf(JSON_VALUE(calls_complete.inputs_dump, {pb_4:String}), 'null'), '') = {pb_5:String}))))
-                AND ((calls_complete.deleted_at = {pb_6:String}))
+                AND ((calls_complete.deleted_at = {pb_6:DateTime64(3)}))
                 AND ((NOT ((calls_complete.started_at IS NULL)))))
                 ORDER BY calls_complete.started_at DESC
                 LIMIT 10)
@@ -1130,6 +1134,6 @@ def test_object_ref_filter_calls_complete_mixed_conditions() -> None:
             "pb_3": '$."model"',
             "pb_4": '$."prompt"',
             "pb_5": "test prompt",
-            "pb_6": "1970-01-01T00:00:00Z",
+            "pb_6": SENTINEL_DATETIME,
         },
     )

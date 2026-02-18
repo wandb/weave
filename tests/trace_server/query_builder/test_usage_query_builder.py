@@ -1225,7 +1225,7 @@ def test_calls_complete_basic():
                     WHERE cm.project_id = {pb_0:String}
                       AND cm.started_at >= toDateTime({pb_1:Float64}, {pb_3:String})
                       AND cm.started_at < toDateTime({pb_2:Float64}, {pb_3:String})
-                      AND cm.deleted_at IS NULL )) ARRAY
+                      AND cm.deleted_at = toDateTime64(0, 3) )) ARRAY
               JOIN JSONExtractKeysAndValuesRaw(ifNull(usage_raw, '{}')) AS kv)
            GROUP BY bucket,
                     model),
@@ -1298,7 +1298,7 @@ def test_calls_complete_with_filter():
                     WHERE cm.project_id = {pb_0:String}
                       AND cm.started_at >= toDateTime({pb_1:Float64}, {pb_3:String})
                       AND cm.started_at < toDateTime({pb_2:Float64}, {pb_3:String})
-                      AND cm.deleted_at IS NULL
+                      AND cm.deleted_at = toDateTime64(0, 3)
                       AND op_name IN {pb_5:Array(String)} )) ARRAY
               JOIN JSONExtractKeysAndValuesRaw(ifNull(usage_raw, '{}')) AS kv)
            GROUP BY bucket,
