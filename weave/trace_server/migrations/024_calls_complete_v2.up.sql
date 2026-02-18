@@ -5,10 +5,9 @@
 --   3. Switch from MergeTree to ReplacingMergeTree(created_at)
 --   4. Partition by month on started_at
 --   5. Add TTL DELETE by ttl_at
---   6. Add new columns: ttl_at, source, speedy_keys
---   7. Convert attributes_dump from String to JSON
---   8. Add bloom filter index on summary_dump
---   9. Add table-level settings: min_bytes_for_wide_part=0
+--   6. Add new columns: ttl_at, source (Enum8), speedy_keys
+--   7. Add bloom filter index on summary_dump
+--   8. Add table-level settings: min_bytes_for_wide_part=0
 --
 -- Migration procedure:
 --   Step 1: Create new table calls_complete_new
@@ -49,8 +48,8 @@ CREATE TABLE calls_complete_new (
     summary_dump    String,
     output_refs     Array(String),
 
-    -- attributes_dump converted from String to JSON
-    attributes_dump JSON DEFAULT '{}',
+    -- attributes_dump stays as String (not converted to JSON)
+    attributes_dump String,
 
     -- UInt64 fields remain Nullable (punted)
     wb_run_step     Nullable(UInt64),
@@ -58,7 +57,7 @@ CREATE TABLE calls_complete_new (
 
     -- New columns
     ttl_at          DateTime DEFAULT '2050-01-01 00:00:00',
-    source          String DEFAULT '',
+    source          Enum8('direct' = 1, 'dual' = 2, 'migration' = 3) DEFAULT 'migration',
     speedy_keys     JSON DEFAULT '{}',
 
     -- Indexes (carried forward from v1 + new)
@@ -115,7 +114,7 @@ SELECT
     wb_run_step,
     wb_run_step_end,
     toDateTime('2050-01-01 00:00:00') AS ttl_at,
-    '' AS source,
+    'migration' AS source,
     '{}' AS speedy_keys
 FROM calls_complete;
 
@@ -149,7 +148,7 @@ SELECT
     wb_run_step,
     wb_run_step_end,
     toDateTime('2050-01-01 00:00:00') AS ttl_at,
-    '' AS source,
+    'migration' AS source,
     '{}' AS speedy_keys
 FROM calls_complete;
 
@@ -201,7 +200,7 @@ SELECT
     anySimpleState(calls_complete.op_name) as op_name,
     anySimpleState(calls_complete.started_at) as started_at,
     anySimpleState(calls_complete.ended_at) as ended_at,
-    anySimpleState(length(toString(calls_complete.attributes_dump))) as attributes_size_bytes,
+    anySimpleState(length(calls_complete.attributes_dump)) as attributes_size_bytes,
     anySimpleState(length(calls_complete.inputs_dump)) as inputs_size_bytes,
     anySimpleState(length(calls_complete.output_dump)) as output_size_bytes,
     anySimpleState(length(calls_complete.summary_dump)) as summary_size_bytes,
