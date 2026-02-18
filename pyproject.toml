@@ -277,6 +277,7 @@ select = [
   "E711",    # https://docs.astral.sh/ruff/rules/none-comparison/
   "E713",    # https://docs.astral.sh/ruff/rules/not-in-test/
   "PYI019",  # https://docs.astral.sh/ruff/rules/custom-type-var-for-self/
+  "FA",      # https://docs.astral.sh/ruff/rules/#flake8-future-annotations-fa
 ]
 ignore = [
   # Fix these when possible.  They are formatting changes related to the docs!
