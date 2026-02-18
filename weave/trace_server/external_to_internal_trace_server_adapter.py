@@ -36,8 +36,9 @@ class IdConverter:
         raise NotImplementedError()
 
     def get_auth_user(self) -> typing.Any:
-        """Override to provide auth user for username resolution.
+        """Return the authenticated user from auth scope, if available.
 
+        Used to populate wb_username on calls that belong to the current user.
         Returns an object with `id` and `username` attributes, or None.
         """
         return None
