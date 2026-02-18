@@ -135,7 +135,9 @@ def pdf_bytes() -> bytes:
     buf = io.BytesIO()
     c = pdf_canvas.Canvas(buf, pagesize=letter)
     for i in range(80):
-        c.drawString(50, 750 - (i * 9), f"Line {i}: padding content for reliable MIME detection")
+        c.drawString(
+            50, 750 - (i * 9), f"Line {i}: padding content for reliable MIME detection"
+        )
     c.save()
     return buf.getvalue()
 
