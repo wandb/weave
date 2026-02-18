@@ -43,6 +43,14 @@ class IdConverter:
         """
         return None
 
+    def get_username_for_user_id(self, user_id: str) -> str | None:
+        """Look up the username for a given external user ID.
+
+        Implementations should cache results for efficiency. Returns None if the
+        username cannot be resolved.
+        """
+        return None
+
 
 A = TypeVar("A")
 B = TypeVar("B")
@@ -159,10 +167,9 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
             res.call.wb_run_id = self._idc.int_to_ext_run_id(res.call.wb_run_id)
         if res.call.wb_user_id is not None:
             res.call.wb_user_id = self._idc.int_to_ext_user_id(res.call.wb_user_id)
-            # Resolve username from auth scope when user matches
-            auth_user = self._idc.get_auth_user()
-            if auth_user and res.call.wb_user_id == auth_user.id:
-                res.call.wb_username = auth_user.username
+            res.call.wb_username = self._idc.get_username_for_user_id(
+                res.call.wb_user_id
+            )
         return res
 
     def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
@@ -182,7 +189,6 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
                 ]
             # TODO: How do we correctly process user_id for the query filters?
         res = self._ref_apply(self._internal_trace_server.calls_query, req)
-        auth_user = self._idc.get_auth_user()
         for call in res.calls:
             if call.project_id != req.project_id:
                 raise ValueError("Internal Error - Project Mismatch")
@@ -191,9 +197,7 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
                 call.wb_run_id = self._idc.int_to_ext_run_id(call.wb_run_id)
             if call.wb_user_id is not None:
                 call.wb_user_id = self._idc.int_to_ext_user_id(call.wb_user_id)
-                # Resolve username from auth scope when user matches
-                if auth_user and call.wb_user_id == auth_user.id:
-                    call.wb_username = auth_user.username
+                call.wb_username = self._idc.get_username_for_user_id(call.wb_user_id)
         return res
 
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
@@ -215,7 +219,6 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         res = self._stream_ref_apply(
             self._internal_trace_server.calls_query_stream, req
         )
-        auth_user = self._idc.get_auth_user()
         for call in res:
             if call.project_id != req.project_id:
                 raise ValueError("Internal Error - Project Mismatch")
@@ -224,9 +227,7 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
                 call.wb_run_id = self._idc.int_to_ext_run_id(call.wb_run_id)
             if call.wb_user_id is not None:
                 call.wb_user_id = self._idc.int_to_ext_user_id(call.wb_user_id)
-                # Resolve username from auth scope when user matches
-                if auth_user and call.wb_user_id == auth_user.id:
-                    call.wb_username = auth_user.username
+                call.wb_username = self._idc.get_username_for_user_id(call.wb_user_id)
             yield call
 
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:

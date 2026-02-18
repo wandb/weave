@@ -93,6 +93,12 @@ class DummyIdConverter(external_to_internal_trace_server_adapter.IdConverter):
     def get_auth_user(self) -> DummyAuthUser | None:
         return self._auth_user
 
+    def get_username_for_user_id(self, user_id: str) -> str | None:
+        # For tests, return username if the auth_user matches, otherwise None
+        if self._auth_user and user_id == self._auth_user.id:
+            return self._auth_user.username
+        return None
+
 
 class TestOnlyUserInjectingExternalTraceServer(
     external_to_internal_trace_server_adapter.ExternalTraceServer
