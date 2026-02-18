@@ -380,6 +380,10 @@ def client(zero_stack, request, trace_server, caching_client_isolation):
         yield client
     finally:
         weave_client_context.set_weave_client_global(None)
+        try:
+            client.server.close()
+        except Exception:
+            pass
 
 
 @pytest.fixture
@@ -406,6 +410,10 @@ def client_creator(zero_stack, request, trace_server, caching_client_isolation):
             weave.trace.settings.parse_and_apply_settings(
                 weave.trace.settings.UserSettings()
             )
+            try:
+                client.server.close()
+            except Exception:
+                pass
 
     return client
 
