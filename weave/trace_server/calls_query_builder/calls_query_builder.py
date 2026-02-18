@@ -2462,11 +2462,11 @@ def _build_calls_complete_stats_query(
     table_name = get_calls_table_name(ReadTable.CALLS_COMPLETE)
     cq = _build_stats_calls_query(req, ReadTable.CALLS_COMPLETE)
 
-    # Inject deleted_at filter for calls_complete (epoch zero = not deleted).
+    # Inject deleted_at sentinel filter for calls_complete (epoch zero = not deleted).
     # This is needed because _build_query_body doesn't inject it automatically --
-    # that happens in as_sql() which we bypass here. Using None as the literal
-    # triggers the sentinel handling in process_operation, which produces the
-    # correct DateTime64(3) typed comparison.
+    # that happens in as_sql() which we bypass here.
+    # Use None as the literal so process_operation applies the sentinel value with
+    # proper DateTime64(3) typing (same pattern as as_sql()).
     cq.add_condition(
         tsi_query.EqOperation.model_validate(
             {
