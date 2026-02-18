@@ -27,10 +27,13 @@ def _get_magic_instances() -> tuple[Any, Any]:
         _magic_checked = True
         try:
             import magic
+
             _magic_mime_instance = magic.Magic(mime=True)
-            _magic_ext_instance = magic.Magic(extension=True) # type: ignore
+            _magic_ext_instance = magic.Magic(extension=True)  # type: ignore
         except NotImplementedError as e:
-            logger.warning("libmagic version out of date, upgrade libmagic to version above 524 for extension detection.")
+            logger.warning(
+                "libmagic version out of date, upgrade libmagic to version above 524 for extension detection."
+            )
             _magic_ext_instance = None
         except (ImportError, Exception) as e:
             logger.debug("python-magic is not available: %s", e)
