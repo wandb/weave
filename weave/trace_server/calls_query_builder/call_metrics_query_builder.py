@@ -42,11 +42,14 @@ def _normalize_call_metrics(metrics: list[CallMetricSpec]) -> list[CallMetricSpe
     return normalized
 
 
-def _get_call_metric_extraction_sql(metric: str) -> str:
+def _get_call_metric_extraction_sql(
+    metric: str, read_table: ReadTable = ReadTable.CALLS_MERGED
+) -> str:
     """Generate SQL to extract a call-level metric.
 
     Args:
         metric: The metric name (latency_ms, call_count, error_count)
+        read_table: Which table to query; affects NULL vs sentinel checks.
 
     Returns:
         SQL expression that extracts the metric value.
@@ -56,6 +59,8 @@ def _get_call_metric_extraction_sql(metric: str) -> str:
     elif metric == "call_count":
         return "1"
     elif metric == "error_count":
+        if read_table == ReadTable.CALLS_COMPLETE:
+            return "if(exception != '', 1, 0)"
         return "if(exception IS NOT NULL, 1, 0)"
     else:
         raise ValueError(f"Unknown call metric: {metric}")
@@ -96,7 +101,7 @@ def build_call_metrics_query(
     inner_metric_exprs: list[str] = []
     for metric_spec in normalized_metrics:
         metric = metric_spec.metric
-        extraction_sql = _get_call_metric_extraction_sql(metric)
+        extraction_sql = _get_call_metric_extraction_sql(metric, read_table)
         inner_metric_exprs.append(f"{extraction_sql} AS m_{metric}")
 
     inner_metric_sql = ",\n        ".join(inner_metric_exprs)

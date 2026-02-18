@@ -1707,8 +1707,15 @@ def _handle_status_summary_field(
     success_param = pb.add_param(tsi.TraceStatus.SUCCESS.value)
     descendant_error_param = pb.add_param(tsi.TraceStatus.DESCENDANT_ERROR.value)
 
+    # For calls_complete (use_agg_fn=False), exception is non-nullable String
+    # with sentinel ''. For calls_merged (use_agg_fn=True), exception is Nullable.
+    if use_agg_fn:
+        exception_check = f"{exception_sql} IS NOT NULL"
+    else:
+        exception_check = f"{exception_sql} != ''"
+
     return f"""CASE
-        WHEN {exception_sql} IS NOT NULL THEN {param_slot(error_param, "String")}
+        WHEN {exception_check} THEN {param_slot(error_param, "String")}
         WHEN IFNULL({status_counts_sql}, 0) > 0 THEN {param_slot(descendant_error_param, "String")}
         WHEN {ended_to_sql} IS NULL THEN {param_slot(running_param, "String")}
         ELSE {param_slot(success_param, "String")}
@@ -2691,7 +2698,7 @@ def build_calls_complete_update_end_query(
         UPDATE {formatted_table}
         SET
             ended_at = fromUnixTimestamp64Micro({{{ended_at_param}:Int64}}, 'UTC'),
-            exception = {{{exception_param}:Nullable(String)}},
+            exception = {{{exception_param}:String}},
             output_dump = {{{output_dump_param}:String}},
             summary_dump = {{{summary_dump_param}:String}},
             output_refs = {{{output_refs_param}:Array(String)}},

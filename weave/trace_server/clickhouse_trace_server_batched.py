@@ -834,7 +834,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         project_id_param = pb.add_param(end_call.project_id)
         id_param = pb.add_param(end_call.id)
         ended_at_param = pb.add_param(ended_at_us)
-        exception_param = pb.add_param(end_call.exception)
+        exception_param = pb.add_param(end_call.exception or "")
         output_dump_param = pb.add_param(output_dump)
         summary_dump_param = pb.add_param(summary_dump)
         output_refs_param = pb.add_param(output_refs)
