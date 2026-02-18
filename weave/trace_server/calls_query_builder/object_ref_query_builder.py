@@ -69,6 +69,7 @@ from weave.trace_server.orm import (
     quote_json_path,
     split_escaped_field_path,
 )
+from weave.trace_server.project_version.types import ReadTable
 
 if TYPE_CHECKING:
     from weave.trace_server.calls_query_builder.calls_query_builder import (
@@ -237,7 +238,7 @@ class ObjectRefCondition(BaseModel):
         pb: "ParamBuilder",
         table_alias: str,
         field_to_object_join_alias_map: dict[str, str],
-        use_agg_fn: bool = True,
+        read_table: ReadTable = ReadTable.CALLS_MERGED,
         is_order_join: bool = False,
     ) -> str:
         """Generate SQL condition for this object reference condition.
@@ -246,6 +247,7 @@ class ObjectRefCondition(BaseModel):
             pb: Parameter builder for SQL parameters
             table_alias: Table alias to use in the query
             field_to_object_join_alias_map: Mapping from condition keys to CTE names
+            read_table: Which table to query (calls_merged or calls_complete)
 
         Returns:
             str: SQL condition string
@@ -261,6 +263,7 @@ class ObjectRefCondition(BaseModel):
             )
 
         cte_alias = field_to_object_join_alias_map[self.unique_key]
+        use_agg_fn = read_table != ReadTable.CALLS_COMPLETE
 
         # Extract the root field and accessor key from the condition
         root_field = self.get_root_field()
@@ -444,13 +447,13 @@ class ObjectRefQueryProcessor:
         table_alias: str,
         expand_columns: list[str],
         field_to_object_join_alias_map: dict[str, str],
-        use_agg_fn: bool = True,
+        read_table: ReadTable = ReadTable.CALLS_MERGED,
     ):
         self.pb = pb
         self.table_alias = table_alias
         self.expand_columns = expand_columns
         self.field_to_object_join_alias_map = field_to_object_join_alias_map
-        self.use_agg_fn = use_agg_fn
+        self.read_table = read_table
         self.fields_used: set[str] = set()
 
     def process_operand(self, operand: "tsi_query.Operand") -> str:
@@ -496,7 +499,7 @@ class ObjectRefQueryProcessor:
                 self.pb,
                 self.table_alias,
                 self.field_to_object_join_alias_map,
-                use_agg_fn=self.use_agg_fn,
+                read_table=self.read_table,
             )
         else:
             # Handle as normal condition
@@ -508,7 +511,7 @@ class ObjectRefQueryProcessor:
                 tsi_query.Query.model_validate({"$expr": {"$and": [operand]}}),
                 self.pb,
                 self.table_alias,
-                use_agg_fn=self.use_agg_fn,
+                read_table=self.read_table,
             )
             self.fields_used.update(f.field for f in filter_conditions.fields_used)
             return combine_conditions(filter_conditions.conditions, "AND")

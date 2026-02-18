@@ -6447,3 +6447,37 @@ def test_calls_query_ordering_with_costs_comprehensive(client):
     assert calls[0].id == call6.id
     assert calls[1].id == call5.id
     assert calls[2].id == call4.id
+
+
+def test_sentinel_round_trip_none_values(client):
+    """Verify that None values survive the full write→read pipeline without leaking sentinels.
+
+    The calls_complete table uses non-nullable columns with sentinel values (empty string
+    for strings, epoch 1970-01-01 for datetimes) instead of NULL. The app layer converts
+    between Python None and sentinels at the ClickHouse boundary. This test validates
+    that nullable fields remain None when read back, not "".
+    """
+
+    @weave.op
+    def returns_none() -> None:
+        return None
+
+    returns_none()
+
+    calls = list(client.get_calls())
+    assert len(calls) == 1
+    c = calls[0]
+
+    # Nullable fields that should be None must not leak sentinels (e.g. "")
+    assert c.parent_id is None
+    assert c.exception is None
+    assert c.wb_run_id is None
+    assert c.display_name is None
+    assert c.output is None
+
+    # Non-null fields must be present
+    assert c.id is not None
+    assert c.trace_id is not None
+    assert c.started_at is not None
+    assert c.ended_at is not None
+    assert c.op_name is not None

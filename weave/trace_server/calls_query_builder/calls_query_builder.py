@@ -128,7 +128,10 @@ class QueryBuilderField(BaseModel):
         return clickhouse_cast(f"{table_alias}.{self.field}", cast)
 
     def as_select_sql(
-        self, pb: ParamBuilder, table_alias: str, use_agg_fn: bool = True
+        self,
+        pb: ParamBuilder,
+        table_alias: str,
+        read_table: "ReadTable" = ReadTable.CALLS_MERGED,
     ) -> str:
         return f"{self.as_sql(pb, table_alias)} AS {self.field}"
 
@@ -146,17 +149,21 @@ class CallsMergedAggField(CallsMergedField):
         pb: ParamBuilder,
         table_alias: str,
         cast: tsi_query.CastTo | None = None,
-        use_agg_fn: bool = True,
+        read_table: "ReadTable" = ReadTable.CALLS_MERGED,
     ) -> str:
+        use_agg_fn = read_table != ReadTable.CALLS_COMPLETE
         inner = super().as_sql(pb, table_alias)
         if not use_agg_fn:
             return clickhouse_cast(inner, cast)
         return clickhouse_cast(f"{self.agg_fn}({inner})", cast)
 
     def as_select_sql(
-        self, pb: ParamBuilder, table_alias: str, use_agg_fn: bool = True
+        self,
+        pb: ParamBuilder,
+        table_alias: str,
+        read_table: "ReadTable" = ReadTable.CALLS_MERGED,
     ) -> str:
-        return f"{self.as_sql(pb, table_alias, use_agg_fn=use_agg_fn)} AS {self.field}"
+        return f"{self.as_sql(pb, table_alias, read_table=read_table)} AS {self.field}"
 
 
 class AggFieldWithTableOverrides(CallsMergedAggField):
@@ -169,9 +176,9 @@ class AggFieldWithTableOverrides(CallsMergedAggField):
         pb: ParamBuilder,
         table_alias: str,
         cast: tsi_query.CastTo | None = None,
-        use_agg_fn: bool = True,
+        read_table: "ReadTable" = ReadTable.CALLS_MERGED,
     ) -> str:
-        return super().as_sql(pb, self.table_name, cast, use_agg_fn)
+        return super().as_sql(pb, self.table_name, cast, read_table)
 
 
 class CallsMergedDynamicField(CallsMergedAggField):
@@ -182,20 +189,23 @@ class CallsMergedDynamicField(CallsMergedAggField):
         pb: ParamBuilder,
         table_alias: str,
         cast: tsi_query.CastTo | None = None,
-        use_agg_fn: bool = True,
+        read_table: "ReadTable" = ReadTable.CALLS_MERGED,
     ) -> str:
-        res = super().as_sql(pb, table_alias, use_agg_fn=use_agg_fn)
+        res = super().as_sql(pb, table_alias, read_table=read_table)
         return json_dump_field_as_sql(pb, table_alias, res, self.extra_path, cast)
 
     def as_select_sql(
-        self, pb: ParamBuilder, table_alias: str, use_agg_fn: bool = True
+        self,
+        pb: ParamBuilder,
+        table_alias: str,
+        read_table: "ReadTable" = ReadTable.CALLS_MERGED,
     ) -> str:
         if self.extra_path:
             raise NotImplementedError(
                 "Dynamic fields cannot be selected directly, yet - implement me!"
             )
         return (
-            f"{super().as_sql(pb, table_alias, use_agg_fn=use_agg_fn)} AS {self.field}"
+            f"{super().as_sql(pb, table_alias, read_table=read_table)} AS {self.field}"
         )
 
     def with_path(self, path: list[str]) -> "CallsMergedDynamicField":
@@ -220,12 +230,12 @@ class CallsMergedSummaryField(CallsMergedField):
         pb: ParamBuilder,
         table_alias: str,
         cast: tsi_query.CastTo | None = None,
-        use_agg_fn: bool = True,
+        read_table: "ReadTable" = ReadTable.CALLS_MERGED,
     ) -> str:
         # Look up handler for the requested summary field
         handler = get_summary_field_handler(self.summary_field)
         if handler:
-            sql = handler(pb, table_alias, use_agg_fn)
+            sql = handler(pb, table_alias, read_table)
             return clickhouse_cast(sql, cast)
         else:
             supported_fields = ", ".join(SUMMARY_FIELD_HANDLERS.keys())
@@ -235,9 +245,12 @@ class CallsMergedSummaryField(CallsMergedField):
             )
 
     def as_select_sql(
-        self, pb: ParamBuilder, table_alias: str, use_agg_fn: bool = True
+        self,
+        pb: ParamBuilder,
+        table_alias: str,
+        read_table: "ReadTable" = ReadTable.CALLS_MERGED,
     ) -> str:
-        return f"{self.as_sql(pb, table_alias, use_agg_fn=use_agg_fn)} AS {self.field}"
+        return f"{self.as_sql(pb, table_alias, read_table=read_table)} AS {self.field}"
 
     def is_heavy(self) -> bool:
         # These are computed from non-heavy fields (status uses exception and ended_at)
@@ -289,7 +302,7 @@ class CallsMergedFeedbackPayloadField(CallsMergedField):
         pb: ParamBuilder,
         table_alias: str,
         cast: tsi_query.CastTo | None = None,
-        use_agg_fn: bool = True,
+        read_table: "ReadTable" = ReadTable.CALLS_MERGED,
     ) -> str:
         """Generate SQL for accessing feedback payload fields.
 
@@ -297,13 +310,14 @@ class CallsMergedFeedbackPayloadField(CallsMergedField):
             pb: Parameter builder for query parameterization
             table_alias: The table alias (unused, always uses 'feedback')
             cast: Optional cast type for the result
-            use_agg_fn: Whether to use aggregate functions (anyIf/any).
-                When True (calls_merged): uses anyIf() to pick one feedback entry per call
-                When False (calls_complete): uses CASE WHEN to conditionally access feedback
+            read_table: Which table to query (calls_merged or calls_complete).
+                When calls_merged: uses anyIf() to pick one feedback entry per call
+                When calls_complete: uses CASE WHEN to conditionally access feedback
 
         Returns:
             SQL expression for the feedback field
         """
+        use_agg_fn = read_table != ReadTable.CALLS_COMPLETE
         inner = super().as_sql(pb, "feedback")
         if self.feedback_type == "*":
             # If we are aggregating (calls_merged) use any, non-aggregate uses directly
@@ -324,7 +338,10 @@ class CallsMergedFeedbackPayloadField(CallsMergedField):
         return json_dump_field_as_sql(pb, "feedback", res, self.extra_path, cast)
 
     def as_select_sql(
-        self, pb: ParamBuilder, table_alias: str, use_agg_fn: bool = True
+        self,
+        pb: ParamBuilder,
+        table_alias: str,
+        read_table: "ReadTable" = ReadTable.CALLS_MERGED,
     ) -> str:
         raise NotImplementedError(
             "Feedback fields cannot be selected directly, yet - implement me!"
@@ -346,7 +363,7 @@ class CallsMergedQueueItemField(CallsMergedField):
         pb: ParamBuilder,
         table_alias: str,
         cast: tsi_query.CastTo | None = None,
-        use_agg_fn: bool = True,
+        read_table: "ReadTable" = ReadTable.CALLS_MERGED,
     ) -> str:
         """Generate SQL for accessing queue item fields.
 
@@ -354,19 +371,23 @@ class CallsMergedQueueItemField(CallsMergedField):
             pb: Parameter builder for query parameterization
             table_alias: The table alias (unused, always uses 'annotation_queue_items')
             cast: Optional cast type for the result
-            use_agg_fn: Whether to use aggregate functions.
-                When True (calls_merged): uses any() to aggregate queue items per call
-                When False (calls_complete): directly references the field without aggregation
+            read_table: Which table to query (calls_merged or calls_complete).
+                When calls_merged: uses any() to aggregate queue items per call
+                When calls_complete: directly references the field without aggregation
 
         Returns:
             SQL expression for the queue item field
         """
+        use_agg_fn = read_table != ReadTable.CALLS_COMPLETE
         inner = f"annotation_queue_items.{self.field}"
         res = inner if not use_agg_fn else f"any({inner})"
         return clickhouse_cast(res, cast)
 
     def as_select_sql(
-        self, pb: ParamBuilder, table_alias: str, use_agg_fn: bool = True
+        self,
+        pb: ParamBuilder,
+        table_alias: str,
+        read_table: "ReadTable" = ReadTable.CALLS_MERGED,
     ) -> str:
         raise NotImplementedError(
             "Queue item fields cannot be selected directly, yet - implement me!"
@@ -390,17 +411,21 @@ class AggregatedDataSizeField(CallsMergedField):
         return super().as_sql(pb, table_alias, cast)
 
     def as_select_sql(
-        self, pb: ParamBuilder, table_alias: str, use_agg_fn: bool = True
+        self,
+        pb: ParamBuilder,
+        table_alias: str,
+        read_table: "ReadTable" = ReadTable.CALLS_MERGED,
     ) -> str:
         # It doesn't make sense for a non-root call to have a total storage size,
         # even if a value could be computed.
+        use_agg_fn = read_table != ReadTable.CALLS_COMPLETE
         parent_id_expr = maybe_agg(f"{table_alias}.parent_id", use_agg_fn)
         storage_expr = maybe_agg(
             f"{self.join_table_name}.total_storage_size_bytes", use_agg_fn
         )
-        # For calls_complete (use_agg_fn=False), parent_id uses sentinel ''
-        # instead of NULL. For calls_merged (use_agg_fn=True), use IS NULL.
-        if use_agg_fn:
+        # For calls_complete (read_table=CALLS_COMPLETE), parent_id uses sentinel ''
+        # instead of NULL. For calls_merged, use IS NULL.
+        if read_table != ReadTable.CALLS_COMPLETE:
             null_check = f"{parent_id_expr} IS NULL"
         else:
             null_check = f"{parent_id_expr} = ''"
@@ -441,7 +466,10 @@ class QueryBuilderDynamicField(QueryBuilderField):
         return json_dump_field_as_sql(pb, table_alias, res, self.extra_path, cast)
 
     def as_select_sql(
-        self, pb: ParamBuilder, table_alias: str, use_agg_fn: bool = True
+        self,
+        pb: ParamBuilder,
+        table_alias: str,
+        read_table: "ReadTable" = ReadTable.CALLS_MERGED,
     ) -> str:
         if self.extra_path:
             raise NotImplementedError(
@@ -528,7 +556,7 @@ class OrderField(BaseModel):
         table_alias: str,
         expand_columns: list[str] | None = None,
         field_to_object_join_alias_map: dict[str, str] | None = None,
-        use_agg_fn: bool = True,
+        read_table: "ReadTable" = ReadTable.CALLS_MERGED,
     ) -> str:
         options: list[tuple[tsi_query.CastTo | None, str]]
         if isinstance(
@@ -560,18 +588,19 @@ class OrderField(BaseModel):
             )
             cte_alias = field_to_object_join_alias_map.get(order_condition.unique_key)
             if cte_alias:
-                return self._build_object_ref_order_sql(cte_alias, options, use_agg_fn)
+                return self._build_object_ref_order_sql(cte_alias, options, read_table)
 
         # Standard field ordering logic
-        return self._build_standard_order_sql(pb, table_alias, options, use_agg_fn)
+        return self._build_standard_order_sql(pb, table_alias, options, read_table)
 
     def _build_object_ref_order_sql(
         self,
         cte_alias: str,
         options: list[tuple[tsi_query.CastTo | None, str]],
-        use_agg_fn: bool,
+        read_table: "ReadTable",
     ) -> str:
         """Build ORDER BY SQL for object reference fields."""
+        use_agg_fn = read_table != ReadTable.CALLS_COMPLETE
         base_expr = f"{cte_alias}.object_val_dump"
         base_sql = maybe_agg(base_expr, use_agg_fn)
 
@@ -590,7 +619,7 @@ class OrderField(BaseModel):
         pb: ParamBuilder,
         table_alias: str,
         options: list[tuple[tsi_query.CastTo | None, str]],
-        use_agg_fn: bool,
+        read_table: "ReadTable",
     ) -> str:
         """Build ORDER BY SQL for standard fields."""
         parts = []
@@ -604,7 +633,7 @@ class OrderField(BaseModel):
                 ),
             ):
                 field_sql = self.field.as_sql(
-                    pb, table_alias, cast_to, use_agg_fn=use_agg_fn
+                    pb, table_alias, cast_to, read_table=read_table
                 )
             else:
                 field_sql = self.field.as_sql(pb, table_alias, cast_to)
@@ -638,8 +667,7 @@ class Condition(BaseModel):
         table_alias: str,
         expand_columns: list[str] | None = None,
         field_to_object_join_alias_map: dict[str, str] | None = None,
-        use_agg_fn: bool = True,
-        read_table: "ReadTable | None" = None,
+        read_table: "ReadTable" = ReadTable.CALLS_MERGED,
     ) -> str:
         # Check if this condition involves object references
         if (
@@ -652,7 +680,7 @@ class Condition(BaseModel):
                 table_alias,
                 expand_columns,
                 field_to_object_join_alias_map,
-                use_agg_fn=use_agg_fn,
+                read_table=read_table,
             )
             sql = processor.process_operand(self.operand)
             if self._consumed_fields is None:
@@ -665,7 +693,6 @@ class Condition(BaseModel):
             tsi_query.Query.model_validate({"$expr": {"$and": [self.operand]}}),
             pb,
             table_alias,
-            use_agg_fn=use_agg_fn,
             read_table=read_table,
         )
         if self._consumed_fields is None:
@@ -740,11 +767,14 @@ class HardCodedFilter(BaseModel):
         )
 
     def as_sql(
-        self, pb: ParamBuilder, table_alias: str, use_agg_fn: bool = True
+        self,
+        pb: ParamBuilder,
+        table_alias: str,
+        read_table: "ReadTable" = ReadTable.CALLS_MERGED,
     ) -> str:
         return combine_conditions(
             process_calls_filter_to_conditions(
-                self.filter, pb, table_alias, use_agg_fn=use_agg_fn
+                self.filter, pb, table_alias, read_table=read_table
             ),
             "AND",
         )
@@ -765,11 +795,6 @@ class CallsQuery(BaseModel):
     include_storage_size: bool = False
     include_total_storage_size: bool = False
     read_table: ReadTable = ReadTable.CALLS_MERGED
-
-    @property
-    def use_agg_fn(self) -> bool:
-        """Whether to use aggregate functions in SQL generation."""
-        return self.read_table != ReadTable.CALLS_COMPLETE
 
     @property
     def table_name(self) -> str:
@@ -1343,7 +1368,7 @@ class CallsQuery(BaseModel):
                     table_alias,
                     field_to_object_join_alias_map,
                     is_order_join=True,
-                    use_agg_fn=False,
+                    read_table=ReadTable.CALLS_COMPLETE,
                 )
                 object_ref_joins_parts.append(join_condition_sql)
 
@@ -1388,7 +1413,6 @@ class CallsQuery(BaseModel):
                     table_alias,
                     expand_columns=expand_columns,
                     field_to_object_join_alias_map=field_to_object_join_alias_map,
-                    use_agg_fn=self.use_agg_fn,
                     read_table=self.read_table,
                 )
                 filter_conditions_sql.append(query_condition_sql)
@@ -1405,7 +1429,7 @@ class CallsQuery(BaseModel):
         if self.hardcoded_filter is not None:
             filter_conditions_sql.append(
                 self.hardcoded_filter.as_sql(
-                    pb, table_alias, use_agg_fn=self.use_agg_fn
+                    pb, table_alias, read_table=self.read_table
                 )
             )
 
@@ -1413,7 +1437,9 @@ class CallsQuery(BaseModel):
         if len(filter_conditions_sql) > 0:
             # For calls_complete, these become WHERE conditions (no GROUP BY)
             # For calls_merged, these are HAVING conditions (after GROUP BY)
-            prefix = "HAVING " if self.use_agg_fn else "AND "
+            prefix = (
+                "HAVING " if self.read_table != ReadTable.CALLS_COMPLETE else "AND "
+            )
             filter_sql = prefix + combine_conditions(filter_conditions_sql, "AND")
 
         return FilterConditionsResult(
@@ -1451,7 +1477,7 @@ class CallsQuery(BaseModel):
                     table_alias,
                     expand_columns,
                     field_to_object_join_alias_map,
-                    use_agg_fn=self.use_agg_fn,
+                    read_table=self.read_table,
                 )
                 for order_field in self.order_fields
             ]
@@ -1517,7 +1543,7 @@ class CallsQuery(BaseModel):
             id_subquery_name=id_subquery_name,
         )
         group_by_sql = ""
-        if self.use_agg_fn:
+        if self.read_table != ReadTable.CALLS_COMPLETE:
             group_by_sql = f"GROUP BY ({table_alias}.project_id, {table_alias}.id)"
 
         # Use PREWHERE for project_id to filter data before reading from disk
@@ -1530,10 +1556,14 @@ class CallsQuery(BaseModel):
         )
 
         # Fix where_clause when empty but we have filter_sql
-        # For calls_complete (use_agg_fn=False), filter_sql starts with "AND "
+        # For calls_complete, filter_sql starts with "AND "
         # If where_clause is empty, set it to "WHERE 1" so filter_sql can append naturally
         # TODO: optimize it further to make this condition builder smarter
-        if not where_clause and filter_result.filter_sql and not self.use_agg_fn:
+        if (
+            not where_clause
+            and filter_result.filter_sql
+            and self.read_table == ReadTable.CALLS_COMPLETE
+        ):
             where_clause = "WHERE 1"
 
         return f"""FROM {table_alias}
@@ -1570,7 +1600,7 @@ class CallsQuery(BaseModel):
             Complete SQL query string
         """
         select_fields_sql = ", ".join(
-            field.as_select_sql(pb, table_alias, use_agg_fn=self.use_agg_fn)
+            field.as_select_sql(pb, table_alias, read_table=self.read_table)
             for field in self.select_fields
         )
         body = self._build_query_body(
@@ -1673,18 +1703,20 @@ def _field_as_sql_maybe_agg(
     field: CallsMergedField,
     pb: ParamBuilder,
     table_alias: str,
-    use_agg_fn: bool = True,
+    read_table: "ReadTable" = ReadTable.CALLS_MERGED,
     cast: tsi_query.CastTo | None = None,
 ) -> str:
-    """Convert a field to SQL, passing use_agg_fn if the field supports it."""
+    """Convert a field to SQL, passing read_table if the field supports it."""
     if isinstance(field, CallsMergedAggField):
-        return field.as_sql(pb, table_alias, cast=cast, use_agg_fn=use_agg_fn)
+        return field.as_sql(pb, table_alias, cast=cast, read_table=read_table)
     return field.as_sql(pb, table_alias, cast=cast)
 
 
 # Handler function for status summary field
 def _handle_status_summary_field(
-    pb: ParamBuilder, table_alias: str, use_agg_fn: bool = True
+    pb: ParamBuilder,
+    table_alias: str,
+    read_table: "ReadTable" = ReadTable.CALLS_MERGED,
 ) -> str:
     # Status logic:
     # - If exception is not null -> ERROR
@@ -1695,11 +1727,11 @@ def _handle_status_summary_field(
     status_counts_field = get_field_by_name("summary.status_counts.error")
 
     exception_sql = _field_as_sql_maybe_agg(
-        exception_field, pb, table_alias, use_agg_fn
+        exception_field, pb, table_alias, read_table
     )
-    ended_to_sql = _field_as_sql_maybe_agg(ended_at_field, pb, table_alias, use_agg_fn)
+    ended_to_sql = _field_as_sql_maybe_agg(ended_at_field, pb, table_alias, read_table)
     status_counts_sql = _field_as_sql_maybe_agg(
-        status_counts_field, pb, table_alias, use_agg_fn, cast="int"
+        status_counts_field, pb, table_alias, read_table, cast="int"
     )
 
     error_param = pb.add_param(tsi.TraceStatus.ERROR.value)
@@ -1707,9 +1739,9 @@ def _handle_status_summary_field(
     success_param = pb.add_param(tsi.TraceStatus.SUCCESS.value)
     descendant_error_param = pb.add_param(tsi.TraceStatus.DESCENDANT_ERROR.value)
 
-    # For calls_complete (use_agg_fn=False), exception is non-nullable String
-    # with sentinel ''. For calls_merged (use_agg_fn=True), exception is Nullable.
-    if use_agg_fn:
+    # For calls_complete, exception is non-nullable String with sentinel ''.
+    # For calls_merged, exception is Nullable.
+    if read_table != ReadTable.CALLS_COMPLETE:
         exception_check = f"{exception_sql} IS NOT NULL"
     else:
         exception_check = f"{exception_sql} != ''"
@@ -1724,7 +1756,9 @@ def _handle_status_summary_field(
 
 # Handler function for latency_ms summary field
 def _handle_latency_ms_summary_field(
-    pb: ParamBuilder, table_alias: str, use_agg_fn: bool = True
+    pb: ParamBuilder,
+    table_alias: str,
+    read_table: "ReadTable" = ReadTable.CALLS_MERGED,
 ) -> str:
     # Latency_ms logic:
     # - If ended_at is null or there's an exception, return null
@@ -1733,9 +1767,9 @@ def _handle_latency_ms_summary_field(
     ended_at_field = get_field_by_name("ended_at")
 
     started_at_sql = _field_as_sql_maybe_agg(
-        started_at_field, pb, table_alias, use_agg_fn
+        started_at_field, pb, table_alias, read_table
     )
-    ended_at_sql = _field_as_sql_maybe_agg(ended_at_field, pb, table_alias, use_agg_fn)
+    ended_at_sql = _field_as_sql_maybe_agg(ended_at_field, pb, table_alias, read_table)
 
     # Convert time difference to milliseconds
     # Use toUnixTimestamp64Milli for direct and precise millisecond difference
@@ -1749,7 +1783,9 @@ def _handle_latency_ms_summary_field(
 
 # Handler function for trace_name summary field
 def _handle_trace_name_summary_field(
-    pb: ParamBuilder, table_alias: str, use_agg_fn: bool = True
+    pb: ParamBuilder,
+    table_alias: str,
+    read_table: "ReadTable" = ReadTable.CALLS_MERGED,
 ) -> str:
     # Trace_name logic:
     # - If display_name is available, use that
@@ -1759,9 +1795,9 @@ def _handle_trace_name_summary_field(
     op_name_field = get_field_by_name("op_name")
 
     display_name_sql = _field_as_sql_maybe_agg(
-        display_name_field, pb, table_alias, use_agg_fn
+        display_name_field, pb, table_alias, read_table
     )
-    op_name_sql = _field_as_sql_maybe_agg(op_name_field, pb, table_alias, use_agg_fn)
+    op_name_sql = _field_as_sql_maybe_agg(op_name_field, pb, table_alias, read_table)
 
     return f"""CASE
         WHEN {display_name_sql} IS NOT NULL AND {display_name_sql} != '' THEN {display_name_sql}
@@ -1782,7 +1818,7 @@ SUMMARY_FIELD_HANDLERS = {
 # Helper function to get a summary field handler by name
 def get_summary_field_handler(
     summary_field: str,
-) -> Callable[[ParamBuilder, str, bool], str] | None:
+) -> Callable[[ParamBuilder, str, "ReadTable"], str] | None:
     """Returns the handler function for a given summary field name."""
     return SUMMARY_FIELD_HANDLERS.get(summary_field)
 
@@ -1854,13 +1890,13 @@ def process_query_to_conditions(
     query: tsi.Query,
     param_builder: ParamBuilder,
     table_alias: str,
-    use_agg_fn: bool = True,
-    read_table: "ReadTable | None" = None,
+    read_table: "ReadTable" = ReadTable.CALLS_MERGED,
 ) -> FilterToConditions:
     """Converts a Query to a list of conditions for a clickhouse query."""
     conditions = []
     raw_fields_used: dict[str, CallsMergedField] = {}
-    use_sentinels = read_table == ReadTable.CALLS_COMPLETE if read_table else False
+    use_agg_fn = read_table != ReadTable.CALLS_COMPLETE
+    use_sentinels = read_table == ReadTable.CALLS_COMPLETE
 
     # This is the mongo-style query
     def process_operation(operation: tsi_query.Operation) -> str:
@@ -1900,16 +1936,7 @@ def process_query_to_conditions(
                 )
                 if sentinel is not None:
                     sentinel_param = param_builder.add_param(sentinel)
-                    sentinel_type = (
-                        "String"
-                        if isinstance(sentinel, str)
-                        else "DateTime64(3)"
-                        if field_name in ch_sentinel_values.SENTINEL_DATETIME_FIELDS
-                        else "String"
-                    )
-                    # Use DateTime64(6) for ended_at specifically
-                    if field_name == "ended_at":
-                        sentinel_type = "DateTime64(6)"
+                    sentinel_type = ch_sentinel_values.sentinel_ch_type(field_name)
                     cond = f"({lhs_part} = {param_slot(sentinel_param, sentinel_type)})"
                 else:
                     cond = f"({lhs_part} IS NULL)"
@@ -1975,7 +2002,7 @@ def process_query_to_conditions(
                 ),
             ):
                 field = structured_field.as_sql(
-                    param_builder, table_alias, use_agg_fn=use_agg_fn
+                    param_builder, table_alias, read_table=read_table
                 )
             else:
                 field = structured_field.as_sql(param_builder, table_alias)
@@ -2036,7 +2063,9 @@ def process_op_name_filter_to_sql(
     if not isinstance(op_field, CallsMergedAggField):
         raise TypeError("op_name is not an aggregate field")
 
-    op_field_sql = op_field.as_sql(param_builder, table_alias, use_agg_fn=False)
+    op_field_sql = op_field.as_sql(
+        param_builder, table_alias, read_table=ReadTable.CALLS_COMPLETE
+    )
     for name in op_names:
         if name.endswith(WILDCARD_ARTIFACT_VERSION_AND_PATH):
             wildcarded_names.append(name)
@@ -2080,7 +2109,7 @@ def process_trace_id_filter_to_sql(
     if not isinstance(trace_id_field, CallsMergedAggField):
         raise TypeError("trace_id is not an aggregate field")
     trace_id_field_sql = trace_id_field.as_sql(
-        param_builder, table_alias, use_agg_fn=False
+        param_builder, table_alias, read_table=ReadTable.CALLS_COMPLETE
     )
 
     # If there's only one trace_id, use an equality condition for performance
@@ -2115,7 +2144,7 @@ def process_thread_id_filter_to_sql(
     if not isinstance(thread_id_field, CallsMergedAggField):
         raise TypeError("thread_id is not an aggregate field")
     thread_id_field_sql = thread_id_field.as_sql(
-        param_builder, table_alias, use_agg_fn=False
+        param_builder, table_alias, read_table=ReadTable.CALLS_COMPLETE
     )
 
     # If there's only one thread_id, use an equality condition for performance
@@ -2150,7 +2179,7 @@ def process_turn_id_filter_to_sql(
     if not isinstance(turn_id_field, CallsMergedAggField):
         raise TypeError("turn_id is not an aggregate field")
     turn_id_field_sql = turn_id_field.as_sql(
-        param_builder, table_alias, use_agg_fn=False
+        param_builder, table_alias, read_table=ReadTable.CALLS_COMPLETE
     )
 
     # If there's only one turn_id, use an equality condition for performance
@@ -2179,7 +2208,7 @@ def process_trace_roots_only_filter_to_sql(
         raise TypeError("parent_id is not an aggregate field")
 
     parent_id_field_sql = parent_id_field.as_sql(
-        param_builder, table_alias, use_agg_fn=False
+        param_builder, table_alias, read_table=ReadTable.CALLS_COMPLETE
     )
 
     # For calls_complete, parent_id uses sentinel '' instead of NULL
@@ -2205,7 +2234,7 @@ def process_parent_ids_filter_to_sql(
         raise TypeError("parent_id is not an aggregate field")
 
     parent_id_field_sql = parent_id_field.as_sql(
-        param_builder, table_alias, use_agg_fn=False
+        param_builder, table_alias, read_table=ReadTable.CALLS_COMPLETE
     )
 
     parent_ids_sql = f"{parent_id_field_sql} IN {param_slot(param_builder.add_param(hardcoded_filter.filter.parent_ids), 'Array(String)')}"
@@ -2236,7 +2265,9 @@ def process_ref_filters_to_sql(
         if not isinstance(field, CallsMergedAggField):
             raise TypeError(f"{field_name} is not an aggregate field")
 
-        field_sql = field.as_sql(param_builder, table_alias, use_agg_fn=False)
+        field_sql = field.as_sql(
+            param_builder, table_alias, read_table=ReadTable.CALLS_COMPLETE
+        )
         param = param_builder.add_param(refs)
         ref_filter_sql = f"hasAny({field_sql}, {param_slot(param, 'Array(String)')})"
         return f"{ref_filter_sql} OR length({field_sql}) = 0"
@@ -2295,7 +2326,7 @@ def process_wb_run_ids_filter_to_sql(
         raise TypeError("wb_run_id is not an aggregate field")
 
     wb_run_id_field_sql = wb_run_id_field.as_sql(
-        param_builder, table_alias, use_agg_fn=False
+        param_builder, table_alias, read_table=ReadTable.CALLS_COMPLETE
     )
     wb_run_id_filter_sql = f"{wb_run_id_field_sql} IN {param_slot(param_builder.add_param(wb_run_ids), 'Array(String)')}"
 
@@ -2306,7 +2337,7 @@ def process_calls_filter_to_conditions(
     filter: tsi.CallsFilter,
     param_builder: ParamBuilder,
     table_alias: str,
-    use_agg_fn: bool = True,
+    read_table: "ReadTable" = ReadTable.CALLS_MERGED,
 ) -> list[str]:
     """Converts a CallsFilter to a list of conditions for a clickhouse query.
 
@@ -2316,7 +2347,7 @@ def process_calls_filter_to_conditions(
         filter: The CallsFilter to convert
         param_builder: Parameter builder for query parameterization
         table_alias: The table alias to use in SQL
-        use_agg_fn: Whether to wrap fields in aggregate functions (True for calls_merged)
+        read_table: Which table to query (calls_merged or calls_complete)
     """
     conditions: list[str] = []
 
@@ -2324,7 +2355,7 @@ def process_calls_filter_to_conditions(
         """Get SQL for a field, conditionally applying aggregation."""
         field = get_field_by_name(field_name)
         if isinstance(field, CallsMergedAggField):
-            return field.as_sql(param_builder, table_alias, use_agg_fn=use_agg_fn)
+            return field.as_sql(param_builder, table_alias, read_table=read_table)
         return field.as_sql(param_builder, table_alias)
 
     # technically not required, as we are now doing a pre-groupby optimization
@@ -2587,8 +2618,9 @@ def _optimized_wb_run_id_not_null_query(
     if read_table == ReadTable.CALLS_COMPLETE:
         wb_run_id_check = f"{table_name}.wb_run_id != ''"
         deleted_at_param = param_builder.add_param(ch_sentinel_values.SENTINEL_DATETIME)
+        deleted_at_type = ch_sentinel_values.sentinel_ch_type("deleted_at")
         deleted_at_check = (
-            f"{table_name}.deleted_at = {param_slot(deleted_at_param, 'DateTime64(3)')}"
+            f"{table_name}.deleted_at = {param_slot(deleted_at_param, deleted_at_type)}"
         )
     else:
         wb_run_id_check = f"{table_name}.wb_run_id IS NOT NULL"

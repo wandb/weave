@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from weave.trace_server.calls_query_builder.utils import param_slot
+from weave.trace_server.ch_sentinel_values import sentinel_ch_literal
 from weave.trace_server.orm import ParamBuilder, combine_conditions
 from weave.trace_server.project_version.types import ReadTable, TableConfig
 from weave.trace_server.trace_server_interface import (
@@ -275,8 +276,9 @@ def build_grouped_calls_subquery(
             f"{table_alias}.{column} AS {column}" for column in select_columns
         )
         group_by_clause = ""
-        # calls_complete uses non-nullable DateTime64(3) with epoch zero sentinel
-        deleted_at_filter = f"{table_alias}.deleted_at = toDateTime64(0, 3)"
+        deleted_at_filter = (
+            f"{table_alias}.deleted_at = {sentinel_ch_literal('deleted_at')}"
+        )
 
     return f"""
         SELECT

@@ -38,10 +38,69 @@ SENTINEL_DATETIME_FIELDS = frozenset(
 
 ALL_SENTINEL_FIELDS = SENTINEL_STRING_FIELDS | SENTINEL_DATETIME_FIELDS
 
+# Single source of truth for ClickHouse DateTime64 precision per column.
+# Must match the column definitions in migration 024_calls_complete_v2.up.sql.
+DATETIME_PRECISION: dict[str, int] = {
+    "ended_at": 6,
+    "updated_at": 3,
+    "deleted_at": 3,
+}
+
 
 def is_sentinel_field(field: str) -> bool:
     """Check if a field uses sentinel values in calls_complete."""
     return field in ALL_SENTINEL_FIELDS
+
+
+def sentinel_ch_type(field: str) -> str:
+    """Return the ClickHouse type string for a sentinel field's parameterized slot.
+
+    Args:
+        field: The column name.
+
+    Returns:
+        ClickHouse type string, e.g. "String" or "DateTime64(6)".
+
+    Raises:
+        ValueError: If the field is not a sentinel field.
+
+    Examples:
+        >>> sentinel_ch_type("deleted_at")
+        'DateTime64(3)'
+        >>> sentinel_ch_type("exception")
+        'String'
+    """
+    if field in SENTINEL_STRING_FIELDS:
+        return "String"
+    if field in SENTINEL_DATETIME_FIELDS:
+        precision = DATETIME_PRECISION[field]
+        return f"DateTime64({precision})"
+    raise ValueError(f"Not a sentinel field: {field}")
+
+
+def sentinel_ch_literal(field: str) -> str:
+    """Return a raw SQL literal for the sentinel value of a datetime field.
+
+    Useful in contexts where a parameterized slot is not available
+    (e.g. stats_query_base, hardcoded SQL fragments).
+
+    Args:
+        field: The datetime column name.
+
+    Returns:
+        SQL expression like "toDateTime64(0, 3)".
+
+    Raises:
+        ValueError: If the field is not a sentinel datetime field.
+
+    Examples:
+        >>> sentinel_ch_literal("deleted_at")
+        'toDateTime64(0, 3)'
+    """
+    if field not in SENTINEL_DATETIME_FIELDS:
+        raise ValueError(f"Not a sentinel datetime field: {field}")
+    precision = DATETIME_PRECISION[field]
+    return f"toDateTime64(0, {precision})"
 
 
 def get_sentinel_value(field: str) -> str | datetime.datetime | None:
