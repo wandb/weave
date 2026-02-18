@@ -1935,6 +1935,7 @@ def process_query_to_conditions(
                     else None
                 )
                 if sentinel is not None:
+                    assert field_name is not None
                     sentinel_param = param_builder.add_param(sentinel)
                     sentinel_type = ch_sentinel_values.sentinel_ch_type(field_name)
                     cond = f"({lhs_part} = {param_slot(sentinel_param, sentinel_type)})"
