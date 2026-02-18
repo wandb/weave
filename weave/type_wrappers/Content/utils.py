@@ -8,7 +8,7 @@ from pathlib import Path
 # The types module is imported here as it has no external dependencies
 # and is used in the `_get_mimetypes_module` helper.
 from types import ModuleType
-from typing import TYPE_CHECKING, Any, cast
+from typing import Any
 from urllib.parse import unquote_to_bytes
 
 from weave.type_wrappers.Content.content_types import (
@@ -21,10 +21,6 @@ from weave.type_wrappers.Content.content_types import (
 
 logger = logging.getLogger(__name__)
 
-if TYPE_CHECKING:
-    # This block is only for static analysis and does not cause an import at runtime.
-    from polyfile.magic import MagicMatcher
-
 # See: https://mimesniff.spec.whatwg.org/
 # Buffer size should be >= 1445 for deterministic results in most cases
 # Most documentation uses 2048 to slightly exceed this requirement
@@ -33,6 +29,10 @@ MIME_DETECTION_BUFFER_SIZE = 2048
 
 # A global variable to hold the lazily imported mimetypes module.
 _mimetypes_module: ModuleType | None = None
+
+# Lazily resolved magic backend (python_magic_resolver or polyfile_magic_resolver).
+_UNSET: Any = object()
+_resolver: Any = _UNSET
 
 DATA_URL_PATTERN = re.compile(
     r"^data:(?P<media_type>[\w\/\-\+\.]+(?:;[\w\-]+\=[\w\-\.]+)*)?(?P<base64>;base64)?,(?P<data>.*)$"
@@ -53,6 +53,56 @@ def _get_mimetypes_module() -> ModuleType:
         _m.add_type("text/markdown", ".md")
         _mimetypes_module = _m
     return _mimetypes_module
+
+
+def _get_resolver() -> Any:
+    """Lazily resolve the magic backend.
+
+    Prefers python-magic (faster, supports from_file + extension detection),
+    falls back to polyfile (pure Python, buffer-only MIME detection).
+    Returns None if neither library is available.
+    """
+    global _resolver
+    if _resolver is not _UNSET:
+        return _resolver
+
+    from weave.type_wrappers.Content import python_magic_resolver
+
+    if python_magic_resolver.is_available():
+        _resolver = python_magic_resolver
+        return _resolver
+
+    from weave.type_wrappers.Content import polyfile_magic_resolver
+
+    if polyfile_magic_resolver.is_available():
+        _resolver = polyfile_magic_resolver
+        return _resolver
+
+    _resolver = None
+    return None
+
+
+def _detect_from_resolver(
+    *, filename: str | None, buffer: bytes | None
+) -> tuple[str | None, str | None]:
+    """Dispatch detection to the available magic backend.
+
+    Returns (mimetype, extension) tuple; either value may be None.
+    Logs a warning when no backend is available and buffer was provided.
+    """
+    resolver = _get_resolver()
+    if resolver is not None:
+        return resolver.detect(filename=filename, buffer=buffer)
+
+    if buffer is not None:
+        logger.warning(
+            "Failed to determine MIME type from file extension and cannot infer from data\n"
+            "MIME type detection from raw data requires python-magic or polyfile\n"
+            "Install one by running: `pip install python-magic` or `pip install polyfile`\n"
+            "python-magic requires libmagic: `apt-get install libmagic1` (Linux), "
+            "`brew install libmagic` (macOS), or `pip install python-magic-bin` (Windows)"
+        )
+    return None, None
 
 
 def full_name(obj: Any) -> str:
@@ -116,28 +166,24 @@ def get_extension_from_mimetype(mimetype: str) -> str | None:
 
 
 def guess_from_buffer(buffer: bytes) -> str | None:
-    """Guess the mimetype from a byte buffer using polyfile."""
+    """Guess the mimetype from a byte buffer using the available magic backend."""
     if len(buffer) == 0:
         return None
 
-    try:
-        # Lazily import polyfile only when needed.
-        from polyfile.magic import MagicMatcher
-    except (ImportError, ModuleNotFoundError):
+    resolver = _get_resolver()
+    if resolver is None:
         logger.warning(
             "Failed to determine MIME type from file extension and cannot infer from data\n"
-            "MIME type detection from raw data requires the polyfile library\n"
-            "Install it by running: `pip install polyfile `\n"
-            "See: https://pypi.org/project/polyfile for detailed instructions"
+            "MIME type detection from raw data requires python-magic or polyfile\n"
+            "Install one by running: `pip install python-magic` or `pip install polyfile`\n"
+            "python-magic requires libmagic: `apt-get install libmagic1` (Linux), "
+            "`brew install libmagic` (macOS), or `pip install python-magic-bin` (Windows)\n"
+            "See: https://pypi.org/project/python-magic for detailed instructions"
         )
         return None
 
-    try:
-        matcher = cast("MagicMatcher", MagicMatcher.DEFAULT_INSTANCE)
-        return next(matcher.match(buffer)).mimetypes[0]
-    except IndexError:
-        # This occurs if polyfile is installed but finds no match.
-        return None
+    mimetype, _ = resolver.detect(filename=None, buffer=buffer)
+    return mimetype
 
 
 def guess_from_filename(filename: str) -> str | None:
@@ -186,14 +232,25 @@ def get_mime_and_extension(
     ):
         return guessed_type, extension
 
+    # Stdlib mimetypes-based detection from filename / extension
     if filename is not None:
         mimetype = guess_from_filename(filename)
 
     if not mimetype and extension is not None:
         mimetype = guess_from_extension(extension)
 
-    if not mimetype and buffer is not None:
-        mimetype = guess_from_buffer(buffer[:MIME_DETECTION_BUFFER_SIZE])
+    # Content-based detection via magic backend (python-magic or polyfile).
+    # python-magic: tries magic.from_file first, falls back to from_buffer.
+    # polyfile: buffer-only detection, extension always None.
+    if not mimetype or not extension:
+        magic_mime, magic_ext = _detect_from_resolver(
+            filename=filename,
+            buffer=buffer[:MIME_DETECTION_BUFFER_SIZE] if buffer else None,
+        )
+        if not mimetype and magic_mime:
+            mimetype = magic_mime
+        if not extension and magic_ext:
+            extension = magic_ext
 
     if mimetype and extension:
         return mimetype, extension
