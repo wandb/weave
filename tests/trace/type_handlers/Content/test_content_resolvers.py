@@ -124,13 +124,18 @@ def wav_bytes() -> bytes:
 
 @pytest.fixture(scope="session")
 def pdf_bytes() -> bytes:
-    """Generate a minimal valid PDF as bytes."""
+    """Generate a valid PDF as bytes.
+
+    Adds enough content to exceed typical magic detection thresholds (~2 KB),
+    avoiding false-positive MIME matches on small binary payloads.
+    """
     from reportlab.lib.pagesizes import letter
     from reportlab.pdfgen import canvas as pdf_canvas
 
     buf = io.BytesIO()
     c = pdf_canvas.Canvas(buf, pagesize=letter)
-    c.drawString(100, 700, "Test")
+    for i in range(80):
+        c.drawString(50, 750 - (i * 9), f"Line {i}: padding content for reliable MIME detection")
     c.save()
     return buf.getvalue()
 
