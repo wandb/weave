@@ -6,6 +6,7 @@ file extension information.
 
 from __future__ import annotations
 
+import importlib.util
 import logging
 from typing import TYPE_CHECKING, cast
 
@@ -17,12 +18,7 @@ if TYPE_CHECKING:
 
 def is_available() -> bool:
     """Check whether polyfile is installed and usable."""
-    try:
-        from polyfile.magic import MagicMatcher
-
-        return True
-    except (ImportError, ModuleNotFoundError):
-        return False
+    return importlib.util.find_spec("polyfile.magic") is not None
 
 
 def detect(
@@ -46,6 +42,7 @@ def detect(
     try:
         matcher = cast("MagicMatcher", MagicMatcher.DEFAULT_INSTANCE)
         mimetype = next(matcher.match(buffer)).mimetypes[0]
-        return mimetype, None
     except (IndexError, StopIteration):
         return None, None
+    else:
+        return mimetype, None
