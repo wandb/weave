@@ -57,9 +57,7 @@ def test_username_resolved_when_auth_user_matches(sqlite_server):
 
     # Query calls via stream
     calls = list(
-        external_server.calls_query_stream(
-            tsi.CallsQueryReq(project_id=project_id)
-        )
+        external_server.calls_query_stream(tsi.CallsQueryReq(project_id=project_id))
     )
 
     assert len(calls) == 1
@@ -105,9 +103,7 @@ def test_username_none_when_auth_user_does_not_match(sqlite_server):
 
     # Query calls via stream
     calls = list(
-        external_server.calls_query_stream(
-            tsi.CallsQueryReq(project_id=project_id)
-        )
+        external_server.calls_query_stream(tsi.CallsQueryReq(project_id=project_id))
     )
 
     assert len(calls) == 1
@@ -148,9 +144,7 @@ def test_username_none_when_no_auth_user(sqlite_server):
 
     # Query calls via stream
     calls = list(
-        external_server.calls_query_stream(
-            tsi.CallsQueryReq(project_id=project_id)
-        )
+        external_server.calls_query_stream(tsi.CallsQueryReq(project_id=project_id))
     )
 
     assert len(calls) == 1
@@ -227,9 +221,7 @@ def test_username_resolved_in_call_read(sqlite_server):
     )
 
     # Read the call directly
-    res = external_server.call_read(
-        tsi.CallReadReq(project_id=project_id, id=call_id)
-    )
+    res = external_server.call_read(tsi.CallReadReq(project_id=project_id, id=call_id))
 
     assert res.call is not None
     assert res.call.wb_user_id == auth_user.id
