@@ -128,7 +128,8 @@ class CallCompleteCHInsertable(
     wb_run_step_end: int | None = None
 
     # New columns added in migration 024
-    ttl_at: datetime.datetime | None = None
+    # Default matches CH column: ttl_at DateTime DEFAULT '2050-01-01 00:00:00'
+    ttl_at: datetime.datetime = datetime.datetime(2050, 1, 1)
     source: str = ""
     speedy_keys: str = "{}"
 
