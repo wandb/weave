@@ -59,7 +59,7 @@ def _get_call_metric_extraction_sql(
     elif metric == "call_count":
         return "1"
     elif metric == "error_count":
-        if read_table == ReadTable.CALLS_COMPLETE:
+        if read_table != ReadTable.CALLS_MERGED:
             return "if(exception != '', 1, 0)"
         return "if(exception IS NOT NULL, 1, 0)"
     else:

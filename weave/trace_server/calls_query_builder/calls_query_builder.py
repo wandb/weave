@@ -151,7 +151,7 @@ class CallsMergedAggField(CallsMergedField):
         cast: tsi_query.CastTo | None = None,
         read_table: "ReadTable" = ReadTable.CALLS_MERGED,
     ) -> str:
-        use_agg_fn = read_table != ReadTable.CALLS_COMPLETE
+        use_agg_fn = read_table == ReadTable.CALLS_MERGED
         inner = super().as_sql(pb, table_alias)
         if not use_agg_fn:
             return clickhouse_cast(inner, cast)
@@ -317,7 +317,7 @@ class CallsMergedFeedbackPayloadField(CallsMergedField):
         Returns:
             SQL expression for the feedback field
         """
-        use_agg_fn = read_table != ReadTable.CALLS_COMPLETE
+        use_agg_fn = read_table == ReadTable.CALLS_MERGED
         inner = super().as_sql(pb, "feedback")
         if self.feedback_type == "*":
             # If we are aggregating (calls_merged) use any, non-aggregate uses directly
@@ -378,7 +378,7 @@ class CallsMergedQueueItemField(CallsMergedField):
         Returns:
             SQL expression for the queue item field
         """
-        use_agg_fn = read_table != ReadTable.CALLS_COMPLETE
+        use_agg_fn = read_table == ReadTable.CALLS_MERGED
         inner = f"annotation_queue_items.{self.field}"
         res = inner if not use_agg_fn else f"any({inner})"
         return clickhouse_cast(res, cast)
@@ -418,14 +418,14 @@ class AggregatedDataSizeField(CallsMergedField):
     ) -> str:
         # It doesn't make sense for a non-root call to have a total storage size,
         # even if a value could be computed.
-        use_agg_fn = read_table != ReadTable.CALLS_COMPLETE
+        use_agg_fn = read_table == ReadTable.CALLS_MERGED
         parent_id_expr = maybe_agg(f"{table_alias}.parent_id", use_agg_fn)
         storage_expr = maybe_agg(
             f"{self.join_table_name}.total_storage_size_bytes", use_agg_fn
         )
         # For calls_complete (read_table=CALLS_COMPLETE), parent_id uses sentinel ''
         # instead of NULL. For calls_merged, use IS NULL.
-        if read_table != ReadTable.CALLS_COMPLETE:
+        if read_table == ReadTable.CALLS_MERGED:
             null_check = f"{parent_id_expr} IS NULL"
         else:
             null_check = f"{parent_id_expr} = ''"
@@ -600,7 +600,7 @@ class OrderField(BaseModel):
         read_table: "ReadTable",
     ) -> str:
         """Build ORDER BY SQL for object reference fields."""
-        use_agg_fn = read_table != ReadTable.CALLS_COMPLETE
+        use_agg_fn = read_table == ReadTable.CALLS_MERGED
         base_expr = f"{cte_alias}.object_val_dump"
         base_sql = maybe_agg(base_expr, use_agg_fn)
 
@@ -1437,9 +1437,7 @@ class CallsQuery(BaseModel):
         if len(filter_conditions_sql) > 0:
             # For calls_complete, these become WHERE conditions (no GROUP BY)
             # For calls_merged, these are HAVING conditions (after GROUP BY)
-            prefix = (
-                "HAVING " if self.read_table != ReadTable.CALLS_COMPLETE else "AND "
-            )
+            prefix = "HAVING " if self.read_table == ReadTable.CALLS_MERGED else "AND "
             filter_sql = prefix + combine_conditions(filter_conditions_sql, "AND")
 
         return FilterConditionsResult(
@@ -1543,7 +1541,7 @@ class CallsQuery(BaseModel):
             id_subquery_name=id_subquery_name,
         )
         group_by_sql = ""
-        if self.read_table != ReadTable.CALLS_COMPLETE:
+        if self.read_table == ReadTable.CALLS_MERGED:
             group_by_sql = f"GROUP BY ({table_alias}.project_id, {table_alias}.id)"
 
         # Use PREWHERE for project_id to filter data before reading from disk
@@ -1562,7 +1560,7 @@ class CallsQuery(BaseModel):
         if (
             not where_clause
             and filter_result.filter_sql
-            and self.read_table == ReadTable.CALLS_COMPLETE
+            and self.read_table != ReadTable.CALLS_MERGED
         ):
             where_clause = "WHERE 1"
 
@@ -1741,7 +1739,7 @@ def _handle_status_summary_field(
 
     # For calls_complete, exception is non-nullable String with sentinel ''.
     # For calls_merged, exception is Nullable.
-    if read_table != ReadTable.CALLS_COMPLETE:
+    if read_table == ReadTable.CALLS_MERGED:
         exception_check = f"{exception_sql} IS NOT NULL"
     else:
         exception_check = f"{exception_sql} != ''"
@@ -1895,8 +1893,8 @@ def process_query_to_conditions(
     """Converts a Query to a list of conditions for a clickhouse query."""
     conditions = []
     raw_fields_used: dict[str, CallsMergedField] = {}
-    use_agg_fn = read_table != ReadTable.CALLS_COMPLETE
-    use_sentinels = read_table == ReadTable.CALLS_COMPLETE
+    use_agg_fn = read_table == ReadTable.CALLS_MERGED
+    use_sentinels = read_table != ReadTable.CALLS_MERGED
 
     # This is the mongo-style query
     def process_operation(operation: tsi_query.Operation) -> str:
@@ -2213,7 +2211,7 @@ def process_trace_roots_only_filter_to_sql(
     )
 
     # For calls_complete, parent_id uses sentinel '' instead of NULL
-    if read_table == ReadTable.CALLS_COMPLETE:
+    if read_table != ReadTable.CALLS_MERGED:
         null_check = f"{parent_id_field_sql} = ''"
     else:
         null_check = f"{parent_id_field_sql} IS NULL"
@@ -2446,7 +2444,7 @@ def build_calls_stats_query(
     # For calls_complete, use a flat query (10x+ faster, avoids subquery materialization):
     #   Fast:  SELECT count() FROM calls_complete WHERE ...
     #   Slow:  SELECT count() FROM (SELECT id FROM calls_complete WHERE ...)
-    if read_table == ReadTable.CALLS_COMPLETE:
+    if read_table != ReadTable.CALLS_MERGED:
         query = _build_calls_complete_stats_query(
             req, param_builder, aggregated_columns
         )
@@ -2616,7 +2614,7 @@ def _optimized_wb_run_id_not_null_query(
     project_id_param = param_builder.add_param(project_id)
     table_name = get_calls_table_name(read_table)
     # For calls_complete, sentinel values replace NULL checks
-    if read_table == ReadTable.CALLS_COMPLETE:
+    if read_table != ReadTable.CALLS_MERGED:
         wb_run_id_check = f"{table_name}.wb_run_id != ''"
         deleted_at_param = param_builder.add_param(ch_sentinel_values.SENTINEL_DATETIME)
         deleted_at_type = ch_sentinel_values.sentinel_ch_type("deleted_at")

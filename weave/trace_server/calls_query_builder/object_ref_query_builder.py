@@ -263,7 +263,7 @@ class ObjectRefCondition(BaseModel):
             )
 
         cte_alias = field_to_object_join_alias_map[self.unique_key]
-        use_agg_fn = read_table != ReadTable.CALLS_COMPLETE
+        use_agg_fn = read_table == ReadTable.CALLS_MERGED
 
         # Extract the root field and accessor key from the condition
         root_field = self.get_root_field()
