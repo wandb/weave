@@ -324,6 +324,70 @@ def test_obj_batch_delete_version_preserves_indices(trace_server, client):
     assert {obj.digest for obj in res.objs} == {pre_del_digests[0], pre_del_digests[2]}
 
 
+def test_str_digest_is_key_order_independent():
+    """str_digest must return the same value regardless of dict key insertion order."""
+    val_a = {"b": 1, "a": 2, "c": [{"z": 9, "y": 8}]}
+    val_b = {"a": 2, "c": [{"y": 8, "z": 9}], "b": 1}
+
+    digest_a = str_digest(json.dumps(val_a, sort_keys=True))
+    digest_b = str_digest(json.dumps(val_b, sort_keys=True))
+    assert digest_a == digest_b
+
+    # Without sort_keys the digests would differ
+    assert str_digest(json.dumps(val_a)) != str_digest(json.dumps(val_b))
+
+
+def test_obj_batch_different_key_order_deduplicates(trace_server, client):
+    """Objects with identical values but different key ordering share the same digest."""
+    if client_is_sqlite(client):
+        pytest.skip("SQLite does not support batch object creation")
+    server = trace_server._internal_trace_server
+    pid = _internal_pid()
+    wb_user_id = _internal_wb_user_id()
+    obj_id = "key_order_obj"
+
+    val_a = {"b": 1, "a": 2}
+    val_b = {"a": 2, "b": 1}
+
+    server.obj_create_batch(
+        batch=[
+            _mk_obj(pid, obj_id, wb_user_id, val_a),
+            _mk_obj(pid, obj_id, wb_user_id, val_b),
+        ]
+    )
+
+    res = server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=pid,
+            filter=tsi.ObjectVersionFilter(object_ids=[obj_id], latest_only=False),
+        )
+    )
+    # Both values are logically identical, so only one version should exist
+    assert len(res.objs) == 1
+
+
+def test_table_create_different_key_order_same_digest(trace_server):
+    """Rows with different key ordering produce the same digest in table_create."""
+    server = trace_server._internal_trace_server
+    pid = _internal_pid()
+
+    row_a = {"b": 1, "a": 2}
+    row_b = {"a": 2, "b": 1}
+
+    res = server.table_create(
+        tsi.TableCreateReq(
+            table=tsi.TableSchemaForInsert(
+                project_id=pid,
+                rows=[row_a, row_b],
+            )
+        )
+    )
+
+    # Both rows are logically identical so their digests must match
+    assert len(res.row_digests) == 2
+    assert res.row_digests[0] == res.row_digests[1]
+
+
 def test_obj_batch_mixed_projects_errors(trace_server, client):
     """Uploading objects to different projects in one batch should error."""
     if client_is_sqlite(client):

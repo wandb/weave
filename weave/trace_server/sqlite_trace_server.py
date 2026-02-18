@@ -870,7 +870,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             req.obj.val, req.obj.builtin_object_class
         )
         processed_val = processed_result["val"]
-        json_val = json.dumps(processed_val)
+        json_val = json.dumps(processed_val, sort_keys=True)
         digest = str_digest(json_val)
         project_id, object_id, wb_user_id = (
             req.obj.project_id,
@@ -1106,7 +1106,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         for r in req.table.rows:
             if not isinstance(r, dict):
                 raise TypeError("All rows must be dictionaries")
-            row_json = json.dumps(r)
+            row_json = json.dumps(r, sort_keys=True)
             row_digest = str_digest(row_json)
             insert_rows.append((req.table.project_id, row_digest, row_json))
         with self.lock:
@@ -1175,7 +1175,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         def add_new_row_needed_to_insert(row_data: Any) -> str:
             if not isinstance(row_data, dict):
                 raise TypeError("All rows must be dictionaries")
-            row_json = json.dumps(row_data)
+            row_json = json.dumps(row_data, sort_keys=True)
             row_digest = str_digest(row_json)
             if row_digest not in known_digests:
                 new_rows_needed_to_insert.append((req.project_id, row_digest, row_json))
