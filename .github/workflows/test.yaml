@@ -80,6 +80,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+      - name: Install Libmagic dependency package
+        run: sudo apt update && sudo apt install -y libmagic1
       - name: Set up Python ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
         uses: actions/setup-python@v5
         with:
