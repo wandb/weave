@@ -109,7 +109,7 @@ def test_simple_op(client):
     calls = list(client.get_calls())
     assert len(calls) == 1
     fetched_call = calls[0]
-    digest = "nFk3Jq6jb72HLfeGaxwcsHyckk0gRWNFn17M2AR8Oxo"
+    digest = "VAjc7UcWtXC9OiUr6jrzM6CURhBaMiBr0gqOddcCxY4"
     expected_name = (
         f"{TRACE_REF_SCHEME}:///{client.entity}/{client.project}/op/my_op:{digest}"
     )
@@ -3440,7 +3440,7 @@ def test_objects_and_keys_with_special_characters(client):
     gotten_res = weave.ref(found_ref).get()
     assert gotten_res == "hello world"
 
-    exp_op_digest = "qlezedpwj0O4lZYB3vcgSYj0eQvQDdStowLaGBCEmaI"
+    exp_op_digest = "UsyKRnrEyBIieYPDU6eGrbGJgtXjFVFoR6PEemZma68"
     exp_op_ref = f"{ref_base}/op/{exp_name}:{exp_op_digest}"
 
     found_ref = test.ref.uri()
