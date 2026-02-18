@@ -61,10 +61,24 @@ def _normalize_magic_extension(raw_ext: str | None) -> str | None:
     return ext
 
 
+def _resolve_extension(raw_ext: str | None, mimetype: str) -> str | None:
+    """Normalize a libmagic extension, falling back to stdlib mimetypes."""
+    import mimetypes
+
+    extension = _normalize_magic_extension(raw_ext)
+    if extension is None:
+        extension = mimetypes.guess_extension(mimetype)
+    return extension
+
+
 def is_available() -> bool:
-    """Check whether python-magic is installed and usable."""
-    mime_magic, ext_magic = _get_magic_instances()
-    return mime_magic is not None and ext_magic is not None
+    """Check whether python-magic is installed and usable.
+
+    Only requires the MIME-detection instance; extension detection is optional
+    (it needs a newer libmagic that may not be bundled on Windows).
+    """
+    mime_magic, _ext_magic = _get_magic_instances()
+    return mime_magic is not None
 
 
 def detect(
@@ -76,20 +90,22 @@ def detect(
     If from_file fails because the file is not found, falls back to
     from_buffer when buffer is available.
 
+    Extension detection uses libmagic's extension mode when available,
+    otherwise falls back to stdlib mimetypes.guess_extension().
+
     Returns (mimetype, extension) tuple; either value may be None.
     """
     mime_magic, ext_magic = _get_magic_instances()
-    if mime_magic is None or ext_magic is None:
+    if mime_magic is None:
         return None, None
 
     # Try from_file when filename is provided
     if filename is not None:
         try:
             mimetype = mime_magic.from_file(filename)
-            raw_ext = ext_magic.from_file(filename)
-            extension = _normalize_magic_extension(raw_ext)
             if mimetype:
-                return mimetype, extension
+                raw_ext = ext_magic.from_file(filename) if ext_magic else None
+                return mimetype, _resolve_extension(raw_ext, mimetype)
         except FileNotFoundError:
             # File not found — fall through to from_buffer
             pass
@@ -100,10 +116,9 @@ def detect(
     if buffer is not None:
         try:
             mimetype = mime_magic.from_buffer(buffer)
-            raw_ext = ext_magic.from_buffer(buffer)
-            extension = _normalize_magic_extension(raw_ext)
             if mimetype:
-                return mimetype, extension
+                raw_ext = ext_magic.from_buffer(buffer) if ext_magic else None
+                return mimetype, _resolve_extension(raw_ext, mimetype)
         except Exception as e:
             logger.debug("magic.from_buffer failed: %s", e)
 
