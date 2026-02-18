@@ -7,10 +7,20 @@ Python None values and their ClickHouse sentinel representations.
 The app layer converts between Python None and sentinels at the CH boundary:
 - On write (insert): None -> sentinel via to_ch_value()
 - On read (query result): sentinel -> None via from_ch_value()
+- On query (SQL generation): null_check_sql() generates the correct IS NULL
+  or = sentinel comparison based on which table is being queried.
 """
 
+from __future__ import annotations
+
 import datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+from weave.trace_server.calls_query_builder.utils import param_slot
+from weave.trace_server.project_version.types import ReadTable
+
+if TYPE_CHECKING:
+    from weave.trace_server.orm import ParamBuilder
 
 SENTINEL_DATETIME = datetime.datetime(1970, 1, 1, tzinfo=datetime.timezone.utc)
 SENTINEL_STRING = ""
@@ -155,3 +165,43 @@ def from_ch_value(field: str, value: Any) -> Any:
             return None if val_utc == sentinel_utc else value
         return value
     return value
+
+
+def null_check_sql(
+    field_name: str,
+    field_sql: str,
+    read_table: ReadTable,
+    pb: ParamBuilder,
+    *,
+    negate: bool = False,
+) -> str:
+    """Generate SQL to check whether a field is null/sentinel, aware of table type.
+
+    For calls_merged (nullable columns): produces ``field IS [NOT] NULL``.
+    For calls_complete sentinel fields: produces ``field [!]= <sentinel_param>``.
+    For calls_complete non-sentinel fields: produces ``field IS [NOT] NULL``.
+
+    Args:
+        field_name: The column name (e.g. "ended_at", "parent_id").
+        field_sql: The fully-qualified SQL expression (e.g. "t.ended_at").
+        read_table: Which table variant is being queried.
+        pb: Parameter builder for adding parameterized sentinel values.
+        negate: If True, check for non-null/non-sentinel instead.
+
+    Returns:
+        A SQL fragment like ``t.ended_at IS NULL`` or ``t.ended_at = {pb_N:DateTime64(6)}``.
+
+    Examples:
+        >>> null_check_sql("ended_at", "t.ended_at", ReadTable.CALLS_COMPLETE, pb)
+        't.ended_at = {pb_0:DateTime64(6)}'
+        >>> null_check_sql("ended_at", "t.ended_at", ReadTable.CALLS_MERGED, pb)
+        't.ended_at IS NULL'
+    """
+    if read_table == ReadTable.CALLS_MERGED or field_name not in ALL_SENTINEL_FIELDS:
+        return f"{field_sql} IS NOT NULL" if negate else f"{field_sql} IS NULL"
+
+    sentinel = get_sentinel_value(field_name)
+    sentinel_param = pb.add_param(sentinel)
+    ch_type = sentinel_ch_type(field_name)
+    op = "!=" if negate else "="
+    return f"{field_sql} {op} {param_slot(sentinel_param, ch_type)}"

@@ -18,10 +18,13 @@ from weave.trace_server.ch_sentinel_values import (
     from_ch_value,
     get_sentinel_value,
     is_sentinel_field,
+    null_check_sql,
     sentinel_ch_literal,
     sentinel_ch_type,
     to_ch_value,
 )
+from weave.trace_server.orm import ParamBuilder
+from weave.trace_server.project_version.types import ReadTable
 
 # ---------------------------------------------------------------------------
 # is_sentinel_field
@@ -306,3 +309,70 @@ def test_sentinel_datetime_is_utc_epoch() -> None:
 def test_sentinel_string_is_empty() -> None:
     """SENTINEL_STRING is empty string."""
     assert SENTINEL_STRING == ""
+
+
+# ---------------------------------------------------------------------------
+# null_check_sql
+# ---------------------------------------------------------------------------
+
+
+def test_null_check_sql_string_sentinel_field_calls_complete() -> None:
+    """For calls_complete, string sentinel fields compare against empty-string param."""
+    pb = ParamBuilder("pb")
+    result = null_check_sql("parent_id", "t.parent_id", ReadTable.CALLS_COMPLETE, pb)
+    assert "=" in result
+    assert "IS NULL" not in result
+    assert "String" in result
+
+
+def test_null_check_sql_datetime_sentinel_field_calls_complete() -> None:
+    """For calls_complete, datetime sentinel fields compare against epoch-zero param."""
+    pb = ParamBuilder("pb")
+    result = null_check_sql("ended_at", "t.ended_at", ReadTable.CALLS_COMPLETE, pb)
+    assert "=" in result
+    assert "IS NULL" not in result
+    assert "DateTime64(6)" in result
+
+
+def test_null_check_sql_sentinel_field_calls_merged() -> None:
+    """For calls_merged, sentinel fields still use IS NULL (nullable columns)."""
+    pb = ParamBuilder("pb")
+    result = null_check_sql("parent_id", "t.parent_id", ReadTable.CALLS_MERGED, pb)
+    assert result == "t.parent_id IS NULL"
+
+
+def test_null_check_sql_non_sentinel_field_calls_complete() -> None:
+    """For calls_complete, non-sentinel fields still use IS NULL."""
+    pb = ParamBuilder("pb")
+    result = null_check_sql(
+        "wb_run_step", "t.wb_run_step", ReadTable.CALLS_COMPLETE, pb
+    )
+    assert result == "t.wb_run_step IS NULL"
+
+
+def test_null_check_sql_negate_calls_complete() -> None:
+    """Negated check for calls_complete sentinel field uses != sentinel."""
+    pb = ParamBuilder("pb")
+    result = null_check_sql(
+        "wb_run_id", "t.wb_run_id", ReadTable.CALLS_COMPLETE, pb, negate=True
+    )
+    assert "!=" in result
+    assert "IS NOT NULL" not in result
+
+
+def test_null_check_sql_negate_calls_merged() -> None:
+    """Negated check for calls_merged uses IS NOT NULL."""
+    pb = ParamBuilder("pb")
+    result = null_check_sql(
+        "wb_run_id", "t.wb_run_id", ReadTable.CALLS_MERGED, pb, negate=True
+    )
+    assert result == "t.wb_run_id IS NOT NULL"
+
+
+def test_null_check_sql_negate_non_sentinel_field() -> None:
+    """Negated check for non-sentinel field always uses IS NOT NULL."""
+    pb = ParamBuilder("pb")
+    result = null_check_sql(
+        "op_name", "t.op_name", ReadTable.CALLS_COMPLETE, pb, negate=True
+    )
+    assert result == "t.op_name IS NOT NULL"

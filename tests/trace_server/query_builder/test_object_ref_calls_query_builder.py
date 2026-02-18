@@ -1,14 +1,11 @@
-import datetime
-
 from tests.trace_server.query_builder.utils import assert_sql
 from weave.trace_server.calls_query_builder.calls_query_builder import (
     CallsQuery,
     HardCodedFilter,
 )
+from weave.trace_server.ch_sentinel_values import SENTINEL_DATETIME
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.project_version.types import ReadTable
-
-SENTINEL_DATETIME = datetime.datetime(1970, 1, 1, tzinfo=datetime.timezone.utc)
 
 
 def test_object_ref_filter_simple() -> None:
@@ -1021,7 +1018,7 @@ def test_object_ref_filter_calls_complete() -> None:
           (SELECT calls_complete.id AS id
            FROM calls_complete PREWHERE calls_complete.project_id = {pb_0:String}
            WHERE (length(calls_complete.output_refs) > 0
-                  OR calls_complete.ended_at IS NULL)
+                  OR calls_complete.ended_at = {pb_4:DateTime64(6)})
            AND (((coalesce(nullIf(JSON_VALUE(calls_complete.output_dump, {pb_3:String}), 'null'), '') IN
                       (SELECT ref
                        FROM obj_filter_0)
@@ -1107,7 +1104,7 @@ def test_object_ref_filter_calls_complete_mixed_conditions() -> None:
              filtered_calls AS (
         SELECT calls_complete.id AS id
         FROM calls_complete PREWHERE calls_complete.project_id = {pb_0:String}
-        WHERE (calls_complete.parent_id = '')
+        WHERE (calls_complete.parent_id = {pb_7:String})
           AND (length(calls_complete.input_refs) > 0
                OR calls_complete.started_at IS NULL)
         AND (((((coalesce(nullIf(JSON_VALUE(calls_complete.inputs_dump, {pb_3:String}), 'null'), '') IN
@@ -1135,5 +1132,6 @@ def test_object_ref_filter_calls_complete_mixed_conditions() -> None:
             "pb_4": '$."prompt"',
             "pb_5": "test prompt",
             "pb_6": SENTINEL_DATETIME,
+            "pb_7": "",
         },
     )

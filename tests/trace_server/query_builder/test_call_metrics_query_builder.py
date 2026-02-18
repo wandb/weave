@@ -819,7 +819,7 @@ def test_calls_complete_call_and_error_counts():
              (SELECT toStartOfInterval(started_at, INTERVAL 3600 SECOND, {pb_3:String}) AS bucket,
                      1 AS m_call_count,
                      if(
-                        exception != '', 1, 0) AS m_error_count
+                        exception != {pb_5:String}, 1, 0) AS m_error_count
               FROM
                 (SELECT cm.started_at AS started_at,
                         cm.started_at AS started_at,
@@ -846,6 +846,7 @@ def test_calls_complete_call_and_error_counts():
             "pb_2": 1733097600.0,
             "pb_3": "UTC",
             "pb_4": 3600,
+            "pb_5": "",
         },
         ["timestamp", "sum_call_count", "sum_error_count", "count"],
         3600,

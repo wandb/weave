@@ -1,5 +1,3 @@
-import datetime
-
 import pytest
 import sqlparse
 
@@ -15,11 +13,10 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     build_calls_complete_update_end_query,
     build_calls_complete_update_query,
 )
+from weave.trace_server.ch_sentinel_values import SENTINEL_DATETIME
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.project_version.types import ReadTable
-
-SENTINEL_DATETIME = datetime.datetime(1970, 1, 1, tzinfo=datetime.timezone.utc)
 
 
 @pytest.mark.parametrize(
@@ -2973,7 +2970,7 @@ def test_calls_complete_with_hardcoded_filter_and_json_condition_and_summary_ord
         WITH filtered_calls AS (
             SELECT calls_complete.id AS id
             FROM calls_complete
-            PREWHERE calls_complete.project_id = {pb_10:String}
+            PREWHERE calls_complete.project_id = {pb_11:String}
             WHERE ((calls_complete.op_name IN {pb_3:Array(String)})
                     OR (calls_complete.op_name IS NULL))
                 AND (calls_complete.trace_id = {pb_4:String}
@@ -2984,14 +2981,14 @@ def test_calls_complete_with_hardcoded_filter_and_json_condition_and_summary_ord
                 AND ((NOT ((calls_complete.started_at IS NULL))))
             )
             ORDER BY CASE
-                WHEN calls_complete.exception != '' THEN {pb_6:String}
+                WHEN calls_complete.exception != {pb_10:String} THEN {pb_6:String}
                 WHEN IFNULL(
                     toInt64OrNull(
                         coalesce(nullIf(JSON_VALUE(calls_complete.summary_dump, {pb_5:String}), 'null'), '')
                     ),
                     0
                 ) > 0 THEN {pb_9:String}
-                WHEN calls_complete.ended_at IS NULL THEN {pb_7:String}
+                WHEN calls_complete.ended_at = {pb_2:DateTime64(6)} THEN {pb_7:String}
                 ELSE {pb_8:String}
                 END ASC
             LIMIT 100
@@ -3002,17 +2999,17 @@ def test_calls_complete_with_hardcoded_filter_and_json_condition_and_summary_ord
             calls_complete.exception AS exception,
             calls_complete.ended_at AS ended_at
         FROM calls_complete
-        PREWHERE calls_complete.project_id = {pb_10:String}
+        PREWHERE calls_complete.project_id = {pb_11:String}
         WHERE (calls_complete.id IN filtered_calls)
         ORDER BY CASE
-            WHEN calls_complete.exception != '' THEN {pb_6:String}
+            WHEN calls_complete.exception != {pb_10:String} THEN {pb_6:String}
             WHEN IFNULL(
                 toInt64OrNull(
                     coalesce(nullIf(JSON_VALUE(calls_complete.summary_dump, {pb_5:String}), 'null'), '')
                 ),
                 0
             ) > 0 THEN {pb_9:String}
-            WHEN calls_complete.ended_at IS NULL THEN {pb_7:String}
+            WHEN calls_complete.ended_at = {pb_2:DateTime64(6)} THEN {pb_7:String}
             ELSE {pb_8:String}
             END ASC
         """,
@@ -3027,7 +3024,8 @@ def test_calls_complete_with_hardcoded_filter_and_json_condition_and_summary_ord
             "pb_7": "running",
             "pb_8": "success",
             "pb_9": "descendant_error",
-            "pb_10": "project",
+            "pb_10": "",
+            "pb_11": "project",
         },
     )
 
@@ -3222,23 +3220,23 @@ def test_query_with_summary_weave_status_filter_calls_complete() -> None:
         """
         SELECT
             calls_complete.id AS id
-        FROM calls_complete PREWHERE calls_complete.project_id = {pb_6:String}
+        FROM calls_complete PREWHERE calls_complete.project_id = {pb_7:String}
         WHERE 1
           AND (
             (((CASE
-                WHEN calls_complete.exception != '' THEN {pb_1:String}
+                WHEN calls_complete.exception != {pb_5:String} THEN {pb_1:String}
                 WHEN IFNULL(toInt64OrNull(coalesce(nullIf(JSON_VALUE(calls_complete.summary_dump, {pb_0:String}), 'null'), '')), 0) > 0 THEN {pb_4:String}
-                WHEN calls_complete.ended_at IS NULL THEN {pb_2:String}
+                WHEN calls_complete.ended_at = {pb_6:DateTime64(6)} THEN {pb_2:String}
                 ELSE {pb_3:String}
             END = {pb_3:String})
             OR
             (CASE
-                WHEN calls_complete.exception != '' THEN {pb_1:String}
+                WHEN calls_complete.exception != {pb_5:String} THEN {pb_1:String}
                 WHEN IFNULL(toInt64OrNull(coalesce(nullIf(JSON_VALUE(calls_complete.summary_dump, {pb_0:String}), 'null'), '')), 0) > 0 THEN {pb_4:String}
-                WHEN calls_complete.ended_at IS NULL THEN {pb_2:String}
+                WHEN calls_complete.ended_at = {pb_6:DateTime64(6)} THEN {pb_2:String}
                 ELSE {pb_3:String}
             END = {pb_1:String})))
-            AND ((calls_complete.deleted_at = {pb_5:DateTime64(3)}))
+            AND ((calls_complete.deleted_at = {pb_6:DateTime64(3)}))
             AND ((NOT ((calls_complete.started_at IS NULL)))))
         """,
         {
@@ -3247,8 +3245,9 @@ def test_query_with_summary_weave_status_filter_calls_complete() -> None:
             "pb_2": "running",
             "pb_3": "success",
             "pb_4": "descendant_error",
-            "pb_5": SENTINEL_DATETIME,
-            "pb_6": "project",
+            "pb_5": "",
+            "pb_6": SENTINEL_DATETIME,
+            "pb_7": "project",
         },
     )
 
@@ -3571,7 +3570,7 @@ def test_stats_query_calls_complete_flat_with_total_storage_size() -> None:
         """
         SELECT count() AS count,
                sum(coalesce(CASE
-                   WHEN calls_complete.parent_id = ''
+                   WHEN calls_complete.parent_id = {pb_2:String}
                         THEN rolled_up_cms.total_storage_size_bytes
                    ELSE NULL
                END, 0)) AS total_storage_size_bytes
@@ -3590,6 +3589,7 @@ def test_stats_query_calls_complete_flat_with_total_storage_size() -> None:
         {
             "pb_0": SENTINEL_DATETIME,
             "pb_1": "project",
+            "pb_2": "",
         },
         read_table=ReadTable.CALLS_COMPLETE,
     )
@@ -3616,4 +3616,85 @@ def test_stats_query_calls_merged_uses_subquery() -> None:
         """,
         {"pb_0": "project"},
         read_table=ReadTable.CALLS_MERGED,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Bug-fix tests: sentinel-aware ended_at checks for calls_complete
+# ---------------------------------------------------------------------------
+
+
+def test_latency_ms_sort_calls_complete_uses_sentinel_for_ended_at() -> None:
+    """For calls_complete, latency_ms must check ended_at against the sentinel, not IS NULL.
+
+    Bug: _handle_latency_ms_summary_field used `ended_at IS NULL` which never matches in
+    calls_complete (ended_at is non-nullable with epoch-zero sentinel). This caused
+    unfinished calls to compute garbage latency instead of NULL.
+    """
+    cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_COMPLETE)
+    cq.add_field("id")
+    cq.add_field("started_at")
+    cq.add_field("ended_at")
+    cq.add_order("summary.weave.latency_ms", "desc")
+
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_complete.id AS id,
+            calls_complete.started_at AS started_at,
+            calls_complete.ended_at AS ended_at
+        FROM calls_complete
+        PREWHERE calls_complete.project_id = {pb_1:String}
+        WHERE 1
+          AND (
+            ((calls_complete.deleted_at = {pb_0:DateTime64(3)}))
+            AND ((NOT ((calls_complete.started_at IS NULL))))
+        )
+        ORDER BY CASE
+            WHEN calls_complete.ended_at = {pb_0:DateTime64(6)} THEN NULL
+            ELSE (toUnixTimestamp64Milli(calls_complete.ended_at) - toUnixTimestamp64Milli(calls_complete.started_at))
+        END DESC
+        """,
+        {
+            "pb_0": SENTINEL_DATETIME,
+            "pb_1": "project",
+        },
+    )
+
+
+def test_latency_ms_filter_calls_complete_uses_sentinel_for_ended_at() -> None:
+    """For calls_complete, latency_ms filter must use sentinel check for ended_at."""
+    cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_COMPLETE)
+    cq.add_field("id")
+    cq.add_field("started_at")
+    cq.add_field("ended_at")
+    cq.add_condition(
+        tsi_query.GtOperation.model_validate(
+            {"$gt": [{"$getField": "summary.weave.latency_ms"}, {"$literal": 1000}]}
+        )
+    )
+
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_complete.id AS id,
+            calls_complete.started_at AS started_at,
+            calls_complete.ended_at AS ended_at
+        FROM calls_complete
+        PREWHERE calls_complete.project_id = {pb_2:String}
+        WHERE 1
+          AND (((CASE
+              WHEN calls_complete.ended_at = {pb_0:DateTime64(6)} THEN NULL
+              ELSE (toUnixTimestamp64Milli(calls_complete.ended_at) - toUnixTimestamp64Milli(calls_complete.started_at))
+          END > {pb_1:UInt64}))
+        AND ((calls_complete.deleted_at = {pb_0:DateTime64(3)}))
+        AND ((NOT ((calls_complete.started_at IS NULL)))))
+        """,
+        {
+            "pb_0": SENTINEL_DATETIME,
+            "pb_1": 1000,
+            "pb_2": "project",
+        },
     )

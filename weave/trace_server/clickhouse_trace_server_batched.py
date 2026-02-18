@@ -6371,31 +6371,18 @@ def _ch_call_dict_to_call_schema_dict(ch_call_dict: dict) -> dict:
     # Convert sentinel values back to None for all sentinel-tracked fields.
     # This handles both the old Nullable path (returns None) and the new
     # non-nullable path (returns sentinel -> converted to None).
-    ended_at = _ensure_datetimes_have_tz(
-        ch_sentinel_values.from_ch_value("ended_at", ch_call_dict.get("ended_at"))
-    )
-    display_name = ch_sentinel_values.from_ch_value(
-        "display_name", ch_call_dict.get("display_name")
-    )
-    parent_id = ch_sentinel_values.from_ch_value(
-        "parent_id", ch_call_dict.get("parent_id")
-    )
-    thread_id = ch_sentinel_values.from_ch_value(
-        "thread_id", ch_call_dict.get("thread_id")
-    )
-    turn_id = ch_sentinel_values.from_ch_value("turn_id", ch_call_dict.get("turn_id"))
-    exception = ch_sentinel_values.from_ch_value(
-        "exception", ch_call_dict.get("exception")
-    )
-    wb_user_id = ch_sentinel_values.from_ch_value(
-        "wb_user_id", ch_call_dict.get("wb_user_id")
-    )
-    wb_run_id = ch_sentinel_values.from_ch_value(
-        "wb_run_id", ch_call_dict.get("wb_run_id")
-    )
-    otel_dump = ch_sentinel_values.from_ch_value(
-        "otel_dump", ch_call_dict.get("otel_dump")
-    )
+    sv: dict[str, Any] = {}
+    for field in ch_sentinel_values.ALL_SENTINEL_FIELDS:
+        raw = ch_call_dict.get(field)
+        val = ch_sentinel_values.from_ch_value(field, raw)
+        if field in ch_sentinel_values.SENTINEL_DATETIME_FIELDS:
+            val = _ensure_datetimes_have_tz(val)
+        sv[field] = val
+
+    ended_at = sv["ended_at"]
+    display_name = sv["display_name"]
+    exception = sv["exception"]
+    otel_dump = sv["otel_dump"]
 
     # Load attributes from attributes_dump
     attributes = _dict_dump_to_dict(ch_call_dict.get("attributes_dump", "{}"))
@@ -6410,9 +6397,9 @@ def _ch_call_dict_to_call_schema_dict(ch_call_dict: dict) -> dict:
         "project_id": ch_call_dict.get("project_id"),
         "id": ch_call_dict.get("id"),
         "trace_id": ch_call_dict.get("trace_id"),
-        "parent_id": parent_id,
-        "thread_id": thread_id,
-        "turn_id": turn_id,
+        "parent_id": sv["parent_id"],
+        "thread_id": sv["thread_id"],
+        "turn_id": sv["turn_id"],
         "op_name": ch_call_dict.get("op_name"),
         "started_at": started_at,
         "ended_at": ended_at,
@@ -6428,10 +6415,10 @@ def _ch_call_dict_to_call_schema_dict(ch_call_dict: dict) -> dict:
             display_name=display_name,
         ),
         "exception": exception,
-        "wb_run_id": wb_run_id,
+        "wb_run_id": sv["wb_run_id"],
         "wb_run_step": ch_call_dict.get("wb_run_step"),
         "wb_run_step_end": ch_call_dict.get("wb_run_step_end"),
-        "wb_user_id": wb_user_id,
+        "wb_user_id": sv["wb_user_id"],
         "display_name": display_name,
         "storage_size_bytes": ch_call_dict.get("storage_size_bytes"),
         "total_storage_size_bytes": ch_call_dict.get("total_storage_size_bytes"),

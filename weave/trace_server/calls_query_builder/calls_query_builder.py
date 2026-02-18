@@ -416,22 +416,17 @@ class AggregatedDataSizeField(CallsMergedField):
         table_alias: str,
         read_table: "ReadTable" = ReadTable.CALLS_MERGED,
     ) -> str:
-        # It doesn't make sense for a non-root call to have a total storage size,
-        # even if a value could be computed.
         use_agg_fn = read_table == ReadTable.CALLS_MERGED
         parent_id_expr = maybe_agg(f"{table_alias}.parent_id", use_agg_fn)
         storage_expr = maybe_agg(
             f"{self.join_table_name}.total_storage_size_bytes", use_agg_fn
         )
-        # For calls_complete (read_table=CALLS_COMPLETE), parent_id uses sentinel ''
-        # instead of NULL. For calls_merged, use IS NULL.
-        if read_table == ReadTable.CALLS_MERGED:
-            null_check = f"{parent_id_expr} IS NULL"
-        else:
-            null_check = f"{parent_id_expr} = ''"
+        parent_null = ch_sentinel_values.null_check_sql(
+            "parent_id", parent_id_expr, read_table, pb
+        )
         conditional_field = f"""
             CASE
-                WHEN {null_check}
+                WHEN {parent_null}
                 THEN {storage_expr}
                 ELSE NULL
             END
@@ -1219,7 +1214,7 @@ class CallsQuery(BaseModel):
         heavy_filter = optimization_conditions.heavy_filter_opt_sql or ""
 
         object_refs = process_object_refs_filter_to_opt_sql(
-            pb, table_alias, object_ref_fields_consumed
+            pb, table_alias, object_ref_fields_consumed, self.read_table
         )
 
         id_subquery = ""
@@ -1737,17 +1732,17 @@ def _handle_status_summary_field(
     success_param = pb.add_param(tsi.TraceStatus.SUCCESS.value)
     descendant_error_param = pb.add_param(tsi.TraceStatus.DESCENDANT_ERROR.value)
 
-    # For calls_complete, exception is non-nullable String with sentinel ''.
-    # For calls_merged, exception is Nullable.
-    if read_table == ReadTable.CALLS_MERGED:
-        exception_check = f"{exception_sql} IS NOT NULL"
-    else:
-        exception_check = f"{exception_sql} != ''"
+    exception_check = ch_sentinel_values.null_check_sql(
+        "exception", exception_sql, read_table, pb, negate=True
+    )
+    ended_at_null = ch_sentinel_values.null_check_sql(
+        "ended_at", ended_to_sql, read_table, pb
+    )
 
     return f"""CASE
         WHEN {exception_check} THEN {param_slot(error_param, "String")}
         WHEN IFNULL({status_counts_sql}, 0) > 0 THEN {param_slot(descendant_error_param, "String")}
-        WHEN {ended_to_sql} IS NULL THEN {param_slot(running_param, "String")}
+        WHEN {ended_at_null} THEN {param_slot(running_param, "String")}
         ELSE {param_slot(success_param, "String")}
     END"""
 
@@ -1768,11 +1763,12 @@ def _handle_latency_ms_summary_field(
         started_at_field, pb, table_alias, read_table
     )
     ended_at_sql = _field_as_sql_maybe_agg(ended_at_field, pb, table_alias, read_table)
+    ended_at_null = ch_sentinel_values.null_check_sql(
+        "ended_at", ended_at_sql, read_table, pb
+    )
 
-    # Convert time difference to milliseconds
-    # Use toUnixTimestamp64Milli for direct and precise millisecond difference
     return f"""CASE
-        WHEN {ended_at_sql} IS NULL THEN NULL
+        WHEN {ended_at_null} THEN NULL
         ELSE (
             toUnixTimestamp64Milli({ended_at_sql}) - toUnixTimestamp64Milli({started_at_sql})
         )
@@ -2210,13 +2206,10 @@ def process_trace_roots_only_filter_to_sql(
         param_builder, table_alias, read_table=ReadTable.CALLS_COMPLETE
     )
 
-    # For calls_complete, parent_id uses sentinel '' instead of NULL
-    if read_table != ReadTable.CALLS_MERGED:
-        null_check = f"{parent_id_field_sql} = ''"
-    else:
-        null_check = f"{parent_id_field_sql} IS NULL"
-
-    return f"AND ({null_check})"
+    parent_null = ch_sentinel_values.null_check_sql(
+        "parent_id", parent_id_field_sql, read_table, param_builder
+    )
+    return f"AND ({parent_null})"
 
 
 def process_parent_ids_filter_to_sql(
@@ -2291,20 +2284,27 @@ def process_object_refs_filter_to_opt_sql(
     param_builder: ParamBuilder,
     table_alias: str,
     object_ref_fields_consumed: set[str],
+    read_table: "ReadTable" = ReadTable.CALLS_MERGED,
 ) -> str:
     """Processes object ref fields to an optimization sql string."""
     if not object_ref_fields_consumed:
         return ""
 
-    # Optimization for filtering with refs, only include calls that have non-zero
-    # input refs when we are conditioning on refs in inputs, or is a naked call end.
     refs_filter_opt_sql = ""
     if "inputs_dump" in object_ref_fields_consumed:
-        refs_filter_opt_sql += f"AND (length({table_alias}.input_refs) > 0 OR {table_alias}.started_at IS NULL)"
-    # If we are conditioning on output refs, filter down calls to those with non-zero
-    # output refs, or they are a naked call start.
+        started_at_null = ch_sentinel_values.null_check_sql(
+            "started_at", f"{table_alias}.started_at", read_table, param_builder
+        )
+        refs_filter_opt_sql += (
+            f"AND (length({table_alias}.input_refs) > 0 OR {started_at_null})"
+        )
     if "output_dump" in object_ref_fields_consumed:
-        refs_filter_opt_sql += f"AND (length({table_alias}.output_refs) > 0 OR {table_alias}.ended_at IS NULL)"
+        ended_at_null = ch_sentinel_values.null_check_sql(
+            "ended_at", f"{table_alias}.ended_at", read_table, param_builder
+        )
+        refs_filter_opt_sql += (
+            f"AND (length({table_alias}.output_refs) > 0 OR {ended_at_null})"
+        )
 
     return refs_filter_opt_sql
 
@@ -2523,12 +2523,14 @@ def _build_calls_complete_stats_query(
     stats_parts: list[str] = []
     for col_name, col_agg in aggregated_columns.items():
         if col_name == "total_storage_size_bytes":
-            # Inline the total_storage_size expression for the flat query.
-            # Mirrors AggregatedDataSizeField.as_select_sql(use_agg_fn=False),
-            # wrapped in the aggregate function directly.
-            # For calls_complete, parent_id uses sentinel '' instead of NULL
+            parent_null = ch_sentinel_values.null_check_sql(
+                "parent_id",
+                f"{table_name}.parent_id",
+                ReadTable.CALLS_COMPLETE,
+                param_builder,
+            )
             total_storage_expr = (
-                f"CASE WHEN {table_name}.parent_id = '' "
+                f"CASE WHEN {parent_null} "
                 f"THEN {ROLLED_UP_CALL_MERGED_STATS_TABLE_NAME}.total_storage_size_bytes "
                 f"ELSE NULL END"
             )
@@ -2613,17 +2615,12 @@ def _optimized_wb_run_id_not_null_query(
     """
     project_id_param = param_builder.add_param(project_id)
     table_name = get_calls_table_name(read_table)
-    # For calls_complete, sentinel values replace NULL checks
-    if read_table != ReadTable.CALLS_MERGED:
-        wb_run_id_check = f"{table_name}.wb_run_id != ''"
-        deleted_at_param = param_builder.add_param(ch_sentinel_values.SENTINEL_DATETIME)
-        deleted_at_type = ch_sentinel_values.sentinel_ch_type("deleted_at")
-        deleted_at_check = (
-            f"{table_name}.deleted_at = {param_slot(deleted_at_param, deleted_at_type)}"
-        )
-    else:
-        wb_run_id_check = f"{table_name}.wb_run_id IS NOT NULL"
-        deleted_at_check = f"{table_name}.deleted_at IS NULL"
+    wb_run_id_check = ch_sentinel_values.null_check_sql(
+        "wb_run_id", f"{table_name}.wb_run_id", read_table, param_builder, negate=True
+    )
+    deleted_at_check = ch_sentinel_values.null_check_sql(
+        "deleted_at", f"{table_name}.deleted_at", read_table, param_builder
+    )
     return f"""
         SELECT count() FROM (
             SELECT {table_name}.id AS id
