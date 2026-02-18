@@ -27,9 +27,7 @@ def _get_magic_instances() -> tuple[Any, Any]:
         _magic_checked = True
         try:
             import magic
-
-            _magic_mime_instance = magic.Magic(mime=True)
-            _magic_ext_instance = magic.Magic(extension=True)
+            _magic_mime_instance = magic.Magic(mime=True, extension=True) # type: ignore
         except (ImportError, Exception) as e:
             logger.debug("python-magic is not available: %s", e)
     return _magic_mime_instance, _magic_ext_instance
