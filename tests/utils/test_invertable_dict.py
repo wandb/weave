@@ -8,10 +8,17 @@ pytestmark = pytest.mark.trace_server
 def test_invertable_dict_construction_and_access():
     mapping = InvertableDict({"jpg": "jpeg", "png": "png"})
 
+    # Default mapping -- looks and acts like a regular dict
     assert len(mapping) == 2
     assert mapping["jpg"] == "jpeg"
-    assert "png" in mapping
+    assert mapping["png"] == "png"
     assert sorted(iter(mapping)) == ["jpg", "png"]
+
+    # Inverse mapping -- looks and acts like a regular dict
+    assert len(mapping.inv) == 2
+    assert mapping.inv["jpeg"] == "jpg"
+    assert mapping.inv["png"] == "png"
+    assert sorted(iter(mapping.inv)) == ["jpeg", "png"]
 
 
 def test_invertable_dict_rejects_duplicate_values_on_init():
