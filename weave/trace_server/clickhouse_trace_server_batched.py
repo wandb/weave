@@ -842,7 +842,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         output_dump_param = pb.add_param(output_dump)
         summary_dump_param = pb.add_param(summary_dump)
         output_refs_param = pb.add_param(output_refs)
-        wb_run_step_end_param = pb.add_param(end_call.wb_run_step_end)
+        wb_run_step_end_param = pb.add_param(
+            ch_sentinel_values.to_ch_value("wb_run_step_end", end_call.wb_run_step_end)
+        )
 
         # Add started_at param if provided for more efficient primary key usage
         started_at_param: str | None = None
