@@ -8,6 +8,7 @@ from contextlib import contextmanager
 from unittest import mock
 
 import pytest
+
 from weave.utils import sanitize
 
 
@@ -61,8 +62,9 @@ def mock_pii_engines(module):
 
 def test_redact_pii_string_redacts_default_entities(pii_redaction_module) -> None:
     original = "John Doe test@example.com 555-0101"
-    with mock_pii_engines(pii_redaction_module), mock.patch.dict(
-        os.environ, {}, clear=True
+    with (
+        mock_pii_engines(pii_redaction_module),
+        mock.patch.dict(os.environ, {}, clear=True),
     ):
         redacted = pii_redaction_module.redact_pii_string(original)
 
@@ -74,8 +76,11 @@ def test_redact_pii_string_redacts_default_entities(pii_redaction_module) -> Non
 
 def test_redact_pii_string_excludes_specific_entities(pii_redaction_module) -> None:
     original = "Contact test@example.com"
-    with mock_pii_engines(pii_redaction_module), mock.patch.dict(
-        os.environ, {"WEAVE_REDACT_PII_EXCLUDE_FIELDS": "EMAIL_ADDRESS"}, clear=True
+    with (
+        mock_pii_engines(pii_redaction_module),
+        mock.patch.dict(
+            os.environ, {"WEAVE_REDACT_PII_EXCLUDE_FIELDS": "EMAIL_ADDRESS"}, clear=True
+        ),
     ):
         redacted = pii_redaction_module.redact_pii_string(original)
 
@@ -86,8 +91,9 @@ def test_redact_pii_string_honors_custom_entity_list(pii_redaction_module) -> No
     email_only_text = "Contact test@example.com"
     person_only_text = "John Doe"
 
-    with mock_pii_engines(pii_redaction_module), mock.patch.dict(
-        os.environ, {"WEAVE_REDACT_PII_FIELDS": "PERSON"}, clear=True
+    with (
+        mock_pii_engines(pii_redaction_module),
+        mock.patch.dict(os.environ, {"WEAVE_REDACT_PII_FIELDS": "PERSON"}, clear=True),
     ):
         email_only_redacted = pii_redaction_module.redact_pii_string(email_only_text)
         person_only_redacted = pii_redaction_module.redact_pii_string(person_only_text)
@@ -104,8 +110,9 @@ def test_redact_pii_redacts_sensitive_keys_and_entities(pii_redaction_module) ->
         "unchanged": "public-data",
     }
 
-    with mock_pii_engines(pii_redaction_module), mock.patch.dict(
-        os.environ, {"WEAVE_REDACT_PII_FIELDS": "PERSON"}, clear=True
+    with (
+        mock_pii_engines(pii_redaction_module),
+        mock.patch.dict(os.environ, {"WEAVE_REDACT_PII_FIELDS": "PERSON"}, clear=True),
     ):
         redacted = pii_redaction_module.redact_pii(data)
 
@@ -117,8 +124,9 @@ def test_redact_pii_redacts_sensitive_keys_and_entities(pii_redaction_module) ->
 
 def test_redact_pii_string_input_is_redacted(pii_redaction_module) -> None:
     original = "John Doe"
-    with mock_pii_engines(pii_redaction_module), mock.patch.dict(
-        os.environ, {"WEAVE_REDACT_PII_FIELDS": "PERSON"}, clear=True
+    with (
+        mock_pii_engines(pii_redaction_module),
+        mock.patch.dict(os.environ, {"WEAVE_REDACT_PII_FIELDS": "PERSON"}, clear=True),
     ):
         redacted = pii_redaction_module.redact_pii(original)
 
