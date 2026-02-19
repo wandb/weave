@@ -22,7 +22,9 @@ from weave.trace.vals import WeaveObject, pydantic_getattribute
 logger = logging.getLogger(__name__)
 
 
-def deprecated_field(new_field_name: str) -> Callable[[Callable[[Any], object]], property]:
+def deprecated_field(
+    new_field_name: str,
+) -> Callable[[Callable[[Any], object]], property]:
     """Create a deprecated property decorator that issues warnings when accessed.
 
     This decorator factory creates a property that acts as a deprecated alias
