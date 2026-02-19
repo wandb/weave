@@ -102,6 +102,9 @@ class Content(BaseModel, Generic[T]):
         strict: bool | None = None,
         from_attributes: bool | None = None,
         context: dict[str, Any] | None = None,
+        extra: str | None = None,
+        by_alias: bool | None = None,
+        by_name: bool | None = None,
     ) -> Self:
         """Override model_validate to handle Content reconstruction from dict."""
         if isinstance(obj, dict):
@@ -133,7 +136,13 @@ class Content(BaseModel, Generic[T]):
 
         # Fall back to parent implementation for other cases
         return super().model_validate(
-            obj, strict=strict, from_attributes=from_attributes, context=context
+            obj,
+            strict=strict,
+            from_attributes=from_attributes,
+            context=context,
+            extra=extra,
+            by_alias=by_alias,
+            by_name=by_name,
         )
 
     @classmethod
@@ -143,6 +152,9 @@ class Content(BaseModel, Generic[T]):
         *,
         strict: bool | None = None,
         context: dict[str, Any] | None = None,
+        extra: str | None = None,
+        by_alias: bool | None = None,
+        by_name: bool | None = None,
     ) -> Self:
         """Override model_validate_json to handle Content reconstruction from JSON."""
         # Parse the JSON
