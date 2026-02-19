@@ -43,7 +43,7 @@ There are two ways to authenticate with Azure Blob Storage:
 import logging
 from abc import abstractmethod
 from collections.abc import Callable
-from typing import Any, cast
+from typing import Any, TypeVar, cast
 
 import boto3
 from azure.core.exceptions import HttpResponseError
@@ -61,6 +61,7 @@ from tenacity import (
     wait_exponential,
     wait_random_exponential,
 )
+from typing_extensions import ParamSpec
 
 from weave.trace_server.environment import wf_file_storage_uri
 from weave.trace_server.file_storage_credentials import (
@@ -87,6 +88,9 @@ DEFAULT_READ_TIMEOUT = 30
 RETRY_MAX_ATTEMPTS = 3
 RETRY_MIN_WAIT = 1  # seconds
 RETRY_MAX_WAIT = 10  # seconds
+
+P = ParamSpec("P")
+R = TypeVar("R")
 
 
 class FileStorageWriteError(Exception):
@@ -190,7 +194,9 @@ def _is_rate_limit_error(exception: BaseException | None) -> bool:
     return False
 
 
-def create_retry_decorator(operation_name: str) -> Callable[[Any], Any]:
+def create_retry_decorator(
+    operation_name: str,
+) -> Callable[[Callable[P, R]], Callable[P, R]]:
     """Creates a retry decorator with consistent retry policy and special 429 handling."""
 
     def after_retry(retry_state: RetryCallState) -> None:
@@ -217,12 +223,15 @@ def create_retry_decorator(operation_name: str) -> Callable[[Any], Any]:
             retry_state
         )
 
-    return retry(
-        stop=stop_after_attempt(RETRY_MAX_ATTEMPTS),
-        wait=create_wait_strategy,
-        reraise=True,
-        before_sleep=before_sleep_log(logger, logging.DEBUG),
-        after=after_retry,
+    return cast(
+        Callable[[Callable[P, R]], Callable[P, R]],
+        retry(
+            stop=stop_after_attempt(RETRY_MAX_ATTEMPTS),
+            wait=create_wait_strategy,
+            reraise=True,
+            before_sleep=before_sleep_log(logger, logging.DEBUG),
+            after=after_retry,
+        ),
     )
 
 
