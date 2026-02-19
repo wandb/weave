@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from polyfile.magic import MagicMatcher
+    pass
 
 
 def is_available() -> bool:
