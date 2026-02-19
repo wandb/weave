@@ -16,6 +16,7 @@ INCOMPATIBLE_SHARDS = {
     "3.13": [
         "cohere",
         "notdiamond",
+        "presidio",
         "verifiers_test",
     ],
 }
@@ -104,6 +105,7 @@ SHARDS_WITHOUT_EXTRAS = {
         "openai_realtime",
         "vertexai",
         "bedrock",
+        "presidio",
         "scorers",
         "pandas_test",
         "huggingface",
@@ -140,6 +142,11 @@ def tests(session: nox.Session, shard: str):
         sync_args.extend(["--group", "trace_server", "--group", "trace_server_tests"])
 
     session.run(*sync_args)
+
+    # Presidio's spaCy engine may shell out to `python -m pip` to fetch language models.
+    # uv-created venvs can omit pip, so bootstrap it explicitly for this shard.
+    if shard == "presidio":
+        session.run("python", "-m", "ensurepip", "--upgrade")
 
     env = {
         k: session.env.get(k) or os.getenv(k)
@@ -180,6 +187,10 @@ def tests(session: nox.Session, shard: str):
         "trace_server_bindings": ["tests/trace_server_bindings/"],
         "stainless": ["tests/trace_server_bindings/"],
         "scorers": ["tests/scorers/"],
+        "presidio": [
+            "tests/scorers/test_presidio_guardrail.py",
+            "tests/utils/test_pii_redaction.py",
+        ],
         "autogen_tests": ["tests/integrations/autogen/"],
         "verifiers_test": ["tests/integrations/verifiers/"],
         "trace": [
