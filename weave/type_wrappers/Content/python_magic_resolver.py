@@ -77,7 +77,7 @@ def is_available() -> bool:
     Only requires the MIME-detection instance; extension detection is optional
     (it needs a newer libmagic that may not be bundled on Windows).
     """
-    mime_magic, _ext_magic = _get_magic_instances()
+    mime_magic, _ = _get_magic_instances()
     return mime_magic is not None
 
 
