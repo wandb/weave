@@ -29,6 +29,21 @@ from weave.trace.context.weave_client_context import get_weave_client
 _openai_agents_patcher: OpenAIAgentsPatcher | None = None
 
 
+class OpenAIAgentsSettings(IntegrationSettings):
+    """Settings for OpenAI Agents integration.
+
+    Attributes:
+        enabled: Whether the integration is enabled at all.
+        op_settings: Operation settings for traced functions.
+        patch_realtime_websockets: Whether to also patch the websockets library
+            for OpenAI Realtime tracing (default: True). OpenAI Agents uses
+            websockets as its realtime backend. Only websocket connections to
+            OpenAI Realtime URLs are affected.
+    """
+
+    patch_realtime_websockets: bool = True
+
+
 def _call_type(span: Span) -> str:
     """Determine the appropriate call type for a given OpenAI Agent span."""
     return span.span_data.type or "task"

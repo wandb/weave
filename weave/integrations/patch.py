@@ -241,6 +241,16 @@ def patch_openai_agents(settings: IntegrationSettings | None = None) -> None:
         triggering_symbols=["openai_agents"],
         settings=settings,
     )
+    # OpenAI Agents uses the websockets library for its realtime backend,
+    # so also patch the realtime websocket integration.
+    # Users can opt out via OpenAIAgentsSettings(patch_realtime_websockets=False).
+    from weave.integrations.openai_agents.openai_agents import OpenAIAgentsSettings
+
+    should_patch_realtime = True
+    if isinstance(settings, OpenAIAgentsSettings):
+        should_patch_realtime = settings.patch_realtime_websockets
+    if should_patch_realtime:
+        patch_openai_realtime()
 
 
 def patch_verdict(settings: IntegrationSettings | None = None) -> None:
