@@ -457,9 +457,11 @@ class WeaveTable(Traceable):
                 return
 
         for i, _ in enumerate(self._prefetched_rows):
+
             def make_get_row_digest(idx: int) -> typing.Callable[[], str]:
                 def get_row_digest() -> str:
                     return cached_table_ref.row_digests[idx]
+
                 return get_row_digest
 
             next_id_future = wc.future_executor.defer(make_get_row_digest(i))
@@ -537,9 +539,12 @@ class WeaveTable(Traceable):
                         self.root,
                     )
 
-                def make_row_task(v: Any, r: RefWithExtra | None) -> typing.Callable[[], Any]:
+                def make_row_task(
+                    v: Any, r: RefWithExtra | None
+                ) -> typing.Callable[[], Any]:
                     def row_task() -> Any:
                         return process_row(v, r)
+
                     return row_task
 
                 future = wc.future_executor.defer(make_row_task(val, new_ref))

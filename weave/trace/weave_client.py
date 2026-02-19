@@ -1831,9 +1831,11 @@ class WeaveClient:
         # Create chunks in parallel using future_executor - defer serialization
         chunk_futures = []
         for raw_chunk in raw_chunks:
+
             def make_chunk_task(chunk: list[Any]) -> Callable[[], TableCreateRes]:
                 def chunk_task() -> TableCreateRes:
                     return self._send_table_create(chunk)
+
                 return chunk_task
 
             chunk_future = self.future_executor.defer(make_chunk_task(raw_chunk))
