@@ -28,7 +28,7 @@ Outstanding Optimizations/Work:
 import logging
 import re
 from collections.abc import Callable, KeysView, Sequence
-from typing import Literal, NamedTuple, cast
+from typing import Literal, NamedTuple, TypeGuard
 
 from pydantic import BaseModel, Field
 from typing_extensions import Self
@@ -76,6 +76,17 @@ logger = logging.getLogger(__name__)
 
 CTE_FILTERED_CALLS = "filtered_calls"
 CTE_ALL_CALLS = "all_calls"
+
+OrderDirection = Literal["ASC", "DESC"]
+SortDirection = Literal["asc", "desc"]
+
+
+def is_order_direction(direction: str) -> TypeGuard[OrderDirection]:
+    return direction in ("ASC", "DESC")
+
+
+def is_sort_direction(direction: str) -> TypeGuard[SortDirection]:
+    return direction in ("asc", "desc")
 
 
 class FilterConditionsResult(NamedTuple):
@@ -793,9 +804,8 @@ class CallsQuery(BaseModel):
         if field in DISALLOWED_FILTERING_FIELDS:
             raise ValueError(f"Field {field} is not allowed in ORDER BY")
         direction = direction.upper()
-        if direction not in ("ASC", "DESC"):
+        if not is_order_direction(direction):
             raise ValueError(f"Direction {direction} is not allowed")
-        direction = cast(Literal["ASC", "DESC"], direction)
         self.order_fields.append(
             OrderField(field=get_field_by_name(field), direction=direction)
         )
@@ -1107,13 +1117,13 @@ class CallsQuery(BaseModel):
             ctes.add_cte(cte.name, cte.sql)
 
     def _convert_to_orm_sort_fields(self) -> list[SortBy]:
-        return [
-            SortBy(
-                field=sort_by.field.field,
-                direction=cast(Literal["asc", "desc"], sort_by.direction.lower()),
-            )
-            for sort_by in self.order_fields
-        ]
+        sort_fields: list[SortBy] = []
+        for sort_by in self.order_fields:
+            direction = sort_by.direction.lower()
+            if not is_sort_direction(direction):
+                raise ValueError(f"Direction {sort_by.direction} is not allowed")
+            sort_fields.append(SortBy(field=sort_by.field.field, direction=direction))
+        return sort_fields
 
     def _build_where_clause_optimizations(
         self,

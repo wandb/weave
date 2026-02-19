@@ -6,7 +6,16 @@ import json
 import os
 import wave
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Generic, Literal, TypeVar, cast, get_args
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Generic,
+    Literal,
+    TypeGuard,
+    TypeVar,
+    cast,
+    get_args,
+)
 
 from typing_extensions import Self
 
@@ -22,6 +31,7 @@ SUPPORTED_FORMATS_TYPE = Literal["mp3", "wav"]
 SUPPORTED_FORMATS = cast(
     list[SUPPORTED_FORMATS_TYPE], sorted(get_args(SUPPORTED_FORMATS_TYPE))
 )
+SUPPORTED_FORMATS_SET: set[SUPPORTED_FORMATS_TYPE] = set(SUPPORTED_FORMATS)
 T = TypeVar("T", bound=SUPPORTED_FORMATS_TYPE)
 
 
@@ -53,6 +63,11 @@ def get_format_from_filename(filename: str) -> str:
         return ""
 
     return filename[last_dot + 1 :].lower()
+
+
+def is_supported_audio_format(format: str) -> TypeGuard[SUPPORTED_FORMATS_TYPE]:
+    """Check whether a string is a supported audio format."""
+    return format in SUPPORTED_FORMATS_SET
 
 
 def try_decode(data: str | bytes) -> bytes:
@@ -133,13 +148,13 @@ class Audio(Generic[T]):
             ValueError: If format is not supported
         """
         data = try_decode(data)
-        if format not in list(map(str, SUPPORTED_FORMATS)):
+        if not is_supported_audio_format(format):
             raise ValueError("Unknown format {format}, must be one of: mp3 or wav")
 
         # We already attempted to decode it as base64 and coerced to bytes so we can skip that step
         return cls(
             data=data,
-            format=cast(SUPPORTED_FORMATS_TYPE, format),
+            format=format,
             validate_base64=False,
         )
 
@@ -163,13 +178,13 @@ class Audio(Generic[T]):
             raise ValueError(f"File {path} does not exist")
 
         format_str = get_format_from_filename(str(path))
-        if format_str not in list(map(str, SUPPORTED_FORMATS)):
+        if not is_supported_audio_format(format_str):
             raise ValueError(
                 f"Invalid file path {path}, file must end in one of: mp3 or wav"
             )
 
         data = open(path, "rb").read()
-        return cls(data=data, format=cast(SUPPORTED_FORMATS_TYPE, format_str))
+        return cls(data=data, format=format_str)
 
     def export(self, path: str | bytes | Path | os.PathLike) -> None:
         """Export audio data to a file.
