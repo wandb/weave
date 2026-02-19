@@ -27,7 +27,7 @@ Outstanding Optimizations/Work:
 
 import logging
 import re
-from collections.abc import Callable, KeysView
+from collections.abc import Callable, KeysView, Sequence
 from typing import Literal, NamedTuple, cast
 
 from pydantic import BaseModel, Field
@@ -52,6 +52,7 @@ from weave.trace_server.calls_query_builder.utils import (
     json_dump_field_as_sql,
     param_slot,
     safely_format_sql,
+    timestamp_to_datetime_str,
 )
 from weave.trace_server.clickhouse_trace_server_settings import LOCAL_TABLE_SUFFIX
 from weave.trace_server.common_interface import SortBy
@@ -1620,6 +1621,11 @@ ALLOWED_CALL_FIELDS = {
 
 DISALLOWED_FILTERING_FIELDS = {"storage_size_bytes", "total_storage_size_bytes"}
 
+# Fields that are stored as DateTime64 columns in ClickHouse. When comparing
+# these fields with numeric unix timestamps, the value must be converted to a
+# datetime string so ClickHouse can properly use primary key / ORDER BY indexes.
+DATETIME_COLUMN_FIELDS = {"started_at", "ended_at", "deleted_at"}
+
 
 def get_field_by_name(name: str) -> CallsMergedField:
     if name not in ALLOWED_CALL_FIELDS:
@@ -1767,6 +1773,57 @@ class FilterToConditions(BaseModel):
     fields_used: list[CallsMergedField]
 
 
+def _maybe_convert_datetime_operands(
+    operands: Sequence["tsi_query.Operand"],
+) -> Sequence["tsi_query.Operand"]:
+    """Convert numeric literals to datetime strings when compared against DateTime columns.
+
+    When a numeric literal (int/float unix timestamp) is being compared against a
+    DateTime column field (started_at, ended_at, deleted_at), convert it to a datetime
+    string so ClickHouse can properly use primary key / ORDER BY indexes on DateTime64
+    columns.
+
+    Returns a new list of operands with conversions applied, or the original sequence if
+    no conversion is needed.
+
+    Examples:
+        >>> ops = _maybe_convert_datetime_operands([
+        ...     tsi_query.GetFieldOperator(**{"$getField": "started_at"}),
+        ...     tsi_query.LiteralOperation(**{"$literal": 1770052073.869}),
+        ... ])
+        >>> isinstance(ops[1].literal_, str)
+        True
+    """
+    if len(operands) != 2:
+        return operands
+
+    field_idx = None
+    literal_idx = None
+
+    for i, op in enumerate(operands):
+        if (
+            isinstance(op, tsi_query.GetFieldOperator)
+            and op.get_field_ in DATETIME_COLUMN_FIELDS
+        ):
+            field_idx = i
+        elif isinstance(op, tsi_query.LiteralOperation) and isinstance(
+            op.literal_, (int, float)
+        ):
+            literal_idx = i
+
+    if field_idx is None or literal_idx is None:
+        return operands
+
+    # Convert numeric timestamp to datetime string for proper DateTime64 comparison
+    timestamp = operands[literal_idx].literal_
+    assert isinstance(timestamp, (int, float))
+    datetime_str = timestamp_to_datetime_str(timestamp)
+
+    new_operands = list(operands)
+    new_operands[literal_idx] = tsi_query.LiteralOperation(**{"$literal": datetime_str})
+    return new_operands
+
+
 def process_query_to_conditions(
     query: tsi.Query,
     param_builder: ParamBuilder,
@@ -1799,30 +1856,35 @@ def process_query_to_conditions(
             operand_part = process_operand(operation.not_[0])
             cond = f"(NOT ({operand_part}))"
         elif isinstance(operation, tsi_query.EqOperation):
-            lhs_part = process_operand(operation.eq_[0])
+            ops = _maybe_convert_datetime_operands(operation.eq_)
+            lhs_part = process_operand(ops[0])
             if (
-                isinstance(operation.eq_[1], tsi_query.LiteralOperation)
-                and operation.eq_[1].literal_ is None
+                isinstance(ops[1], tsi_query.LiteralOperation)
+                and ops[1].literal_ is None
             ):
                 cond = f"({lhs_part} IS NULL)"
             else:
-                rhs_part = process_operand(operation.eq_[1])
+                rhs_part = process_operand(ops[1])
                 cond = f"({lhs_part} = {rhs_part})"
         elif isinstance(operation, tsi_query.GtOperation):
-            lhs_part = process_operand(operation.gt_[0])
-            rhs_part = process_operand(operation.gt_[1])
+            ops = _maybe_convert_datetime_operands(operation.gt_)
+            lhs_part = process_operand(ops[0])
+            rhs_part = process_operand(ops[1])
             cond = f"({lhs_part} > {rhs_part})"
         elif isinstance(operation, tsi_query.LtOperation):
-            lhs_part = process_operand(operation.lt_[0])
-            rhs_part = process_operand(operation.lt_[1])
+            ops = _maybe_convert_datetime_operands(operation.lt_)
+            lhs_part = process_operand(ops[0])
+            rhs_part = process_operand(ops[1])
             cond = f"({lhs_part} < {rhs_part})"
         elif isinstance(operation, tsi_query.GteOperation):
-            lhs_part = process_operand(operation.gte_[0])
-            rhs_part = process_operand(operation.gte_[1])
+            ops = _maybe_convert_datetime_operands(operation.gte_)
+            lhs_part = process_operand(ops[0])
+            rhs_part = process_operand(ops[1])
             cond = f"({lhs_part} >= {rhs_part})"
         elif isinstance(operation, tsi_query.LteOperation):
-            lhs_part = process_operand(operation.lte_[0])
-            rhs_part = process_operand(operation.lte_[1])
+            ops = _maybe_convert_datetime_operands(operation.lte_)
+            lhs_part = process_operand(ops[0])
+            rhs_part = process_operand(ops[1])
             cond = f"({lhs_part} <= {rhs_part})"
         elif isinstance(operation, tsi_query.InOperation):
             lhs_part = process_operand(operation.in_[0])

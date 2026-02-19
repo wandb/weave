@@ -895,8 +895,21 @@ async def test_llamaindex_quick_start(client: WeaveClient) -> None:
     flattened_calls = flatten_calls(calls)
 
     # LlamaIndex 0.14.1+ no longer emits FunctionAgent-done span and SpanDrop event
-    assert len(flattened_calls) == 48
-    assert flattened_calls_to_names(flattened_calls) == [
+    names = flattened_calls_to_names(flattened_calls)
+    # Streaming chat can emit multiple LLMChatInProgress events depending on chunking.
+    # Collapse consecutive duplicates to avoid flakes across platforms.
+    normalized_names: list[tuple[str, int]] = []
+    for name, depth in names:
+        if (
+            normalized_names
+            and normalized_names[-1] == (name, depth)
+            and name == "llama_index.event.LLMChatInProgress"
+        ):
+            continue
+        normalized_names.append((name, depth))
+
+    assert len(normalized_names) == 48
+    assert normalized_names == [
         ("llama_index.span.SentenceSplitter-parse_nodes", 0),
         ("llama_index.span.SentenceSplitter.split_text_metadata_aware", 1),
         ("llama_index.span.FunctionAgent.run", 0),
