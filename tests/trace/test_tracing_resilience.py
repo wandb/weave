@@ -13,6 +13,7 @@ import weave
 from tests.trace.util import DummyTestException
 from weave.trace.context import call_context
 from weave.trace.context.tests_context import raise_on_captured_errors
+from weave.trace.op import _add_accumulator
 
 
 def assert_no_current_call():
