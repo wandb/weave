@@ -8,10 +8,8 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from weave.shared.pydantic_util import pydantic_asdict_one_level
 from weave.trace.op import is_op
-from weave.trace_server.client_server_common.pydantic_util import (
-    pydantic_asdict_one_level,
-)
 
 
 class ObjectRecord:
