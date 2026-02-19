@@ -126,7 +126,7 @@ class CallCompleteCHInsertable(
     summary_dump: str
     otel_dump: str | None = None
     wb_run_step_end: int | None = None
-    ttl_at: datetime.datetime = datetime.datetime(2050, 1, 1)
+    ttl_at: datetime.datetime = datetime.datetime(2100, 1, 1)
     source: str = "direct"
 
     _wb_run_step_end_v = field_validator("wb_run_step_end")(

@@ -13,6 +13,8 @@ from weave.trace_server.ch_sentinel_values import (
     DATETIME_PRECISION,
     SENTINEL_DATETIME,
     SENTINEL_DATETIME_FIELDS,
+    SENTINEL_INT,
+    SENTINEL_INT_FIELDS,
     SENTINEL_STRING,
     SENTINEL_STRING_FIELDS,
     from_ch_value,
@@ -27,7 +29,7 @@ from weave.trace_server.ch_sentinel_values import (
 from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.project_version.types import ReadTable
 
-NON_SENTINEL_FIELDS = ["op_name", "id", "inputs_dump", "wb_run_step", "trace_id"]
+NON_SENTINEL_FIELDS = ["op_name", "id", "inputs_dump", "trace_id"]
 
 
 def test_constants() -> None:
@@ -36,15 +38,23 @@ def test_constants() -> None:
     assert SENTINEL_DATETIME == datetime.datetime(
         1970, 1, 1, tzinfo=datetime.timezone.utc
     )
-    assert ALL_SENTINEL_FIELDS == SENTINEL_STRING_FIELDS | SENTINEL_DATETIME_FIELDS
+    assert SENTINEL_INT == 0
+    assert ALL_SENTINEL_FIELDS == (
+        SENTINEL_STRING_FIELDS | SENTINEL_DATETIME_FIELDS | SENTINEL_INT_FIELDS
+    )
     assert len(SENTINEL_STRING_FIELDS) > 0
     assert len(SENTINEL_DATETIME_FIELDS) > 0
+    assert len(SENTINEL_INT_FIELDS) > 0
     assert SENTINEL_STRING_FIELDS.isdisjoint(SENTINEL_DATETIME_FIELDS)
+    assert SENTINEL_STRING_FIELDS.isdisjoint(SENTINEL_INT_FIELDS)
+    assert SENTINEL_DATETIME_FIELDS.isdisjoint(SENTINEL_INT_FIELDS)
 
 
 def test_is_sentinel_field() -> None:
     """Known sentinel fields return True; other fields return False."""
-    for field in SENTINEL_STRING_FIELDS | SENTINEL_DATETIME_FIELDS:
+    for field in (
+        SENTINEL_STRING_FIELDS | SENTINEL_DATETIME_FIELDS | SENTINEL_INT_FIELDS
+    ):
         assert is_sentinel_field(field) is True, f"{field} should be sentinel"
 
     for field in NON_SENTINEL_FIELDS:
@@ -52,7 +62,7 @@ def test_is_sentinel_field() -> None:
 
 
 def test_get_sentinel_value() -> None:
-    """Returns empty string for string fields, SENTINEL_DATETIME for datetime fields, None otherwise."""
+    """Returns correct sentinel for each field type, None otherwise."""
     for field in SENTINEL_STRING_FIELDS:
         assert get_sentinel_value(field) == "", f"{field} sentinel should be ''"
 
@@ -60,6 +70,9 @@ def test_get_sentinel_value() -> None:
         assert get_sentinel_value(field) is SENTINEL_DATETIME, (
             f"{field} sentinel should be SENTINEL_DATETIME"
         )
+
+    for field in SENTINEL_INT_FIELDS:
+        assert get_sentinel_value(field) == 0, f"{field} sentinel should be 0"
 
     for field in NON_SENTINEL_FIELDS:
         assert get_sentinel_value(field) is None, (
@@ -81,6 +94,9 @@ def test_sentinel_ch_type() -> None:
     assert sentinel_ch_type("updated_at") == "DateTime64(3)"
     assert sentinel_ch_type("deleted_at") == "DateTime64(3)"
 
+    for field in SENTINEL_INT_FIELDS:
+        assert sentinel_ch_type(field) == "UInt64"
+
     for field in NON_SENTINEL_FIELDS:
         with pytest.raises(ValueError, match=f"Not a sentinel field: {field}"):
             sentinel_ch_type(field)
@@ -97,6 +113,10 @@ def test_sentinel_ch_literal() -> None:
     assert sentinel_ch_literal("ended_at") == "toDateTime64(0, 6)"
     assert sentinel_ch_literal("updated_at") == "toDateTime64(0, 3)"
     assert sentinel_ch_literal("deleted_at") == "toDateTime64(0, 3)"
+
+    # Int sentinel fields return 0.
+    assert sentinel_ch_literal("wb_run_step") == "0"
+    assert sentinel_ch_literal("wb_run_step_end") == "0"
 
     # Non-sentinel fields raise ValueError.
     for field in NON_SENTINEL_FIELDS:
@@ -116,6 +136,10 @@ def test_to_ch_value() -> None:
     for field in SENTINEL_DATETIME_FIELDS:
         assert to_ch_value(field, None) is SENTINEL_DATETIME
         assert to_ch_value(field, dt) is dt
+
+    for field in SENTINEL_INT_FIELDS:
+        assert to_ch_value(field, None) == 0
+        assert to_ch_value(field, 42) == 42
 
     for field in NON_SENTINEL_FIELDS:
         assert to_ch_value(field, None) is None
@@ -140,6 +164,11 @@ def test_from_ch_value() -> None:
         assert from_ch_value(field, real_dt) is real_dt
         assert from_ch_value(field, naive_real) is naive_real
         assert from_ch_value(field, None) is None  # CH may return None during migration
+
+    for field in SENTINEL_INT_FIELDS:
+        assert from_ch_value(field, 0) is None
+        assert from_ch_value(field, 42) == 42
+        assert from_ch_value(field, 1) == 1
 
     for field in NON_SENTINEL_FIELDS:
         assert from_ch_value(field, None) is None
@@ -170,11 +199,18 @@ def test_null_check_sql() -> None:
     result = null_check_sql("parent_id", "t.parent_id", ReadTable.CALLS_MERGED, pb)
     assert result == "t.parent_id IS NULL"
 
-    # calls_complete: non-sentinel fields still use IS NULL
+    # calls_complete: int sentinel field uses = sentinel param
     pb = ParamBuilder("pb")
     result = null_check_sql(
         "wb_run_step", "t.wb_run_step", ReadTable.CALLS_COMPLETE, pb
     )
+    assert "=" in result
+    assert "IS NULL" not in result
+    assert "UInt64" in result
+
+    # calls_merged: int sentinel fields still use IS NULL (nullable columns)
+    pb = ParamBuilder("pb")
+    result = null_check_sql("wb_run_step", "t.wb_run_step", ReadTable.CALLS_MERGED, pb)
     assert result == "t.wb_run_step IS NULL"
 
     # negate: calls_complete sentinel field uses != sentinel
@@ -231,12 +267,18 @@ def test_null_check_literal_sql() -> None:
     )
     assert result == "t.ended_at != toDateTime64(0, 6)"
 
-    # Non-sentinel field: always uses IS NULL regardless of table.
+    # calls_complete int sentinel field: uses = 0 or != 0.
     result = null_check_literal_sql(
         "wb_run_step", "t.wb_run_step", ReadTable.CALLS_COMPLETE
     )
-    assert result == "t.wb_run_step IS NULL"
+    assert result == "t.wb_run_step = 0"
 
+    result = null_check_literal_sql(
+        "wb_run_step", "t.wb_run_step", ReadTable.CALLS_COMPLETE, negate=True
+    )
+    assert result == "t.wb_run_step != 0"
+
+    # Non-sentinel field: always uses IS NULL regardless of table.
     result = null_check_literal_sql(
         "op_name", "t.op_name", ReadTable.CALLS_COMPLETE, negate=True
     )

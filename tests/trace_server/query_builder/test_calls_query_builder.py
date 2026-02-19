@@ -1694,7 +1694,7 @@ def test_build_calls_complete_update_end_query() -> None:
             output_dump = {output_dump:String},
             summary_dump = {summary_dump:String},
             output_refs = {output_refs:Array(String)},
-            wb_run_step_end = {wb_run_step_end:Nullable(UInt64)},
+            wb_run_step_end = {wb_run_step_end:UInt64},
             updated_at = now64(3)
         WHERE project_id = {project_id:String}
             AND started_at = fromUnixTimestamp64Micro({started_at:Int64}, 'UTC')

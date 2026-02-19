@@ -20,6 +20,7 @@ Sentinel string fields: parent_id, display_name, exception, otel_dump,
     wb_user_id, wb_run_id, thread_id, turn_id  (sentinel = '')
 Sentinel datetime fields: ended_at, updated_at, deleted_at
     (sentinel = epoch zero)
+Sentinel int fields: wb_run_step, wb_run_step_end  (sentinel = 0)
 """
 
 from __future__ import annotations
@@ -34,6 +35,7 @@ if TYPE_CHECKING:
 
 SENTINEL_DATETIME = datetime.datetime(1970, 1, 1, tzinfo=datetime.timezone.utc)
 SENTINEL_STRING = ""
+SENTINEL_INT = 0
 
 SENTINEL_STRING_FIELDS = frozenset(
     {
@@ -56,7 +58,16 @@ SENTINEL_DATETIME_FIELDS = frozenset(
     }
 )
 
-ALL_SENTINEL_FIELDS = SENTINEL_STRING_FIELDS | SENTINEL_DATETIME_FIELDS
+SENTINEL_INT_FIELDS = frozenset(
+    {
+        "wb_run_step",
+        "wb_run_step_end",
+    }
+)
+
+ALL_SENTINEL_FIELDS = (
+    SENTINEL_STRING_FIELDS | SENTINEL_DATETIME_FIELDS | SENTINEL_INT_FIELDS
+)
 
 # Single source of truth for ClickHouse DateTime64 precision per column.
 # Must match the column definitions in migration 024_calls_complete_v2.up.sql.
@@ -89,12 +100,16 @@ def sentinel_ch_type(field: str) -> str:
         'DateTime64(3)'
         >>> sentinel_ch_type("exception")
         'String'
+        >>> sentinel_ch_type("wb_run_step")
+        'UInt64'
     """
     if field in SENTINEL_STRING_FIELDS:
         return "String"
     if field in SENTINEL_DATETIME_FIELDS:
         precision = DATETIME_PRECISION[field]
         return f"DateTime64({precision})"
+    if field in SENTINEL_INT_FIELDS:
+        return "UInt64"
     raise ValueError(f"Not a sentinel field: {field}")
 
 
@@ -119,12 +134,16 @@ def sentinel_ch_literal(field: str) -> str:
         'toDateTime64(0, 3)'
         >>> sentinel_ch_literal("parent_id")
         "''"
+        >>> sentinel_ch_literal("wb_run_step")
+        '0'
     """
     if field in SENTINEL_STRING_FIELDS:
         return "''"
     if field in SENTINEL_DATETIME_FIELDS:
         precision = DATETIME_PRECISION[field]
         return f"toDateTime64(0, {precision})"
+    if field in SENTINEL_INT_FIELDS:
+        return "0"
     raise ValueError(f"Not a sentinel field: {field}")
 
 
@@ -164,12 +183,14 @@ def null_check_literal_sql(
     return f"{field_sql} {op} {literal}"
 
 
-def get_sentinel_value(field: str) -> str | datetime.datetime | None:
+def get_sentinel_value(field: str) -> str | datetime.datetime | int | None:
     """Return the sentinel value for a given field, or None if not a sentinel field."""
     if field in SENTINEL_STRING_FIELDS:
         return SENTINEL_STRING
     if field in SENTINEL_DATETIME_FIELDS:
         return SENTINEL_DATETIME
+    if field in SENTINEL_INT_FIELDS:
+        return SENTINEL_INT
     return None
 
 
@@ -190,7 +211,9 @@ def to_ch_value(field: str, value: Any) -> Any:
         return SENTINEL_STRING
     if field in SENTINEL_DATETIME_FIELDS:
         return SENTINEL_DATETIME
-    return value  # Nullable fields (wb_run_step, etc.) keep None
+    if field in SENTINEL_INT_FIELDS:
+        return SENTINEL_INT
+    return value
 
 
 def from_ch_value(field: str, value: Any) -> Any:
@@ -215,6 +238,8 @@ def from_ch_value(field: str, value: Any) -> Any:
             sentinel_utc = SENTINEL_DATETIME.replace(tzinfo=None)
             return None if val_utc == sentinel_utc else value
         return value
+    if field in SENTINEL_INT_FIELDS:
+        return None if value == SENTINEL_INT else value
     return value
 
 

@@ -51,12 +51,12 @@ CREATE TABLE calls_complete_new (
     -- attributes_dump stays as String (not converted to JSON)
     attributes_dump String,
 
-    -- UInt64 fields remain Nullable (punted)
-    wb_run_step     Nullable(UInt64),
-    wb_run_step_end Nullable(UInt64),
+    -- UInt64 fields: non-nullable, 0 = not set
+    wb_run_step     UInt64 DEFAULT 0,
+    wb_run_step_end UInt64 DEFAULT 0,
 
     -- New columns
-    ttl_at          DateTime DEFAULT '2050-01-01 00:00:00',
+    ttl_at          DateTime DEFAULT '2100-01-01 00:00:00',
     source          Enum8('direct' = 1, 'dual' = 2, 'migration' = 3) DEFAULT 'direct',
 
     -- Indexes (carried forward from v1 + new)
@@ -110,9 +110,9 @@ SELECT
     summary_dump,
     output_refs,
     attributes_dump,
-    wb_run_step,
-    wb_run_step_end,
-    toDateTime('2050-01-01 00:00:00') AS ttl_at,
+    COALESCE(wb_run_step, 0) AS wb_run_step,
+    COALESCE(wb_run_step_end, 0) AS wb_run_step_end,
+    toDateTime('2100-01-01 00:00:00') AS ttl_at,
     'direct' AS source
 FROM calls_complete;
 
@@ -143,9 +143,9 @@ SELECT
     summary_dump,
     output_refs,
     attributes_dump,
-    wb_run_step,
-    wb_run_step_end,
-    toDateTime('2050-01-01 00:00:00') AS ttl_at,
+    COALESCE(wb_run_step, 0) AS wb_run_step,
+    COALESCE(wb_run_step_end, 0) AS wb_run_step_end,
+    toDateTime('2100-01-01 00:00:00') AS ttl_at,
     'direct' AS source
 FROM calls_complete;
 
@@ -176,8 +176,8 @@ CREATE TABLE calls_complete_stats
     exception_size_bytes SimpleAggregateFunction(any, UInt64),
     wb_user_id SimpleAggregateFunction(any, String),
     wb_run_id SimpleAggregateFunction(any, String),
-    wb_run_step SimpleAggregateFunction(any, Nullable(UInt64)),
-    wb_run_step_end SimpleAggregateFunction(any, Nullable(UInt64)),
+    wb_run_step SimpleAggregateFunction(any, UInt64),
+    wb_run_step_end SimpleAggregateFunction(any, UInt64),
     thread_id SimpleAggregateFunction(any, String),
     turn_id SimpleAggregateFunction(any, String),
     created_at SimpleAggregateFunction(min, DateTime64(3)),

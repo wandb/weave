@@ -2835,7 +2835,7 @@ def build_calls_complete_update_end_query(
             output_dump = {{{output_dump_param}:String}},
             summary_dump = {{{summary_dump_param}:String}},
             output_refs = {{{output_refs_param}:Array(String)}},
-            wb_run_step_end = {{{wb_run_step_end_param}:Nullable(UInt64)}},
+            wb_run_step_end = {{{wb_run_step_end_param}:UInt64}},
             updated_at = now64(3)
         WHERE {where_clause}
         """
