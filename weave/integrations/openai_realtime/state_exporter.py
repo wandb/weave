@@ -59,7 +59,7 @@ class SessionSpan(BaseModel):
             self.root_call = wc.create_call("realtime.session", inputs=self.session)
 
     def on_updated(self, msg: dict) -> None:
-        """This function runs when we recieve a session.updated message
+        """This function runs when we receive a session.updated message
         In Beta:
             session.updated message can come from the server before send/recv session.create(d)
         In GA:
