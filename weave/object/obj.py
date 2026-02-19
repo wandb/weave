@@ -17,6 +17,7 @@ from weave.trace.ref_util import get_ref
 from weave.trace.refs import ObjectRef
 from weave.trace.vals import WeaveObject, pydantic_getattribute
 
+
 class Object(BaseModel):
     """Base class for Weave objects that can be tracked and versioned.
 
