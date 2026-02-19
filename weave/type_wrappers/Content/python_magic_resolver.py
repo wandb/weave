@@ -41,7 +41,7 @@ def _check_availability() -> tuple[bool, bool]:
     try:
         magic.Magic(extension=True)  # type: ignore[call-overload]
         _magic_has_extension = True
-    except NotImplementedError:
+    except (NotImplementedError, TypeError):
         logger.warning(
             "libmagic version out of date, upgrade libmagic to version above 524 for extension detection."
         )
