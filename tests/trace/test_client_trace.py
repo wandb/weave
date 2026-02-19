@@ -32,6 +32,12 @@ from tests.trace_server.conftest_lib.trace_server_external_adapter import (
     DummyIdConverter,
 )
 from weave import Thread, ThreadPoolExecutor
+from weave.shared.refs_internal import extra_value_quoter
+from weave.shared.trace_server_interface_util import (
+    TRACE_REF_SCHEME,
+    WILDCARD_ARTIFACT_VERSION_AND_PATH,
+    extract_refs_from_values,
+)
 from weave.trace import weave_client
 from weave.trace.context.call_context import require_current_call
 from weave.trace.context.weave_client_context import (
@@ -46,13 +52,7 @@ from weave.trace_server.clickhouse_trace_server_settings import ENTITY_TOO_LARGE
 from weave.trace_server.common_interface import SortBy
 from weave.trace_server.errors import InsertTooLarge, InvalidFieldError, InvalidRequest
 from weave.trace_server.ids import generate_id
-from weave.trace_server.refs_internal import extra_value_quoter
 from weave.trace_server.token_costs import COST_OBJECT_NAME
-from weave.trace_server.trace_server_interface_util import (
-    TRACE_REF_SCHEME,
-    WILDCARD_ARTIFACT_VERSION_AND_PATH,
-    extract_refs_from_values,
-)
 from weave.trace_server.validation_util import CHValidationError
 from weave.utils.project_id import from_project_id, to_project_id
 
