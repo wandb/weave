@@ -1,5 +1,6 @@
-from pydantic import Field
 from typing import Literal
+
+from pydantic import Field
 from typing_extensions import Self
 
 from weave.flow.casting import Scorer

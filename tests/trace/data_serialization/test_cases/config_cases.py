@@ -101,7 +101,7 @@ config_cases = [
             },
             debounced_scoring_enabled=True,
             debounced_scoring_aggregation_field="trace_id",
-            debounced_scoring_timeout_seconds=60.1
+            debounced_scoring_timeout_seconds=60.1,
         ),
         inline_call_param=False,
         is_legacy=False,
