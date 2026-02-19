@@ -1,13 +1,14 @@
 """MIME type and extension detection using python-magic (libmagic wrapper).
 
 Provides detection from both file paths (magic.from_file) and byte buffers
-(magic.from_buffer). Creates fresh Magic instances per call to avoid
-contention — each instance has its own internal lock and libmagic cookie.
+(magic.from_buffer). Uses thread-local Magic instances so each thread gets
+its own libmagic cookie — no cross-thread contention, no per-call overhead.
 """
 
 from __future__ import annotations
 
 import logging
+import threading
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -17,6 +18,10 @@ logger = logging.getLogger(__name__)
 # case of a race is redundant initialisation (idempotent), no lock is needed.
 _magic_available: bool | None = None
 _magic_has_extension: bool = False
+
+# Thread-local storage for Magic instances.  Each thread lazily creates its
+# own pair of instances on first use and reuses them for subsequent calls.
+_thread_local = threading.local()
 
 
 def _check_availability() -> tuple[bool, bool]:
@@ -43,21 +48,25 @@ def _check_availability() -> tuple[bool, bool]:
     return _magic_available, _magic_has_extension
 
 
-def _make_magic_instances() -> tuple[Any, Any]:
-    """Create fresh Magic instances for this call.
+def _get_magic_instances() -> tuple[Any, Any]:
+    """Return thread-local Magic instances, creating them on first access.
 
-    Each Magic instance carries its own threading.Lock and libmagic cookie,
-    so concurrent callers never share C-level state.
+    Each thread gets its own libmagic cookie so concurrent callers never
+    share C-level state.
     """
+    mime_inst = getattr(_thread_local, "mime", None)
+    if mime_inst is not None:
+        return mime_inst, getattr(_thread_local, "ext", None)
+
     available, has_extension = _check_availability()
     if not available:
         return None, None
 
     import magic
 
-    mime_inst = magic.Magic(mime=True)
-    ext_inst = magic.Magic(extension=True) if has_extension else None  # type: ignore[call-overload]
-    return mime_inst, ext_inst
+    _thread_local.mime = magic.Magic(mime=True)
+    _thread_local.ext = magic.Magic(extension=True) if has_extension else None  # type: ignore[call-overload]
+    return _thread_local.mime, _thread_local.ext
 
 
 def _normalize_magic_extension(raw_ext: str | None) -> str | None:
@@ -115,7 +124,7 @@ def detect(
 
     Returns (mimetype, extension) tuple; either value may be None.
     """
-    mime_magic, ext_magic = _make_magic_instances()
+    mime_magic, ext_magic = _get_magic_instances()
     if mime_magic is None:
         return None, None
 
