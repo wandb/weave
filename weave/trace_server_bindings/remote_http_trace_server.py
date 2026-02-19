@@ -932,6 +932,36 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
             params={"project_id": req.project_id},
         )
 
+    def annotation_queue_delete(
+        self, req: tsi.AnnotationQueueDeleteReq
+    ) -> tsi.AnnotationQueueDeleteRes:
+        return self._generic_request(
+            f"/annotation_queues/{req.queue_id}",
+            req,
+            tsi.AnnotationQueueDeleteReq,
+            tsi.AnnotationQueueDeleteRes,
+            method="DELETE",
+            params={"project_id": req.project_id},
+        )
+
+    def annotation_queue_update(
+        self, req: tsi.AnnotationQueueUpdateReq
+    ) -> tsi.AnnotationQueueUpdateRes:
+        # Convert to Body type to exclude queue_id from request body (it's in the URL path)
+        body = his.AnnotationQueueUpdateBody(
+            project_id=req.project_id,
+            name=req.name,
+            description=req.description,
+            scorer_refs=req.scorer_refs,
+        )
+        return self._generic_request(
+            f"/annotation_queues/{req.queue_id}",
+            body,
+            his.AnnotationQueueUpdateBody,
+            tsi.AnnotationQueueUpdateRes,
+            method="PUT",
+        )
+
     def annotation_queue_add_calls(
         self, req: tsi.AnnotationQueueAddCallsReq
     ) -> tsi.AnnotationQueueAddCallsRes:
