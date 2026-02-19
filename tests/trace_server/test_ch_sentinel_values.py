@@ -6,6 +6,8 @@ conversion between Python None and ClickHouse sentinel representations.
 
 import datetime
 
+import pytest
+
 from weave.trace_server.ch_sentinel_values import (
     ALL_SENTINEL_FIELDS,
     DATETIME_PRECISION,
@@ -79,11 +81,8 @@ def test_sentinel_ch_type() -> None:
     assert sentinel_ch_type("deleted_at") == "DateTime64(3)"
 
     for field in NON_SENTINEL_FIELDS:
-        try:
+        with pytest.raises(ValueError, match=f"Not a sentinel field: {field}"):
             sentinel_ch_type(field)
-            raise AssertionError(f"Expected ValueError for {field}")
-        except ValueError as e:
-            assert f"Not a sentinel field: {field}" in str(e)
 
 
 def test_sentinel_ch_literal() -> None:
@@ -93,11 +92,8 @@ def test_sentinel_ch_literal() -> None:
     assert sentinel_ch_literal("deleted_at") == "toDateTime64(0, 3)"
 
     for field in list(SENTINEL_STRING_FIELDS) + NON_SENTINEL_FIELDS:
-        try:
+        with pytest.raises(ValueError, match=f"Not a sentinel datetime field: {field}"):
             sentinel_ch_literal(field)
-            raise AssertionError(f"Expected ValueError for {field}")
-        except ValueError as e:
-            assert f"Not a sentinel datetime field: {field}" in str(e)
 
 
 def test_to_ch_value() -> None:

@@ -28,7 +28,7 @@ Outstanding Optimizations/Work:
 import logging
 import re
 from collections.abc import Callable, KeysView, Sequence
-from typing import Literal, NamedTuple, cast
+from typing import Any, Literal, NamedTuple, cast
 
 from pydantic import BaseModel, Field
 from typing_extensions import Self
@@ -128,11 +128,7 @@ class QueryBuilderField(BaseModel):
         return clickhouse_cast(f"{table_alias}.{self.field}", cast)
 
     def as_select_sql(
-        self,
-        pb: ParamBuilder,
-        table_alias: str,
-        use_agg_fn: bool = True,
-        read_table: "ReadTable" = ReadTable.CALLS_MERGED,
+        self, pb: ParamBuilder, table_alias: str, use_agg_fn: bool = True, **kwargs: Any
     ) -> str:
         return f"{self.as_sql(pb, table_alias)} AS {self.field}"
 
@@ -140,6 +136,17 @@ class QueryBuilderField(BaseModel):
 class CallsMergedField(QueryBuilderField):
     def is_heavy(self) -> bool:
         return False
+
+    def _resolve_field_sql(
+        self, pb: ParamBuilder, table_alias: str, use_agg_fn: bool = True
+    ) -> str:
+        """Return the SQL expression for this field, honoring use_agg_fn if supported."""
+        return self.as_sql(pb, table_alias)
+
+    def as_select_sql(
+        self, pb: ParamBuilder, table_alias: str, use_agg_fn: bool = True, **kwargs: Any
+    ) -> str:
+        return f"{self._resolve_field_sql(pb, table_alias, use_agg_fn)} AS {self.field}"
 
     def null_check_sql(
         self,
@@ -151,7 +158,7 @@ class CallsMergedField(QueryBuilderField):
         negate: bool = False,
     ) -> str:
         """Generate IS [NOT] NULL or sentinel equality check for this field."""
-        field_sql = self.as_sql(pb, table_alias)
+        field_sql = self._resolve_field_sql(pb, table_alias, use_agg_fn)
         return ch_sentinel_values.null_check_sql(
             self.field, field_sql, read_table, pb, negate=negate
         )
@@ -172,29 +179,11 @@ class CallsMergedAggField(CallsMergedField):
             return clickhouse_cast(inner, cast)
         return clickhouse_cast(f"{self.agg_fn}({inner})", cast)
 
-    def as_select_sql(
-        self,
-        pb: ParamBuilder,
-        table_alias: str,
-        use_agg_fn: bool = True,
-        read_table: "ReadTable" = ReadTable.CALLS_MERGED,
+    def _resolve_field_sql(
+        self, pb: ParamBuilder, table_alias: str, use_agg_fn: bool = True
     ) -> str:
-        return f"{self.as_sql(pb, table_alias, use_agg_fn=use_agg_fn)} AS {self.field}"
-
-    def null_check_sql(
-        self,
-        pb: ParamBuilder,
-        table_alias: str,
-        read_table: "ReadTable",
-        *,
-        use_agg_fn: bool = True,
-        negate: bool = False,
-    ) -> str:
-        """Generate IS [NOT] NULL or sentinel equality check for this field."""
-        field_sql = self.as_sql(pb, table_alias, use_agg_fn=use_agg_fn)
-        return ch_sentinel_values.null_check_sql(
-            self.field, field_sql, read_table, pb, negate=negate
-        )
+        """Return the SQL expression for this field, honoring use_agg_fn."""
+        return self.as_sql(pb, table_alias, use_agg_fn=use_agg_fn)
 
 
 class AggFieldWithTableOverrides(CallsMergedAggField):
@@ -226,16 +215,14 @@ class CallsMergedDynamicField(CallsMergedAggField):
         return json_dump_field_as_sql(pb, table_alias, res, self.extra_path, cast)
 
     def as_select_sql(
-        self,
-        pb: ParamBuilder,
-        table_alias: str,
-        use_agg_fn: bool = True,
-        read_table: "ReadTable" = ReadTable.CALLS_MERGED,
+        self, pb: ParamBuilder, table_alias: str, use_agg_fn: bool = True, **kwargs: Any
     ) -> str:
         if self.extra_path:
             raise NotImplementedError(
                 "Dynamic fields cannot be selected directly, yet - implement me!"
             )
+        # Use the parent (CallsMergedAggField) as_sql to get the aggregate
+        # expression without the JSON extraction that our own as_sql adds.
         return (
             f"{super().as_sql(pb, table_alias, use_agg_fn=use_agg_fn)} AS {self.field}"
         )
@@ -282,7 +269,9 @@ class CallsMergedSummaryField(CallsMergedField):
         pb: ParamBuilder,
         table_alias: str,
         use_agg_fn: bool = True,
+        *,
         read_table: "ReadTable" = ReadTable.CALLS_MERGED,
+        **kwargs: Any,
     ) -> str:
         return f"{self.as_sql(pb, table_alias, use_agg_fn=use_agg_fn, read_table=read_table)} AS {self.field}"
 
@@ -371,11 +360,7 @@ class CallsMergedFeedbackPayloadField(CallsMergedField):
         return json_dump_field_as_sql(pb, "feedback", res, self.extra_path, cast)
 
     def as_select_sql(
-        self,
-        pb: ParamBuilder,
-        table_alias: str,
-        use_agg_fn: bool = True,
-        read_table: "ReadTable" = ReadTable.CALLS_MERGED,
+        self, pb: ParamBuilder, table_alias: str, use_agg_fn: bool = True, **kwargs: Any
     ) -> str:
         raise NotImplementedError(
             "Feedback fields cannot be selected directly, yet - implement me!"
@@ -417,11 +402,7 @@ class CallsMergedQueueItemField(CallsMergedField):
         return clickhouse_cast(res, cast)
 
     def as_select_sql(
-        self,
-        pb: ParamBuilder,
-        table_alias: str,
-        use_agg_fn: bool = True,
-        read_table: "ReadTable" = ReadTable.CALLS_MERGED,
+        self, pb: ParamBuilder, table_alias: str, use_agg_fn: bool = True, **kwargs: Any
     ) -> str:
         raise NotImplementedError(
             "Queue item fields cannot be selected directly, yet - implement me!"
@@ -449,7 +430,9 @@ class AggregatedDataSizeField(CallsMergedField):
         pb: ParamBuilder,
         table_alias: str,
         use_agg_fn: bool = True,
+        *,
         read_table: "ReadTable" = ReadTable.CALLS_MERGED,
+        **kwargs: Any,
     ) -> str:
         # It doesn't make sense for a non-root call to have a total storage size,
         # even if a value could be computed.
@@ -497,17 +480,13 @@ class QueryBuilderDynamicField(QueryBuilderField):
         return json_dump_field_as_sql(pb, table_alias, res, self.extra_path, cast)
 
     def as_select_sql(
-        self,
-        pb: ParamBuilder,
-        table_alias: str,
-        use_agg_fn: bool = True,
-        read_table: "ReadTable" = ReadTable.CALLS_MERGED,
+        self, pb: ParamBuilder, table_alias: str, use_agg_fn: bool = True, **kwargs: Any
     ) -> str:
         if self.extra_path:
             raise NotImplementedError(
                 "Dynamic fields cannot be selected directly, yet - implement me!"
             )
-        return f"{super().as_sql(pb, table_alias)} AS {self.field}"
+        return super().as_select_sql(pb, table_alias, use_agg_fn=use_agg_fn)
 
 
 class WhereFilters(BaseModel):
@@ -1867,6 +1846,10 @@ def _handle_trace_name_summary_field(
     display_name_set = display_name_field.null_check_sql(
         pb, table_alias, read_table, use_agg_fn=use_agg_fn, negate=True
     )
+    # For calls_merged, display_name is Nullable(String) so an empty string
+    # is distinct from NULL.  Exclude both to preserve pre-sentinel behavior.
+    if read_table == ReadTable.CALLS_MERGED:
+        display_name_set = f"{display_name_set} AND {display_name_sql} != ''"
 
     return f"""CASE
         WHEN {display_name_set} THEN {display_name_sql}
@@ -2005,9 +1988,11 @@ def process_query_to_conditions(
                 )
                 if sentinel is not None:
                     assert field_name is not None
-                    sentinel_param = param_builder.add_param(sentinel)
                     sentinel_type = ch_sentinel_values.sentinel_ch_type(field_name)
-                    cond = f"({lhs_part} = {param_slot(sentinel_param, sentinel_type)})"
+                    sentinel_slot = param_builder.add(
+                        sentinel, param_type=sentinel_type
+                    )
+                    cond = f"({lhs_part} = {sentinel_slot})"
                 else:
                     cond = f"({lhs_part} IS NULL)"
             else:

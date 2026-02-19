@@ -27,7 +27,6 @@ from __future__ import annotations
 import datetime
 from typing import TYPE_CHECKING, Any
 
-from weave.trace_server.calls_query_builder.utils import param_slot
 from weave.trace_server.project_version.types import ReadTable
 
 if TYPE_CHECKING:
@@ -212,12 +211,9 @@ def null_check_sql(
         return f"{field_sql} IS NOT NULL" if negate else f"{field_sql} IS NULL"
 
     sentinel = get_sentinel_value(field_name)
-    # ParamBuilder deduplicates by value, so all datetime sentinel fields share
-    # one parameter name even though sentinel_ch_type returns different precisions
-    # (e.g. DateTime64(3) for deleted_at vs DateTime64(6) for ended_at).  This is
-    # intentional: ClickHouse casts the parameter value to the column's type, so
-    # the same epoch-zero value works regardless of the precision in param_slot.
-    sentinel_param = pb.add_param(sentinel)
     ch_type = sentinel_ch_type(field_name)
+    # Use pb.add() (non-deduplicating) so each sentinel field gets its own
+    # parameter with the correct type annotation (handles diff Datetime precisions)
+    sentinel_slot = pb.add(sentinel, param_type=ch_type)
     op = "!=" if negate else "="
-    return f"{field_sql} {op} {param_slot(sentinel_param, ch_type)}"
+    return f"{field_sql} {op} {sentinel_slot}"

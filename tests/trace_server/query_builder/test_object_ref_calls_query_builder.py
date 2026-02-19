@@ -1018,7 +1018,7 @@ def test_object_ref_filter_calls_complete() -> None:
           (SELECT calls_complete.id AS id
            FROM calls_complete PREWHERE calls_complete.project_id = {pb_0:String}
            WHERE (length(calls_complete.output_refs) > 0
-                  OR calls_complete.ended_at = {pb_4:DateTime64(6)})
+                  OR calls_complete.ended_at = {pb_5:DateTime64(6)})
            AND (((coalesce(nullIf(JSON_VALUE(calls_complete.output_dump, {pb_3:String}), 'null'), '') IN
                       (SELECT ref
                        FROM obj_filter_0)
@@ -1039,6 +1039,7 @@ def test_object_ref_filter_calls_complete() -> None:
             "pb_2": 1,
             "pb_3": '$."model"',
             "pb_4": SENTINEL_DATETIME,
+            "pb_5": SENTINEL_DATETIME,
         },
     )
 

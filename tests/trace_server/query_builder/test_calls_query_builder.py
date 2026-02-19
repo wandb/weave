@@ -1632,7 +1632,7 @@ def test_query_with_summary_weave_trace_name_sort() -> None:
             ))
         )
         ORDER BY CASE
-            WHEN argMaxMerge(calls_merged.display_name) IS NOT NULL THEN argMaxMerge(calls_merged.display_name)
+            WHEN argMaxMerge(calls_merged.display_name) IS NOT NULL AND argMaxMerge(calls_merged.display_name) != '' THEN argMaxMerge(calls_merged.display_name)
             WHEN any(calls_merged.op_name) IS NOT NULL AND any(calls_merged.op_name) LIKE 'weave-trace-internal:///%' THEN
                 regexpExtract(toString(any(calls_merged.op_name)), '/([^/:]*):', 1)
             ELSE any(calls_merged.op_name)
@@ -1673,7 +1673,7 @@ def test_query_with_summary_weave_trace_name_filter() -> None:
         PREWHERE calls_merged.project_id = {pb_1:String}
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (((CASE
-                WHEN argMaxMerge(calls_merged.display_name) IS NOT NULL THEN argMaxMerge(calls_merged.display_name)
+                WHEN argMaxMerge(calls_merged.display_name) IS NOT NULL AND argMaxMerge(calls_merged.display_name) != '' THEN argMaxMerge(calls_merged.display_name)
                 WHEN any(calls_merged.op_name) IS NOT NULL AND any(calls_merged.op_name) LIKE 'weave-trace-internal:///%' THEN
                     regexpExtract(toString(any(calls_merged.op_name)), '/([^/:]*):', 1)
                 ELSE any(calls_merged.op_name)
@@ -2970,7 +2970,7 @@ def test_calls_complete_with_hardcoded_filter_and_json_condition_and_summary_ord
         WITH filtered_calls AS (
             SELECT calls_complete.id AS id
             FROM calls_complete
-            PREWHERE calls_complete.project_id = {pb_11:String}
+            PREWHERE calls_complete.project_id = {pb_12:String}
             WHERE ((calls_complete.op_name IN {pb_3:Array(String)})
                     OR (calls_complete.op_name IS NULL))
                 AND (calls_complete.trace_id = {pb_4:String}
@@ -2988,7 +2988,7 @@ def test_calls_complete_with_hardcoded_filter_and_json_condition_and_summary_ord
                     ),
                     0
                 ) > 0 THEN {pb_9:String}
-                WHEN calls_complete.ended_at = {pb_2:DateTime64(6)} THEN {pb_7:String}
+                WHEN calls_complete.ended_at = {pb_11:DateTime64(6)} THEN {pb_7:String}
                 ELSE {pb_8:String}
                 END ASC
             LIMIT 100
@@ -2999,17 +2999,17 @@ def test_calls_complete_with_hardcoded_filter_and_json_condition_and_summary_ord
             calls_complete.exception AS exception,
             calls_complete.ended_at AS ended_at
         FROM calls_complete
-        PREWHERE calls_complete.project_id = {pb_11:String}
+        PREWHERE calls_complete.project_id = {pb_12:String}
         WHERE (calls_complete.id IN filtered_calls)
         ORDER BY CASE
-            WHEN calls_complete.exception != {pb_10:String} THEN {pb_6:String}
+            WHEN calls_complete.exception != {pb_13:String} THEN {pb_6:String}
             WHEN IFNULL(
                 toInt64OrNull(
                     coalesce(nullIf(JSON_VALUE(calls_complete.summary_dump, {pb_5:String}), 'null'), '')
                 ),
                 0
             ) > 0 THEN {pb_9:String}
-            WHEN calls_complete.ended_at = {pb_2:DateTime64(6)} THEN {pb_7:String}
+            WHEN calls_complete.ended_at = {pb_14:DateTime64(6)} THEN {pb_7:String}
             ELSE {pb_8:String}
             END ASC
         """,
@@ -3025,7 +3025,10 @@ def test_calls_complete_with_hardcoded_filter_and_json_condition_and_summary_ord
             "pb_8": "success",
             "pb_9": "descendant_error",
             "pb_10": "",
-            "pb_11": "project",
+            "pb_11": SENTINEL_DATETIME,
+            "pb_12": "project",
+            "pb_13": "",
+            "pb_14": SENTINEL_DATETIME,
         },
     )
 
@@ -3220,7 +3223,7 @@ def test_query_with_summary_weave_status_filter_calls_complete() -> None:
         """
         SELECT
             calls_complete.id AS id
-        FROM calls_complete PREWHERE calls_complete.project_id = {pb_7:String}
+        FROM calls_complete PREWHERE calls_complete.project_id = {pb_10:String}
         WHERE 1
           AND (
             (((CASE
@@ -3231,12 +3234,12 @@ def test_query_with_summary_weave_status_filter_calls_complete() -> None:
             END = {pb_3:String})
             OR
             (CASE
-                WHEN calls_complete.exception != {pb_5:String} THEN {pb_1:String}
+                WHEN calls_complete.exception != {pb_7:String} THEN {pb_1:String}
                 WHEN IFNULL(toInt64OrNull(coalesce(nullIf(JSON_VALUE(calls_complete.summary_dump, {pb_0:String}), 'null'), '')), 0) > 0 THEN {pb_4:String}
-                WHEN calls_complete.ended_at = {pb_6:DateTime64(6)} THEN {pb_2:String}
+                WHEN calls_complete.ended_at = {pb_8:DateTime64(6)} THEN {pb_2:String}
                 ELSE {pb_3:String}
             END = {pb_1:String})))
-            AND ((calls_complete.deleted_at = {pb_6:DateTime64(3)}))
+            AND ((calls_complete.deleted_at = {pb_9:DateTime64(3)}))
             AND ((NOT ((calls_complete.started_at IS NULL)))))
         """,
         {
@@ -3247,7 +3250,10 @@ def test_query_with_summary_weave_status_filter_calls_complete() -> None:
             "pb_4": "descendant_error",
             "pb_5": "",
             "pb_6": SENTINEL_DATETIME,
-            "pb_7": "project",
+            "pb_7": "",
+            "pb_8": SENTINEL_DATETIME,
+            "pb_9": SENTINEL_DATETIME,
+            "pb_10": "project",
         },
     )
 
@@ -3645,20 +3651,21 @@ def test_latency_ms_sort_calls_complete_uses_sentinel_for_ended_at() -> None:
             calls_complete.started_at AS started_at,
             calls_complete.ended_at AS ended_at
         FROM calls_complete
-        PREWHERE calls_complete.project_id = {pb_1:String}
+        PREWHERE calls_complete.project_id = {pb_2:String}
         WHERE 1
           AND (
             ((calls_complete.deleted_at = {pb_0:DateTime64(3)}))
             AND ((NOT ((calls_complete.started_at IS NULL))))
         )
         ORDER BY CASE
-            WHEN calls_complete.ended_at = {pb_0:DateTime64(6)} THEN NULL
+            WHEN calls_complete.ended_at = {pb_1:DateTime64(6)} THEN NULL
             ELSE (toUnixTimestamp64Milli(calls_complete.ended_at) - toUnixTimestamp64Milli(calls_complete.started_at))
         END DESC
         """,
         {
             "pb_0": SENTINEL_DATETIME,
-            "pb_1": "project",
+            "pb_1": SENTINEL_DATETIME,
+            "pb_2": "project",
         },
     )
 
@@ -3683,19 +3690,20 @@ def test_latency_ms_filter_calls_complete_uses_sentinel_for_ended_at() -> None:
             calls_complete.started_at AS started_at,
             calls_complete.ended_at AS ended_at
         FROM calls_complete
-        PREWHERE calls_complete.project_id = {pb_2:String}
+        PREWHERE calls_complete.project_id = {pb_3:String}
         WHERE 1
           AND (((CASE
               WHEN calls_complete.ended_at = {pb_0:DateTime64(6)} THEN NULL
               ELSE (toUnixTimestamp64Milli(calls_complete.ended_at) - toUnixTimestamp64Milli(calls_complete.started_at))
           END > {pb_1:UInt64}))
-        AND ((calls_complete.deleted_at = {pb_0:DateTime64(3)}))
+        AND ((calls_complete.deleted_at = {pb_2:DateTime64(3)}))
         AND ((NOT ((calls_complete.started_at IS NULL)))))
         """,
         {
             "pb_0": SENTINEL_DATETIME,
             "pb_1": 1000,
-            "pb_2": "project",
+            "pb_2": SENTINEL_DATETIME,
+            "pb_3": "project",
         },
     )
 
@@ -3809,14 +3817,14 @@ def test_status_sort_calls_complete_uses_sentinels() -> None:
         cq,
         """
         SELECT calls_complete.id AS id
-        FROM calls_complete PREWHERE calls_complete.project_id = {pb_7:String}
+        FROM calls_complete PREWHERE calls_complete.project_id = {pb_8:String}
         WHERE 1
           AND (((calls_complete.deleted_at = {pb_0:DateTime64(3)}))
                AND ((NOT ((calls_complete.started_at IS NULL)))))
         ORDER BY CASE
                      WHEN calls_complete.exception != {pb_6:String} THEN {pb_2:String}
                      WHEN IFNULL(toInt64OrNull(coalesce(nullIf(JSON_VALUE(calls_complete.summary_dump, {pb_1:String}), 'null'), '')), 0) > 0 THEN {pb_5:String}
-                     WHEN calls_complete.ended_at = {pb_0:DateTime64(6)} THEN {pb_3:String}
+                     WHEN calls_complete.ended_at = {pb_7:DateTime64(6)} THEN {pb_3:String}
                      ELSE {pb_4:String}
                  END ASC
         """,
@@ -3828,6 +3836,7 @@ def test_status_sort_calls_complete_uses_sentinels() -> None:
             "pb_4": "success",
             "pb_5": "descendant_error",
             "pb_6": "",
-            "pb_7": "project",
+            "pb_7": SENTINEL_DATETIME,
+            "pb_8": "project",
         },
     )
