@@ -54,17 +54,7 @@ def test_query_baseline(read_table: ReadTable, expected_table: str) -> None:
             FROM {expected_table}
             PREWHERE {expected_table}.project_id = {{pb_0:String}}
             WHERE 1
-              AND (
-                ((
-                    {expected_table}.deleted_at IS NULL
-                ))
-                AND
-                ((
-                   NOT ((
-                      {expected_table}.started_at IS NULL
-                   ))
-                ))
-            )
+              AND ({expected_table}.deleted_at IS NULL)
         """
     assert_sql(cq, expected_query, {"pb_0": "project"})
 
@@ -654,8 +644,7 @@ def test_query_with_simple_feedback_filter_calls_complete() -> None:
             (((coalesce(nullIf(JSON_VALUE(CASE WHEN feedback.feedback_type = {pb_0:String} THEN feedback.payload_dump END,
             {pb_1:String}), 'null'), '') > coalesce(nullIf(JSON_VALUE(CASE WHEN feedback.feedback_type = {pb_0:String} THEN feedback.payload_dump END,
             {pb_2:String}), 'null'), '')))
-                AND ((calls_complete.deleted_at IS NULL))
-                    AND ((NOT ((calls_complete.started_at IS NULL)))))
+                AND ((calls_complete.deleted_at IS NULL)))
         """,
         {
             "pb_0": "wandb.runnable.my_op",
@@ -1249,8 +1238,7 @@ def test_calls_query_with_like_optimization_calls_complete() -> None:
         WHERE (calls_complete.inputs_dump LIKE {pb_2:String})
         AND
             (((coalesce(nullIf(JSON_VALUE(calls_complete.inputs_dump, {pb_0:String}), 'null'), '') = {pb_1:String}))
-                AND ((calls_complete.deleted_at IS NULL))
-                    AND ((NOT ((calls_complete.started_at IS NULL)))))
+                AND ((calls_complete.deleted_at IS NULL)))
         """,
         {
             "pb_3": "project",
@@ -3522,8 +3510,7 @@ def test_stats_query_calls_complete_flat_count_with_filter() -> None:
         SELECT count() AS count
         FROM calls_complete
         PREWHERE calls_complete.project_id = {pb_1:String}
-        WHERE ((calls_complete.op_name IN {pb_0:Array(String)})
-               OR (calls_complete.op_name IS NULL))
+        WHERE (calls_complete.op_name IN {pb_0:Array(String)})
           AND (calls_complete.deleted_at IS NULL)
         """,
         {"pb_0": ["my_op"], "pb_1": "project"},

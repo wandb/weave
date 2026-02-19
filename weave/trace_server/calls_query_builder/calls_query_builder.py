@@ -989,16 +989,26 @@ class CallsQuery(BaseModel):
             )
         )
 
-        # Important: We must always filter out calls that have not been started
-        # This can occur when there is an out of order call part insertion or worse,
-        # when such occurrence happens and the client terminates early.
-        # Additionally: This condition is also REQUIRED for proper functioning
-        # when using pre-group by (WHERE) optimizations
-        self.add_condition(
-            tsi_query.NotOperation.model_validate(
-                {"$not": [{"$eq": [{"$getField": "started_at"}, {"$literal": None}]}]}
+        # For calls_merged, filter out rows without a started_at timestamp.
+        # This handles out-of-order call part insertion or early client termination
+        # that leaves orphaned call-end rows. Also REQUIRED for correct pre-GROUP BY
+        # (WHERE) optimizations. Not needed for calls_complete where each row is
+        # already a complete call.
+        if self.read_table != ReadTable.CALLS_COMPLETE:
+            self.add_condition(
+                tsi_query.NotOperation.model_validate(
+                    {
+                        "$not": [
+                            {
+                                "$eq": [
+                                    {"$getField": "started_at"},
+                                    {"$literal": None},
+                                ]
+                            }
+                        ]
+                    }
+                )
             )
-        )
 
         table_alias_resolved = table_alias or get_calls_table_name(self.read_table)
 
@@ -1136,29 +1146,37 @@ class CallsQuery(BaseModel):
         Returns:
             WhereFilters object containing all filter SQL strings
         """
-        # The op_name, trace_id, trace_roots, wb_run_id conditions REQUIRE conditioning
-        # on the started_at field after grouping in the HAVING clause. These filters
-        # remove call starts before grouping, creating orphan call ends. By conditioning
-        # on `NOT any(started_at) is NULL`, we filter out orphaned call ends, ensuring
-        # all rows returned at least have a call start.
+        # For calls_merged: the op_name, trace_id, trace_roots, wb_run_id conditions
+        # REQUIRE conditioning on the started_at field after grouping in the HAVING
+        # clause. These filters remove call starts before grouping, creating orphan
+        # call ends. By conditioning on `NOT any(started_at) is NULL`, we filter out
+        # orphaned call ends, ensuring all rows returned at least have a call start.
+        # For calls_complete: no orphan rows exist, so null guards are skipped.
+        rt = self.read_table
 
-        op_name = process_op_name_filter_to_sql(self.hardcoded_filter, pb, table_alias)
+        op_name = process_op_name_filter_to_sql(
+            self.hardcoded_filter, pb, table_alias, rt
+        )
         trace_id = process_trace_id_filter_to_sql(
-            self.hardcoded_filter, pb, table_alias
+            self.hardcoded_filter, pb, table_alias, rt
         )
         thread_id = process_thread_id_filter_to_sql(
-            self.hardcoded_filter, pb, table_alias
+            self.hardcoded_filter, pb, table_alias, rt
         )
-        turn_id = process_turn_id_filter_to_sql(self.hardcoded_filter, pb, table_alias)
+        turn_id = process_turn_id_filter_to_sql(
+            self.hardcoded_filter, pb, table_alias, rt
+        )
         wb_run_id = process_wb_run_ids_filter_to_sql(
-            self.hardcoded_filter, pb, table_alias
+            self.hardcoded_filter, pb, table_alias, rt
         )
-        ref_filter = process_ref_filters_to_sql(self.hardcoded_filter, pb, table_alias)
+        ref_filter = process_ref_filters_to_sql(
+            self.hardcoded_filter, pb, table_alias, rt
+        )
         trace_roots_only = process_trace_roots_only_filter_to_sql(
             self.hardcoded_filter, pb, table_alias
         )
         parent_ids = process_parent_ids_filter_to_sql(
-            self.hardcoded_filter, pb, table_alias
+            self.hardcoded_filter, pb, table_alias, rt
         )
 
         # Filter out object ref conditions from optimization since they're handled via CTEs
@@ -1183,7 +1201,7 @@ class CallsQuery(BaseModel):
         heavy_filter = optimization_conditions.heavy_filter_opt_sql or ""
 
         object_refs = process_object_refs_filter_to_opt_sql(
-            pb, table_alias, object_ref_fields_consumed
+            pb, table_alias, object_ref_fields_consumed, rt
         )
 
         id_subquery = ""
@@ -1966,6 +1984,7 @@ def process_op_name_filter_to_sql(
     hardcoded_filter: HardCodedFilter | None,
     param_builder: ParamBuilder,
     table_alias: str,
+    read_table: ReadTable = ReadTable.CALLS_MERGED,
 ) -> str:
     """Pulls out the op_name and returns a sql string if there are any op_names."""
     if hardcoded_filter is None or not hardcoded_filter.filter.op_names:
@@ -1975,9 +1994,6 @@ def process_op_name_filter_to_sql(
 
     assert_parameter_length_less_than_max("op_names", len(op_names))
 
-    # We will build up (0 or 1) + N conditions for the op_version_refs
-    # If there are any non-wildcarded names, then we at least have an IN condition
-    # If there are any wildcarded names, then we have a LIKE condition for each
     or_conditions: list[str] = []
     non_wildcarded_names: list[str] = []
     wildcarded_names: list[str] = []
@@ -2007,8 +2023,10 @@ def process_op_name_filter_to_sql(
     if not or_conditions:
         return ""
 
-    # Account for unmerged call parts by including null op_name (call ends)
-    or_conditions += [f"{op_field_sql} IS NULL"]
+    # For calls_merged, include NULL op_name to preserve unmerged call-end rows
+    # pre-GROUP BY. For calls_complete, each row is a complete call with no orphans.
+    if read_table != ReadTable.CALLS_COMPLETE:
+        or_conditions += [f"{op_field_sql} IS NULL"]
 
     return " AND " + combine_conditions(or_conditions, "OR")
 
@@ -2017,6 +2035,7 @@ def process_trace_id_filter_to_sql(
     hardcoded_filter: HardCodedFilter | None,
     param_builder: ParamBuilder,
     table_alias: str,
+    read_table: ReadTable = ReadTable.CALLS_MERGED,
 ) -> str:
     """Pulls out the trace_id and returns a sql string if there are any trace_ids."""
     if hardcoded_filter is None or not hardcoded_filter.filter.trace_ids:
@@ -2033,13 +2052,15 @@ def process_trace_id_filter_to_sql(
         param_builder, table_alias, use_agg_fn=False
     )
 
-    # If there's only one trace_id, use an equality condition for performance
     if len(trace_ids) == 1:
         trace_cond = f"{trace_id_field_sql} = {param_slot(param_builder.add_param(trace_ids[0]), 'String')}"
     elif len(trace_ids) > 1:
         trace_cond = f"{trace_id_field_sql} IN {param_slot(param_builder.add_param(trace_ids), 'Array(String)')}"
     else:
         return ""
+
+    if read_table == ReadTable.CALLS_COMPLETE:
+        return f" AND ({trace_cond})"
 
     return f" AND ({trace_cond} OR {trace_id_field_sql} IS NULL)"
 
@@ -2048,6 +2069,7 @@ def process_thread_id_filter_to_sql(
     hardcoded_filter: HardCodedFilter | None,
     param_builder: ParamBuilder,
     table_alias: str,
+    read_table: ReadTable = ReadTable.CALLS_MERGED,
 ) -> str:
     """Pulls out the thread_id and returns a sql string if there are any thread_ids."""
     if (
@@ -2068,13 +2090,15 @@ def process_thread_id_filter_to_sql(
         param_builder, table_alias, use_agg_fn=False
     )
 
-    # If there's only one thread_id, use an equality condition for performance
     if len(thread_ids) == 1:
         thread_cond = f"{thread_id_field_sql} = {param_slot(param_builder.add_param(thread_ids[0]), 'String')}"
     elif len(thread_ids) > 1:
         thread_cond = f"{thread_id_field_sql} IN {param_slot(param_builder.add_param(thread_ids), 'Array(String)')}"
     else:
         return ""
+
+    if read_table == ReadTable.CALLS_COMPLETE:
+        return f" AND ({thread_cond})"
 
     return f" AND ({thread_cond} OR {thread_id_field_sql} IS NULL)"
 
@@ -2083,6 +2107,7 @@ def process_turn_id_filter_to_sql(
     hardcoded_filter: HardCodedFilter | None,
     param_builder: ParamBuilder,
     table_alias: str,
+    read_table: ReadTable = ReadTable.CALLS_MERGED,
 ) -> str:
     """Pulls out the turn_id and returns a sql string if there are any turn_ids."""
     if (
@@ -2103,13 +2128,15 @@ def process_turn_id_filter_to_sql(
         param_builder, table_alias, use_agg_fn=False
     )
 
-    # If there's only one turn_id, use an equality condition for performance
     if len(turn_ids) == 1:
         turn_cond = f"{turn_id_field_sql} = {param_slot(param_builder.add_param(turn_ids[0]), 'String')}"
     elif len(turn_ids) > 1:
         turn_cond = f"{turn_id_field_sql} IN {param_slot(param_builder.add_param(turn_ids), 'Array(String)')}"
     else:
         return ""
+
+    if read_table == ReadTable.CALLS_COMPLETE:
+        return f" AND ({turn_cond})"
 
     return f" AND ({turn_cond} OR {turn_id_field_sql} IS NULL)"
 
@@ -2138,6 +2165,7 @@ def process_parent_ids_filter_to_sql(
     hardcoded_filter: HardCodedFilter | None,
     param_builder: ParamBuilder,
     table_alias: str,
+    read_table: ReadTable = ReadTable.CALLS_MERGED,
 ) -> str:
     """Pulls out the parent_id and returns a sql string if there are any parent_ids."""
     if hardcoded_filter is None or not hardcoded_filter.filter.parent_ids:
@@ -2153,6 +2181,9 @@ def process_parent_ids_filter_to_sql(
 
     parent_ids_sql = f"{parent_id_field_sql} IN {param_slot(param_builder.add_param(hardcoded_filter.filter.parent_ids), 'Array(String)')}"
 
+    if read_table == ReadTable.CALLS_COMPLETE:
+        return f"AND ({parent_ids_sql})"
+
     return f"AND ({parent_ids_sql} OR {parent_id_field_sql} IS NULL)"
 
 
@@ -2160,6 +2191,7 @@ def process_ref_filters_to_sql(
     hardcoded_filter: HardCodedFilter | None,
     param_builder: ParamBuilder,
     table_alias: str,
+    read_table: ReadTable = ReadTable.CALLS_MERGED,
 ) -> str:
     """Adds a ref filter optimization to the query.
 
@@ -2174,6 +2206,8 @@ def process_ref_filters_to_sql(
     ):
         return ""
 
+    is_complete = read_table == ReadTable.CALLS_COMPLETE
+
     def process_ref_filter(field_name: str, refs: list[str]) -> str:
         field = get_field_by_name(field_name)
         if not isinstance(field, CallsMergedAggField):
@@ -2182,6 +2216,8 @@ def process_ref_filters_to_sql(
         field_sql = field.as_sql(param_builder, table_alias, use_agg_fn=False)
         param = param_builder.add_param(refs)
         ref_filter_sql = f"hasAny({field_sql}, {param_slot(param, 'Array(String)')})"
+        if is_complete:
+            return ref_filter_sql
         return f"{ref_filter_sql} OR length({field_sql}) = 0"
 
     ref_filters = []
@@ -2204,20 +2240,24 @@ def process_object_refs_filter_to_opt_sql(
     param_builder: ParamBuilder,
     table_alias: str,
     object_ref_fields_consumed: set[str],
+    read_table: ReadTable = ReadTable.CALLS_MERGED,
 ) -> str:
     """Processes object ref fields to an optimization sql string."""
     if not object_ref_fields_consumed:
         return ""
 
-    # Optimization for filtering with refs, only include calls that have non-zero
-    # input refs when we are conditioning on refs in inputs, or is a naked call end.
+    is_complete = read_table == ReadTable.CALLS_COMPLETE
     refs_filter_opt_sql = ""
     if "inputs_dump" in object_ref_fields_consumed:
-        refs_filter_opt_sql += f"AND (length({table_alias}.input_refs) > 0 OR {table_alias}.started_at IS NULL)"
-    # If we are conditioning on output refs, filter down calls to those with non-zero
-    # output refs, or they are a naked call start.
+        if is_complete:
+            refs_filter_opt_sql += f"AND (length({table_alias}.input_refs) > 0)"
+        else:
+            refs_filter_opt_sql += f"AND (length({table_alias}.input_refs) > 0 OR {table_alias}.started_at IS NULL)"
     if "output_dump" in object_ref_fields_consumed:
-        refs_filter_opt_sql += f"AND (length({table_alias}.output_refs) > 0 OR {table_alias}.ended_at IS NULL)"
+        if is_complete:
+            refs_filter_opt_sql += f"AND (length({table_alias}.output_refs) > 0)"
+        else:
+            refs_filter_opt_sql += f"AND (length({table_alias}.output_refs) > 0 OR {table_alias}.ended_at IS NULL)"
 
     return refs_filter_opt_sql
 
@@ -2226,6 +2266,7 @@ def process_wb_run_ids_filter_to_sql(
     hardcoded_filter: HardCodedFilter | None,
     param_builder: ParamBuilder,
     table_alias: str,
+    read_table: ReadTable = ReadTable.CALLS_MERGED,
 ) -> str:
     """Pulls out the wb_run_id and returns a sql string if there are any wb_run_ids."""
     if hardcoded_filter is None or not hardcoded_filter.filter.wb_run_ids:
@@ -2241,6 +2282,9 @@ def process_wb_run_ids_filter_to_sql(
         param_builder, table_alias, use_agg_fn=False
     )
     wb_run_id_filter_sql = f"{wb_run_id_field_sql} IN {param_slot(param_builder.add_param(wb_run_ids), 'Array(String)')}"
+
+    if read_table == ReadTable.CALLS_COMPLETE:
+        return f"AND ({wb_run_id_filter_sql})"
 
     return f"AND ({wb_run_id_filter_sql} OR {wb_run_id_field_sql} IS NULL)"
 
