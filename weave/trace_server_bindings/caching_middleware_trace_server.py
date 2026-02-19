@@ -115,6 +115,10 @@ class CachingMiddlewareTraceServer(
         except Exception:
             logger.exception("Error closing cache")
 
+    def close(self) -> None:
+        """Explicitly close cache resources (preferred over __del__)."""
+        self._cache.close()
+
     @classmethod
     def from_env(cls, next_trace_server: TraceServerClientInterface) -> Self:
         cache_dir = server_cache_dir()
