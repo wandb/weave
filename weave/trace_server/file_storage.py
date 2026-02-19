@@ -43,7 +43,7 @@ There are two ways to authenticate with Azure Blob Storage:
 import logging
 from abc import abstractmethod
 from collections.abc import Callable
-from typing import Any, TypeVar, cast
+from typing import TypeVar, cast
 
 import boto3
 from azure.core.exceptions import HttpResponseError

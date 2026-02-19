@@ -36,7 +36,8 @@ from collections.abc import Callable
 from concurrent.futures import Future, wait
 from contextvars import ContextVar
 from threading import Lock
-from typing import Any, TypeVar
+from typing import TypeVar
+
 from typing_extensions import ParamSpec
 
 from weave.trace.context.tests_context import get_raise_on_captured_errors
