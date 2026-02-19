@@ -7,6 +7,14 @@
     "litellm_provider": "coreweave",
     "api_key_name": "WANDB_API_KEY"
   },
+  "MiniMaxAI/MiniMax-M2.5": {
+    "litellm_provider": "coreweave",
+    "api_key_name": "WANDB_API_KEY"
+  },
+  "zai-org/GLM-5-FP8": {
+    "litellm_provider": "coreweave",
+    "api_key_name": "WANDB_API_KEY"
+  },
   "zai-org/GLM-4.5": {
     "litellm_provider": "coreweave",
     "api_key_name": "WANDB_API_KEY"
@@ -32,6 +40,10 @@
     "api_key_name": "WANDB_API_KEY"
   },
   "Qwen/Qwen2.5-14B-Instruct": {
+    "litellm_provider": "coreweave",
+    "api_key_name": "WANDB_API_KEY"
+  },
+  "moonshotai/Kimi-K2.5": {
     "litellm_provider": "coreweave",
     "api_key_name": "WANDB_API_KEY"
   },
@@ -2038,6 +2050,10 @@
     "litellm_provider": "anthropic",
     "api_key_name": "ANTHROPIC_API_KEY"
   },
+  "us/claude-sonnet-4-6": {
+    "litellm_provider": "anthropic",
+    "api_key_name": "ANTHROPIC_API_KEY"
+  },
   "claude-sonnet-4-5-20250929-v1:0": {
     "litellm_provider": "bedrock",
     "api_key_name": "BEDROCK_API_KEY"
@@ -2469,11 +2485,27 @@
     "litellm_provider": "vertex_ai-language-models",
     "api_key_name": "VERTEXAI_JSON_CREDENTIALS"
   },
+  "gemini-3.1-pro-preview": {
+    "litellm_provider": "vertex_ai-language-models",
+    "api_key_name": "VERTEXAI_JSON_CREDENTIALS"
+  },
+  "gemini-3.1-pro-preview-customtools": {
+    "litellm_provider": "vertex_ai-language-models",
+    "api_key_name": "VERTEXAI_JSON_CREDENTIALS"
+  },
   "vertex_ai/gemini-3-pro-preview": {
     "litellm_provider": "vertex_ai",
     "api_key_name": "VERTEXAI_JSON_CREDENTIALS"
   },
   "vertex_ai/gemini-3-flash-preview": {
+    "litellm_provider": "vertex_ai",
+    "api_key_name": "VERTEXAI_JSON_CREDENTIALS"
+  },
+  "vertex_ai/gemini-3.1-pro-preview": {
+    "litellm_provider": "vertex_ai",
+    "api_key_name": "VERTEXAI_JSON_CREDENTIALS"
+  },
+  "vertex_ai/gemini-3.1-pro-preview-customtools": {
     "litellm_provider": "vertex_ai",
     "api_key_name": "VERTEXAI_JSON_CREDENTIALS"
   },
@@ -2777,6 +2809,14 @@
     "api_key_name": "GEMINI_API_KEY"
   },
   "gemini/gemini-3-flash-preview": {
+    "litellm_provider": "gemini",
+    "api_key_name": "GEMINI_API_KEY"
+  },
+  "gemini/gemini-3.1-pro-preview": {
+    "litellm_provider": "gemini",
+    "api_key_name": "GEMINI_API_KEY"
+  },
+  "gemini/gemini-3.1-pro-preview-customtools": {
     "litellm_provider": "gemini",
     "api_key_name": "GEMINI_API_KEY"
   },
@@ -3775,7 +3815,19 @@
     "litellm_provider": "mistral",
     "api_key_name": "MISTRAL_API_KEY"
   },
+  "mistral/devstral-small-latest": {
+    "litellm_provider": "mistral",
+    "api_key_name": "MISTRAL_API_KEY"
+  },
   "mistral/labs-devstral-small-2512": {
+    "litellm_provider": "mistral",
+    "api_key_name": "MISTRAL_API_KEY"
+  },
+  "mistral/devstral-latest": {
+    "litellm_provider": "mistral",
+    "api_key_name": "MISTRAL_API_KEY"
+  },
+  "mistral/devstral-medium-latest": {
     "litellm_provider": "mistral",
     "api_key_name": "MISTRAL_API_KEY"
   },
