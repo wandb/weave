@@ -112,6 +112,8 @@ jobs:
       - name: Install SQLite dev package
         if: steps.filter_shards.outputs.skip != 'true'
         run: sudo apt update && sudo apt install -y libsqlite3-dev
+      - name: Install Libmagic dependency package
+        run: sudo apt update && sudo apt install -y libmagic1
       - name: Set up Python ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
         if: steps.filter_shards.outputs.skip != 'true'
         uses: actions/setup-python@v5

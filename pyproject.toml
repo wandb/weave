@@ -450,6 +450,10 @@ test = [
   "opencv-python", # Video generation
   "reportlab",     # PDF generation
 
+  # MIME type detection (requires libmagic system library on Linux/macOS)
+  "python-magic; sys_platform != 'win32'",
+  "python-magic-bin; sys_platform == 'win32'",
+
   "confluent-kafka",
 
   "weave[trace_server]",
