@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 from typing_extensions import Self
 
-from weave.trace_server import refs_internal
+from weave.shared import refs_internal
 
 if TYPE_CHECKING:
     from weave.trace_server.errors import ObjectDeletedError

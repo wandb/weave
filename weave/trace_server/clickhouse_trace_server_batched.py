@@ -29,6 +29,17 @@ from tenacity import (
     wait_exponential,
 )
 
+from weave.shared import refs_internal as ri
+from weave.shared.digest import (
+    compute_file_digest,
+    compute_object_digest_result,
+    compute_row_digest,
+    compute_table_digest,
+)
+from weave.shared.trace_server_interface_util import (
+    assert_non_null_wb_user_id,
+    extract_refs_from_values,
+)
 from weave.trace_server import (
     ch_sentinel_values,
     constants,
@@ -38,7 +49,6 @@ from weave.trace_server import (
 from weave.trace_server import clickhouse_trace_server_migrator as wf_migrator
 from weave.trace_server import clickhouse_trace_server_settings as ch_settings
 from weave.trace_server import environment as wf_env
-from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_common as tsc
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.actions_worker.dispatcher import execute_batch
@@ -145,7 +155,6 @@ from weave.trace_server.model_providers.model_providers import (
     LLMModelProviderInfo,
     read_model_to_provider_info_map,
 )
-from weave.trace_server.object_class_util import process_incoming_object_val
 from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
 from weave.trace_server.opentelemetry.python_spans import Resource, Span
 from weave.trace_server.orm import ParamBuilder, Row
@@ -197,12 +206,6 @@ from weave.trace_server.trace_server_common import (
     make_derived_summary_fields,
     make_feedback_query_req,
     set_nested_key,
-)
-from weave.trace_server.trace_server_interface_util import (
-    assert_non_null_wb_user_id,
-    bytes_digest,
-    extract_refs_from_values,
-    str_digest,
 )
 from weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker import (
     EvaluateModelArgs,
@@ -390,7 +393,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self, project_id: str, create: bool
     ) -> str:
         if not create:
-            return bytes_digest(
+            return compute_file_digest(
                 (object_creation_utils.PLACEHOLDER_OP_SOURCE).encode("utf-8")
             )
 
@@ -1498,20 +1501,21 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.obj_create")
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
-        processed_result = process_incoming_object_val(
-            req.obj.val, req.obj.builtin_object_class
+        digest_result = compute_object_digest_result(
+            req.obj.val,
+            req.obj.builtin_object_class,
         )
-        processed_val = processed_result["val"]
-        json_val = json.dumps(processed_val, sort_keys=True)
-        digest = str_digest(json_val)
+        processed_val = digest_result.processed_val
+        json_val = digest_result.json_val
+        digest = digest_result.digest
 
         ch_obj = ObjCHInsertable(
             project_id=req.obj.project_id,
             object_id=req.obj.object_id,
             wb_user_id=req.obj.wb_user_id,
             kind=get_kind(processed_val),
-            base_object_class=processed_result["base_object_class"],
-            leaf_object_class=processed_result["leaf_object_class"],
+            base_object_class=digest_result.base_object_class,
+            leaf_object_class=digest_result.leaf_object_class,
             refs=extract_refs_from_values(processed_val),
             val_dump=json_val,
             digest=digest,
@@ -1555,19 +1559,20 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             )
 
         for obj in batch:
-            processed_result = process_incoming_object_val(
-                obj.val, obj.builtin_object_class
+            digest_result = compute_object_digest_result(
+                obj.val,
+                obj.builtin_object_class,
             )
-            processed_val = processed_result["val"]
-            json_val = json.dumps(processed_val, sort_keys=True)
-            digest = str_digest(json_val)
+            processed_val = digest_result.processed_val
+            json_val = digest_result.json_val
+            digest = digest_result.digest
             ch_obj = ObjCHInsertable(
                 project_id=obj.project_id,
                 object_id=obj.object_id,
                 wb_user_id=obj.wb_user_id,
                 kind=get_kind(processed_val),
-                base_object_class=processed_result["base_object_class"],
-                leaf_object_class=processed_result["leaf_object_class"],
+                base_object_class=digest_result.base_object_class,
+                leaf_object_class=digest_result.leaf_object_class,
                 refs=extract_refs_from_values(processed_val),
                 val_dump=json_val,
                 digest=digest,
@@ -1725,8 +1730,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 raise TypeError(
                     f"""Validation Error: Encountered a non-dictionary row when creating a table. Please ensure that all rows are dictionaries. Violating row:\n{r}."""
                 )
-            row_json = json.dumps(r, sort_keys=True)
-            row_digest = str_digest(row_json)
+            row_json = json.dumps(r)
+            row_digest = compute_row_digest(r)
             insert_rows.append(
                 (
                     req.table.project_id,
@@ -1744,10 +1749,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         row_digests = [r[1] for r in insert_rows]
 
-        table_hasher = hashlib.sha256()
-        for row_digest in row_digests:
-            table_hasher.update(row_digest.encode())
-        digest = table_hasher.hexdigest()
+        digest = compute_table_digest(row_digests)
 
         self._insert(
             "tables",
@@ -1787,8 +1789,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         def add_new_row_needed_to_insert(row_data: Any) -> str:
             if not isinstance(row_data, dict):
                 raise TypeError("All rows must be dictionaries")
-            row_json = json.dumps(row_data, sort_keys=True)
-            row_digest = str_digest(row_json)
+            row_json = json.dumps(row_data)
+            row_digest = compute_row_digest(row_data)
             if row_digest not in known_digests:
                 new_rows_needed_to_insert.append(
                     (
@@ -1831,10 +1833,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 column_names=["project_id", "digest", "refs", "val_dump"],
             )
 
-        table_hasher = hashlib.sha256()
-        for row_digest in final_row_digests:
-            table_hasher.update(row_digest.encode())
-        digest = table_hasher.hexdigest()
+        digest = compute_table_digest(final_row_digests)
 
         self._insert(
             "tables",
@@ -1848,10 +1847,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     ) -> tsi.TableCreateFromDigestsRes:
         """Create a table by specifying row digests, instead actual rows."""
         # Calculate table digest from row digests
-        table_hasher = hashlib.sha256()
-        for row_digest in req.row_digests:
-            table_hasher.update(row_digest.encode())
-        digest = table_hasher.hexdigest()
+        digest = compute_table_digest(req.row_digests)
 
         # Insert into tables table
         self._insert(
@@ -4947,7 +4943,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         return [r.val for r in extra_results]
 
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
-        digest = bytes_digest(req.content)
+        digest = compute_file_digest(req.content)
         use_file_storage = self._should_use_file_storage_for_writes(req.project_id)
         client = self.file_storage_client
 
