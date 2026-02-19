@@ -638,6 +638,132 @@ def test_calls_usage_rolls_up_descendants(client: weave_client.WeaveClient) -> N
     assert root_two_usage.total_tokens == 3
 
 
+def test_calls_query_include_descendant_usage_rolls_up_descendants(
+    client: weave_client.WeaveClient,
+) -> None:
+    project_id = client._project_id()
+    trace_id = str(uuid.uuid4())
+    now = datetime.datetime.now(datetime.timezone.utc)
+
+    root_id = str(uuid.uuid4())
+    child_id = str(uuid.uuid4())
+    grandchild_id = str(uuid.uuid4())
+
+    _create_call(
+        client,
+        root_id,
+        trace_id,
+        None,
+        now,
+        {"gpt-4": {"prompt_tokens": 5, "completion_tokens": 5, "total_tokens": 10}},
+    )
+    _create_call(
+        client,
+        child_id,
+        trace_id,
+        root_id,
+        now + datetime.timedelta(seconds=2),
+        {"gpt-4": {"input_tokens": 2, "output_tokens": 1}},
+    )
+    _create_call(
+        client,
+        grandchild_id,
+        trace_id,
+        child_id,
+        now + datetime.timedelta(seconds=4),
+        {"gpt-4": {"prompt_tokens": 3, "completion_tokens": 1, "total_tokens": 4}},
+    )
+
+    res_without_rollup = client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=project_id,
+            filter=tsi.CallsFilter(call_ids=[root_id]),
+        )
+    )
+    usage_without_rollup = res_without_rollup.calls[0].summary["usage"]["gpt-4"]
+    assert usage_without_rollup["prompt_tokens"] == 5
+    assert usage_without_rollup["completion_tokens"] == 5
+    assert usage_without_rollup["total_tokens"] == 10
+
+    res_with_rollup = client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=project_id,
+            filter=tsi.CallsFilter(call_ids=[root_id, child_id]),
+            include_descendant_usage=True,
+        )
+    )
+
+    by_id = {call.id: call for call in res_with_rollup.calls}
+
+    root_usage = by_id[root_id].summary["usage"]["gpt-4"]
+    assert root_usage["prompt_tokens"] == 10
+    assert root_usage["completion_tokens"] == 7
+    assert root_usage["total_tokens"] == 17
+
+    child_usage = by_id[child_id].summary["usage"]["gpt-4"]
+    assert child_usage["prompt_tokens"] == 5
+    assert child_usage["completion_tokens"] == 2
+    assert child_usage["total_tokens"] == 7
+
+
+def test_calls_query_stream_include_descendant_usage_rolls_up_descendants(
+    client: weave_client.WeaveClient,
+) -> None:
+    project_id = client._project_id()
+    trace_id = str(uuid.uuid4())
+    now = datetime.datetime.now(datetime.timezone.utc)
+
+    root_id = str(uuid.uuid4())
+    child_id = str(uuid.uuid4())
+    grandchild_id = str(uuid.uuid4())
+
+    _create_call(
+        client,
+        root_id,
+        trace_id,
+        None,
+        now,
+        {"gpt-4": {"prompt_tokens": 5, "completion_tokens": 5, "total_tokens": 10}},
+    )
+    _create_call(
+        client,
+        child_id,
+        trace_id,
+        root_id,
+        now + datetime.timedelta(seconds=2),
+        {"gpt-4": {"input_tokens": 2, "output_tokens": 1}},
+    )
+    _create_call(
+        client,
+        grandchild_id,
+        trace_id,
+        child_id,
+        now + datetime.timedelta(seconds=4),
+        {"gpt-4": {"prompt_tokens": 3, "completion_tokens": 1, "total_tokens": 4}},
+    )
+
+    calls = list(
+        client.server.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=project_id,
+                filter=tsi.CallsFilter(call_ids=[root_id, child_id]),
+                include_descendant_usage=True,
+            )
+        )
+    )
+    by_id = {call.id: call for call in calls}
+
+    root_usage = by_id[root_id].summary["usage"]["gpt-4"]
+    assert root_usage["prompt_tokens"] == 10
+    assert root_usage["completion_tokens"] == 7
+    assert root_usage["total_tokens"] == 17
+
+    child_usage = by_id[child_id].summary["usage"]["gpt-4"]
+    assert child_usage["prompt_tokens"] == 5
+    assert child_usage["completion_tokens"] == 2
+    assert child_usage["total_tokens"] == 7
+
+
 def test_calls_usage_include_costs_flag(client: weave_client.WeaveClient) -> None:
     skip_if_sqlite(client)
 

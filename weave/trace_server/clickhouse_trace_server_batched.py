@@ -1234,11 +1234,14 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         select_columns = [c.field for c in cq.select_fields]
         expand_columns = req.expand_columns or []
         include_feedback = req.include_feedback or False
+        include_descendant_usage = req.include_descendant_usage or False
 
         if include_feedback:
             set_current_span_dd_tags({"include_feedback": "true"})
         if expand_columns:
             set_current_span_dd_tags({"expand_columns": "true"})
+        if include_descendant_usage:
+            set_current_span_dd_tags({"include_descendant_usage": "true"})
 
         def row_to_call_schema_dict(row: tuple[Any, ...]) -> dict[str, Any]:
             return _ch_call_dict_to_call_schema_dict(
@@ -1246,6 +1249,42 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             )
 
         try:
+            if include_descendant_usage:
+                call_dicts: list[dict[str, Any]] = []
+                if not expand_columns and not include_feedback:
+                    for row in raw_res:
+                        call_dicts.append(row_to_call_schema_dict(row))
+                else:
+                    ref_cache = LRUCache(max_size=1000)
+                    batch_processor = DynamicBatchProcessor(
+                        initial_size=ch_settings.INITIAL_CALLS_STREAM_BATCH_SIZE,
+                        max_size=ch_settings.MAX_CALLS_STREAM_BATCH_SIZE,
+                        growth_factor=10,
+                    )
+                    for batch in batch_processor.make_batches(raw_res):
+                        batch_call_dicts = [
+                            row_to_call_schema_dict(row) for row in batch
+                        ]
+                        if expand_columns and req.return_expanded_column_values:
+                            self._expand_call_refs(
+                                req.project_id,
+                                batch_call_dicts,
+                                expand_columns,
+                                ref_cache,
+                            )
+                        if include_feedback:
+                            self._add_feedback_to_calls(
+                                req.project_id, batch_call_dicts
+                            )
+                        call_dicts.extend(batch_call_dicts)
+
+                self._add_descendant_usage_to_calls(
+                    req.project_id, call_dicts, req.include_costs or False
+                )
+                for call in call_dicts:
+                    yield tsi.CallSchema.model_validate(call)
+                return
+
             if not expand_columns and not include_feedback:
                 for row in raw_res:
                     yield tsi.CallSchema.model_validate(row_to_call_schema_dict(row))
@@ -1273,6 +1312,62 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             # Ensure upstream _query_stream is closed on any exit
             if hasattr(raw_res, "close"):
                 raw_res.close()
+
+    @ddtrace.tracer.wrap(
+        name="clickhouse_trace_server_batched._add_descendant_usage_to_calls"
+    )
+    def _add_descendant_usage_to_calls(
+        self,
+        project_id: str,
+        calls: list[dict[str, Any]],
+        include_costs: bool,
+    ) -> None:
+        if len(calls) == 0:
+            return
+
+        trace_ids = sorted(
+            {
+                str(trace_id)
+                for trace_id in (call.get("trace_id") for call in calls)
+                if trace_id
+            }
+        )
+        aggregated_usage: dict[str, dict[str, tsi.LLMAggregatedUsage]] = {}
+
+        for i in range(0, len(trace_ids), tsc.MAX_FILTER_LENGTH):
+            trace_id_chunk = trace_ids[i : i + tsc.MAX_FILTER_LENGTH]
+            trace_calls = self.calls_query_stream(
+                tsi.CallsQueryReq(
+                    project_id=project_id,
+                    filter=tsi.CallsFilter(trace_ids=trace_id_chunk),
+                    columns=["id", "parent_id", "summary"],
+                    include_costs=include_costs,
+                    include_descendant_usage=False,
+                )
+            )
+
+            aggregated_usage.update(
+                usage_utils.aggregate_usage_with_descendants(
+                    (
+                        usage_utils.UsageCall(
+                            id=trace_call.id,
+                            parent_id=trace_call.parent_id,
+                            summary=cast(dict[str, Any] | None, trace_call.summary),
+                        )
+                        for trace_call in trace_calls
+                    ),
+                    include_costs,
+                )
+            )
+
+        for call in calls:
+            call_id = call.get("id")
+            rolled_up_usage = aggregated_usage.get(str(call_id), {}) if call_id else {}
+            call["summary"] = usage_utils.with_rolled_up_usage(
+                cast(dict[str, Any] | None, call.get("summary")),
+                rolled_up_usage,
+                include_costs,
+            )
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._add_feedback_to_calls")
     def _add_feedback_to_calls(
