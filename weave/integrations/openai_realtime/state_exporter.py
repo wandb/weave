@@ -588,8 +588,12 @@ class StateExporter(BaseModel):
                 )
                 self.conversation_calls[conv_id] = conv_call
                 response_parent = conv_call
-            else:
+            elif session_call:
                 response_parent = session_call
+            else:
+                logger.warning(f"Could not find session for response - {response_id}")
+                # Will not happen in GA but potentially possible in Beta
+                response_parent = None
 
             call = client.create_call(
                 "realtime.response", inputs=inputs, parent=response_parent
