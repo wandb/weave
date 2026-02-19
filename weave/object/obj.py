@@ -1,6 +1,4 @@
-import logging
-from collections.abc import Callable
-from typing import Any, TypeVar
+from typing import Any
 
 from pydantic import (
     BaseModel,
@@ -18,59 +16,6 @@ from weave.trace.op_protocol import Op
 from weave.trace.ref_util import get_ref
 from weave.trace.refs import ObjectRef
 from weave.trace.vals import WeaveObject, pydantic_getattribute
-
-logger = logging.getLogger(__name__)
-
-T = TypeVar("T")
-
-
-def deprecated_field(new_field_name: str) -> Callable[[Callable[[Any], T]], property]:
-    """Create a deprecated property decorator that issues warnings when accessed.
-
-    This decorator factory creates a property that acts as a deprecated alias
-    for another field. When the deprecated property is accessed (either for
-    getting or setting), it logs a warning message and delegates to the new
-    field name.
-
-    Args:
-        new_field_name (str): The name of the new field that should be used
-            instead of the deprecated one.
-
-    Returns:
-        Callable[[Callable[[Any], T]], property]: A decorator function that
-            takes a method and returns a property with getter and setter that
-            issue deprecation warnings.
-
-    Example:
-        ```python
-        class MyClass:
-            new_field: str = "value"
-
-            @deprecated_field("new_field")
-            def old_field(self) -> str:
-                pass  # Implementation not used, just for type hints
-
-        obj = MyClass()
-        # This will log a warning and return "value"
-        value = obj.old_field
-        ```
-    """
-
-    def decorator(func: Callable[[Any], T]) -> property:
-        warning_msg = f"Use `{new_field_name}` instead of `{func.__name__}`, which is deprecated and will be removed in a future version."
-
-        def getter(self: Any) -> T:
-            logger.warning(warning_msg)
-            return getattr(self, new_field_name)
-
-        def setter(self: Any, value: T) -> None:
-            logger.warning(warning_msg)
-            setattr(self, new_field_name, value)
-
-        return property(fget=getter, fset=setter)
-
-    return decorator
-
 
 class Object(BaseModel):
     """Base class for Weave objects that can be tracked and versioned.
