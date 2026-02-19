@@ -1,6 +1,6 @@
 import logging
 from collections.abc import Callable
-from typing import Any, TypeVar
+from typing import Any
 
 from pydantic import (
     BaseModel,
@@ -21,10 +21,8 @@ from weave.trace.vals import WeaveObject, pydantic_getattribute
 
 logger = logging.getLogger(__name__)
 
-T = TypeVar("T")
 
-
-def deprecated_field(new_field_name: str) -> Callable[[Callable[[Any], T]], property]:
+def deprecated_field(new_field_name: str) -> Callable[[Callable[[Any], object]], property]:
     """Create a deprecated property decorator that issues warnings when accessed.
 
     This decorator factory creates a property that acts as a deprecated alias
@@ -37,7 +35,7 @@ def deprecated_field(new_field_name: str) -> Callable[[Callable[[Any], T]], prop
             instead of the deprecated one.
 
     Returns:
-        Callable[[Callable[[Any], T]], property]: A decorator function that
+        Callable[[Callable[[Any], object]], property]: A decorator function that
             takes a method and returns a property with getter and setter that
             issue deprecation warnings.
 
@@ -56,14 +54,14 @@ def deprecated_field(new_field_name: str) -> Callable[[Callable[[Any], T]], prop
         ```
     """
 
-    def decorator(func: Callable[[Any], T]) -> property:
+    def decorator(func: Callable[[Any], object]) -> property:
         warning_msg = f"Use `{new_field_name}` instead of `{func.__name__}`, which is deprecated and will be removed in a future version."
 
-        def getter(self: Any) -> T:
+        def getter(self: Any) -> object:
             logger.warning(warning_msg)
             return getattr(self, new_field_name)
 
-        def setter(self: Any, value: T) -> None:
+        def setter(self: Any, value: object) -> None:
             logger.warning(warning_msg)
             setattr(self, new_field_name, value)
 

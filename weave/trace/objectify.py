@@ -28,7 +28,7 @@ def register_object(cls: type[T_co]) -> type[T_co]:
     return cls
 
 
-def maybe_objectify(obj: WeaveObject) -> T_co | WeaveObject:
+def maybe_objectify(obj: WeaveObject) -> Object | WeaveObject:
     if (cls_name := getattr(obj, "_class_name", None)) is None:
         return obj
 

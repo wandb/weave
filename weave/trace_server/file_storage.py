@@ -263,7 +263,7 @@ class S3StorageClient(FileStorageClient):
         )
 
     @create_retry_decorator("s3_storage")
-    def store(self, uri: S3FileStorageURI, data: bytes) -> None:
+    def store(self, uri: FileStorageURI, data: bytes) -> None:
         """Store data in S3 bucket with automatic retries on failure."""
         assert isinstance(uri, S3FileStorageURI)
         assert uri.to_uri_str().startswith(self.base_uri.to_uri_str())
@@ -278,7 +278,7 @@ class S3StorageClient(FileStorageClient):
         self.client.put_object(**put_object_params)
 
     @create_retry_decorator("s3_read")
-    def read(self, uri: S3FileStorageURI) -> bytes:
+    def read(self, uri: FileStorageURI) -> bytes:
         """Read data from S3 bucket with automatic retries on failure."""
         assert isinstance(uri, S3FileStorageURI)
         assert uri.to_uri_str().startswith(self.base_uri.to_uri_str())
@@ -300,7 +300,7 @@ class GCSStorageClient(FileStorageClient):
         )
 
     @create_retry_decorator("gcs_storage")
-    def store(self, uri: GCSFileStorageURI, data: bytes) -> None:
+    def store(self, uri: FileStorageURI, data: bytes) -> None:
         """Store data in GCS bucket with automatic retries on failure.
 
         Use if_generation_match=0 to skip writing if the object already exists.
@@ -323,7 +323,7 @@ class GCSStorageClient(FileStorageClient):
             logger.debug("Object already exists at %s, skipping write", uri)
 
     @create_retry_decorator("gcs_read")
-    def read(self, uri: GCSFileStorageURI) -> bytes:
+    def read(self, uri: FileStorageURI) -> bytes:
         """Read data from GCS bucket with automatic retries on failure."""
         assert isinstance(uri, GCSFileStorageURI)
         assert uri.to_uri_str().startswith(self.base_uri.to_uri_str())
@@ -368,7 +368,7 @@ class AzureStorageClient(FileStorageClient):
             )
 
     @create_retry_decorator("azure_storage")
-    def store(self, uri: AzureFileStorageURI, data: bytes) -> None:
+    def store(self, uri: FileStorageURI, data: bytes) -> None:
         """Store data in Azure container with automatic retries on failure."""
         assert isinstance(uri, AzureFileStorageURI)
         assert uri.to_uri_str().startswith(self.base_uri.to_uri_str())
@@ -378,7 +378,7 @@ class AzureStorageClient(FileStorageClient):
         blob_client.upload_blob(data, overwrite=True)
 
     @create_retry_decorator("azure_read")
-    def read(self, uri: AzureFileStorageURI) -> bytes:
+    def read(self, uri: FileStorageURI) -> bytes:
         """Read data from Azure container with automatic retries on failure."""
         assert isinstance(uri, AzureFileStorageURI)
         assert uri.to_uri_str().startswith(self.base_uri.to_uri_str())
