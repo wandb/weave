@@ -1,4 +1,4 @@
-from unittest.mock import Mock
+from unittest.mock import Mock, patch as mock_patch
 
 import agents
 import pytest
@@ -6,7 +6,11 @@ from agents import Agent, GuardrailFunctionOutput, InputGuardrail, Runner
 from agents.tracing import AgentSpanData, ResponseSpanData, Span, Trace
 from pydantic import BaseModel
 
-from weave.integrations.openai_agents.openai_agents import WeaveTracingProcessor
+from weave.integrations.openai_agents.openai_agents import (
+    OpenAIAgentsSettings,
+    WeaveTracingProcessor,
+)
+from weave.trace.autopatch import IntegrationSettings
 from weave.trace.weave_client import WeaveClient
 
 # TODO: Responses should be updated once we have patching for the new Responses API
@@ -383,3 +387,81 @@ def test_response_spans_are_skipped(client: WeaveClient) -> None:
     processor.on_trace_end(trace)
     assert "trace_1" not in processor._trace_calls
     assert "trace_1" not in processor._trace_data
+
+
+class TestOpenAIAgentsRealtimePatching:
+    """Tests for automatic realtime websocket patching when patching openai agents."""
+
+    def test_settings_defaults(self) -> None:
+        s = OpenAIAgentsSettings()
+        assert isinstance(s, IntegrationSettings)
+        assert s.patch_realtime_websockets is True
+        assert s.enabled is True
+
+    def test_settings_opt_out(self) -> None:
+        s = OpenAIAgentsSettings(patch_realtime_websockets=False)
+        assert s.patch_realtime_websockets is False
+        assert s.enabled is True
+
+    def test_plain_settings_is_not_agents_settings(self) -> None:
+        plain = IntegrationSettings()
+        assert not isinstance(plain, OpenAIAgentsSettings)
+
+    def test_patch_openai_agents_calls_realtime(self) -> None:
+        from weave.integrations import patch as patch_module
+
+        patch_module._PATCHED_INTEGRATIONS.discard("openai_agents")
+        patch_module._PATCHED_INTEGRATIONS.discard("openai_realtime")
+
+        called = {"realtime": False, "agents": False}
+
+        def fake_patch_integration(**kwargs):
+            if "openai_agents" in kwargs.get("triggering_symbols", []):
+                called["agents"] = True
+                for name in kwargs["triggering_symbols"]:
+                    patch_module._PATCHED_INTEGRATIONS.add(name)
+            elif "openai_realtime" in kwargs.get("triggering_symbols", []):
+                called["realtime"] = True
+                for name in kwargs["triggering_symbols"]:
+                    patch_module._PATCHED_INTEGRATIONS.add(name)
+
+        with mock_patch.object(
+            patch_module, "_patch_integration", side_effect=fake_patch_integration
+        ):
+            patch_module.patch_openai_agents()
+
+        assert called["agents"]
+        assert called["realtime"]
+
+        patch_module._PATCHED_INTEGRATIONS.discard("openai_agents")
+        patch_module._PATCHED_INTEGRATIONS.discard("openai_realtime")
+
+    def test_patch_openai_agents_opt_out_realtime(self) -> None:
+        from weave.integrations import patch as patch_module
+
+        patch_module._PATCHED_INTEGRATIONS.discard("openai_agents")
+        patch_module._PATCHED_INTEGRATIONS.discard("openai_realtime")
+
+        called = {"realtime": False, "agents": False}
+
+        def fake_patch_integration(**kwargs):
+            if "openai_agents" in kwargs.get("triggering_symbols", []):
+                called["agents"] = True
+                for name in kwargs["triggering_symbols"]:
+                    patch_module._PATCHED_INTEGRATIONS.add(name)
+            elif "openai_realtime" in kwargs.get("triggering_symbols", []):
+                called["realtime"] = True
+                for name in kwargs["triggering_symbols"]:
+                    patch_module._PATCHED_INTEGRATIONS.add(name)
+
+        settings = OpenAIAgentsSettings(patch_realtime_websockets=False)
+        with mock_patch.object(
+            patch_module, "_patch_integration", side_effect=fake_patch_integration
+        ):
+            patch_module.patch_openai_agents(settings)
+
+        assert called["agents"]
+        assert not called["realtime"]
+
+        patch_module._PATCHED_INTEGRATIONS.discard("openai_agents")
+        patch_module._PATCHED_INTEGRATIONS.discard("openai_realtime")
