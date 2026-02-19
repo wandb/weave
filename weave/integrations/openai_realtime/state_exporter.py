@@ -507,7 +507,7 @@ class StateExporter(BaseModel):
                     usages[key].append(value)
 
         for model, usage_list in usages.items():
-            summed = {}
+            summed: dict[str, int | float] = {}
             for usage in usage_list:
                 for key, value in usage.items():
                     if isinstance(value, (int, float)):
@@ -564,7 +564,7 @@ class StateExporter(BaseModel):
 
         client = require_weave_client()
 
-        session_call = None
+        session_call: Call | None = None
         if self.session_span:
             session_call = self.session_span.get_root_call()
 
