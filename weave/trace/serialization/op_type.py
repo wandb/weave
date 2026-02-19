@@ -501,7 +501,7 @@ def find_last_weave_op_function(
     last_function = None
 
     for node in ast.walk(tree):
-        if isinstance(node, ast.FunctionDef) or isinstance(node, AsyncFunctionDef):
+        if isinstance(node, (ast.FunctionDef, AsyncFunctionDef)):
             for decorator in node.decorator_list:
                 # Check if the decorator is 'weave.op' (attribute without call)
                 if (
