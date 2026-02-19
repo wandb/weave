@@ -1,5 +1,5 @@
 import json
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Literal, TypedDict, TypeGuard, cast
 
 from pydantic import BaseModel, BeforeValidator, Field
 
@@ -14,10 +14,19 @@ from weave.trace_server.trace_server_interface import (
 from weave.utils.project_id import to_project_id
 
 ResponseFormat = Literal["json_object", "json_schema", "text"]
+LiteLLMResponseFormatType = Literal["json_object", "text"]
 
 
-def is_response_format(value: Any) -> bool:
+class LiteLLMResponseFormat(TypedDict):
+    type: LiteLLMResponseFormatType
+
+
+def is_response_format(value: Any) -> TypeGuard[LiteLLMResponseFormatType]:
     return isinstance(value, str) and value in ["json_object", "text"]
+
+
+def is_response_format_dict(value: Any) -> TypeGuard[LiteLLMResponseFormat]:
+    return isinstance(value, dict) and is_response_format(value.get("type"))
 
 
 class Message(BaseModel):
@@ -306,15 +315,13 @@ def parse_params_to_litellm_params(
 
     for key, value in source_dict_to_iterate.items():
         if key == "response_format":
-            litellm_response_format_value = None
-            if isinstance(value, str) and is_response_format(value):
-                litellm_response_format_value = {"type": value}
-            elif (
-                isinstance(value, dict)
-                and "type" in value
-                and is_response_format(value["type"])
-            ):  # Pre-formed dict with valid type
-                litellm_response_format_value = value
+            litellm_response_format_value: LiteLLMResponseFormat | None = None
+            if is_response_format(value):
+                litellm_response_format_value = cast(
+                    LiteLLMResponseFormat, {"type": value}
+                )
+            elif is_response_format_dict(value):  # Pre-formed dict with valid type
+                litellm_response_format_value = cast(LiteLLMResponseFormat, value)
 
             if litellm_response_format_value is not None:
                 final_params["response_format"] = litellm_response_format_value

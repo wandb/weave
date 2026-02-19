@@ -43,7 +43,7 @@ There are two ways to authenticate with Azure Blob Storage:
 import logging
 from abc import abstractmethod
 from collections.abc import Callable
-from typing import Any, cast
+from typing import Generic, ParamSpec, TypeGuard, TypeVar, cast
 
 import boto3
 from azure.core.exceptions import HttpResponseError
@@ -78,6 +78,10 @@ from weave.trace_server.file_storage_uris import (
     S3FileStorageURI,
 )
 
+P = ParamSpec("P")
+R = TypeVar("R")
+UriT = TypeVar("UriT", bound=FileStorageURI)
+
 # Configure logger
 logger = logging.getLogger(__name__)
 
@@ -87,6 +91,20 @@ DEFAULT_READ_TIMEOUT = 30
 RETRY_MAX_ATTEMPTS = 3
 RETRY_MIN_WAIT = 1  # seconds
 RETRY_MAX_WAIT = 10  # seconds
+
+
+def _is_azure_connection_credentials(
+    credentials: AzureConnectionCredentials | AzureAccountCredentials,
+) -> TypeGuard[AzureConnectionCredentials]:
+    """Narrow Azure credential union to the connection-string variant."""
+    return "connection_string" in credentials
+
+
+def _is_azure_account_credentials(
+    credentials: AzureConnectionCredentials | AzureAccountCredentials,
+) -> TypeGuard[AzureAccountCredentials]:
+    """Narrow Azure credential union to the account-based variant."""
+    return "connection_string" not in credentials
 
 
 class FileStorageWriteError(Exception):
@@ -104,24 +122,24 @@ class FileStorageReadError(Exception):
 # Publicly exposed methods:
 
 
-class FileStorageClient:
+class FileStorageClient(Generic[UriT]):
     """Abstract base class defining the interface for cloud storage operations.
     Implementations are provided for AWS S3, Google Cloud Storage, and Azure Blob Storage.
     """
 
-    base_uri: FileStorageURI
+    base_uri: UriT
 
-    def __init__(self, base_uri: FileStorageURI):
+    def __init__(self, base_uri: UriT):
         assert isinstance(base_uri, FileStorageURI)
         self.base_uri = base_uri
 
     @abstractmethod
-    def store(self, uri: FileStorageURI, data: bytes) -> None:
+    def store(self, uri: UriT, data: bytes) -> None:
         """Store data at the specified URI location in cloud storage."""
         pass
 
     @abstractmethod
-    def read(self, uri: FileStorageURI) -> bytes:
+    def read(self, uri: UriT) -> bytes:
         """Read data from the specified URI location in cloud storage."""
         pass
 
@@ -190,7 +208,9 @@ def _is_rate_limit_error(exception: BaseException | None) -> bool:
     return False
 
 
-def create_retry_decorator(operation_name: str) -> Callable[[Any], Any]:
+def create_retry_decorator(
+    operation_name: str,
+) -> Callable[[Callable[P, R]], Callable[P, R]]:
     """Creates a retry decorator with consistent retry policy and special 429 handling."""
 
     def after_retry(retry_state: RetryCallState) -> None:
@@ -226,10 +246,10 @@ def create_retry_decorator(operation_name: str) -> Callable[[Any], Any]:
     )
 
 
-class S3StorageClient(FileStorageClient):
+class S3StorageClient(FileStorageClient[S3FileStorageURI]):
     """AWS S3 storage implementation with retry logic and configurable timeouts."""
 
-    def __init__(self, base_uri: FileStorageURI, credentials: AWSCredentials):
+    def __init__(self, base_uri: S3FileStorageURI, credentials: AWSCredentials):
         """Initialize S3 client with credentials and default timeout configuration."""
         assert isinstance(base_uri, S3FileStorageURI)
         super().__init__(base_uri)
@@ -277,11 +297,11 @@ class S3StorageClient(FileStorageClient):
         return response["Body"].read()
 
 
-class GCSStorageClient(FileStorageClient):
+class GCSStorageClient(FileStorageClient[GCSFileStorageURI]):
     """Google Cloud Storage implementation with retry logic and configurable timeouts."""
 
     def __init__(
-        self, base_uri: FileStorageURI, credentials: GCPCredentials | None = None
+        self, base_uri: GCSFileStorageURI, credentials: GCPCredentials | None = None
     ):
         """Initialize GCS client with credentials and default timeout configuration."""
         assert isinstance(base_uri, GCSFileStorageURI)
@@ -323,12 +343,12 @@ class GCSStorageClient(FileStorageClient):
         return blob.download_as_bytes(timeout=DEFAULT_READ_TIMEOUT, retry=None)
 
 
-class AzureStorageClient(FileStorageClient):
+class AzureStorageClient(FileStorageClient[AzureFileStorageURI]):
     """Azure Blob Storage implementation supporting both connection string and account credentials."""
 
     def __init__(
         self,
-        base_uri: FileStorageURI,
+        base_uri: AzureFileStorageURI,
         credentials: AzureConnectionCredentials | AzureAccountCredentials,
     ):
         """Initialize Azure client with either connection string or account credentials."""
@@ -338,14 +358,14 @@ class AzureStorageClient(FileStorageClient):
 
     def _get_client(self, account: str) -> BlobServiceClient:
         """Create Azure client based on available credentials (connection string or account)."""
-        if "connection_string" in self.credentials:
-            connection_creds = cast(AzureConnectionCredentials, self.credentials)
+        if _is_azure_connection_credentials(self.credentials):
+            creds = cast(AzureConnectionCredentials, self.credentials)
             return BlobServiceClient.from_connection_string(
-                connection_creds["connection_string"],
+                creds["connection_string"],
                 connection_timeout=DEFAULT_CONNECT_TIMEOUT,
                 read_timeout=DEFAULT_READ_TIMEOUT,
             )
-        else:
+        if _is_azure_account_credentials(self.credentials):
             account_creds = cast(AzureAccountCredentials, self.credentials)
             if "account_url" in account_creds and account_creds["account_url"]:
                 account_url = account_creds["account_url"]
@@ -357,6 +377,9 @@ class AzureStorageClient(FileStorageClient):
                 connection_timeout=DEFAULT_CONNECT_TIMEOUT,
                 read_timeout=DEFAULT_READ_TIMEOUT,
             )
+        raise ValueError(
+            "Invalid Azure credentials: expected connection string or account credentials"
+        )
 
     @create_retry_decorator("azure_storage")
     def store(self, uri: AzureFileStorageURI, data: bytes) -> None:

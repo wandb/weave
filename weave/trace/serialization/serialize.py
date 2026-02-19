@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Mapping, Sequence
 from types import CoroutineType
-from typing import TYPE_CHECKING, Any, Literal, TypedDict
+from typing import TYPE_CHECKING, Any, Literal, TypedDict, TypeGuard
 
 from pydantic import BaseModel
 
@@ -23,7 +23,10 @@ if TYPE_CHECKING:
     from weave.trace.weave_client import WeaveClient
 
 
-def is_pydantic_model_class(obj: Any) -> bool:
+PrimitiveType = int | float | str | bool | None
+
+
+def is_pydantic_model_class(obj: Any) -> TypeGuard[type[BaseModel]]:
     """Determine if obj is a subclass of pydantic.BaseModel."""
     try:
         return (
@@ -165,7 +168,7 @@ def stringify(obj: Any, limit: int = MAX_STR_LEN) -> str:
     return rep
 
 
-def is_primitive(obj: Any) -> bool:
+def is_primitive(obj: Any) -> TypeGuard[PrimitiveType]:
     """Check if an object is a known primitive type."""
     return isinstance(obj, (int, float, str, bool, type(None)))
 

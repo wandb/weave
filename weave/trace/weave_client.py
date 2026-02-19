@@ -665,7 +665,7 @@ class WeaveClient:
             The created Call object.
         """
         if is_tracing_setting_disabled() or (
-            is_op(op) and should_skip_tracing_for_op(cast(Op, op))
+            is_op(op) and should_skip_tracing_for_op(op)
         ):
             return placeholder_call()
 

@@ -6,7 +6,7 @@
 # the trace interface should only ever operate on internal refs.
 import urllib
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, TypeGuard
 
 WEAVE_INTERNAL_SCHEME = "weave-trace-internal"
 WEAVE_SCHEME = "weave"
@@ -236,5 +236,5 @@ def string_will_be_interpreted_as_ref(s: str) -> bool:
     )
 
 
-def any_will_be_interpreted_as_ref_str(val: Any) -> bool:
+def any_will_be_interpreted_as_ref_str(val: Any) -> TypeGuard[str]:
     return isinstance(val, str) and string_will_be_interpreted_as_ref(val)
